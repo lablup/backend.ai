@@ -51,8 +51,7 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
         logger.addHandler(handler)
         # Apply JSON formatter to existing handlers for extra fields
         for existing_handler in logger.handlers:
-            if hasattr(existing_handler, "setFormatter"):
-                existing_handler.setFormatter(json_formatter)
+            existing_handler.setFormatter(json_formatter)
     logging.info("open telemetry logging initialized successfully.")
 
 
