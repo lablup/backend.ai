@@ -12,7 +12,11 @@ from ai.backend.agent.resources import (
     allocate,
     known_slot_types,
 )
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
+    Provisioner,
+    ProvisionStage,
+)
 from ai.backend.common.types import (
     DeviceName,
     ResourceSlot,
@@ -32,43 +36,8 @@ class ResourceSpec:
     allow_fractional_resource_fragmentation: bool
 
 
-class ResourceSpecGenerator(SpecGenerator[ResourceSpec]):
-    def __init__(
-        self,
-        resource_slots: Mapping[str, str],
-        resource_opts: Mapping[str, Any],
-        computers: Mapping[DeviceName, ComputerContext],
-        allocation_order: list[DeviceName],
-        affinity_map: AffinityMap,
-        affinity_policy: AffinityPolicy,
-        allow_fractional_resource_fragmentation: bool,
-    ) -> None:
-        """
-        Initializes the resource spec generator with the kernel configuration.
-        :param kernel_config: The configuration for the kernel.
-        """
-        self._resource_slots = resource_slots
-        self._resource_opts = resource_opts
-        self._computers = computers
-        self._allocation_order = allocation_order
-        self._affinity_map = affinity_map
-        self._affinity_policy = affinity_policy
-        self._allow_fractional_resource_fragmentation = allow_fractional_resource_fragmentation
-
-    @override
-    async def wait_for_spec(self) -> ResourceSpec:
-        """
-        Waits for the spec to be ready.
-        """
-        return ResourceSpec(
-            resource_slots=ResourceSlot.from_json(self._resource_slots),
-            resource_opts=self._resource_opts,
-            computers=self._computers,
-            allocation_order=self._allocation_order,
-            affinity_map=self._affinity_map,
-            affinity_policy=self._affinity_policy,
-            allow_fractional_resource_fragmentation=self._allow_fractional_resource_fragmentation,
-        )
+class ResourceSpecGenerator(ArgsSpecGenerator[ResourceSpec]):
+    pass
 
 
 @dataclass
