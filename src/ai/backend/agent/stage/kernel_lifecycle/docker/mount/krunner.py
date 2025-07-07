@@ -106,11 +106,9 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             *self._prepare_libbaihook_mounts(info),
             *self._prepare_krunner_volume_mounts(info),
             *self._prepare_python_lib_mounts(info),
+            *self._prepare_musl_mounts(info),
+            *self._prepare_jail_mounts(info, spec.sandbox_type),
         ]
-        if info.libc_style == LibcStyle.MUSL:
-            mounts.extend(self._prepare_musl_mounts())
-        if spec.sandbox_type == "jail":
-            mounts.extend(self._prepare_jail_mounts(info))
 
         mounts.extend(await self._prepare_accelerator_mounts(spec))
         mounts.extend(await self._prepare_hook_mounts(spec, info))
@@ -134,31 +132,33 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
                 artifacts[m.group(1)] = p.name
         return artifacts
 
-    def _prepare_default_mounts(self) -> list[Mount]:
-        def mount(source: str, target: str) -> Mount:
-            return Mount(
-                MountTypes.BIND,
-                self._resolve_krunner_filepath(source),
-                Path(target),
-                MountPermission.READ_ONLY,
-            )
+    def _parse_mount(self, source: str, target: str) -> Mount:
+        return Mount(
+            MountTypes.BIND,
+            self._resolve_krunner_filepath(source),
+            Path(target),
+            MountPermission.READ_ONLY,
+        )
 
+    def _prepare_default_mounts(self) -> list[Mount]:
         return [
-            mount("runner/extract_dotfiles.py", "/opt/kernel/extract_dotfiles.py"),
-            mount("runner/entrypoint.sh", "/opt/kernel/entrypoint.sh"),
-            mount("runner/fantompass.py", "/opt/kernel/fantompass.py"),
-            mount("runner/hash_phrase.py", "/opt/kernel/hash_phrase.py"),
-            mount("runner/words.json", "/opt/kernel/words.json"),
-            mount(
+            self._parse_mount("runner/extract_dotfiles.py", "/opt/kernel/extract_dotfiles.py"),
+            self._parse_mount("runner/entrypoint.sh", "/opt/kernel/entrypoint.sh"),
+            self._parse_mount("runner/fantompass.py", "/opt/kernel/fantompass.py"),
+            self._parse_mount("runner/hash_phrase.py", "/opt/kernel/hash_phrase.py"),
+            self._parse_mount("runner/words.json", "/opt/kernel/words.json"),
+            self._parse_mount(
                 "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
                 "/home/work/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
             ),
         ]
 
-    def _prepare_musl_mounts(self) -> list[Mount]:
+    def _prepare_musl_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:
         """
         Mounts musl-specific files to the target path.
         """
+        if runner_info.libc_style != LibcStyle.MUSL:
+            return []
         return [
             Mount(
                 MountTypes.BIND,
@@ -174,19 +174,13 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
         """
         architecture = runner_info.architecture
 
-        def mount(source: str, target: str) -> Mount:
-            return Mount(
-                MountTypes.BIND,
-                self._resolve_krunner_filepath(source),
-                Path(target),
-                MountPermission.READ_ONLY,
-            )
-
         return [
-            mount(f"runner/su-exec.{architecture}.bin", "/opt/kernel/su-exec"),
-            mount(f"runner/dropbearmulti.{architecture}.bin", "/opt/kernel/dropbearmulti"),
-            mount(f"runner/sftp-server.{architecture}.bin", "/opt/kernel/sftp-server"),
-            mount(f"runner/tmux.{architecture}.bin", "/opt/kernel/tmux"),
+            self._parse_mount(f"runner/su-exec.{architecture}.bin", "/opt/kernel/su-exec"),
+            self._parse_mount(
+                f"runner/dropbearmulti.{architecture}.bin", "/opt/kernel/dropbearmulti"
+            ),
+            self._parse_mount(f"runner/sftp-server.{architecture}.bin", "/opt/kernel/sftp-server"),
+            self._parse_mount(f"runner/tmux.{architecture}.bin", "/opt/kernel/tmux"),
         ]
 
     def _prepare_libbaihook_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:
@@ -204,7 +198,9 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             )
         ]
 
-    def _prepare_jail_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:
+    def _prepare_jail_mounts(self, runner_info: KernelRunnerInfo, sandbox_type: str) -> list[Mount]:
+        if sandbox_type != "jail":
+            return []
         architecture = runner_info.architecture
         distro = runner_info.distro
         jail_candidates = self._find_artifacts(f"jail.*.{architecture}.bin")
