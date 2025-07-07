@@ -44,6 +44,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -552,6 +553,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
+    root_ctx.valkey_stream = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        human_readable_name="stream",
+        db_id=REDIS_STREAM_DB,
+    )
     for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
@@ -566,6 +572,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
     await root_ctx.redis_lock.close()
+    await root_ctx.valkey_stream.close()
 
 
 @actxmgr
@@ -740,6 +747,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.event_hub,
             root_ctx.registry,
