@@ -2,10 +2,9 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Optional, Self, final
+from typing import Iterable, Optional, Self
 
 from glide import (
-    Batch,
     GlideClient,
     GlideClientConfiguration,
     NodeAddress,
@@ -80,25 +79,6 @@ class ValkeySentinelTarget:
             password=redis_target.password,
             request_timeout=1_000,  # Default request timeout
         )
-
-
-class ValkeyClient:
-    _client: GlideClient
-    _is_cluster_mode: bool
-
-    def __init__(self, client: GlideClient, is_cluster_mode: bool) -> None:
-        self._client = client
-        self._is_cluster_mode = is_cluster_mode
-
-    @final
-    async def ping(self) -> None:
-        """
-        Ping the Valkey server to check connectivity.
-        """
-        await self._client.ping()
-
-    def _create_batch(self, is_atomic: bool = False) -> Batch:
-        return Batch(is_atomic=is_atomic)
 
 
 class AbstractValkeyClient(ABC):
