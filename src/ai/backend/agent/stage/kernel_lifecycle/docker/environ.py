@@ -5,7 +5,11 @@ from typing import Any, Final, Optional, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.common.docker import KernelFeatures, LabelName
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
+    Provisioner,
+    ProvisionStage,
+)
 from ai.backend.common.types import (
     BinarySize,
     DeviceModelInfo,
@@ -47,21 +51,8 @@ class EnvironSpec:
     kernel_info: KernelInfo
 
 
-class EnvironSpecGenerator(SpecGenerator[EnvironSpec]):
-    def __init__(
-        self,
-        agent_info: AgentInfo,
-        kernel_info: KernelInfo,
-    ) -> None:
-        self._agent_info = agent_info
-        self._kernel_info = kernel_info
-
-    @override
-    async def wait_for_spec(self) -> EnvironSpec:
-        return EnvironSpec(
-            agent_info=self._agent_info,
-            kernel_info=self._kernel_info,
-        )
+class EnvironSpecGenerator(ArgsSpecGenerator[EnvironSpec]):
+    pass
 
 
 @dataclass
@@ -76,7 +67,7 @@ class Environ(dict[str, str]):
         self[key] = str(value)
         return self
 
-    def append_value(self, key: str, values: Collection[str], *, separator: str) -> Self:
+    def append_values(self, key: str, values: Collection[str], *, separator: str) -> Self:
         if not values:
             return self
         if orig_value := self.get(key):
@@ -89,7 +80,7 @@ class Environ(dict[str, str]):
         self[key] = separator.join(sorted(new_values))
         return self
 
-    def override(self, environ: Mapping[str, str]) -> Self:
+    def update_always(self, environ: Mapping[str, str]) -> Self:
         for key, value in environ.items():
             self[key] = value
         return self
@@ -124,14 +115,14 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
             environ.set_value(LD_PRELOAD, LIBBAIHOOK_MOUNT_PATH)
             .set_value(LOCAL_USER_ID, self._get_local_uid(spec))
             .set_value(LOCAL_GROUP_ID, self._get_local_gid(spec))
-            .append_value(ADDITIONAL_GIDS, self._get_supplementary_gids(spec), separator=",")
-            .append_value(ADDITIONAL_GIDS, self._get_computer_gids(spec), separator=",")
+            .append_values(ADDITIONAL_GIDS, self._get_supplementary_gids(spec), separator=",")
+            .append_values(ADDITIONAL_GIDS, self._get_computer_gids(spec), separator=",")
             .update_if_not_exists(self._get_core_count(spec))
         )
 
         hook_paths = await self._get_container_hooks(spec)
         device_environ = await self._get_device_environ(spec)
-        environ = environ.append_value(LD_PRELOAD, hook_paths, separator=":").override(
+        environ = environ.append_values(LD_PRELOAD, hook_paths, separator=":").update_always(
             device_environ
         )
         return EnvironResult(environ=environ.to_dict())
