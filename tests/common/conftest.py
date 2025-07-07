@@ -95,8 +95,8 @@ async def test_valkey_stream(redis_container):  # noqa: F811
     )
     client = await ValkeyStreamClient.create(
         redis_target,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
+        human_readable_name="event_producer.stream",
+        db_id=REDIS_STREAM_DB,
         pubsub_channels=["test-broadcast"],
     )
     yield client
