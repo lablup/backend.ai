@@ -9,7 +9,7 @@ from ai.backend.client.output.fields import session_node_fields
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
-from ai.backend.test.contexts.group import GroupContext
+from ai.backend.test.contexts.group import CreatedGroupContext, GroupContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.model_service import (
     CreatedModelServiceEndpointMetaContext,
@@ -197,3 +197,14 @@ class PublicEndpointTemplate(_BaseEndpointTemplate):
     @override
     def _extra_service_params(self) -> dict[str, Any]:
         return {"expose_to_public": True}
+
+
+class CustomGroupEndpointTemplate(_BaseEndpointTemplate):
+    @property
+    def name(self) -> str:
+        return "custom_group_endpoint_template"
+
+    @override
+    def _extra_service_params(self) -> dict[str, Any]:
+        created_group_meta = CreatedGroupContext.current()
+        return {"group_name": created_group_meta.group_name}
