@@ -2680,7 +2680,7 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         pretty_container_id,
-                        service_port,
+                        service_ports,
                     )
                 except asyncio.TimeoutError:
                     await self.inject_container_lifecycle_event(
