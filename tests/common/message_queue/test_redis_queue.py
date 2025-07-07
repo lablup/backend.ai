@@ -65,7 +65,7 @@ async def redis_queue(redis_container, queue_args: RedisMQArgs):
     )
     queue = await RedisQueue.create(redis_target, queue_args)
     yield queue
-    await queue._client._client.flushdb()
+    await queue._client._client.client.flushdb()
     await queue.close()
 
 
