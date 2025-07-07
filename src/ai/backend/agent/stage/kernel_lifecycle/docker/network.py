@@ -6,9 +6,9 @@ from typing import Any, Optional, override
 from ai.backend.agent.exception import NetworkPluginNotFound
 from ai.backend.agent.plugin.network import NetworkPluginContext
 from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
     Provisioner,
     ProvisionStage,
-    SpecGenerator,
 )
 from ai.backend.common.types import (
     ClusterInfo,
@@ -32,42 +32,8 @@ class NetworkSpec:
     alternative_bridge: Optional[str]
 
 
-class NetworkSpecGenerator(SpecGenerator[NetworkSpec]):
-    def __init__(
-        self,
-        kernel_config: KernelCreationConfig,
-        cluster_size: int,
-        replicas: Mapping[str, int],
-        network_config: Mapping[str, Any],
-        ssh_keypair: ClusterSSHKeyPair,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping],
-        gwbridge_subnet: Optional[str] = None,
-        alternative_bridge: Optional[str] = None,
-    ) -> None:
-        self._kernel_config = kernel_config
-        self._cluster_size = cluster_size
-        self._replicas = replicas
-        self._network_config = network_config
-        self._ssh_keypair = ssh_keypair
-        self._cluster_ssh_port_mapping = cluster_ssh_port_mapping
-        self._gwbridge_subnet = gwbridge_subnet
-        self._alternative_bridge = alternative_bridge
-
-    @override
-    async def wait_for_spec(self) -> NetworkSpec:
-        """
-        Waits for the spec to be ready.
-        """
-        return NetworkSpec(
-            kernel_config=self._kernel_config,
-            cluster_size=self._cluster_size,
-            replicas=self._replicas,
-            network_config=self._network_config,
-            ssh_keypair=self._ssh_keypair,
-            cluster_ssh_port_mapping=self._cluster_ssh_port_mapping,
-            gwbridge_subnet=self._gwbridge_subnet,
-            alternative_bridge=self._alternative_bridge,
-        )
+class NetworkSpecGenerator(ArgsSpecGenerator[NetworkSpec]):
+    pass
 
 
 @dataclass
