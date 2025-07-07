@@ -1401,25 +1401,41 @@ class EventDispatcher:
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
-            await self.dispatch_consumers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-                msg.msg_id,
-            )
+            try:
+                decoded_event_name = msg.payload[b"name"].decode()
+                await self.dispatch_consumers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                    msg.msg_id,
+                )
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._consume_loop(): unexpected error while processing message: {}",
+                    repr(e),
+                )
+                # We do not raise the exception here, because we want to continue processing other messages.
+                # The exception will be handled by the exception handler of the task group.
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
-            await self.dispatch_subscribers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-            )
+            try:
+                decoded_event_name = msg.payload[b"name"].decode()
+                await self.dispatch_subscribers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                )
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._subscribe_loop(): unexpected error while processing message: {}",
+                    repr(e),
+                )
+                # We do not raise the exception here, because we want to continue processing other messages.
+                # The exception will be handled by the exception handler of the task group.
 
 
 class EventProducer:
