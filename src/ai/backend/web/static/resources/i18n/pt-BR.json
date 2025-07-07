@@ -101,16 +101,20 @@
     "Attachments": "Anexos",
     "CannotFindModel": "Modelos LLM não encontrados. Verifique o caminho de base e a compatibilidade do token com o OpenAI e, em seguida, prima \"Atualizar modelos",
     "CompareWithOtherModels": "Compare com outros modelos",
+    "CreateCompareChat": "Adicionar chat de comparação",
     "DeleteChatHistory": "Conversa clara",
     "DeleteChattingSession": "Eliminar Chat",
     "DeleteChattingSessionDescription": "Você está prestes a excluir este tópico. \nUma vez excluído, ele não pode ser recuperado. \nPor favor, proceda com cautela.",
     "DropFileHere": "Solte o arquivo aqui",
+    "History": "História",
     "NewChat": "Novo chat",
     "SelectEndpoint": "Selecione o ponto final",
     "SelectModel": "Selecione o modelo",
     "SelectToken": "Selecionar Token",
-    "SyncInput": "Sincronizado",
+    "SenderPlaceholder": "Escreva aqui a sua mensagem...",
+    "SyncInput": "Sincronizar a entrada do chat",
     "Thinking": "Pensamento",
+    "TokenCounterTooltip": "O TPS representa o número de tokens processados por segundo. Este valor é medido no lado do cliente e inclui a latência da rede. O total de tokens representa o número total de tokens nas mensagens de entrada e de chat.",
     "UploadFiles": "Carregar arquivos",
     "UploadFilesDescription": "Clique ou arraste os arquivos para esta área para fazer upload",
     "ViewReasoning": "Ver raciocínio",
@@ -224,6 +228,8 @@
     "All": "Todos",
     "AllowsLettersNumbersAnd-_Dot": "Só são permitidas letras (A-Z, a-z), números, '-', '_' e '.'.",
     "AutoMount": "Montagem automática",
+    "AutomountFolderCreationDesc": "As pastas de montagem automática são montadas automaticamente quando uma sessão é iniciada.",
+    "AutomountFolderNameMustStartWithDot": "O nome da pasta de montagem automática deve começar com um ponto ('.').",
     "AutomountFolders": "Pastas Automount",
     "CloningIsOnlyPossibleSameHost": "Atualmente, a clonagem só é possível no mesmo host.",
     "Create": "Crio",
@@ -236,6 +242,7 @@
     "DialogDataFolder": "Pastas dedicadas ao pipeline que são criadas automaticamente ao criar pipelines no FastTrack.",
     "DialogFolderStartingWithDotAutomount": "As pastas que começam com um. (Ponto) são montadas automaticamente quando uma nova sessão é iniciada.",
     "DialogModelFolder": "Pode servir e gerir modelos.",
+    "DotPrefixReservedForAutomount": "As pastas que começam por '.' estão reservadas para utilização na montagem automática.",
     "EnterDifferentValue": "Insira um valor diferente do nome do arquivo ou pasta existente. Verifique se o caractere de espaço no campo de entrada ou não.",
     "ExistingFolderName": "Nome da pasta existente",
     "FileAndFolderNameRequired": "O nome do arquivo / pasta é obrigatório",
@@ -246,12 +253,14 @@
     "FolderToCopy": "Pasta para copiar",
     "Foldername": "Nome da pasta",
     "Folders": "Pastas",
+    "From": "De",
     "General": "Em geral",
     "Host": "Hospedeiro",
     "HostDetails": "Apresenta informações sobre quotas para o anfitrião de armazenamento selecionado.",
     "InvalidEmail": "Endereço de e -mail inválido",
     "Invited": "convidamos",
     "InvitedFolders": "Pastas convidadas",
+    "InvitedFoldersTooltip": "{{ count }} convites de pastas estão com resposta pendente.",
     "Limit": "Limite",
     "ModelStore": "Loja de modelos",
     "Models": "Modelos",
@@ -281,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Ações",
+      "Allowed": "Permitido",
       "ClickFilebrowserButton": "Para fazer o upload da (s) pasta (s), clique no botão Executar navegador de arquivos.",
       "CreateANewFolder": "Criar uma nova pasta",
       "Created": "Criada",
@@ -321,6 +331,7 @@
       "RemoveFileExtension": "Remover ",
       "RenameAFile": "Renomear arquivo",
       "RenameAFolder": "Renomear pasta",
+      "RetryingOperation": "Representando para estabelecer sessão ...",
       "RunSSH/SFTPserver": "Executar o servidor SFTP",
       "SFTPSessionNotAvailable": "A sessão SFTP não está disponível neste momento",
       "ShareFolder": "Compartilhar pasta",
@@ -414,6 +425,8 @@
       "View": "Visualizar"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Falhou em aceitar convite",
+      "FailedToDeclineInvitation": "Falhou em recusar o convite",
       "FolderSharingNotAvailableToUser": "A partilha de pastas não está disponível para o(s) utilizador(es) solicitado(s):",
       "InvitationError": "O convite falhou. O usuário já pode ter sido convidado.",
       "Invited": "Convidado com sucesso",
@@ -424,7 +437,10 @@
       "NoValidEmails": "Nenhum e-mail válido foi inserido",
       "Shared": "Compartilhou com sucesso a pasta do grupo",
       "SharingError": "O compartilhamento falhou. O usuário pode já estar compartilhado ou não pertencer ao projeto apropriado.",
-      "SuccessfullyLeftSharedFolder": "Deixou com sucesso a pasta compartilhada"
+      "SuccessfullyAcceptedInvitation": "Convite aceito com sucesso",
+      "SuccessfullyDeclinedInvitation": "Com sucesso recusou o convite",
+      "SuccessfullyLeftSharedFolder": "Deixou com sucesso a pasta compartilhada",
+      "UserIsAlreadyInvited": "{{email}} já está convidado"
     },
     "modelStore": {
       "AddedItems": "Itens adicionados",
@@ -469,6 +485,10 @@
       "StatusOfSelectedHost": "Estado do anfitrião selecionado",
       "Used": "utilizado"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Este navegador não suporta notificações.",
+    "PermissionDenied": "Você negou acesso à notificação. \nPara usar alertas, deixe -o nas configurações do navegador."
   },
   "dialog": {
     "ErrorOccurred": "Ocorreu um erro",
@@ -534,7 +554,9 @@
     "DescSignificantInstallTime": "Este processo requer um tempo de download significativo.",
     "Digest": "Digerir",
     "Disabled": "Desativado",
+    "ErrorMinimumValue": "{{key}} deve ser pelo menos {{value}}",
     "FullImagePath": "Caminho completo da imagem",
+    "ImageReinstallationRequired": "Reinstalação de imagem necessária",
     "Images": "Imagens",
     "Install": "Instalar",
     "Installed": "instalado",
@@ -545,6 +567,7 @@
     "ManageApps": "Gerenciar aplicativos",
     "ModifyImageResourceLimit": "Modificar Limite de Recursos de Imagem",
     "ModifyImageResourceLimitReinstallRequired": "<p>Se você modificar uma imagem que já foi instalada, será necessário reinstalá-la.</p><p>As modificações não serão aplicadas até que a imagem seja reinstalada.\n\n</p>",
+    "ModifyMinimumImageResourceLimit": "Modificar o limite mínimo de recursos da imagem",
     "Namespace": "Namespace",
     "NoChangeMade": "Não foram efectuadas alterações",
     "NoImageToDisplay": "Não há imagens a apresentar",
@@ -645,6 +668,7 @@
     "Manual": "Manual",
     "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}",
     "NSelected": "{{contagem}} selecionado",
+    "NavigateToDetailPage": "Ir para a página de pormenores",
     "NewPassword": "Nova Senha",
     "None": "Nenhum",
     "Password": "Senha",
@@ -806,6 +830,7 @@
     "Password": "Senha",
     "PasswordChanged": "A senha foi alterada com sucesso",
     "PleaseInputLoginInfo": "Por favor, insira ID e senha para login.",
+    "PleaseInputOTPCode": "Por favor, digite seu código 2FA para login.",
     "PleaseWait": "Por favor, espere para fazer o login.",
     "SecretKey": "Chave secreta",
     "SendChangePasswordEmail": "Enviar email de alteração de senha",
@@ -1106,6 +1131,7 @@
     "MaxFolderCount": "Contagem máxima de pastas",
     "MaxNetworkCount": "Contagem máxima de rede",
     "MaxPendingSessionCount": "Contagem máxima de sessão pendente",
+    "MaxPendingSessionResourceSlots": "Slots de recurso de sessão pendente máximo",
     "MaxQuotaScopeSize": "Tamanho máximo do escopo da cota (GB)",
     "MaxSessionCountPerModelSession": "Contagem máxima de sessões por sessão de modelo",
     "MaxSessionLifetime": "Tempo de vida da sessão (seg.)",
@@ -1154,7 +1180,7 @@
     "ResourcePresets": "Predefinições de recursos",
     "Resources": "Recursos",
     "SHMEMShouldBeSmallerThanMemory": "A memória partilhada deve ser mais pequena do que a memória",
-    "SharedMemory": "Memória compartilhada (GB)",
+    "SharedMemory": "Memória compartilhada",
     "Updated": "Predefinição de recurso atualizada"
   },
   "session": {
@@ -1163,6 +1189,7 @@
     "Agents": "Agentes",
     "AllowedClientIps": "IPs de clientes permitidos",
     "AlreadyTerminatingSession": "Já está a terminar a sessão.",
+    "AnotherUserSession": "Esta sessão foi criada por outro usuário.",
     "Architecture": "Arquitetura",
     "Arguments": "Argumentos",
     "AverageUsage": "Avg",
@@ -1663,10 +1690,9 @@
       "Last12Hours": "Últimas 12 horas",
       "Last3Hours": "Últimas 3 horas",
       "Last7Days": "Últimos 7 dias",
-      "LastDay": "Último 1 dia"
-    },
-    "timeRanges": {
-      "LastHour": "Última 1 hora"
+      "LastDay": "Último 1 dia",
+      "LastHour": "Última 1 hora",
+      "Today": "Hoje"
     }
   },
   "storageHost": {
@@ -1801,7 +1827,6 @@
     "BootstrapScriptDescription": "O script bootstrap será executado apenas uma vez após a criação da sessão",
     "BootstrapScriptEmpty": "O script está vazio. \nPor favor insira o roteiro.",
     "BootstrapScriptUpdated": "Script de bootstrap atualizado.",
-    "ClassicSessionLauncher": "Lançador de sessão Classic",
     "ClearSSHKeypairInput": "O par de chaves SSH gravado será removido. Você tem certeza que quer continuar?",
     "ConfigFilename": "Nome do arquivo de configuração",
     "CurrentSSHPublicKey": "Chave pública atual:",
@@ -1811,7 +1836,7 @@
     "DescAutomaticUpdateCheck": "Notifique quando uma nova versão do webui for lançada. <br /> Onde a Internet estiver instável ou offline, esta opção será automaticamente desligada. Você pode alternar essa opção para iniciar a verificação automática de atualização novamente.",
     "DescBetaFeatures": "Use recursos beta para Web UI. Os recursos beta <br /> podem ser instáveis. Alguns recursos beta podem não ser adotados como recurso oficial.",
     "DescClassicSessionLauncher": "Use o iniciador de sessão Classic em vez do iniciador de sessão NEO. \nO iniciador de sessão Classic pode não ter os recursos mais recentes.",
-    "DescDesktopNotification": "Ative ou desative a notificação na área de trabalho. <br /> Se ativado, o Backend.AI também usa o sistema de notificação integrado do SO. Desativar esta opção não afeta as notificações na IU da web.",
+    "DescDesktopNotification": "Ativa a notificação da área de trabalho. \n<br /> Se ativado, o back-end.ai também usa o sistema de notificação interno do sistema operacional. \nDesligar essa opção não afeta as notificações na interface da usuário da web. \nDependendo do sistema operacional, as notificações de desktop podem exigir permissões de notificação de ativação nas configurações do sistema.",
     "DescExperimentalDashboard": "Use a página do painel em vez da página de resumo.",
     "DescKeepLoginSessionInformation": "Deixe o aplicativo webui manter as informações atuais da sessão de login na próxima vez. <br /> Se a opção for desligada, as informações de login serão apagadas a cada logout.",
     "DescLanguage": "Definir linguagem de interface. Outros idiomas que não o inglês e o coreano serão fornecidos via tradução da máquina.",
