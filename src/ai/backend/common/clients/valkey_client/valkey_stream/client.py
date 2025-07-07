@@ -53,6 +53,7 @@ R = TypeVar("R")
 
 
 def valkey_decorator(
+    *,
     retry_count: int = 3,
     retry_delay: float = 0.1,
 ) -> Callable[
@@ -156,7 +157,6 @@ class ValkeyStreamClient:
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator()
     async def make_consumer_group(
         self,
         stream_key: str,

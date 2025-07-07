@@ -7,6 +7,8 @@ from typing import Iterable, Optional, Self
 from glide import (
     GlideClient,
     GlideClientConfiguration,
+    Logger,
+    LogLevel,
     NodeAddress,
     ServerCredentials,
 )
@@ -22,6 +24,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 _DEFAULT_REQUEST_TIMEOUT = 1_000  # Default request timeout in milliseconds
+
+Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
 
 @dataclass
