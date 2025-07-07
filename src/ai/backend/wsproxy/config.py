@@ -411,6 +411,7 @@ class WSProxyConfig(BaseSchema):
     permit_hash_key: Annotated[
         str, Field(examples=["50M3G00DL00KING53CR3T"], description="Permit hash key")
     ]
+    api_secret: Annotated[str, Field(examples=["50M3G00DL00KING53CR3T"], description="API secret")]
 
     @property
     def advertised_api_addr(self) -> str:
@@ -419,7 +420,6 @@ class WSProxyConfig(BaseSchema):
         """
         port = self.advertised_api_port or self.bind_api_port
         return f"http://{self.advertised_host}:{port}"
-
 
     aiomonitor_termui_port: Annotated[
         int,
