@@ -10,76 +10,30 @@ from ai.backend.common.asyncio import closing_async
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
     Provisioner,
     ProvisionStage,
-    SpecGenerator,
 )
 from ai.backend.common.types import AutoPullBehavior, ImageRegistry
 
 
 @dataclass
 class ImagePullSpec:
-    do_pull: bool
-
     image_ref: ImageRef
+    image_digest: str
     registry_conf: ImageRegistry
     pull_timeout: Optional[float]
+    auto_pull_behavior: AutoPullBehavior
 
 
-class ImagePullSpecGenerator(SpecGenerator[ImagePullSpec]):
-    image_ref: ImageRef
-    registry_conf: ImageRegistry
-    pull_timeout: Optional[float]
-
-    def __init__(
-        self,
-        image_ref: ImageRef,
-        image_digest: str,
-        registry_conf: ImageRegistry,
-        pull_timeout: Optional[float],
-        auto_pull_behavior: AutoPullBehavior,
-    ) -> None:
-        self.image_ref = image_ref
-        self.image_digest = image_digest
-        self.registry_conf = registry_conf
-        self.pull_timeout = pull_timeout
-        self.auto_pull_behavior = auto_pull_behavior
-
-    @override
-    async def wait_for_spec(self) -> ImagePullSpec:
-        """
-        Waits for the spec to be ready.
-        """
-        do_pull = (not self.image_ref.is_local) and await self._check_image_exist()
-        return ImagePullSpec(
-            do_pull=do_pull,
-            image_ref=self.image_ref,
-            registry_conf=self.registry_conf,
-            pull_timeout=self.pull_timeout,
-        )
-
-    async def _check_image_exist(self) -> bool:
-        try:
-            async with closing_async(Docker()) as docker:
-                image_info = await docker.images.inspect(self.image_ref.canonical)
-                if self.auto_pull_behavior == AutoPullBehavior.DIGEST:
-                    if image_info["Id"] != self.image_digest:
-                        return True
-        except DockerError as e:
-            if e.status == HTTPStatus.NOT_FOUND:
-                match self.auto_pull_behavior:
-                    case AutoPullBehavior.DIGEST | AutoPullBehavior.TAG:
-                        return True
-                    case AutoPullBehavior.NONE:
-                        raise ImageNotAvailable(self.image_ref)
-            else:
-                raise
-        return False
+class ImagePullSpecGenerator(ArgsSpecGenerator[ImagePullSpec]):
+    pass
 
 
 @dataclass
 class ImagePullResult:
     image_ref: ImageRef
+    did_pull: bool
 
 
 class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
@@ -90,6 +44,34 @@ class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
 
     @override
     async def setup(self, spec: ImagePullSpec) -> ImagePullResult:
+        do_pull = (not spec.image_ref.is_local) and await self._check_image_exist(spec)
+        if do_pull:
+            image_ref = await self._pull_image(spec)
+            did_pull = True
+        else:
+            image_ref = spec.image_ref
+            did_pull = False
+        return ImagePullResult(image_ref=image_ref, did_pull=did_pull)
+
+    async def _check_image_exist(self, spec: ImagePullSpec) -> bool:
+        try:
+            async with closing_async(Docker()) as docker:
+                image_info = await docker.images.inspect(spec.image_ref.canonical)
+                if spec.auto_pull_behavior == AutoPullBehavior.DIGEST:
+                    if image_info["Id"] != spec.image_digest:
+                        return True
+        except DockerError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                match spec.auto_pull_behavior:
+                    case AutoPullBehavior.DIGEST | AutoPullBehavior.TAG:
+                        return True
+                    case AutoPullBehavior.NONE:
+                        raise ImageNotAvailable(spec.image_ref)
+            else:
+                raise
+        return False
+
+    async def _pull_image(self, spec: ImagePullSpec) -> ImageRef:
         auth_config: Optional[dict[str, str]] = None
         reg_user = spec.registry_conf.get("username")
         reg_passwd = spec.registry_conf.get("password")
@@ -110,7 +92,7 @@ class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-        return ImagePullResult(image_ref=spec.image_ref)
+        return spec.image_ref
 
     @override
     async def teardown(self, resource: ImagePullResult) -> None:
