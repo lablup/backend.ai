@@ -32,7 +32,15 @@ from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
+from sqlalchemy.orm import (
+    contains_eager,
+    foreign,
+    joinedload,
+    load_only,
+    noload,
+    relationship,
+    selectinload,
+)
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
@@ -661,6 +669,19 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 }
 
 
+# Defined for avoiding circular import
+def _get_keypair_row_join_condition():
+    from ai.backend.manager.models.keypair import KeyPairRow
+
+    return KeyPairRow.access_key == foreign(SessionRow.access_key)
+
+
+def _get_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(SessionRow.user_uuid)
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -711,10 +732,21 @@ class SessionRow(Base):
     domain = relationship("DomainRow", back_populates="sessions")
     group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
     group = relationship("GroupRow", back_populates="sessions")
-    user_uuid = ForeignKeyIDColumn("user_uuid", "users.uuid", nullable=False)
-    user = relationship("UserRow", back_populates="sessions")
-    access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    access_key_row = relationship("KeyPairRow", back_populates="sessions")
+    user_uuid = sa.Column("user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"))
+    user = relationship(
+        "UserRow",
+        primaryjoin=_get_user_row_join_condition,
+        back_populates="sessions",
+        foreign_keys=[user_uuid],
+    )
+
+    access_key = sa.Column("access_key", sa.String(length=20))
+    access_key_row = relationship(
+        "KeyPairRow",
+        primaryjoin=_get_keypair_row_join_condition,
+        back_populates="sessions",
+        foreign_keys=[access_key],
+    )
 
     # `image` column is identical to kernels `image` column.
     images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
