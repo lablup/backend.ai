@@ -188,6 +188,7 @@ from .models import (
     SessionStatus,
     UserRole,
     UserRow,
+    VFolderRow,
     agents,
     domains,
     handle_session_exception,
@@ -3655,7 +3656,9 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
-    async def get_health_check_info(self, endpoint: EndpointRow) -> HealthCheckConfig | None:
+    async def get_health_check_info(
+        self, endpoint: EndpointRow, model: VFolderRow
+    ) -> HealthCheckConfig | None:
         _info: HealthCheckConfig | None = None
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
@@ -3663,19 +3666,19 @@ class AgentRegistry:
         elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
-                endpoint.model_row.host,
-                endpoint.model_row.vfid,
+                model.host,
+                model.vfid,
                 endpoint.model_definition_path,
             )
             model_definition = await ModelServiceHelper.validate_model_definition(
                 self.storage_manager,
-                endpoint.model_row.host,
-                endpoint.model_row.vfid,
+                model.host,
+                model.vfid,
                 model_definition_path,
             )
 
-            for model in model_definition["models"]:
-                if health_check_info := model.get("service", {}).get("health_check"):
+            for model_info in model_definition["models"]:
+                if health_check_info := model_info.get("service", {}).get("health_check"):
                     _info = HealthCheckConfig(
                         path=health_check_info["path"],
                         interval=health_check_info["interval"],
@@ -3699,6 +3702,7 @@ class AgentRegistry:
             .select_from(scaling_groups)
             .where((scaling_groups.c.name == endpoint.resource_group))
         )
+        model = await VFolderRow.get(db_sess, endpoint.model)
 
         result = await db_sess.execute(query)
         sgroup = result.first()
@@ -3724,7 +3728,7 @@ class AgentRegistry:
                     "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
                 })
 
-        health_check_information = await self.get_health_check_info(endpoint)
+        health_check_information = await self.get_health_check_info(endpoint, model)
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
