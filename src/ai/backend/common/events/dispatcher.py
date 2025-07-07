@@ -591,32 +591,48 @@ class EventDispatcher(EventDispatcherGroup):
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
                 return
-            mq_msg = cast(MQMessage, msg)
-            msg_payload = MessagePayload.from_anycast(mq_msg.payload)
-            post_callback = _ConsumerPostCallback(
-                msg.msg_id,
-                self._msg_queue,
-                len(self._consumers[msg_payload.name]),
-            )
-            await self.dispatch_consumers(
-                msg_payload.name,
-                AgentId(msg_payload.source),
-                msg_payload.args,
-                [post_callback],
-            )
+            try:
+                mq_msg = cast(MQMessage, msg)
+                msg_payload = MessagePayload.from_anycast(mq_msg.payload)
+                post_callback = _ConsumerPostCallback(
+                    msg.msg_id,
+                    self._msg_queue,
+                    len(self._consumers[msg_payload.name]),
+                )
+                await self.dispatch_consumers(
+                    msg_payload.name,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
+                    [post_callback],
+                )
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._consume_loop: unexpected-error, {}",
+                    repr(e),
+                )
+                # Do not raise the exception to avoid stopping the loop.
+                # The exception will be handled by the task group.
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            msg = cast(BroadcastMessage, msg)
-            msg_payload = MessagePayload.from_broadcast(msg.payload)
-            await self.dispatch_subscribers(
-                msg_payload.name,
-                AgentId(msg_payload.source),
-                msg_payload.args,
-            )
+            try:
+                msg = cast(BroadcastMessage, msg)
+                msg_payload = MessagePayload.from_broadcast(msg.payload)
+                await self.dispatch_subscribers(
+                    msg_payload.name,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
+                )
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
+                    repr(e),
+                )
+                # Do not raise the exception to avoid stopping the loop.
+                # The exception will be handled by the task group.
 
 
 class EventProducer:
