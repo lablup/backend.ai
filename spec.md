@@ -8,10 +8,13 @@ Therefore, we need a way to group templates that must always be applied, or that
 
 The grouping should not only handle specific cases like KeypairResourcePolicyTemplate, but should be applicable in a more generalized manner.
 
+Before you say that your work is complete, don't forget to run the test code first to make sure everything is working properly.
+
 ## Reference
 
 - [What is TemplateWrapper](./src/ai/backend/test/templates/README.md)
 : Understand the basic concept of templates.
 
 - [How to run test](./src/ai/backend/test/tester/README.md)
-: Refer to this README and try running the tests. Use the `run-test` command to debug the specific test code you modified.
+: Refer to this README and try running the tests. Use the `run-test` command as guided in the `README` to debug the specific test code you modified.
+
