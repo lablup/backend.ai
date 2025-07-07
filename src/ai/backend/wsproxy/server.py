@@ -187,7 +187,10 @@ async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
     config = root_ctx.local_config.wsproxy
-    return web.json_response({"api_version": "v2", "advertise_address": config.advertised_api_addr})
+    return web.json_response({
+        "api_version": "v2",
+        "advertise_address": config.advertised_api_addr,
+    })
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
