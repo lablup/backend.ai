@@ -818,8 +818,8 @@ class AbstractAgent(
         )
         self.redis_stream_pool = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM),
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
+            human_readable_name="event_producer.stream",
+            db_id=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
@@ -2836,7 +2836,7 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         pretty_container_id,
-                        service_port,
+                        service_ports,
                     )
                 except asyncio.TimeoutError:
                     await self.inject_container_lifecycle_event(
