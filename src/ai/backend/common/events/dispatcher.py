@@ -595,7 +595,7 @@ class EventDispatcher(EventDispatcherGroup):
                 mq_msg = cast(MQMessage, msg)
                 msg_payload = MessagePayload.from_anycast(mq_msg.payload)
                 post_callback = _ConsumerPostCallback(
-                    msg.msg_id,
+                    mq_msg.msg_id,
                     self._msg_queue,
                     len(self._consumers[msg_payload.name]),
                 )
