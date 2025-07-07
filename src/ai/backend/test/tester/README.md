@@ -15,7 +15,7 @@ It performs actual integration tests by directly sending requests to the real Ba
 The most commonly used command is `run`, which executes tests that are expected to pass in a default development environment:
 
 ```console
-$ backend.ai test run
+$ ./backend.ai test run
 ```
 
 This command automatically excludes tests that require special environment configurations, making it ideal for first-time users and standard development workflows.
@@ -25,7 +25,7 @@ This command automatically excludes tests that require special environment confi
 To run all available tests, including those that require special configurations, use:
 
 ```console
-$ backend.ai test run-all
+$ ./backend.ai test run-all
 ```
 
 ### Running specific tests
@@ -33,13 +33,13 @@ $ backend.ai test run-all
 If you want to run only a specific test, execute the command as follows:
 
 ```console
-$ backend.ai test run-test <test_name>
+$ ./backend.ai test run-test <test_name>
 ```
 
 You can use the following command to see which test codes exist and which tests can be executed:
 
 ```console
-$ backend.ai test get-all-specs
+$ ./backend.ai test get-all-specs
 ```
 
 ### Understanding `run` vs `run-all`
