@@ -97,6 +97,25 @@ class SSEDep(BaseDependencyModel):
     )
 
 
+class KeypairResourcePolicyDep(BaseDependencyModel):
+    max_session_lifetime: int = Field(
+        default=0,
+        description="The maximum session lifetime in seconds.",
+        examples=[60 * 30],  # 30 minutes,
+    )
+    # TODO: Replace these with sensible defaults.
+    max_concurrent_sessions: int = Field(
+        default=10,
+        description="The maximum number of concurrent sessions allowed.",
+        examples=[10],
+    )
+    max_containers_per_session: int = Field(
+        default=10,
+        description="The maximum number of containers allowed per session.",
+        examples=[10],
+    )
+
+
 class ClusterDep(BaseDependencyModel):
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.
