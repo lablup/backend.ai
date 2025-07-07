@@ -16,32 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 25.6.12 (2025-07-07)
-
-### Features
-* Add expiration time to login history Redis keys to reduce Redis memory usage. ([#4939](https://github.com/lablup/backend.ai/issues/4939))
-* Built-in WSProxy exposes advertised address ([#4975](https://github.com/lablup/backend.ai/issues/4975))
-
-### Fixes
-* Improve logging for inspecting missing containers ([#4784](https://github.com/lablup/backend.ai/issues/4784))
-* Status code is missing when the `Accept` header is not set to `application/json` in the wsproxy exception middleware ([#4788](https://github.com/lablup/backend.ai/issues/4788))
-* Fix Agent Memory plugin to handle multiple IO device stat ([#4789](https://github.com/lablup/backend.ai/issues/4789))
-* Fix invalid state error when setting kernel termination future ([#4791](https://github.com/lablup/backend.ai/issues/4791))
-* Cool down Redis error logs `AttributeError: 'NoneType' object has no attribute 'get'` ([#4795](https://github.com/lablup/backend.ai/issues/4795))
-* Fix wrong `Accept` Header on `HarborRegistryV2._process_oci_index()` ([#4807](https://github.com/lablup/backend.ai/issues/4807))
-* Fix incorrect query filter definition in GQL image node ([#4843](https://github.com/lablup/backend.ai/issues/4843))
-* Prevent model service creation with project type vfolder ([#4852](https://github.com/lablup/backend.ai/issues/4852))
-* Allow GQL modify_user mutation to update users `main_access_key` ([#4879](https://github.com/lablup/backend.ai/issues/4879))
-* Ensure endpoints are properly cleaned up during group purge operations ([#4917](https://github.com/lablup/backend.ai/issues/4917))
-* Handle `NoSuchProcess` properly when gather process memory stat ([#4922](https://github.com/lablup/backend.ai/issues/4922))
-* Skip kernel destroy when agent shutdown ([#4923](https://github.com/lablup/backend.ai/issues/4923))
-* Check if Agent is daemon process before query docker netstat ([#4929](https://github.com/lablup/backend.ai/issues/4929))
-* Wrong indent in Agent container stat function ([#4946](https://github.com/lablup/backend.ai/issues/4946))
-* Change to use json.dumps in Agent to properly serialize yarl types ([#4957](https://github.com/lablup/backend.ai/issues/4957))
-* Calculate correct VFolder permissions when admins query ([#4962](https://github.com/lablup/backend.ai/issues/4962))
-
-
-## 25.6.11 (2025-06-23)
+## 25.6.11a (2025-06-23)
 
 ### Features
 * Add additional logging to kernel creation and termination ([#4737](https://github.com/lablup/backend.ai/issues/4737))
