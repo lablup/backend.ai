@@ -13,7 +13,11 @@ from ai.backend.agent.resources import Mount
 from ai.backend.agent.types import VolumeInfo
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
+    Provisioner,
+    ProvisionStage,
+)
 from ai.backend.common.types import (
     MountPermission,
     MountTypes,
@@ -41,42 +45,8 @@ class IntrinsicMountSpec:
     domain_socket_proxies: list[DomainSocketProxy]
 
 
-class IntrinsicMountSpecGenerator(SpecGenerator[IntrinsicMountSpec]):
-    def __init__(
-        self,
-        config_dir: Path,
-        work_dir: Path,
-        tmp_dir: Path,
-        scratch_type: str,
-        agent_sockpath: Path,
-        image_ref: ImageRef,
-        coredump: CoreDumpConfig,
-        ipc_base_path: Path,
-        domain_socket_proxies: list[DomainSocketProxy],
-    ) -> None:
-        self._config_dir = config_dir
-        self._work_dir = work_dir
-        self._tmp_dir = tmp_dir
-        self._scratch_type = scratch_type
-        self._agent_sockpath = agent_sockpath
-        self._image_ref = image_ref
-        self._coredump = coredump
-        self._ipc_base_path = ipc_base_path
-        self._domain_socket_proxies = domain_socket_proxies
-
-    @override
-    async def wait_for_spec(self) -> IntrinsicMountSpec:
-        return IntrinsicMountSpec(
-            config_dir=self._config_dir,
-            work_dir=self._work_dir,
-            tmp_dir=self._tmp_dir,
-            scratch_type=self._scratch_type,
-            agent_sockpath=self._agent_sockpath,
-            image_ref=self._image_ref,
-            coredump=self._coredump,
-            ipc_base_path=self._ipc_base_path,
-            domain_socket_proxies=self._domain_socket_proxies,
-        )
+class IntrinsicMountSpecGenerator(ArgsSpecGenerator[IntrinsicMountSpec]):
+    pass
 
 
 @dataclass

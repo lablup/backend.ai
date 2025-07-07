@@ -12,7 +12,11 @@ from cachetools import LRUCache, cached
 from ai.backend.agent.kernel import match_distro_data
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
+    Provisioner,
+    ProvisionStage,
+)
 from ai.backend.common.types import (
     DeviceName,
     MountPermission,
@@ -52,33 +56,8 @@ class KernelRunnerMountSpec:
     resource_spec: KernelResourceSpec
 
 
-class KernelRunnerMountSpecGenerator(SpecGenerator[KernelRunnerMountSpec]):
-    def __init__(
-        self,
-        config_dir: Path,
-        distro: str,
-        krunner_volumes: Mapping[str, str],
-        sandbox_type: str,
-        existing_computers: Mapping[DeviceName, ComputerContext],
-        resource_spec: KernelResourceSpec,
-    ) -> None:
-        self._config_dir = config_dir
-        self._distro = distro
-        self._krunner_volumes = krunner_volumes
-        self._sandbox_type = sandbox_type
-        self._existing_computers = existing_computers
-        self._resource_spec = resource_spec
-
-    @override
-    async def wait_for_spec(self) -> KernelRunnerMountSpec:
-        return KernelRunnerMountSpec(
-            config_dir=self._config_dir,
-            distro=self._distro,
-            krunner_volumes=self._krunner_volumes,
-            sandbox_type=self._sandbox_type,
-            existing_computers=self._existing_computers,
-            resource_spec=self._resource_spec,
-        )
+class KernelRunnerMountSpecGenerator(ArgsSpecGenerator[KernelRunnerMountSpec]):
+    pass
 
 
 @dataclass

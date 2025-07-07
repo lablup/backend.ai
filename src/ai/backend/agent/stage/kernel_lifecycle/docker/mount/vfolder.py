@@ -1,10 +1,9 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, override
+from typing import override
 
 from ai.backend.agent.resources import Mount
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import (
     MountTypes,
     VFolderMount,
@@ -17,20 +16,8 @@ class VFolderMountSpec:
     prevent_vfolder_mount: bool
 
 
-class VFolderMountSpecGenerator(SpecGenerator[VFolderMountSpec]):
-    def __init__(self, raw_mounts: list[Mapping[str, Any]], prevent_vfolder_mount: bool) -> None:
-        self._raw_mounts = raw_mounts
-        self._prevent_vfolder_mount = prevent_vfolder_mount
-
-    @override
-    async def wait_for_spec(self) -> VFolderMountSpec:
-        """
-        Waits for the spec to be ready.
-        """
-        vfolder_mounts = [VFolderMount.from_json(item) for item in self._raw_mounts]
-        return VFolderMountSpec(
-            mounts=vfolder_mounts, prevent_vfolder_mount=self._prevent_vfolder_mount
-        )
+class VFolderMountSpecGenerator(ArgsSpecGenerator[VFolderMountSpec]):
+    pass
 
 
 @dataclass
