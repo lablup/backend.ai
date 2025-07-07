@@ -13,12 +13,13 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.hashes import SHA256
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.models.session import SessionRow
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -80,7 +81,12 @@ keypairs = sa.Table(
 
 class KeyPairRow(Base):
     __table__ = keypairs
-    sessions = relationship("SessionRow", back_populates="access_key_row")
+    sessions = relationship(
+        "SessionRow",
+        primaryjoin=lambda: keypairs.c.access_key == foreign(SessionRow.access_key),
+        foreign_keys="SessionRow.access_key",
+        back_populates="access_key_row",
+    )
     resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
     sgroup_for_keypairs_rows = relationship(
         "ScalingGroupForKeypairsRow",
