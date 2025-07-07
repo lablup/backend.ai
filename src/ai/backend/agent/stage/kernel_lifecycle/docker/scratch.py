@@ -13,7 +13,11 @@ from typing import Optional, override
 import pkg_resources
 
 from ai.backend.common.docker import KernelFeatures
-from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.stage.types import (
+    ArgsSpecGenerator,
+    Provisioner,
+    ProvisionStage,
+)
 from ai.backend.common.types import BinarySize, KernelId
 
 
@@ -40,40 +44,19 @@ class ScratchSpec:
     scratch_size: BinarySize
 
 
-class ScratchSpecGenerator(SpecGenerator[ScratchSpec]):
-    def __init__(
-        self,
-        kernel_id: KernelId,
-        container_config: ContainerOwnershipConfig,
-        scratch_type: str,
-        scratch_root: Path,
-        scratch_size: BinarySize,
-    ) -> None:
-        self._kernel_id = kernel_id
-        self._container_config = container_config
-        self._scratch_type = scratch_type
-        self._scratch_root = scratch_root
-        self._scratch_size = scratch_size
-
-    @override
-    async def wait_for_spec(self) -> ScratchSpec:
-        """
-        Waits for the spec to be ready.
-        """
-        return ScratchSpec(
-            kernel_id=self._kernel_id,
-            container_config=self._container_config,
-            scratch_type=self._scratch_type,
-            scratch_root=self._scratch_root.resolve(),
-            scratch_size=self._scratch_size,
-        )
+class ScratchSpecGenerator(ArgsSpecGenerator[ScratchSpec]):
+    pass
 
 
 @dataclass
 class ScratchResult:
-    scratch_root: Path
+    scratch_dir: Path
+    scratch_file: Path
+    tmp_dir: Path
+    work_dir: Path
+    config_dir: Path
+
     scratch_type: str
-    kernel_id: KernelId
 
 
 class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
@@ -109,16 +92,16 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
 
     @override
     async def setup(self, spec: ScratchSpec) -> ScratchResult:
-        work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
-        config_dir = self._config_dir(spec.scratch_root, spec.kernel_id).resolve()
-
         await self._create_filesystem(spec)
-        await self._create_scratch_dirs(work_dir, config_dir)
-        await self._clone_dotfiles(work_dir, spec.container_config)
+        await self._create_scratch_dirs(spec)
+        await self._clone_dotfiles(spec)
         return ScratchResult(
-            scratch_root=spec.scratch_root,
+            scratch_dir=self._scratch_dir(spec.scratch_root, spec.kernel_id).resolve(),
+            scratch_file=self._scratch_file(spec.scratch_root, spec.kernel_id).resolve(),
+            tmp_dir=self._tmp_dir(spec.scratch_root, spec.kernel_id).resolve(),
+            work_dir=self._work_dir(spec.scratch_root, spec.kernel_id).resolve(),
+            config_dir=self._config_dir(spec.scratch_root, spec.kernel_id).resolve(),
             scratch_type=spec.scratch_type,
-            kernel_id=spec.kernel_id,
         )
 
     async def _create_filesystem(self, spec: ScratchSpec) -> None:
@@ -196,7 +179,10 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         if exit_code != 0:
             raise RuntimeError("mount failed")
 
-    async def _create_scratch_dirs(self, config_dir: Path, work_dir: Path) -> None:
+    async def _create_scratch_dirs(self, spec: ScratchSpec) -> None:
+        work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
+        config_dir = self._config_dir(spec.scratch_root, spec.kernel_id).resolve()
+
         def create() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
             config_dir.chmod(0o755)
@@ -206,56 +192,55 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, create)
 
-    async def _clone_dotfiles(self, work_dir: Path, config: ContainerOwnershipConfig) -> None:
+    async def _clone_dotfiles(self, spec: ScratchSpec) -> None:
         # Since these files are bind-mounted inside a bind-mounted directory,
         # we need to touch them first to avoid their "ghost" files are created
         # as root in the host-side filesystem, which prevents deletion of scratch
         # directories when the agent is running as non-root.
 
-        def clone() -> None:
-            jupyter_custom_css_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
-            )
-            logo_path = Path(pkg_resources.resource_filename("ai.backend.runner", "logo.svg"))
-            font_path = Path(pkg_resources.resource_filename("ai.backend.runner", "roboto.ttf"))
-            font_italic_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", "roboto-italic.ttf")
-            )
-            bashrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".bashrc"))
-            bash_profile_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
-            )
-            zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
-            vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
-            tmux_conf_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
-            )
-            jupyter_custom_dir = work_dir / ".jupyter" / "custom"
-            jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
-            shutil.copy(logo_path.resolve(), jupyter_custom_dir / "logo.svg")
-            shutil.copy(font_path.resolve(), jupyter_custom_dir / "roboto.ttf")
-            shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
-            shutil.copy(bashrc_path.resolve(), work_dir / ".bashrc")
-            shutil.copy(bash_profile_path.resolve(), work_dir / ".bash_profile")
-            shutil.copy(zshrc_path.resolve(), work_dir / ".zshrc")
-            shutil.copy(vimrc_path.resolve(), work_dir / ".vimrc")
-            shutil.copy(tmux_conf_path.resolve(), work_dir / ".tmux.conf")
-
-            paths = [
-                work_dir,
-                work_dir / ".jupyter",
-                work_dir / ".jupyter" / "custom",
-                work_dir / ".bashrc",
-                work_dir / ".bash_profile",
-                work_dir / ".zshrc",
-                work_dir / ".vimrc",
-                work_dir / ".tmux.conf",
-            ]
-            self._chown_paths_if_root(paths, config)
-
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, clone)
+        await loop.run_in_executor(None, self._clone_func, spec)
+
+    def _clone_func(self, spec: ScratchSpec) -> None:
+        work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
+        jupyter_custom_css_path = Path(
+            pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
+        )
+        logo_path = Path(pkg_resources.resource_filename("ai.backend.runner", "logo.svg"))
+        font_path = Path(pkg_resources.resource_filename("ai.backend.runner", "roboto.ttf"))
+        font_italic_path = Path(
+            pkg_resources.resource_filename("ai.backend.runner", "roboto-italic.ttf")
+        )
+        bashrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".bashrc"))
+        bash_profile_path = Path(
+            pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
+        )
+        zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
+        vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
+        tmux_conf_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf"))
+        jupyter_custom_dir = work_dir / ".jupyter" / "custom"
+        jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
+        shutil.copy(logo_path.resolve(), jupyter_custom_dir / "logo.svg")
+        shutil.copy(font_path.resolve(), jupyter_custom_dir / "roboto.ttf")
+        shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
+        shutil.copy(bashrc_path.resolve(), work_dir / ".bashrc")
+        shutil.copy(bash_profile_path.resolve(), work_dir / ".bash_profile")
+        shutil.copy(zshrc_path.resolve(), work_dir / ".zshrc")
+        shutil.copy(vimrc_path.resolve(), work_dir / ".vimrc")
+        shutil.copy(tmux_conf_path.resolve(), work_dir / ".tmux.conf")
+
+        paths = [
+            work_dir,
+            work_dir / ".jupyter",
+            work_dir / ".jupyter" / "custom",
+            work_dir / ".bashrc",
+            work_dir / ".bash_profile",
+            work_dir / ".zshrc",
+            work_dir / ".vimrc",
+            work_dir / ".tmux.conf",
+        ]
+        self._chown_paths_if_root(paths, spec.container_config)
 
     def _chown_paths_if_root(
         self,
@@ -289,8 +274,8 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
     @override
     async def teardown(self, resource: ScratchResult) -> None:
         loop = asyncio.get_running_loop()
-        scratch_dir = self._scratch_dir(resource.scratch_root, resource.kernel_id).resolve()
-        tmp_dir = self._tmp_dir(resource.scratch_root, resource.kernel_id).resolve()
+        scratch_dir = resource.scratch_dir
+        tmp_dir = resource.tmp_dir
         try:
             if sys.platform.startswith("linux") and resource.scratch_type == "memory":
                 await self._destroy_scratch_filesystem(scratch_dir)
@@ -298,7 +283,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
                 await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
                 await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
             elif sys.platform.startswith("linux") and resource.scratch_type == "hostfile":
-                await self._destroy_loop_filesystem(resource.scratch_root, resource.kernel_id)
+                await self._destroy_loop_filesystem(resource)
             else:
                 await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
         except CalledProcessError:
@@ -326,10 +311,10 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
                 stderr=proc.stderr,  # type: ignore[arg-type]
             )
 
-    async def _destroy_loop_filesystem(self, scratch_root: Path, kernel_id: KernelId) -> None:
+    async def _destroy_loop_filesystem(self, resource: ScratchResult) -> None:
         loop = asyncio.get_running_loop()
-        scratch_dir = self._scratch_dir(scratch_root, kernel_id).resolve()
-        scratch_file = self._scratch_file(scratch_root, kernel_id).resolve()
+        scratch_dir = resource.scratch_dir
+        scratch_file = resource.scratch_file
         umount = await asyncio.create_subprocess_exec("umount", str(scratch_dir))
         exit_code = await umount.wait()
         if exit_code != 0:
