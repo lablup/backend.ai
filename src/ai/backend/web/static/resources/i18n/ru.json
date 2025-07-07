@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Действия",
+      "Allowed": "Допустимый",
       "ClickFilebrowserButton": "Чтобы загрузить папку (и), нажмите кнопку «Выполнить просмотрщик файлов».",
       "CreateANewFolder": "Создать новую папку",
       "Created": "Созданный",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Максимальное количество папок",
     "MaxNetworkCount": "Максимальное количество сетей",
     "MaxPendingSessionCount": "Максимальный счет в ожидании сессии",
+    "MaxPendingSessionResourceSlots": "Максимальный ожидающий сессионные слоты ресурсов",
     "MaxQuotaScopeSize": "Максимальный размер квоты (ГБ)",
     "MaxSessionCountPerModelSession": "Максимальное количество сеансов на модельный сеанс",
     "MaxSessionLifetime": "Время жизни сеанса (сек.)",

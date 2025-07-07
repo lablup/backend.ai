@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Aktionen",
+      "Allowed": "Erlaubt",
       "ClickFilebrowserButton": "Um Ordner hochzuladen, klicken Sie bitte auf die Schaltfläche Dateibrowser ausführen.",
       "CreateANewFolder": "Einen neuen Ordner erstellen",
       "Created": "Erstellt",
@@ -1113,6 +1114,7 @@
     "ContainerPerSession": "Container pro Sitzung",
     "CreateResourcePolicy": "Erstellen Sie eine Ressourcenrichtlinie",
     "CreatedAt": "Hergestellt in",
+    "DefaultForUnspecified": "Standard für nicht spezifizierte",
     "DeletePolicy": "Richtlinien löschen",
     "DeletePolicyDescription": "Sie sind kurz davor, diese Richtlinie zu löschen:",
     "ExportCSV": "CSV exportieren",
@@ -1126,6 +1128,7 @@
     "MaxFolderCount": "Maximale Ordneranzahl",
     "MaxNetworkCount": "Maximale Netzwerkanzahl",
     "MaxPendingSessionCount": "Maximal ausstehende Sitzungsanzahl",
+    "MaxPendingSessionResourceSlots": "Maxe ausstehende Sitzungsressourcenschlitze",
     "MaxQuotaScopeSize": "Maximale Kontingentumfangsgröße (GB)",
     "MaxSessionCountPerModelSession": "Maximale Sitzungsanzahl pro Modellsitzung",
     "MaxSessionLifetime": "Lebensdauer der Sitzung (Sek.)",
