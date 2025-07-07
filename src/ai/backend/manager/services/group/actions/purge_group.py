@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.exception import BackendError
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.group.actions.base import GroupAction
 from ai.backend.manager.services.group.types import GroupData
@@ -28,3 +29,18 @@ class PurgeGroupActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.data.id) if self.data is not None else None
+
+
+class PurgeGroupActionActiveKernelsError(BackendError):
+    error_type = "https://api.backend.ai/probs/group-active-kernels"
+    error_title = "Group has active kernels."
+
+
+class PurgeGroupActionVFoldersMountedToActiveKernelsError(BackendError):
+    error_type = "https://api.backend.ai/probs/group-vfolders-mounted-to-active-kernels"
+    error_title = "Group has vfolders mounted to active kernels."
+
+
+class PurgeGroupActionActiveEndpointsError(BackendError):
+    error_type = "https://api.backend.ai/probs/group-active-endpoints"
+    error_title = "Group has active endpoints."
