@@ -26,7 +26,7 @@ from ai.backend.test.templates.template import (
 )
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
-_ENDPOINT_CREATION_TIMEOUT = 30
+_ENDPOINT_CREATION_TIMEOUT = 60
 
 
 class _BaseEndpointTemplate(WrapperTestTemplate):

@@ -1433,7 +1433,6 @@ class RedisTarget:
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
-    is_cluster: bool = False
     redis_helper_config: Optional[RedisHelperConfig] = None
 
     def __getitem__(self, key: str) -> Any:
