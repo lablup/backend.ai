@@ -41,7 +41,7 @@ name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
 architecture = "x86_64"
 
 [context.session]
-resources = { cpu = 1, mem = "512mb" }
+resources = { cpu = 1, mem = "320mb" }
 
 [context.session-imagify]
 new-image-name = "new-customized-image"
