@@ -55,6 +55,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -258,7 +259,7 @@ class AgentRegistry:
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,
         redis_live: RedisConnectionInfo,
-        redis_image: RedisConnectionInfo,
+        redis_image: ValkeyImageClient,
         redis_stream: RedisConnectionInfo,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
@@ -3106,13 +3107,7 @@ class AgentRegistry:
             images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             image_canonicals = set(img_info[0] for img_info in images)
 
-            async def _pipe_builder(r: Redis):
-                pipe = r.pipeline()
-                for image_canonical in image_canonicals:
-                    await pipe.sadd(image_canonical, agent_id)
-                return pipe
-
-            await redis_helper.execute(self.redis_image, _pipe_builder)
+            await self.redis_image.add_agent_to_images(agent_id, image_canonicals)
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
@@ -3122,22 +3117,10 @@ class AgentRegistry:
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for image_canonical in image_canonicals:
-                await pipe.srem(image_canonical, agent_id)
-            return pipe
-
-        await redis_helper.execute(self.redis_image, _pipe_builder)
+        await self.redis_image.remove_agent_from_images(agent_id, image_canonicals)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await redis_helper.execute(self.redis_live, lambda r: r.hdel("agent.last_seen", agent_id))
-
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            async for imgname in r.scan_iter():
-                await pipe.srem(imgname, agent_id)
-            return pipe
 
         async def _update() -> None:
             async with self.db.begin() as conn:
@@ -3172,7 +3155,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await redis_helper.execute(self.redis_image, _pipe_builder)
+        await self.redis_image.remove_agent_from_all_images(agent_id)
         await execute_with_retry(_update)
 
     async def sync_kernel_stats(

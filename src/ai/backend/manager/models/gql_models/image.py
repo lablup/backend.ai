@@ -21,11 +21,8 @@ import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphql import Undefined, UndefinedType
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
@@ -244,16 +241,8 @@ class Image(graphene.ObjectType):
         row: ImageRow,
     ) -> Image:
         # TODO: add architecture
-        _installed_agents = await redis_helper.execute(
-            ctx.redis_image,
-            lambda r: r.smembers(row.name),
-        )
-        installed_agents: List[str] = []
-        for agent_id in _installed_agents:
-            if isinstance(agent_id, bytes):
-                installed_agents.append(agent_id.decode())
-            else:
-                installed_agents.append(agent_id)
+        _installed_agents = await ctx.redis_image.get_agents_for_image(row.name)
+        installed_agents: List[str] = list(_installed_agents)
         return cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -262,21 +251,11 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
-        async def _pipe(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.smembers(row.name)
-            return pipe
+        image_canonicals = [row.name for row in rows]
+        results = await ctx.redis_image.get_agents_for_images(image_canonicals)
 
-        results = await redis_helper.execute(ctx.redis_image, _pipe)
         for idx, row in enumerate(rows):
-            installed_agents: List[str] = []
-            _installed_agents = results[idx]
-            for agent_id in _installed_agents:
-                if isinstance(agent_id, bytes):
-                    installed_agents.append(agent_id.decode())
-                else:
-                    installed_agents.append(agent_id)
+            installed_agents: List[str] = list(results[idx])
             yield cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -493,15 +472,8 @@ class ImageNode(graphene.ObjectType):
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, full_names: Sequence[str]
     ) -> list[set[AgentId]]:
-        async def pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for name in full_names:
-                pipe.smembers(name)
-            return pipe
-
-        result = await redis_helper.execute(ctx.redis_image, pipe_builder)
-        result = cast(list[set[bytes]], result)
-        return [{AgentId(agent_id.decode()) for agent_id in agents} for agents in result]
+        results = await ctx.redis_image.get_agents_for_images(list(full_names))
+        return [{AgentId(agent_id) for agent_id in agents} for agents in results]
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context

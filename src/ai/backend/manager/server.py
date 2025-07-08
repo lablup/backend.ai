@@ -44,6 +44,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
@@ -538,10 +539,10 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STATISTICS_DB,
     )
-    root_ctx.redis_image = redis_helper.get_redis_object(
+    root_ctx.redis_image = await ValkeyImageClient.create(
         redis_profile_target.profile_target(RedisRole.IMAGE),
-        name="image",  # per-agent image availability
-        db=REDIS_IMAGE_DB,
+        db_id=REDIS_IMAGE_DB,
+        human_readable_name="image",  # per-agent image availability
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
         redis_profile_target.profile_target(RedisRole.STREAM),
@@ -561,11 +562,12 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
-        root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
         await redis_helper.ping_redis_connection(redis_info.client)
+    # ValkeyImageClient has its own connection handling
+    # No need to ping it separately as it's already connected
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()

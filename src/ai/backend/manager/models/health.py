@@ -124,7 +124,6 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
     redis_connection_infos: tuple[RedisConnectionInfo, ...] = (
         root_ctx.redis_live,
         root_ctx.redis_stat,
-        root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     )

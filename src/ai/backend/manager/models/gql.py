@@ -13,6 +13,7 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -310,7 +311,7 @@ class GraphQueryContext:
     services_ctx: ServicesContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
-    redis_image: RedisConnectionInfo
+    redis_image: ValkeyImageClient
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager

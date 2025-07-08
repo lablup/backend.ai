@@ -12,6 +12,7 @@ import attrs
 import click
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
@@ -137,7 +138,7 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 class RedisConnectionSet:
     live: RedisConnectionInfo
     stat: RedisConnectionInfo
-    image: RedisConnectionInfo
+    image: ValkeyImageClient
     stream: RedisConnectionInfo
 
 
@@ -159,10 +160,10 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         name="mgr_cli.stat",
         db=REDIS_STATISTICS_DB,
     )
-    redis_image = redis_helper.get_redis_object(
+    redis_image = await ValkeyImageClient.create(
         etcd_redis_config.profile_target(RedisRole.IMAGE),
-        name="mgr_cli.image",
-        db=REDIS_IMAGE_DB,
+        db_id=REDIS_IMAGE_DB,
+        human_readable_name="mgr_cli.image",
     )
     redis_stream = redis_helper.get_redis_object(
         etcd_redis_config.profile_target(RedisRole.STREAM),
