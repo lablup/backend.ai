@@ -15,6 +15,11 @@ login-endpoint = "http://127.0.0.1:8090"
 access-key = "AKIAIOSFODNN7EXAMPLE"
 secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
+[context.keypair-resource-policy]
+max-session-lifetime = 3600
+max-concurrent-sessions = 10
+max-containers-per-session = 10
+
 [context.login-credential]
 user-id = "admin@lablup.com"
 password = "wJalrXUt"

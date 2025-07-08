@@ -19,6 +19,7 @@ class ContextName(enum.StrEnum):
     CLIENT_SESSION = "client_session"
     ENDPOINT = "endpoint"
     KEYPAIR = "keypair"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
     LOGIN_CREDENTIAL = "login_credential"
     SESSION = "session"
     SSE = "sse"
