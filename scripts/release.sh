@@ -28,5 +28,8 @@ echo $TARGET_VERSION > VERSION
 # Update the changelog
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 
+# Update sample config files
+./backend.ai mgr config generate-sample --overwrite
+
 git add -A
 git commit -m "release: $TARGET_VERSION"
