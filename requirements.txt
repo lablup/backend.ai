@@ -76,6 +76,7 @@ setuptools~=80.0.0
 tabulate~=0.8.9
 temporenc~=0.1.0
 tenacity>=9.0
+toml~=0.10.2
 tomli~=2.0.1
 tomlkit~=0.13.2
 tqdm~=4.67.1
