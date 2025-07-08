@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from stat import S_IFDIR, S_IFLNK
 from subprocess import CalledProcessError
 from typing import AsyncIterator
 
@@ -71,11 +72,12 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                         break
                     line = line.rstrip(b"\n")
                     item = json.loads(line)
+
                     item_path = Path(item["path"])
                     entry_type = DirEntryType.FILE
-                    if item["filetype"] == 40000:
+                    if item["filetype"] == S_IFDIR:
                         entry_type = DirEntryType.DIRECTORY
-                    if item["filetype"] == 120000:
+                    if item["filetype"] == S_IFLNK:
                         entry_type = DirEntryType.SYMLINK
                     yield DirEntry(
                         name=item_path.name,
