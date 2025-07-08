@@ -1,16 +1,13 @@
-import asyncio
 import logging
-import time
-from typing import Awaitable, Callable, ParamSpec, Self, TypeVar
+from typing import ParamSpec, Self, TypeVar
 
 from glide import Batch
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
+    valkey_decorator,
 )
-from ai.backend.common.exception import UnreachableError
-from ai.backend.common.metrics.metric import ClientMetricObserver, ClientType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -18,62 +15,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
-def valkey_decorator(
-    *,
-    retry_count: int = 3,
-    retry_delay: float = 0.1,
-) -> Callable[
-    [Callable[P, Awaitable[R]]],
-    Callable[P, Awaitable[R]],
-]:
-    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-        observer = ClientMetricObserver.instance()
-
-        async def wrapper(*args, **kwargs) -> R:
-            log.debug("Calling {}", func.__name__)
-            start = time.perf_counter()
-            for attempt in range(retry_count):
-                try:
-                    observer.observe_client_operation_triggered(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                    )
-                    res = await func(*args, **kwargs)
-                    observer.observe_client_operation(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                        success=True,
-                        duration=time.perf_counter() - start,
-                    )
-                    return res
-                except Exception as e:
-                    if attempt < retry_count - 1:
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    log.exception(
-                        "Error in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                        func.__name__,
-                        args,
-                        kwargs,
-                        retry_count,
-                        e,
-                    )
-                    observer.observe_client_operation(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                        success=False,
-                        duration=time.perf_counter() - start,
-                    )
-                    raise e
-            raise UnreachableError(
-                f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
-            )
-
-        return wrapper
-
-    return decorator
 
 
 class ValkeyImageClient:

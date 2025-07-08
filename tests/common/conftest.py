@@ -8,8 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import RedisTarget
@@ -81,6 +82,27 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
         await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         await etcd.close()
         del etcd
+
+
+@pytest.fixture
+async def test_valkey_live(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyLiveClient.create(
+        redis_target,
+        human_readable_name="test.live",
+        db_id=REDIS_LIVE_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
 
 
 @pytest.fixture

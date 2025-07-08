@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd
@@ -275,7 +276,7 @@ class SchedulerDispatcher(aobject):
     scale_timer: GlobalTimer
     update_session_status_timer: GlobalTimer
 
-    redis_live: RedisConnectionInfo
+    redis_live: ValkeyLiveClient
     redis_stat: RedisConnectionInfo
 
     def __init__(
@@ -295,11 +296,8 @@ class SchedulerDispatcher(aobject):
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             self.config_provider.config.redis.model_dump()
         )
-        self.redis_live = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            name="scheduler.live",
-            db=REDIS_LIVE_DB,
-        )
+        # redis_live will be initialized in __ainit__
+        self.redis_live = cast(ValkeyLiveClient, None)
         self.redis_stat = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="stat",
@@ -351,6 +349,17 @@ class SchedulerDispatcher(aobject):
         await self.session_start_timer.join()
         await self.scale_timer.join()
         await self.update_session_status_timer.join()
+
+        # Initialize ValkeyLiveClient
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self.config_provider.config.redis.model_dump()
+        )
+        self.redis_live = await ValkeyLiveClient.create(
+            redis_profile_target.profile_target(RedisRole.LIVE),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="scheduler.live",
+        )
+
         log.info("Session scheduler started")
 
     async def close(self) -> None:
@@ -381,22 +390,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
-                redis_key,
-                mapping={
-                    "trigger_event": event_name,
-                    "execution_time": datetime.now(tzutc()).isoformat(),
-                },
-            )
-            return pipe
-
-        await redis_helper.execute(
-            self.redis_live,
-            _pipeline,
+        # Execute Redis operations using ValkeyLiveClient batch
+        batch = self.redis_live.create_batch(is_atomic=True)
+        batch.delete([redis_key])
+        batch.hset(
+            redis_key,
+            {
+                "trigger_event": event_name,
+                "execution_time": datetime.now(tzutc()).isoformat(),
+            },
         )
+        await self.redis_live.execute_batch(batch)
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -426,23 +430,17 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await redis_helper.execute(
-                            self.redis_live,
-                            lambda r: r.hset(
-                                redis_key,
-                                "resource_group",
-                                sgroup_name,
-                            ),
+                        await self.redis_live.hset(
+                            redis_key,
+                            "resource_group",
+                            sgroup_name,
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await redis_helper.execute(
-                    self.redis_live,
-                    lambda r: r.hset(
-                        redis_key,
-                        "finish_time",
-                        datetime.now(tzutc()).isoformat(),
-                    ),
+                await self.redis_live.hset(
+                    redis_key,
+                    "finish_time",
+                    datetime.now(tzutc()).isoformat(),
                 )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1290,22 +1288,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
-                redis_key,
-                mapping={
-                    "trigger_event": event_name,
-                    "execution_time": datetime.now(tzutc()).isoformat(),
-                },
-            )
-            return pipe
-
-        await redis_helper.execute(
-            self.redis_live,
-            _pipeline,
+        # Execute Redis operations using ValkeyLiveClient batch
+        batch = self.redis_live.create_batch(is_atomic=True)
+        batch.delete([redis_key])
+        batch.hset(
+            redis_key,
+            {
+                "trigger_event": event_name,
+                "execution_time": datetime.now(tzutc()).isoformat(),
+            },
         )
+        await self.redis_live.execute_batch(batch)
         lock_lifetime = self.config_provider.config.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
@@ -1352,13 +1345,10 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            await redis_helper.execute(
-                self.redis_live,
-                lambda r: r.hset(
-                    redis_key,
-                    "finish_time",
-                    datetime.now(tzutc()).isoformat(),
-                ),
+            await self.redis_live.hset(
+                redis_key,
+                "finish_time",
+                datetime.now(tzutc()).isoformat(),
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1383,22 +1373,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.start"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
-                redis_key,
-                mapping={
-                    "trigger_event": event_name,
-                    "execution_time": datetime.now(tzutc()).isoformat(),
-                },
-            )
-            return pipe
-
-        await redis_helper.execute(
-            self.redis_live,
-            _pipeline,
+        # Execute Redis operations using ValkeyLiveClient batch
+        batch = self.redis_live.create_batch(is_atomic=True)
+        batch.delete([redis_key])
+        batch.hset(
+            redis_key,
+            {
+                "trigger_event": event_name,
+                "execution_time": datetime.now(tzutc()).isoformat(),
+            },
         )
+        await self.redis_live.execute_batch(batch)
         lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
@@ -1452,13 +1437,10 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            await redis_helper.execute(
-                self.redis_live,
-                lambda r: r.hset(
-                    redis_key,
-                    "finish_time",
-                    datetime.now(tzutc()).isoformat(),
-                ),
+            await self.redis_live.hset(
+                redis_key,
+                "finish_time",
+                datetime.now(tzutc()).isoformat(),
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1636,28 +1618,23 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
-                redis_key,
-                mapping={
-                    "trigger_event": event_name,
-                    "execution_time": datetime.now(tzutc()).isoformat(),
-                },
-            )
-            return pipe
+        # Execute Redis operations using ValkeyLiveClient batch
+        batch = self.redis_live.create_batch(is_atomic=True)
+        batch.delete([redis_key])
+        batch.hset(
+            redis_key,
+            {
+                "trigger_event": event_name,
+                "execution_time": datetime.now(tzutc()).isoformat(),
+            },
+        )
+        await self.redis_live.execute_batch(batch)
 
         async def _autoscale_txn() -> None:
             async with self.db.begin_session(commit_on_end=True) as session:
                 await self._autoscale_endpoints(session)
 
         await execute_with_retry(_autoscale_txn)
-
-        await redis_helper.execute(
-            self.redis_live,
-            _pipeline,
-        )
 
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
@@ -1764,13 +1741,10 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
-                redis_key,
-                "down",
-                dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
-            ),
+        await self.redis_live.hset(
+            redis_key,
+            "down",
+            dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
         )
 
         created_routes = []
@@ -1792,15 +1766,12 @@ class SchedulerDispatcher(aobject):
             await db_sess.commit()
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
-                redis_key,
-                mapping={
-                    "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
-                    "finish_time": datetime.now(tzutc()).isoformat(),
-                },
-            ),
+        await self.redis_live.hset(
+            redis_key,
+            mapping={
+                "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
+                "finish_time": datetime.now(tzutc()).isoformat(),
+            },
         )
 
         async def _delete():

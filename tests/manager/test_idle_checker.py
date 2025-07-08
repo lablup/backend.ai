@@ -181,10 +181,7 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
-        )
+        await checker_host._redis_live.set(f"session.{session_id}.last_access", str(last_access))
 
         should_alive = await network_idle_checker.check_idleness(
             kernel,
@@ -235,10 +232,7 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
-        )
+        await checker_host._redis_live.set(f"session.{session_id}.last_access", str(last_access))
 
         should_alive = await network_idle_checker.check_idleness(
             kernel,
@@ -293,10 +287,7 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
-        )
+        await checker_host._redis_live.set(f"session.{session_id}.last_access", str(last_access))
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
         should_alive = await network_idle_checker.check_idleness(
@@ -353,10 +344,7 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
-        )
+        await checker_host._redis_live.set(f"session.{session_id}.last_access", str(last_access))
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
         should_alive = await network_idle_checker.check_idleness(
