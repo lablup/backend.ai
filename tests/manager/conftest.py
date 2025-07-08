@@ -930,7 +930,15 @@ async def registry_ctx(mocker):
     mock_redis_stat = MagicMock()
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
-    mock_redis_image = MagicMock()
+    # Create a mock ValkeyImageClient that satisfies the type requirements
+    mock_redis_image = AsyncMock()
+    mock_redis_image.close = AsyncMock()  # Add required async methods
+    mock_redis_image.get_all_agents_images = AsyncMock(return_value=[])
+    mock_redis_image.get_agent_images = AsyncMock(return_value=[])
+    mock_redis_image.add_agent_image = AsyncMock()
+    mock_redis_image.remove_agent_image = AsyncMock()
+    mock_redis_image.remove_agent = AsyncMock()
+    mock_redis_image.clear_all_images = AsyncMock()
     mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
