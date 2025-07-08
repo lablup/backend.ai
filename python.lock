@@ -23,6 +23,7 @@
 //     "aiohttp~=3.11.16",
 //     "aiomonitor~=0.7.0",
 //     "aioresponses>=0.7.3",
+//     "aiosignal==1.3.2",
 //     "aiosqlite~=0.21.0",
 //     "aiotools~=1.9.0",
 //     "aiotusclient~=0.1.4",
@@ -110,6 +111,7 @@
 //     "types-setuptools",
 //     "types-six",
 //     "types-tabulate",
+//     "types-toml",
 //     "typing_extensions~=4.11",
 //     "uvloop~=0.21; sys_platform != \"Windows\"",
 //     "valkey-glide~=2.0.1",
@@ -498,22 +500,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
-              "url": "https://files.pythonhosted.org/packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl"
+              "hash": "45cde58e409a301715980c2b01d0c28bdde3770d8290b5eb2173759d9acb31a5",
+              "url": "https://files.pythonhosted.org/packages/ec/6a/bc7e17a3e87a2985d3e8f4da4cd0f481060eb78fb08596c42be62c90a4d9/aiosignal-1.3.2-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7",
-              "url": "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz"
+              "hash": "a8c255c66fafb1e499c9351d0bf32ff2d8a0321595ebac3b93713656d2436f54",
+              "url": "https://files.pythonhosted.org/packages/ba/b5/6d55e80f6d8a08ce22b982eafa278d823b541c925f11ee774b0b9c43473d/aiosignal-1.3.2.tar.gz"
             }
           ],
           "project_name": "aiosignal",
           "requires_dists": [
-            "frozenlist>=1.1.0",
-            "typing-extensions>=4.2; python_version < \"3.13\""
+            "frozenlist>=1.1.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.4.0"
+          "version": "1.3.2"
         },
         {
           "artifacts": [
@@ -5850,6 +5851,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "627b47775d25fa29977d9c70dc0cbab3f314f32c8d8d0c012f2ef5de7aaec05d",
+              "url": "https://files.pythonhosted.org/packages/da/a2/d32ab58c0b216912638b140ab2170ee4b8644067c293b170e19fba340ccc/types_toml-0.10.8.20240310-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3d41501302972436a6b8b239c850b26689657e25281b48ff0ec06345b8830331",
+              "url": "https://files.pythonhosted.org/packages/86/47/3e4c75042792bff8e90d7991aa5c51812cc668828cc6cce711e97f63a607/types-toml-0.10.8.20240310.tar.gz"
+            }
+          ],
+          "project_name": "types-toml",
+          "requires_dists": [],
+          "requires_python": ">=3.8",
+          "version": "0.10.8.20240310"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "d1e1e3b58374dc93031d6eda2420a48ea44a36c2b4766a4fdeb3710755731d76",
               "url": "https://files.pythonhosted.org/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl"
             },
@@ -6393,6 +6412,7 @@
     "aiohttp~=3.11.16",
     "aiomonitor~=0.7.0",
     "aioresponses>=0.7.3",
+    "aiosignal==1.3.2",
     "aiosqlite~=0.21.0",
     "aiotools~=1.9.0",
     "aiotusclient~=0.1.4",
@@ -6480,6 +6500,7 @@
     "types-setuptools",
     "types-six",
     "types-tabulate",
+    "types-toml",
     "typing_extensions~=4.11",
     "uvloop~=0.21; sys_platform != \"Windows\"",
     "valkey-glide~=2.0.1",

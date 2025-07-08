@@ -7,7 +7,7 @@ and examples using JSON Schema.
 """
 
 import textwrap
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import toml
 from pydantic import BaseModel
@@ -31,7 +31,7 @@ def _wrap_comment(text: str, width: int = 80) -> str:
     return "\n".join(wrapped_lines)
 
 
-def _get_field_comment(field_schema: Dict[str, Any]) -> str:
+def _get_field_comment(field_schema: dict[str, Any]) -> str:
     """Generate comment for a field based on its schema."""
     comment_parts = []
 
@@ -47,7 +47,7 @@ def _get_field_comment(field_schema: Dict[str, Any]) -> str:
     return "\n".join(comment_parts)
 
 
-def _get_default_from_schema(field_schema: Dict[str, Any]) -> Any:
+def _get_default_from_schema(field_schema: dict[str, Any]) -> Any:
     """Get default value from JSON schema."""
     if "default" in field_schema:
         return field_schema["default"]
@@ -71,13 +71,13 @@ def _get_default_from_schema(field_schema: Dict[str, Any]) -> Any:
 
 
 def _generate_config_from_schema(
-    schema: Dict[str, Any], definitions: Dict[str, Any] = None
-) -> Dict[str, Any]:
+    schema: dict[str, Any], definitions: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Generate configuration dictionary from JSON schema."""
     if definitions is None:
         definitions = schema.get("$defs", {})
 
-    config = {}
+    config: dict[str, Any] = {}
     properties = schema.get("properties", {})
 
     for field_name, field_schema in properties.items():
@@ -152,7 +152,7 @@ def _generate_config_from_schema(
 
 
 def _add_field_comments_from_schema(
-    toml_str: str, schema: Dict[str, Any], definitions: Dict[str, Any] = None
+    toml_str: str, schema: dict[str, Any], definitions: Optional[dict[str, Any]] = None
 ) -> str:
     """Add comments to TOML string based on JSON schema."""
     if definitions is None:
