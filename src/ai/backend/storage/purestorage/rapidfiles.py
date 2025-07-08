@@ -71,7 +71,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                     if not line:
                         break
                     line = line.rstrip(b"\n")
-                    item = load_json(line)
+                    item = json.loads(line)
 
                     item_path = Path(item["path"])
                     entry_type = DirEntryType.FILE
