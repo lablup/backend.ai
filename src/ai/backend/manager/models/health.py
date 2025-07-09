@@ -208,12 +208,8 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
     try:
         _raw_value = cast(
             list[bytes] | None,
-            await redis_helper.execute_script(
-                root_ctx.valkey_stat_client,
-                "read_manager_status",
-                _read_manager_status_script,
-                [f"{MANAGER_STATUS_KEY}*"],
-                [],
+            await root_ctx.valkey_stat_client.scan_and_get_manager_status(
+                f"{MANAGER_STATUS_KEY}*",
             ),
         )
     except (asyncio.TimeoutError, redis.exceptions.ConnectionError):

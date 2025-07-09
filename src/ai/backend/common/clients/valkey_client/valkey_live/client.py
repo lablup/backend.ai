@@ -141,9 +141,26 @@ class ValkeyLiveClient:
 
     # Public methods for specific use cases (with decorator)
     @valkey_decorator()
-    async def get(self, key: str) -> Optional[bytes]:
-        """Get value by key."""
+    async def get_live_data(self, key: str) -> Optional[bytes]:
+        """Get live data value by key."""
         return await self._get(key)
+
+    @valkey_decorator()
+    async def get(self, key: str) -> Optional[bytes]:
+        """Get value by key (deprecated: use get_live_data)."""
+        return await self._get(key)
+
+    @valkey_decorator()
+    async def store_live_data(
+        self,
+        key: str,
+        value: str | bytes,
+        *,
+        ex: Optional[int] = None,
+        xx: Optional[bool] = None,
+    ) -> None:
+        """Store live data value for key with optional expiration."""
+        await self._set(key, value, ex=ex, xx=xx)
 
     @valkey_decorator()
     async def set(
@@ -154,7 +171,7 @@ class ValkeyLiveClient:
         ex: Optional[int] = None,
         xx: Optional[bool] = None,
     ) -> None:
-        """Set value for key with optional expiration."""
+        """Set value for key with optional expiration (deprecated: use store_live_data)."""
         await self._set(key, value, ex=ex, xx=xx)
 
     @valkey_decorator()
@@ -177,6 +194,18 @@ class ValkeyLiveClient:
         )
 
     @valkey_decorator()
+    async def store_scheduler_metadata(
+        self,
+        name: str,
+        key: Optional[str] = None,
+        value: Optional[str | bytes] = None,
+        *,
+        mapping: Optional[Mapping[str, str | bytes]] = None,
+    ) -> int:
+        """Store scheduler metadata in hash fields."""
+        return await self._hset(name, key, value, mapping=mapping)
+
+    @valkey_decorator()
     async def hset(
         self,
         name: str,
@@ -185,7 +214,7 @@ class ValkeyLiveClient:
         *,
         mapping: Optional[Mapping[str, str | bytes]] = None,
     ) -> int:
-        """Set hash field(s) for scheduler operations."""
+        """Set hash field(s) for scheduler operations (deprecated: use store_scheduler_metadata)."""
         return await self._hset(name, key, value, mapping=mapping)
 
     def create_batch(self, is_atomic: bool = False) -> "ValkeyLiveBatch":
@@ -225,6 +254,25 @@ class ValkeyLiveClient:
         results = await self.execute_batch(batch)
         return results
 
+    @valkey_decorator()
+    async def update_connection_tracker(
+        self,
+        tracker_key: str,
+        tracker_value: str,
+    ) -> None:
+        """
+        Update connection tracker with current timestamp.
+
+        :param tracker_key: The key for the connection tracker sorted set.
+        :param tracker_value: The value to add to the tracker.
+        """
+        # Get current server time
+        time_result = await self._time()
+        current_time = time_result[0] + (time_result[1] / 1000000)
+
+        # Add to sorted set with timestamp as score
+        await self._client.client.zadd(tracker_key, {tracker_value: current_time})
+
 
 class ValkeyLiveBatch:
     """
@@ -253,13 +301,26 @@ class ValkeyLiveBatch:
             keys = [keys]
         self._batch.delete(cast(List[str | bytes], keys))
 
+    def store_scheduler_metadata(
+        self,
+        name: str,
+        mapping: Mapping[str, str | bytes],
+    ) -> None:
+        """
+        Add scheduler metadata storage operation to batch.
+
+        :param name: The name of the hash.
+        :param mapping: Dictionary of field-value pairs.
+        """
+        self._batch.hset(name, cast(Mapping[str | bytes, str | bytes], mapping))
+
     def hset(
         self,
         name: str,
         mapping: Mapping[str, str | bytes],
     ) -> None:
         """
-        Add hash set operation to batch.
+        Add hash set operation to batch (deprecated: use store_scheduler_metadata).
 
         :param name: The name of the hash.
         :param mapping: Dictionary of field-value pairs.

@@ -12,7 +12,6 @@ import base64
 import json
 import logging
 import secrets
-import textwrap
 import uuid
 import weakref
 from collections import defaultdict
@@ -503,27 +502,21 @@ async def stream_proxy(
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent(
-        """
-        local now = redis.call('TIME')
-        now = now[1] + (now[2] / (10^6))
-        redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """
-    )
+    async def update_connection_tracker() -> None:
+        """Update connection tracker with current timestamp."""
+        # Get current server time
+        now = await redis_live.client.time()
+        timestamp = now[0] + (now[1] / 1000000)
+
+        # Add to sorted set with timestamp as score
+        await redis_live.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
             rpc_ptask_group.create_task(
                 call_non_bursty(
                     conn_tracker_key,
-                    apartial(
-                        redis_helper.execute_script,
-                        redis_live,
-                        "update_conn_tracker",
-                        _conn_tracker_script,
-                        [conn_tracker_key],
-                        [conn_tracker_val],
-                    ),
+                    update_connection_tracker,
                     max_bursts=128,
                     max_idle=5000,
                 ),

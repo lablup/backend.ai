@@ -6,7 +6,6 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 
@@ -87,12 +86,9 @@ async def check_concurrency(
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
-    ok, concurrency_used = await redis_helper.execute_script(
-        sched_ctx.registry.valkey_stat_client,
-        "check_keypair_concurrency_used",
-        _check_keypair_concurrency_script,
-        [redis_key],
-        [max_concurrent_sessions],
+    ok, concurrency_used = await sched_ctx.registry.valkey_stat_client.check_keypair_concurrency(
+        redis_key,
+        max_concurrent_sessions,
     )
     if ok == 0:
         return PredicateResult(

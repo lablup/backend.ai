@@ -1503,7 +1503,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             image_id = image["digest"].partition(":")[-1]
             # check if distro data is available on redis cache
             cached_distro = await redis_helper.execute(
-                self.valkey_stat_client_pool, lambda r: r.get(f"image:{image_id}:distro")
+                self.valkey_stat_client, lambda r: r.get(f"image:{image_id}:distro")
             )
             if cached_distro:
                 return cached_distro.decode()
@@ -1546,7 +1546,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             else:
                 raise RuntimeError("Could not determine the C library variant.")
             await redis_helper.execute(
-                self.valkey_stat_client_pool, lambda r: r.set(f"image:{image_id}:distro", distro)
+                self.valkey_stat_client, lambda r: r.set(f"image:{image_id}:distro", distro)
             )
             return distro
 

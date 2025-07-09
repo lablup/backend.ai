@@ -129,6 +129,26 @@ class ValkeyRateLimitClient:
         return 0
 
     @valkey_decorator()
+    async def set_rate_limit_config(
+        self,
+        key: str,
+        value: str,
+        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
+    ) -> None:
+        """
+        Set rate limit configuration with expiration time.
+
+        :param key: The key to set.
+        :param value: The configuration value to set.
+        :param expiration: The expiration time in seconds.
+        """
+        await self._client.client.set(
+            key=key,
+            value=value,
+            expiry=ExpirySet(ExpiryType.SEC, expiration),
+        )
+
+    @valkey_decorator()
     async def set_with_expiration(
         self,
         key: str,
@@ -136,7 +156,7 @@ class ValkeyRateLimitClient:
         expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
     ) -> None:
         """
-        Set a key with expiration time.
+        Set a key with expiration time (deprecated: use set_rate_limit_config).
 
         :param key: The key to set.
         :param value: The value to set.
@@ -173,9 +193,20 @@ class ValkeyRateLimitClient:
         return 0
 
     @valkey_decorator()
+    async def get_rate_limit_data(self, key: str) -> Optional[str]:
+        """
+        Get rate limit data by key.
+
+        :param key: The key to get.
+        :return: The rate limit data or None if not found.
+        """
+        result = await self._client.client.get(key)
+        return result.decode("utf-8") if result else None
+
+    @valkey_decorator()
     async def get_key(self, key: str) -> Optional[str]:
         """
-        Get the value of a key.
+        Get the value of a key (deprecated: use get_rate_limit_data).
 
         :param key: The key to get.
         :return: The value or None if not found.

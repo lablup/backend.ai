@@ -87,14 +87,45 @@ class ValkeyStatClient:
         await self._client.disconnect()
 
     @valkey_decorator()
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get_cached_stat(self, key: str) -> Optional[bytes]:
         """
-        Get the value of a key.
+        Get cached statistics data by key.
 
         :param key: The key to retrieve.
-        :return: The value of the key, or None if the key doesn't exist.
+        :return: The cached statistics value, or None if the key doesn't exist.
         """
         return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def get(self, key: str) -> Optional[bytes]:
+        """
+        Get value by key.
+
+        :param key: The key to retrieve.
+        :return: The value, or None if the key doesn't exist.
+        """
+        return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def cache_agent_stat(
+        self,
+        key: str,
+        value: bytes,
+        expire_sec: Optional[int] = None,
+    ) -> None:
+        """
+        Cache agent statistics data with optional expiration.
+
+        :param key: The key to set.
+        :param value: The statistics value to cache.
+        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
+        """
+        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
+        await self._client.client.set(
+            key=key,
+            value=value,
+            expiry=ExpirySet(ExpiryType.SEC, expiration),
+        )
 
     @valkey_decorator()
     async def set(
@@ -104,7 +135,7 @@ class ValkeyStatClient:
         expire_sec: Optional[int] = None,
     ) -> None:
         """
-        Set the value of a key with optional expiration.
+        Set the value of a key with optional expiration (deprecated: use cache_agent_stat).
 
         :param key: The key to set.
         :param value: The value to set.
@@ -182,6 +213,31 @@ class ValkeyStatClient:
         return await self._client.client.mget(list(keys))
 
     @valkey_decorator()
+    async def store_agent_metadata(
+        self,
+        key: str,
+        field_value_map: Mapping[str, bytes],
+        expire_sec: Optional[int] = None,
+    ) -> None:
+        """
+        Store agent metadata using hash fields.
+
+        :param key: The hash key.
+        :param field_value_map: Mapping of field names to values.
+        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
+        """
+        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
+
+        # Use batch operation to set hash fields and expiration atomically
+        batch = self._create_batch(is_atomic=True)
+
+        # Convert mapping to proper format for hset
+        batch.hset(key, cast(Mapping[Union[str, bytes], Union[str, bytes]], field_value_map))
+        batch.expire(key, expiration)
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
     async def hset(
         self,
         key: str,
@@ -189,7 +245,7 @@ class ValkeyStatClient:
         expire_sec: Optional[int] = None,
     ) -> None:
         """
-        Set multiple hash fields to multiple values.
+        Set multiple hash fields to multiple values (deprecated: use store_agent_metadata).
 
         :param key: The hash key.
         :param field_value_map: Mapping of field names to values.
@@ -271,13 +327,40 @@ class ValkeyStatClient:
         return cast(List[Optional[bytes]], results)
 
     @valkey_decorator()
+    async def cache_kernel_stats(
+        self,
+        key_value_map: Mapping[str, bytes],
+        expire_sec: Optional[int] = None,
+    ) -> None:
+        """
+        Cache kernel statistics data efficiently using batch operations.
+
+        :param key_value_map: Mapping of kernel IDs to statistics values.
+        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
+        """
+        if not key_value_map:
+            return
+
+        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
+        batch = self._create_batch(is_atomic=True)
+
+        for key, value in key_value_map.items():
+            batch.set(
+                key=key,
+                value=value,
+                expiry=ExpirySet(ExpiryType.SEC, expiration),
+            )
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
     async def set_multiple_keys(
         self,
         key_value_map: Mapping[str, bytes],
         expire_sec: Optional[int] = None,
     ) -> None:
         """
-        Set multiple keys efficiently using batch operations.
+        Set multiple keys efficiently using batch operations (deprecated: use cache_kernel_stats).
 
         :param key_value_map: Mapping of keys to values.
         :param expire_sec: Expiration time in seconds. If None, uses default expiration.
@@ -296,6 +379,210 @@ class ValkeyStatClient:
             )
 
         await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def update_kernel_commit_statuses(
+        self,
+        kernel_ids: List[str],
+        expire_sec: int,
+    ) -> None:
+        """
+        Update kernel commit statuses with expiration.
+
+        :param kernel_ids: List of kernel IDs to update.
+        :param expire_sec: Expiration time in seconds.
+        """
+        if not kernel_ids:
+            return
+
+        # Use batch operations to set multiple keys with same value and expiration
+        batch = self._create_batch(is_atomic=True)
+
+        for kernel_id in kernel_ids:
+            key = f"kernel.{kernel_id}.commit"
+            batch.set(
+                key=key,
+                value=b"ongoing",
+                expiry=ExpirySet(ExpiryType.SEC, expire_sec),
+            )
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def register_session_ids_for_status_update(
+        self,
+        status_set_key: str,
+        session_ids: List[bytes],
+    ) -> None:
+        """
+        Register session IDs for status updates using set operations.
+
+        :param status_set_key: The key for the status set.
+        :param session_ids: List of encoded session IDs.
+        """
+        if not session_ids:
+            return
+
+        # Use SADD to add session IDs to the set
+        for session_id in session_ids:
+            await self._client.client.sadd(status_set_key, [session_id])
+
+    @valkey_decorator()
+    async def get_and_clear_session_ids_for_status_update(
+        self,
+        status_set_key: str,
+    ) -> List[bytes]:
+        """
+        Get all session IDs from the status set and clear it atomically.
+
+        :param status_set_key: The key for the status set.
+        :return: List of encoded session IDs.
+        """
+        # Use batch operations to get count, then pop all members
+        batch = self._create_batch(is_atomic=True)
+        batch.scard(status_set_key)
+
+        # Execute first to get the count
+        results = await self._client.client.exec(batch, raise_on_error=True)
+        count = results[0] if results else 0
+
+        if count == 0:
+            return []
+
+        # Pop all members
+        result = await self._client.client.spop(status_set_key)
+        return cast(List[bytes], result or [])
+
+    @valkey_decorator()
+    async def remove_session_ids_from_status_update(
+        self,
+        status_set_key: str,
+        session_ids: List[bytes],
+    ) -> int:
+        """
+        Remove session IDs from the status update set.
+
+        :param status_set_key: The key for the status set.
+        :param session_ids: List of encoded session IDs to remove.
+        :return: Number of session IDs removed.
+        """
+        if not session_ids:
+            return 0
+
+        # Use SREM to remove session IDs from the set
+        removed_count = 0
+        for session_id in session_ids:
+            removed_count += await self._client.client.srem(status_set_key, [session_id])
+        return removed_count
+
+    @valkey_decorator()
+    async def update_abuse_report(
+        self,
+        hash_name: str,
+        new_report: Mapping[str, Any],
+    ) -> None:
+        """
+        Update kernel abuse report data, removing stale entries and adding new ones.
+
+        :param hash_name: The hash key for storing abuse reports.
+        :param new_report: New abuse report data as a mapping.
+        """
+        # Get all current report keys
+        current_keys = await self._client.client.hkeys(hash_name)
+
+        # Use batch operations to update the report atomically
+        batch = self._create_batch(is_atomic=True)
+
+        # Remove stale entries
+        if current_keys:
+            for key in current_keys:
+                key_str = key.decode("utf-8") if isinstance(key, bytes) else str(key)
+                if key_str not in new_report:
+                    batch.hdel(hash_name, [key])
+
+        # Add/update new entries
+        if new_report:
+            for kern_id, report_val in new_report.items():
+                report_bytes = (
+                    str(report_val).encode("utf-8")
+                    if not isinstance(report_val, bytes)
+                    else report_val
+                )
+                batch.hset(hash_name, {kern_id: report_bytes})
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def check_keypair_concurrency(
+        self,
+        redis_key: str,
+        limit: int,
+    ) -> tuple[int, int]:
+        """
+        Check and increment keypair concurrency usage.
+
+        :param redis_key: The key for storing concurrency count.
+        :param limit: The maximum allowed concurrent sessions.
+        :return: Tuple of (ok, concurrency_used) where ok is 1 if allowed, 0 if limit exceeded.
+        """
+        # Set default value if key doesn't exist
+        current_value = await self._client.client.get(redis_key)
+        if current_value is None:
+            await self._client.client.set(redis_key, "0")
+
+        # Get current count
+        result = await self._client.client.get(redis_key)
+        if result is not None:
+            try:
+                current_count = int(str(result))
+            except (ValueError, TypeError):
+                current_count = 0
+        else:
+            current_count = 0
+
+        # Check if limit is exceeded
+        if limit > 0 and current_count >= limit:
+            return (0, current_count)
+
+        # Increment counter
+        await self._client.client.incr(redis_key)
+        return (1, current_count + 1)
+
+    @valkey_decorator()
+    async def scan_and_get_manager_status(
+        self,
+        pattern: str,
+    ) -> List[Optional[bytes]]:
+        """
+        Scan for manager status keys and get their values.
+
+        :param pattern: The pattern to match keys against.
+        :return: List of values for matching keys.
+        """
+        # Use SCAN to find all matching keys
+        cursor = 0
+        matched_keys: list[bytes] = []
+
+        while True:
+            result = await self._client.client.scan(str(cursor), match=pattern)
+            if isinstance(result[0], (int, str, bytes)):
+                cursor = int(str(result[0]))
+            else:
+                cursor = 0
+            if isinstance(result[1], list):
+                matched_keys.extend(result[1])
+
+            if cursor == 0:
+                break
+
+        if not matched_keys:
+            return []
+
+        # Get all values for matched keys
+        str_keys: list[str | bytes] = [
+            key.decode("utf-8") if isinstance(key, bytes) else str(key) for key in matched_keys
+        ]
+        return await self._client.client.mget(str_keys)
 
     # Compatibility methods for redis_helper interface
     async def execute(
