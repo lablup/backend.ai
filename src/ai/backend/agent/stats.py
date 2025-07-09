@@ -821,7 +821,7 @@ class StatContext:
             )
 
             # Use ValkeyStatClient set_multiple_keys for batch operations
-            key_value_map = {}
+            key_value_map: dict[str, bytes] = {}
             for cid in updated_cids:
                 serializable_table = {}
                 for pid in self.process_metrics[cid].keys():
@@ -841,7 +841,7 @@ class StatContext:
                         serializable_table,
                     )
                 serialized_metrics = msgpack.packb(serializable_table)
-                key_value_map[cid] = serialized_metrics
+                key_value_map[str(cid)] = serialized_metrics
 
             if key_value_map:
                 await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)
