@@ -289,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "行動",
+      "Allowed": "許可された",
       "ClickFilebrowserButton": "フォルダをアップロードするには、[ファイルブラウザの実行]ボタンをクリックしてください。",
       "CreateANewFolder": "新しいフォルダを作成します",
       "Created": "作成した",
@@ -329,6 +330,7 @@
       "RemoveFileExtension": "取り除く ",
       "RenameAFile": "ファイルの名前を変更",
       "RenameAFolder": "フォルダー名の変更",
+      "RetryingOperation": "セッションを確立するために再試行...",
       "RunSSH/SFTPserver": "SFTPサーバーの使用",
       "SFTPSessionNotAvailable": "現在、SFTPセッションの使用ができません。",
       "ShareFolder": "共有フォルダ",
@@ -1128,6 +1130,7 @@
     "MaxFolderCount": "最大フォルダ数",
     "MaxNetworkCount": "最大ネットワーク数",
     "MaxPendingSessionCount": "最大保留中のセッションカウント",
+    "MaxPendingSessionResourceSlots": "最大保留中のセッションリソーススロット",
     "MaxQuotaScopeSize": "最大クォータ スコープ サイズ (GB)",
     "MaxSessionCountPerModelSession": "モデルセッションごとの最大セッション数",
     "MaxSessionLifetime": "セッションの最大実行時間",
