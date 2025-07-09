@@ -732,7 +732,9 @@ class SessionRow(Base):
     domain = relationship("DomainRow", back_populates="sessions")
     group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
     group = relationship("GroupRow", back_populates="sessions")
-    user_uuid = sa.Column("user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"))
+    user_uuid = sa.Column(
+        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    )
     user = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,

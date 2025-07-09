@@ -412,5 +412,10 @@ def scheduler():
     """Command set for scheduler related operations."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.config:cli")
+def config():
+    """Command set for configuration management."""
+
+
 if __name__ == "__main__":
     main()
