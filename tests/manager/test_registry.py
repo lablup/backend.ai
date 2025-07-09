@@ -34,9 +34,6 @@ async def test_handle_heartbeat(
         "ai.backend.manager.models.container_registry.ContainerRegistryRow.get_known_container_registries",
         mock_get_known_container_registries,
     )
-    mock_redis_wrapper = MagicMock()
-    mock_redis_wrapper.execute = AsyncMock()
-    mocker.patch("ai.backend.manager.registry.redis_helper", mock_redis_wrapper)
 
     def mocked_entrypoints(entry_point_group: str, blocklist: Optional[set[str]] = None):
         return []
@@ -44,6 +41,11 @@ async def test_handle_heartbeat(
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
     registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_config_provider, _, _ = registry_ctx
+
+    # Mock redis_live methods since redis_helper is no longer used
+    mock_redis_live = MagicMock()
+    mock_redis_live.update_agent_last_seen = AsyncMock()
+    mocker.patch.object(registry, "redis_live", mock_redis_live)
     image_data = zlib.compress(
         msgpack.packb([
             ("index.docker.io/lablup/python:3.6-ubuntu18.04",),

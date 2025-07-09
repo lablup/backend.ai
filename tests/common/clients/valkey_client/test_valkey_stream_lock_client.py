@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 
-from ai.backend.common.clients.valkey_stream_lock.client import ValkeyStreamLockClient
+from ai.backend.common.clients.valkey_client.valkey_stream_lock.client import ValkeyStreamLockClient
 
 
 async def test_valkey_stream_lock_ping(test_valkey_stream_lock: ValkeyStreamLockClient) -> None:

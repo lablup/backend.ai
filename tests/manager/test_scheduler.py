@@ -601,9 +601,12 @@ async def test_manually_assign_agent_available(
     ) = registry_ctx
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
-    mock_redis_wrapper = MagicMock()
-    mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
-    mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
+    # Mock the recalc_concurrency_used function since it uses ValkeyStatClient
+    mock_recalc_concurrency_used = AsyncMock()
+    mocker.patch(
+        "ai.backend.manager.scheduler.dispatcher.recalc_concurrency_used",
+        mock_recalc_concurrency_used,
+    )
     sgroup_opts = ScalingGroupOpts()
     agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(

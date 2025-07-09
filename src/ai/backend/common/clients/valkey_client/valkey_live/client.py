@@ -121,8 +121,10 @@ class ValkeyLiveClient:
                 f"Unexpected result from time command: {result}. Expected a tuple of (seconds, microseconds)."
             )
         seconds_bytes, microseconds_bytes = result
-        seconds = cast(int, seconds_bytes)
-        microseconds = cast(int, microseconds_bytes)
+        seconds = int(seconds_bytes) if isinstance(seconds_bytes, bytes) else seconds_bytes
+        microseconds = (
+            int(microseconds_bytes) if isinstance(microseconds_bytes, bytes) else microseconds_bytes
+        )
         return seconds + (microseconds / 10**6)
 
     @valkey_decorator()
