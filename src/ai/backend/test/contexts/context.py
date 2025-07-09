@@ -25,6 +25,7 @@ class ContextName(enum.StrEnum):
     DOMAIN = "domain"
     GROUP = "group"
     SCALING_GROUP = "scaling_group"
+    USER_RESOURCE_POLICY = "user_resource_policy"
     MODEL_SERVICE = "model_service"
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
