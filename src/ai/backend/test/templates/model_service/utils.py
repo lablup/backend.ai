@@ -1,11 +1,12 @@
 import asyncio
 from uuid import UUID
 
-from ai.backend.client.output.fields import session_node_fields
+from ai.backend.client.output.fields import service_fields, session_node_fields
 from ai.backend.client.session import AsyncSession
 
 
-async def wait_until_all_inference_sessions_ready(
+# TODO: Remove the polling loop below after the SSE API is added to the model service API
+async def ensure_inference_sessions_ready(
     client_session: AsyncSession,
     endpoint_id: UUID,
     replicas: int,
@@ -16,15 +17,23 @@ async def wait_until_all_inference_sessions_ready(
     and has the model vfolder mounted.
     """
     while True:
-        result = await client_session.Service(endpoint_id).info()
-        active_routes = result["active_routes"]
-        session_ids = [route["session_id"] for route in active_routes]
+        result = await client_session.Service.detail(
+            service_id=str(endpoint_id),
+            fields=[
+                service_fields["routings"],
+            ],
+        )
+        routings_info = result["routings"]
+        healthy_session_ids = []
+        for routing in routings_info:
+            if routing["session"] is not None and routing["status"] == "HEALTHY":
+                healthy_session_ids.append(routing["session"])
 
-        ready_session_cnt = 0
-        for session_id in session_ids:
-            # Wait until all inference sessions are ready.
-            if not session_id:
-                break
+        if len(healthy_session_ids) != replicas:
+            await asyncio.sleep(1)
+            continue
+
+        for session_id in healthy_session_ids:
             session_info = await client_session.ComputeSession.from_session_id(
                 UUID(session_id)
             ).detail([
@@ -37,15 +46,13 @@ async def wait_until_all_inference_sessions_ready(
                 f"Session type should be 'inference'. "
                 f"Actual type: {session_info['type']}, session_id: {session_id}"
             )
-            assert session_info["vfolder_mounts"] == [str(vfolder_id)], (
+            assert str(vfolder_id) in session_info["vfolder_mounts"], (
                 f"Model vfolder should be mounted into the inference session. "
                 f"Actual mounted vfolder: {session_info['vfolder_mounts']}, "
                 f"session_id: {session_id}"
             )
-            if session_info["status"] == "RUNNING":
-                ready_session_cnt += 1
-
-        if ready_session_cnt >= replicas:
-            break
-
-        await asyncio.sleep(1)
+            assert session_info["status"] == "RUNNING", (
+                f"Session should be in RUNNING state. "
+                f"Actual status: {session_info['status']}, session_id: {session_id}"
+            )
+        break

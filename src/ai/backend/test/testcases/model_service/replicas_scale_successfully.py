@@ -8,7 +8,7 @@ from ai.backend.test.contexts.model_service import (
     CreatedModelServiceEndpointMetaContext,
     ModelServiceContext,
 )
-from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
+from ai.backend.test.templates.model_service.utils import ensure_inference_sessions_ready
 from ai.backend.test.templates.template import TestCode
 
 _ENDPOINT_CREATION_TIMEOUT = 30
@@ -23,7 +23,7 @@ class ReplicasScaleSuccessfully(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         model_service_dep = ModelServiceContext.current()
-        original_replicas_count = model_service_dep.replicas
+        original_replicas_count = model_service_dep.initial_replicas
         model_service_endpoint_meta = CreatedModelServiceEndpointMetaContext.current()
         service_id = model_service_endpoint_meta.service_id
 
@@ -59,7 +59,7 @@ class ReplicasScaleSuccessfully(TestCode):
         vfolder_id: UUID,
     ) -> None:
         await asyncio.wait_for(
-            wait_until_all_inference_sessions_ready(
+            ensure_inference_sessions_ready(
                 client_session=client_session,
                 endpoint_id=endpoint_id,
                 replicas=expected_replicas,

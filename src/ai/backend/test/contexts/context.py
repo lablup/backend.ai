@@ -37,18 +37,23 @@ class ContextName(enum.StrEnum):
     SESSION_DEPENDENCY = "session_dependency"
     VFOLDER = "vfolder"
     VFOLDER_UPLOAD_FILES = "vfolder_upload_files"
+    MODEL_SERVICE_SCALE_REPLICAS = "model_service_scale_replicas"
+    SCALED_MODEL_SERVICE_REPLICA_COUNT = "scaled_model_service_replica_count"
 
     VFOLDER_UPLOADED_FILES_META = "vfolder_uploaded_files_meta"
+    MODEL_SERVICE_AUTO_SCALING_RULE = "model_service_auto_scaling_rule"
+
     CREATED_VFOLDER_META = "created_vfolder_meta"
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
-    CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
     CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
+    CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
     CREATED_USER_CONTEXT = "created_user_context"
     CREATED_USER_CLIENT_SESSION = "created_user_client_session"
     CREATED_GROUP = "created_group"
     VFOLDER_INVITATION = "vfolder_invitation"
     VFOLDER_INVITATION_PERMISSION = "vfolder_invitation_permission"
+    CREATED_AUTO_SCALING_RULE_ID = "created_auto_scaling_rule_id"
 
 
 class BaseTestContext(Generic[T]):
