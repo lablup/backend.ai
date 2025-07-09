@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -113,13 +113,9 @@ GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
-    raw_alloc_map = await redis_helper.execute(
-        ctx.valkey_stat_client, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
-    )
-
+    raw_alloc_map = await ctx.valkey_stat_client.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        alloc_map = load_json(raw_alloc_map)
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
+        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
     return {}
 
 

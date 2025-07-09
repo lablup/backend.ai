@@ -149,26 +149,6 @@ class ValkeyRateLimitClient:
         )
 
     @valkey_decorator()
-    async def set_with_expiration(
-        self,
-        key: str,
-        value: str,
-        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> None:
-        """
-        Set a key with expiration time (deprecated: use set_rate_limit_config).
-
-        :param key: The key to set.
-        :param value: The value to set.
-        :param expiration: The expiration time in seconds.
-        """
-        await self._client.client.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
-        )
-
-    @valkey_decorator()
     async def increment_with_expiration(
         self,
         key: str,

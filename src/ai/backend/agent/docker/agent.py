@@ -1502,11 +1502,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async with Docker() as docker:
             image_id = image["digest"].partition(":")[-1]
             # check if distro data is available on redis cache
-            cached_distro = await redis_helper.execute(
-                self.valkey_stat_client, lambda r: r.get(f"image:{image_id}:distro")
-            )
+            cached_distro = await self.valkey_stat_client.get_image_distro(image_id)
             if cached_distro:
-                return cached_distro.decode()
+                return cached_distro
 
             container_config: dict[str, Any] = {
                 "Image": image["canonical"],

@@ -7,25 +7,6 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import (
 )
 
 
-async def test_valkey_stat_basic_operations(test_valkey_stat: ValkeyStatClient) -> None:
-    """Test basic get/set/delete operations."""
-    test_key = f"test-key-{random.randint(1000, 9999)}"
-    test_value = b"test-value"
-
-    # Test set and get
-    await test_valkey_stat.set(test_key, test_value)
-    result = await test_valkey_stat.get(test_key)
-    assert result == test_value
-
-    # Test delete
-    deleted_count = await test_valkey_stat.delete([test_key])
-    assert deleted_count == 1
-
-    # Test get after delete
-    result = await test_valkey_stat.get(test_key)
-    assert result is None
-
-
 async def test_valkey_stat_expiration(test_valkey_stat: ValkeyStatClient) -> None:
     """Test key expiration functionality."""
     test_key = f"test-key-exp-{random.randint(1000, 9999)}"
@@ -35,7 +16,7 @@ async def test_valkey_stat_expiration(test_valkey_stat: ValkeyStatClient) -> Non
     await test_valkey_stat.set(test_key, test_value, expire_sec=1)
 
     # Verify key exists immediately
-    result = await test_valkey_stat.get(test_key)
+    result = await test_valkey_stat._get_raw(test_key)
     assert result == test_value
 
     # Note: In actual usage, the key would expire after 1 second
@@ -132,58 +113,6 @@ async def test_valkey_stat_time_operation(test_valkey_stat: ValkeyStatClient) ->
     # Should return [seconds, microseconds] as bytes
     assert isinstance(time_result[0], int)
     assert isinstance(time_result[1], int)
-
-
-async def test_valkey_stat_non_existent_keys(test_valkey_stat: ValkeyStatClient) -> None:
-    """Test operations on non-existent keys."""
-    non_existent_key = f"non-existent-{random.randint(1000, 9999)}"
-
-    # Get non-existent key
-    result = await test_valkey_stat.get(non_existent_key)
-    assert result is None
-
-    # Delete non-existent key
-    deleted_count = await test_valkey_stat.delete([non_existent_key])
-    assert deleted_count == 0
-
-    # mget with non-existent keys
-    results = await test_valkey_stat.mget([non_existent_key])
-    assert len(results) == 1
-    assert results[0] is None
-
-
-async def test_valkey_stat_empty_operations(test_valkey_stat: ValkeyStatClient) -> None:
-    """Test operations with empty inputs."""
-    # Empty key list for get_multiple_keys
-    results = await test_valkey_stat.get_multiple_keys([])
-    assert results == []
-
-    # Empty key-value map for set_multiple_keys
-    await test_valkey_stat.set_multiple_keys({})  # Should not raise an error
-
-    # Empty mget
-    results = await test_valkey_stat.mget([])
-    assert results == []
-
-
-async def test_valkey_stat_mixed_data_types(test_valkey_stat: ValkeyStatClient) -> None:
-    """Test with different data types (all as bytes)."""
-    test_key = f"test-mixed-{random.randint(1000, 9999)}"
-
-    # Test with binary data
-    binary_data = b"\x00\x01\x02\x03\xff\xfe\xfd"
-    await test_valkey_stat.set(test_key, binary_data)
-    result = await test_valkey_stat.get(test_key)
-    assert result == binary_data
-
-    # Test with UTF-8 encoded string
-    utf8_string = "Hello, 世界! 🌍".encode("utf-8")
-    await test_valkey_stat.set(test_key, utf8_string)
-    result = await test_valkey_stat.get(test_key)
-    assert result == utf8_string
-
-    # Clean up
-    await test_valkey_stat.delete([test_key])
 
 
 async def test_valkey_stat_hash_with_expiration(test_valkey_stat: ValkeyStatClient) -> None:

@@ -8,22 +8,6 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 )
 
 
-async def test_valkey_rate_limit_set_and_get(test_valkey_rate_limit: ValkeyRateLimitClient) -> None:
-    """Test basic set and get operations with expiration."""
-    key = f"test-key-{random.randint(1000, 9999)}"
-    value = f"test-value-{random.randint(1000, 9999)}"
-
-    # Set a key with custom expiration
-    await test_valkey_rate_limit.set_with_expiration(key, value, 60)
-
-    # Get the key and verify
-    result = await test_valkey_rate_limit.get_key(key)
-    assert result == value
-
-    # Clean up
-    await test_valkey_rate_limit.delete_key(key)
-
-
 async def test_valkey_rate_limit_increment(test_valkey_rate_limit: ValkeyRateLimitClient) -> None:
     """Test increment operation with expiration."""
     key = f"test-counter-{random.randint(1000, 9999)}"
@@ -98,31 +82,6 @@ async def test_valkey_rate_limit_logic_execution(
     # Clean up
     await test_valkey_rate_limit.delete_key(access_key)
     await test_valkey_rate_limit.delete_key("__request_id")
-
-
-async def test_valkey_rate_limit_delete_key(test_valkey_rate_limit: ValkeyRateLimitClient) -> None:
-    """Test key deletion."""
-    key = f"test-delete-{random.randint(1000, 9999)}"
-    value = f"test-value-{random.randint(1000, 9999)}"
-
-    # Set a key
-    await test_valkey_rate_limit.set_with_expiration(key, value, 60)
-
-    # Verify it exists
-    result = await test_valkey_rate_limit.get_key(key)
-    assert result == value
-
-    # Delete the key
-    deleted = await test_valkey_rate_limit.delete_key(key)
-    assert deleted is True
-
-    # Verify it's gone
-    result = await test_valkey_rate_limit.get_key(key)
-    assert result is None
-
-    # Try to delete non-existent key
-    deleted = await test_valkey_rate_limit.delete_key(key)
-    assert deleted is False
 
 
 async def test_valkey_rate_limit_nonexistent_key(

@@ -12,7 +12,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.clients.valkey_stream.client import ValkeyStreamLockClient
+from ai.backend.common.clients.valkey_stream_lock.client import ValkeyStreamLockClient
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
     REDIS_RATE_LIMIT_DB,

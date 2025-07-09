@@ -2489,9 +2489,8 @@ class AgentRegistry:
                                 to_be_terminated.append(kernel)
 
                             async def _update() -> None:
-                                kern_stat = await redis_helper.execute(
-                                    self.valkey_stat_client,
-                                    lambda r: r.get(str(kernel.id)),
+                                kern_stat = await self.valkey_stat_client.get_kernel_statistics(
+                                    str(kernel.id)
                                 )
                                 async with self.db.begin_session() as db_sess:
                                     values = {
@@ -2508,7 +2507,7 @@ class AgentRegistry:
                                         ),
                                     }
                                     if kern_stat:
-                                        values["last_stat"] = msgpack.unpackb(kern_stat)
+                                        values["last_stat"] = kern_stat
                                     await db_sess.execute(
                                         sa.update(KernelRow)
                                         .values(**values)
@@ -2588,11 +2587,10 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis_helper.execute(
-                                    self.valkey_stat_client, lambda r: r.get(str(kernel.id))
+                                last_stat = await self.valkey_stat_client.get_kernel_statistics(
+                                    str(kernel.id),
                                 )
-                                if raw_last_stat is not None:
-                                    last_stat = msgpack.unpackb(raw_last_stat)
+                                if last_stat is not None:
                                     last_stat["version"] = 2
                             except asyncio.TimeoutError:
                                 pass
@@ -3426,19 +3424,7 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-
-        kern_stat = cast(
-            bytes | None,
-            await redis_helper.execute(
-                self.valkey_stat_client,
-                lambda r: r.get(str(kernel_id)),
-            ),
-        )
-        if kern_stat is not None:
-            last_stat = msgpack.unpackb(kern_stat)
-        else:
-            last_stat = None
-
+        last_stat = await self.valkey_stat_client.get_kernel_statistics(str(kernel_id))
         now = datetime.now(tzutc())
 
         async def _get_and_transit(

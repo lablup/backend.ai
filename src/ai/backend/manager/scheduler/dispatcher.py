@@ -389,17 +389,15 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
-        # Execute Redis operations using ValkeyLiveClient batch
-        batch = self.redis_live.create_batch(is_atomic=True)
-        batch.delete([redis_key])
-        batch.hset(
+        # Clear and initialize scheduler metadata
+        await self.redis_live.delete_live_data([redis_key])
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
-            {
+            mapping={
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
         )
-        await self.redis_live.execute_batch(batch)
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -429,14 +427,14 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self.redis_live.hset(
+                        await self.redis_live.store_scheduler_metadata(
                             redis_key,
                             "resource_group",
                             sgroup_name,
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await self.redis_live.hset(
+                await self.redis_live.store_scheduler_metadata(
                     redis_key,
                     "finish_time",
                     datetime.now(tzutc()).isoformat(),
@@ -1287,17 +1285,15 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
-        # Execute Redis operations using ValkeyLiveClient batch
-        batch = self.redis_live.create_batch(is_atomic=True)
-        batch.delete([redis_key])
-        batch.hset(
+        # Clear and initialize scheduler metadata
+        await self.redis_live.delete_live_data([redis_key])
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
-            {
+            mapping={
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
         )
-        await self.redis_live.execute_batch(batch)
         lock_lifetime = self.config_provider.config.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
@@ -1344,7 +1340,7 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            await self.redis_live.hset(
+            await self.redis_live.store_scheduler_metadata(
                 redis_key,
                 "finish_time",
                 datetime.now(tzutc()).isoformat(),
@@ -1372,17 +1368,15 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.start"
 
-        # Execute Redis operations using ValkeyLiveClient batch
-        batch = self.redis_live.create_batch(is_atomic=True)
-        batch.delete([redis_key])
-        batch.hset(
+        # Clear and initialize scheduler metadata
+        await self.redis_live.delete_live_data([redis_key])
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
-            {
+            mapping={
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
         )
-        await self.redis_live.execute_batch(batch)
         lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
@@ -1436,7 +1430,7 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            await self.redis_live.hset(
+            await self.redis_live.store_scheduler_metadata(
                 redis_key,
                 "finish_time",
                 datetime.now(tzutc()).isoformat(),
@@ -1617,17 +1611,15 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
-        # Execute Redis operations using ValkeyLiveClient batch
-        batch = self.redis_live.create_batch(is_atomic=True)
-        batch.delete([redis_key])
-        batch.hset(
+        # Clear and initialize scheduler metadata
+        await self.redis_live.delete_live_data([redis_key])
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
-            {
+            mapping={
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
         )
-        await self.redis_live.execute_batch(batch)
 
         async def _autoscale_txn() -> None:
             async with self.db.begin_session(commit_on_end=True) as session:
@@ -1740,7 +1732,7 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        await self.redis_live.hset(
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
             "down",
             dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
@@ -1765,7 +1757,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.commit()
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await self.redis_live.hset(
+        await self.redis_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),

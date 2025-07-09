@@ -7,7 +7,7 @@ import attrs
 from aiohttp import web
 from aiotools import apartial
 
-from ai.backend.common.clients.valkey_client.valkey_rate_limit import ValkeyRateLimitClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter

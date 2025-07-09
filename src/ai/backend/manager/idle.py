@@ -123,8 +123,7 @@ def calculate_remaining_time(
 
 
 async def get_redis_now(redis_obj: ValkeyLiveClient) -> float:
-    t = await redis_obj.time()
-    return t[0] + (t[1] / (10**6))
+    return await redis_obj.get_server_time()
 
 
 async def get_db_now(dbconn: SAConnection) -> datetime:
@@ -398,7 +397,7 @@ class IdleCheckerHost:
         key_list = list(key_session_report_map.keys())
 
         # Get all reports using ValkeyLiveClient batch operation
-        reports = await self._redis_live.get_multiple_keys(key_list)
+        reports = await self._redis_live.get_multiple_live_data(key_list)
 
         ret: dict[SessionId, dict[str, ReportInfo]] = {}
         for key, report in zip(key_list, reports):
@@ -468,7 +467,7 @@ class AbstractIdleCheckReporter(ABC):
         pass
 
     async def set_remaining_time_report(self, session_id: SessionId, remaining: float) -> None:
-        await self._redis_live.set(
+        await self._redis_live.store_live_data(
             self.get_report_key(session_id),
             msgpack.packb(remaining),
             ex=int(DEFAULT_CHECK_INTERVAL) * 10,
@@ -533,7 +532,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
     async def del_remaining_time_report(
         self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> None:
-        await redis_obj.delete(self.get_report_key(session_id))
+        await redis_obj.delete_live_data(self.get_report_key(session_id))
 
     async def get_grace_period_end(
         self,
@@ -563,7 +562,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_obj.get(key)
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -706,7 +705,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
-        await self._redis_live.set(
+        await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
             "0",
             xx=True,
@@ -714,9 +713,8 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
 
     async def _update_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
-        t = await self._redis_live.time()
-        timestamp = t[0] + (t[1] / (10**6))
-        await self._redis_live.set(
+        timestamp = await self._redis_live.get_server_time()
+        await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
             f"{timestamp:.06f}",
             ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
@@ -783,7 +781,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         if active_streams is not None and active_streams > 0:
             return True
         now: float = await get_redis_now(self._redis_live)
-        raw_last_access = await self._redis_live.get(f"session.{session_id}.last_access")
+        raw_last_access = await self._redis_live.get_live_data(f"session.{session_id}.last_access")
         if raw_last_access is None or raw_last_access == "0":
             return True
         last_access = float(raw_last_access)
@@ -814,7 +812,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_obj.get(key)
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -872,7 +870,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_obj.get(key)
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -1013,7 +1011,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     ) -> Optional[dict[str, Any]]:
         key = self.get_extra_info_key(session_id)
         assert key is not None
-        data = await redis_obj.get(key)
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
     def get_time_window(self, policy: Row) -> timedelta:
@@ -1060,11 +1058,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Wait until the time "interval" is passed after the last udpated time.
-        t = await self._redis_live.time()
-        util_now: float = t[0] + (t[1] / (10**6))
+        util_now = await self._redis_live.get_server_time()
         raw_util_last_collected = cast(
             bytes | None,
-            await self._redis_live.get(util_last_collected_key),
+            await self._redis_live.get_live_data(util_last_collected_key),
         )
         util_last_collected: float = (
             float(raw_util_last_collected) if raw_util_last_collected else 0.0
@@ -1074,11 +1071,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         raw_util_first_collected = cast(
             bytes | None,
-            await self._redis_live.get(util_first_collected_key),
+            await self._redis_live.get_live_data(util_first_collected_key),
         )
         if raw_util_first_collected is None:
             util_first_collected = util_now
-            await self._redis_live.set(
+            await self._redis_live.store_live_data(
                 util_first_collected_key,
                 f"{util_now:.06f}",
                 ex=max(86400, int(self.time_window.total_seconds() * 2)),
@@ -1138,7 +1135,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Update utilization time-series data.
         raw_util_series = cast(
             Optional[bytes],
-            await self._redis_live.get(util_series_key),
+            await self._redis_live.get_live_data(util_series_key),
         )
 
         def default_util_series() -> dict[str, list[float]]:
@@ -1170,12 +1167,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if util_now - util_first_collected >= time_window.total_seconds():
             do_idle_check = True
 
-        await self._redis_live.set(
+        await self._redis_live.store_live_data(
             util_series_key,
             msgpack.packb(util_series),
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
-        await self._redis_live.set(
+        await self._redis_live.store_live_data(
             util_last_collected_key,
             f"{util_now:.06f}",
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
@@ -1198,7 +1195,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         }
         _key = self.get_extra_info_key(session_id)
         assert _key is not None
-        await self._redis_live.set(
+        await self._redis_live.store_live_data(
             _key,
             msgpack.packb(report),
             ex=int(DEFAULT_CHECK_INTERVAL) * 10,
@@ -1240,16 +1237,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
             live_stat = {}
             kernel_counter = 0
             for kernel_id in kernel_ids:
-                raw_live_stat = cast(
-                    bytes | None,
-                    await self._valkey_stat_client.get(str(kernel_id)),
-                )
+                raw_live_stat = await self._valkey_stat_client.get_kernel_statistics(str(kernel_id))
                 if raw_live_stat is None:
                     log.warning(
                         f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
                     )
                     continue
-                live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
+                live_stat = raw_live_stat
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_names_to_check
@@ -1285,7 +1279,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_obj.get(key)
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 

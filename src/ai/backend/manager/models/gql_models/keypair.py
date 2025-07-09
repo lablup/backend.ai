@@ -11,7 +11,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common import redis_helper
-from ai.backend.common.clients.valkey_client.valkey_rate_limit import ValkeyRateLimitClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, RedisProfileTarget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -159,12 +159,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        n = await redis_helper.execute(
-            ctx.valkey_stat_client, lambda r: r.get(f"kp:{self.access_key}:num_queries")
-        )
-        if n is not None:
-            return n
-        return 0
+        return await ctx.valkey_stat_client.get_keypair_query_count(self.access_key)
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
@@ -200,24 +195,14 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        kp_key = "keypair.concurrency_used"
-        concurrency_used = await redis_helper.execute(
-            ctx.valkey_stat_client,
-            lambda r: r.get(f"{kp_key}.{self.access_key}"),
-        )
-        if concurrency_used is not None:
-            return int(concurrency_used)
-        return 0
+        return await ctx.valkey_stat_client.get_keypair_concurrency_used(self.access_key)
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
-        last_call_time_key = f"kp:{self.access_key}:last_call_time"
-        row_ts = await redis_helper.execute(
-            ctx.valkey_stat_client, lambda r: r.get(last_call_time_key)
-        )
+        row_ts = await ctx.valkey_stat_client.get_keypair_last_used_time(self.access_key)
         if row_ts is None:
             return None
-        return datetime.fromtimestamp(float(row_ts))
+        return datetime.fromtimestamp(row_ts)
 
     @classmethod
     async def load_all(

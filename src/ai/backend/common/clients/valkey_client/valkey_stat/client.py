@@ -1,6 +1,8 @@
+import json
 import logging
 from typing import Any, Awaitable, Callable, List, Mapping, Optional, Self, Sequence, Union, cast
 
+import msgpack
 from glide import (
     Batch,
     ExpirySet,
@@ -97,9 +99,116 @@ class ValkeyStatClient:
         return await self._client.client.get(key)
 
     @valkey_decorator()
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get_keypair_query_count(self, access_key: str) -> int:
         """
-        Get value by key.
+        Get API query count for a keypair.
+
+        :param access_key: The keypair access key.
+        :return: The query count, or 0 if not found.
+        """
+        result = await self._client.client.get(f"kp:{access_key}:num_queries")
+        if result is None:
+            return 0
+        try:
+            return int(result.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return 0
+
+    @valkey_decorator()
+    async def get_keypair_concurrency_used(self, access_key: str) -> int:
+        """
+        Get current concurrency usage for a keypair.
+
+        :param access_key: The keypair access key.
+        :return: The concurrency usage count, or 0 if not found.
+        """
+        result = await self._client.client.get(f"keypair.concurrency_used.{access_key}")
+        if result is None:
+            return 0
+        try:
+            return int(result.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return 0
+
+    @valkey_decorator()
+    async def get_keypair_last_used_time(self, access_key: str) -> Optional[float]:
+        """
+        Get last API call timestamp for a keypair.
+
+        :param access_key: The keypair access key.
+        :return: The timestamp as float, or None if not found.
+        """
+        result = await self._client.client.get(f"kp:{access_key}:last_call_time")
+        if result is None:
+            return None
+        try:
+            return float(result.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+    @valkey_decorator()
+    async def get_gpu_allocation_map(self, agent_id: str) -> Optional[dict[str, float]]:
+        """
+        Get GPU allocation mapping for an agent.
+
+        :param agent_id: The agent ID.
+        :return: GPU allocation map as dict, or None if not found.
+        """
+        result = await self._client.client.get(f"gpu_alloc_map.{agent_id}")
+        if result is None:
+            return None
+        try:
+            return json.loads(result.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
+    @valkey_decorator()
+    async def get_kernel_statistics(self, kernel_id: str) -> Optional[dict[str, Any]]:
+        """
+        Get kernel utilization statistics.
+
+        :param kernel_id: The kernel ID.
+        :return: Kernel statistics as dict, or None if not found.
+        """
+        result = await self._client.client.get(str(kernel_id))
+        if result is None:
+            return None
+        try:
+            return msgpack.unpackb(result, raw=False)
+        except (msgpack.exceptions.ExtraData, msgpack.exceptions.UnpackException, ValueError):
+            return None
+
+    @valkey_decorator()
+    async def get_image_distro(self, image_id: str) -> Optional[str]:
+        """
+        Get cached Linux distribution for a Docker image.
+
+        :param image_id: The Docker image ID.
+        :return: The distribution name, or None if not found.
+        """
+        result = await self._client.client.get(f"image:{image_id}:distro")
+        if result is None:
+            return None
+        try:
+            return result.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+
+    @valkey_decorator()
+    async def get_volume_usage(self, proxy_name: str, volume_name: str) -> Optional[bytes]:
+        """
+        Get volume usage information.
+
+        :param proxy_name: The proxy name.
+        :param volume_name: The volume name.
+        :return: Volume usage data as dict, or None if not found.
+        """
+        return await self._client.client.get(f"volume.usage.{proxy_name}.{volume_name}")
+
+    @valkey_decorator()
+    async def _get_raw(self, key: str) -> Optional[bytes]:
+        """
+        Get raw value by key (internal use only for testing).
 
         :param key: The key to retrieve.
         :return: The value, or None if the key doesn't exist.
@@ -666,8 +775,8 @@ class ValkeyStatPipeline:
         self._client = client
         self._operations: List[dict] = []
 
-    def get(self, key: str) -> "ValkeyStatPipeline":
-        """Add get operation to pipeline."""
+    def get_raw(self, key: str) -> "ValkeyStatPipeline":
+        """Add get operation to pipeline (for internal use only)."""
         self._operations.append({"operation": "get", "key": key})
         return self
 
