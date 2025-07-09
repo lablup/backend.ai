@@ -17,6 +17,7 @@ from ai.backend.test.templates.vfolder.invite import (
     RejectInvitationTemplate,
     VFolderInviteTemplate,
 )
+from ai.backend.test.templates.vfolder.share import ShareVFolderTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.testcases.vfolder.access import VFolderAccessFailure, VFolderAccessSuccess
 from ai.backend.test.testcases.vfolder.clone import VFolderCloneSuccess
@@ -32,6 +33,7 @@ from ai.backend.test.testcases.vfolder.invite_failures import (
 from ai.backend.test.testcases.vfolder.list_files import VFolderListFilesSuccess
 from ai.backend.test.testcases.vfolder.move import VFolderFileMoveSuccess
 from ai.backend.test.testcases.vfolder.rename_file import VFolderFileRenameSuccess
+from ai.backend.test.testcases.vfolder.share import VFolderSharePermissionOverrideSuccess
 from ai.backend.test.tester.dependency import UploadFileDep
 
 _TEST_FILE_CONTENT = "This is a test file for VFolder download."
@@ -367,6 +369,29 @@ VFOLDER_TEST_SPECS = {
                 ]
             ]
         },
+    ),
+    "shared_vfolder_permission_override": TestSpec(
+        name="shared_vfolder_permission_override",
+        description=textwrap.dedent("""\
+            Test for VFolder sharing functionality.
+            The test will:
+            1. Authenticate as admin and create a VFolder.
+            2. Create a test user.
+            3. Share the VFolder with the test user.
+            4. Login as the test user.
+            5. Verify that the test user can access the VFolder with the shared permission.
+            6. Unshare the VFolder from the test user.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderSharePermissionOverrideSuccess()).with_wrappers(
+            # Run as admin(sharing user)
+            KeypairAuthTemplate,
+            ProjectVFolderTemplate,
+            UserTemplate,
+            ShareVFolderTemplate,
+            # Run as shared user
+            KeypairAuthAsCreatedUserTemplate,
+        ),
     ),
     **VFOLDER_INVITATION_TEST_SPECS,
 }

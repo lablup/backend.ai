@@ -34,6 +34,8 @@ __all__ = (
     "api_session",
 )
 
+from contextlib import asynccontextmanager as actxmgr
+
 from ..common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
@@ -536,3 +538,13 @@ class AsyncSession(BaseSession):
     async def __aexit__(self, *exc_info) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
+
+
+# TODO: Remove this after refactoring session management with contextvars
+@actxmgr
+async def set_api_context(session):
+    token = api_session.set(session)
+    try:
+        yield
+    finally:
+        api_session.reset(token)
