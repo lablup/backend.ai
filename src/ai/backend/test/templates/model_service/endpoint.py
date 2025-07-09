@@ -19,7 +19,7 @@ from ai.backend.test.contexts.session import (
     SessionContext,
 )
 from ai.backend.test.data.model_service import ModelServiceEndpointMeta
-from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
+from ai.backend.test.templates.model_service.utils import ensure_inference_sessions_ready
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -45,7 +45,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             "image": image_dep.name,
             "architecture": image_dep.architecture,
             "model_id_or_name": model_service_dep.model_vfolder_name,
-            "initial_session_count": model_service_dep.replicas,
+            "initial_session_count": model_service_dep.initial_replicas,
             "resources": session_dep.resources,
             "resource_opts": {},
             "domain_name": domain_dep.name,
@@ -74,11 +74,9 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     async def _context(self) -> AsyncIterator[None]:
         client_session = ClientSessionContext.current()
         model_service_dep = ModelServiceContext.current()
-
-        vfolder_func = client_session.VFolder(name=model_service_dep.model_vfolder_name)
-        await vfolder_func.update_id_by_name()
-        if vfolder_func.id is None:
-            raise RuntimeError("Model VFolder id is None.")
+        vfolder_id = await client_session.VFolder(
+            name=model_service_dep.model_vfolder_name
+        ).get_id()
 
         endpoint_id = None
         try:
@@ -87,7 +85,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
 
             endpoint_id = UUID(response["endpoint_id"])
-            assert response["replicas"] == model_service_dep.replicas, (
+            assert response["replicas"] == model_service_dep.initial_replicas, (
                 "Replicas count does not match the expected value."
             )
 
@@ -98,17 +96,17 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             assert info["runtime_variant"] == model_service_dep.runtime_variant, (
                 f"Runtime variant should be '{model_service_dep.runtime_variant}'."
             )
-            assert info["desired_session_count"] == model_service_dep.replicas, (
+            assert info["desired_session_count"] == model_service_dep.initial_replicas, (
                 "Desired session count should match the replicas."
             )
-            assert info["model_id"] == str(vfolder_func.id), "Model ID should match the VFolder ID."
+            assert info["model_id"] == str(vfolder_id), "Model ID should match the VFolder ID."
 
             await asyncio.wait_for(
-                wait_until_all_inference_sessions_ready(
-                    client_session=client_session,
-                    endpoint_id=endpoint_id,
-                    replicas=model_service_dep.replicas,
-                    vfolder_id=vfolder_func.id,
+                ensure_inference_sessions_ready(
+                    client_session,
+                    endpoint_id,
+                    model_service_dep.initial_replicas,
+                    vfolder_id,
                 ),
                 timeout=_ENDPOINT_CREATION_TIMEOUT,
             )
