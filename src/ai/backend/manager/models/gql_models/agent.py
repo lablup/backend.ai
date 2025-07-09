@@ -15,11 +15,9 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
@@ -231,35 +229,13 @@ class AgentNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
-
-        ret = []
-        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
-            else:
-                ret.append(None)
-
-        return ret
+        return await ctx.valkey_stat_client.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
-
-        ret = []
-        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            ret.append(int(cnt) if cnt is not None else 0)
-        return ret
+        return await ctx.valkey_stat_client.get_agent_container_counts_batch(list(agent_ids))
 
     @classmethod
     async def get_connection(
@@ -602,20 +578,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
-
-        ret = []
-        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
-            else:
-                ret.append(None)
-
-        return ret
+        return await ctx.valkey_stat_client.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_cpu_cur_pct(
@@ -651,16 +614,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
-
-        ret = []
-        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            ret.append(int(cnt) if cnt is not None else 0)
-        return ret
+        return await ctx.valkey_stat_client.get_agent_container_counts_batch(list(agent_ids))
 
 
 async def _query_domain_groups_by_ak(

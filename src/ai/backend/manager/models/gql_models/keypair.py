@@ -10,7 +10,6 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, RedisProfileTarget
@@ -555,8 +554,8 @@ class DeleteKeyPair(graphene.Mutation):
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         result = await simple_db_mutate(cls, ctx, delete_query)
         if result.ok:
-            await redis_helper.execute(
-                ctx.valkey_stat_client,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            await ctx.valkey_stat_client.delete_keypair_concurrency(
+                access_key=access_key,
+                is_private=False,
             )
         return result

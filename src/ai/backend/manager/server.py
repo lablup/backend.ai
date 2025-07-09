@@ -45,9 +45,10 @@ from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.clients.valkey_stream_lock.client import ValkeyStreamLockClient
+from ai.backend.common.clients.valkey_client.valkey_stream_lock.client import ValkeyStreamLockClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -531,11 +532,12 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
+    root_ctx.redis_profile_target = redis_profile_target
 
-    root_ctx.redis_live = redis_helper.get_redis_object(
+    root_ctx.redis_live = await ValkeyLiveClient.create(
         redis_profile_target.profile_target(RedisRole.LIVE),
-        name="live",  # tracking live status of various entities
-        db=REDIS_LIVE_DB,
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="live",  # tracking live status of various entities
     )
     root_ctx.valkey_stat_client = await ValkeyStatClient.create(
         redis_profile_target.profile_target(RedisRole.STATISTICS),
@@ -562,12 +564,14 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="stream",
         db_id=REDIS_STREAM_DB,
     )
-    for redis_info in (
-        root_ctx.redis_live,
-        root_ctx.valkey_stat_client,
-        root_ctx.redis_stream,
-    ):
-        await redis_helper.ping_redis_connection(redis_info.client)
+    # Ping ValkeyLiveClient directly
+    await root_ctx.redis_live.get_server_time()
+
+    # Ping ValkeyStatClient
+    await root_ctx.valkey_stat_client.get_cached_stat("__ping__")
+
+    # Ping legacy redis_stream
+    await redis_helper.ping_redis_connection(root_ctx.redis_stream.client)
 
     await root_ctx.valkey_stream_lock.ping()
     # ValkeyImageClient has its own connection handling
@@ -690,8 +694,9 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 ETCDServiceDiscoveryArgs(root_ctx.etcd)
             )
         case ServiceDiscoveryType.REDIS:
+            live_redis_target = root_ctx.redis_profile_target.profile_target(RedisRole.LIVE)
             root_ctx.service_discovery = RedisServiceDiscovery(
-                RedisServiceDiscoveryArgs(root_ctx.redis_live)
+                RedisServiceDiscoveryArgs(redis_target=live_redis_target)
             )
 
     root_ctx.sd_loop = ServiceDiscoveryLoop(

@@ -12,7 +12,7 @@ from pydantic import (
 )
 from sqlalchemy.pool import Pool
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 
 if TYPE_CHECKING:
     from ..api.context import RootContext
@@ -185,14 +185,13 @@ async def report_manager_status(root_ctx: RootContext) -> None:
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
-    await redis_helper.execute(
-        root_ctx.valkey_stat_client,
-        lambda r: r.set(
-            _get_connection_status_key(cxn_info.node_id, cxn_info.pid),
-            _data,
-            ex=lifetime,
-        ),
-    )
+    if lifetime is not None:
+        await root_ctx.valkey_stat_client.set_manager_status(
+            node_id=cxn_info.node_id,
+            pid=cxn_info.pid,
+            status_data=_data,
+            lifetime=lifetime,
+        )
 
 
 async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInfoOfProcess]:

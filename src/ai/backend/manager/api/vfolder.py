@@ -40,7 +40,7 @@ from pydantic import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import BaseFieldModel
@@ -569,13 +569,8 @@ async def fetch_exposed_volume_fields(
                     except ZeroDivisionError:
                         volume_usage["percentage"] = 0
 
-            await redis_helper.execute(
-                valkey_stat_client,
-                lambda r: r.set(
-                    f"volume.usage.{proxy_name}.{volume_name}",
-                    msgpack.packb(volume_usage),
-                    ex=60,
-                ),
+            await valkey_stat_client.set_volume_usage(
+                proxy_name, volume_name, msgpack.packb(volume_usage), 60
             )
 
     return volume_usage

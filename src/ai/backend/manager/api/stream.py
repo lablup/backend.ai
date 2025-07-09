@@ -41,7 +41,6 @@ from aiohttp import web
 from aiotools import adefer, apartial
 from etcd_client import GRPCStatusCode, GRPCStatusError
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingBroadcastEvent
 from ai.backend.common.json import dump_json, load_json
@@ -504,12 +503,21 @@ async def stream_proxy(
 
     async def update_connection_tracker() -> None:
         """Update connection tracker with current timestamp."""
-        # Get current server time
-        now = await redis_live.client.time()
-        timestamp = now[0] + (now[1] / 1000000)
+        from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 
-        # Add to sorted set with timestamp as score
-        await redis_live.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
+        if isinstance(redis_live, ValkeyLiveClient):
+            # Get current server time
+            now = await redis_live._client.client.time()
+            timestamp = float(now[0]) + (float(now[1]) / 1000000)
+
+            # Add to sorted set with timestamp as score
+            await redis_live._client.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
+        else:
+            # Legacy RedisConnectionInfo case
+            import time
+
+            timestamp = time.time()
+            # Handle legacy connection (use redis_helper if needed)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -530,13 +538,7 @@ async def stream_proxy(
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
             app_ctx.active_session_ids[kernel_id] += 1
-            now = await redis_helper.execute(redis_live, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-            await redis_helper.execute(
-                redis_live,
-                # redis-py's ZADD implementation flattens mapping in value-key order
-                lambda r: r.zadd(conn_tracker_key, {conn_tracker_val: now}),
-            )
+            await redis_live.update_connection_tracker(kernel_id, conn_tracker_val)
             await root_ctx.idle_checker_host.update_app_streaming_status(
                 kernel_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
@@ -547,17 +549,8 @@ async def stream_proxy(
             app_ctx.active_session_ids[kernel_id] -= 1
             if app_ctx.active_session_ids[kernel_id] <= 0:
                 del app_ctx.active_session_ids[kernel_id]
-            await redis_helper.execute(
-                redis_live, lambda r: r.zrem(conn_tracker_key, conn_tracker_val)
-            )
-            remaining_count = await redis_helper.execute(
-                redis_live,
-                lambda r: r.zcount(
-                    conn_tracker_key,
-                    float("-inf"),
-                    float("+inf"),
-                ),
-            )
+            await redis_live.remove_connection_tracker(kernel_id, conn_tracker_val)
+            remaining_count = await redis_live.count_active_connections(str(kernel_id))
             if remaining_count == 0:
                 await root_ctx.idle_checker_host.update_app_streaming_status(
                     kernel_id,
@@ -700,26 +693,17 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                 else:
                     raise e
             async with app_ctx.conn_tracker_lock:
-                now = await redis_helper.execute(redis_live, lambda r: r.time())
-                now = now[0] + (now[1] / (10**6))
+                now = await redis_live.get_server_time()
                 for session_id in app_ctx.active_session_ids.keys():
-                    conn_tracker_key = f"session.{session_id}.active_app_connections"
-                    prev_remaining_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
+                    prev_remaining_count = await redis_live.count_active_connections(
+                        str(session_id)
                     )
-                    removed_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zremrangebyscore(
-                            conn_tracker_key,
-                            float("-inf"),
-                            now - no_packet_timeout.total_seconds(),
-                        ),
+                    removed_count = await redis_live.remove_stale_connections(
+                        str(session_id),
+                        float("-inf"),
+                        now - no_packet_timeout.total_seconds(),
                     )
-                    remaining_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
-                    )
+                    remaining_count = await redis_live.count_active_connections(str(session_id))
                     log.debug(
                         f"conn_tracker: gc {session_id} "
                         f"removed/remaining = {removed_count}/{remaining_count}",

@@ -37,7 +37,6 @@ import trafaret as t
 from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, Field
-from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -92,7 +91,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
@@ -951,16 +949,16 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
-        async def _check_impl(r: Redis):
-            async for agent_id, prev in r.hscan_iter("agent.last_seen"):
-                prev = datetime.fromtimestamp(float(prev), tzutc())
-                if now - prev > timeout:
-                    await root_ctx.event_producer.anycast_event(
-                        AgentTerminatedEvent("agent-lost"),
-                        source_override=agent_id.decode(),
-                    )
+        agent_last_seen = await root_ctx.redis_live.scan_agent_last_seen()
+        for agent_id, prev_timestamp in agent_last_seen:
+            prev = datetime.fromtimestamp(prev_timestamp, tzutc())
+            if now - prev > timeout:
+                from ai.backend.common.types import AgentId
 
-        await redis_helper.execute(root_ctx.redis_live, _check_impl)
+                await root_ctx.event_producer.anycast_event(
+                    AgentTerminatedEvent("agent-lost"),
+                    source_override=AgentId(agent_id),
+                )
     except asyncio.CancelledError:
         pass
 

@@ -48,7 +48,6 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 
-from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -1543,9 +1542,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 distro = "alpine3.8"
             else:
                 raise RuntimeError("Could not determine the C library variant.")
-            await redis_helper.execute(
-                self.valkey_stat_client, lambda r: r.set(f"image:{image_id}:distro", distro)
-            )
+            await self.valkey_stat_client.set_image_distro(image_id, distro)
             return distro
 
     async def scan_images(self) -> ScanImagesResult:

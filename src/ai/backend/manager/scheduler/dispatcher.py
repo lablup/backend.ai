@@ -30,13 +30,10 @@ import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
@@ -798,17 +795,13 @@ class SchedulerDispatcher(aobject):
             return candidate_agents
         max_container_count = int(raw_value)
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            for ag in candidate_agents:
-                await pipe.get(f"container_count.{ag.id}")
-            return pipe
+        agent_ids = [str(ag.id) for ag in candidate_agents]
+        raw_counts = await self.registry.valkey_stat_client.get_agent_container_counts_batch(
+            agent_ids
+        )
 
-        raw_counts = await redis_helper.execute(self.registry.valkey_stat_client, _pipe_builder)
-
-        def _check(cnt: str | None) -> bool:
-            _cnt = int(cnt) if cnt is not None else 0
-            return max_container_count > _cnt
+        def _check(cnt: int) -> bool:
+            return max_container_count > cnt
 
         return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
 

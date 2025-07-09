@@ -68,7 +68,7 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
@@ -1772,9 +1772,9 @@ class AbstractAgent(
             )
 
     async def set_container_count(self, container_count: int) -> None:
-        await redis_helper.execute(
-            self.valkey_stat_client,
-            lambda r: r.set(f"container_count.{self.id}", container_count),
+        await self.valkey_stat_client.set_agent_container_count(
+            agent_id=str(self.id),
+            container_count=container_count,
         )
 
     @abstractmethod

@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import attrs
 import graphene
@@ -14,6 +14,8 @@ from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -21,7 +23,7 @@ from ai.backend.common.exception import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    pass
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -57,7 +59,7 @@ from .gql_models.container_registry_v2 import (
 
 set_input_object_type_default_value(Undefined)
 
-from ai.backend.common.types import QuotaScopeID, SessionId
+from ai.backend.common.types import QuotaScopeID, RedisConnectionInfo, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
     AsyncNode,
@@ -80,7 +82,6 @@ if TYPE_CHECKING:
     from ai.backend.common.types import (
         AccessKey,
         AgentId,
-        RedisConnectionInfo,
         SlotName,
         SlotTypes,
     )
@@ -313,7 +314,7 @@ class GraphQueryContext:
     network_plugin_ctx: NetworkPluginContext
     services_ctx: ServicesContext
     valkey_stat_client: ValkeyStatClient
-    redis_live: RedisConnectionInfo
+    redis_live: Union[RedisConnectionInfo, ValkeyLiveClient]
     redis_image: ValkeyImageClient
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]

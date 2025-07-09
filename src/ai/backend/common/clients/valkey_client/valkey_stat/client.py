@@ -1,6 +1,18 @@
 import json
 import logging
-from typing import Any, Awaitable, Callable, List, Mapping, Optional, Self, Sequence, Union, cast
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Final,
+    List,
+    Mapping,
+    Optional,
+    Self,
+    Sequence,
+    Union,
+    cast,
+)
 
 import msgpack
 from glide import (
@@ -20,6 +32,15 @@ from ai.backend.logging.utils import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_EXPIRATION = 86400  # 24 hours default expiration
+_KEYPAIR_CONCURRENCY_PREFIX: Final[str] = "keypair.concurrency_used"
+_KEYPAIR_SFTP_CONCURRENCY_PREFIX: Final[str] = "keypair.sftp_concurrency_used"
+_KERNEL_COMMIT_PREFIX: Final[str] = "kernel"
+_KERNEL_COMMIT_SUFFIX: Final[str] = "commit"
+_ABUSE_REPORT_HASH: Final[str] = "abuse_report"
+_CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
+_MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
+_INFERENCE_PREFIX: Final[str] = "inference"
+_COMPUTER_METADATA_HASH: Final[str] = "computer.metadata"
 
 
 class ValkeyStatClient:
@@ -179,6 +200,282 @@ class ValkeyStatClient:
             return None
 
     @valkey_decorator()
+    async def get_kernel_statistics_raw(self, kernel_id: str) -> Optional[bytes]:
+        """
+        Get kernel utilization statistics as raw bytes for sync operations.
+
+        :param kernel_id: The kernel ID.
+        :return: Raw kernel statistics bytes, or None if not found.
+        """
+        return await self._client.client.get(str(kernel_id))
+
+    def _get_kernel_commit_key(self, kernel_id: str) -> str:
+        """
+        Generate kernel commit status key.
+
+        :param kernel_id: The kernel ID.
+        :return: The generated key.
+        """
+        return f"{_KERNEL_COMMIT_PREFIX}.{kernel_id}.{_KERNEL_COMMIT_SUFFIX}"
+
+    def _get_container_count_key(self, agent_id: str) -> str:
+        """
+        Generate container count key for an agent.
+
+        :param agent_id: The agent ID.
+        :return: The generated key.
+        """
+        return f"{_CONTAINER_COUNT_PREFIX}.{agent_id}"
+
+    @valkey_decorator()
+    async def get_kernel_commit_statuses(self, kernel_ids: List[str]) -> List[Optional[bytes]]:
+        """
+        Get commit statuses for multiple kernels efficiently.
+
+        :param kernel_ids: List of kernel IDs to get commit statuses for.
+        :return: List of commit status bytes, one for each kernel.
+        """
+        if not kernel_ids:
+            return []
+
+        keys = [self._get_kernel_commit_key(kernel_id) for kernel_id in kernel_ids]
+        return await self.get_multiple_keys(keys)
+
+    @valkey_decorator()
+    async def get_abuse_report(self, kernel_id: str) -> Optional[str]:
+        """
+        Get abuse report for a specific kernel.
+
+        :param kernel_id: The kernel ID to get abuse report for.
+        :return: The abuse report string for the kernel, or None if not found.
+        """
+        result = await self._client.client.hget(_ABUSE_REPORT_HASH, kernel_id)
+        if result is None:
+            return None
+        try:
+            return result.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+
+    @valkey_decorator()
+    async def set_agent_container_count(self, agent_id: str, container_count: int) -> None:
+        """
+        Set the current container count for an agent.
+
+        :param agent_id: The agent ID.
+        :param container_count: The number of containers currently running on the agent.
+        """
+        key = self._get_container_count_key(agent_id)
+        await self._client.client.set(key, str(container_count))
+
+    @valkey_decorator()
+    async def get_session_statistics_batch(self, session_ids: List[str]) -> List[Optional[dict]]:
+        """
+        Get statistics for multiple sessions efficiently.
+
+        :param session_ids: List of session IDs to get statistics for.
+        :return: List of session statistics, with None for non-existent sessions.
+        """
+        if not session_ids:
+            return []
+
+        results = await self.get_multiple_keys(session_ids)
+        stats = []
+        for result in results:
+            if result is not None:
+                try:
+                    stats.append(msgpack.unpackb(result))
+                except (
+                    msgpack.exceptions.ExtraData,
+                    msgpack.exceptions.UnpackException,
+                    ValueError,
+                ):
+                    stats.append(None)
+            else:
+                stats.append(None)
+        return stats
+
+    @valkey_decorator()
+    async def get_user_kernel_statistics_batch(
+        self, kernel_ids: List[str]
+    ) -> List[Optional[bytes]]:
+        """
+        Get raw kernel statistics for multiple kernels for user service operations.
+
+        :param kernel_ids: List of kernel IDs to get statistics for.
+        :return: List of raw kernel statistics bytes, with None for non-existent kernels.
+        """
+        if not kernel_ids:
+            return []
+
+        return await self.get_multiple_keys(kernel_ids)
+
+    @valkey_decorator()
+    async def get_agent_statistics_batch(self, agent_ids: List[str]) -> List[Optional[dict]]:
+        """
+        Get agent statistics for multiple agents.
+
+        :param agent_ids: List of agent IDs to get statistics for.
+        :return: List of agent statistics, with None for non-existent agents.
+        """
+        if not agent_ids:
+            return []
+
+        results = await self.get_multiple_keys(agent_ids)
+        stats = []
+        for result in results:
+            if result is not None:
+                try:
+                    stats.append(msgpack.unpackb(result, ext_hook_mapping=msgpack.uuid_to_str))
+                except (
+                    msgpack.exceptions.ExtraData,
+                    msgpack.exceptions.UnpackException,
+                    ValueError,
+                ):
+                    stats.append(None)
+            else:
+                stats.append(None)
+        return stats
+
+    @valkey_decorator()
+    async def get_agent_container_counts_batch(self, agent_ids: List[str]) -> List[int]:
+        """
+        Get container counts for multiple agents.
+
+        :param agent_ids: List of agent IDs to get container counts for.
+        :return: List of container counts, with 0 for non-existent agents.
+        """
+        if not agent_ids:
+            return []
+
+        keys = [self._get_container_count_key(agent_id) for agent_id in agent_ids]
+        results = await self.get_multiple_keys(keys)
+
+        counts = []
+        for result in results:
+            if result is not None:
+                try:
+                    counts.append(int(result.decode("utf-8")))
+                except (ValueError, UnicodeDecodeError):
+                    counts.append(0)
+            else:
+                counts.append(0)
+        return counts
+
+    def _get_manager_status_key(self, node_id: str, pid: int) -> str:
+        """
+        Generate manager status key.
+
+        :param node_id: The node ID.
+        :param pid: The process ID.
+        :return: The generated key.
+        """
+        return f"{_MANAGER_STATUS_PREFIX}.{node_id}:{pid}"
+
+    @valkey_decorator()
+    async def set_manager_status(
+        self, node_id: str, pid: int, status_data: bytes, lifetime: int
+    ) -> None:
+        """
+        Set manager status with expiration.
+
+        :param node_id: The node ID.
+        :param pid: The process ID.
+        :param status_data: The status data to set.
+        :param lifetime: The expiration time in seconds.
+        """
+        key = self._get_manager_status_key(node_id, pid)
+        await self._client.client.set(
+            key=key,
+            value=status_data,
+            expiry=ExpirySet(ExpiryType.SEC, lifetime),
+        )
+
+    def _get_inference_app_key(self, endpoint_id: str) -> str:
+        """
+        Generate inference app key for an endpoint.
+
+        :param endpoint_id: The endpoint ID.
+        :return: The generated key.
+        """
+        return f"{_INFERENCE_PREFIX}.{endpoint_id}.app"
+
+    @valkey_decorator()
+    async def get_inference_app_statistics_batch(
+        self, endpoint_ids: List[str]
+    ) -> List[Optional[dict]]:
+        """
+        Get inference app statistics for multiple endpoints.
+
+        :param endpoint_ids: List of endpoint IDs to get statistics for.
+        :return: List of inference app statistics, with None for non-existent endpoints.
+        """
+        if not endpoint_ids:
+            return []
+
+        keys = [self._get_inference_app_key(endpoint_id) for endpoint_id in endpoint_ids]
+        results = await self.get_multiple_keys(keys)
+
+        stats = []
+        for result in results:
+            if result is not None:
+                try:
+                    stats.append(msgpack.unpackb(result))
+                except (
+                    msgpack.exceptions.ExtraData,
+                    msgpack.exceptions.UnpackException,
+                    ValueError,
+                ):
+                    stats.append(None)
+            else:
+                stats.append(None)
+        return stats
+
+    def _get_inference_replica_key(self, endpoint_id: str, replica_id: str) -> str:
+        """
+        Generate inference replica key.
+
+        :param endpoint_id: The endpoint ID.
+        :param replica_id: The replica ID.
+        :return: The generated key.
+        """
+        return f"{_INFERENCE_PREFIX}.{endpoint_id}.replica.{replica_id}"
+
+    @valkey_decorator()
+    async def get_inference_replica_statistics_batch(
+        self, endpoint_replica_pairs: List[tuple[str, str]]
+    ) -> List[Optional[dict]]:
+        """
+        Get inference replica statistics for multiple endpoint-replica pairs.
+
+        :param endpoint_replica_pairs: List of (endpoint_id, replica_id) tuples.
+        :return: List of inference replica statistics, with None for non-existent entries.
+        """
+        if not endpoint_replica_pairs:
+            return []
+
+        keys = [
+            self._get_inference_replica_key(endpoint_id, replica_id)
+            for endpoint_id, replica_id in endpoint_replica_pairs
+        ]
+        results = await self.get_multiple_keys(keys)
+
+        stats = []
+        for result in results:
+            if result is not None:
+                try:
+                    stats.append(msgpack.unpackb(result))
+                except (
+                    msgpack.exceptions.ExtraData,
+                    msgpack.exceptions.UnpackException,
+                    ValueError,
+                ):
+                    stats.append(None)
+            else:
+                stats.append(None)
+        return stats
+
+    @valkey_decorator()
     async def get_image_distro(self, image_id: str) -> Optional[str]:
         """
         Get cached Linux distribution for a Docker image.
@@ -195,6 +492,16 @@ class ValkeyStatClient:
             return None
 
     @valkey_decorator()
+    async def set_image_distro(self, image_id: str, distro: str) -> None:
+        """
+        Cache Linux distribution for a Docker image.
+
+        :param image_id: The Docker image ID.
+        :param distro: The Linux distribution name.
+        """
+        await self._client.client.set(f"image:{image_id}:distro", distro)
+
+    @valkey_decorator()
     async def get_volume_usage(self, proxy_name: str, volume_name: str) -> Optional[bytes]:
         """
         Get volume usage information.
@@ -204,6 +511,43 @@ class ValkeyStatClient:
         :return: Volume usage data as dict, or None if not found.
         """
         return await self._client.client.get(f"volume.usage.{proxy_name}.{volume_name}")
+
+    @valkey_decorator()
+    async def set_volume_usage(
+        self, proxy_name: str, volume_name: str, usage_data: bytes, expiry_seconds: int = 60
+    ) -> None:
+        """
+        Set volume usage information with expiration.
+
+        :param proxy_name: The proxy name.
+        :param volume_name: The volume name.
+        :param usage_data: The volume usage data to cache.
+        :param expiry_seconds: The expiration time in seconds.
+        """
+        expiry = ExpirySet(ExpiryType.SEC, expiry_seconds)
+        await self._client.client.set(
+            f"volume.usage.{proxy_name}.{volume_name}", usage_data, expiry=expiry
+        )
+
+    @valkey_decorator()
+    async def get_computer_metadata(self) -> dict[str, str]:
+        """
+        Get all computer metadata from the hash.
+
+        :return: Dictionary of slot name to metadata JSON string.
+        """
+        result = await self._client.client.hgetall(_COMPUTER_METADATA_HASH)
+        if result is None:
+            return {}
+
+        # Convert bytes keys and values to strings
+        metadata: dict[str, str] = {}
+        for key, value in result.items():
+            str_key: str = key.decode("utf-8") if isinstance(key, bytes) else key
+            str_value: str = value.decode("utf-8") if isinstance(value, bytes) else value
+            metadata[str_key] = str_value
+
+        return metadata
 
     @valkey_decorator()
     async def _get_raw(self, key: str) -> Optional[bytes]:
@@ -297,6 +641,56 @@ class ValkeyStatClient:
         :return: The new value after increment.
         """
         return await self._client.client.incr(key)
+
+    def _get_keypair_concurrency_key(self, access_key: str, is_private: bool) -> str:
+        """
+        Generate keypair concurrency key.
+
+        :param access_key: The access key.
+        :param is_private: Whether this is for SFTP concurrency.
+        :return: The generated key.
+        """
+        prefix = _KEYPAIR_SFTP_CONCURRENCY_PREFIX if is_private else _KEYPAIR_CONCURRENCY_PREFIX
+        return f"{prefix}.{access_key}"
+
+    @valkey_decorator()
+    async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
+        """
+        Decrement keypair concurrency counter.
+
+        :param access_key: The access key to decrement concurrency for.
+        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
+        :return: The new value after decrement.
+        """
+        key = self._get_keypair_concurrency_key(access_key, is_private)
+        return await self._client.client.incrby(key, -1)
+
+    @valkey_decorator()
+    async def delete_keypair_concurrency(self, access_key: str, is_private: bool = False) -> bool:
+        """
+        Delete keypair concurrency counter.
+
+        :param access_key: The access key to delete concurrency counter for.
+        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
+        :return: True if the key was deleted, False if it didn't exist.
+        """
+        key = self._get_keypair_concurrency_key(access_key, is_private)
+        result = await self._client.client.delete([key])
+        return result > 0
+
+    @valkey_decorator()
+    async def set_keypair_concurrency(
+        self, access_key: str, concurrency_used: int, is_private: bool = False
+    ) -> None:
+        """
+        Set keypair concurrency counter.
+
+        :param access_key: The access key to set concurrency for.
+        :param concurrency_used: The concurrency value to set.
+        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
+        """
+        key = self._get_keypair_concurrency_key(access_key, is_private)
+        await self._client.client.set(key, str(concurrency_used))
 
     @valkey_decorator()
     async def expire(self, key: str, seconds: int) -> bool:
