@@ -33,7 +33,7 @@ from redis.retry import Retry
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    pass
 
 from .types import HostPortPair as _HostPortPair
 from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
@@ -291,7 +291,7 @@ async def execute(
 
 
 async def execute_script(
-    redis_obj: Union[RedisConnectionInfo],
+    redis_obj: RedisConnectionInfo,
     script_id: str,
     script: str,
     keys: Sequence[str],
@@ -607,15 +607,12 @@ async def create_valkey_client(
     return await GlideClient.create(config)
 
 
-async def ping_redis_connection(redis_client: Union[Redis, "ValkeyStatClient"]) -> bool:
+async def ping_redis_connection(redis_client: Redis) -> bool:
     try:
-        # Handle ValkeyStatClient - ping returns bytes, convert to bool
-        if hasattr(redis_client, "execute"):
-            ping_result = await redis_client.ping()
-            return ping_result == b"PONG"
-        # Handle Redis client - ping returns bool
-        else:
-            return await redis_client.ping()
+        ping_result = await redis_client.ping()
+        return (
+            ping_result == b"PONG"
+        )  # Handle ValkeyStatClient - ping returns bytes, convert to bool
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e

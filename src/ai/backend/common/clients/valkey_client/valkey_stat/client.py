@@ -2,8 +2,6 @@ import json
 import logging
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Final,
     List,
     Mapping,
@@ -531,8 +529,8 @@ class ValkeyStatClient:
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
         for key, value in result.items():
-            str_key: str = key.decode("utf-8") if isinstance(key, bytes) else key
-            str_value: str = value.decode("utf-8") if isinstance(value, bytes) else value
+            str_key: str = key.decode("utf-8")
+            str_value: str = value.decode("utf-8")
             metadata[str_key] = str_value
 
         return metadata
@@ -720,10 +718,10 @@ class ValkeyStatClient:
         expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
 
         # Use batch operation to set hash fields and expiration atomically
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         # Convert mapping to proper format for hset
-        batch.hset(key, cast(Mapping[Union[str, bytes], Union[str, bytes]], field_value_map))
+        batch.hset(key, cast(Mapping[str | bytes, str | bytes], field_value_map))
         batch.expire(key, expiration)
 
         await self._client.client.exec(batch, raise_on_error=True)
@@ -745,10 +743,10 @@ class ValkeyStatClient:
         expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
 
         # Use batch operation to set hash fields and expiration atomically
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         # Convert mapping to proper format for hset
-        batch.hset(key, cast(Mapping[Union[str, bytes], Union[str, bytes]], field_value_map))
+        batch.hset(key, cast(Mapping[str | bytes, str | bytes], field_value_map))
         batch.expire(key, expiration)
 
         await self._client.client.exec(batch, raise_on_error=True)
@@ -772,7 +770,7 @@ class ValkeyStatClient:
         :param batch_operations: List of operations to execute.
         :return: List of results from each operation.
         """
-        batch = self._create_batch(is_atomic=False)
+        batch = self._create_batch()
 
         for operation in batch_operations:
             op_type = operation["operation"]
@@ -810,7 +808,7 @@ class ValkeyStatClient:
         if not keys:
             return []
 
-        batch = self._create_batch(is_atomic=False)
+        batch = self._create_batch()
         for key in keys:
             batch.get(key)
 
@@ -833,7 +831,7 @@ class ValkeyStatClient:
             return
 
         expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         for key, value in key_value_map.items():
             batch.set(
@@ -860,7 +858,7 @@ class ValkeyStatClient:
             return
 
         expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         for key, value in key_value_map.items():
             batch.set(
@@ -887,7 +885,7 @@ class ValkeyStatClient:
             return
 
         # Use batch operations to set multiple keys with same value and expiration
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         for kernel_id in kernel_ids:
             key = f"kernel.{kernel_id}.commit"
@@ -930,7 +928,7 @@ class ValkeyStatClient:
         :return: List of encoded session IDs.
         """
         # Use batch operations to get count, then pop all members
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
         batch.scard(status_set_key)
 
         # Execute first to get the count
@@ -970,7 +968,7 @@ class ValkeyStatClient:
     async def update_abuse_report(
         self,
         hash_name: str,
-        new_report: Mapping[str, Any],
+        new_report: Mapping[str, str],
     ) -> None:
         """
         Update kernel abuse report data, removing stale entries and adding new ones.
@@ -982,24 +980,17 @@ class ValkeyStatClient:
         current_keys = await self._client.client.hkeys(hash_name)
 
         # Use batch operations to update the report atomically
-        batch = self._create_batch(is_atomic=True)
+        batch = self._create_batch()
 
         # Remove stale entries
-        if current_keys:
-            for key in current_keys:
-                key_str = key.decode("utf-8") if isinstance(key, bytes) else str(key)
-                if key_str not in new_report:
-                    batch.hdel(hash_name, [key])
+        for key in current_keys:
+            key_str = key.decode("utf-8")
+            if key_str not in new_report:
+                batch.hdel(hash_name, [key])
 
         # Add/update new entries
-        if new_report:
-            for kern_id, report_val in new_report.items():
-                report_bytes = (
-                    str(report_val).encode("utf-8")
-                    if not isinstance(report_val, bytes)
-                    else report_val
-                )
-                batch.hset(hash_name, {kern_id: report_bytes})
+        for kern_id, report_val in new_report.items():
+            batch.hset(hash_name, {kern_id: report_val})
 
         await self._client.client.exec(batch, raise_on_error=True)
 
@@ -1043,7 +1034,7 @@ class ValkeyStatClient:
     async def scan_and_get_manager_status(
         self,
         pattern: str,
-    ) -> List[Optional[bytes]]:
+    ) -> list[Optional[bytes]]:
         """
         Scan for manager status keys and get their values.
 
@@ -1051,62 +1042,19 @@ class ValkeyStatClient:
         :return: List of values for matching keys.
         """
         # Use SCAN to find all matching keys
-        cursor = 0
+        cursor = b"0"
         matched_keys: list[bytes] = []
 
         while True:
             result = await self._client.client.scan(str(cursor), match=pattern)
-            if isinstance(result[0], (int, str, bytes)):
-                cursor = int(str(result[0]))
-            else:
-                cursor = 0
-            if isinstance(result[1], list):
-                matched_keys.extend(result[1])
-
-            if cursor == 0:
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            matched_keys.extend(keys)
+            if cursor == b"0":
                 break
-
         if not matched_keys:
             return []
-
-        # Get all values for matched keys
-        str_keys: list[str | bytes] = [
-            key.decode("utf-8") if isinstance(key, bytes) else str(key) for key in matched_keys
-        ]
-        return await self._client.client.mget(str_keys)
-
-    # Compatibility methods for redis_helper interface
-    async def execute(
-        self,
-        func: Callable[[Any], Awaitable[Any]],
-        *,
-        encoding: Optional[str] = None,
-        command_timeout: Optional[float] = None,
-    ) -> Any:
-        """
-        Execute a function with ValkeyStatClient for redis_helper compatibility.
-
-        :param func: Function that takes a client and returns an awaitable
-        :param encoding: Optional encoding for response (for compatibility)
-        :param command_timeout: Optional timeout (for compatibility)
-        :return: Result of the function execution
-        """
-        try:
-            result = await func(self)
-
-            # Handle encoding if specified and result is bytes
-            if encoding and isinstance(result, bytes):
-                return result.decode(encoding)
-            elif encoding and isinstance(result, list):
-                # Handle list of bytes responses
-                return [
-                    item.decode(encoding) if isinstance(item, bytes) else item for item in result
-                ]
-
-            return result
-        except Exception as e:
-            # Re-raise with original exception for compatibility
-            raise e
+        return await self._client.client.mget(cast(list[str | bytes], matched_keys))
 
     # Additional Redis-compatible methods
     @valkey_decorator()

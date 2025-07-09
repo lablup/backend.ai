@@ -1,7 +1,7 @@
 import logging
 import time
 from decimal import Decimal
-from typing import Optional, Self
+from typing import Optional, Self, cast
 
 from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary
 
@@ -89,7 +89,7 @@ class ValkeyRateLimitClient:
             request_id = 1
 
         # Use batch for atomicity
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
 
         # Remove expired entries
         tx.zremrangebyscore(
@@ -108,12 +108,12 @@ class ValkeyRateLimitClient:
         tx.zcard(access_key)
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-
+        if not results:
+            log.exception("No results returned from rate limit logic execution.")
+            return 0
         # The last result is the count
-        count = results[-1] if results else 0
-        if isinstance(count, (int, str)):
-            return int(count)
-        return 0
+        count = cast(int, results[-1])
+        return count
 
     @valkey_decorator()
     async def get_rolling_count(self, access_key: str) -> int:
@@ -123,10 +123,7 @@ class ValkeyRateLimitClient:
         :param access_key: The access key to get the count for.
         :return: The current count.
         """
-        result = await self._client.client.zcard(access_key)
-        if isinstance(result, (int, str)):
-            return int(result)
-        return 0
+        return await self._client.client.zcard(access_key)
 
     @valkey_decorator()
     async def set_rate_limit_config(
@@ -161,15 +158,13 @@ class ValkeyRateLimitClient:
         :param expiration: The expiration time in seconds.
         :return: The new value after increment.
         """
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.incr(key)
         tx.expire(key, expiration)
         results = await self._client.client.exec(tx, raise_on_error=True)
         # Handle the result properly by extracting the first result
         if results and len(results) > 0:
-            result = results[0]
-            if isinstance(result, (int, str)):
-                return int(result)
+            return cast(int, results[0])
         return 0
 
     @valkey_decorator()
@@ -247,7 +242,7 @@ class ValkeyRateLimitClient:
         :param member: The member to add.
         :param expiration: The expiration time in seconds.
         """
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.zadd(key, {member: score})
         tx.expire(key, expiration)
         await self._client.client.exec(tx, raise_on_error=True)

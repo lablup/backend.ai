@@ -371,7 +371,7 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.schedule"
 
         # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.delete_live_data(redis_key)
         await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
@@ -1263,7 +1263,7 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.check_precondition"
 
         # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.delete_live_data(redis_key)
         await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
@@ -1346,7 +1346,7 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.start"
 
         # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.delete_live_data(redis_key)
         await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
@@ -1589,7 +1589,7 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.scale_services"
 
         # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.delete_live_data(redis_key)
         await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={

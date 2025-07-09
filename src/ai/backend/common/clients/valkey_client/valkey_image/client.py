@@ -164,17 +164,11 @@ class ValkeyImageClient:
 
         results = await self._client.client.exec(tx, raise_on_error=True)
         final_results: list[set[str]] = []
-        if results:
-            for result in results:
-                if result is None:
-                    final_results.append(set())
-                elif hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
-                    final_results.append({
-                        member.decode() if isinstance(member, bytes) else str(member)
-                        for member in result
-                    })
-                else:
-                    final_results.append(set())
+        if not results:
+            return final_results
+        for result in results:
+            result = cast(set[bytes], result)
+            final_results.append({member.decode() for member in result})
         return final_results
 
     @valkey_decorator()
@@ -209,12 +203,9 @@ class ValkeyImageClient:
             tx.scard(image_canonical)
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-        if results:
-            return [
-                int(result) if result is not None and isinstance(result, (int, str)) else 0
-                for result in results
-            ]
-        return []
+        if not results:
+            return []
+        return [cast(int, result) for result in results]
 
     @valkey_decorator()
     async def get_all_image_names(self) -> list[str]:

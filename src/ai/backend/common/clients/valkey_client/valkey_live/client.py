@@ -106,26 +106,22 @@ class ValkeyLiveClient:
         await self._client.client.set(key, value, conditional_set=conditional_set, expiry=expiry)
 
     @valkey_decorator()
-    async def delete_live_data(self, keys: str | List[str]) -> int:
+    async def delete_live_data(self, key: str) -> int:
         """Delete live data keys."""
-        if isinstance(keys, str):
-            keys = [keys]
-        return await self._client.client.delete(cast(List[str | bytes], keys))
+        return await self._client.client.delete([key])
 
     @valkey_decorator()
     async def get_server_time(self) -> float:
-        """Get server time as float timestamp."""
+        """Get server time as timestamp."""
         result = await self._client.client.time()
         if len(result) != 2:
             raise ValueError(
                 f"Unexpected result from time command: {result}. Expected a tuple of (seconds, microseconds)."
             )
         seconds_bytes, microseconds_bytes = result
-        seconds = int(seconds_bytes) if isinstance(seconds_bytes, bytes) else seconds_bytes
-        microseconds = (
-            int(microseconds_bytes) if isinstance(microseconds_bytes, bytes) else microseconds_bytes
-        )
-        return seconds + (microseconds / 10**6)
+        seconds = int(seconds_bytes)
+        microseconds = int(microseconds_bytes)
+        return float(seconds + (microseconds / 10**6))
 
     @valkey_decorator()
     async def count_active_connections(self, session_id: str) -> int:
@@ -170,8 +166,8 @@ class ValkeyLiveClient:
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
         for key, value in result.items():
-            str_key: str = key.decode("utf-8") if isinstance(key, bytes) else key
-            str_value: str = value.decode("utf-8") if isinstance(value, bytes) else value
+            str_key: str = key.decode("utf-8")
+            str_value: str = value.decode("utf-8")
             metadata[str_key] = str_value
 
         return metadata
@@ -387,14 +383,10 @@ class ValkeyLiveClient:
             if len(scan_result) != 2:
                 break
             cursor = cast(bytes, scan_result[0])
-            keys = cast(list, scan_result[1])
+            keys = cast(list[bytes], scan_result[1])
 
             for key in keys:
-                if isinstance(key, bytes):
-                    results.append(key.decode("utf-8"))
-                else:
-                    results.append(key)
-
+                results.append(key.decode("utf-8"))
             if cursor == b"0":
                 break
 
@@ -412,14 +404,9 @@ class ValkeyLiveClient:
         :param expiry_seconds: Expiry time in seconds.
         """
 
-        # Convert string values to bytes for hset
-        byte_mapping = {
-            k: v.encode("utf-8") if isinstance(v, str) else v for k, v in mapping.items()
-        }
-
         # Use batch to set hash and expiry atomically
-        batch = self._create_batch(is_atomic=True)
-        batch.hset(key, cast(Mapping[str | bytes, str | bytes], byte_mapping))
+        batch = self._create_batch()
+        batch.hset(key, cast(Mapping[str | bytes, str | bytes], mapping))
         batch.expire(key, expiry_seconds)
         await self._execute_batch(batch)
 
@@ -438,8 +425,8 @@ class ValkeyLiveClient:
         # Convert bytes keys and values to strings
         str_result: dict[str, str] = {}
         for k, v in result.items():
-            str_key: str = k.decode("utf-8") if isinstance(k, bytes) else k
-            str_value: str = v.decode("utf-8") if isinstance(v, bytes) else v
+            str_key: str = k.decode("utf-8")
+            str_value: str = v.decode("utf-8")
             str_result[str_key] = str_value
 
         return str_result

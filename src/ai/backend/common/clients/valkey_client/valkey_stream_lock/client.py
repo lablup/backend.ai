@@ -73,7 +73,7 @@ class ValkeyStreamLockClient:
         Ping the Redis server.
         """
         result = await self._client.client.ping()
-        return result.decode() if isinstance(result, bytes) else result
+        return result.decode()
 
     @valkey_decorator()
     async def set_with_expiry(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
@@ -93,7 +93,9 @@ class ValkeyStreamLockClient:
         Get a value by key.
         """
         result = await self._client.client.get(key)
-        return result.decode() if isinstance(result, bytes) else result
+        if result is None:
+            return None
+        return result.decode()
 
     @valkey_decorator()
     async def delete(self, key: str) -> int:

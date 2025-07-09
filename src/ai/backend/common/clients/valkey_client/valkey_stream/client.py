@@ -205,7 +205,7 @@ class ValkeyStreamClient:
         :param payload: The payload to re-add to the stream.
         :raises: GlideClientError if the message cannot be requeued.
         """
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.xack(stream_key, group_name, [message_id])
         values = [(k, v) for k, v in payload.items()]
         tx.xadd(
@@ -346,7 +346,7 @@ class ValkeyStreamClient:
         :raises: GlideClientError if the logs cannot be enqueued.
         """
         key = self._container_log_key(container_id)
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.rpush(
             key,
             [logs],
