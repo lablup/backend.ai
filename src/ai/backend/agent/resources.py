@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
+
 DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
