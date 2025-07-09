@@ -25,6 +25,7 @@ class ContextName(enum.StrEnum):
     DOMAIN = "domain"
     GROUP = "group"
     SCALING_GROUP = "scaling_group"
+    USER_RESOURCE_POLICY = "user_resource_policy"
     MODEL_SERVICE = "model_service"
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
@@ -45,6 +46,7 @@ class ContextName(enum.StrEnum):
     CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
     CREATED_USER_CONTEXT = "created_user_context"
     CREATED_USER_CLIENT_SESSION = "created_user_client_session"
+    CREATED_GROUP = "created_group"
     VFOLDER_INVITATION = "vfolder_invitation"
     VFOLDER_INVITATION_PERMISSION = "vfolder_invitation_permission"
 
