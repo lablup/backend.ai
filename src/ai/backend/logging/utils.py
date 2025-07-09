@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any, LiteralString
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Generator, LiteralString, Mapping
 
 from ai.backend.logging.otel import OpenTelemetrySpec
+
+_log_context_fields: ContextVar[Mapping[str, Any]] = ContextVar("log_context_fields", default={})
 
 __all__ = (
     "BraceMessage",
     "BraceStyleAdapter",
     "enforce_debug_logging",
+    "with_log_context_fields",
 )
 
 
@@ -35,6 +40,9 @@ class BraceStyleAdapter(logging.LoggerAdapter):
         if self.isEnabledFor(level):
             msg, kwargs = self.process(msg, kwargs)
             kwargs["stacklevel"] = kwargs.get("stacklevel", 1) + 1
+            kwargs["extra"] = {
+                **_log_context_fields.get(),
+            }
             self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
 
     @classmethod
@@ -56,3 +64,14 @@ def enforce_debug_logging(loggers: Iterable[str]) -> None:
     for name in loggers:
         instance = logging.getLogger(name)
         instance.setLevel(logging.DEBUG)
+
+
+@contextmanager
+def with_log_context_fields(fields: Mapping[str, Any]) -> Generator[Mapping[str, Any], None, None]:
+    current_fields = _log_context_fields.get()
+    new_fields = {**current_fields, **fields}
+    token = _log_context_fields.set(new_fields)
+    try:
+        yield new_fields
+    finally:
+        _log_context_fields.reset(token)
