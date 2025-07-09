@@ -26,7 +26,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
     valkey_decorator,
 )
-from ai.backend.common.types import RedisHelperConfig, RedisTarget
+from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -50,22 +50,13 @@ class ValkeyStatClient:
 
     _client: AbstractValkeyClient
     _closed: bool
-    name: str
-    service_name: Optional[str]
-    redis_helper_config: RedisHelperConfig
 
     def __init__(
         self,
         client: AbstractValkeyClient,
-        name: str = "valkey_stat",
-        service_name: Optional[str] = None,
-        redis_helper_config: Optional[RedisHelperConfig] = None,
     ) -> None:
         self._client = client
         self._closed = False
-        self.name = name
-        self.service_name = service_name
-        self.redis_helper_config = redis_helper_config or {}
 
     @classmethod
     async def create(
@@ -94,9 +85,6 @@ class ValkeyStatClient:
         await client.connect()
         return cls(
             client=client,
-            name=human_readable_name,
-            service_name=human_readable_name,
-            redis_helper_config={},
         )
 
     async def close(self) -> None:
@@ -1119,20 +1107,6 @@ class ValkeyStatClient:
         except Exception as e:
             # Re-raise with original exception for compatibility
             raise e
-
-    @property
-    def client(self) -> "ValkeyStatClient":
-        """
-        Property to provide client access for redis_helper compatibility.
-        """
-        return self
-
-    @property
-    def sentinel(self) -> None:
-        """
-        Property to provide sentinel compatibility (ValkeyStatClient doesn't use sentinel).
-        """
-        return None
 
     # Additional Redis-compatible methods
     @valkey_decorator()

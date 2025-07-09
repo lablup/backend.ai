@@ -497,7 +497,7 @@ async def stream_proxy(
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-    redis_live = root_ctx.redis_live
+    redis_live = root_ctx.valkey_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
@@ -674,7 +674,7 @@ async def handle_kernel_terminating(
 
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
-    redis_live = root_ctx.redis_live
+    redis_live = root_ctx.valkey_live
     try:
         while True:
             try:

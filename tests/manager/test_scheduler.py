@@ -620,13 +620,16 @@ async def test_manually_assign_agent_available(
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
     mock_etcd = DummyEtcd()
-
+    test_valkey_live = MagicMock()
+    test_valkey_stat = MagicMock()
     dispatcher = SchedulerDispatcher(
         config_provider=mock_config_provider,
         etcd=mock_etcd,  # type: ignore
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
         registry=registry,
+        valkey_live=test_valkey_live,
+        valkey_stat=test_valkey_stat,
     )
 
     # manually assigned agent has None capacity

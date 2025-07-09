@@ -302,7 +302,7 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
 
     scheduler_status = {}
     for event in SchedulerEvent:
-        scheduler_status[event.value] = await root_ctx.redis_live.get_scheduler_metadata(
+        scheduler_status[event.value] = await root_ctx.valkey_live.get_scheduler_metadata(
             f"manager.{manager_id}.{event.value}"
         )
 

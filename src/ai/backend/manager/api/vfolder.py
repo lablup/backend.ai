@@ -628,7 +628,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     fetch_exposed_volume_fields_tasks = [
         fetch_exposed_volume_fields(
             storage_manager=root_ctx.storage_manager,
-            valkey_stat_client=root_ctx.valkey_stat_client,
+            valkey_stat_client=root_ctx.valkey_stat,
             proxy_name=proxy_name,
             volume_name=volume_data["name"],
         )

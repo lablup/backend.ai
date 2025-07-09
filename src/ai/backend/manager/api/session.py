@@ -949,7 +949,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
-        agent_last_seen = await root_ctx.redis_live.scan_agent_last_seen()
+        agent_last_seen = await root_ctx.valkey_live.scan_agent_last_seen()
         for agent_id, prev_timestamp in agent_last_seen:
             prev = datetime.fromtimestamp(prev_timestamp, tzutc())
             if now - prev > timeout:

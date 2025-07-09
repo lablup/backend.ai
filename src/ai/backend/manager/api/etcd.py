@@ -104,7 +104,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
     known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
     # Collect plugin-reported accelerator metadata
-    computer_metadata = await root_ctx.valkey_stat_client.get_computer_metadata()
+    computer_metadata = await root_ctx.valkey_stat.get_computer_metadata()
     reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
         slot_name: cast(AcceleratorMetadata, load_json(metadata_json))
         for slot_name, metadata_json in computer_metadata.items()

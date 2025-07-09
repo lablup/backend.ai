@@ -183,7 +183,7 @@ async def blpop(
 
 
 async def execute(
-    redis_obj: Union[RedisConnectionInfo, "ValkeyStatClient"],
+    redis_obj: RedisConnectionInfo,
     func: Callable[[Union[Redis, Any]], Awaitable[Any]],
     *,
     service_name: Optional[str] = None,
@@ -201,11 +201,6 @@ async def execute(
     if not callable(func):
         raise TypeError("The func must be a function or a coroutinefunction with no arguments.")
 
-    # Handle ValkeyStatClient differently
-    if hasattr(redis_obj, "execute"):  # ValkeyStatClient has execute method
-        return await redis_obj.execute(func, encoding=encoding)
-
-    # Handle RedisConnectionInfo
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
     reconnect_poll_interval = redis_obj.redis_helper_config.get("reconnect_poll_timeout", 0.0)
@@ -296,7 +291,7 @@ async def execute(
 
 
 async def execute_script(
-    redis_obj: Union[RedisConnectionInfo, "ValkeyStatClient"],
+    redis_obj: Union[RedisConnectionInfo],
     script_id: str,
     script: str,
     keys: Sequence[str],

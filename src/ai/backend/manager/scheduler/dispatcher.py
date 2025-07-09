@@ -36,7 +36,6 @@ from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -76,7 +75,6 @@ from ai.backend.common.types import (
     ClusterMode,
     EndpointId,
     KernelId,
-    RedisProfileTarget,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -273,8 +271,8 @@ class SchedulerDispatcher(aobject):
     scale_timer: GlobalTimer
     update_session_status_timer: GlobalTimer
 
-    redis_live: ValkeyLiveClient
-    valkey_stat_client: ValkeyStatClient
+    _valkey_live: ValkeyLiveClient
+    _valkey_stat: ValkeyStatClient
 
     def __init__(
         self,
@@ -283,6 +281,8 @@ class SchedulerDispatcher(aobject):
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
         registry: AgentRegistry,
+        valkey_live: ValkeyLiveClient,
+        valkey_stat: ValkeyStatClient,
     ) -> None:
         self.config_provider = config_provider
         self.etcd = etcd
@@ -290,9 +290,8 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
-        # redis_live will be initialized in __ainit__
-        self.redis_live = cast(ValkeyLiveClient, None)
-        self.valkey_stat_client = cast(ValkeyStatClient, None)
+        self._valkey_live = valkey_live
+        self._valkey_stat = valkey_stat
 
     async def __ainit__(self) -> None:
         self.schedule_timer = GlobalTimer(
@@ -340,21 +339,6 @@ class SchedulerDispatcher(aobject):
         await self.scale_timer.join()
         await self.update_session_status_timer.join()
 
-        # Initialize ValkeyLiveClient and ValkeyStatClient
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.config_provider.config.redis.model_dump()
-        )
-        self.redis_live = await ValkeyLiveClient.create(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            db_id=REDIS_LIVE_DB,
-            human_readable_name="scheduler.live",
-        )
-        self.valkey_stat_client = await ValkeyStatClient.create(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            db_id=REDIS_STATISTICS_DB,
-            human_readable_name="scheduler.stat",
-        )
-
         log.info("Session scheduler started")
 
     async def close(self) -> None:
@@ -364,8 +348,8 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.session_start_timer.leave())
             tg.create_task(self.schedule_timer.leave())
             tg.create_task(self.update_session_status_timer.leave())
-        await self.redis_live.close()
-        await self.valkey_stat_client.close()
+        await self._valkey_live.close()
+        await self._valkey_stat.close()
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -387,8 +371,8 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.schedule"
 
         # Clear and initialize scheduler metadata
-        await self.redis_live.delete_live_data([redis_key])
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "trigger_event": event_name,
@@ -424,14 +408,14 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self.redis_live.store_scheduler_metadata(
+                        await self._valkey_live.store_scheduler_metadata(
                             redis_key,
                             "resource_group",
                             sgroup_name,
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await self.redis_live.store_scheduler_metadata(
+                await self._valkey_live.store_scheduler_metadata(
                     redis_key,
                     "finish_time",
                     datetime.now(tzutc()).isoformat(),
@@ -1279,8 +1263,8 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.check_precondition"
 
         # Clear and initialize scheduler metadata
-        await self.redis_live.delete_live_data([redis_key])
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "trigger_event": event_name,
@@ -1333,7 +1317,7 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            await self.redis_live.store_scheduler_metadata(
+            await self._valkey_live.store_scheduler_metadata(
                 redis_key,
                 "finish_time",
                 datetime.now(tzutc()).isoformat(),
@@ -1362,8 +1346,8 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.start"
 
         # Clear and initialize scheduler metadata
-        await self.redis_live.delete_live_data([redis_key])
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "trigger_event": event_name,
@@ -1423,7 +1407,7 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            await self.redis_live.store_scheduler_metadata(
+            await self._valkey_live.store_scheduler_metadata(
                 redis_key,
                 "finish_time",
                 datetime.now(tzutc()).isoformat(),
@@ -1481,11 +1465,11 @@ class SchedulerDispatcher(aobject):
         # to speed up and lower the pressure to the redis we must load every metrics
         # in bulk, not querying each key at once
         kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
-            self.valkey_stat_client,
+            self._valkey_stat,
             cast(list[SessionId], list(metric_requested_kernels)),
         )
         endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
-            self.valkey_stat_client,
+            self._valkey_stat,
             cast(list[SessionId], list(metric_requested_endpoints)),
         )
 
@@ -1605,8 +1589,8 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.scale_services"
 
         # Clear and initialize scheduler metadata
-        await self.redis_live.delete_live_data([redis_key])
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.delete_live_data([redis_key])
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "trigger_event": event_name,
@@ -1725,7 +1709,7 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             "down",
             dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
@@ -1750,7 +1734,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.commit()
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await self.redis_live.store_scheduler_metadata(
+        await self._valkey_live.store_scheduler_metadata(
             redis_key,
             mapping={
                 "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),

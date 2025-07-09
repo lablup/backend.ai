@@ -939,7 +939,7 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_endpoint_impl(
         cls,
-        valkey_stat_client: "ValkeyStatClient",
+        valkey_stat_client: ValkeyStatClient,
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         endpoint_id_strs = [str(endpoint_id) for endpoint_id in endpoint_ids]
@@ -951,7 +951,7 @@ class EndpointStatistics:
         ctx: "GraphQueryContext",
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat_client, endpoint_ids)
+        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)
 
     @classmethod
     async def batch_load_by_replica(
@@ -962,6 +962,4 @@ class EndpointStatistics:
         endpoint_replica_pairs = [
             (str(endpoint_id), str(replica_id)) for endpoint_id, replica_id in endpoint_replica_ids
         ]
-        return await ctx.valkey_stat_client.get_inference_replica_statistics_batch(
-            endpoint_replica_pairs
-        )
+        return await ctx.valkey_stat.get_inference_replica_statistics_batch(endpoint_replica_pairs)

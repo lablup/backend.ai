@@ -45,9 +45,9 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=root_context.db,  # type: ignore
-        valkey_stat_client=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
+        valkey_stat=None,  # type: ignore
+        valkey_image=None,  # type: ignore
+        valkey_live=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=root_context.background_task_manager,  # type: ignore
@@ -184,7 +184,7 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
-    raw_alloc_map_cache = await root_ctx.valkey_stat_client.mget(["gpu_alloc_map.i-ag1"])
+    raw_alloc_map_cache = await root_ctx.valkey_stat.mget(["gpu_alloc_map.i-ag1"])
     alloc_map_cache = [
         json.loads(stat) if stat is not None else None for stat in raw_alloc_map_cache
     ]

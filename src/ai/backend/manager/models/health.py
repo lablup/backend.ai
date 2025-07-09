@@ -186,7 +186,7 @@ async def report_manager_status(root_ctx: RootContext) -> None:
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
     if lifetime is not None:
-        await root_ctx.valkey_stat_client.set_manager_status(
+        await root_ctx.valkey_stat.set_manager_status(
             node_id=cxn_info.node_id,
             pid=cxn_info.pid,
             status_data=_data,
@@ -200,7 +200,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
     try:
         _raw_value = cast(
             list[bytes] | None,
-            await root_ctx.valkey_stat_client.scan_and_get_manager_status(
+            await root_ctx.valkey_stat.scan_and_get_manager_status(
                 f"{MANAGER_STATUS_KEY}*",
             ),
         )

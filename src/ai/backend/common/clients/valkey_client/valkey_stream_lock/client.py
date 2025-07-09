@@ -21,14 +21,10 @@ class ValkeyStreamLockClient:
 
     _client: AbstractValkeyClient
     _closed: bool
-    _default_ttl: int
-    name: str
 
-    def __init__(self, client: AbstractValkeyClient, default_ttl: int = _DEFAULT_LOCK_TTL) -> None:
+    def __init__(self, client: AbstractValkeyClient) -> None:
         self._client = client
         self._closed = False
-        self._default_ttl = default_ttl
-        self.name = "valkey_stream_lock"
 
     @classmethod
     async def create(
@@ -37,7 +33,6 @@ class ValkeyStreamLockClient:
         *,
         db_id: int,
         human_readable_name: str,
-        default_ttl: int = _DEFAULT_LOCK_TTL,
     ) -> Self:
         """
         Create a ValkeyStreamLockClient instance.
@@ -45,17 +40,15 @@ class ValkeyStreamLockClient:
         :param redis_target: The target Redis server to connect to.
         :param db_id: The database index to use.
         :param human_readable_name: The human-readable name of the client.
-        :param default_ttl: The default TTL for locks (in seconds).
         :return: An instance of ValkeyStreamLockClient.
         """
         client = create_valkey_client(
             target=redis_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
-            pubsub_channels=None,
         )
         await client.connect()
-        return cls(client=client, default_ttl=default_ttl)
+        return cls(client=client)
 
     async def close(self) -> None:
         """
@@ -89,7 +82,7 @@ class ValkeyStreamLockClient:
         """
         from glide import ExpirySet, ExpiryType
 
-        expiry_time = ttl if ttl is not None else self._default_ttl
+        expiry_time = ttl if ttl is not None else _DEFAULT_LOCK_TTL
         expiry = ExpirySet(ExpiryType.SEC, expiry_time)
         result = await self._client.client.set(key, value, expiry=expiry)
         return result is not None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from ai.backend.common.clients.valkey_client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 
 
 async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -> None:

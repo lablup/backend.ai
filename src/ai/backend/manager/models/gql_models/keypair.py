@@ -158,7 +158,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        return await ctx.valkey_stat_client.get_keypair_query_count(self.access_key)
+        return await ctx.valkey_stat.get_keypair_query_count(self.access_key)
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
@@ -194,11 +194,11 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        return await ctx.valkey_stat_client.get_keypair_concurrency_used(self.access_key)
+        return await ctx.valkey_stat.get_keypair_concurrency_used(self.access_key)
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
-        row_ts = await ctx.valkey_stat_client.get_keypair_last_used_time(self.access_key)
+        row_ts = await ctx.valkey_stat.get_keypair_last_used_time(self.access_key)
         if row_ts is None:
             return None
         return datetime.fromtimestamp(row_ts)
@@ -554,7 +554,7 @@ class DeleteKeyPair(graphene.Mutation):
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         result = await simple_db_mutate(cls, ctx, delete_query)
         if result.ok:
-            await ctx.valkey_stat_client.delete_keypair_concurrency(
+            await ctx.valkey_stat.delete_keypair_concurrency(
                 access_key=access_key,
                 is_private=False,
             )

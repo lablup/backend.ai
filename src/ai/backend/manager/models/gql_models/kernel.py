@@ -204,7 +204,7 @@ class KernelNode(graphene.ObjectType):
         cls, ctx: GraphQueryContext, kernel_ids: Sequence[KernelId]
     ) -> list[dict[str, Any] | None]:
         kernel_ids_str = [str(kid) for kid in kernel_ids]
-        return await ctx.valkey_stat_client.get_session_statistics_batch(kernel_ids_str)
+        return await ctx.valkey_stat.get_session_statistics_batch(kernel_ids_str)
 
 
 class KernelConnection(Connection):

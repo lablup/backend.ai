@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
@@ -59,7 +59,7 @@ from .gql_models.container_registry_v2 import (
 
 set_input_object_type_default_value(Undefined)
 
-from ai.backend.common.types import QuotaScopeID, RedisConnectionInfo, SessionId
+from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
     AsyncNode,
@@ -313,9 +313,9 @@ class GraphQueryContext:
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
     services_ctx: ServicesContext
-    valkey_stat_client: ValkeyStatClient
-    redis_live: Union[RedisConnectionInfo, ValkeyLiveClient]
-    redis_image: ValkeyImageClient
+    valkey_stat: ValkeyStatClient
+    valkey_live: ValkeyLiveClient
+    valkey_image: ValkeyImageClient
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager

@@ -111,7 +111,7 @@ GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
-    raw_alloc_map = await ctx.valkey_stat_client.get_gpu_allocation_map(str(agent_id))
+    raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
         return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
     return {}
@@ -229,13 +229,13 @@ class AgentNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        return await ctx.valkey_stat_client.get_agent_statistics_batch(list(agent_ids))
+        return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        return await ctx.valkey_stat_client.get_agent_container_counts_batch(list(agent_ids))
+        return await ctx.valkey_stat.get_agent_container_counts_batch(list(agent_ids))
 
     @classmethod
     async def get_connection(
@@ -578,7 +578,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        return await ctx.valkey_stat_client.get_agent_statistics_batch(list(agent_ids))
+        return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_cpu_cur_pct(
@@ -614,7 +614,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        return await ctx.valkey_stat_client.get_agent_container_counts_batch(list(agent_ids))
+        return await ctx.valkey_stat.get_agent_container_counts_batch(list(agent_ids))
 
 
 async def _query_domain_groups_by_ak(

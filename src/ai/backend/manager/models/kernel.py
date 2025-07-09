@@ -15,7 +15,6 @@ from typing import (
     Self,
     Sequence,
     TypedDict,
-    Union,
     cast,
 )
 
@@ -31,7 +30,6 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -858,18 +856,12 @@ class KernelStatistics:
     @classmethod
     async def batch_load_by_kernel_impl(
         cls,
-        valkey_stat_client: Union[RedisConnectionInfo, "ValkeyStatClient"],
+        valkey_stat_client: ValkeyStatClient,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """For cases where required to collect kernel metrics in bulk internally"""
-        from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-
-        if isinstance(valkey_stat_client, ValkeyStatClient):
-            session_ids_str = [str(sess_id) for sess_id in session_ids]
-            return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
-        else:
-            # Legacy RedisConnectionInfo - return empty results
-            return [None] * len(session_ids)
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
 
     @classmethod
     async def batch_load_by_kernel(
@@ -878,7 +870,7 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat_client, session_ids)
+        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(
@@ -886,14 +878,8 @@ class KernelStatistics:
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-
-        if isinstance(ctx.redis_live, ValkeyLiveClient):
-            session_ids_str = [str(sess_id) for sess_id in session_ids]
-            return await ctx.redis_live.get_session_statistics_batch(session_ids_str)
-        else:
-            # Legacy RedisConnectionInfo - return empty results
-            return [None] * len(session_ids)
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await ctx.valkey_live.get_session_statistics_batch(session_ids_str)
 
 
 async def recalc_concurrency_used(

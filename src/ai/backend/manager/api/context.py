@@ -56,9 +56,9 @@ class RootContext(BaseContext):
     event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
-    redis_live: ValkeyLiveClient
-    valkey_stat_client: ValkeyStatClient
-    redis_image: ValkeyImageClient
+    valkey_live: ValkeyLiveClient
+    valkey_stat: ValkeyStatClient
+    valkey_image: ValkeyImageClient
     redis_stream: RedisConnectionInfo
     valkey_stream: ValkeyStreamClient
     valkey_stream_lock: ValkeyStreamLockClient

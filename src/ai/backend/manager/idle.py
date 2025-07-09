@@ -198,7 +198,8 @@ class IdleCheckerHost:
         config_provider: ManagerConfigProvider,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
-        redis_live: ValkeyLiveClient,
+        valkey_live: ValkeyLiveClient,
+        valkey_stat: ValkeyStatClient,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._event_dispatch_checkers: list[AbstractEventDispatcherIdleChecker] = []
@@ -207,10 +208,10 @@ class IdleCheckerHost:
         self._config_provider = config_provider
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        self._redis_live = redis_live
-        self._valkey_stat_client = cast(ValkeyStatClient, None)
+        self._valkey_live = valkey_live
+        self._valkey_stat = valkey_stat
         # NewUserGracePeriodChecker will be initialized in start() method
-        self._grace_period_checker = NewUserGracePeriodChecker(self._redis_live)
+        self._grace_period_checker = NewUserGracePeriodChecker(self._valkey_live)
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -228,17 +229,6 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
-
-        # Initialize ValkeyStatClient
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._config_provider.config.redis.model_dump()
-        )
-        self._valkey_stat_client = await ValkeyStatClient.create(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            human_readable_name="idle.stat",
-            db_id=REDIS_STATISTICS_DB,
-        )
-
         raw_config = self._config_provider.config.idle.checkers
         await self._grace_period_checker.populate_config(
             raw_config.get(self._grace_period_checker.name) or {}
@@ -262,8 +252,8 @@ class IdleCheckerHost:
         for checker in self._checkers:
             await checker.aclose()
         await self.timer.leave()
-        await self._valkey_stat_client.close()
-        await self._redis_live.close()
+        await self._valkey_stat.close()
+        await self._valkey_live.close()
 
     async def update_app_streaming_status(
         self,
@@ -371,9 +361,9 @@ class IdleCheckerHost:
     ) -> dict[str, Any]:
         return {
             checker.name: {
-                "remaining": await checker.get_checker_result(self._redis_live, session_id),
+                "remaining": await checker.get_checker_result(self._valkey_live, session_id),
                 "remaining_time_type": checker.remaining_time_type.value,
-                "extra": await checker.get_extra_info(self._redis_live, session_id),
+                "extra": await checker.get_extra_info(self._valkey_live, session_id),
             }
             for checker in self._checkers
         }
@@ -397,7 +387,7 @@ class IdleCheckerHost:
         key_list = list(key_session_report_map.keys())
 
         # Get all reports using ValkeyLiveClient batch operation
-        reports = await self._redis_live.get_multiple_live_data(key_list)
+        reports = await self._valkey_live.get_multiple_live_data(key_list)
 
         ret: dict[SessionId, dict[str, ReportInfo]] = {}
         for key, report in zip(key_list, reports):
@@ -1305,23 +1295,28 @@ async def init_idle_checkers(
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         config_provider.config.redis.model_dump()
     )
-    redis_live = await ValkeyLiveClient.create(
+    valkey_live = await ValkeyLiveClient.create(
         redis_profile_target.profile_target(RedisRole.LIVE),
         human_readable_name="idle.live",
         db_id=REDIS_LIVE_DB,
     )
-
+    valkey_stat = await ValkeyStatClient.create(
+        redis_profile_target.profile_target(RedisRole.STATISTICS),
+        human_readable_name="idle.stat",
+        db_id=REDIS_STATISTICS_DB,
+    )
     checker_host = IdleCheckerHost(
         db,
         config_provider,
         event_producer,
         lock_factory,
-        redis_live,
+        valkey_live,
+        valkey_stat,
     )
     checker_init_args = IdleCheckerArgs(
         event_producer,
-        checker_host._redis_live,
-        checker_host._valkey_stat_client,
+        checker_host._valkey_live,
+        checker_host._valkey_stat,
     )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
@@ -1336,7 +1331,7 @@ async def init_idle_checkers(
         checker_instance = checker_cls(checker_init_args)
         checker_host.add_checker(checker_instance)
     event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
-        checker_host._redis_live,
+        checker_host._valkey_live,
     )
     for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
         if event_dispatcher_checker_cls.name() in enabled_checker_names:
