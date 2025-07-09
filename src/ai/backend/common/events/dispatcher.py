@@ -13,6 +13,7 @@ from typing import (
     Callable,
     Coroutine,
     Generic,
+    Mapping,
     Optional,
     Protocol,
     Type,
