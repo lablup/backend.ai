@@ -97,6 +97,7 @@ agent_local_config_iv = (
             t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
             t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
+            t.Key("store-stat-to-redis", default=True): t.ToBool,
             t.Key(
                 "sync-container-lifecycles", default=default_sync_container_lifecycles_config
             ): t.Dict({
