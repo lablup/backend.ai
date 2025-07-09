@@ -102,7 +102,6 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
-    ComputerContext,
     ScanImagesResult,
 )
 from ..exception import ContainerCreationError, UnsupportedResource
@@ -110,7 +109,13 @@ from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
 from ..types import (

@@ -63,12 +63,17 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
-    ComputerContext,
     ScanImagesResult,
 )
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
 from ..types import Container, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
