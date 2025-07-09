@@ -1,5 +1,5 @@
 import logging
-from typing import ParamSpec, Self, TypeVar
+from typing import ParamSpec, Self, TypeVar, cast
 
 from glide import Batch
 
@@ -116,18 +116,17 @@ class ValkeyImageClient:
         cursor = b"0"
         while True:
             result = await self._client.client.scan(cursor)
-            if isinstance(result, list) and len(result) >= 2:
-                new_cursor = result[0]
-                keys = result[1]
-                if keys:
-                    tx = self._create_batch()
-                    for key in keys:
-                        key_str = key.decode() if isinstance(key, bytes) else str(key)
-                        tx.srem(key_str, [agent_id])
-                    await self._client.client.exec(tx, raise_on_error=True)
-                cursor = new_cursor if isinstance(new_cursor, bytes) else b"0"
-            else:
-                break
+            if len(result) != 2:
+                raise ValueError(
+                    f"Unexpected result from scan: {result}. Expected a tuple of (cursor, keys)."
+                )
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            if keys:
+                tx = self._create_batch()
+                for key in keys:
+                    tx.srem(key, [agent_id])
+                await self._client.client.exec(tx, raise_on_error=True)
             if cursor == b"0":
                 break
 
@@ -143,7 +142,7 @@ class ValkeyImageClient:
         :return: Set of agent IDs.
         """
         result = await self._client.client.smembers(image_canonical)
-        return {member.decode() if isinstance(member, bytes) else str(member) for member in result}
+        return {member.decode() for member in result}
 
     @valkey_decorator()
     async def get_agents_for_images(
@@ -228,16 +227,14 @@ class ValkeyImageClient:
         cursor = b"0"
         while True:
             result = await self._client.client.scan(cursor)
-            if isinstance(result, list) and len(result) >= 2:
-                new_cursor = result[0]
-                keys = result[1]
-                if keys:
-                    all_keys.extend([
-                        key.decode() if isinstance(key, bytes) else str(key) for key in keys
-                    ])
-                cursor = new_cursor if isinstance(new_cursor, bytes) else b"0"
-            else:
-                break
+            if len(result) != 2:
+                raise ValueError(
+                    f"Unexpected result from scan: {result}. Expected a tuple of (cursor, keys)."
+                )
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            if keys:
+                all_keys.extend([key.decode() for key in keys])
             if cursor == b"0":
                 break
         return all_keys
