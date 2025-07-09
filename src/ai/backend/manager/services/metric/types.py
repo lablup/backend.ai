@@ -100,3 +100,28 @@ class MetricSpecForQuery:
         if not self.labels:
             return ""
         return f"{{{','.join(self.labels)}}}"
+
+
+@dataclass
+class DeviceMetricResponseInfo:
+    value_type: str
+    device_metric_name: Optional[str]
+    agent_id: Optional[str]
+    device_id: Optional[str]
+
+    instance: Optional[str]
+    job: Optional[str]
+
+
+@dataclass
+class DeviceMetricOptionalLabel:
+    value_type: ValueType
+    device_metric_name: Optional[str]
+    agent_id: Optional[str]
+    device_id: Optional[str]
+
+
+@dataclass
+class DeviceMetricResult:
+    metric: ContainerMetricResponseInfo
+    values: list[MetricResultValue]

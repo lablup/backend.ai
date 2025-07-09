@@ -1865,6 +1865,13 @@ class ManagerUnifiedConfig(BaseModel):
         Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
+    fetch_stat_from_redis: bool = Field(
+        default=True,
+        description="""
+        Parse live_stats from data stored in Redis.
+        Else, parse live_stats from Prometheus data.
+        """,
+    )
 
     # TODO: Remove me after changing the method of loading the license server address in the plugins
     class Config:

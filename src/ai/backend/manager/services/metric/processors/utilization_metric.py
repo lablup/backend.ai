@@ -9,6 +9,12 @@ from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricMetadataAction,
     ContainerMetricMetadataActionResult,
 )
+from ai.backend.manager.services.metric.actions.device import (
+    DeviceMetricAction,
+    DeviceMetricActionResult,
+    DeviceMetricMetadataAction,
+    DeviceMetricMetadataActionResult,
+)
 
 from ..root_service import UtilizationMetricService
 
@@ -19,6 +25,11 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
     ]
 
+    query_device: ActionProcessor[DeviceMetricAction, DeviceMetricActionResult]
+    query_device_metadata: ActionProcessor[
+        DeviceMetricMetadataAction, DeviceMetricMetadataActionResult
+    ]
+
     def __init__(
         self, service: UtilizationMetricService, action_monitors: list[ActionMonitor]
     ) -> None:
@@ -26,10 +37,14 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         self.query_container_metadata = ActionProcessor(
             service.container.query_metadata, action_monitors
         )
+        self.query_device = ActionProcessor(service.device.query_metric, action_monitors)
+        self.query_device_metadata = ActionProcessor(service.device.query_metadata, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
+            DeviceMetricAction.spec(),
+            DeviceMetricMetadataAction.spec(),
         ]

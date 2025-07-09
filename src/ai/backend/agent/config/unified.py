@@ -550,6 +550,13 @@ class AgentConfig(BaseModel):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
+    store_stat_to_redis: bool = Field(
+        default=True,
+        description="Whether to store statistics data into Redis",
+        examples=[True, False],
+        validation_alias=AliasChoices("store-stat-to-redis", "store_stat_to_redis"),
+        serialization_alias="store-stat-to-redis",
+    )
     sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
         default_factory=SyncContainerLifecyclesConfig,
         description="Container lifecycle synchronization config",

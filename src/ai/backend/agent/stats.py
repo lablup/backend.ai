@@ -524,6 +524,10 @@ class StatContext:
                 self.agent.id,
                 redis_agent_updates["node"],
             )
+
+        if not self.agent.local_config.agent.store_stat_to_redis:
+            return
+
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
         self._stage_observer.observe_stage(
@@ -693,6 +697,8 @@ class StatContext:
             upper_layer="collect_container_stat",
         )
 
+        if not self.agent.local_config.agent.store_stat_to_redis:
+            return
         # Use ValkeyStatClient set_multiple_keys for batch operations
         key_value_map = {str(kernel_id): update for kernel_id, update in kernel_serialized_updates}
         if key_value_map:
@@ -820,6 +826,9 @@ class StatContext:
                 stage="before_report_to_redis",
                 upper_layer="collect_per_container_process_stat",
             )
+
+            if not self.agent.local_config.agent.store_stat_to_redis:
+                return
 
             # Use ValkeyStatClient set_multiple_keys for batch operations
             key_value_map: dict[str, bytes] = {}
