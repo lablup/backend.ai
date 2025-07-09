@@ -8,10 +8,10 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_rate_limit import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, RedisProfileTarget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -171,17 +171,16 @@ class KeyPair(graphene.ObjectType):
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             ctx.config_provider.config.redis.model_dump()
         )
-        redis_rlim = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
-            name="ratelimit",
-            db=REDIS_RATE_LIMIT_DB,
+        redis_target = redis_profile_target.profile_target(RedisRole.RATE_LIMIT)
+        valkey_client = await ValkeyRateLimitClient.create(
+            redis_target=redis_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="ratelimit",
         )
-
-        async def _zcard(r: Redis):
-            return await r.zcard(self.access_key)
-
-        ret = await redis_helper.execute(redis_rlim, _zcard)
-        return int(ret) if ret is not None else 0
+        try:
+            return await valkey_client.get_rolling_count(self.access_key)
+        finally:
+            await valkey_client.close()
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
