@@ -17,6 +17,7 @@ from functools import partial
 from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from uuid import uuid4
 
 import aiohttp_cors
 import aiotools
@@ -47,6 +48,7 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
@@ -810,6 +812,17 @@ async def server_main(
         ssl_context=ssl_ctx,
     )
     await site.start()
+
+    if config["otel"]["enabled"]:
+        otel_spec = OpenTelemetrySpec(
+            service_id=uuid4(),
+            service_name="web",
+            service_version=__version__,
+            log_level=config["otel"]["log-level"],
+            endpoint=config["otel"]["endpoint"],
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+
     log.info("started.")
 
     try:
