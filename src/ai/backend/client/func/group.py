@@ -157,16 +157,17 @@ class Group(BaseFunction):
             (group_fields["id"], group_fields["domain_name"], group_fields["name"]),
         )
         query = query.replace("$fields", " ".join(resolved_fields))
+        inputs = {
+            "description": description,
+            "is_active": is_active,
+            "domain_name": domain_name,
+            "total_resource_slots": total_resource_slots,
+            "allowed_vfolder_hosts": allowed_vfolder_hosts,
+            "integration_id": integration_id,
+        }
         variables = {
             "name": name,
-            "input": {
-                "description": description,
-                "is_active": is_active,
-                "domain_name": domain_name,
-                "total_resource_slots": total_resource_slots,
-                "allowed_vfolder_hosts": allowed_vfolder_hosts,
-                "integration_id": integration_id,
-            },
+            "input": {k: v for k, v in inputs.items() if v is not None},
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["create_group"]
