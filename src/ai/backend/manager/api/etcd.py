@@ -109,7 +109,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
         slot_name: cast(AcceleratorMetadata, load_json(metadata_json))
         for slot_name, metadata_json in (
             await redis_helper.execute(
-                root_ctx.redis_stat,
+                root_ctx.valkey_stat_client,
                 lambda r: r.hgetall("computer.metadata"),
                 encoding="utf-8",
             )

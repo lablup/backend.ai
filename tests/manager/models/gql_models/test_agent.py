@@ -7,7 +7,6 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.event_types.bgtask.broadcast import BgtaskDoneEvent
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
@@ -46,7 +45,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=root_context.db,  # type: ignore
-        redis_stat=None,  # type: ignore
+        valkey_stat_client=None,  # type: ignore
         redis_image=None,  # type: ignore
         redis_live=None,  # type: ignore
         manager_status=None,  # type: ignore
@@ -185,11 +184,7 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
-    alloc_map_keys = [f"gpu_alloc_map.{agent['id']}" for agent in extra_fixtures["agents"]]
-    raw_alloc_map_cache = await redis_helper.execute(
-        root_ctx.redis_stat,
-        lambda r: r.mget(*alloc_map_keys),
-    )
+    raw_alloc_map_cache = await root_ctx.valkey_stat_client.mget(["gpu_alloc_map.i-ag1"])
     alloc_map_cache = [
         json.loads(stat) if stat is not None else None for stat in raw_alloc_map_cache
     ]

@@ -51,7 +51,6 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from redis.asyncio import Redis
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
@@ -72,6 +71,7 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
@@ -737,8 +737,6 @@ class AbstractAgent(
     images: Mapping[str, ScannedImage]
     port_pool: set[int]
 
-    redis: Redis
-
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
@@ -829,10 +827,10 @@ class AbstractAgent(
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
         )
-        self.redis_stat_pool = redis_helper.get_redis_object(
+        self.valkey_stat_client_pool = await ValkeyStatClient.create(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="stat",
-            db=REDIS_STATISTICS_DB,
+            human_readable_name="agent.stat",
+            db_id=REDIS_STATISTICS_DB,
         )
 
         self.background_task_manager = BackgroundTaskManager(
@@ -857,17 +855,13 @@ class AbstractAgent(
         log.info("Slot types: {!r}", known_slot_types)
         self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
-        async def _pipeline(r: Redis):
-            pipe = r.pipeline()
-            for metadata in metadatas:
-                await pipe.hset(
-                    "computer.metadata",
-                    metadata["slot_name"],
-                    dump_json_str(metadata),
-                )
-            return pipe
+        # Use ValkeyStatClient batch operations for better performance
+        field_value_map = {}
+        for metadata in metadatas:
+            field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
 
-        await redis_helper.execute(self.redis_stat_pool, _pipeline)
+        if field_value_map:
+            await self.valkey_stat_client_pool.hset("computer.metadata", field_value_map)
 
         self.affinity_map = AffinityMap.build(all_devices)
 
@@ -997,7 +991,7 @@ class AbstractAgent(
         await self.event_producer.close()
         await self.event_dispatcher.close()
         await self.redis_stream_pool.close()
-        await self.redis_stat_pool.close()
+        await self.valkey_stat_client_pool.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config["debug"]["log-heartbeats"]:
@@ -1086,7 +1080,7 @@ class AbstractAgent(
         """
         )
         await redis_helper.execute_script(
-            self.redis_stat_pool,
+            self.valkey_stat_client_pool,
             "check_kernel_commit_statuses",
             commit_status_script,
             [f"kernel.{kern}.commit" for kern in commit_kernels],
@@ -1797,7 +1791,8 @@ class AbstractAgent(
 
     async def set_container_count(self, container_count: int) -> None:
         await redis_helper.execute(
-            self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
+            self.valkey_stat_client_pool,
+            lambda r: r.set(f"container_count.{self.id}", container_count),
         )
 
     @abstractmethod
@@ -1946,7 +1941,7 @@ class AbstractAgent(
             """
             )
             await redis_helper.execute_script(
-                self.redis_stat_pool,
+                self.valkey_stat_client_pool,
                 "report_abusing_kernels",
                 abuse_report_script,
                 [hash_name],

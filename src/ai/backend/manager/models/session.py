@@ -64,13 +64,15 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
     VFolderMount,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionData
 
@@ -1537,7 +1539,7 @@ class SessionLifecycleManager:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyStatClient,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,

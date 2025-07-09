@@ -5,7 +5,10 @@ import inspect
 import logging
 import socket
 import time
+
+# Import ValkeyStatClient with TYPE_CHECKING to avoid circular imports
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Awaitable,
@@ -28,6 +31,9 @@ from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .types import HostPortPair as _HostPortPair
 from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
@@ -177,8 +183,8 @@ async def blpop(
 
 
 async def execute(
-    redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis], Awaitable[Any]],
+    redis_obj: Union[RedisConnectionInfo, "ValkeyStatClient"],
+    func: Callable[[Union[Redis, Any]], Awaitable[Any]],
     *,
     service_name: Optional[str] = None,
     encoding: Optional[str] = None,
@@ -195,6 +201,11 @@ async def execute(
     if not callable(func):
         raise TypeError("The func must be a function or a coroutinefunction with no arguments.")
 
+    # Handle ValkeyStatClient differently
+    if hasattr(redis_obj, "execute"):  # ValkeyStatClient has execute method
+        return await redis_obj.execute(func, encoding=encoding)
+
+    # Handle RedisConnectionInfo
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
     reconnect_poll_interval = redis_obj.redis_helper_config.get("reconnect_poll_timeout", 0.0)
@@ -285,7 +296,7 @@ async def execute(
 
 
 async def execute_script(
-    redis_obj: RedisConnectionInfo,
+    redis_obj: Union[RedisConnectionInfo, "ValkeyStatClient"],
     script_id: str,
     script: str,
     keys: Sequence[str],
@@ -306,6 +317,10 @@ async def execute_script(
         keys: The Redis keys that will be passed to the script.
         args: The arguments that will be passed to the script.
     """
+    # ValkeyStatClient doesn't support Lua scripts
+    if hasattr(redis_obj, "execute"):  # ValkeyStatClient
+        raise NotImplementedError("ValkeyStatClient does not support Lua script execution")
+
     script_hash = _scripts.get(script_id, "x")
     while True:
         try:
@@ -597,9 +612,15 @@ async def create_valkey_client(
     return await GlideClient.create(config)
 
 
-async def ping_redis_connection(redis_client: Redis) -> bool:
+async def ping_redis_connection(redis_client: Union[Redis, "ValkeyStatClient"]) -> bool:
     try:
-        return await redis_client.ping()
+        # Handle ValkeyStatClient - ping returns bytes, convert to bool
+        if hasattr(redis_client, "execute"):
+            ping_result = await redis_client.ping()
+            return ping_result == b"PONG"
+        # Handle Redis client - ping returns bool
+        else:
+            return await redis_client.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e

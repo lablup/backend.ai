@@ -19,6 +19,9 @@ from ai.backend.common.exception import (
     ErrorCode,
     PermissionDeniedError,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -309,7 +312,7 @@ class GraphQueryContext:
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
     services_ctx: ServicesContext
-    redis_stat: RedisConnectionInfo
+    valkey_stat_client: ValkeyStatClient
     redis_live: RedisConnectionInfo
     redis_image: ValkeyImageClient
     manager_status: ManagerStatus

@@ -212,7 +212,7 @@ class KernelNode(graphene.ObjectType):
             return pipe
 
         ret: list[dict[str, Any] | None] = []
-        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
             if stat is not None:
                 ret.append(msgpack.unpackb(stat))
             else:

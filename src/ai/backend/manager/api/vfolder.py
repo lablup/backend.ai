@@ -46,12 +46,14 @@ from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
-    RedisConnectionInfo,
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
     VFolderUsageMode,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -525,7 +527,7 @@ class ExposedVolumeInfoField(StrEnum):
 
 async def fetch_exposed_volume_fields(
     storage_manager: StorageSessionManager,
-    redis_connection: RedisConnectionInfo,
+    redis_connection: ValkeyStatClient,
     proxy_name: str,
     volume_name: str,
 ) -> Dict[str, int | float]:
@@ -634,7 +636,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     fetch_exposed_volume_fields_tasks = [
         fetch_exposed_volume_fields(
             storage_manager=root_ctx.storage_manager,
-            redis_connection=root_ctx.redis_stat,
+            redis_connection=root_ctx.valkey_stat_client,
             proxy_name=proxy_name,
             volume_name=volume_data["name"],
         )

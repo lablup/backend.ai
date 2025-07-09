@@ -80,7 +80,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         user=request["user"],
         access_key=request["keypair"]["access_key"],
         db=root_ctx.db,
-        redis_stat=root_ctx.redis_stat,
+        valkey_stat_client=root_ctx.valkey_stat_client,
         redis_image=root_ctx.redis_image,
         redis_live=root_ctx.redis_live,
         network_plugin_ctx=root_ctx.network_plugin_ctx,

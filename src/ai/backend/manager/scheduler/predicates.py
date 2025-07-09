@@ -88,7 +88,7 @@ async def check_concurrency(
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
     ok, concurrency_used = await redis_helper.execute_script(
-        sched_ctx.registry.redis_stat,
+        sched_ctx.registry.valkey_stat_client,
         "check_keypair_concurrency_used",
         _check_keypair_concurrency_script,
         [redis_key],

@@ -38,6 +38,7 @@ from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd
@@ -78,7 +79,6 @@ from ai.backend.common.types import (
     ClusterMode,
     EndpointId,
     KernelId,
-    RedisConnectionInfo,
     RedisProfileTarget,
     ResourceSlot,
     SessionId,
@@ -277,7 +277,7 @@ class SchedulerDispatcher(aobject):
     update_session_status_timer: GlobalTimer
 
     redis_live: ValkeyLiveClient
-    redis_stat: RedisConnectionInfo
+    valkey_stat_client: ValkeyStatClient
 
     def __init__(
         self,
@@ -293,16 +293,9 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.config_provider.config.redis.model_dump()
-        )
         # redis_live will be initialized in __ainit__
         self.redis_live = cast(ValkeyLiveClient, None)
-        self.redis_stat = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="stat",
-            db=REDIS_STATISTICS_DB,
-        )
+        self.valkey_stat_client = cast(ValkeyStatClient, None)
 
     async def __ainit__(self) -> None:
         self.schedule_timer = GlobalTimer(
@@ -350,7 +343,7 @@ class SchedulerDispatcher(aobject):
         await self.scale_timer.join()
         await self.update_session_status_timer.join()
 
-        # Initialize ValkeyLiveClient
+        # Initialize ValkeyLiveClient and ValkeyStatClient
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             self.config_provider.config.redis.model_dump()
         )
@@ -358,6 +351,11 @@ class SchedulerDispatcher(aobject):
             redis_profile_target.profile_target(RedisRole.LIVE),
             db_id=REDIS_LIVE_DB,
             human_readable_name="scheduler.live",
+        )
+        self.valkey_stat_client = await ValkeyStatClient.create(
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="scheduler.stat",
         )
 
         log.info("Session scheduler started")
@@ -370,6 +368,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.schedule_timer.leave())
             tg.create_task(self.update_session_status_timer.leave())
         await self.redis_live.close()
+        await self.valkey_stat_client.close()
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -807,7 +806,7 @@ class SchedulerDispatcher(aobject):
                 await pipe.get(f"container_count.{ag.id}")
             return pipe
 
-        raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
+        raw_counts = await redis_helper.execute(self.registry.valkey_stat_client, _pipe_builder)
 
         def _check(cnt: str | None) -> bool:
             _cnt = int(cnt) if cnt is not None else 0
@@ -1495,11 +1494,11 @@ class SchedulerDispatcher(aobject):
         # to speed up and lower the pressure to the redis we must load every metrics
         # in bulk, not querying each key at once
         kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
-            self.redis_stat,
+            self.valkey_stat_client,
             cast(list[SessionId], list(metric_requested_kernels)),
         )
         endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
-            self.redis_stat,
+            self.valkey_stat_client,
             cast(list[SessionId], list(metric_requested_endpoints)),
         )
 
@@ -2134,4 +2133,6 @@ async def _rollback_predicate_mutations(
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
     log.debug("recalculate concurrency used in rollback predicates (ak: {})", session.access_key)
-    await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, session.access_key)
+    await recalc_concurrency_used(
+        db_sess, sched_ctx.registry.valkey_stat_client, session.access_key
+    )

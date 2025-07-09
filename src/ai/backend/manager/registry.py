@@ -143,6 +143,9 @@ from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.exceptions import (
     BackendError,
@@ -257,7 +260,7 @@ class AgentRegistry:
         config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
         redis_live: RedisConnectionInfo,
         redis_image: ValkeyImageClient,
         redis_stream: RedisConnectionInfo,
@@ -274,7 +277,7 @@ class AgentRegistry:
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
-        self.redis_stat = redis_stat
+        self.valkey_stat_client = valkey_stat_client
         self.redis_live = redis_live
         self.redis_image = redis_image
         self.redis_stream = redis_stream
@@ -289,7 +292,7 @@ class AgentRegistry:
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
-            redis_stat,
+            valkey_stat_client,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -2178,12 +2181,12 @@ class AgentRegistry:
         _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
             await redis_helper.execute(
-                self.redis_stat,
+                self.valkey_stat_client,
                 _update_by_fullscan,
             )
         else:
             await redis_helper.execute(
-                self.redis_stat,
+                self.valkey_stat_client,
                 _update,
             )
 
@@ -2347,7 +2350,7 @@ class AgentRegistry:
                 else:
                     kp_key = "keypair.concurrency_used"
                 await redis_helper.execute(
-                    self.redis_stat,
+                    self.valkey_stat_client,
                     lambda r: r.incrby(
                         f"{kp_key}.{access_key}",
                         -1,
@@ -2487,7 +2490,7 @@ class AgentRegistry:
 
                             async def _update() -> None:
                                 kern_stat = await redis_helper.execute(
-                                    self.redis_stat,
+                                    self.valkey_stat_client,
                                     lambda r: r.get(str(kernel.id)),
                                 )
                                 async with self.db.begin_session() as db_sess:
@@ -2586,7 +2589,7 @@ class AgentRegistry:
                             last_stat = None
                             try:
                                 raw_last_stat = await redis_helper.execute(
-                                    self.redis_stat, lambda r: r.get(str(kernel.id))
+                                    self.valkey_stat_client, lambda r: r.get(str(kernel.id))
                                 )
                                 if raw_last_stat is not None:
                                     last_stat = msgpack.unpackb(raw_last_stat)
@@ -3167,7 +3170,7 @@ class AgentRegistry:
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
             kern_stat = await redis_helper.execute(
-                self.redis_stat,
+                self.valkey_stat_client,
                 lambda r: r.get(raw_kernel_id),
             )
             if kern_stat is None:
@@ -3427,7 +3430,7 @@ class AgentRegistry:
         kern_stat = cast(
             bytes | None,
             await redis_helper.execute(
-                self.redis_stat,
+                self.valkey_stat_client,
                 lambda r: r.get(str(kernel_id)),
             ),
         )
@@ -3471,7 +3474,7 @@ class AgentRegistry:
                 "recalculate concurrency used in kernel termination (ak: {})",
                 access_key,
             )
-            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            await recalc_concurrency_used(db_session, self.valkey_stat_client, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,
@@ -3508,7 +3511,7 @@ class AgentRegistry:
                 await pipe.get(f"kernel.{kernel_id}.commit")
             return pipe
 
-        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+        commit_statuses = await redis_helper.execute(self.valkey_stat_client, _pipe_builder)
 
         return {
             kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
@@ -3621,7 +3624,7 @@ class AgentRegistry:
     ) -> Optional[AbuseReport]:
         hash_name = "abuse_report"
         abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
-            self.redis_stat,
+            self.valkey_stat_client,
             lambda r: r.hgetall(hash_name),
             encoding="utf-8",
         )

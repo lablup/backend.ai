@@ -15,8 +15,9 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -80,7 +81,7 @@ class MutationResult:
 class GroupService:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
-    _redis_stat: RedisConnectionInfo
+    _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
 
     def __init__(
@@ -88,12 +89,12 @@ class GroupService:
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._config_provider = config_provider
-        self._redis_stat = redis_stat
+        self._valkey_stat_client = valkey_stat_client
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         data = action.input.fields_to_store()
@@ -404,7 +405,9 @@ class GroupService:
             self._db, start_date, end_date, project_ids=project_ids
         )
         local_tz = self._config_provider.config.system.timezone
-        usage_groups = await parse_resource_usage_groups(kernels, self._redis_stat, local_tz)
+        usage_groups = await parse_resource_usage_groups(
+            kernels, self._valkey_stat_client, local_tz
+        )
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
 
@@ -471,7 +474,7 @@ class GroupService:
                 await pipe.get(str(row["id"]))
             return pipe
 
-        raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
+        raw_stats = await redis_helper.execute(self._valkey_stat_client, _pipe_builder)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone

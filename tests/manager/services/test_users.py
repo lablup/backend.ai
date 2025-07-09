@@ -69,7 +69,7 @@ def processors(
     user_service = UserService(
         db=database_engine,
         storage_manager=mock_storage_manager,
-        redis_stat=mock_redis_connection,
+        valkey_stat_client=mock_redis_connection,
         agent_registry=agent_registry_mock,
     )
     return UserProcessors(user_service=user_service, action_monitors=[mock_action_monitor])

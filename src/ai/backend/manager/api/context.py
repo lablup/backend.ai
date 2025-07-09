@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.fetcher import EventFetcher
@@ -53,7 +54,7 @@ class RootContext(BaseContext):
     event_producer: EventProducer
     etcd: AsyncEtcd
     redis_live: RedisConnectionInfo
-    redis_stat: RedisConnectionInfo
+    valkey_stat_client: ValkeyStatClient
     redis_image: ValkeyImageClient
     redis_stream: RedisConnectionInfo
     valkey_stream: ValkeyStreamClient

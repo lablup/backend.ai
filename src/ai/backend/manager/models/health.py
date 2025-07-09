@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional, Union, cast
 
 import redis.exceptions
 from pydantic import (
@@ -20,6 +20,8 @@ from ai.backend.common.types import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+
     from ..api.context import RootContext
 
 
@@ -121,9 +123,9 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
     unified_config = root_ctx.config_provider.config
 
-    redis_connection_infos: tuple[RedisConnectionInfo, ...] = (
+    redis_connection_infos: tuple[Union[RedisConnectionInfo, "ValkeyStatClient"], ...] = (
         root_ctx.redis_live,
-        root_ctx.redis_stat,
+        root_ctx.valkey_stat_client,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     )
@@ -132,9 +134,15 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
         err_msg = None
         num_connections = None
         try:
-            pool = cast(ConnectionPool, info.client.connection_pool)
-            num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
-            max_connections = pool.max_connections
+            # ValkeyStatClient doesn't have connection_pool attribute
+            if hasattr(info, "execute"):  # ValkeyStatClient
+                # For ValkeyStatClient, we can't get connection pool info
+                num_connections = -1
+                max_connections = -1
+            else:
+                pool = cast(ConnectionPool, info.client.connection_pool)
+                num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
+                max_connections = pool.max_connections
         except Exception as e:
             redis_config = cast(
                 RedisHelperConfig, unified_config.redis.redis_helper_config.model_dump()
@@ -169,7 +177,7 @@ async def report_manager_status(root_ctx: RootContext) -> None:
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
     await redis_helper.execute(
-        root_ctx.redis_stat,
+        root_ctx.valkey_stat_client,
         lambda r: r.set(
             _get_connection_status_key(cxn_info.node_id, cxn_info.pid),
             _data,
@@ -185,7 +193,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
         _raw_value = cast(
             list[bytes] | None,
             await redis_helper.execute_script(
-                root_ctx.redis_stat,
+                root_ctx.valkey_stat_client,
                 "read_manager_status",
                 _read_manager_status_script,
                 [f"{MANAGER_STATUS_KEY}*"],

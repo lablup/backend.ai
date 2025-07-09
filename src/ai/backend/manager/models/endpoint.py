@@ -15,6 +15,7 @@ from typing import (
     List,
     Optional,
     Self,
+    Union,
     cast,
 )
 from uuid import UUID, uuid4
@@ -48,6 +49,9 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -940,7 +944,7 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_endpoint_impl(
         cls,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: Union[RedisConnectionInfo, "ValkeyStatClient"],
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
@@ -950,7 +954,7 @@ class EndpointStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(redis_stat, _build_pipeline)
+        results = await redis_helper.execute(valkey_stat_client, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
@@ -964,7 +968,7 @@ class EndpointStatistics:
         ctx: "GraphQueryContext",
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.batch_load_by_endpoint_impl(ctx.redis_stat, endpoint_ids)
+        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat_client, endpoint_ids)
 
     @classmethod
     async def batch_load_by_replica(
@@ -979,7 +983,7 @@ class EndpointStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(ctx.valkey_stat_client, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))

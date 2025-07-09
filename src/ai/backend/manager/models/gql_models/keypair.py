@@ -160,7 +160,7 @@ class KeyPair(graphene.ObjectType):
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         n = await redis_helper.execute(
-            ctx.redis_stat, lambda r: r.get(f"kp:{self.access_key}:num_queries")
+            ctx.valkey_stat_client, lambda r: r.get(f"kp:{self.access_key}:num_queries")
         )
         if n is not None:
             return n
@@ -203,7 +203,7 @@ class KeyPair(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         kp_key = "keypair.concurrency_used"
         concurrency_used = await redis_helper.execute(
-            ctx.redis_stat,
+            ctx.valkey_stat_client,
             lambda r: r.get(f"{kp_key}.{self.access_key}"),
         )
         if concurrency_used is not None:
@@ -213,7 +213,9 @@ class KeyPair(graphene.ObjectType):
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
         last_call_time_key = f"kp:{self.access_key}:last_call_time"
-        row_ts = await redis_helper.execute(ctx.redis_stat, lambda r: r.get(last_call_time_key))
+        row_ts = await redis_helper.execute(
+            ctx.valkey_stat_client, lambda r: r.get(last_call_time_key)
+        )
         if row_ts is None:
             return None
         return datetime.fromtimestamp(float(row_ts))
@@ -570,7 +572,7 @@ class DeleteKeyPair(graphene.Mutation):
         result = await simple_db_mutate(cls, ctx, delete_query)
         if result.ok:
             await redis_helper.execute(
-                ctx.redis_stat,
+                ctx.valkey_stat_client,
                 lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
             )
         return result

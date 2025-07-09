@@ -18,8 +18,9 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -105,19 +106,19 @@ class MutationResult:
 class UserService:
     _db: ExtendedAsyncSAEngine
     _storage_manager: StorageSessionManager
-    _redis_stat: RedisConnectionInfo
+    _valkey_stat_client: ValkeyStatClient
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
         agent_registry: AgentRegistry,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
-        self._redis_stat = redis_stat
+        self._valkey_stat_client = valkey_stat_client
         self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
@@ -495,7 +496,7 @@ class UserService:
 
             await self._delete_vfolders(self._db, user_uuid, self._storage_manager)
             await self._delete_error_logs(conn, user_uuid)
-            await self._delete_keypairs(conn, self._redis_stat, user_uuid)
+            await self._delete_keypairs(conn, self._valkey_stat_client, user_uuid)
 
             await db_session.execute(sa.delete(users).where(users.c.email == email))
 
@@ -745,7 +746,7 @@ class UserService:
     async def _delete_keypairs(
         self,
         conn: SAConnection,
-        redis_conn: RedisConnectionInfo,
+        redis_conn: ValkeyStatClient,
         user_uuid: UUID,
     ) -> int:
         """
@@ -884,7 +885,7 @@ class UserService:
                 await pipe.get(str(row["id"]))
             return pipe
 
-        raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
+        raw_stats = await redis_helper.execute(self._valkey_stat_client, _pipe_builder)
 
         for row, raw_stat in zip(rows, raw_stats):
             if raw_stat is not None:

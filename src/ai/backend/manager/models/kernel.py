@@ -15,6 +15,7 @@ from typing import (
     Self,
     Sequence,
     TypedDict,
+    Union,
     cast,
 )
 
@@ -41,6 +42,9 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from ..defs import DEFAULT_ROLE
 from ..errors.exceptions import (
@@ -857,7 +861,7 @@ class KernelStatistics:
     @classmethod
     async def batch_load_by_kernel_impl(
         cls,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: Union[RedisConnectionInfo, "ValkeyStatClient"],
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """For cases where required to collect kernel metrics in bulk internally"""
@@ -869,7 +873,7 @@ class KernelStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(redis_stat, _build_pipeline)
+        results = await redis_helper.execute(valkey_stat_client, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
@@ -884,7 +888,7 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.redis_stat, session_ids)
+        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat_client, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(
@@ -917,7 +921,7 @@ class KernelStatistics:
 
 async def recalc_concurrency_used(
     db_sess: SASession,
-    redis_stat: RedisConnectionInfo,
+    valkey_stat_client: ValkeyStatClient,
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
@@ -948,14 +952,14 @@ async def recalc_concurrency_used(
         assert isinstance(sftp_concurrency_used, int)
 
     await redis_helper.execute(
-        redis_stat,
+        valkey_stat_client,
         lambda r: r.set(
             f"keypair.concurrency_used.{access_key}",
             concurrency_used,
         ),
     )
     await redis_helper.execute(
-        redis_stat,
+        valkey_stat_client,
         lambda r: r.set(
             f"keypair.sftp_concurrency_used.{access_key}",
             sftp_concurrency_used,

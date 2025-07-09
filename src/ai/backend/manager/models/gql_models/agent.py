@@ -114,7 +114,7 @@ GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await redis_helper.execute(
-        ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
+        ctx.valkey_stat_client, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
     )
 
     if raw_alloc_map:
@@ -242,7 +242,7 @@ class AgentNode(graphene.ObjectType):
             return pipe
 
         ret = []
-        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
             if stat is not None:
                 ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
@@ -261,7 +261,7 @@ class AgentNode(graphene.ObjectType):
             return pipe
 
         ret = []
-        for cnt in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
             ret.append(int(cnt) if cnt is not None else 0)
         return ret
 
@@ -613,7 +613,7 @@ class Agent(graphene.ObjectType):
             return pipe
 
         ret = []
-        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
             if stat is not None:
                 ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
@@ -662,7 +662,7 @@ class Agent(graphene.ObjectType):
             return pipe
 
         ret = []
-        for cnt in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
             ret.append(int(cnt) if cnt is not None else 0)
         return ret
 
@@ -950,13 +950,10 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     AgentId(agent_id)
                 )
                 key = f"gpu_alloc_map.{agent_id}"
-                await redis_helper.execute(
-                    graph_ctx.registry.redis_stat,
-                    lambda r: r.setex(
-                        name=key,
-                        value=dump_json_str(alloc_map),
-                        time=GPU_ALLOC_MAP_CACHE_PERIOD,
-                    ),
+                await graph_ctx.registry.valkey_stat_client.setex(
+                    name=key,
+                    value=dump_json_str(alloc_map),
+                    time=GPU_ALLOC_MAP_CACHE_PERIOD,
                 )
             except Exception as e:
                 reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"

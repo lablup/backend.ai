@@ -644,7 +644,7 @@ async def utilization_idle_checker__utilization(
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
-        checker_host._redis_stat,
+        checker_host._valkey_stat_client,
         lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
     )
     try:
@@ -742,7 +742,7 @@ async def utilization_idle_checker(
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
-        checker_host._redis_stat,
+        checker_host._valkey_stat_client,
         lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
     )
     try:
@@ -827,7 +827,7 @@ async def utilization_idle_checker(
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
-        checker_host._redis_stat,
+        checker_host._valkey_stat_client,
         lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
     )
     try:
@@ -910,7 +910,7 @@ async def utilization_idle_checker(
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
-        checker_host._redis_stat,
+        checker_host._valkey_stat_client,
         lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
     )
     try:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, tzinfo
 from enum import StrEnum
-from typing import Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 from uuid import UUID
 
 import attrs
@@ -13,8 +13,10 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .group import GroupRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
@@ -490,7 +492,7 @@ def parse_resource_usage(
 
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
-    redis_stat: RedisConnectionInfo,
+    valkey_stat_client: ValkeyStatClient,
     local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
     stat_map = {k.id: k.last_stat for k in kernels}
@@ -502,7 +504,7 @@ async def parse_resource_usage_groups(
             await pipe.get(str(kern_id))
         return pipe
 
-    raw_stats = await redis_helper.execute(redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(valkey_stat_client, _pipe_builder)
     for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):
         if raw_stat is None:
             continue

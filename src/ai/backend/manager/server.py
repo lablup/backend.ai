@@ -45,6 +45,7 @@ from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
@@ -222,7 +223,7 @@ PUBLIC_INTERFACES: Final = [
     "db",
     "registry",
     "redis_live",
-    "redis_stat",
+    "valkey_stat_client",
     "redis_image",
     "redis_stream",
     "event_dispatcher",
@@ -534,10 +535,10 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
-    root_ctx.redis_stat = redis_helper.get_redis_object(
+    root_ctx.valkey_stat_client = await ValkeyStatClient.create(
         redis_profile_target.profile_target(RedisRole.STATISTICS),
-        name="stat",  # temporary storage for stat snapshots
-        db=REDIS_STATISTICS_DB,
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="stat",  # temporary storage for stat snapshots
     )
     root_ctx.redis_image = await ValkeyImageClient.create(
         redis_profile_target.profile_target(RedisRole.IMAGE),
@@ -561,7 +562,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     for redis_info in (
         root_ctx.redis_live,
-        root_ctx.redis_stat,
+        root_ctx.valkey_stat_client,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
@@ -571,7 +572,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
-    await root_ctx.redis_stat.close()
+    await root_ctx.valkey_stat_client.close()
     await root_ctx.redis_live.close()
     await root_ctx.redis_lock.close()
     await root_ctx.valkey_stream.close()
@@ -648,7 +649,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 etcd=root_ctx.etcd,
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
-                redis_stat=root_ctx.redis_stat,
+                valkey_stat_client=root_ctx.valkey_stat_client,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
@@ -892,7 +893,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.config_provider,
         root_ctx.db,
         root_ctx.agent_cache,
-        root_ctx.redis_stat,
+        root_ctx.valkey_stat_client,
         root_ctx.redis_live,
         root_ctx.redis_image,
         root_ctx.redis_stream,

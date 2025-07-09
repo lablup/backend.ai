@@ -43,9 +43,10 @@ from pydantic_core import core_schema
 from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
@@ -64,7 +65,6 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
-    RedisConnectionInfo,
     RedisProfileTarget,
     ResourceSlot,
     SessionExecutionStatus,
@@ -209,14 +209,7 @@ class IdleCheckerHost:
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         self._redis_live = redis_live
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._config_provider.config.redis.model_dump()
-        )
-        self._redis_stat = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="idle.stat",
-            db=REDIS_STATISTICS_DB,
-        )
+        self._valkey_stat_client = cast(ValkeyStatClient, None)
         # NewUserGracePeriodChecker will be initialized in start() method
         self._grace_period_checker = NewUserGracePeriodChecker(self._redis_live)
 
@@ -236,6 +229,16 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
+
+        # Initialize ValkeyStatClient
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self._config_provider.config.redis.model_dump()
+        )
+        self._valkey_stat_client = await ValkeyStatClient.create(
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
+            human_readable_name="idle.stat",
+            db_id=REDIS_STATISTICS_DB,
+        )
 
         raw_config = self._config_provider.config.idle.checkers
         await self._grace_period_checker.populate_config(
@@ -260,7 +263,7 @@ class IdleCheckerHost:
         for checker in self._checkers:
             await checker.aclose()
         await self.timer.leave()
-        await self._redis_stat.close()
+        await self._valkey_stat_client.close()
         await self._redis_live.close()
 
     async def update_app_streaming_status(
@@ -568,7 +571,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 class IdleCheckerArgs:
     event_producer: EventProducer
     redis_live: ValkeyLiveClient
-    redis_stat: RedisConnectionInfo
+    valkey_stat_client: ValkeyStatClient
 
 
 class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
@@ -579,7 +582,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
         args: IdleCheckerArgs,
     ) -> None:
         self._redis_live = args.redis_live
-        self._redis_stat = args.redis_stat
+        self._valkey_stat_client = args.valkey_stat_client
         self._event_producer = args.event_producer
 
     @override
@@ -1239,10 +1242,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
-                    await redis_helper.execute(
-                        self._redis_stat,
-                        lambda r: r.get(str(kernel_id)),
-                    ),
+                    await self._valkey_stat_client.get(str(kernel_id)),
                 )
                 if raw_live_stat is None:
                     log.warning(
@@ -1327,7 +1327,7 @@ async def init_idle_checkers(
     checker_init_args = IdleCheckerArgs(
         event_producer,
         checker_host._redis_live,
-        checker_host._redis_stat,
+        checker_host._valkey_stat_client,
     )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
