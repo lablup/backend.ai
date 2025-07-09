@@ -127,7 +127,6 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
         root_ctx.redis_live,
         root_ctx.valkey_stat_client,
         root_ctx.redis_stream,
-        root_ctx.redis_lock,
     )
     redis_objects = []
     for info in redis_connection_infos:
@@ -157,6 +156,23 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
                 err_msg=err_msg,
             )
         )
+
+    # Add ValkeyStreamLockClient health check
+    err_msg = None
+    try:
+        await root_ctx.valkey_stream_lock.ping()
+    except Exception as e:
+        err_msg = f"Cannot ping valkey_stream_lock. (e:{str(e)})"
+
+    redis_objects.append(
+        RedisObjectConnectionInfo(
+            name="valkey_stream_lock",
+            max_connections=1,  # ValkeyStreamLockClient uses a single connection
+            num_connections=None,
+            err_msg=err_msg,
+        )
+    )
+
     return redis_objects
 
 

@@ -47,6 +47,7 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.clients.valkey_stream.client import ValkeyStreamLockClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -93,6 +94,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
+    RedisConnectionInfo,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
@@ -550,10 +552,10 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
-    root_ctx.redis_lock = redis_helper.get_redis_object(
+    root_ctx.valkey_stream_lock = await ValkeyStreamLockClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
-        name="lock",  # distributed locks
-        db=REDIS_STREAM_LOCK,
+        human_readable_name="lock",
+        db_id=REDIS_STREAM_LOCK,
     )
     root_ctx.valkey_stream = await ValkeyStreamClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
@@ -564,9 +566,10 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_live,
         root_ctx.valkey_stat_client,
         root_ctx.redis_stream,
-        root_ctx.redis_lock,
     ):
         await redis_helper.ping_redis_connection(redis_info.client)
+
+    await root_ctx.valkey_stream_lock.ping()
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
     yield
@@ -574,7 +577,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.redis_image.close()
     await root_ctx.valkey_stat_client.close()
     await root_ctx.redis_live.close()
-    await root_ctx.redis_lock.close()
+    await root_ctx.valkey_stream_lock.close()
     await root_ctx.valkey_stream.close()
 
 
@@ -1058,9 +1061,16 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
 
+            # Create a compatibility wrapper for ValkeyStreamLockClient
+            class ValkeyStreamLockWrapper:
+                def __init__(self, valkey_client: ValkeyStreamLockClient) -> None:
+                    self.client = valkey_client.client
+                    self.name = valkey_client.name
+
+            wrapper = ValkeyStreamLockWrapper(root_ctx.valkey_stream_lock)
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock,
+                cast(RedisConnectionInfo, wrapper),
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config["lock_retry_interval"],
             )

@@ -12,6 +12,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.clients.valkey_stream.client import ValkeyStreamLockClient
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
     REDIS_RATE_LIMIT_DB,
@@ -129,6 +130,27 @@ async def test_valkey_stream(redis_container):  # noqa: F811
         pubsub_channels=["test-broadcast"],
     )
     yield client
+
+
+@pytest.fixture
+async def test_valkey_stream_lock(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyStreamLockClient.create(
+        redis_target,
+        human_readable_name="test.stream_lock",
+        db_id=REDIS_STREAM_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
 
 
 @pytest.fixture
