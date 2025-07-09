@@ -61,7 +61,7 @@ class RoleRow(Base):
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
     )
-    permission_rows: list[RolePermissionRow] = relationship(
+    role_permission_rows: list[RolePermissionRow] = relationship(
         "RolePermissionRow",
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(RolePermissionRow.role_id)",
