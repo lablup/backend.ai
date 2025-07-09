@@ -56,9 +56,9 @@ class RoleRow(Base):
         "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
 
-    user_assignments: list[UserRoleRow] = relationship(
+    mapped_user_role_rows: list[UserRoleRow] = relationship(
         "UserRoleRow",
-        back_populates="assigned_role",
+        back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
     )
     permission_rows: list[RolePermissionRow] = relationship(
