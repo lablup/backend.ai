@@ -1,3 +1,6 @@
+# Legacy trafaret-based config - DEPRECATED
+# Please use ai.backend.agent.config.unified for new code
+
 import os
 from typing import Any
 
@@ -7,9 +10,12 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.types import ResourceGroupType, ServiceDiscoveryType
 
-from .affinity_map import AffinityPolicy
-from .stats import StatModes
-from .types import AgentBackend
+from ..affinity_map import AffinityPolicy
+from ..stats import StatModes
+from ..types import AgentBackend
+
+# Import the new pydantic config for transition
+from .unified import AgentUnifiedConfig
 
 coredump_defaults = {
     "enabled": False,
