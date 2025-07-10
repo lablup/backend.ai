@@ -30,8 +30,6 @@ import yarl
 from async_timeout import timeout
 from pydantic import BaseModel
 
-from .types import VFolderMount
-
 if TYPE_CHECKING:
     from decimal import Decimal
 
@@ -466,23 +464,3 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
             else:
                 merged[k] = vb
     return merged
-
-
-class MountsResolver:
-    """
-    A utility class to resolve mounts from a list of mount names.
-    It ensures that each mount name is unique and returns a set of unique mount names.
-    """
-
-    _mounts: Iterable[VFolderMount]
-
-    def __init__(self, mounts: Iterable[VFolderMount]) -> None:
-        self._mounts = mounts
-
-    def resolve_names(self, *, allow_duplicates: bool = False) -> tuple[str, ...]:
-        """
-        Returns a set of unique mount names.
-        """
-        if allow_duplicates:
-            return tuple(mount.name for mount in self._mounts)
-        return tuple(*{mount.name for mount in self._mounts})
