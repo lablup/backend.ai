@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Optional, cast
 
 from aiohttp import web
 
@@ -8,14 +8,15 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.web.session import get_session
 
 from . import user_agent
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 
 async def get_api_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
     session = await get_session(request)
@@ -46,13 +47,13 @@ async def get_api_session(
         )
     ak, sk = token["access_key"], token["secret_key"]
     api_config = APIConfig(
-        domain=config["api"]["domain"],
+        domain=config.api.domain,
         endpoint=api_endpoint,
         endpoint_type="api",
         access_key=ak,
         secret_key=sk,
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config.api.ssl_verify,
     )
     return APISession(config=api_config, proxy_mode=True)
 
@@ -61,18 +62,18 @@ async def get_anonymous_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
     api_config = APIConfig(
-        domain=config["api"]["domain"],
+        domain=config.api.domain,
         endpoint=api_endpoint,
         endpoint_type="api",
         access_key="",
         secret_key="",
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config.api.ssl_verify,
     )
     return APISession(config=api_config, proxy_mode=True)
 
