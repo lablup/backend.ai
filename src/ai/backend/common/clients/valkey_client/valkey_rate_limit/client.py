@@ -1,9 +1,9 @@
 import logging
 import time
 from decimal import Decimal
-from typing import Optional, Self, cast
+from typing import Final, Optional, Self, cast
 
-from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary
+from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary, Script
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -17,6 +17,23 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_RATE_LIMIT_EXPIRATION = 60 * 15  # 15 minutes
 _TIME_PRECISION = Decimal("1e-3")  # milliseconds
+
+
+_RATE_LIMIT_SCRIPT: Final[str] = """
+local access_key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local request_id = tonumber(redis.call('INCR', '__request_id'))
+if request_id >= 1e12 then
+    redis.call('SET', '__request_id', 1)
+end
+if redis.call('EXISTS', access_key) == 1 then
+    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
+end
+redis.call('ZADD', access_key, now, tostring(request_id))
+redis.call('EXPIRE', access_key, window)
+return redis.call('ZCARD', access_key)
+"""
 
 
 class ValkeyRateLimitClient:
@@ -81,38 +98,15 @@ class ValkeyRateLimitClient:
         """
         now = Decimal(time.time()).quantize(_TIME_PRECISION)
         now_float = float(now)
-
         # Increment request ID counter
-        request_id = await self._client.client.incr("__request_id")
-        if request_id >= 1e12:
-            await self._client.client.set("__request_id", "1")
-            request_id = 1
-
-        # Use batch for atomicity
-        tx = self._create_batch()
-
-        # Remove expired entries
-        tx.zremrangebyscore(
-            access_key,
-            ScoreBoundary(0),
-            ScoreBoundary(now_float - window),
+        result = await self._client.client.invoke_script(
+            Script(_RATE_LIMIT_SCRIPT),
+            keys=[access_key],
+            args=[str(now_float), str(window)],
         )
 
-        # Add current request
-        tx.zadd(access_key, {str(request_id): now_float})
-
-        # Set expiration
-        tx.expire(access_key, window)
-
-        # Get current count
-        tx.zcard(access_key)
-
-        results = await self._client.client.exec(tx, raise_on_error=True)
-        if not results:
-            log.exception("No results returned from rate limit logic execution.")
-            return 0
         # The last result is the count
-        count = cast(int, results[-1])
+        count = cast(int, result)
         return count
 
     @valkey_decorator()

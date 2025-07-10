@@ -8,7 +8,6 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.clients.valkey_client.valkey_stream_lock.client import ValkeyStreamLockClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -61,7 +60,6 @@ class RootContext(BaseContext):
     valkey_image: ValkeyImageClient
     redis_stream: RedisConnectionInfo
     valkey_stream: ValkeyStreamClient
-    valkey_stream_lock: ValkeyStreamLockClient
     redis_profile_target: RedisProfileTarget
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions

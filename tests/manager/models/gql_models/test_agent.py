@@ -184,7 +184,7 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
-    raw_alloc_map_cache = await root_ctx.valkey_stat.mget(["gpu_alloc_map.i-ag1"])
+    raw_alloc_map_cache = await root_ctx.valkey_stat._client.client.mget(["gpu_alloc_map.i-ag1"])
     alloc_map_cache = [
         json.loads(stat) if stat is not None else None for stat in raw_alloc_map_cache
     ]

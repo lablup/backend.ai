@@ -33,7 +33,6 @@ python_distribution(
         "src/ai/backend/common/clients/valkey_client/valkey_rate_limit:src",
         "src/ai/backend/common/clients/valkey_client/valkey_stat:src",
         "src/ai/backend/common/clients/valkey_client/valkey_stream:src",
-        "src/ai/backend/common/clients/valkey_client/valkey_stream_lock:src",
         "src/ai/backend/common/configs:src",
         "src/ai/backend/common/contexts:src",
         "src/ai/backend/common/data/session:src",

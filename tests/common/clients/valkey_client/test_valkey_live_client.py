@@ -10,13 +10,18 @@ async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -
     test_hash = f"test-hash-{random.randint(1000, 9999)}"
 
     # Test single field hset
-    result = await test_valkey_live.store_scheduler_metadata(test_hash, "field1", "value1")
+    result = await test_valkey_live.add_scheduler_metadata(
+        test_hash,
+        {
+            "field1": "value1",
+        },
+    )
     assert result == 1
 
     # Test multiple field hset with mapping
-    result = await test_valkey_live.store_scheduler_metadata(
+    result = await test_valkey_live.add_scheduler_metadata(
         test_hash,
-        mapping={
+        {
             "field2": "value2",
             "field3": "value3",
         },

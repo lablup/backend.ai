@@ -23,22 +23,6 @@ _rlim_window: Final = 60 * 15
 # We implement rate limiting using a rolling counter, which prevents
 # last-minute and first-minute bursts between the intervals.
 
-_rlim_script = """
-local access_key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local request_id = tonumber(redis.call('INCR', '__request_id'))
-if request_id >= 1e12 then
-    redis.call('SET', '__request_id', 1)
-end
-if redis.call('EXISTS', access_key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
-end
-redis.call('ZADD', access_key, now, tostring(request_id))
-redis.call('EXPIRE', access_key, window)
-return redis.call('ZCARD', access_key)
-"""
-
 
 @web.middleware
 async def rlim_middleware(

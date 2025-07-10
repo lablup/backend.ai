@@ -14,6 +14,7 @@ from glide import (
     ConditionalChange,
     ExpirySet,
     ExpiryType,
+    InfBound,
     ScoreBoundary,
 )
 
@@ -111,6 +112,24 @@ class ValkeyLiveClient:
         return await self._client.client.delete([key])
 
     @valkey_decorator()
+    async def replace_schedule_data(self, key: str, values: Mapping[str, str]) -> None:
+        """
+        Replace schedule data for a key with new values.
+
+        :param key: The key to replace data for.
+        :param values: Mapping of field names to new values.
+        """
+        if not values:
+            log.warning("No values provided to replace schedule data.")
+            return
+
+        # Use batch to set all fields atomically
+        batch = self._create_batch()
+        batch.delete([key])
+        batch.hset(key, cast(Mapping[str | bytes, str | bytes], values))
+        await self._execute_batch(batch)
+
+    @valkey_decorator()
     async def get_server_time(self) -> float:
         """Get server time as timestamp."""
         result = await self._client.client.time()
@@ -119,40 +138,30 @@ class ValkeyLiveClient:
                 f"Unexpected result from time command: {result}. Expected a tuple of (seconds, microseconds)."
             )
         seconds_bytes, microseconds_bytes = result
-        seconds = int(seconds_bytes)
-        microseconds = int(microseconds_bytes)
-        return float(seconds + (microseconds / 10**6))
+        seconds = float(seconds_bytes)
+        microseconds = float(microseconds_bytes)
+        return seconds + (microseconds / 10**6)
 
     @valkey_decorator()
     async def count_active_connections(self, session_id: str) -> int:
         """Count active connections for a session."""
         return await self._client.client.zcount(
-            f"session.{session_id}.active_app_connections",
-            ScoreBoundary(float("-inf")),
-            ScoreBoundary(float("+inf")),
+            self._active_app_connection_key(session_id),
+            InfBound.NEG_INF,
+            InfBound.POS_INF,
         )
 
     @valkey_decorator()
-    async def store_scheduler_metadata(
+    async def add_scheduler_metadata(
         self,
-        name: str,
-        key: Optional[str] = None,
-        value: Optional[str | bytes] = None,
-        *,
-        mapping: Optional[Mapping[str, str | bytes]] = None,
+        key: str,
+        mapping: Mapping[str, str | bytes],
     ) -> int:
         """Store scheduler metadata in hash fields."""
-        if mapping is not None:
-            return await self._client.client.hset(
-                name, cast(Mapping[str | bytes, str | bytes], mapping)
-            )
-        elif key is not None and value is not None:
-            return await self._client.client.hset(name, {key: value})
-        else:
-            raise ValueError("Either provide key/value or mapping")
+        return await self._client.client.hset(key, cast(Mapping[str | bytes, str | bytes], mapping))
 
     @valkey_decorator()
-    async def get_scheduler_metadata(self, name: str) -> dict[str, str]:
+    async def get_scheduler_metadata(self, name: str) -> Mapping[str, str]:
         """
         Get scheduler metadata from hash fields.
 
@@ -191,7 +200,7 @@ class ValkeyLiveClient:
         return await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
-    async def get_multiple_live_data(self, keys: List[str]) -> List[bytes | None]:
+    async def get_multiple_live_data(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple live data keys in a single batch operation.
 
@@ -200,13 +209,7 @@ class ValkeyLiveClient:
         """
         if not keys:
             return []
-
-        batch = self._create_batch()
-        for key in keys:
-            batch.get(key)
-
-        results = await self._execute_batch(batch)
-        return results
+        return await self._client.client.mget(cast(list[str | bytes], keys))
 
     @valkey_decorator()
     async def update_connection_tracker(
@@ -221,7 +224,7 @@ class ValkeyLiveClient:
         :param connection_id: The connection ID to add/update.
         """
         current_time = await self.get_server_time()
-        tracker_key = f"session.{session_id}.active_app_connections"
+        tracker_key = self._active_app_connection_key(session_id)
         await self._client.client.zadd(tracker_key, {connection_id: current_time})
 
     @valkey_decorator()
@@ -237,27 +240,25 @@ class ValkeyLiveClient:
         :param connection_id: The connection ID to remove.
         :return: Number of connections removed.
         """
-        tracker_key = f"session.{session_id}.active_app_connections"
+        tracker_key = self._active_app_connection_key(session_id)
         return await self._client.client.zrem(tracker_key, [connection_id])
 
     @valkey_decorator()
     async def remove_stale_connections(
         self,
         session_id: str,
-        min_timestamp: float,
         max_timestamp: float,
     ) -> int:
         """
         Remove connections from tracker by score range.
 
         :param session_id: The session ID to clean up connections for.
-        :param min_timestamp: Minimum timestamp (inclusive).
         :param max_timestamp: Maximum timestamp (inclusive).
         :return: Number of connections removed.
         """
-        tracker_key = f"session.{session_id}.active_app_connections"
+        tracker_key = self._active_app_connection_key(session_id)
         return await self._client.client.zremrangebyscore(
-            tracker_key, ScoreBoundary(min_timestamp), ScoreBoundary(max_timestamp)
+            tracker_key, InfBound.NEG_INF, ScoreBoundary(max_timestamp)
         )
 
     @valkey_decorator()
@@ -268,7 +269,7 @@ class ValkeyLiveClient:
         :param agent_id: The agent ID to update.
         :param timestamp: The timestamp when the agent was last seen.
         """
-        await self._client.client.hset("agent.last_seen", {agent_id: str(timestamp)})
+        await self._client.client.hset(_AGENT_LAST_SEEN_HASH, {agent_id: str(timestamp)})
 
     @valkey_decorator()
     async def remove_agent_last_seen(self, agent_id: str) -> None:
@@ -277,7 +278,7 @@ class ValkeyLiveClient:
 
         :param agent_id: The agent ID to remove.
         """
-        await self._client.client.hdel("agent.last_seen", [agent_id])
+        await self._client.client.hdel(_AGENT_LAST_SEEN_HASH, [agent_id])
 
     def _get_session_requests_key(self, session_id: str) -> str:
         """
@@ -333,9 +334,9 @@ class ValkeyLiveClient:
                     last_response_ms = int(last_response_result.decode("utf-8"))
                     stats.append({"requests": requests, "last_response_ms": last_response_ms})
                 except (ValueError, UnicodeDecodeError):
-                    stats.append(None)
+                    stats.append({"requests": 0, "last_response_ms": 0})
             else:
-                stats.append(None)
+                stats.append({"requests": 0, "last_response_ms": 0})
 
         return stats
 
@@ -353,16 +354,16 @@ class ValkeyLiveClient:
             if len(scan_result) != 2:
                 break
             cursor = cast(bytes, scan_result[0])
-            fields = cast(dict, scan_result[1])
-
-            for agent_id_bytes, timestamp_bytes in fields.items():
+            fields = cast(list[bytes], scan_result[1])
+            for i in range(0, len(fields), 2):
+                if i + 1 >= len(fields):
+                    continue
                 try:
-                    agent_id = agent_id_bytes.decode("utf-8")
-                    timestamp = float(timestamp_bytes.decode("utf-8"))
-                    results.append((agent_id, timestamp))
+                    field_name = fields[i].decode("utf-8")
+                    field_value = float(fields[i + 1].decode("utf-8"))
+                    results.append((field_name, field_value))
                 except (ValueError, UnicodeDecodeError):
                     continue
-
             if cursor == b"0":
                 break
 
@@ -440,3 +441,11 @@ class ValkeyLiveClient:
         :return: Number of keys deleted.
         """
         return await self._client.client.delete([key])
+
+    def _active_app_connection_key(self, session_id: str) -> str:
+        """
+        Generate the key for tracking active app connections for a session.
+        :param session_id: The session ID.
+        :return: The key for active app connections.
+        """
+        return f"session.{session_id}.active_app_connections"

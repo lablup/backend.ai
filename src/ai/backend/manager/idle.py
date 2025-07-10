@@ -122,10 +122,6 @@ def calculate_remaining_time(
     return remaining.total_seconds()
 
 
-async def get_redis_now(redis_obj: ValkeyLiveClient) -> float:
-    return await redis_obj.get_server_time()
-
-
 async def get_db_now(dbconn: SAConnection) -> datetime:
     return await dbconn.scalar(sa.select(sa.func.now()))
 
@@ -770,7 +766,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         active_streams = await self._redis_live.count_active_connections(session_id)
         if active_streams is not None and active_streams > 0:
             return True
-        now: float = await get_redis_now(self._redis_live)
+        now = await self._redis_live.get_server_time()
         raw_last_access = await self._redis_live.get_live_data(f"session.{session_id}.last_access")
         if raw_last_access is None or raw_last_access == "0":
             return True
@@ -1049,10 +1045,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Wait until the time "interval" is passed after the last udpated time.
         util_now = await self._redis_live.get_server_time()
-        raw_util_last_collected = cast(
-            bytes | None,
-            await self._redis_live.get_live_data(util_last_collected_key),
-        )
+        raw_util_last_collected = await self._redis_live.get_live_data(util_last_collected_key)
+
         util_last_collected: float = (
             float(raw_util_last_collected) if raw_util_last_collected else 0.0
         )

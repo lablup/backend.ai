@@ -860,7 +860,7 @@ class AbstractAgent(
             field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
 
         if field_value_map:
-            await self.valkey_stat_client.hset("computer.metadata", field_value_map)
+            await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
         self.affinity_map = AffinityMap.build(all_devices)
 

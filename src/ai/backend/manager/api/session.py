@@ -953,8 +953,6 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         for agent_id, prev_timestamp in agent_last_seen:
             prev = datetime.fromtimestamp(prev_timestamp, tzutc())
             if now - prev > timeout:
-                from ai.backend.common.types import AgentId
-
                 await root_ctx.event_producer.anycast_event(
                     AgentTerminatedEvent("agent-lost"),
                     source_override=AgentId(agent_id),

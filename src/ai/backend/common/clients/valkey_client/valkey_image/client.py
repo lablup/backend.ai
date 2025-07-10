@@ -114,6 +114,7 @@ class ValkeyImageClient:
         :param agent_id: The agent ID to remove.
         """
         cursor = b"0"
+        keys_to_remove: list[bytes] = []
         while True:
             result = await self._client.client.scan(cursor)
             if len(result) != 2:
@@ -122,13 +123,14 @@ class ValkeyImageClient:
                 )
             cursor = cast(bytes, result[0])
             keys = cast(list[bytes], result[1])
-            if keys:
-                tx = self._create_batch()
-                for key in keys:
-                    tx.srem(key, [agent_id])
-                await self._client.client.exec(tx, raise_on_error=True)
+            keys_to_remove.extend(keys)
             if cursor == b"0":
                 break
+        if keys_to_remove:
+            tx = self._create_batch()
+            for key in keys:
+                tx.srem(key, [agent_id])
+            await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_decorator()
     async def get_agents_for_image(
@@ -172,19 +174,6 @@ class ValkeyImageClient:
         return final_results
 
     @valkey_decorator()
-    async def get_agent_count_for_image(
-        self,
-        image_canonical: str,
-    ) -> int:
-        """
-        Get the count of agents that have a specific image.
-
-        :param image_canonical: The image canonical name.
-        :return: Number of agents.
-        """
-        return await self._client.client.scard(image_canonical)
-
-    @valkey_decorator()
     async def get_agent_counts_for_images(
         self,
         image_canonicals: list[str],
@@ -206,29 +195,6 @@ class ValkeyImageClient:
         if not results:
             return []
         return [cast(int, result) for result in results]
-
-    @valkey_decorator()
-    async def get_all_image_names(self) -> list[str]:
-        """
-        Get all image canonical names.
-
-        :return: List of image canonical names.
-        """
-        all_keys = []
-        cursor = b"0"
-        while True:
-            result = await self._client.client.scan(cursor)
-            if len(result) != 2:
-                raise ValueError(
-                    f"Unexpected result from scan: {result}. Expected a tuple of (cursor, keys)."
-                )
-            cursor = cast(bytes, result[0])
-            keys = cast(list[bytes], result[1])
-            if keys:
-                all_keys.extend([key.decode() for key in keys])
-            if cursor == b"0":
-                break
-        return all_keys
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         return Batch(is_atomic=is_atomic)

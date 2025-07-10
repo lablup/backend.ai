@@ -38,7 +38,7 @@ _ABUSE_REPORT_HASH: Final[str] = "abuse_report"
 _CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
 _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
-_COMPUTER_METADATA_HASH: Final[str] = "computer.metadata"
+_COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
 
 
 class ValkeyStatClient:
@@ -96,16 +96,6 @@ class ValkeyStatClient:
         await self._client.disconnect()
 
     @valkey_decorator()
-    async def get_cached_stat(self, key: str) -> Optional[bytes]:
-        """
-        Get cached statistics data by key.
-
-        :param key: The key to retrieve.
-        :return: The cached statistics value, or None if the key doesn't exist.
-        """
-        return await self._client.client.get(key)
-
-    @valkey_decorator()
     async def get_keypair_query_count(self, access_key: str) -> int:
         """
         Get API query count for a keypair.
@@ -113,7 +103,7 @@ class ValkeyStatClient:
         :param access_key: The keypair access key.
         :return: The query count, or 0 if not found.
         """
-        result = await self._client.client.get(f"kp:{access_key}:num_queries")
+        result = await self._client.client.get(self._get_keypair_query_count_key(access_key))
         if result is None:
             return 0
         try:
@@ -129,7 +119,7 @@ class ValkeyStatClient:
         :param access_key: The keypair access key.
         :return: The concurrency usage count, or 0 if not found.
         """
-        result = await self._client.client.get(f"keypair.concurrency_used.{access_key}")
+        result = await self._client.client.get(f"{_KEYPAIR_CONCURRENCY_PREFIX}.{access_key}")
         if result is None:
             return 0
         try:
@@ -145,7 +135,7 @@ class ValkeyStatClient:
         :param access_key: The keypair access key.
         :return: The timestamp as float, or None if not found.
         """
-        result = await self._client.client.get(f"kp:{access_key}:last_call_time")
+        result = await self._client.client.get(self._get_keypair_last_call_time_key(access_key))
         if result is None:
             return None
         try:
@@ -165,8 +155,13 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return json.loads(result.decode("utf-8"))
+            return json.loads(result)
         except (json.JSONDecodeError, UnicodeDecodeError):
+            log.warning(
+                "Failed to decode GPU allocation map for agent {}: {}",
+                agent_id,
+                result.decode("utf-8"),
+            )
             return None
 
     @valkey_decorator()
@@ -183,17 +178,12 @@ class ValkeyStatClient:
         try:
             return msgpack.unpackb(result, raw=False)
         except (msgpack.exceptions.ExtraData, msgpack.exceptions.UnpackException, ValueError):
+            log.warning(
+                "Failed to unpack kernel statistics for ID {}: {}",
+                kernel_id,
+                result.decode("utf-8"),
+            )
             return None
-
-    @valkey_decorator()
-    async def get_kernel_statistics_raw(self, kernel_id: str) -> Optional[bytes]:
-        """
-        Get kernel utilization statistics as raw bytes for sync operations.
-
-        :param kernel_id: The kernel ID.
-        :return: Raw kernel statistics bytes, or None if not found.
-        """
-        return await self._client.client.get(str(kernel_id))
 
     def _get_kernel_commit_key(self, kernel_id: str) -> str:
         """
@@ -225,7 +215,7 @@ class ValkeyStatClient:
             return []
 
         keys = [self._get_kernel_commit_key(kernel_id) for kernel_id in kernel_ids]
-        return await self.get_multiple_keys(keys)
+        return await self._get_multiple_keys(keys)
 
     @valkey_decorator()
     async def get_abuse_report(self, kernel_id: str) -> Optional[str]:
@@ -251,6 +241,7 @@ class ValkeyStatClient:
         :param agent_id: The agent ID.
         :param container_count: The number of containers currently running on the agent.
         """
+        # TODO: If Agent ID is changed, a leak may occur. (expire is needed)
         key = self._get_container_count_key(agent_id)
         await self._client.client.set(key, str(container_count))
 
@@ -265,19 +256,24 @@ class ValkeyStatClient:
         if not session_ids:
             return []
 
-        results = await self.get_multiple_keys(session_ids)
-        stats = []
-        for result in results:
-            if result is not None:
-                try:
-                    stats.append(msgpack.unpackb(result))
-                except (
-                    msgpack.exceptions.ExtraData,
-                    msgpack.exceptions.UnpackException,
-                    ValueError,
-                ):
-                    stats.append(None)
-            else:
+        results = await self._get_multiple_keys(session_ids)
+        stats: list[Optional[dict]] = []
+        for i, result in enumerate(results):
+            if result is None:
+                stats.append(None)
+                continue
+            try:
+                stats.append(msgpack.unpackb(result))
+            except (
+                msgpack.exceptions.ExtraData,
+                msgpack.exceptions.UnpackException,
+                ValueError,
+            ):
+                log.warning(
+                    "Failed to unpack session statistics for ID {}: {}",
+                    session_ids[i],
+                    result.decode("utf-8"),
+                )
                 stats.append(None)
         return stats
 
@@ -291,35 +287,34 @@ class ValkeyStatClient:
         :param kernel_ids: List of kernel IDs to get statistics for.
         :return: List of raw kernel statistics bytes, with None for non-existent kernels.
         """
-        if not kernel_ids:
-            return []
-
-        return await self.get_multiple_keys(kernel_ids)
+        return await self._get_multiple_keys(kernel_ids)
 
     @valkey_decorator()
-    async def get_agent_statistics_batch(self, agent_ids: List[str]) -> List[Optional[dict]]:
+    async def get_agent_statistics_batch(self, agent_ids: List[str]) -> list[Optional[dict]]:
         """
         Get agent statistics for multiple agents.
 
         :param agent_ids: List of agent IDs to get statistics for.
         :return: List of agent statistics, with None for non-existent agents.
         """
-        if not agent_ids:
-            return []
-
-        results = await self.get_multiple_keys(agent_ids)
-        stats = []
-        for result in results:
-            if result is not None:
-                try:
-                    stats.append(msgpack.unpackb(result, ext_hook_mapping=msgpack.uuid_to_str))
-                except (
-                    msgpack.exceptions.ExtraData,
-                    msgpack.exceptions.UnpackException,
-                    ValueError,
-                ):
-                    stats.append(None)
-            else:
+        results = await self._get_multiple_keys(agent_ids)
+        stats: list[Optional[dict]] = []
+        for i, result in enumerate(results):
+            if result is None:
+                stats.append(None)
+                continue
+            try:
+                stats.append(msgpack.unpackb(result, ext_hook_mapping=msgpack.uuid_to_str))
+            except (
+                msgpack.exceptions.ExtraData,
+                msgpack.exceptions.UnpackException,
+                ValueError,
+            ):
+                log.warning(
+                    "Failed to unpack agent statistics for ID {}: {}",
+                    agent_ids[i],
+                    result.decode("utf-8"),
+                )
                 stats.append(None)
         return stats
 
@@ -335,16 +330,21 @@ class ValkeyStatClient:
             return []
 
         keys = [self._get_container_count_key(agent_id) for agent_id in agent_ids]
-        results = await self.get_multiple_keys(keys)
+        results = await self._get_multiple_keys(keys)
 
         counts = []
-        for result in results:
-            if result is not None:
-                try:
-                    counts.append(int(result.decode("utf-8")))
-                except (ValueError, UnicodeDecodeError):
-                    counts.append(0)
-            else:
+        for i, result in enumerate(results):
+            if result is None:
+                counts.append(0)
+                continue
+            try:
+                counts.append(int(result.decode("utf-8")))
+            except (ValueError, UnicodeDecodeError):
+                log.warning(
+                    "Failed to decode container count for key {}: {}",
+                    keys[i],
+                    result.decode("utf-8"),
+                )
                 counts.append(0)
         return counts
 
@@ -388,8 +388,8 @@ class ValkeyStatClient:
 
     @valkey_decorator()
     async def get_inference_app_statistics_batch(
-        self, endpoint_ids: List[str]
-    ) -> List[Optional[dict]]:
+        self, endpoint_ids: list[str]
+    ) -> list[Optional[dict]]:
         """
         Get inference app statistics for multiple endpoints.
 
@@ -400,20 +400,25 @@ class ValkeyStatClient:
             return []
 
         keys = [self._get_inference_app_key(endpoint_id) for endpoint_id in endpoint_ids]
-        results = await self.get_multiple_keys(keys)
+        results = await self._get_multiple_keys(keys)
 
-        stats = []
-        for result in results:
-            if result is not None:
-                try:
-                    stats.append(msgpack.unpackb(result))
-                except (
-                    msgpack.exceptions.ExtraData,
-                    msgpack.exceptions.UnpackException,
-                    ValueError,
-                ):
-                    stats.append(None)
-            else:
+        stats: list[Optional[dict]] = []
+        for i, result in enumerate(results):
+            if result is None:
+                stats.append(None)
+                continue
+            try:
+                stats.append(msgpack.unpackb(result))
+            except (
+                msgpack.exceptions.ExtraData,
+                msgpack.exceptions.UnpackException,
+                ValueError,
+            ):
+                log.warning(
+                    "Failed to unpack inference app statistics for key {}: {}",
+                    keys[i],
+                    result.decode("utf-8"),
+                )
                 stats.append(None)
         return stats
 
@@ -444,20 +449,25 @@ class ValkeyStatClient:
             self._get_inference_replica_key(endpoint_id, replica_id)
             for endpoint_id, replica_id in endpoint_replica_pairs
         ]
-        results = await self.get_multiple_keys(keys)
+        results = await self._get_multiple_keys(keys)
 
-        stats = []
-        for result in results:
-            if result is not None:
-                try:
-                    stats.append(msgpack.unpackb(result))
-                except (
-                    msgpack.exceptions.ExtraData,
-                    msgpack.exceptions.UnpackException,
-                    ValueError,
-                ):
-                    stats.append(None)
-            else:
+        stats: list[Optional[dict]] = []
+        for i, result in enumerate(results):
+            if result is None:
+                stats.append(None)
+                continue
+            try:
+                stats.append(msgpack.unpackb(result))
+            except (
+                msgpack.exceptions.ExtraData,
+                msgpack.exceptions.UnpackException,
+                ValueError,
+            ):
+                log.warning(
+                    "Failed to unpack inference replica statistics for key {}: {}",
+                    keys[i],
+                    result.decode("utf-8"),
+                )
                 stats.append(None)
         return stats
 
@@ -469,10 +479,15 @@ class ValkeyStatClient:
         :param image_id: The Docker image ID.
         :return: The distribution name, or None if not found.
         """
-        result = await self._client.client.get(f"image:{image_id}:distro")
-        if result is None:
+        batch = self._create_batch()
+        key = f"image:{image_id}:distro"
+        batch.get(key)
+        batch.expire(key, _DEFAULT_EXPIRATION)
+        results = await self._client.client.exec(batch, raise_on_error=True)
+        if not results:
             return None
         try:
+            result = cast(bytes, results[0])
             return result.decode("utf-8")
         except UnicodeDecodeError:
             return None
@@ -485,7 +500,11 @@ class ValkeyStatClient:
         :param image_id: The Docker image ID.
         :param distro: The Linux distribution name.
         """
-        await self._client.client.set(f"image:{image_id}:distro", distro)
+        await self._client.client.set(
+            f"image:{image_id}:distro",
+            distro,
+            expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION),
+        )
 
     @valkey_decorator()
     async def get_volume_usage(self, proxy_name: str, volume_name: str) -> Optional[bytes]:
@@ -500,7 +519,11 @@ class ValkeyStatClient:
 
     @valkey_decorator()
     async def set_volume_usage(
-        self, proxy_name: str, volume_name: str, usage_data: bytes, expiry_seconds: int = 60
+        self,
+        proxy_name: str,
+        volume_name: str,
+        usage_data: bytes,
+        expiry_seconds: int,
     ) -> None:
         """
         Set volume usage information with expiration.
@@ -516,23 +539,36 @@ class ValkeyStatClient:
         )
 
     @valkey_decorator()
-    async def get_computer_metadata(self) -> dict[str, str]:
+    async def store_computer_metadata(
+        self,
+        metadata: Mapping[str, bytes],
+    ) -> None:
+        """
+        Store computer metadata in the hash.
+
+        :param metadata: Dictionary of metadata to store.
+        """
+        # TODO: Changed to allow setting expiration using the `set` method instead of the `hset` method.
+        await self._client.client.hset(
+            _COMPUTER_METADATA_KEY, cast(Mapping[str | bytes, str | bytes], metadata)
+        )
+
+    @valkey_decorator()
+    async def get_computer_metadata(self) -> dict[str, bytes]:
         """
         Get all computer metadata from the hash.
 
         :return: Dictionary of slot name to metadata JSON string.
         """
-        result = await self._client.client.hgetall(_COMPUTER_METADATA_HASH)
+        result = await self._client.client.hgetall(_COMPUTER_METADATA_KEY)
         if result is None:
             return {}
 
         # Convert bytes keys and values to strings
-        metadata: dict[str, str] = {}
+        metadata: dict[str, bytes] = {}
         for key, value in result.items():
             str_key: str = key.decode("utf-8")
-            str_value: str = value.decode("utf-8")
-            metadata[str_key] = str_value
-
+            metadata[str_key] = value
         return metadata
 
     @valkey_decorator()
@@ -545,27 +581,7 @@ class ValkeyStatClient:
         """
         return await self._client.client.get(key)
 
-    @valkey_decorator()
-    async def cache_agent_stat(
-        self,
-        key: str,
-        value: bytes,
-        expire_sec: Optional[int] = None,
-    ) -> None:
-        """
-        Cache agent statistics data with optional expiration.
-
-        :param key: The key to set.
-        :param value: The statistics value to cache.
-        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
-        """
-        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-        await self._client.client.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
-        )
-
+    # TODO: Remove this too generalized methods
     @valkey_decorator()
     async def set(
         self,
@@ -574,7 +590,7 @@ class ValkeyStatClient:
         expire_sec: Optional[int] = None,
     ) -> None:
         """
-        Set the value of a key with optional expiration (deprecated: use cache_agent_stat).
+        Set the value of a key with optional expiration.
 
         :param key: The key to set.
         :param value: The value to set.
@@ -597,15 +613,22 @@ class ValkeyStatClient:
         """
         return await self._client.client.delete(list(keys))
 
-    @valkey_decorator()
-    async def time(self) -> List[int]:
+    async def _time(self) -> float:
         """
         Get the current server time.
 
         :return: Server time as [seconds, microseconds].
         """
-        time_result = await self._client.client.time()
-        return [int(time_result[0]), int(time_result[1])]
+        result = await self._client.client.time()
+        if len(result) != 2:
+            raise ValueError(
+                f"Unexpected result from time command: {result}. Expected a tuple of (seconds, microseconds)."
+            )
+        seconds_bytes, microseconds_bytes = result
+
+        seconds = float(seconds_bytes)
+        microseconds = float(microseconds_bytes)
+        return seconds + (microseconds / 10**6)
 
     @valkey_decorator()
     async def setex(self, name: str, value: Union[str, bytes], time: int) -> None:
@@ -638,6 +661,21 @@ class ValkeyStatClient:
         """
         prefix = _KEYPAIR_SFTP_CONCURRENCY_PREFIX if is_private else _KEYPAIR_CONCURRENCY_PREFIX
         return f"{prefix}.{access_key}"
+
+    @valkey_decorator()
+    async def increment_keypair_query_count(
+        self,
+        access_key: str,
+    ) -> None:
+        now = await self._time()
+        batch = self._create_batch()
+        num_queries_key = self._get_keypair_query_count_key(access_key)
+        batch.incr(num_queries_key)
+        batch.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+        last_call_time_key = self._get_keypair_last_call_time_key(access_key)
+        batch.set(last_call_time_key, str(now).encode())
+        batch.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
+        await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
     async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
@@ -679,126 +717,7 @@ class ValkeyStatClient:
         await self._client.client.set(key, str(concurrency_used))
 
     @valkey_decorator()
-    async def expire(self, key: str, seconds: int) -> bool:
-        """
-        Set the expiration time for a key.
-
-        :param key: The key to expire.
-        :param seconds: Expiration time in seconds.
-        :return: True if the expiration was set successfully.
-        """
-        return await self._client.client.expire(key, seconds)
-
-    @valkey_decorator()
-    async def mget(self, keys: Sequence[str]) -> List[Optional[bytes]]:
-        """
-        Get multiple keys in a single operation.
-
-        :param keys: List of keys to retrieve.
-        :return: List of values, with None for non-existent keys.
-        """
-        if not keys:
-            return []
-        return await self._client.client.mget(list(keys))
-
-    @valkey_decorator()
-    async def store_agent_metadata(
-        self,
-        key: str,
-        field_value_map: Mapping[str, bytes],
-        expire_sec: Optional[int] = None,
-    ) -> None:
-        """
-        Store agent metadata using hash fields.
-
-        :param key: The hash key.
-        :param field_value_map: Mapping of field names to values.
-        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
-        """
-        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-
-        # Use batch operation to set hash fields and expiration atomically
-        batch = self._create_batch()
-
-        # Convert mapping to proper format for hset
-        batch.hset(key, cast(Mapping[str | bytes, str | bytes], field_value_map))
-        batch.expire(key, expiration)
-
-        await self._client.client.exec(batch, raise_on_error=True)
-
-    @valkey_decorator()
-    async def hset(
-        self,
-        key: str,
-        field_value_map: Mapping[str, bytes],
-        expire_sec: Optional[int] = None,
-    ) -> None:
-        """
-        Set multiple hash fields to multiple values (deprecated: use store_agent_metadata).
-
-        :param key: The hash key.
-        :param field_value_map: Mapping of field names to values.
-        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
-        """
-        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-
-        # Use batch operation to set hash fields and expiration atomically
-        batch = self._create_batch()
-
-        # Convert mapping to proper format for hset
-        batch.hset(key, cast(Mapping[str | bytes, str | bytes], field_value_map))
-        batch.expire(key, expiration)
-
-        await self._client.client.exec(batch, raise_on_error=True)
-
-    @valkey_decorator()
-    async def hget(self, key: str, field: str) -> Optional[bytes]:
-        """
-        Get the value of a hash field.
-
-        :param key: The hash key.
-        :param field: The field name.
-        :return: The value of the field, or None if it doesn't exist.
-        """
-        return await self._client.client.hget(key, field)
-
-    @valkey_decorator()
-    async def execute_batch(self, batch_operations: List[dict]) -> List[Any]:
-        """
-        Execute multiple operations in a batch.
-
-        :param batch_operations: List of operations to execute.
-        :return: List of results from each operation.
-        """
-        batch = self._create_batch()
-
-        for operation in batch_operations:
-            op_type = operation["operation"]
-            if op_type == "get":
-                batch.get(operation["key"])
-            elif op_type == "set":
-                expire_sec = operation.get("expire_sec", _DEFAULT_EXPIRATION)
-                batch.set(
-                    key=operation["key"],
-                    value=operation["value"],
-                    expiry=ExpirySet(ExpiryType.SEC, expire_sec),
-                )
-            elif op_type == "delete":
-                batch.delete(operation["keys"])
-            elif op_type == "hset":
-                batch.hset(operation["key"], operation["field_value_map"])
-                if "expire_sec" in operation:
-                    batch.expire(operation["key"], operation["expire_sec"])
-            elif op_type == "hget":
-                batch.hget(operation["key"], operation["field"])
-            else:
-                raise ValueError(f"Unsupported operation type: {op_type}")
-
-        results = await self._client.client.exec(batch, raise_on_error=True)
-        return results if results is not None else []
-
-    @valkey_decorator()
-    async def get_multiple_keys(self, keys: List[str]) -> List[Optional[bytes]]:
+    async def _get_multiple_keys(self, keys: List[str]) -> List[Optional[bytes]]:
         """
         Get multiple keys efficiently using batch operations.
 
@@ -807,40 +726,7 @@ class ValkeyStatClient:
         """
         if not keys:
             return []
-
-        batch = self._create_batch()
-        for key in keys:
-            batch.get(key)
-
-        results = await self._client.client.exec(batch, raise_on_error=True)
-        return cast(List[Optional[bytes]], results)
-
-    @valkey_decorator()
-    async def cache_kernel_stats(
-        self,
-        key_value_map: Mapping[str, bytes],
-        expire_sec: Optional[int] = None,
-    ) -> None:
-        """
-        Cache kernel statistics data efficiently using batch operations.
-
-        :param key_value_map: Mapping of kernel IDs to statistics values.
-        :param expire_sec: Expiration time in seconds. If None, uses default expiration.
-        """
-        if not key_value_map:
-            return
-
-        expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-        batch = self._create_batch()
-
-        for key, value in key_value_map.items():
-            batch.set(
-                key=key,
-                value=value,
-                expiry=ExpirySet(ExpiryType.SEC, expiration),
-            )
-
-        await self._client.client.exec(batch, raise_on_error=True)
+        return await self._client.client.mget(cast(list[str | bytes], keys))
 
     @valkey_decorator()
     async def set_multiple_keys(
@@ -849,7 +735,7 @@ class ValkeyStatClient:
         expire_sec: Optional[int] = None,
     ) -> None:
         """
-        Set multiple keys efficiently using batch operations (deprecated: use cache_kernel_stats).
+        Set multiple keys efficiently using batch operations.
 
         :param key_value_map: Mapping of keys to values.
         :param expire_sec: Expiration time in seconds. If None, uses default expiration.
@@ -1056,22 +942,6 @@ class ValkeyStatClient:
             return []
         return await self._client.client.mget(cast(list[str | bytes], matched_keys))
 
-    # Additional Redis-compatible methods
-    @valkey_decorator()
-    async def ping(self) -> bytes:
-        """
-        Ping the Redis server (redis_helper compatibility).
-        """
-        # Use time as a simple ping equivalent
-        return await self.ping()
-
-    @valkey_decorator()
-    async def pipeline(self) -> "ValkeyStatPipeline":
-        """
-        Create a pipeline-like object for batch operations (redis_helper compatibility).
-        """
-        return ValkeyStatPipeline(self)
-
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """
         Create a batch object for batch operations.
@@ -1081,57 +951,14 @@ class ValkeyStatClient:
         """
         return Batch(is_atomic=is_atomic)
 
+    def _get_keypair_query_count_key(
+        self,
+        access_key: str,
+    ) -> str:
+        return f"kp:{access_key}:num_queries"
 
-class ValkeyStatPipeline:
-    """
-    Pipeline-like wrapper for ValkeyStatClient to provide redis_helper compatibility.
-    """
-
-    def __init__(self, client: ValkeyStatClient) -> None:
-        self._client = client
-        self._operations: List[dict] = []
-
-    def get_raw(self, key: str) -> "ValkeyStatPipeline":
-        """Add get operation to pipeline (for internal use only)."""
-        self._operations.append({"operation": "get", "key": key})
-        return self
-
-    def set(self, key: str, value: bytes, ex: Optional[int] = None) -> "ValkeyStatPipeline":
-        """Add set operation to pipeline."""
-        operation: dict = {"operation": "set", "key": key, "value": value}
-        if ex is not None:
-            operation["expire_sec"] = ex
-        self._operations.append(operation)
-        return self
-
-    def delete(self, *keys: str) -> "ValkeyStatPipeline":
-        """Add delete operation to pipeline."""
-        self._operations.append({"operation": "delete", "keys": list(keys)})
-        return self
-
-    def hset(self, key: str, field: str, value: bytes) -> "ValkeyStatPipeline":
-        """Add hset operation to pipeline."""
-        self._operations.append({
-            "operation": "hset",
-            "key": key,
-            "field_value_map": {field: value},
-        })
-        return self
-
-    def hget(self, key: str, field: str) -> "ValkeyStatPipeline":
-        """Add hget operation to pipeline."""
-        self._operations.append({"operation": "hget", "key": key, "field": field})
-        return self
-
-    def expire(self, key: str, time: int) -> "ValkeyStatPipeline":
-        """Add expire operation to pipeline."""
-        # For simplicity, we'll set expire_sec on the last operation if it's a set/hset
-        if self._operations and self._operations[-1]["operation"] in ["set", "hset"]:
-            self._operations[-1]["expire_sec"] = time
-        return self
-
-    async def execute(self) -> List[Any]:
-        """Execute all pipeline operations."""
-        if not self._operations:
-            return []
-        return await self._client.execute_batch(self._operations)
+    def _get_keypair_last_call_time_key(
+        self,
+        access_key: str,
+    ) -> str:
+        return f"kp:{access_key}:last_call_time"

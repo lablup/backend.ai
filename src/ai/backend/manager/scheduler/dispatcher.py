@@ -370,11 +370,9 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
-        # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data(redis_key)
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.replace_schedule_data(
             redis_key,
-            mapping={
+            {
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
@@ -408,17 +406,19 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self._valkey_live.store_scheduler_metadata(
+                        await self._valkey_live.add_scheduler_metadata(
                             redis_key,
-                            "resource_group",
-                            sgroup_name,
+                            {
+                                "resource_group": sgroup_name,
+                            },
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await self._valkey_live.store_scheduler_metadata(
+                await self._valkey_live.add_scheduler_metadata(
                     redis_key,
-                    "finish_time",
-                    datetime.now(tzutc()).isoformat(),
+                    {
+                        "finish_time": datetime.now(tzutc()).isoformat(),
+                    },
                 )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1262,11 +1262,9 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
-        # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data(redis_key)
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.replace_schedule_data(
             redis_key,
-            mapping={
+            {
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
@@ -1317,10 +1315,11 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            await self._valkey_live.store_scheduler_metadata(
+            await self._valkey_live.add_scheduler_metadata(
                 redis_key,
-                "finish_time",
-                datetime.now(tzutc()).isoformat(),
+                {
+                    "finish_time": datetime.now(tzutc()).isoformat(),
+                },
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1344,12 +1343,9 @@ class SchedulerDispatcher(aobject):
         """
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.start"
-
-        # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data(redis_key)
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.replace_schedule_data(
             redis_key,
-            mapping={
+            {
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
@@ -1407,10 +1403,11 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            await self._valkey_live.store_scheduler_metadata(
+            await self._valkey_live.add_scheduler_metadata(
                 redis_key,
-                "finish_time",
-                datetime.now(tzutc()).isoformat(),
+                {
+                    "finish_time": datetime.now(tzutc()).isoformat(),
+                },
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1588,11 +1585,9 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
-        # Clear and initialize scheduler metadata
-        await self._valkey_live.delete_live_data(redis_key)
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.replace_schedule_data(
             redis_key,
-            mapping={
+            {
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
@@ -1709,10 +1704,11 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.add_scheduler_metadata(
             redis_key,
-            "down",
-            dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
+            {
+                "down": dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
+            },
         )
 
         created_routes = []
@@ -1734,9 +1730,9 @@ class SchedulerDispatcher(aobject):
             await db_sess.commit()
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await self._valkey_live.store_scheduler_metadata(
+        await self._valkey_live.add_scheduler_metadata(
             redis_key,
-            mapping={
+            {
                 "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
             },

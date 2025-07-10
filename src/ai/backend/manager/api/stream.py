@@ -700,7 +700,6 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                     )
                     removed_count = await redis_live.remove_stale_connections(
                         str(session_id),
-                        float("-inf"),
                         now - no_packet_timeout.total_seconds(),
                     )
                     remaining_count = await redis_live.count_active_connections(str(session_id))

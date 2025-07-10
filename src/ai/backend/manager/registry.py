@@ -3173,12 +3173,12 @@ class AgentRegistry:
         log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat_client.get_kernel_statistics_raw(raw_kernel_id)
+            kern_stat = await self.valkey_stat_client.get_kernel_statistics(raw_kernel_id)
             if kern_stat is None:
                 log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
                 continue
             else:
-                per_kernel_updates[kernel_id] = msgpack.unpackb(kern_stat)
+                per_kernel_updates[kernel_id] = kern_stat
 
         async def _update():
             async with self.db.begin() as conn:

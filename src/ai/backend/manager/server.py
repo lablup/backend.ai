@@ -48,7 +48,6 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.clients.valkey_client.valkey_stream_lock.client import ValkeyStreamLockClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -553,11 +552,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
-    root_ctx.valkey_stream_lock = await ValkeyStreamLockClient.create(
-        redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
-        human_readable_name="lock",
-        db_id=REDIS_STREAM_LOCK,
-    )
     root_ctx.valkey_stream = await ValkeyStreamClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
         human_readable_name="stream",
@@ -566,13 +560,9 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
 
-    # Ping ValkeyStatClient
-    await root_ctx.valkey_stat.get_cached_stat("__ping__")
-
     # Ping legacy redis_stream
     await redis_helper.ping_redis_connection(root_ctx.redis_stream.client)
 
-    await root_ctx.valkey_stream_lock.ping()
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
     yield
@@ -580,7 +570,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_image.close()
     await root_ctx.valkey_stat.close()
     await root_ctx.valkey_live.close()
-    await root_ctx.valkey_stream_lock.close()
     await root_ctx.valkey_stream.close()
 
 
