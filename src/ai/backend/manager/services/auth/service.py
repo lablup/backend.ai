@@ -368,6 +368,11 @@ class AuthService:
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
         # Get SSH public key. Return partial string from the public key just for checking.
         pubkey = await self._repository.keypair.get_ssh_public_key(action.access_key)
+        if pubkey is None:
+            raise ObjectNotFound(
+                extra_msg="No SSH keypair found for the access key.",
+                object_name="SSH keypair",
+            )
         return GetSSHKeypairActionResult(public_key=pubkey)
 
     async def generate_ssh_keypair(

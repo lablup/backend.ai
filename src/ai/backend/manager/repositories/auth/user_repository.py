@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
@@ -18,14 +19,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class UserRepository(BaseAuthRepository):
-    async def check_user_in_group(self, group_id: str, user_id: str) -> Optional[Row]:
+    async def check_user_in_group(self, group_id: UUID, user_id: UUID) -> Optional[Row]:
         try:
             query = (
                 sa.select([association_groups_users.c.group_id])
                 .select_from(association_groups_users)
                 .where(
-                    (association_groups_users.c.group_id == group_id)
-                    & (association_groups_users.c.user_id == user_id),
+                    (association_groups_users.c.group_id == str(group_id))
+                    & (association_groups_users.c.user_id == str(user_id)),
                 )
             )
             async with self._db.begin() as conn:
@@ -33,7 +34,9 @@ class UserRepository(BaseAuthRepository):
                 return result.first()
         except SQLAlchemyError as e:
             log.error("Failed to check user in group: {}", e)
-            raise InternalServerError("Database error occurred while checking user group membership")
+            raise InternalServerError(
+                "Database error occurred while checking user group membership"
+            )
 
     async def check_email_exists(self, email: str) -> Optional[Row]:
         try:
@@ -134,6 +137,6 @@ class UserRepository(BaseAuthRepository):
             password=password,
         )
 
-    async def get_user_row_by_uuid(self, user_uuid: str) -> Optional[UserRow]:
+    async def get_user_row_by_uuid(self, user_uuid: UUID) -> Optional[UserRow]:
         async with self._db.begin_session() as db_session:
             return await UserRow.query_user_by_uuid(user_uuid, db_session)
