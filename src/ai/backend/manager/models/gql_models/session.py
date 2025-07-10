@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
+from ai.backend.common.utils import MountsResolver
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel import KernelRow
@@ -899,8 +900,7 @@ class ComputeSession(graphene.ObjectType):
             "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            # TODO: Consider using `MountsResolver` to resolve mounts
-            "mounts": [*{mount.name for mount in vfolder_mounts}],
+            "mounts": MountsResolver(vfolder_mounts).resolve_names(),
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
             "vfolder_mounts": [*{vf.vfid.folder_id for vf in vfolder_mounts}],
             "occupying_slots": row.occupying_slots.to_json(),
