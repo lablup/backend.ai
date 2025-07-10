@@ -135,7 +135,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import MountsResolver, str_to_timedelta
+from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.image import ImageIdentifier
@@ -1059,7 +1059,7 @@ class AgentRegistry:
             "internal_data": internal_data,
             "callback_url": callback_url,
             "occupied_shares": {},
-            "mounts": MountsResolver(vfolder_mounts).resolve_names(),  # TODO: keep for legacy?
+            "mounts": [*{mount.name for mount in vfolder_mounts}],  # TODO: keep for legacy?
             "vfolder_mounts": vfolder_mounts,
             "repl_in_port": 0,
             "repl_out_port": 0,
