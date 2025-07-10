@@ -121,7 +121,10 @@ class Services:
         user_service = UserService(
             args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
         )
-        image_service = ImageService(args.db, args.agent_registry)
+        from ai.backend.manager.repositories.image.repository import ImageRepository
+
+        image_repository = ImageRepository(args.db)
+        image_service = ImageService(args.db, args.agent_registry, image_repository)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
             args.db, args.config_provider, args.storage_manager, args.background_task_manager
