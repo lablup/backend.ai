@@ -307,14 +307,14 @@ async def server_main(
                 ),
             )
 
-            if local_config["storage-proxy"]["otel"]["enabled"]:
+            if local_config["otel"]["enabled"]:
                 meta = sd_loop.metadata
                 otel_spec = OpenTelemetrySpec(
                     service_id=meta.id,
                     service_name=meta.service_group,
                     service_version=meta.version,
-                    log_level=local_config["storage-proxy"]["otel"]["log-level"],
-                    endpoint=local_config["storage-proxy"]["otel"]["endpoint"],
+                    log_level=local_config["otel"]["log-level"],
+                    endpoint=local_config["otel"]["endpoint"],
                 )
                 BraceStyleAdapter.apply_otel(otel_spec)
             await event_dispatcher.start()
