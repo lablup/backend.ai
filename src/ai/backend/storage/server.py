@@ -56,6 +56,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
@@ -305,6 +306,17 @@ async def server_main(
                     ),
                 ),
             )
+
+            if local_config["storage-proxy"]["otel"]["enabled"]:
+                meta = sd_loop.metadata
+                otel_spec = OpenTelemetrySpec(
+                    service_id=meta.id,
+                    service_name=meta.service_group,
+                    service_version=meta.version,
+                    log_level=local_config["storage-proxy"]["otel"]["log-level"],
+                    endpoint=local_config["storage-proxy"]["otel"]["endpoint"],
+                )
+                BraceStyleAdapter.apply_otel(otel_spec)
             await event_dispatcher.start()
             try:
                 yield
