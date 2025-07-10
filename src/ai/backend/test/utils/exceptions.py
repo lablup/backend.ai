@@ -10,10 +10,3 @@ class UnexpectedSuccess(Exception):
 
     def __init__(self, message="Test succeeded unexpectedly."):
         super().__init__(message)
-
-
-class UnexpectedFailure(Exception):
-    """Raised when a test marked as expected to succeed actually fails."""
-
-    def __init__(self, message="Test failed unexpectedly."):
-        super().__init__(message)

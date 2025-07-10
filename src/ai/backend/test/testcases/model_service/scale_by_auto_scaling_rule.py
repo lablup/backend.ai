@@ -20,7 +20,7 @@ from ai.backend.test.contexts.model_service import (
 from ai.backend.test.contexts.session import ClusterContext
 from ai.backend.test.templates.model_service.utils import ensure_inference_sessions_ready
 from ai.backend.test.templates.template import TestCode
-from ai.backend.test.utils.exceptions import DependencyNotSet, UnexpectedFailure
+from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _METRIC_COLLECTION_TIMEOUT = 120
 _SCALE_TIMEOUT = 60
@@ -122,7 +122,7 @@ class ScaleInByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
             raise DependencyNotSet("AutoScalingRuleContext.min_replicas must be set")
 
         if current_replica_count <= min_replicas:
-            raise UnexpectedFailure(
+            raise AssertionError(
                 f"Current replicas must be greater than min_replicas(current: {current_replica_count} / min_replicas: {min_replicas}). Check test configuration or TestSpec"
             )
 
@@ -179,7 +179,7 @@ class ScaleOutByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
             raise DependencyNotSet("AutoScalingRuleContext.max_replicas must be set")
 
         if current_replica_count >= max_replicas:
-            raise UnexpectedFailure(
+            raise AssertionError(
                 f"Current replicas must be less than max_replicas(current: {current_replica_count} / max_replicas: {max_replicas}). Check test configuration or TestSpec"
             )
 
