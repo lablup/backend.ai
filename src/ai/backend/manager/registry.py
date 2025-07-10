@@ -480,7 +480,8 @@ class AgentRegistry:
                 "sessionId": str(sess.id),
                 "sessionName": str(sess.name),
                 "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,
+                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
+                "servicePorts": sess.main_kernel.service_ports,
                 "created": False,
             }
         except SessionNotFound:

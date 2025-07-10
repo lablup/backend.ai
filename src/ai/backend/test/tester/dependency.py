@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
@@ -184,6 +184,17 @@ class VFolderDep(BaseDependencyModel):
     cloneable: bool = Field(
         description="Whether the vfolder is cloneable.",
     )
+    share_permission: str = Field(
+        default="ro",
+        description="The share permission for the vfolder.",
+        examples=["ro", "rw"],
+    )
+
+    @model_validator(mode="after")
+    def validate(self):
+        if self.permission == self.share_permission:
+            raise ValueError("permission and share_permission must be different")
+        return self
 
 
 class UploadFileDep(BaseDependencyModel):
