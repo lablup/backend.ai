@@ -1242,10 +1242,6 @@ async def server_main(
     )  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
-    # Store krunner volumes separately for now
-    # TODO: Add krunner_volumes to ContainerConfig schema in future
-    krunner_volumes_dict = {"krunner-volumes": krunner_volumes}
-
     # Update agent id and instance type if not set
     agent_updates = {}
     if not local_config.agent.id:
@@ -1318,9 +1314,6 @@ async def server_main(
         local_config.agent.instance_type,
         rpc_addr.host,
     )
-
-    # Pre-load compute plugin configurations.
-    plugins_config = await etcd.get_prefix_dict("config/plugins/accelerator")
 
     # Start RPC server.
     global agent_instance
