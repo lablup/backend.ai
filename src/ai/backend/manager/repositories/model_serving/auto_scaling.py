@@ -6,11 +6,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.manager.models.endpoint import (
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
-    AutoScalingMetricSource,
-    AutoScalingMetricComparator,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -33,7 +33,9 @@ class AutoScalingRepository:
     ) -> None:
         self._db = db
 
-    async def get_endpoint_by_id(self, service_id: uuid.UUID, load_routes: bool = False) -> EndpointRow:
+    async def get_endpoint_by_id(
+        self, service_id: uuid.UUID, load_routes: bool = False
+    ) -> EndpointRow:
         async with self._db.begin_readonly_session() as db_sess:
             try:
                 return await EndpointRow.get(db_sess, service_id, load_routes=load_routes)
@@ -67,7 +69,10 @@ class AutoScalingRepository:
                 row = await EndpointAutoScalingRuleRow.get(
                     db_session, rule_id, load_endpoint=load_endpoint
                 )
-                if load_endpoint and row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
+                if (
+                    load_endpoint
+                    and row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states()
+                ):
                     raise EndpointAutoScalingRuleNotFound
                 return row
             except NoResultFound:

@@ -148,14 +148,16 @@ class Services:
             args.db, args.agent_registry, args.config_provider
         )
         utilization_metric_service = UtilizationMetricService(args.config_provider)
-        
+
         # Create repository instances
-        from ai.backend.manager.repositories.model_serving.model_serving import ModelServingRepository
         from ai.backend.manager.repositories.model_serving.auto_scaling import AutoScalingRepository
-        
+        from ai.backend.manager.repositories.model_serving.model_serving import (
+            ModelServingRepository,
+        )
+
         model_serving_repository = ModelServingRepository(args.db)
         auto_scaling_repository = AutoScalingRepository(args.db)
-        
+
         model_serving_service = ModelServingService(
             repository=model_serving_repository,
             agent_registry=args.agent_registry,

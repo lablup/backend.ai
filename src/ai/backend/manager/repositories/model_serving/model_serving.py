@@ -43,7 +43,9 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as db_sess:
             return await VFolderRow.get(db_sess, vfolder_id)
 
-    async def resolve_image(self, image_identifiers: list[ImageIdentifier | ImageAlias | ImageRef]) -> ImageRow:
+    async def resolve_image(
+        self, image_identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
+    ) -> ImageRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await ImageRow.resolve(db_sess, image_identifiers)
 

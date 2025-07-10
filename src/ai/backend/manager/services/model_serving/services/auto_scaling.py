@@ -1,7 +1,7 @@
 import asyncio
 import decimal
 import logging
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 import sqlalchemy as sa
 
@@ -50,7 +50,9 @@ class AutoScalingService:
         self, action: ScaleServiceReplicasAction
     ) -> ScaleServiceReplicasActionResult:
         endpoint = await self._repository.get_endpoint_by_id(action.service_id, load_routes=True)
-        await self._repository.verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await self._repository.verify_user_access_scopes(
+            action.requester_ctx, endpoint.session_owner
+        )
 
         await self._repository.update_endpoint_replicas(action.service_id, action.to)
         return ScaleServiceReplicasActionResult(
@@ -118,7 +120,9 @@ class AutoScalingService:
                     raise GenericForbidden
 
         async def _do_mutate() -> MutationResult:
-            updated_rule = await self._repository.update_auto_scaling_rule(row, action.modifier.fields_to_update())
+            updated_rule = await self._repository.update_auto_scaling_rule(
+                row, action.modifier.fields_to_update()
+            )
             return MutationResult(
                 success=True,
                 message="Auto scaling rule updated",
