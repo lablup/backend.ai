@@ -49,11 +49,11 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
-from ai.backend.web.config.unified import WebServerUnifiedConfig
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar

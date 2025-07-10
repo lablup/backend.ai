@@ -6,9 +6,9 @@ from aiohttp import web
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.web.session import get_session
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from . import user_agent
-from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 
 async def get_api_session(

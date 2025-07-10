@@ -1,3 +1,1 @@
-python_sources(
-    name="src",
-)
+python_sources(name="src")

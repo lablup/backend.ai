@@ -3,14 +3,13 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 from pydantic import (
     AliasChoices,
     BaseModel,
     Field,
     FilePath,
-    field_validator,
 )
 
 from ai.backend.common.typed_validators import (
@@ -140,7 +139,9 @@ class ServiceConfig(BaseModel):
         Whether to allow anonymous users to change passwords.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("allow_anonymous_change_password", "allow-anonymous-change-password"),
+        validation_alias=AliasChoices(
+            "allow_anonymous_change_password", "allow-anonymous-change-password"
+        ),
         serialization_alias="allow-anonymous-change-password",
     )
     allow_project_resource_monitor: bool = Field(
@@ -149,7 +150,9 @@ class ServiceConfig(BaseModel):
         Whether to allow project resource monitoring.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("allow_project_resource_monitor", "allow-project-resource-monitor"),
+        validation_alias=AliasChoices(
+            "allow_project_resource_monitor", "allow-project-resource-monitor"
+        ),
         serialization_alias="allow-project-resource-monitor",
     )
     allow_change_signin_mode: bool = Field(
@@ -167,7 +170,9 @@ class ServiceConfig(BaseModel):
         Whether to allow manual image name specification for sessions.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("allow_manual_image_name_for_session", "allow-manual-image-name-for-session"),
+        validation_alias=AliasChoices(
+            "allow_manual_image_name_for_session", "allow-manual-image-name-for-session"
+        ),
         serialization_alias="allow-manual-image-name-for-session",
     )
     allow_signup_without_confirmation: bool = Field(
@@ -176,7 +181,9 @@ class ServiceConfig(BaseModel):
         Whether to allow signup without email confirmation.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("allow_signup_without_confirmation", "allow-signup-without-confirmation"),
+        validation_alias=AliasChoices(
+            "allow_signup_without_confirmation", "allow-signup-without-confirmation"
+        ),
         serialization_alias="allow-signup-without-confirmation",
     )
     always_enqueue_compute_session: bool = Field(
@@ -185,7 +192,9 @@ class ServiceConfig(BaseModel):
         Whether to always enqueue compute sessions.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("always_enqueue_compute_session", "always-enqueue-compute-session"),
+        validation_alias=AliasChoices(
+            "always_enqueue_compute_session", "always-enqueue-compute-session"
+        ),
         serialization_alias="always-enqueue-compute-session",
     )
     webui_debug: bool = Field(
@@ -302,7 +311,9 @@ class ServiceConfig(BaseModel):
         Whether to allow custom resource allocation.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("allow_custom_resource_allocation", "allow-custom-resource-allocation"),
+        validation_alias=AliasChoices(
+            "allow_custom_resource_allocation", "allow-custom-resource-allocation"
+        ),
         serialization_alias="allow-custom-resource-allocation",
     )
     edu_appname_prefix: str = Field(
@@ -338,7 +349,9 @@ class ServiceConfig(BaseModel):
         Whether to enable interactive login account switching.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("enable_interactive_login_account_switch", "enable-interactive-login-account-switch"),
+        validation_alias=AliasChoices(
+            "enable_interactive_login_account_switch", "enable-interactive-login-account-switch"
+        ),
         serialization_alias="enable-interactive-login-account-switch",
     )
     default_file_browser_image: str = Field(
@@ -534,7 +547,9 @@ class ResourcesConfig(BaseModel):
         Maximum CUDA devices per container.
         """,
         examples=[16, 32],
-        validation_alias=AliasChoices("max_cuda_devices_per_container", "max-cuda-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_cuda_devices_per_container", "max-cuda-devices-per-container"
+        ),
         serialization_alias="max-cuda-devices-per-container",
     )
     max_cuda_shares_per_container: int = Field(
@@ -543,7 +558,9 @@ class ResourcesConfig(BaseModel):
         Maximum CUDA shares per container.
         """,
         examples=[16, 32],
-        validation_alias=AliasChoices("max_cuda_shares_per_container", "max-cuda-shares-per-container"),
+        validation_alias=AliasChoices(
+            "max_cuda_shares_per_container", "max-cuda-shares-per-container"
+        ),
         serialization_alias="max-cuda-shares-per-container",
     )
     max_rocm_devices_per_container: int = Field(
@@ -552,7 +569,9 @@ class ResourcesConfig(BaseModel):
         Maximum ROCm devices per container.
         """,
         examples=[10, 20],
-        validation_alias=AliasChoices("max_rocm_devices_per_container", "max-rocm-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_rocm_devices_per_container", "max-rocm-devices-per-container"
+        ),
         serialization_alias="max-rocm-devices-per-container",
     )
     max_tpu_devices_per_container: int = Field(
@@ -561,7 +580,9 @@ class ResourcesConfig(BaseModel):
         Maximum TPU devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_tpu_devices_per_container", "max-tpu-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_tpu_devices_per_container", "max-tpu-devices-per-container"
+        ),
         serialization_alias="max-tpu-devices-per-container",
     )
     max_ipu_devices_per_container: int = Field(
@@ -570,7 +591,9 @@ class ResourcesConfig(BaseModel):
         Maximum IPU devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_ipu_devices_per_container", "max-ipu-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_ipu_devices_per_container", "max-ipu-devices-per-container"
+        ),
         serialization_alias="max-ipu-devices-per-container",
     )
     max_atom_devices_per_container: int = Field(
@@ -579,7 +602,9 @@ class ResourcesConfig(BaseModel):
         Maximum Atom devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_atom_devices_per_container", "max-atom-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_atom_devices_per_container", "max-atom-devices-per-container"
+        ),
         serialization_alias="max-atom-devices-per-container",
     )
     max_gaudi2_devices_per_container: int = Field(
@@ -588,7 +613,9 @@ class ResourcesConfig(BaseModel):
         Maximum Gaudi2 devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_gaudi2_devices_per_container", "max-gaudi2-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_gaudi2_devices_per_container", "max-gaudi2-devices-per-container"
+        ),
         serialization_alias="max-gaudi2-devices-per-container",
     )
     max_atom_plus_devices_per_container: int = Field(
@@ -597,7 +624,9 @@ class ResourcesConfig(BaseModel):
         Maximum Atom Plus devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_atom_plus_devices_per_container", "max-atom-plus-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_atom_plus_devices_per_container", "max-atom-plus-devices-per-container"
+        ),
         serialization_alias="max-atom-plus-devices-per-container",
     )
     max_warboy_devices_per_container: int = Field(
@@ -606,7 +635,9 @@ class ResourcesConfig(BaseModel):
         Maximum Warboy devices per container.
         """,
         examples=[8, 16],
-        validation_alias=AliasChoices("max_warboy_devices_per_container", "max-warboy-devices-per-container"),
+        validation_alias=AliasChoices(
+            "max_warboy_devices_per_container", "max-warboy-devices-per-container"
+        ),
         serialization_alias="max-warboy-devices-per-container",
     )
     max_shm_per_container: float = Field(
@@ -1110,27 +1141,3 @@ class WebServerUnifiedConfig(BaseModel):
         Debug configuration.
         """,
     )
-
-    @field_validator("service", mode="before")
-    @classmethod
-    def _validate_service(cls, v):
-        if isinstance(v, dict):
-            # Ensure required fields are present
-            if "port" not in v:
-                raise ValueError("Service port is required")
-            if "mode" not in v:
-                raise ValueError("Service mode is required")
-        return v
-
-    @field_validator("api", mode="before")
-    @classmethod
-    def _validate_api(cls, v):
-        if isinstance(v, dict):
-            # Ensure required fields are present
-            if "domain" not in v:
-                raise ValueError("API domain is required")
-            if "endpoint" not in v:
-                raise ValueError("API endpoint is required")
-            if "text" not in v:
-                raise ValueError("API text is required")
-        return v
