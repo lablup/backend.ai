@@ -816,7 +816,7 @@ async def server_main(
     if config["otel"]["enabled"]:
         otel_spec = OpenTelemetrySpec(
             service_id=uuid4(),
-            service_name="web",
+            service_name="webserver",
             service_version=__version__,
             log_level=config["otel"]["log-level"],
             endpoint=config["otel"]["endpoint"],
