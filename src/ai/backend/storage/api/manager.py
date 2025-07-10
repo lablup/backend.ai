@@ -93,7 +93,7 @@ async def token_auth_middleware(
         if not token:
             raise web.HTTPForbidden()
         ctx: RootContext = request.app["ctx"]
-        if token != ctx.local_config["api"]["manager"]["secret"]:
+        if token != ctx.local_config.api.manager.secret:
             raise web.HTTPForbidden()
     return await handler(request)
 
@@ -1054,11 +1054,11 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
-            ctx.local_config["storage-proxy"]["secret"],
+            ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
         return web.json_response(
@@ -1100,11 +1100,11 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
-            ctx.local_config["storage-proxy"]["secret"],
+            ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
         return web.json_response(
@@ -1281,7 +1281,7 @@ async def handle_volume_mount(
         return
     err_msg: str | None = None
     mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    volume_mount_path = str(context.local_config.volume.volumes[event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
     mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
     resp = await context.watcher.request_task(mount_task)
@@ -1328,7 +1328,7 @@ async def handle_volume_umount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    volume_mount_path = str(context.local_config.volume.volumes[event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
     umount_task = UmountTask.from_event(
         event,
