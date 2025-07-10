@@ -86,7 +86,7 @@ class VolumePool:
 
             volume_cls: Type[AbstractVolume] = self._backends[volume_config["backend"]]
             volume_obj = volume_cls(
-                local_config=volume_config,
+                local_config=self._local_config.model_dump(by_alias=True),
                 mount_path=Path(volume_config["path"]),
                 etcd=self._etcd,
                 event_dispatcher=self._event_dispatcher,

@@ -230,7 +230,7 @@ class RootContext:
                 raise InvalidVolumeError(name)
             volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
             volume_obj = volume_cls(
-                local_config=self.local_config.model_dump(),
+                local_config=self.local_config.model_dump(by_alias=True),
                 mount_path=Path(volume_config["path"]),
                 options=volume_config["options"] or {},
                 etcd=self.etcd,

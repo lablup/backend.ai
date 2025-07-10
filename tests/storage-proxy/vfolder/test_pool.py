@@ -6,6 +6,7 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.exception import InvalidVolumeError
 from ai.backend.storage.types import VolumeInfo
 from ai.backend.storage.volumes.pool import VolumePool
@@ -52,17 +53,45 @@ def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
 
 @pytest.mark.asyncio
 async def test_get_volume():
-    local_config = {
+    raw_config = {
         "volume": {
-            "test_volume": {
-                "backend": "vfs",
-                "path": "/mnt/test_volume",
-                "options": {},
-                "fsprefix": "vfs-test",
+            "volumes": {
+                "test_volume": {
+                    "backend": "vfs",
+                    "path": "/mnt/test_volume",
+                    "options": {},
+                    "fsprefix": "vfs-test",
+                }
             }
         },
-        "storage-proxy": {"scandir-limit": 1000},
+        "storage-proxy": {
+            "node-id": "storage-proxy-1",
+            "scandir-limit": 1000,
+            "secret": "test-secret",
+            "session-expire": "1d",
+        },
+        "api": {
+            "client": {
+                "service-addr": {"host": "127.0.0.1", "port": 6021},
+                "ssl-enabled": False,
+            },
+            "manager": {
+                "service-addr": {"host": "127.0.0.1", "port": 6022},
+                "announce-addr": {"host": "127.0.0.1", "port": 6022},
+                "internal-addr": {"host": "127.0.0.1", "port": 6023},
+                "announce-internal-addr": {"host": "127.0.0.1", "port": 6023},
+                "ssl-enabled": False,
+                "secret": "test-secret",
+            },
+        },
+        "etcd": {
+            "namespace": "local",
+            "addr": {"host": "127.0.0.1", "port": 2379},
+        },
+        "logging": {},
+        "debug": {},
     }
+    local_config = StorageProxyUnifiedConfig.model_validate(raw_config)
 
     mock_etcd = AsyncMock()
     mock_event_dispatcher = MagicMock()
