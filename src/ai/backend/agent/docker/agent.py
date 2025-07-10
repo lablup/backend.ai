@@ -1362,7 +1362,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 {
                     "Cmd": [
                         f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
                     ],
                     "HostConfig": {
                         "Mounts": [
