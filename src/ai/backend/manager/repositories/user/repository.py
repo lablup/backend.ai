@@ -494,7 +494,6 @@ class UserRepository:
             await conn.execute(sa.delete(users).where(users.c.email == email))
 
     async def get_kernels_for_monthly_stats(self, user_uuid: Optional[UUID] = None) -> list[Row]:
-        time_window = 900
         now = datetime.now(tzutc())
         start_date = now - timedelta(days=30)
 

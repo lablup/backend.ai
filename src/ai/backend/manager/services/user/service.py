@@ -13,6 +13,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.exceptions import UserNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserStatus
@@ -48,7 +49,6 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.type import UserData
-from ai.backend.manager.errors.exceptions import UserNotFound
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -86,7 +86,9 @@ class UserService:
             _status = UserStatus.ACTIVE if action.input.is_active else UserStatus.INACTIVE
         if action.input.status is not None:
             _status = action.input.status
-        group_ids = [] if action.input.group_ids is None else [UUID(gid) for gid in action.input.group_ids]
+        group_ids = (
+            [] if action.input.group_ids is None else [UUID(gid) for gid in action.input.group_ids]
+        )
 
         user_data = {
             "username": username,
