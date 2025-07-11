@@ -1327,11 +1327,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
             kernel_version = docker_version["KernelVersion"]
             if "linuxkit" in kernel_version:
-                # TODO: Handle docker-mode detection with pydantic config
-                pass  # self.local_config.agent.docker_mode = "linuxkit"
+                self.local_config.agent.docker_mode = "linuxkit"
             else:
-                # TODO: Handle docker-mode detection with pydantic config
-                pass  # self.local_config.agent.docker_mode = "native"
+                self.local_config.agent.docker_mode = "native"
             docker_info = await docker.system.info()
             docker_info = dict(docker_info)
             # Assume cgroup v1 if CgroupVersion key is absent
