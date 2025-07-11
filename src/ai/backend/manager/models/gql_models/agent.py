@@ -29,6 +29,8 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.services.metric.actions.device import DeviceMetricAction
+from ai.backend.manager.services.metric.types import DeviceMetricOptionalLabel
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -372,16 +374,36 @@ class Agent(graphene.ObjectType):
     gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     # Legacy fields
-    mem_slots = graphene.Int()
-    cpu_slots = graphene.Float()
-    gpu_slots = graphene.Float()
-    tpu_slots = graphene.Float()
-    used_mem_slots = graphene.Int()
-    used_cpu_slots = graphene.Float()
-    used_gpu_slots = graphene.Float()
-    used_tpu_slots = graphene.Float()
-    cpu_cur_pct = graphene.Float()
-    mem_cur_bytes = graphene.Float()
+    mem_slots = graphene.Int(
+        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+    )
+    cpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+    )
+    gpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+    )
+    tpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+    )
+    used_mem_slots = graphene.Int(
+        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+    )
+    used_cpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+    )
+    used_gpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+    )
+    used_tpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+    )
+    cpu_cur_pct = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `live_stat` instead."
+    )
+    mem_cur_bytes = graphene.Float(
+        deprecation_reason="Deprecated since 25.12.0. use `live_stat` instead."
+    )
 
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
@@ -437,14 +459,12 @@ class Agent(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
-        ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_cpu_cur_pct)
-        return await loader.load(self.id)
+        # Deprecated since 25.12.0, use live_stat instead
+        return None
 
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
-        ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_mem_cur_bytes)
-        return await loader.load(self.id)
+        # Deprecated since 25.12.0, use live_stat instead
+        return None
 
     async def resolve_hardware_metadata(
         self,
@@ -606,50 +626,40 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        # TODO: make it work
+        fetch_redis = ctx.config_provider.config.fetch_stat_from_redis
+        if not fetch_redis:
             for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
+                action_result = (
+                    await ctx.processors.utilization_metric.query_container.wait_for_complete(
+                        DeviceMetricAction(
+                            metric_name=None,
+                            labels=DeviceMetricOptionalLabel(
+                                device_id="",
+                                agent_id=agent_id,
+                                deviece_type="agent",
+                            ),
+                        )
+                    )
+                )
+        else:
 
-        ret = []
-        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
-            else:
-                ret.append(None)
+            async def _pipe_builder(r: Redis):
+                pipe = r.pipeline()
+                for agent_id in agent_ids:
+                    await pipe.get(agent_id)
+                return pipe
 
-        return ret
+            ret = []
+            for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+                if stat is not None:
+                    ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
+                else:
+                    ret.append(None)
 
-    @classmethod
-    async def batch_load_cpu_cur_pct(
-        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
-    ) -> Sequence[Any]:
-        ret = []
-        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
-                try:
-                    ret.append(float(stat["node"]["cpu_util"]["pct"]))
-                except (KeyError, TypeError, ValueError):
-                    ret.append(0.0)
-            else:
-                ret.append(0.0)
-        return ret
+            return ret
 
-    @classmethod
-    async def batch_load_mem_cur_bytes(
-        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
-    ) -> Sequence[Any]:
-        ret = []
-        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
-                try:
-                    ret.append(float(stat["node"]["mem"]["current"]))
-                except (KeyError, TypeError, ValueError):
-                    ret.append(0)
-            else:
-                ret.append(0)
-        return ret
+            pass
 
     @classmethod
     async def batch_load_container_count(

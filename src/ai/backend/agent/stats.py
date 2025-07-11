@@ -525,6 +525,10 @@ class StatContext:
                 self.agent.local_config["agent"]["id"],
                 redis_agent_updates["node"],
             )
+
+        if not self.agent.local_config["agent"]["store-stat-to-redis"]:
+            return
+
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
         self._stage_observer.observe_stage(
@@ -696,6 +700,9 @@ class StatContext:
             upper_layer="collect_container_stat",
         )
 
+        if not self.agent.local_config["agent"]["store-stat-to-redis"]:
+            return
+
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
             for kernel_id, update in kernel_serialized_updates:
@@ -826,6 +833,9 @@ class StatContext:
                 stage="before_report_to_redis",
                 upper_layer="collect_per_container_process_stat",
             )
+
+            if not self.agent.local_config["agent"]["store-stat-to-redis"]:
+                return
 
             async def _pipe_builder(r: Redis) -> Pipeline:
                 pipe = r.pipeline(transaction=False)
