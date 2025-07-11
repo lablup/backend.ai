@@ -387,7 +387,7 @@ class AgentRPCServer(aobject):
             agent_public_key=self.rpc_auth_agent_public_key,
         )
 
-        rpc_addr = self.local_config.agent.rpc_listen_addr
+        rpc_addr = self.local_config.agent.rpc_listen_addr.to_legacy()
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
@@ -486,6 +486,15 @@ class AgentRPCServer(aobject):
             await self.etcd.get_prefix("config/redis"),
         )
         log.info("configured redis: {0}", self._redis_config)
+
+        # Update local_config with redis settings
+        # Convert HostPortPair to dict format for compatibility
+        redis_config_dict = self._redis_config.copy()
+        if isinstance(self._redis_config.get("addr"), object):
+            addr = self._redis_config["addr"]
+            redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
+
+        self.local_config = self.local_config.model_copy(update={"redis": redis_config_dict})
 
         # Fill up vfolder configs from etcd and store as separate attributes
         self._vfolder_config = config.vfolder_config_iv.check(
@@ -1161,9 +1170,10 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: agent worker-{pidx}")
+    local_cfg: AgentUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        _args[0].logging,
+        local_cfg.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1493,7 +1503,7 @@ def main(
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = cfg["agent"]["rpc-listen-addr"].host
+    rpc_host = cfg["agent"]["rpc-listen-addr"]["host"]
     if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
         rpc_host.is_unspecified or rpc_host.is_link_local
     ):
@@ -1573,7 +1583,7 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
-                    args=(cfg, log_endpoint),
+                    args=(cfg_obj, log_endpoint),
                     wait_timeout=5.0,
                 )
                 log.info("exit.")
