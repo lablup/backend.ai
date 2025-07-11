@@ -24,7 +24,6 @@ import aiotools
 import click
 import jinja2
 import tomli
-import yarl
 from aiohttp import web
 from redis.asyncio import Redis
 from setproctitle import setproctitle
@@ -729,7 +728,8 @@ async def server_main(
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
-    pipeline_api_endpoint = config.pipeline.endpoint
+    pipeline_api_endpoint = str(config.pipeline.endpoint)
+    pipeline_api_ws_endpoint = pipeline_api_endpoint.replace("http", "ws", 1)
     pipeline_handler = partial(
         web_handler, is_anonymous=True, api_endpoint=str(pipeline_api_endpoint)
     )
@@ -742,7 +742,7 @@ async def server_main(
     pipeline_websocket_handler = partial(
         websocket_handler,
         is_anonymous=True,
-        api_endpoint=str(yarl.URL(str(pipeline_api_endpoint)).with_scheme("ws")),
+        api_endpoint=pipeline_api_ws_endpoint,
     )
 
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)

@@ -7,10 +7,10 @@ from typing import Any, Optional
 
 from pydantic import (
     AliasChoices,
-    AnyUrl,
     BaseModel,
     Field,
     FilePath,
+    HttpUrl,
 )
 
 from ai.backend.common.typed_validators import (
@@ -691,8 +691,8 @@ class PluginConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    endpoint: AnyUrl = Field(
-        default="http://127.0.0.1:9500",
+    endpoint: HttpUrl = Field(
+        default_factory=lambda: HttpUrl("http://127.0.0.1:9500"),
         description="""
         Pipeline service endpoint URL.
         """,
