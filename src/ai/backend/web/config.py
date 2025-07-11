@@ -48,6 +48,8 @@ config_iv = t.Dict({
         tx.AliasedKey(["ssl_cert", "ssl-cert"], default=None): t.Null | tx.Path(type="file"),
         tx.AliasedKey(["ssl_privkey", "ssl-privkey"], default=None): t.Null | tx.Path(type="file"),
         t.Key("static_path", default=default_static_path): tx.Path(type="dir"),
+        t.Key("template_extension_list", default=[".html", ".js", ".css"]): t.Null
+        | t.List(t.String),
         tx.AliasedKey(
             ["force_endpoint_protocol", "force-endpoint-protocol"],
             default=None,
@@ -96,6 +98,7 @@ config_iv = t.Dict({
             t.Key("object-src", default=None): t.Null | t.List(t.String),
             t.Key("frame-ancestors", default=None): t.Null | t.List(t.String),
             t.Key("form-action", default=None): t.Null | t.List(t.String),
+            t.Key("nonce-targets", default=None): t.Null | t.List(t.String),
         }),
     }).allow_extra("*"),
     t.Key("resources"): t.Dict({
