@@ -39,9 +39,11 @@ class ImageRepository:
         async with self._db.begin_session() as session:
             return await ImageRow.get(session, image_id, load_aliases=load_aliases)
 
-    async def mark_image_as_deleted(self, image_row: ImageRow) -> None:
+    async def mark_image_as_deleted(self, image_id: UUID) -> None:
         async with self._db.begin_session() as session:
-            await image_row.mark_as_deleted(session)
+            image_row = await ImageRow.get(session, image_id)
+            if image_row:
+                await image_row.mark_as_deleted(session)
 
     async def create_image_alias_and_attach(
         self, alias: str, image_canonical: str, architecture: str
