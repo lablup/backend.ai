@@ -203,11 +203,11 @@ class MetadataServer(aobject):
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
-        local_config = self.app["_root.context"].local_config
+        local_config: AgentUnifiedConfig = self.app["_root.context"].local_config
         site = web.TCPSite(
             metadata_server_runner,
-            local_config["agent"]["metadata-server-bind-host"],
-            local_config["agent"]["metadata-server-port"],
+            local_config.agent.metadata_server_bind_host,
+            local_config.agent.metadata_server_port,
         )
         self.runner = metadata_server_runner
         await site.start()

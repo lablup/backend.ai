@@ -1622,7 +1622,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         while True:
             agent_sock = zmq_ctx.socket(zmq.REP)
             try:
-                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
+                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config.agent.agent_sock_port}")
                 while True:
                     msg = await agent_sock.recv_multipart()
                     if not msg:
