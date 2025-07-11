@@ -531,6 +531,13 @@ class AgentConfig(BaseModel):
         validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
         serialization_alias="sync-container-lifecycles",
     )
+    docker_mode: Optional[str] = Field(
+        default=None,
+        description="Docker mode detected based on kernel version (linuxkit/native)",
+        examples=["linuxkit", "native"],
+        validation_alias=AliasChoices("docker-mode", "docker_mode"),
+        serialization_alias="docker-mode",
+    )
 
     model_config = ConfigDict(
         extra="allow",
