@@ -208,7 +208,7 @@ class RootContext:
         return plugin_ctx
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
-        return {name: VolumeInfo(**info) for name, info in self.local_config.volume.volumes.items()}
+        return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         for volume in self.volumes.values():
@@ -225,14 +225,14 @@ class RootContext:
             yield self.volumes[name]
         else:
             try:
-                volume_config = self.local_config.volume.volumes[name]
+                volume_config = self.local_config.volume[name]
             except KeyError:
                 raise InvalidVolumeError(name)
-            volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
+            volume_cls: Type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),
-                mount_path=Path(volume_config["path"]),
-                options=volume_config["options"] or {},
+                mount_path=Path(volume_config.path),
+                options=volume_config.options or {},
                 etcd=self.etcd,
                 event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,

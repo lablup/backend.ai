@@ -65,14 +65,13 @@ class VolumePool:
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {
-            volume_id: VolumeInfo(**info)
-            for volume_id, info in self._local_config.volume.volumes.items()
+            volume_id: info.to_dataclass() for volume_id, info in self._local_config.volume.items()
         }
 
     def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
-        if str(volume_id) not in self._local_config.volume.volumes:
+        if str(volume_id) not in self._local_config.volume:
             raise InvalidVolumeError(volume_id)
-        return VolumeInfo(**self._local_config.volume.volumes[str(volume_id)])
+        return self._local_config.volume[str(volume_id)].to_dataclass()
 
     @actxmgr
     async def get_volume(self, volume_id: VolumeID) -> AsyncIterator[AbstractVolume]:
@@ -80,18 +79,18 @@ class VolumePool:
             yield self._volumes[volume_id]
         else:
             try:
-                volume_config = self._local_config.volume.volumes[str(volume_id)]
+                volume_config = self._local_config.volume[str(volume_id)]
             except KeyError:
                 raise InvalidVolumeError(volume_id)
 
-            volume_cls: Type[AbstractVolume] = self._backends[volume_config["backend"]]
+            volume_cls: Type[AbstractVolume] = self._backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self._local_config.model_dump(by_alias=True),
-                mount_path=Path(volume_config["path"]),
+                mount_path=Path(volume_config.path),
                 etcd=self._etcd,
                 event_dispatcher=self._event_dispatcher,
                 event_producer=self._event_producer,
-                options=volume_config["options"] or {},
+                options=volume_config.options or {},
             )
 
             await volume_obj.init()

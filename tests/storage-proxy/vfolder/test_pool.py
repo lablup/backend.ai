@@ -55,13 +55,11 @@ def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
 async def test_get_volume():
     raw_config = {
         "volume": {
-            "volumes": {
-                "test_volume": {
-                    "backend": "vfs",
-                    "path": "/mnt/test_volume",
-                    "options": {},
-                    "fsprefix": "vfs-test",
-                }
+            "test_volume": {
+                "backend": "vfs",
+                "path": "/mnt/test_volume",
+                "options": {},
+                "fsprefix": "vfs-test",
             }
         },
         "storage-proxy": {

@@ -81,7 +81,7 @@ async def server_main_logwrapper(
     local_config = cast(StorageProxyUnifiedConfig, _args[0])
     log_endpoint = _args[1]
     logger = Logger(
-        local_config.logging.model_dump(),
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -175,7 +175,7 @@ async def server_main(
             if not _is_root():
                 raise ValueError(
                     "Storage proxy must be run as root if watcher is enabled. Else, set"
-                    " `use-wathcer` to false in your local config file."
+                    " `use-watcher` to false in your local config file."
                 )
             insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
             outsock_path: str | None = local_config.storage_proxy.watcher_outsock_path_prefix
@@ -456,7 +456,7 @@ def main(
                     if not _is_root():
                         raise ValueError(
                             "Storage proxy must be run as root if watcher is enabled. Else, set"
-                            " `use-wathcer` to false in your local config file."
+                            " `use-watcher` to false in your local config file."
                         )
                     insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
                     outsock_path: str | None = (
