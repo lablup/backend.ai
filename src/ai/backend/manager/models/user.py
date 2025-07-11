@@ -219,6 +219,12 @@ class UserRow(Base):
         primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
     )
 
+    role_assignments = relationship(
+        "UserRoleRow",
+        back_populates="user_row",
+        primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
+    )
+
     @classmethod
     def load_keypairs(cls) -> Callable:
         from .keypair import KeyPairRow
