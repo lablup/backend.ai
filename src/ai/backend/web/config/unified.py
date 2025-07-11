@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from pydantic import (
     AliasChoices,
+    AnyUrl,
     BaseModel,
     Field,
     FilePath,
@@ -690,7 +691,7 @@ class PluginConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    endpoint: str = Field(
+    endpoint: AnyUrl = Field(
         default="http://127.0.0.1:9500",
         description="""
         Pipeline service endpoint URL.
@@ -764,13 +765,13 @@ class APIConfig(BaseModel):
         """,
         examples=["api.example.com"],
     )
-    endpoint: list[str] = Field(
-        default=["http://127.0.0.1:8080"],
+    endpoint: str = Field(
+        default="http://127.0.0.1:8080",
         min_length=1,
         description="""
-        List of API endpoint URLs.
+        API endpoint URL.
         """,
-        examples=[["http://127.0.0.1:8080"]],
+        examples=["http://127.0.0.1:8080"],
     )
     text: str = Field(
         default="Backend.AI API",

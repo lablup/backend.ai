@@ -24,6 +24,7 @@ import aiotools
 import click
 import jinja2
 import tomli
+import yarl
 from aiohttp import web
 from redis.asyncio import Redis
 from setproctitle import setproctitle
@@ -211,7 +212,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     try:
         anon_api_config = APIConfig(
             domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
+            endpoint=str(config.api.endpoint),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
@@ -383,7 +384,7 @@ async def login_handler(request: web.Request) -> web.Response:
     try:
         anon_api_config = APIConfig(
             domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
+            endpoint=str(config.api.endpoint),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
@@ -544,7 +545,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     try:
         anon_api_config = APIConfig(
             domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
+            endpoint=str(config.api.endpoint),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
@@ -638,9 +639,10 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
+    config = cast(WebServerUnifiedConfig, _args[0])
     log_endpoint = _args[1]
     logger = Logger(
-        _args[0]["logging"],
+        config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -662,7 +664,7 @@ async def server_main(
     pidx: int,
     args: Sequence[Any],
 ) -> AsyncIterator[Any]:
-    config = args[0]
+    config = cast(WebServerUnifiedConfig, args[0])
     app = web.Application(
         middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
     )
@@ -728,15 +730,19 @@ async def server_main(
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
     pipeline_api_endpoint = config.pipeline.endpoint
-    pipeline_handler = partial(web_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint)
+    pipeline_handler = partial(
+        web_handler, is_anonymous=True, api_endpoint=str(pipeline_api_endpoint)
+    )
     pipeline_login_handler = partial(
         web_handler,
         is_anonymous=False,
-        api_endpoint=pipeline_api_endpoint,
+        api_endpoint=str(pipeline_api_endpoint),
         http_headers_to_forward_extra={"X-BackendAI-SessionID"},
     )
     pipeline_websocket_handler = partial(
-        websocket_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint.with_scheme("ws")
+        websocket_handler,
+        is_anonymous=True,
+        api_endpoint=str(yarl.URL(str(pipeline_api_endpoint)).with_scheme("ws")),
     )
 
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
@@ -880,7 +886,7 @@ def main(
 
     cfg = WebServerUnifiedConfig.model_validate(raw_cfg)
     if cfg.pipeline.frontend_endpoint is None:
-        cfg.pipeline.frontend_endpoint = cfg.pipeline.endpoint
+        cfg.pipeline.frontend_endpoint = str(cfg.pipeline.endpoint)
 
     if ctx.invoked_subcommand is None:
         cfg.webserver.pid_file.write_text(str(os.getpid()))
