@@ -38,6 +38,47 @@ class EventLoopType(enum.StrEnum):
     uvloop = "uvloop"
 
 
+class VolumeInfoConfig(BaseModel):
+    backend: str = Field(
+        description="""
+        Storage backend type to use for this volume.
+        Determines how files are stored and accessed.
+        """,
+        examples=["vfs", "purestorage", "cephfs"],
+    )
+    path: Path = Field(
+        description="""
+        Root path for this volume.
+        Must be a directory that exists and is accessible.
+        """,
+        examples=["/var/lib/backend.ai/volumes"],
+    )
+    fsprefix: Optional[PurePath] = Field(
+        default=PurePath("."),
+        description="""
+        Filesystem prefix path for this volume.
+        Used as a subdirectory within the volume path.
+        """,
+        examples=[".", "data"],
+    )
+    options: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Backend-specific options for this volume.
+        Configuration parameters specific to the chosen backend.
+        """,
+        examples=[{}],
+    )
+
+    def to_dataclass(self) -> VolumeInfo:
+        return VolumeInfo(
+            backend=self.backend,
+            path=self.path,
+            fsprefix=self.fsprefix,
+            options=self.options,
+        )
+
+
 class EtcdConfig(BaseModel):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
@@ -247,47 +288,6 @@ class ManagerAPIConfig(BaseModel):
         """,
         examples=["manager-secret-key"],
     )
-
-
-class VolumeInfoConfig(BaseModel):
-    backend: str = Field(
-        description="""
-        Storage backend type to use for this volume.
-        Determines how files are stored and accessed.
-        """,
-        examples=["fs", "s3", "azure"],
-    )
-    path: Path = Field(
-        description="""
-        Root path for this volume.
-        Must be a directory that exists and is accessible.
-        """,
-        examples=["/var/lib/backend.ai/volumes"],
-    )
-    fsprefix: Optional[PurePath] = Field(
-        default=PurePath("."),
-        description="""
-        Filesystem prefix path for this volume.
-        Used as a subdirectory within the volume path.
-        """,
-        examples=[".", "data"],
-    )
-    options: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="""
-        Backend-specific options for this volume.
-        Configuration parameters specific to the chosen backend.
-        """,
-        examples=[{"region": "us-east-1"}, {"endpoint": "localhost:9000"}],
-    )
-
-    def to_dataclass(self) -> VolumeInfo:
-        return VolumeInfo(
-            backend=self.backend,
-            path=self.path,
-            fsprefix=self.fsprefix,
-            options=self.options,
-        )
 
 
 class APIConfig(BaseModel):
