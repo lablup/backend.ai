@@ -29,7 +29,7 @@ def upgrade() -> None:
         sa.Column(
             "registered_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_association_scopes_entities")),
