@@ -9,6 +9,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
+    ImageStatus,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -102,7 +103,8 @@ class ImageService:
         if action.client_role != UserRole.SUPERADMIN:
             if not image_row.is_owned_by(action.user_id):
                 raise ForgetImageActionGenericForbiddenError()
-        await self._image_repository.mark_image_as_deleted(image_row)
+        await self._image_repository.mark_image_as_deleted(image_row.id)
+        image_row.status = ImageStatus.DELETED
         return ForgetImageActionResult(image=image_row.to_dataclass())
 
     async def forget_image_by_id(
@@ -114,7 +116,8 @@ class ImageService:
         if action.client_role != UserRole.SUPERADMIN:
             if not image_row.is_owned_by(action.user_id):
                 raise ForgetImageActionByIdGenericForbiddenError()
-        await self._image_repository.mark_image_as_deleted(image_row)
+        await self._image_repository.mark_image_as_deleted(image_row.id)
+        image_row.status = ImageStatus.DELETED
         return ForgetImageByIdActionResult(image=image_row.to_dataclass())
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
