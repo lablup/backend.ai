@@ -1,11 +1,13 @@
-from .resource_permission import ResourcePermissionRow
+from .association_scopes_entities import AssociationScopesEntitiesRow
+from .entity_permission import EntityPermissionRow
 from .role import RoleRow
-from .role_permission import RolePermissionRow
+from .scope_permission import ScopePermissionRow
 from .user_role import UserRoleRow
 
 __all__ = (
-    "ResourcePermissionRow",
+    "EntityPermissionRow",
     "RoleRow",
-    "RolePermissionRow",
+    "ScopePermissionRow",
     "UserRoleRow",
+    "AssociationScopesEntitiesRow",
 )
