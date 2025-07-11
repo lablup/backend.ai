@@ -17,6 +17,7 @@ from functools import partial
 from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from uuid import uuid4
 
 import aiohttp_cors
 import aiotools
@@ -24,6 +25,7 @@ import click
 import jinja2
 import tomli
 from aiohttp import web
+from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
@@ -46,6 +48,7 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
@@ -315,8 +318,11 @@ async def login_handler(request: web.Request) -> web.Response:
         "data": None,
     }
 
+    redis: Redis = request.app["redis"]
+    BLOCK_TIME = config["session"]["login_block_time"]
+
     async def _get_login_history():
-        login_history = await request.app["redis"].get(
+        login_history = await redis.get(
             f"login_history_{creds['username']}",
         )
         if not login_history:
@@ -341,10 +347,9 @@ async def login_handler(request: web.Request) -> web.Response:
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await request.app["redis"].set(key, value)
+        await redis.set(key, value, ex=BLOCK_TIME)
 
     # Block login if there are too many consecutive failed login attempts.
-    BLOCK_TIME = config["session"]["login_block_time"]
     ALLOWED_FAIL_COUNT = config["session"]["login_allowed_fail_count"]
     login_time = time.time()
     login_history = await _get_login_history()
@@ -807,6 +812,17 @@ async def server_main(
         ssl_context=ssl_ctx,
     )
     await site.start()
+
+    if config["otel"]["enabled"]:
+        otel_spec = OpenTelemetrySpec(
+            service_id=uuid4(),
+            service_name="webserver",
+            service_version=__version__,
+            log_level=config["otel"]["log-level"],
+            endpoint=config["otel"]["endpoint"],
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+
     log.info("started.")
 
     try:

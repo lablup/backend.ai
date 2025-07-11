@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Toimet",
+      "Allowed": "Sallittu",
       "ClickFilebrowserButton": "Lataa kansio(t) napsauttamalla Execute filebrowser-painiketta.",
       "CreateANewFolder": "Luo uusi kansio",
       "Created": "Luotu",
@@ -330,6 +331,7 @@
       "RemoveFileExtension": "Poista ",
       "RenameAFile": "Nimeä tiedosto uudelleen",
       "RenameAFolder": "Nimeä kansio uudelleen",
+      "RetryingOperation": "Uudelleenjärjestelmä istunnon perustamiseksi ...",
       "RunSSH/SFTPserver": "Käynnistä SFTP-palvelin",
       "SFTPSessionNotAvailable": "SFTP-istunto ei ole nyt käytettävissä",
       "ShareFolder": "Jaa kansio",
@@ -1128,6 +1130,7 @@
     "MaxFolderCount": "Kansioiden enimmäismäärä",
     "MaxNetworkCount": "Verkkojen enimmäismäärä",
     "MaxPendingSessionCount": "Maxin vireillä oleva istuntomäärä",
+    "MaxPendingSessionResourceSlots": "Max odottavat istunnon resurssipaikat",
     "MaxQuotaScopeSize": "Kiintiön enimmäiskoko (GB)",
     "MaxSessionCountPerModelSession": "Maksimi istuntojen määrä malliistuntoa kohti",
     "MaxSessionLifetime": "Istunnon kesto (sek.)",

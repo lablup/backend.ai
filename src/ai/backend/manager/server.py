@@ -44,6 +44,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -56,10 +57,11 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import (
@@ -317,11 +319,14 @@ def _debug_error_response(
 ) -> web.StreamResponse:
     error_type = ""
     error_title = ""
+    error_message = "Internal server error"
     status_code = 500
     error_code = ErrorCode.default()
     if isinstance(e, BackendError):
         error_type = e.error_type
         error_title = e.error_title
+        if e.extra_msg:
+            error_message = e.extra_msg
         status_code = e.status_code
         error_code = e.error_code()
 
@@ -330,7 +335,8 @@ def _debug_error_response(
             "type": error_type,
             "title": error_title,
             "error_code": str(error_code),
-            "msg": traceback.format_exc(),
+            "msg": error_message,
+            "traceback": traceback.format_exc(),
         },
         status=status_code,
         dumps=dump_json_str,
@@ -547,6 +553,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
+    root_ctx.valkey_stream = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        human_readable_name="stream",
+        db_id=REDIS_STREAM_DB,
+    )
     for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
@@ -561,6 +572,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
     await root_ctx.redis_lock.close()
+    await root_ctx.valkey_stream.close()
 
 
 @actxmgr
@@ -635,6 +647,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
                 redis_stat=root_ctx.redis_stat,
+                event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
                 agent_registry=root_ctx.registry,
@@ -707,13 +720,14 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.message_queue = _make_message_queue(root_ctx)
+    root_ctx.message_queue = await _make_message_queue(root_ctx)
     yield
     await root_ctx.message_queue.close()
 
 
 @actxmgr
 async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_fetcher = EventFetcher(root_ctx.message_queue)
     root_ctx.event_producer = EventProducer(
         root_ctx.message_queue,
         source=AGENTID_MANAGER,
@@ -733,6 +747,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.event_hub,
             root_ctx.registry,
@@ -747,36 +762,35 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_dispatcher.close()
 
 
-def _make_message_queue(
+async def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
+    node_id = root_ctx.config_provider.config.manager.id
+    args = RedisMQArgs(
+        anycast_stream_key="events",
+        broadcast_channel="events_all",
+        consume_stream_keys={
+            "events",
+        },
+        subscribe_channels={
+            "events_all",
+        },
+        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=node_id,
         db=REDIS_STREAM_DB,
     )
-    node_id = root_ctx.config_provider.config.manager.id
     if root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher:
         return HiRedisQueue(
             stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
+            args,
         )
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
     )
 
 
@@ -959,7 +973,6 @@ class background_task_ctx:
 
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
-            self.root_ctx.redis_stream,
             self.root_ctx.event_producer,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -125,3 +125,21 @@ class ProvisionStage(Stage[TSpec, TResource]):
             return
         await self._provisioner.teardown(self._resource)
         self._resource = None
+
+
+class ArgsSpecGenerator(SpecGenerator[TSpec]):
+    """
+    A spec generator that uses the provided arguments as the spec.
+    """
+
+    _args: TSpec
+
+    def __init__(self, args: TSpec):
+        self._args = args
+
+    @override
+    async def wait_for_spec(self) -> TSpec:
+        """
+        Returns the provided arguments as the spec.
+        """
+        return self._args

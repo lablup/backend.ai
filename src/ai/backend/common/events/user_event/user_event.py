@@ -17,3 +17,11 @@ class UserEvent(ABC):
     def user_event_mapping(self) -> Mapping[str, Any]:
         """Get the user event as a dictionary."""
         raise NotImplementedError
+
+    @abstractmethod
+    def is_close_event(self) -> bool:
+        """
+        Indicate if the event is a close event.
+        Close events are used to signal that the event is no longer needed to be propagated.
+        """
+        raise NotImplementedError

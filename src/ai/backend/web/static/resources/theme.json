@@ -62,6 +62,10 @@
     "sizeCollapsed": {
       "width": 34,
       "height": 34
+    },
+    "aboutModalSize": {
+      "width": 159,
+      "height": 24
     }
   },
   "sider": {},

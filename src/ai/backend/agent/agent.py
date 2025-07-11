@@ -19,7 +19,7 @@ from collections.abc import (
     AsyncGenerator,
     Awaitable,
     Callable,
-    Collection,
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -64,9 +64,14 @@ from tenacity import (
 )
 from trafaret import DataError
 
-from ai.backend.agent.metrics.metric import SyncContainerLifecycleObserver
+from ai.backend.agent.metrics.metric import (
+    StatScope,
+    StatTaskObserver,
+    SyncContainerLifecycleObserver,
+)
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
     REDIS_STATISTICS_DB,
@@ -145,7 +150,7 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.lock import FileLock
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -176,7 +181,6 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
-    RedisConnectionInfo,
     RedisProfileTarget,
     RedisTarget,
     RuntimeVariant,
@@ -211,9 +215,9 @@ from .kernel import (
 )
 from .observer.heartbeat import HeartbeatObserver
 from .resources import (
-    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
+    ComputerContext,
     KernelResourceSpec,
     Mount,
     allocate,
@@ -253,6 +257,7 @@ DEAD_STATUS_SET = frozenset([
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
+STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 KernelIdContainerPair = tuple[KernelId, Container]
@@ -680,11 +685,35 @@ class RestartTracker:
     done_event: asyncio.Event
 
 
-@attrs.define(auto_attribs=True, slots=True)
-class ComputerContext:
-    instance: AbstractComputePlugin
-    devices: Collection[AbstractComputeDevice]
-    alloc_map: AbstractAllocMap
+def _observe_stat_task(
+    stat_scope: StatScope,
+) -> Callable[
+    [Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]],
+    Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+]:
+    stat_task_observer = StatTaskObserver.instance()
+
+    def decorator(
+        func: Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+    ) -> Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]:
+        async def wrapper(self: AbstractAgent, interval: float) -> None:
+            stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
+            try:
+                await func(self, interval)
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                stat_task_observer.observe_stat_task_failure(
+                    agent_id=self.id, stat_scope=stat_scope, exception=e
+                )
+            else:
+                stat_task_observer.observe_stat_task_success(
+                    agent_id=self.id, stat_scope=stat_scope
+                )
+
+        return wrapper
+
+    return decorator
 
 
 class AbstractAgent(
@@ -776,12 +805,7 @@ class AbstractAgent(
             self.local_config["redis"]
         )
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-        stream_redis = redis_helper.get_redis_object(
-            stream_redis_target,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
-        )
-        mq = self._make_message_queue(stream_redis_target, stream_redis)
+        mq = await self._make_message_queue(stream_redis_target)
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -792,10 +816,10 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_pool = redis_helper.get_redis_object(
+        self.redis_stream_pool = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM),
-            name="stream",
-            db=REDIS_STREAM_DB,
+            human_readable_name="event_producer.stream",
+            db_id=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
@@ -804,7 +828,6 @@ class AbstractAgent(
         )
 
         self.background_task_manager = BackgroundTaskManager(
-            stream_redis,
             self.event_producer,
             bgtask_observer=self._metric_registry.bgtask,
         )
@@ -900,30 +923,30 @@ class AbstractAgent(
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
 
-    def _make_message_queue(
-        self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
-    ) -> AbstractMessageQueue:
+    async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """
         Returns the message queue object.
         """
         node_id = self.local_config["agent"]["id"]
+        args = RedisMQArgs(
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys=None,
+            subscribe_channels={
+                "events_all",
+            },
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+            db=REDIS_STREAM_DB,
+        )
         if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
             return HiRedisQueue(
                 stream_redis_target,
-                HiRedisMQArgs(
-                    stream_key="events",
-                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                    node_id=node_id,
-                    db=REDIS_STREAM_DB,
-                ),
+                args,
             )
-        return RedisQueue(
-            stream_redis,
-            RedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
+        return await RedisQueue.create(
+            stream_redis_target,
+            args,
         )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -946,8 +969,6 @@ class AbstractAgent(
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
             await self.save_last_registry(force=True)
-            if stop_signal == signal.SIGTERM:
-                await self.clean_all_kernels(blocking=True)
 
         # Stop timers.
         cancel_results = await cancel_tasks(self.timer_tasks)
@@ -1119,7 +1140,6 @@ class AbstractAgent(
         async_log_iterator: AsyncGenerator[bytes],
     ) -> None:
         chunk_size = self.local_config["agent"]["container-logs"]["chunk-size"]
-        log_key = f"containerlog.{container_id}"
         log_length = 0
         chunk_buffer = BytesIO()
         chunk_length = 0
@@ -1133,9 +1153,9 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await redis_helper.execute(
-                            self.redis_stream_pool,
-                            lambda r: r.rpush(log_key, stored_chunk),
+                        await self.redis_stream_pool.enqueue_container_logs(
+                            container_id,
+                            stored_chunk,
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1146,33 +1166,27 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await redis_helper.execute(
-                    self.redis_stream_pool,
-                    lambda r: r.rpush(log_key, chunk_buffer.getvalue()),
+                await self.redis_stream_pool.enqueue_container_logs(
+                    container_id,
+                    chunk_buffer.getvalue(),
                 )
         finally:
             chunk_buffer.close()
-        # Keep the log for at most one hour in Redis.
-        # This is just a safety measure to prevent memory leak in Redis
-        # for cases when the event delivery has failed or processing
-        # the log data has failed.
-        await redis_helper.execute(
-            self.redis_stream_pool,
-            lambda r: r.expire(log_key, 3600),
-        )
         await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
+    @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting node statistics")
         try:
-            await self.stat_ctx.collect_node_stat()
-        except asyncio.CancelledError:
-            pass
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+                await self.stat_ctx.collect_node_stat()
         except Exception:
             log.exception("unhandled exception while syncing node stats")
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
@@ -1182,13 +1196,16 @@ class AbstractAgent(
                 if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
                 await self.stat_ctx.collect_container_stat(container_ids)
         except asyncio.CancelledError:
             pass
         except Exception:
             log.exception("unhandled exception while syncing container stats")
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting process statistics in container")
@@ -1198,12 +1215,12 @@ class AbstractAgent(
                 if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
-            await self.stat_ctx.collect_per_container_process_stat(container_ids)
-        except asyncio.CancelledError:
-            pass
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
         except Exception:
             log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
+            raise
 
     def _get_public_host(self) -> str:
         agent_config: Mapping[str, Any] = self.local_config["agent"]
@@ -1422,10 +1439,16 @@ class AbstractAgent(
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
-                log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
-                asyncio.create_task(
-                    asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
-                )
+                if dangling_kernel_ids:
+                    log.info(
+                        "cleaning up dangling kernel objects (kernel ids): {}",
+                        ", ".join(map(str, dangling_kernel_ids)),
+                    )
+                    asyncio.create_task(
+                        asyncio.wait_for(
+                            self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0
+                        )
+                    )
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
@@ -1768,25 +1791,6 @@ class AbstractAgent(
         await redis_helper.execute(
             self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
         )
-
-    async def clean_all_kernels(self, blocking: bool = False) -> None:
-        kernel_ids = [*self.kernel_registry.keys()]
-        clean_events = {}
-        loop = asyncio.get_running_loop()
-        if blocking:
-            for kernel_id in kernel_ids:
-                clean_events[kernel_id] = loop.create_future()
-        for kernel_id in kernel_ids:
-            await self.inject_container_lifecycle_event(
-                kernel_id,
-                self.kernel_registry[kernel_id].session_id,
-                LifecycleEvent.DESTROY,
-                KernelLifecycleEventReason.AGENT_TERMINATION,
-                done_future=clean_events[kernel_id] if blocking else None,
-            )
-        if blocking:
-            waiters = [clean_events[kernel_id] for kernel_id in kernel_ids]
-            await asyncio.gather(*waiters)
 
     @abstractmethod
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
@@ -2832,7 +2836,7 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         pretty_container_id,
-                        service_port,
+                        service_ports,
                     )
                 except asyncio.TimeoutError:
                     await self.inject_container_lifecycle_event(

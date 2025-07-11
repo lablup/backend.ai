@@ -750,15 +750,6 @@ It makes the main branch to stand for the upcoming release 24.09, by branching o
 
 * Update ``./VERSION`` file to indicate the next development version (like ``24.09.0dev0``).
 
-* Create a new halfstack compose configuration for the next release by copying and updating the halfstack config of the current release.
-
-  .. code-block:: console
-
-     $ cp docker-compose.halfstack-2403.yml docker-compose.halfstack-2409.yml
-     $ edit docker-compose.halfstack-2409.yml  # update the container versions
-     $ rm docker-compose.halfstack-main.yml
-     $ ln -s docker-compose.halfstack-2409.yml docker-compose.halfstack-main.yml
-     $ git add docker-compose.*.yml
 
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

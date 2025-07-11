@@ -44,12 +44,17 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
-    ComputerContext,
     ScanImagesResult,
 )
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
 from ..types import Container, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel

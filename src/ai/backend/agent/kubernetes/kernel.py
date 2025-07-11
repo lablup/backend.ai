@@ -5,7 +5,7 @@ import os
 import shutil
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple, override
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
 
 import pkg_resources
 import zmq
@@ -511,7 +511,7 @@ async def copy_runner_files(scratch_path: Path) -> None:
     shutil.copytree(helpers_path.resolve(), destination_path / "helpers")
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner

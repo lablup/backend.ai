@@ -7,6 +7,7 @@ from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
+from ai.backend.test.contexts.group import CreatedGroupContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
     BootstrapScriptContext,
@@ -142,3 +143,15 @@ class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTempl
     def _extra_session_params(self) -> dict[str, Any]:
         script_ctx = BootstrapScriptContext.current()
         return {"bootstrap_script": script_ctx.bootstrap_script}
+
+
+class InteractiveSessionWithCustomGroupTemplate(_BaseInteractiveSessionTemplate):
+    @property
+    def name(self) -> str:
+        return "interactive_session_with_custom_group"
+
+    @override
+    def _extra_session_params(self) -> dict[str, Any]:
+        created_group_meta = CreatedGroupContext.current()
+        print(f"Creating endpoint for group: {created_group_meta.group_name}")
+        return {"group_name": created_group_meta.group_name}

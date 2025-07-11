@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
@@ -90,6 +91,7 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -120,7 +122,9 @@ class Dispatchers:
             args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
         )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
-        self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
+        self._kernel_event_handler = KernelEventHandler(
+            args.valkey_stream, args.agent_registry, args.db
+        )
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
@@ -181,6 +185,12 @@ class Dispatchers:
         event_dispatcher.consume(
             AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
+        event_dispatcher.consume(
+            AgentStatusHeartbeat,
+            None,
+            self._agent_event_handler.handle_agent_container_heartbeat,
+            name="agent.status_heartbeat",
+        )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
@@ -193,12 +203,6 @@ class Dispatchers:
             None,
             self._agent_event_handler.handle_agent_error,
             name="agent.error",
-        )
-        evd.consume(
-            AgentStatusHeartbeat,
-            None,
-            self._agent_event_handler.handle_agent_container_heartbeat,
-            name="agent.status_heartbeat",
         )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:

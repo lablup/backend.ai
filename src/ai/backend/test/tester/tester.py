@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Mapping, Optional, Type
+from typing import Any, Mapping, Optional, Type, cast
 
 import aiofiles
 import aiotools
@@ -93,6 +93,20 @@ class Tester:
                     await self._run_param_spec(spec, param)
                 return
             await self._run_single_spec(spec)
+
+    async def run(self) -> None:
+        """
+        Run all test specifications.
+        """
+        self._config = await self._load_tester_config(self._config_file_path)
+        exclude_tags = cast(TesterConfig, self._config).runner.exclude_tags
+
+        tasks = []
+        for spec in self._spec_manager.all_specs():
+            if spec.tags & exclude_tags:
+                continue
+            tasks.append(asyncio.create_task(self._run_spec(spec)))
+        await asyncio.gather(*tasks)
 
     async def run_all(self) -> None:
         """

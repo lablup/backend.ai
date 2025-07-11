@@ -1,3 +1,4 @@
+import enum
 from typing import Optional, Self
 
 from prometheus_client import Counter, Gauge, Histogram
@@ -10,6 +11,12 @@ from ai.backend.common.metrics.types import (
 from ai.backend.common.types import AgentId
 
 from .types import FlattenedDeviceMetric, FlattenedKernelMetric
+
+
+class StatScope(enum.StrEnum):
+    NODE = "node"
+    CONTAINER = "container"
+    PROCESS = "process"
 
 
 class RPCMetricObserver:
@@ -176,3 +183,62 @@ class SyncContainerLifecycleObserver:
     ) -> None:
         exception_name = exception.__class__.__name__
         self._task_failure_count.labels(agent_id=agent_id, exception=exception_name).inc()
+
+
+class StatTaskObserver:
+    _instance: Optional[Self] = None
+
+    _task_trigger_count: Counter
+    _task_success_count: Counter
+    _task_failure_count: Counter
+
+    def __init__(self) -> None:
+        self._task_trigger_count = Counter(
+            name="backendai_stat_task_trigger_count",
+            documentation="Number of stat() task triggered",
+            labelnames=["agent_id", "stat_scope"],
+        )
+        self._task_success_count = Counter(
+            name="backendai_stat_task_success_count",
+            documentation="Number of stat() task succeeded",
+            labelnames=["agent_id", "stat_scope"],
+        )
+        self._task_failure_count = Counter(
+            name="backendai_stat_task_failure_count",
+            documentation="Number of stat() task failed",
+            labelnames=["agent_id", "stat_scope", "exception"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_stat_task_triggered(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+    ) -> None:
+        self._task_trigger_count.labels(agent_id=agent_id, stat_scope=stat_scope).inc()
+
+    def observe_stat_task_success(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+    ) -> None:
+        self._task_success_count.labels(agent_id=agent_id, stat_scope=stat_scope).inc()
+
+    def observe_stat_task_failure(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+        exception: BaseException,
+    ) -> None:
+        exception_name = exception.__class__.__name__
+        self._task_failure_count.labels(
+            agent_id=agent_id, stat_scope=stat_scope, exception=exception_name
+        ).inc()

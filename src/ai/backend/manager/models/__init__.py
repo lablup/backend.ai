@@ -14,6 +14,7 @@ from . import kernel as _kernel
 from . import keypair as _keypair
 from . import network as _network
 from . import rbac as _rbac
+from . import rbac_models as _rbac_models
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import resource_usage as _rusage
@@ -48,6 +49,7 @@ __all__ = (
     *_vfolder.__all__,
     *_dotfile.__all__,
     *_rbac.__all__,
+    *_rbac_models.__all__,
     *_rusage.__all__,
     *_rpolicy.__all__,
     *_rpreset.__all__,
@@ -87,6 +89,7 @@ from .session_template import *  # noqa
 from .storage import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
+from .rbac_models import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa

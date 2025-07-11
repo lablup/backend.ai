@@ -289,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Tindakan",
+      "Allowed": "Diizinkan",
       "ClickFilebrowserButton": "Untuk mengunggah Folder, Silakan klik tombol Jalankan file browser.",
       "CreateANewFolder": "Buat folder baru",
       "Created": "Dibuat",
@@ -329,6 +330,7 @@
       "RemoveFileExtension": "Menghapus ",
       "RenameAFile": "Ganti Nama File",
       "RenameAFolder": "Mengganti nama folder",
+      "RetryingOperation": "Mencoba lagi untuk menetapkan sesi ...",
       "RunSSH/SFTPserver": "Jalankan server SFTP",
       "SFTPSessionNotAvailable": "Sesi SFTP tidak tersedia sekarang",
       "ShareFolder": "Bagikan Folder",
@@ -1127,6 +1129,7 @@
     "MaxFolderCount": "Jumlah Folder Maks",
     "MaxNetworkCount": "Jumlah Jaringan Maks",
     "MaxPendingSessionCount": "Hitungan sesi Max Tertunda",
+    "MaxPendingSessionResourceSlots": "Slot sumber daya sesi maks yang tertunda",
     "MaxQuotaScopeSize": "Ukuran Cakupan Kuota Maks (GB)",
     "MaxSessionCountPerModelSession": "Jumlah Sesi Maks Per Sesi Model",
     "MaxSessionLifetime": "Sesi Seumur Hidup (detik)",

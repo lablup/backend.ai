@@ -21,6 +21,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
     LIVE_STATUS,
@@ -33,6 +34,7 @@ from ai.backend.manager.models.resource_usage import (
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
@@ -50,7 +52,10 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
+    PurgeGroupActionActiveEndpointsError,
+    PurgeGroupActionActiveKernelsError,
     PurgeGroupActionResult,
+    PurgeGroupActionVFoldersMountedToActiveKernelsError,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -189,15 +194,12 @@ class GroupService:
 
         async def _pre_func(conn: SAConnection) -> None:
             if await self._group_vfolder_mounted_to_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
-                    "are currently mounted to active sessions. "
-                    "Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with vfolders mounted to active kernels")
+                raise PurgeGroupActionVFoldersMountedToActiveKernelsError()
             if await self._group_has_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Group has some active session. Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with active kernels")
+                raise PurgeGroupActionActiveKernelsError()
+            await self._delete_endpoints(conn, gid)
             await self._delete_vfolders(gid)
             await self._delete_kernels(conn, gid)
             await self._delete_sessions(conn, gid)
@@ -319,6 +321,56 @@ class GroupService:
 
         stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
         await db_conn.execute(stmt)
+
+    async def _delete_endpoints(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
+        from ai.backend.manager.models.endpoint import EndpointRow
+        from ai.backend.manager.models.routing import RoutingRow
+
+        endpoints = (
+            await db_conn.execute(
+                sa.select(
+                    EndpointRow.id,
+                    sa.case(
+                        (
+                            EndpointRow.lifecycle_stage.in_([
+                                EndpointLifecycle.CREATED,
+                                EndpointLifecycle.DESTROYING,
+                            ]),
+                            True,
+                        ),
+                        else_=False,
+                    ).label("is_active"),
+                ).where(EndpointRow.project == group_id)
+            )
+        ).all()
+
+        if len(endpoints) == 0:
+            return
+
+        active_endpoints = [ep.id for ep in endpoints if ep.is_active]
+        if len(active_endpoints) > 0:
+            log.error(
+                f"Cannot delete group {group_id} because it has active endpoints {active_endpoints}. "
+                "Please delete the endpoints first."
+            )
+            raise PurgeGroupActionActiveEndpointsError()
+
+        endpoint_ids = [ep.id for ep in endpoints]
+        deleted_sessions = await db_conn.execute(
+            sa.delete(SessionRow).where(
+                SessionRow.id.in_(
+                    sa.select(RoutingRow.session).where(
+                        (RoutingRow.endpoint.in_(endpoint_ids)) & (RoutingRow.session.is_not(None))
+                    )
+                )
+            )
+        )
+        log.info(
+            f"Deleted {deleted_sessions.rowcount} sessions associated with endpoints in group {group_id}"
+        )
+
+        await db_conn.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
+        await db_conn.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]

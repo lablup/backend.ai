@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -46,12 +48,14 @@ class RootContext(BaseContext):
     db: ExtendedAsyncSAEngine
     distributed_lock_factory: DistributedLockFactory
     event_dispatcher: EventDispatcher
+    event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
     redis_live: RedisConnectionInfo
     redis_stat: RedisConnectionInfo
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
+    valkey_stream: ValkeyStreamClient
     redis_lock: RedisConnectionInfo
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions

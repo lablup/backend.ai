@@ -130,3 +130,7 @@ class AgentError(RuntimeError):
 
 class InvalidSocket(Exception):
     pass
+
+
+class NetworkPluginNotFound(RuntimeError):
+    pass

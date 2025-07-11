@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
@@ -22,6 +22,13 @@ class BaseDependencyModel(BaseModel):
 class KeyPairDep(BaseDependencyModel):
     access_key: str = Field(description="The access key for the API.", examples=["some-access-key"])
     secret_key: str = Field(description="The secret key for the API.", examples=["some-secret-key"])
+
+
+class UserResourcePolicyDep(BaseDependencyModel):
+    name: str = Field(
+        description="The name of the user resource policy.",
+        examples=["default"],
+    )
 
 
 class EndpointDep(BaseDependencyModel):
@@ -177,6 +184,28 @@ class VFolderDep(BaseDependencyModel):
     cloneable: bool = Field(
         description="Whether the vfolder is cloneable.",
     )
+    share_permission: str = Field(
+        default="ro",
+        description="The share permission for the vfolder.",
+        examples=["ro", "rw"],
+    )
+
+    @model_validator(mode="after")
+    def validate(self):
+        if self.permission == self.share_permission:
+            raise ValueError("permission and share_permission must be different")
+        return self
+
+
+class UploadFileDep(BaseDependencyModel):
+    path: str = Field(
+        description="The name of the file to upload.",
+        examples=["test_file.txt", "nested/inner_file.txt"],
+    )
+    content: str = Field(
+        description="The content of the file to upload.",
+        examples=["This is a test file content."],
+    )
 
 
 class TestContextInjectionModel(BaseDependencyModel):
@@ -235,6 +264,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     vfolder: Optional[VFolderDep] = Field(
         default=None,
         description="The vfolder configuration for the test context.",
+    )
+    user_resource_policy: Optional[UserResourcePolicyDep] = Field(
+        default=None,
+        description="The user resource policy configuration for the test context.",
     )
 
 

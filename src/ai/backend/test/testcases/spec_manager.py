@@ -22,6 +22,20 @@ class TestTag(enum.StrEnum):
     CONTAINER_REGISTRY = "container_registry"
     SESSION = "session"
     MODEL_SERVICE = "model_service"
+    GROUP = "group"
+
+    # Need extra configuration to pass these tests
+    REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION = (
+        "required_single_node_multi_container_configuration"
+    )
+    REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION = (
+        "required_multi_node_multi_container_configuration"
+    )
+    REQUIRED_CONTAINER_REGISTRY_CONFIGURATION = "required_container_registry_configuration"
+
+    # Others
+    LONG_RUNNING = "long_running"
+    SINGLE_NODE_SINGLE_CONTAINER = "single_node_single_container"
 
 
 @dataclass

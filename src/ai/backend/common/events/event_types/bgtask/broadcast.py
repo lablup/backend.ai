@@ -67,7 +67,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
 
     @override
     def status(self) -> BgtaskStatus:
-        return BgtaskStatus.STARTED
+        return BgtaskStatus.UPDATED
 
     @override
     def user_event(self) -> Optional[UserEvent]:

@@ -223,6 +223,10 @@ class VFolderByName(BaseFunction):
             return UUID(data["id"])
 
     @api_function
+    async def get_id(self) -> UUID:
+        return await self._get_id_by_name()
+
+    @api_function
     @classmethod
     async def list_hosts(cls):
         rqst = Request("GET", "/folders/_/hosts")

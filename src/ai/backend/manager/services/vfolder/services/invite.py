@@ -46,6 +46,7 @@ from ..exceptions import (
     VFolderAlreadyExists,
     VFolderGrantAlreadyExists,
     VFolderInvalidParameter,
+    VFolderInvitationNotFound,
     VFolderNotFound,
 )
 from ..types import VFolderInvitationInfo
@@ -178,7 +179,7 @@ class VFolderInviteService:
             invitation_row = await db_session.scalar(query)
             invitation_row = cast(VFolderInvitationRow, invitation_row)
             if invitation_row is None:
-                raise VFolderNotFound()
+                raise VFolderInvitationNotFound
 
             # Get target user.
             query = sa.select(UserRow).where(UserRow.email == invitation_row.invitee)
@@ -255,7 +256,7 @@ class VFolderInviteService:
                 user_row = await db_session.scalar(requester_query)
                 user_row = cast(UserRow, user_row)
                 if invitation_row is None:
-                    raise VFolderNotFound("vfolder invitation")
+                    raise VFolderInvitationNotFound
                 if user_row.email == invitation_row.inviter:
                     state = VFolderInvitationState.CANCELED
                 elif user_row.email == invitation_row.invitee:

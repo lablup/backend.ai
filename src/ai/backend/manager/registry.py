@@ -20,7 +20,6 @@ from collections.abc import (
 )
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -72,7 +71,6 @@ from ai.backend.common.events.event_types.image.anycast import (
     ImagePullStartedEvent,
 )
 from ai.backend.common.events.event_types.kernel.anycast import (
-    DoSyncKernelLogsEvent,
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
@@ -104,10 +102,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionEnqueuedBroadcastEvent,
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
-)
-from ai.backend.common.events.event_types.vfolder.anycast import (
-    VFolderDeletionFailureEvent,
-    VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -218,11 +212,9 @@ from .models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
-    reenter_txn,
     reenter_txn_session,
     sql_json_merge,
 )
-from .models.vfolder import VFolderOperationStatus, update_vfolder_status
 from .types import UserScope
 
 if TYPE_CHECKING:
@@ -488,7 +480,8 @@ class AgentRegistry:
                 "sessionId": str(sess.id),
                 "sessionName": str(sess.name),
                 "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,
+                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
+                "servicePorts": sess.main_kernel.service_ports,
                 "created": False,
             }
         except SessionNotFound:
@@ -2249,6 +2242,7 @@ class AgentRegistry:
 
         :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
         :param reason: Reason to destroy a session if client wants to specify it manually.
+        :param user_role: Role of the user who requested the session destruction.
         """
         session_id = session.id
         if not reason:
@@ -2952,25 +2946,6 @@ class AgentRegistry:
     ) -> None:
         # noop for performance reasons
         pass
-
-    async def kill_all_sessions_in_agent(self, agent_id, agent_addr):
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            coro = rpc.call.clean_all_kernels("manager-freeze-force-kill")
-            return await coro
-
-    async def kill_all_sessions(self, conn=None):
-        async with reenter_txn(self.db, conn, {"postgresql_readonly": True}) as conn:
-            query = sa.select([agents.c.id, agents.c.addr]).where(
-                agents.c.status == AgentStatus.ALIVE
-            )
-            result = await conn.execute(query)
-            rows = result.fetchall()
-        tasks = []
-        for row in rows:
-            tasks.append(
-                self.kill_all_sessions_in_agent(row["id"], row["addr"]),
-            )
-        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def handle_heartbeat(self, agent_id, agent_info):
         now = datetime.now(tzutc())
@@ -4435,78 +4410,6 @@ async def check_scaling_group(
             raise ScalingGroupNotFound(err_msg)
     assert scaling_group is not None
     return scaling_group
-
-
-async def handle_kernel_log(
-    context: AgentRegistry,
-    source: AgentId,
-    event: DoSyncKernelLogsEvent,
-) -> None:
-    # The log data is at most 10 MiB.
-    log_buffer = BytesIO()
-    log_key = f"containerlog.{event.container_id}"
-    try:
-        list_size = await redis_helper.execute(
-            context.redis_stream,
-            lambda r: r.llen(log_key),
-        )
-        if list_size is None:
-            # The log data is expired due to a very slow event delivery.
-            # (should never happen!)
-            log.warning(
-                "tried to store console logs for cid:{}, but the data is expired",
-                event.container_id,
-            )
-            return
-        for _ in range(list_size):
-            # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(context.redis_stream, lambda r: r.lpop(log_key))
-            if chunk is None:  # maybe missing
-                log_buffer.write(b"(container log unavailable)\n")
-                break
-            log_buffer.write(chunk)
-        try:
-            log_data = log_buffer.getvalue()
-
-            async def _update_log() -> None:
-                async with context.db.begin() as conn:
-                    update_query = (
-                        sa.update(kernels)
-                        .values(container_log=log_data)
-                        .where(kernels.c.id == event.kernel_id)
-                    )
-                    await conn.execute(update_query)
-
-            await execute_with_retry(_update_log)
-        finally:
-            # Clear the log data from Redis when done.
-            await redis_helper.execute(
-                context.redis_stream,
-                lambda r: r.delete(log_key),
-            )
-    finally:
-        log_buffer.close()
-
-
-async def handle_vfolder_deletion_success(
-    context: AgentRegistry,
-    source: AgentId,
-    ev: VFolderDeletionSuccessEvent,
-) -> None:
-    await update_vfolder_status(
-        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_COMPLETE, do_log=True
-    )
-
-
-async def handle_vfolder_deletion_failure(
-    context: AgentRegistry,
-    source: AgentId,
-    ev: VFolderDeletionFailureEvent,
-) -> None:
-    log.exception(f"Failed to delete vfolder (vfid:{ev.vfid}, msg:{ev.message})")
-    await update_vfolder_status(
-        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_ERROR, do_log=True
-    )
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

@@ -101,3 +101,8 @@ format = "verbose"
 [volume.volume1]
 backend = "vfs"
 path = "vfolder/local/volume1"
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"
