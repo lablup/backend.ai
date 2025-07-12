@@ -347,14 +347,6 @@ class VFolderGone(BackendError, web.HTTPGone):
     error_type = "https://api.backend.ai/probs/vfolder-gone"
     error_title = "The virtual folder is gone."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.GONE,
-        )
-
 
 class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
     error_title = "Cannot delete model VFolders bound to alive model services."
