@@ -113,6 +113,22 @@ explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.3/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
+[tool.pyright]
+pythonVersion = "3.13"
+include = [
+    "src",
+    "tools/pants-plugins",
+]
+stubPath = "stubs"
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "src/ai/backend/webui",
+    "src/ai/backend/web/static",
+]
+venvPath = "dist/export/python/virtualenvs/python-default"
+venv = "3.13.3"
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
