@@ -15,16 +15,25 @@ from ..base import (
     GUID,
     Base,
     IDColumn,
+    StrEnumType,
 )
+from .types import PermissionState
 
 if TYPE_CHECKING:
     from .role import RoleRow
 
 
-class ResourcePermissionRow(Base):
-    __tablename__ = "resource_permissions"
+class ObjectPermissionRow(Base):
+    __tablename__ = "object_permissions"
 
     id: uuid.UUID = IDColumn()
+    state: PermissionState = sa.Column(
+        "state",
+        StrEnumType(PermissionState),
+        nullable=False,
+        default=PermissionState.ACTIVE,
+        server_default=PermissionState.ACTIVE,
+    )
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
     entity_type: str = sa.Column(
         "entity_type", sa.String(32), nullable=False
@@ -41,6 +50,6 @@ class ResourcePermissionRow(Base):
 
     role_row: RoleRow = relationship(
         "RoleRow",
-        back_populates="resource_permission_rows",
-        primaryjoin="RoleRow.id == foreign(ResourcePermissionRow.role_id)",
+        back_populates="object_permission_rows",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
     )
