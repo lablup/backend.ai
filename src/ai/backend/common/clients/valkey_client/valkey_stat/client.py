@@ -243,7 +243,9 @@ class ValkeyStatClient:
         """
         # TODO: If Agent ID is changed, a leak may occur. (expire is needed)
         key = self._get_container_count_key(agent_id)
-        await self._client.client.set(key, str(container_count))
+        await self._client.client.set(
+            key, str(container_count), expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION)
+        )
 
     @valkey_decorator()
     async def get_session_statistics_batch(self, session_ids: List[str]) -> List[Optional[dict]]:
@@ -850,33 +852,41 @@ class ValkeyStatClient:
             removed_count += await self._client.client.srem(status_set_key, [session_id])
         return removed_count
 
+    async def _hkeys(self, hash_name: str) -> list[bytes]:
+        """
+        Get all keys in a hash.
+        But this method uses hscan to avoid blocking.
+
+        :param hash_name: The name of the hash.
+        :return: List of keys in the hash.
+        """
+        cursor = b"0"
+        keys: list[bytes] = []
+        while True:
+            result = await self._client.client.hscan(hash_name, str(cursor))
+            cursor = cast(bytes, result[0])
+            current_keys = cast(list[bytes], result[1])
+            keys.extend(current_keys)
+            if cursor == b"0":
+                break
+        return keys
+
     @valkey_decorator()
     async def update_abuse_report(
         self,
-        hash_name: str,
         new_report: Mapping[str, str],
     ) -> None:
         """
         Update kernel abuse report data, removing stale entries and adding new ones.
 
-        :param hash_name: The hash key for storing abuse reports.
         :param new_report: New abuse report data as a mapping.
         """
-        # Get all current report keys
-        current_keys = await self._client.client.hkeys(hash_name)
-
         # Use batch operations to update the report atomically
         batch = self._create_batch()
-
-        # Remove stale entries
-        for key in current_keys:
-            key_str = key.decode("utf-8")
-            if key_str not in new_report:
-                batch.hdel(hash_name, [key])
-
+        batch.delete([_ABUSE_REPORT_HASH])
         # Add/update new entries
         for kern_id, report_val in new_report.items():
-            batch.hset(hash_name, {kern_id: report_val})
+            batch.hset(_ABUSE_REPORT_HASH, {kern_id: report_val})
 
         await self._client.client.exec(batch, raise_on_error=True)
 

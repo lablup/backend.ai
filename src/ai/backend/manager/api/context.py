@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-    from ai.backend.common.types import RedisConnectionInfo
 
     from ..agent_cache import AgentRPCCache
     from ..idle import IdleCheckerHost
@@ -58,7 +57,6 @@ class RootContext(BaseContext):
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     valkey_image: ValkeyImageClient
-    redis_stream: RedisConnectionInfo
     valkey_stream: ValkeyStreamClient
     redis_profile_target: RedisProfileTarget
     config_provider: ManagerConfigProvider

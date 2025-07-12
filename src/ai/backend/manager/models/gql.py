@@ -21,9 +21,6 @@ from ai.backend.common.exception import (
     ErrorCode,
     PermissionDeniedError,
 )
-
-if TYPE_CHECKING:
-    pass
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider

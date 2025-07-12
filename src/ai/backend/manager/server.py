@@ -547,11 +547,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db_id=REDIS_IMAGE_DB,
         human_readable_name="image",  # per-agent image availability
     )
-    root_ctx.redis_stream = redis_helper.get_redis_object(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="stream",  # event bus and log streams
-        db=REDIS_STREAM_DB,
-    )
     root_ctx.valkey_stream = await ValkeyStreamClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
         human_readable_name="stream",
@@ -559,14 +554,9 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
-
-    # Ping legacy redis_stream
-    await redis_helper.ping_redis_connection(root_ctx.redis_stream.client)
-
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
     yield
-    await root_ctx.redis_stream.close()
     await root_ctx.valkey_image.close()
     await root_ctx.valkey_stat.close()
     await root_ctx.valkey_live.close()
@@ -892,7 +882,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_stat,
         root_ctx.valkey_live,
         root_ctx.valkey_image,
-        root_ctx.redis_stream,
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,

@@ -37,28 +37,6 @@ _sqlalchemy_pool_type_names = (
     "StaticPool",
 )
 
-
-_read_manager_status_script = """
-local cursor = "0"
-local pattern = KEYS[1]
-local matched_keys = {}
-
-repeat
-    local scan_result = redis.call("SCAN", cursor, "MATCH", pattern)
-    cursor = scan_result[1]
-    for i, key in ipairs(scan_result[2]) do
-        table.insert(matched_keys, key)
-    end
-until cursor == "0"
-
-if #matched_keys == 0 then
-    return {} -- Early return if no keys found
-end
-
-return redis.call("MGET", unpack(matched_keys))
-"""
-
-
 MANAGER_STATUS_KEY = "manager.status"
 
 

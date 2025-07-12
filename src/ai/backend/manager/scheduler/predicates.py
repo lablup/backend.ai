@@ -25,23 +25,6 @@ from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
-_check_keypair_concurrency_script = """
-local key = KEYS[1]
-local limit = tonumber(ARGV[1])
-local result = {}
-redis.call('SETNX', key, 0)
-local count = tonumber(redis.call('GET', key))
-if limit > 0 and count >= limit then
-    result[1] = 0
-    result[2] = count
-    return result
-end
-redis.call('INCR', key)
-result[1] = 1
-result[2] = count + 1
-return result
-"""
-
 
 async def check_reserved_batch_session(
     db_sess: SASession,

@@ -127,7 +127,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
     SessionId,
@@ -260,9 +259,8 @@ class AgentRegistry:
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         valkey_stat_client: ValkeyStatClient,
-        redis_live: Union[RedisConnectionInfo, ValkeyLiveClient],
+        valkey_live: ValkeyLiveClient,
         redis_image: ValkeyImageClient,
-        redis_stream: RedisConnectionInfo,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -277,9 +275,8 @@ class AgentRegistry:
         self.db = db
         self.agent_cache = agent_cache
         self.valkey_stat_client = valkey_stat_client
-        self.redis_live = redis_live
-        self.redis_image = redis_image
-        self.redis_stream = redis_stream
+        self.valkey_live = valkey_live
+        self.valkey_image = redis_image
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -2135,7 +2132,7 @@ class AgentRegistry:
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
-        async def _update(valkey_client):
+        async def _update(valkey_client: ValkeyStatClient) -> None:
             updates: dict[str, bytes] = {}
             for concurrency in access_key_to_concurrency_used.values():
                 cnt_map = concurrency.to_cnt_map()
@@ -2144,21 +2141,19 @@ class AgentRegistry:
             if updates:
                 await valkey_client.set_multiple_keys(updates)
 
-        async def _update_by_fullscan(valkey_client):
+        async def _update_by_fullscan(valkey_client: ValkeyStatClient) -> None:
             updates = {}
             # Use the client's scan method directly for compute concurrency keys
-            cursor = 0
+            cursor = b"0"
             while True:
                 result = await valkey_client._client.client.scan(
                     str(cursor), match=f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*"
                 )
-                cursor = int(str(result[0]))
-                keys = result[1]
+
+                cursor = cast(bytes, result[0])
+                keys = cast(list[bytes], result[1])
                 for stat_key in keys:
-                    if isinstance(stat_key, bytes):
-                        _stat_key = stat_key.decode("utf-8")
-                    else:
-                        _stat_key = cast(str, stat_key)
+                    _stat_key = stat_key.decode("utf-8")
                     ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
                     concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                     usage = (
@@ -2167,21 +2162,18 @@ class AgentRegistry:
                         else 0
                     )
                     updates[_stat_key] = str(usage).encode("utf-8")
-                if cursor == 0:
+                if cursor == b"0":
                     break
             # Use the client's scan method directly for system concurrency keys
-            cursor = 0
+            cursor = b"0"
             while True:
                 result = await valkey_client._client.client.scan(
                     str(cursor), match=f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*"
                 )
-                cursor = int(str(result[0]))
-                keys = result[1]
+                cursor = cast(bytes, result[0])
+                keys = cast(list[bytes], result[1])
                 for stat_key in keys:
-                    if isinstance(stat_key, bytes):
-                        _stat_key = stat_key.decode("utf-8")
-                    else:
-                        _stat_key = cast(str, stat_key)
+                    _stat_key = stat_key.decode("utf-8")
                     ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
                     concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                     usage = (
@@ -2190,7 +2182,7 @@ class AgentRegistry:
                         else 0
                     )
                     updates[_stat_key] = str(usage).encode("utf-8")
-                if cursor == 0:
+                if cursor == b"0":
                     break
             if updates:
                 await valkey_client.set_multiple_keys(updates)
@@ -2969,7 +2961,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await self.redis_live.update_agent_last_seen(agent_id, now.timestamp())
+            await self.valkey_live.update_agent_last_seen(agent_id, now.timestamp())
 
             # Check and update status of the agent record in DB
             async def _update() -> None:
@@ -3111,7 +3103,7 @@ class AgentRegistry:
             images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             image_canonicals = set(img_info[0] for img_info in images)
 
-            await self.redis_image.add_agent_to_images(agent_id, image_canonicals)
+            await self.valkey_image.add_agent_to_images(agent_id, image_canonicals)
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
@@ -3121,13 +3113,10 @@ class AgentRegistry:
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
-        await self.redis_image.remove_agent_from_images(agent_id, image_canonicals)
+        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-
-        if isinstance(self.redis_live, ValkeyLiveClient):
-            await self.redis_live.remove_agent_last_seen(agent_id)
+        await self.valkey_live.remove_agent_last_seen(agent_id)
 
         async def _update() -> None:
             async with self.db.begin() as conn:
@@ -3162,7 +3151,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await self.redis_image.remove_agent_from_all_images(agent_id)
+        await self.valkey_image.remove_agent_from_all_images(agent_id)
         await execute_with_retry(_update)
 
     async def sync_kernel_stats(

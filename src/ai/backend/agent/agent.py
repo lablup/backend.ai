@@ -1898,9 +1898,7 @@ class AbstractAgent(
             for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
 
-            hash_name = "abuse_report"
             await self.valkey_stat_client.update_abuse_report(
-                hash_name,
                 abuse_report,
             )
 

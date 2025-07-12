@@ -503,21 +503,8 @@ async def stream_proxy(
 
     async def update_connection_tracker() -> None:
         """Update connection tracker with current timestamp."""
-        from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-
-        if isinstance(redis_live, ValkeyLiveClient):
-            # Get current server time
-            now = await redis_live._client.client.time()
-            timestamp = float(now[0]) + (float(now[1]) / 1000000)
-
-            # Add to sorted set with timestamp as score
-            await redis_live._client.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
-        else:
-            # Legacy RedisConnectionInfo case
-            import time
-
-            timestamp = time.time()
-            # Handle legacy connection (use redis_helper if needed)
+        timestamp = await redis_live.get_server_time()
+        await redis_live._client.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
