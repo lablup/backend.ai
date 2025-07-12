@@ -1,5 +1,5 @@
 import logging
-from typing import ParamSpec, Self, TypeVar
+from typing import ParamSpec, Self, TypeVar, cast
 
 from glide import Batch
 
@@ -114,22 +114,23 @@ class ValkeyImageClient:
         :param agent_id: The agent ID to remove.
         """
         cursor = b"0"
+        keys_to_remove: list[bytes] = []
         while True:
             result = await self._client.client.scan(cursor)
-            if isinstance(result, list) and len(result) >= 2:
-                new_cursor = result[0]
-                keys = result[1]
-                if keys:
-                    tx = self._create_batch()
-                    for key in keys:
-                        key_str = key.decode() if isinstance(key, bytes) else str(key)
-                        tx.srem(key_str, [agent_id])
-                    await self._client.client.exec(tx, raise_on_error=True)
-                cursor = new_cursor if isinstance(new_cursor, bytes) else b"0"
-            else:
-                break
+            if len(result) != 2:
+                raise ValueError(
+                    f"Unexpected result from scan: {result}. Expected a tuple of (cursor, keys)."
+                )
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            keys_to_remove.extend(keys)
             if cursor == b"0":
                 break
+        if keys_to_remove:
+            tx = self._create_batch()
+            for key in keys:
+                tx.srem(key, [agent_id])
+            await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_decorator()
     async def get_agents_for_image(
@@ -143,7 +144,7 @@ class ValkeyImageClient:
         :return: Set of agent IDs.
         """
         result = await self._client.client.smembers(image_canonical)
-        return {member.decode() if isinstance(member, bytes) else str(member) for member in result}
+        return {member.decode() for member in result}
 
     @valkey_decorator()
     async def get_agents_for_images(
@@ -165,31 +166,12 @@ class ValkeyImageClient:
 
         results = await self._client.client.exec(tx, raise_on_error=True)
         final_results: list[set[str]] = []
-        if results:
-            for result in results:
-                if result is None:
-                    final_results.append(set())
-                elif hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
-                    final_results.append({
-                        member.decode() if isinstance(member, bytes) else str(member)
-                        for member in result
-                    })
-                else:
-                    final_results.append(set())
+        if not results:
+            return final_results
+        for result in results:
+            result = cast(set[bytes], result)
+            final_results.append({member.decode() for member in result})
         return final_results
-
-    @valkey_decorator()
-    async def get_agent_count_for_image(
-        self,
-        image_canonical: str,
-    ) -> int:
-        """
-        Get the count of agents that have a specific image.
-
-        :param image_canonical: The image canonical name.
-        :return: Number of agents.
-        """
-        return await self._client.client.scard(image_canonical)
 
     @valkey_decorator()
     async def get_agent_counts_for_images(
@@ -210,37 +192,9 @@ class ValkeyImageClient:
             tx.scard(image_canonical)
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-        if results:
-            return [
-                int(result) if result is not None and isinstance(result, (int, str)) else 0
-                for result in results
-            ]
-        return []
-
-    @valkey_decorator()
-    async def get_all_image_names(self) -> list[str]:
-        """
-        Get all image canonical names.
-
-        :return: List of image canonical names.
-        """
-        all_keys = []
-        cursor = b"0"
-        while True:
-            result = await self._client.client.scan(cursor)
-            if isinstance(result, list) and len(result) >= 2:
-                new_cursor = result[0]
-                keys = result[1]
-                if keys:
-                    all_keys.extend([
-                        key.decode() if isinstance(key, bytes) else str(key) for key in keys
-                    ])
-                cursor = new_cursor if isinstance(new_cursor, bytes) else b"0"
-            else:
-                break
-            if cursor == b"0":
-                break
-        return all_keys
+        if not results:
+            return []
+        return [cast(int, result) for result in results]
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         return Batch(is_atomic=is_atomic)

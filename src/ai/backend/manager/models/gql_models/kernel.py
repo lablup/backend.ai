@@ -17,11 +17,9 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import noload, selectinload
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -205,20 +203,8 @@ class KernelNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, kernel_ids: Sequence[KernelId]
     ) -> list[dict[str, Any] | None]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for kid in kernel_ids:
-                await pipe.get(str(kid))
-            return pipe
-
-        ret: list[dict[str, Any] | None] = []
-        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat))
-            else:
-                ret.append(None)
-
-        return ret
+        kernel_ids_str = [str(kid) for kid in kernel_ids]
+        return await ctx.valkey_stat.get_session_statistics_batch(kernel_ids_str)
 
 
 class KernelConnection(Connection):

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.fetcher import EventFetcher
@@ -16,6 +18,7 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceDiscovery,
     ServiceDiscoveryLoop,
 )
+from ai.backend.common.types import RedisProfileTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
@@ -27,7 +30,6 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-    from ai.backend.common.types import RedisConnectionInfo
 
     from ..agent_cache import AgentRPCCache
     from ..idle import IdleCheckerHost
@@ -52,12 +54,11 @@ class RootContext(BaseContext):
     event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
-    redis_live: RedisConnectionInfo
-    redis_stat: RedisConnectionInfo
-    redis_image: ValkeyImageClient
-    redis_stream: RedisConnectionInfo
+    valkey_live: ValkeyLiveClient
+    valkey_stat: ValkeyStatClient
+    valkey_image: ValkeyImageClient
     valkey_stream: ValkeyStreamClient
-    redis_lock: RedisConnectionInfo
+    redis_profile_target: RedisProfileTarget
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions
 

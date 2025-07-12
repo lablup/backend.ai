@@ -41,7 +41,7 @@ def service_mock_args():
     return {
         "storage_manager": MagicMock(spec=StorageSessionManager),
         "config_provider": MagicMock(),
-        "redis_stat": MagicMock(spec=RedisConnectionInfo),
+        "valkey_stat_client": MagicMock(spec=RedisConnectionInfo),
     }
 
 
@@ -58,7 +58,7 @@ def processors(
         db=database_engine,
         storage_manager=service_mock_args["storage_manager"],
         config_provider=service_mock_args["config_provider"],
-        redis_stat=service_mock_args["redis_stat"],
+        valkey_stat_client=service_mock_args["valkey_stat_client"],
     )
     return GroupProcessors(group_service, [mock_action_monitor])
 
