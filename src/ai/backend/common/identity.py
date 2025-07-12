@@ -313,7 +313,7 @@ def _define_functions():
                     if local_ipaddrs:
                         return str(local_ipaddrs[0])
                     raise RuntimeError(
-                        "Could not find my IP address bound to subnet {}", subnet_hint
+                        f"Could not find my IP address bound to subnet {subnet_hint}"
                     )
                 try:
                     myself = socket.gethostname()
