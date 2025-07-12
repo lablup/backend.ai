@@ -1,11 +1,13 @@
 import asyncio
 import asyncio.staggered
+import base64
 import enum
 import functools
 import json
 import logging
 import os
 import socket
+import uuid
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
@@ -213,7 +215,10 @@ def _define_functions():
                 if data is None:
                     return f"i-{socket.gethostname()}"
                 o = json.loads(data)
-                return o["compute"]["vmId"]
+                vm_name = o["compute"]["name"]  # unique within the resource group
+                vm_id = uuid.UUID(o["compute"]["vmId"])  # prevent conflicts across resource group
+                vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
+                return f"i-{vm_name}-{vm_id_hash}"
 
             async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
                 data = await curl(
