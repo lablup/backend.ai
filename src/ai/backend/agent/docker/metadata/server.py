@@ -1,6 +1,6 @@
 import logging
 from http import HTTPStatus
-from typing import Any, Iterable, List, Mapping, MutableMapping
+from typing import Any, Iterable, List, Mapping, MutableMapping, cast
 from uuid import UUID
 
 import attr
@@ -8,6 +8,7 @@ from aiodocker.docker import Docker
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.utils import closing_async
@@ -93,7 +94,7 @@ class MetadataServer(aobject):
 
     def __init__(
         self,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         etcd: AsyncEtcd,
         kernel_registry: Mapping[KernelId, AbstractKernel],
     ) -> None:
@@ -112,9 +113,9 @@ class MetadataServer(aobject):
         self.route_structure = {"latest": {"extension": {}}}
 
     async def __ainit__(self):
-        local_config = self.app["_root.context"].local_config
+        local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
-        self.app["docker-mode"] = local_config["agent"]["docker-mode"]
+        self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
         metadata_plugin = ContainerMetadataPlugin({}, local_config)
         await metadata_plugin.init(None)
@@ -202,11 +203,11 @@ class MetadataServer(aobject):
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
-        local_config = self.app["_root.context"].local_config
+        local_config: AgentUnifiedConfig = self.app["_root.context"].local_config
         site = web.TCPSite(
             metadata_server_runner,
-            local_config["agent"]["metadata-server-bind-host"],
-            local_config["agent"]["metadata-server-port"],
+            local_config.agent.metadata_server_bind_host,
+            local_config.agent.metadata_server_port,
         )
         self.runner = metadata_server_runner
         await site.start()

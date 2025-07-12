@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 from ssl import SSLContext
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Dict,
     Generic,
@@ -47,7 +48,7 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainValidator
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -771,6 +772,17 @@ class BinarySize(int):
                 raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
             return f"{value:f}{suffix.lower()}".strip()
+
+
+def _validate_binary_size(v: Any) -> BinarySize:
+    """Validator for BinarySize fields."""
+    if isinstance(v, BinarySize):
+        return v
+    return BinarySize.finite_from_str(v)
+
+
+# Create a custom type annotation for BinarySize fields
+BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
 
 class ResourceSlot(UserDict):

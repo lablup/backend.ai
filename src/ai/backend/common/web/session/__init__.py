@@ -1,12 +1,22 @@
 import abc
 import json
 import logging
-import logging.config
-import sys
 import time
 from collections.abc import MutableMapping
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Final, Iterator, Optional, Union, cast, override
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Final,
+    Iterator,
+    Optional,
+    TypedDict,
+    Union,
+    cast,
+    override,
+)
 
 import trafaret as t
 from aiohttp import web
@@ -23,11 +33,6 @@ extra_config_headers = t.Dict({
 }).allow_extra("*")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
-
-if sys.version_info >= (3, 8):
-    from typing import TypedDict
-else:
-    from typing_extensions import TypedDict
 
 
 class _CookieParams(TypedDict, total=False):
