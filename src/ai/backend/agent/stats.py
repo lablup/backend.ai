@@ -27,10 +27,8 @@ from typing import (
 
 import aiodocker
 import attrs
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import StageObserver
 from ai.backend.common.types import (
@@ -532,13 +530,11 @@ class StatContext:
             upper_layer="collect_node_stat",
         )
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            await pipe.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
-            await pipe.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)
-            return pipe
-
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        # Use ValkeyStatClient set method with expiration
+        agent_id = self.agent.local_config["agent"]["id"]
+        await self.agent.valkey_stat_client.set(
+            agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
+        )
 
     def observe_container_metric(
         self,
@@ -696,13 +692,10 @@ class StatContext:
             upper_layer="collect_container_stat",
         )
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
-            for kernel_id, update in kernel_serialized_updates:
-                pipe.set(str(kernel_id), update)
-            return pipe
-
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        # Use ValkeyStatClient set_multiple_keys for batch operations
+        key_value_map = {str(kernel_id): update for kernel_id, update in kernel_serialized_updates}
+        if key_value_map:
+            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
 
     async def _get_processes(
         self, container_id: ContainerId, docker: aiodocker.Docker
@@ -827,30 +820,28 @@ class StatContext:
                 upper_layer="collect_per_container_process_stat",
             )
 
-            async def _pipe_builder(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
-                for cid in updated_cids:
-                    serializable_table = {}
-                    for pid in self.process_metrics[cid].keys():
-                        metrics = self.process_metrics[cid][pid]
-                        serializable_metrics = {}
-                        for key, obj in metrics.items():
-                            try:
-                                serializable_metrics[str(key)] = obj.to_serializable_dict()
-                            except ValueError:
-                                log.warning(
-                                    "Failed to serialize metric {}: {}", key, str(obj.stats)
-                                )
-                                continue
-                        serializable_table[pid] = serializable_metrics
-                    if self.agent.local_config["debug"]["log-stats"]:
-                        log.debug(
-                            "stats: process_updates: \ncontainer_id: {}\n{}",
-                            cid,
-                            serializable_table,
-                        )
-                    serialized_metrics = msgpack.packb(serializable_table)
-                    pipe.set(cid, serialized_metrics, ex=8)
-                return pipe
+            # Use ValkeyStatClient set_multiple_keys for batch operations
+            key_value_map: dict[str, bytes] = {}
+            for cid in updated_cids:
+                serializable_table = {}
+                for pid in self.process_metrics[cid].keys():
+                    metrics = self.process_metrics[cid][pid]
+                    serializable_metrics = {}
+                    for key, obj in metrics.items():
+                        try:
+                            serializable_metrics[str(key)] = obj.to_serializable_dict()
+                        except ValueError:
+                            log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
+                            continue
+                    serializable_table[pid] = serializable_metrics
+                if self.agent.local_config["debug"]["log-stats"]:
+                    log.debug(
+                        "stats: process_updates: \ncontainer_id: {}\n{}",
+                        cid,
+                        serializable_table,
+                    )
+                serialized_metrics = msgpack.packb(serializable_table)
+                key_value_map[str(cid)] = serialized_metrics
 
-            await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+            if key_value_map:
+                await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)

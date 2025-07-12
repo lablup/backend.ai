@@ -19,13 +19,12 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import redis_helper
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
     redis_config_iv,
 )
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
+from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -282,13 +281,8 @@ async def server_main(
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
                     live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-                    redis_live = redis_helper.get_redis_object(
-                        live_redis_target,
-                        name="storage-proxy.live",
-                        db=REDIS_LIVE_DB,
-                    )
                     service_discovery = RedisServiceDiscovery(
-                        args=RedisServiceDiscoveryArgs(redis=redis_live)
+                        args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
                     )
 
             sd_loop = ServiceDiscoveryLoop(

@@ -51,10 +51,10 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.resources import scan_gpu_alloc_map
-from ai.backend.common import config, identity, msgpack, redis_helper, utils
+from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
     AbstractAgentResp,
@@ -1293,13 +1293,8 @@ async def server_main(
             await agent.read_agent_config()
             redis_profile_target = RedisProfileTarget.from_dict(local_config["redis"])
             live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-            redis_live = redis_helper.get_redis_object(
-                live_redis_target,
-                name="agent.live",
-                db=REDIS_LIVE_DB,
-            )
             service_discovery = RedisServiceDiscovery(
-                args=RedisServiceDiscoveryArgs(redis=redis_live)
+                args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
             )
 
     sd_loop = ServiceDiscoveryLoop(
