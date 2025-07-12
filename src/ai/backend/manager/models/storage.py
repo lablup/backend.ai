@@ -41,7 +41,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
+from ..errors.exceptions import InvalidAPIParameters, VFolderGone, VFolderOperationFailed
 from ..exceptions import InvalidArgument
 from .base import Item, PaginatedList
 from .rbac import (
@@ -227,6 +227,12 @@ class StorageSessionManager:
                     )
                 except aiohttp.ClientResponseError:
                     # when the response body is not JSON, just raise with status info.
+                    if client_resp.status == 410:
+                        raise VFolderGone(
+                            extra_msg=(
+                                "The requested resource is gone. It may have been deleted or moved."
+                            ),
+                        )
                     raise VFolderOperationFailed(
                         extra_msg=(
                             "Storage proxy responded with "
