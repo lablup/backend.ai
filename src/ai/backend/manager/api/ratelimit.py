@@ -7,7 +7,7 @@ import attrs
 from aiohttp import web
 from aiotools import apartial
 
-from ai.backend.common.clients.valkey_client.valkey_rate_limit import ValkeyRateLimitClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
@@ -22,22 +22,6 @@ _rlim_window: Final = 60 * 15
 
 # We implement rate limiting using a rolling counter, which prevents
 # last-minute and first-minute bursts between the intervals.
-
-_rlim_script = """
-local access_key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local request_id = tonumber(redis.call('INCR', '__request_id'))
-if request_id >= 1e12 then
-    redis.call('SET', '__request_id', 1)
-end
-if redis.call('EXISTS', access_key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
-end
-redis.call('ZADD', access_key, now, tostring(request_id))
-redis.call('EXPIRE', access_key, window)
-return redis.call('ZCARD', access_key)
-"""
 
 
 @web.middleware

@@ -11,10 +11,7 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import VFolderID
@@ -468,13 +465,8 @@ class GroupService:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
-
-        raw_stats = await redis_helper.execute(self._valkey_stat_client, _pipe_builder)
+        kernel_ids = [str(row["id"]) for row in rows]
+        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone

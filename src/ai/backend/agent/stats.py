@@ -532,7 +532,7 @@ class StatContext:
 
         # Use ValkeyStatClient set method with expiration
         agent_id = self.agent.local_config["agent"]["id"]
-        await self.agent.valkey_stat_client_pool.set(
+        await self.agent.valkey_stat_client.set(
             agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
         )
 
@@ -695,7 +695,7 @@ class StatContext:
         # Use ValkeyStatClient set_multiple_keys for batch operations
         key_value_map = {str(kernel_id): update for kernel_id, update in kernel_serialized_updates}
         if key_value_map:
-            await self.agent.valkey_stat_client_pool.set_multiple_keys(key_value_map)
+            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
 
     async def _get_processes(
         self, container_id: ContainerId, docker: aiodocker.Docker
@@ -821,7 +821,7 @@ class StatContext:
             )
 
             # Use ValkeyStatClient set_multiple_keys for batch operations
-            key_value_map = {}
+            key_value_map: dict[str, bytes] = {}
             for cid in updated_cids:
                 serializable_table = {}
                 for pid in self.process_metrics[cid].keys():
@@ -841,9 +841,7 @@ class StatContext:
                         serializable_table,
                     )
                 serialized_metrics = msgpack.packb(serializable_table)
-                key_value_map[cid] = serialized_metrics
+                key_value_map[str(cid)] = serialized_metrics
 
             if key_value_map:
-                await self.agent.valkey_stat_client_pool.set_multiple_keys(
-                    key_value_map, expire_sec=8
-                )
+                await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)

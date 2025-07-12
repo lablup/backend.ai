@@ -15,26 +15,21 @@ from typing import (
     Self,
     Sequence,
     TypedDict,
-    Union,
     cast,
 )
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import foreign, load_only, noload, relationship, selectinload
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -861,25 +856,12 @@ class KernelStatistics:
     @classmethod
     async def batch_load_by_kernel_impl(
         cls,
-        valkey_stat_client: Union[RedisConnectionInfo, "ValkeyStatClient"],
+        valkey_stat_client: ValkeyStatClient,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """For cases where required to collect kernel metrics in bulk internally"""
-
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for sess_id in session_ids:
-                await pipe.get(str(sess_id))
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(valkey_stat_client, _build_pipeline)
-        for result in results:
-            if result is not None:
-                stats.append(msgpack.unpackb(result))
-            else:
-                stats.append(None)
-        return stats
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
 
     @classmethod
     async def batch_load_by_kernel(
@@ -888,7 +870,7 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat_client, session_ids)
+        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(
@@ -896,27 +878,8 @@ class KernelStatistics:
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for sess_id in session_ids:
-                await pipe.mget([
-                    f"session.{sess_id}.requests",
-                    f"session.{sess_id}.last_response_time",
-                ])
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(ctx.redis_live, _build_pipeline)
-        for result in results:
-            if result[0] is not None and result[1] is not None:
-                requests = int(result[0])
-                last_response_ms = int(result[1])
-            else:
-                requests = 0
-                last_response_ms = 0
-            stats.append({"requests": int(requests), "last_response_ms": last_response_ms})
-
-        return stats
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await ctx.valkey_live.get_session_statistics_batch(session_ids_str)
 
 
 async def recalc_concurrency_used(
@@ -951,19 +914,15 @@ async def recalc_concurrency_used(
         assert isinstance(concurrency_used, int)
         assert isinstance(sftp_concurrency_used, int)
 
-    await redis_helper.execute(
-        valkey_stat_client,
-        lambda r: r.set(
-            f"keypair.concurrency_used.{access_key}",
-            concurrency_used,
-        ),
+    await valkey_stat_client.set_keypair_concurrency(
+        access_key=str(access_key),
+        concurrency_used=concurrency_used,
+        is_private=False,
     )
-    await redis_helper.execute(
-        valkey_stat_client,
-        lambda r: r.set(
-            f"keypair.sftp_concurrency_used.{access_key}",
-            sftp_concurrency_used,
-        ),
+    await valkey_stat_client.set_keypair_concurrency(
+        access_key=str(access_key),
+        concurrency_used=sftp_concurrency_used,
+        is_private=True,
     )
 
 

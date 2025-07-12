@@ -40,7 +40,7 @@ from pydantic import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import BaseFieldModel
@@ -527,7 +527,7 @@ class ExposedVolumeInfoField(StrEnum):
 
 async def fetch_exposed_volume_fields(
     storage_manager: StorageSessionManager,
-    redis_connection: ValkeyStatClient,
+    valkey_stat_client: ValkeyStatClient,
     proxy_name: str,
     volume_name: str,
 ) -> Dict[str, int | float]:
@@ -538,10 +538,7 @@ async def fetch_exposed_volume_fields(
     show_total = ExposedVolumeInfoField.capacity_bytes in storage_manager._exposed_volume_info
 
     if show_percentage or show_used or show_total:
-        volume_usage_cache = await redis_helper.execute(
-            redis_connection,
-            lambda r: r.get(f"volume.usage.{proxy_name}.{volume_name}"),
-        )
+        volume_usage_cache = await valkey_stat_client.get_volume_usage(proxy_name, volume_name)
 
         if volume_usage_cache:
             volume_usage = msgpack.unpackb(volume_usage_cache)
@@ -572,13 +569,8 @@ async def fetch_exposed_volume_fields(
                     except ZeroDivisionError:
                         volume_usage["percentage"] = 0
 
-            await redis_helper.execute(
-                redis_connection,
-                lambda r: r.set(
-                    f"volume.usage.{proxy_name}.{volume_name}",
-                    msgpack.packb(volume_usage),
-                    ex=60,
-                ),
+            await valkey_stat_client.set_volume_usage(
+                proxy_name, volume_name, msgpack.packb(volume_usage), 60
             )
 
     return volume_usage
@@ -636,7 +628,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     fetch_exposed_volume_fields_tasks = [
         fetch_exposed_volume_fields(
             storage_manager=root_ctx.storage_manager,
-            redis_connection=root_ctx.valkey_stat_client,
+            valkey_stat_client=root_ctx.valkey_stat,
             proxy_name=proxy_name,
             volume_name=volume_data["name"],
         )

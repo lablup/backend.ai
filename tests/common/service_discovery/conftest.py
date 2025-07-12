@@ -57,12 +57,33 @@ async def redis_conn(redis_container):
 
 
 @pytest.fixture
-async def redis_discovery(redis_conn):
-    yield RedisServiceDiscovery(
-        args=RedisServiceDiscoveryArgs(
-            redis=redis_conn,
+async def redis_discovery(redis_container):
+    # Create a proper RedisTarget for the service discovery
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config=RedisHelperConfig(
+            socket_timeout=1.0,
+            socket_connect_timeout=1.0,
+            reconnect_poll_timeout=1.0,
+            max_connections=10,
+            connection_ready_timeout=1.0,
         ),
     )
+
+    discovery = RedisServiceDiscovery(
+        args=RedisServiceDiscoveryArgs(
+            redis_target=redis_target,
+        ),
+    )
+    await discovery.connect()
+    try:
+        # Flush the database to ensure clean state
+        await discovery._valkey_client._client.client.flushdb()
+        yield discovery
+    finally:
+        # Cleanup: flush database before closing
+        await discovery._valkey_client._client.client.flushdb()
+        await discovery.close()
 
 
 @pytest.fixture
