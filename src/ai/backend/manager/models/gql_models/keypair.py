@@ -8,10 +8,9 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, RedisProfileTarget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -159,29 +158,23 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        n = await redis_helper.execute(
-            ctx.valkey_stat_client, lambda r: r.get(f"kp:{self.access_key}:num_queries")
-        )
-        if n is not None:
-            return n
-        return 0
+        return await ctx.valkey_stat.get_keypair_query_count(self.access_key)
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             ctx.config_provider.config.redis.model_dump()
         )
-        redis_rlim = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
-            name="ratelimit",
-            db=REDIS_RATE_LIMIT_DB,
+        redis_target = redis_profile_target.profile_target(RedisRole.RATE_LIMIT)
+        valkey_client = await ValkeyRateLimitClient.create(
+            redis_target=redis_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="ratelimit",
         )
-
-        async def _zcard(r: Redis):
-            return await r.zcard(self.access_key)
-
-        ret = await redis_helper.execute(redis_rlim, _zcard)
-        return int(ret) if ret is not None else 0
+        try:
+            return await valkey_client.get_rolling_count(self.access_key)
+        finally:
+            await valkey_client.close()
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
@@ -201,24 +194,14 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        kp_key = "keypair.concurrency_used"
-        concurrency_used = await redis_helper.execute(
-            ctx.valkey_stat_client,
-            lambda r: r.get(f"{kp_key}.{self.access_key}"),
-        )
-        if concurrency_used is not None:
-            return int(concurrency_used)
-        return 0
+        return await ctx.valkey_stat.get_keypair_concurrency_used(self.access_key)
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
-        last_call_time_key = f"kp:{self.access_key}:last_call_time"
-        row_ts = await redis_helper.execute(
-            ctx.valkey_stat_client, lambda r: r.get(last_call_time_key)
-        )
+        row_ts = await ctx.valkey_stat.get_keypair_last_used_time(self.access_key)
         if row_ts is None:
             return None
-        return datetime.fromtimestamp(float(row_ts))
+        return datetime.fromtimestamp(row_ts)
 
     @classmethod
     async def load_all(
@@ -571,8 +554,8 @@ class DeleteKeyPair(graphene.Mutation):
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         result = await simple_db_mutate(cls, ctx, delete_query)
         if result.ok:
-            await redis_helper.execute(
-                ctx.valkey_stat_client,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            await ctx.valkey_stat.delete_keypair_concurrency(
+                access_key=access_key,
+                is_private=False,
             )
         return result

@@ -481,20 +481,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
 
-            now_result = await root_ctx.valkey_stat_client.time()
-            now = now_result[0] + (now_result[1] / (10**6))
-
-            # Use ValkeyStatClient individual operations
-            num_queries_key = f"kp:{access_key}:num_queries"
-            await root_ctx.valkey_stat_client.incr(num_queries_key)
-            await root_ctx.valkey_stat_client.expire(
-                num_queries_key, 86400 * 30
-            )  # retention: 1 month
-            last_call_time_key = f"kp:{access_key}:last_call_time"
-            await root_ctx.valkey_stat_client.set(last_call_time_key, str(now).encode())
-            await root_ctx.valkey_stat_client.expire(
-                last_call_time_key, 86400 * 30
-            )  # retention: 1 month
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -514,21 +501,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             )
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
-
-            now_result = await root_ctx.valkey_stat_client.time()
-            now = now_result[0] + (now_result[1] / (10**6))
-
-            # Use ValkeyStatClient individual operations
-            num_queries_key = f"kp:{access_key}:num_queries"
-            await root_ctx.valkey_stat_client.incr(num_queries_key)
-            await root_ctx.valkey_stat_client.expire(
-                num_queries_key, 86400 * 30
-            )  # retention: 1 month
-            last_call_time_key = f"kp:{access_key}:last_call_time"
-            await root_ctx.valkey_stat_client.set(last_call_time_key, str(now).encode())
-            await root_ctx.valkey_stat_client.expire(
-                last_call_time_key, 86400 * 30
-            )  # retention: 1 month
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
