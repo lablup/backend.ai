@@ -26,10 +26,11 @@ def upgrade() -> None:
     op.create_primary_key("pk_object_permissions", "object_permissions", ["id"])
 
     op.drop_column("user_roles", "state")
+    op.alter_column("roles", "state", new_column_name="status")
     op.add_column(
         "scope_permissions",
         sa.Column(
-            "state",
+            "status",
             sa.VARCHAR(length=16),
             nullable=False,
             server_default="active",
@@ -38,7 +39,7 @@ def upgrade() -> None:
     op.add_column(
         "object_permissions",
         sa.Column(
-            "state",
+            "status",
             sa.VARCHAR(length=16),
             nullable=False,
             server_default="active",
@@ -64,5 +65,6 @@ def downgrade() -> None:
             server_default="active",
         ),
     )
-    op.drop_column("role_permissions", "state")
-    op.drop_column("resource_permissions", "state")
+    op.alter_column("roles", "status", new_column_name="state")
+    op.drop_column("role_permissions", "status")
+    op.drop_column("resource_permissions", "status")

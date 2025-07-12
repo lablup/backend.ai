@@ -25,11 +25,11 @@ if TYPE_CHECKING:
     from .user_role import UserRoleRow
 
 
-class RoleState(enum.StrEnum):
+class RoleStatus(enum.StrEnum):
     ACTIVE = "active"
-    # 'inactive' state is used when the role is temporarily disabled
+    # 'inactive' status is used when the role is temporarily disabled
     INACTIVE = "inactive"
-    # 'deleted' state is used when the role is permanently removed
+    # 'deleted' status is used when the role is permanently removed
     DELETED = "deleted"
 
 
@@ -39,12 +39,12 @@ class RoleRow(Base):
     id: uuid.UUID = IDColumn()
     name: str = sa.Column("name", sa.String(64), nullable=False)
     description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-    state: str = sa.Column(
-        "state",
-        StrEnumType(RoleState),
+    status: str = sa.Column(
+        "status",
+        StrEnumType(RoleStatus),
         nullable=False,
-        default=RoleState.ACTIVE,
-        server_default=RoleState.ACTIVE,
+        default=RoleStatus.ACTIVE,
+        server_default=RoleStatus.ACTIVE,
     )
     created_at: datetime = sa.Column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()

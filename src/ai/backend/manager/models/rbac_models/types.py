@@ -1,9 +1,9 @@
 import enum
 
 
-class PermissionState(enum.StrEnum):
+class PermissionStatus(enum.StrEnum):
     ACTIVE = "active"
-    # 'inactive' state is used when the permission is temporarily disabled
+    # 'inactive' status is used when the permission is temporarily disabled
     INACTIVE = "inactive"
-    # 'deleted' state is used when the permission is permanently removed
+    # 'deleted' status is used when the permission is permanently removed
     DELETED = "deleted"

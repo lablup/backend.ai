@@ -17,7 +17,7 @@ from ..base import (
     IDColumn,
     StrEnumType,
 )
-from .types import PermissionState
+from .types import PermissionStatus
 
 if TYPE_CHECKING:
     from .role import RoleRow
@@ -27,12 +27,12 @@ class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
 
     id: uuid.UUID = IDColumn()
-    state: PermissionState = sa.Column(
-        "state",
-        StrEnumType(PermissionState),
+    status: PermissionStatus = sa.Column(
+        "status",
+        StrEnumType(PermissionStatus),
         nullable=False,
-        default=PermissionState.ACTIVE,
-        server_default=PermissionState.ACTIVE,
+        default=PermissionStatus.ACTIVE,
+        server_default=PermissionStatus.ACTIVE,
     )
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
     entity_type: str = sa.Column(
