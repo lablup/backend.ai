@@ -10,14 +10,11 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.engine import Result, Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import VFolderID
@@ -762,13 +759,13 @@ class UserService:
         )
         if (row := ak_rows.first()) and (access_key := row.access_key):
             # Log concurrency used only when there is at least one keypair.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            await redis_conn.delete_keypair_concurrency(
+                access_key=access_key,
+                is_private=False,
             )
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
+            await redis_conn.delete_keypair_concurrency(
+                access_key=access_key,
+                is_private=True,
             )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
@@ -879,13 +876,8 @@ class UserService:
             for idx in range(stat_length)
         ]
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
-
-        raw_stats = await redis_helper.execute(self._valkey_stat_client, _pipe_builder)
+        kernel_ids = [str(row["id"]) for row in rows]
+        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         for row, raw_stat in zip(rows, raw_stats):
             if raw_stat is not None:

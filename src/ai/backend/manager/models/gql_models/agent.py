@@ -15,13 +15,11 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -113,13 +111,9 @@ GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
-    raw_alloc_map = await redis_helper.execute(
-        ctx.valkey_stat_client, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
-    )
-
+    raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        alloc_map = load_json(raw_alloc_map)
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
+        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
     return {}
 
 
@@ -235,35 +229,13 @@ class AgentNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
-
-        ret = []
-        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
-            else:
-                ret.append(None)
-
-        return ret
+        return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
-
-        ret = []
-        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            ret.append(int(cnt) if cnt is not None else 0)
-        return ret
+        return await ctx.valkey_stat.get_agent_container_counts_batch(list(agent_ids))
 
     @classmethod
     async def get_connection(
@@ -606,20 +578,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
-
-        ret = []
-        for stat in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            if stat is not None:
-                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
-            else:
-                ret.append(None)
-
-        return ret
+        return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_cpu_cur_pct(
@@ -655,16 +614,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
-
-        ret = []
-        for cnt in await redis_helper.execute(ctx.valkey_stat_client, _pipe_builder):
-            ret.append(int(cnt) if cnt is not None else 0)
-        return ret
+        return await ctx.valkey_stat.get_agent_container_counts_batch(list(agent_ids))
 
 
 async def _query_domain_groups_by_ak(
@@ -950,7 +900,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     AgentId(agent_id)
                 )
                 key = f"gpu_alloc_map.{agent_id}"
-                await graph_ctx.registry.valkey_stat_client.setex(
+                await graph_ctx.registry.valkey_stat.setex(
                     name=key,
                     value=dump_json_str(alloc_map),
                     time=GPU_ALLOC_MAP_CACHE_PERIOD,

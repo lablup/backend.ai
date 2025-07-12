@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Callable, Optional, Self
+from typing import Any, Callable, Optional, Self
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -19,9 +19,6 @@ from .base import (
     IDColumn,
     ResourceSlotColumn,
 )
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 

@@ -8,11 +8,8 @@ from uuid import UUID
 import attrs
 import msgpack
 import sqlalchemy as sa
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
 
-from ai.backend.common import redis_helper
 from ai.backend.common.utils import nmget
 
 if TYPE_CHECKING:
@@ -498,13 +495,8 @@ async def parse_resource_usage_groups(
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
 
-    async def _pipe_builder(r: Redis) -> RedisPipeline:
-        pipe = r.pipeline()
-        for kern_id in stat_empty_kerns:
-            await pipe.get(str(kern_id))
-        return pipe
-
-    raw_stats = await redis_helper.execute(valkey_stat_client, _pipe_builder)
+    kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
+    raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
     for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):
         if raw_stat is None:
             continue

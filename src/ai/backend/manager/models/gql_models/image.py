@@ -241,7 +241,7 @@ class Image(graphene.ObjectType):
         row: ImageRow,
     ) -> Image:
         # TODO: add architecture
-        _installed_agents = await ctx.redis_image.get_agents_for_image(row.name)
+        _installed_agents = await ctx.valkey_image.get_agents_for_image(row.name)
         installed_agents: List[str] = list(_installed_agents)
         return cls.populate_row(ctx, row, installed_agents)
 
@@ -252,7 +252,7 @@ class Image(graphene.ObjectType):
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
         image_canonicals = [row.name for row in rows]
-        results = await ctx.redis_image.get_agents_for_images(image_canonicals)
+        results = await ctx.valkey_image.get_agents_for_images(image_canonicals)
 
         for idx, row in enumerate(rows):
             installed_agents: List[str] = list(results[idx])
@@ -472,7 +472,7 @@ class ImageNode(graphene.ObjectType):
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, full_names: Sequence[str]
     ) -> list[set[AgentId]]:
-        results = await ctx.redis_image.get_agents_for_images(list(full_names))
+        results = await ctx.valkey_image.get_agents_for_images(list(full_names))
         return [{AgentId(agent_id) for agent_id in agents} for agents in results]
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:

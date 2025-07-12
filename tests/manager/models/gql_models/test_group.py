@@ -36,9 +36,9 @@ def get_graphquery_context(
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore
-        valkey_stat_client=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
+        valkey_stat=None,  # type: ignore
+        valkey_image=None,  # type: ignore
+        valkey_live=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=None,  # type: ignore

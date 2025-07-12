@@ -8,7 +8,6 @@ import logging
 import re
 import secrets
 import time
-import typing
 import uuid
 import zlib
 from collections import defaultdict
@@ -45,7 +44,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -53,9 +51,10 @@ from sqlalchemy.orm.exc import NoResultFound
 from typeguard import check_type
 from yarl import URL
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -128,7 +127,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
     SessionId,
@@ -204,10 +202,8 @@ from .models import (
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
-    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFAULT,
-    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
@@ -260,10 +256,9 @@ class AgentRegistry:
         config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
-        valkey_stat_client: ValkeyStatClient,
-        redis_live: RedisConnectionInfo,
-        redis_image: ValkeyImageClient,
-        redis_stream: RedisConnectionInfo,
+        valkey_stat: ValkeyStatClient,
+        valkey_live: ValkeyLiveClient,
+        valkey_image: ValkeyImageClient,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -277,10 +272,9 @@ class AgentRegistry:
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
-        self.valkey_stat_client = valkey_stat_client
-        self.redis_live = redis_live
-        self.redis_image = redis_image
-        self.redis_stream = redis_stream
+        self.valkey_stat = valkey_stat
+        self.valkey_live = valkey_live
+        self.valkey_image = valkey_image
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -292,7 +286,7 @@ class AgentRegistry:
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
-            valkey_stat_client,
+            valkey_stat,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -2134,61 +2128,45 @@ class AgentRegistry:
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
+        await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
 
-        # Update keypair resource usage for keypairs with running containers.
-        async def _update(r: Redis):
-            updates: dict[str, int] = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                updates |= concurrency.to_cnt_map()
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
-        async def _update_by_fullscan(r: Redis):
-            updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.compute_session_ids)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.system_concurrency_used_key)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
+    async def _update_concurrency(
+        self,
+        access_key_to_concurrency_used: Mapping[AccessKey, ConcurrencyUsed],
+        do_fullscan: bool,
+    ) -> None:
+        """Update concurrency values in valkey based on the current state."""
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
         _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
-            await redis_helper.execute(
-                self.valkey_stat_client,
-                _update_by_fullscan,
-            )
+            # Convert ConcurrencyUsed objects to simple access_key -> count mapping
+            # For fullscan, we need both compute and system concurrency counts
+            access_key_to_count = {
+                str(ak): len(concurrency.compute_session_ids)
+                for ak, concurrency in access_key_to_concurrency_used.items()
+            }
+            await self.valkey_stat.update_concurrency_by_fullscan(access_key_to_count)
         else:
-            await redis_helper.execute(
-                self.valkey_stat_client,
-                _update,
-            )
+            # Update keypair resource usage for keypairs with running containers.
+            # Prepare separate maps for compute and system concurrency
+            compute_concurrency_map = {}
+            system_concurrency_map = {}
+            for concurrency in access_key_to_concurrency_used.values():
+                compute_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.compute_session_ids
+                )
+                system_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.system_session_ids
+                )
+
+            # Update compute concurrency
+            if compute_concurrency_map:
+                await self.valkey_stat.update_compute_concurrency_by_map(compute_concurrency_map)
+
+            # Update system concurrency
+            if system_concurrency_map:
+                await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
 
     async def destroy_session_lowlevel(
         self,
@@ -2345,16 +2323,9 @@ class AgentRegistry:
             target_session = cast(SessionRow, target_session)
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
-                if is_private:
-                    kp_key = "keypair.sftp_concurrency_used"
-                else:
-                    kp_key = "keypair.concurrency_used"
-                await redis_helper.execute(
-                    self.valkey_stat_client,
-                    lambda r: r.incrby(
-                        f"{kp_key}.{access_key}",
-                        -1,
-                    ),
+                await self.valkey_stat.decrement_keypair_concurrency(
+                    access_key=str(access_key),
+                    is_private=is_private,
                 )
 
             match target_session.status:
@@ -2489,9 +2460,8 @@ class AgentRegistry:
                                 to_be_terminated.append(kernel)
 
                             async def _update() -> None:
-                                kern_stat = await redis_helper.execute(
-                                    self.valkey_stat_client,
-                                    lambda r: r.get(str(kernel.id)),
+                                kern_stat = await self.valkey_stat.get_kernel_statistics(
+                                    str(kernel.id)
                                 )
                                 async with self.db.begin_session() as db_sess:
                                     values = {
@@ -2508,7 +2478,7 @@ class AgentRegistry:
                                         ),
                                     }
                                     if kern_stat:
-                                        values["last_stat"] = msgpack.unpackb(kern_stat)
+                                        values["last_stat"] = kern_stat
                                     await db_sess.execute(
                                         sa.update(KernelRow)
                                         .values(**values)
@@ -2588,11 +2558,10 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis_helper.execute(
-                                    self.valkey_stat_client, lambda r: r.get(str(kernel.id))
+                                last_stat = await self.valkey_stat.get_kernel_statistics(
+                                    str(kernel.id),
                                 )
-                                if raw_last_stat is not None:
-                                    last_stat = msgpack.unpackb(raw_last_stat)
+                                if last_stat is not None:
                                     last_stat["version"] = 2
                             except asyncio.TimeoutError:
                                 pass
@@ -2965,10 +2934,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis_helper.execute(
-                self.redis_live,
-                lambda r: r.hset("agent.last_seen", agent_id, now.timestamp()),
-            )
+            await self.valkey_live.update_agent_last_seen(agent_id, now.timestamp())
 
             # Check and update status of the agent record in DB
             async def _update() -> None:
@@ -3110,7 +3076,7 @@ class AgentRegistry:
             images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             image_canonicals = set(img_info[0] for img_info in images)
 
-            await self.redis_image.add_agent_to_images(agent_id, image_canonicals)
+            await self.valkey_image.add_agent_to_images(agent_id, image_canonicals)
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
@@ -3120,10 +3086,10 @@ class AgentRegistry:
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
-        await self.redis_image.remove_agent_from_images(agent_id, image_canonicals)
+        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis_helper.execute(self.redis_live, lambda r: r.hdel("agent.last_seen", agent_id))
+        await self.valkey_live.remove_agent_last_seen(agent_id)
 
         async def _update() -> None:
             async with self.db.begin() as conn:
@@ -3158,7 +3124,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await self.redis_image.remove_agent_from_all_images(agent_id)
+        await self.valkey_image.remove_agent_from_all_images(agent_id)
         await execute_with_retry(_update)
 
     async def sync_kernel_stats(
@@ -3169,15 +3135,12 @@ class AgentRegistry:
         log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis_helper.execute(
-                self.valkey_stat_client,
-                lambda r: r.get(raw_kernel_id),
-            )
+            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
             if kern_stat is None:
                 log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
                 continue
             else:
-                per_kernel_updates[kernel_id] = msgpack.unpackb(kern_stat)
+                per_kernel_updates[kernel_id] = kern_stat
 
         async def _update():
             async with self.db.begin() as conn:
@@ -3426,19 +3389,7 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-
-        kern_stat = cast(
-            bytes | None,
-            await redis_helper.execute(
-                self.valkey_stat_client,
-                lambda r: r.get(str(kernel_id)),
-            ),
-        )
-        if kern_stat is not None:
-            last_stat = msgpack.unpackb(kern_stat)
-        else:
-            last_stat = None
-
+        last_stat = await self.valkey_stat.get_kernel_statistics(str(kernel_id))
         now = datetime.now(tzutc())
 
         async def _get_and_transit(
@@ -3474,7 +3425,7 @@ class AgentRegistry:
                 "recalculate concurrency used in kernel termination (ak: {})",
                 access_key,
             )
-            await recalc_concurrency_used(db_session, self.valkey_stat_client, access_key)
+            await recalc_concurrency_used(db_session, self.valkey_stat, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,
@@ -3505,13 +3456,8 @@ class AgentRegistry:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> Mapping[KernelId, str]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for kernel_id in kernel_ids:
-                await pipe.get(f"kernel.{kernel_id}.commit")
-            return pipe
-
-        commit_statuses = await redis_helper.execute(self.valkey_stat_client, _pipe_builder)
+        kernel_ids_str = [str(kernel_id) for kernel_id in kernel_ids]
+        commit_statuses = await self.valkey_stat.get_kernel_commit_statuses(kernel_ids_str)
 
         return {
             kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
@@ -3622,14 +3568,9 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
     ) -> Optional[AbuseReport]:
-        hash_name = "abuse_report"
-        abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
-            self.valkey_stat_client,
-            lambda r: r.hgetall(hash_name),
-            encoding="utf-8",
-        )
         kern_id = str(kernel_id)
-        if abusing_report is None or (result := abusing_report.get(kern_id)) is None:
+        result = await self.valkey_stat.get_abuse_report(kern_id)
+        if result is None:
             return None
         return {
             "kernel": kern_id,

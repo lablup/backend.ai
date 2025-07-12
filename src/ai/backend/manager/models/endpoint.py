@@ -15,7 +15,6 @@ from typing import (
     List,
     Optional,
     Self,
-    Union,
     cast,
 )
 from uuid import UUID, uuid4
@@ -23,8 +22,6 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 import trafaret as t
 import yarl
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
@@ -33,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     AccessKey,
@@ -41,7 +37,6 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
-    RedisConnectionInfo,
     RuntimeVariant,
     SessionTypes,
     VFolderID,
@@ -944,23 +939,11 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_endpoint_impl(
         cls,
-        valkey_stat_client: Union[RedisConnectionInfo, "ValkeyStatClient"],
+        valkey_stat_client: ValkeyStatClient,
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for endpoint_id in endpoint_ids:
-                pipe.get(f"inference.{endpoint_id}.app")
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(valkey_stat_client, _build_pipeline)
-        for result in results:
-            if result is not None:
-                stats.append(msgpack.unpackb(result))
-            else:
-                stats.append(None)
-        return stats
+        endpoint_id_strs = [str(endpoint_id) for endpoint_id in endpoint_ids]
+        return await valkey_stat_client.get_inference_app_statistics_batch(endpoint_id_strs)
 
     @classmethod
     async def batch_load_by_endpoint(
@@ -968,7 +951,7 @@ class EndpointStatistics:
         ctx: "GraphQueryContext",
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat_client, endpoint_ids)
+        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)
 
     @classmethod
     async def batch_load_by_replica(
@@ -976,17 +959,7 @@ class EndpointStatistics:
         ctx: GraphQueryContext,
         endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for endpoint_id, replica_id in endpoint_replica_ids:
-                pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(ctx.valkey_stat_client, _build_pipeline)
-        for result in results:
-            if result is not None:
-                stats.append(msgpack.unpackb(result))
-            else:
-                stats.append(None)
-        return stats
+        endpoint_replica_pairs = [
+            (str(endpoint_id), str(replica_id)) for endpoint_id, replica_id in endpoint_replica_ids
+        ]
+        return await ctx.valkey_stat.get_inference_replica_statistics_batch(endpoint_replica_pairs)
