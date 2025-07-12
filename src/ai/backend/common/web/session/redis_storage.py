@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import logging.config
 import uuid
 from typing import Any, Callable, Optional, override
 
@@ -66,7 +65,8 @@ class RedisStorage(AbstractStorage):
         # instead of Cookie value.
         request_headers = extra_config_headers.check(request.headers)
         sessionId = request_headers.get("X-BackendAI-SessionID", None)
-        lifespan = request.app["config"]["session"]["login_session_extension_sec"]
+        config = request.app["config"]
+        lifespan = config.session.login_session_extension_sec
         if sessionId is not None:
             key = str(sessionId)
         else:
@@ -81,10 +81,7 @@ class RedisStorage(AbstractStorage):
         try:
             data = self._decoder(data_bytes)
             if "expiration_dt" not in data:
-                config = request.app["config"]
-                data["expiration_dt"] = (
-                    get_time() + config["session"]["login_session_extension_sec"]
-                )
+                data["expiration_dt"] = get_time() + config.session.login_session_extension_sec
         except ValueError:
             data = None
         return Session(key, data=data, new=False, max_age=self.max_age, lifespan=lifespan)

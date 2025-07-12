@@ -391,9 +391,9 @@ class AgentRPCServer(aobject):
             agent_public_key=self.rpc_auth_agent_public_key,
         )
 
-        rpc_addr = self.local_config.agent.rpc_listen_addr.to_legacy()
+        rpc_addr = self.local_config.agent.rpc_listen_addr
         self.rpc_server = Peer(
-            bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
+            bind=ZeroMQAddress(f"tcp://{rpc_addr.address}"),
             transport=ZeroMQRPCTransport,
             authenticator=auth_handler,
             scheduler=ExitOrderedAsyncScheduler(),

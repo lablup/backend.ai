@@ -264,7 +264,7 @@ class AgentConfig(BaseModel):
         serialization_alias="backend",
     )
     rpc_listen_addr: HostPortPair = Field(
-        default=HostPortPair(host="", port=6001),
+        default=HostPortPair(host="0.0.0.0", port=6001),
         description="RPC listen address and port",
         examples=[{"host": "", "port": 6001}],
         validation_alias=AliasChoices("rpc-listen-addr", "rpc_listen_addr"),
