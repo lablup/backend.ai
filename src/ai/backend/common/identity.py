@@ -62,7 +62,7 @@ async def _detect_aws(session: aiohttp.ClientSession) -> Optional[CloudProvider]
                 if "ami-id" in text or "instance-id" in text:
                     return CloudProvider.AWS
         return None
-    except (aiohttp.ClientError, asyncio.CancelledError, asyncio.TimeoutError):
+    except (aiohttp.ClientError, asyncio.TimeoutError):
         return None
 
 
@@ -77,7 +77,7 @@ async def _detect_azure(session: aiohttp.ClientSession) -> Optional[CloudProvide
                 if "compute" in data:
                     return CloudProvider.AZURE
         return None
-    except (aiohttp.ClientError, asyncio.CancelledError, asyncio.TimeoutError):
+    except (aiohttp.ClientError, asyncio.TimeoutError):
         return None
 
 
@@ -90,7 +90,7 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> Optional[CloudProvider]
             if resp.status == 200 and resp.headers.get("Metadata-Flavor") == "Google":
                 return CloudProvider.GCP
         return None
-    except (aiohttp.ClientError, asyncio.CancelledError, asyncio.TimeoutError):
+    except (aiohttp.ClientError, asyncio.TimeoutError):
         return None
 
 
