@@ -15,16 +15,25 @@ from ..base import (
     GUID,
     Base,
     IDColumn,
+    StrEnumType,
 )
+from .types import PermissionState
 
 if TYPE_CHECKING:
     from .role import RoleRow
 
 
 class ObjectPermissionRow(Base):
-    __tablename__ = "entity_permissions"
+    __tablename__ = "object_permissions"
 
     id: uuid.UUID = IDColumn()
+    state: PermissionState = sa.Column(
+        "state",
+        StrEnumType(PermissionState),
+        nullable=False,
+        default=PermissionState.ACTIVE,
+        server_default=PermissionState.ACTIVE,
+    )
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
     entity_type: str = sa.Column(
         "entity_type", sa.String(32), nullable=False

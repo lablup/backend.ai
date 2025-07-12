@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import uuid
 from datetime import datetime
 from typing import (
@@ -17,22 +16,11 @@ from ..base import (
     GUID,
     Base,
     IDColumn,
-    StrEnumType,
 )
 
 if TYPE_CHECKING:
     from ..user import UserRow
     from .role import RoleRow
-
-
-class UserRoleState(enum.StrEnum):
-    ACTIVE = "active"
-    # 'inactive' state is used when the role is temporarily disabled
-    INACTIVE = "inactive"
-    # 'expired' state is used when the role has reached its expiration date
-    EXPIRED = "expired"
-    # 'deleted' state is used when the role is permanently removed
-    DELETED = "deleted"
 
 
 class UserRoleRow(Base):
@@ -41,13 +29,6 @@ class UserRoleRow(Base):
     id: uuid.UUID = IDColumn()
     user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    state = sa.Column(
-        "state",
-        StrEnumType(UserRoleState),
-        nullable=False,
-        default=UserRoleState.ACTIVE,
-        server_default=UserRoleState.ACTIVE,
-    )
     granted_by: uuid.UUID = sa.Column(
         "granted_by", GUID, nullable=True
     )  # Null if granted by system

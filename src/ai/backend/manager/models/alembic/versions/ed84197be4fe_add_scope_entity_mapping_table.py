@@ -1,7 +1,7 @@
 """add scope entity mapping table
 
 Revision ID: ed84197be4fe
-Revises: 643deb439458
+Revises: 60bcbf00a96e
 Create Date: 2025-07-11 22:16:00.414113
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "ed84197be4fe"
-down_revision = "643deb439458"
+down_revision = "60bcbf00a96e"
 branch_labels = None
 depends_on = None
 
