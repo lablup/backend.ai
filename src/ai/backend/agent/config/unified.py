@@ -8,8 +8,9 @@ from __future__ import annotations
 import enum
 import logging
 import os
+import textwrap
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Any, Mapping, Optional
 
 from pydantic import (
     AliasChoices,
@@ -17,7 +18,6 @@ from pydantic import (
     ConfigDict,
     Field,
     FilePath,
-    PlainValidator,
     field_validator,
 )
 
@@ -28,7 +28,12 @@ from ai.backend.common.typed_validators import (
     HostPortPair,
     UserID,
 )
-from ai.backend.common.types import BinarySize, ResourceGroupType, ServiceDiscoveryType
+from ai.backend.common.types import (
+    BinarySize,
+    BinarySizeField,
+    ResourceGroupType,
+    ServiceDiscoveryType,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from ..affinity_map import AffinityPolicy
@@ -38,32 +43,21 @@ from ..types import AgentBackend
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _validate_binary_size(v: Any) -> BinarySize:
-    """Validator for BinarySize fields."""
-    if isinstance(v, BinarySize):
-        return v
-    return BinarySize.finite_from_str(v)
-
-
-# Create a custom type annotation for BinarySize fields
-BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
-
-
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class ContainerSandboxType(enum.StrEnum):
-    docker = "docker"
-    jail = "jail"
+    DOCKER = "docker"
+    JAIL = "jail"
 
 
 class ScratchType(enum.StrEnum):
-    hostdir = "hostdir"
-    hostfile = "hostfile"
-    memory = "memory"
-    k8s_nfs = "k8s-nfs"
+    HOSTDIR = "hostdir"
+    HOSTFILE = "hostfile"
+    MEMORY = "memory"
+    K8S_NFS = "k8s-nfs"
 
 
 class SyncContainerLifecyclesConfig(BaseModel):
@@ -162,6 +156,14 @@ class CoreDumpConfig(BaseModel):
         examples=["64M", "128M"],
         validation_alias=AliasChoices("size-limit", "size_limit"),
         serialization_alias="size-limit",
+    )
+    corepath: Optional[Path] = Field(
+        default=None,
+        description=textwrap.dedent("""
+            Path to the core pattern file.
+            It is used to determine where core dumps are stored.
+            This field is set automatically based on the system's core pattern.
+        """),
     )
 
 
@@ -407,7 +409,7 @@ class AgentConfig(BaseModel):
         serialization_alias="pid-file",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="Event loop type",
         examples=[item.value for item in EventLoopType],
         validation_alias=AliasChoices("event-loop", "event_loop"),
@@ -539,6 +541,11 @@ class AgentConfig(BaseModel):
         serialization_alias="docker-mode",
     )
 
+    def real_mount_path(self, directory_path: str) -> Path:
+        if self.mount_path is None:
+            return Path("./", directory_path)
+        return Path(self.mount_path, directory_path)
+
     model_config = ConfigDict(
         extra="allow",
     )
@@ -588,7 +595,7 @@ class ContainerConfig(BaseModel):
         serialization_alias="stats-type",
     )
     sandbox_type: ContainerSandboxType = Field(
-        default=ContainerSandboxType.docker,
+        default=ContainerSandboxType.DOCKER,
         description="Sandbox type",
         examples=[item.value for item in ContainerSandboxType],
         validation_alias=AliasChoices("sandbox-type", "sandbox_type"),
@@ -642,6 +649,33 @@ class ContainerConfig(BaseModel):
         examples=["br-backend"],
         validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
         serialization_alias="alternative-bridge",
+    )
+    krunner_volumes: Optional[Mapping[str, str]] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        KRunner volumes configuration, mapping container names to host paths.
+        This is used to specify volumes that should be mounted into containers
+        when using the KRunner backend.
+        This fields is filled by the agent at runtime based on the
+        `krunner_volumes` configuration in the agent's environment.
+        It is not intended to be set in the configuration file.
+        """),
+        examples=[],
+        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
+        serialization_alias="krunner-volumes",
+    )
+    swarm_enabled: bool = Field(
+        default=False,
+        description=textwrap.dedent("""
+        Whether to enable Docker Swarm mode.
+        This allows the agent to manage containers in a Docker Swarm cluster.
+        When enabled, the agent will use Docker Swarm APIs to manage containers,
+        networks, and services.
+        This field is only used when backend is set to 'docker'.
+        """),
+        examples=[True, False],
+        validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
+        serialization_alias="swarm-enabled",
     )
 
     model_config = ConfigDict(
@@ -799,6 +833,10 @@ class KernelLifecyclesConfig(BaseModel):
 
 
 class DockerExtraConfig(BaseModel):
+    """
+    For checking additional Docker configurations
+    """
+
     swarm_enabled: bool = Field(
         default=False,
         description="Whether Docker Swarm is enabled",
@@ -861,14 +899,6 @@ class AgentUnifiedConfig(BaseModel):
         description="Kernel lifecycles configuration",
         validation_alias=AliasChoices("kernel-lifecycles", "kernel_lifecycles"),
         serialization_alias="kernel-lifecycles",
-    )
-
-    # Docker-specific config
-    docker_extra: DockerExtraConfig = Field(
-        default_factory=DockerExtraConfig,
-        description="Docker-specific configuration",
-        validation_alias=AliasChoices("docker-extra", "docker_extra"),
-        serialization_alias="docker-extra",
     )
 
     # TODO: Remove me after changing config injection logic

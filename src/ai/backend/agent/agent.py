@@ -206,7 +206,7 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
-from .config.unified import AgentUnifiedConfig
+from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
@@ -565,7 +565,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
-        if self.local_config.container.sandbox_type == "jail":
+        if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
             jail_candidates = find_artifacts(
                 f"jail.*.{arch}.bin"
             )  # architecture check is already done when starting agent
@@ -1846,7 +1846,7 @@ class AbstractAgent(
         dest_path = self.local_config.agent.abuse_report_path
         if dest_path is None:
             return
-        auto_terminate: bool = self.local_config.agent.force_terminate_abusing_containers
+        auto_terminate = self.local_config.agent.force_terminate_abusing_containers
 
         def _read(path: Path) -> str:
             with open(path, "r") as fr:
@@ -2299,7 +2299,7 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 kernel_config.get("auto_pull", AutoPullBehavior("digest")),
             )
-            image_pull_timeout = cast(float | None, self.local_config.api.pull_timeout)
+            image_pull_timeout = self.local_config.api.pull_timeout
             if do_pull:
                 log.info(
                     "create_kernel(kernel:{}, session:{}) pulling image: {}",
@@ -2589,7 +2589,7 @@ class AbstractAgent(
                 runtime_path = image_labels.get(LabelName.RUNTIME_PATH, None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
-                if self.local_config.container.sandbox_type == "jail":
+                if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
                     cmdargs += [
                         "/opt/kernel/jail",
                         # "--policy",
@@ -3399,12 +3399,7 @@ async def handle_volume_mount(
         )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_prefix_path = context.local_config.agent.mount_path
-    if volume_mount_prefix_path is None:
-        volume_mount_prefix = "./"
-    else:
-        volume_mount_prefix = str(volume_mount_prefix_path)
-    real_path = Path(volume_mount_prefix, event.dir_name)
+    real_path = context.local_config.agent.real_mount_path(event.dir_name)
     err_msg: str | None = None
     try:
         await mount(
@@ -3447,11 +3442,7 @@ async def handle_volume_umount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_prefix_path = context.local_config.agent.mount_path
-    if volume_mount_prefix_path is None:
-        real_path = Path("./", event.dir_name)
-    else:
-        real_path = Path(volume_mount_prefix_path, event.dir_name)
+    real_path = context.local_config.agent.real_mount_path(event.dir_name)
     err_msg: str | None = None
     did_umount = False
     try:
