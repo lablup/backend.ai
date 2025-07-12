@@ -8,8 +8,8 @@ from string import ascii_uppercase
 from tempfile import NamedTemporaryFile
 from unittest import mock
 
-import aiohttp
 import pytest
+from aioresponses import aioresponses
 
 from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
@@ -24,7 +24,7 @@ from ai.backend.common.utils import (
     readable_size_to_bytes,
     str_to_timedelta,
 )
-from ai.backend.testutils.mock import AsyncContextManagerMock, mock_awaitable, mock_corofunc
+from ai.backend.testutils.mock import AsyncContextManagerMock, mock_awaitable
 
 
 def test_odict() -> None:
@@ -137,30 +137,24 @@ def test_str_to_timedelta() -> None:
 
 
 @pytest.mark.asyncio
-async def test_curl_returns_stripped_body(mocker) -> None:
-    mock_get = mocker.patch.object(aiohttp.ClientSession, "get")
-    mock_resp = {"status": 200, "text": mock_corofunc(b"success  ")}
-    mock_get.return_value = AsyncContextManagerMock(**mock_resp)
+async def test_curl_returns_stripped_body() -> None:
+    with aioresponses() as m:
+        m.get("http://example.com/test/url", status=200, body="success  ")
 
-    resp = await curl("/test/url", "")
-
-    body = await mock_resp["text"]()
-    assert resp == body.strip()
+        resp = await curl("http://example.com/test/url", "")
+        assert resp == "success"  # stripped body
 
 
 @pytest.mark.asyncio
-async def test_curl_returns_default_value_if_not_success(mocker) -> None:
-    mock_get = mocker.patch.object(aiohttp.ClientSession, "get")
-    mock_resp = {"status": 400, "text": mock_corofunc(b"bad request")}
-    mock_get.return_value = AsyncContextManagerMock(**mock_resp)
+async def test_curl_returns_default_value_if_not_success() -> None:
+    with aioresponses() as m:
+        m.get("http://example.com/test/url", status=400, body="bad request")
 
-    # Value.
-    resp = await curl("/test/url", default_value="default")
-    assert resp == "default"
+        resp = await curl("http://example.com/test/url", default_value="default")
+        assert resp == "default"  # from value
 
-    # Callable.
-    resp = await curl("/test/url", default_value=lambda: "default")
-    assert resp == "default"
+        resp = await curl("http://example.com/test/url", default_value=lambda: "default")
+        assert resp == "default"  # from callable
 
 
 def test_string_set_flag() -> None:
