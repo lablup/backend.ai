@@ -40,7 +40,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiotools
 import attrs
@@ -763,7 +763,7 @@ class AbstractAgent(
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
-        self.id = AgentId(local_config.agent.id or "default-agent-id")
+        self.id = AgentId(local_config.agent.id or f"agent-{uuid4()}")
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
         self.kernel_registry = {}
