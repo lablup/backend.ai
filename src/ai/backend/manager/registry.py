@@ -202,10 +202,8 @@ from .models import (
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
-    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFAULT,
-    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
@@ -2130,70 +2128,49 @@ class AgentRegistry:
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
+        await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
 
-        # Update keypair resource usage for keypairs with running containers.
-        async def _update(valkey_client: ValkeyStatClient) -> None:
-            updates: dict[str, bytes] = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                cnt_map = concurrency.to_cnt_map()
-                for key, value in cnt_map.items():
-                    updates[key] = str(value).encode("utf-8")
-            if updates:
-                await valkey_client.set_multiple_keys(updates)
-
-        async def _update_by_fullscan(valkey_client: ValkeyStatClient) -> None:
-            updates = {}
-            # Use the client's scan method directly for compute concurrency keys
-            cursor = b"0"
-            while True:
-                result = await valkey_client._client.client.scan(
-                    str(cursor), match=f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*"
-                )
-
-                cursor = cast(bytes, result[0])
-                keys = cast(list[bytes], result[1])
-                for stat_key in keys:
-                    _stat_key = stat_key.decode("utf-8")
-                    ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                    concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                    usage = (
-                        len(concurrent_sessions.compute_session_ids)
-                        if concurrent_sessions is not None
-                        else 0
-                    )
-                    updates[_stat_key] = str(usage).encode("utf-8")
-                if cursor == b"0":
-                    break
-            # Use the client's scan method directly for system concurrency keys
-            cursor = b"0"
-            while True:
-                result = await valkey_client._client.client.scan(
-                    str(cursor), match=f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*"
-                )
-                cursor = cast(bytes, result[0])
-                keys = cast(list[bytes], result[1])
-                for stat_key in keys:
-                    _stat_key = stat_key.decode("utf-8")
-                    ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                    concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                    usage = (
-                        len(concurrent_sessions.system_concurrency_used_key)
-                        if concurrent_sessions is not None
-                        else 0
-                    )
-                    updates[_stat_key] = str(usage).encode("utf-8")
-                if cursor == b"0":
-                    break
-            if updates:
-                await valkey_client.set_multiple_keys(updates)
-
+    async def _update_concurrency(
+        self,
+        access_key_to_concurrency_used: Mapping[AccessKey, ConcurrencyUsed],
+        do_fullscan: bool,
+    ) -> None:
+        """Update concurrency values in valkey based on the current state."""
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
         _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
-            await _update_by_fullscan(self.valkey_stat_client)
+            # Convert ConcurrencyUsed objects to simple access_key -> count mapping
+            # For fullscan, we need both compute and system concurrency counts
+            access_key_to_count = {
+                str(ak): len(concurrency.compute_session_ids)
+                for ak, concurrency in access_key_to_concurrency_used.items()
+            }
+            await self.valkey_stat_client.update_concurrency_by_fullscan(access_key_to_count)
         else:
-            await _update(self.valkey_stat_client)
+            # Update keypair resource usage for keypairs with running containers.
+            # Prepare separate maps for compute and system concurrency
+            compute_concurrency_map = {}
+            system_concurrency_map = {}
+            for concurrency in access_key_to_concurrency_used.values():
+                compute_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.compute_session_ids
+                )
+                system_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.system_session_ids
+                )
+
+            # Update compute concurrency
+            if compute_concurrency_map:
+                await self.valkey_stat_client.update_compute_concurrency_by_map(
+                    compute_concurrency_map
+                )
+
+            # Update system concurrency
+            if system_concurrency_map:
+                await self.valkey_stat_client.update_system_concurrency_by_map(
+                    system_concurrency_map
+                )
 
     async def destroy_session_lowlevel(
         self,

@@ -39,6 +39,8 @@ _CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
 _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
+_COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.concurrency_used."
+_SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.sftp_concurrency_used."
 
 
 class ValkeyStatClient:
@@ -871,6 +873,24 @@ class ValkeyStatClient:
                 break
         return keys
 
+    async def _keys(self, pattern: str) -> list[bytes]:
+        """
+        Scan for keys matching a pattern without blocking.
+
+        :param pattern: The pattern to match keys against.
+        :return: List of matching keys.
+        """
+        cursor = b"0"
+        matched_keys: list[bytes] = []
+        while True:
+            result = await self._client.client.scan(str(cursor), match=pattern)
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            matched_keys.extend(keys)
+            if cursor == b"0":
+                break
+        return matched_keys
+
     @valkey_decorator()
     async def update_abuse_report(
         self,
@@ -972,3 +992,75 @@ class ValkeyStatClient:
         access_key: str,
     ) -> str:
         return f"kp:{access_key}:last_call_time"
+
+    @valkey_decorator()
+    async def update_compute_concurrency_by_map(
+        self,
+        concurrency_map: dict[str, int],
+    ) -> None:
+        """
+        Update compute concurrency values from a map of access keys to concurrency counts.
+
+        :param concurrency_map: Dictionary mapping access keys to their compute concurrency counts.
+        """
+        if not concurrency_map:
+            return
+
+        updates: dict[str, bytes] = {}
+        for access_key, concurrency_count in concurrency_map.items():
+            key = f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
+            updates[key] = str(concurrency_count).encode("utf-8")
+
+        await self.set_multiple_keys(updates)
+
+    @valkey_decorator()
+    async def update_system_concurrency_by_map(
+        self,
+        concurrency_map: dict[str, int],
+    ) -> None:
+        """
+        Update system (SFTP) concurrency values from a map of access keys to concurrency counts.
+
+        :param concurrency_map: Dictionary mapping access keys to their system concurrency counts.
+        """
+        if not concurrency_map:
+            return
+
+        updates: dict[str, bytes] = {}
+        for access_key, concurrency_count in concurrency_map.items():
+            key = f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
+            updates[key] = str(concurrency_count).encode("utf-8")
+
+        await self.set_multiple_keys(updates)
+
+    @valkey_decorator()
+    async def update_concurrency_by_fullscan(
+        self,
+        access_key_to_concurrency: dict[str, int],
+    ) -> None:
+        """
+        Update concurrency values by doing a full scan and setting all keys.
+        Used when the system has no sessions to reset all concurrency to 0.
+
+        :param access_key_to_concurrency: Dictionary mapping access keys to their concurrency counts.
+        """
+        updates: dict[str, bytes] = {}
+
+        # Scan and update compute concurrency keys
+        compute_keys = await self._keys(f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
+        for key in compute_keys:
+            key_str = key.decode("utf-8")
+            access_key = key_str.replace(_COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
+            concurrency_count = access_key_to_concurrency.get(access_key, 0)
+            updates[key_str] = str(concurrency_count).encode("utf-8")
+
+        # Scan and update system concurrency keys
+        system_keys = await self._keys(f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
+        for key in system_keys:
+            key_str = key.decode("utf-8")
+            access_key = key_str.replace(_SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
+            concurrency_count = access_key_to_concurrency.get(access_key, 0)
+            updates[key_str] = str(concurrency_count).encode("utf-8")
+
+        if updates:
+            await self.set_multiple_keys(updates)
