@@ -343,6 +343,11 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     error_title = "The virtual folder already exists with the same name."
 
 
+class VFolderGone(BackendError, web.HTTPGone):
+    error_type = "https://api.backend.ai/probs/vfolder-gone"
+    error_title = "The virtual folder is gone."
+
+
 class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
     error_title = "Cannot delete model VFolders bound to alive model services."
 
