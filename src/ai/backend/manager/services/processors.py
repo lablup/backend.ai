@@ -16,6 +16,7 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -157,7 +158,8 @@ class Services:
             config_provider=args.config_provider,
         )
         model_serving_auto_scaling = AutoScalingService(args.db)
-        auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)
+        auth_repository = AuthRepository(args.db)
+        auth = AuthService(repository=auth_repository, hook_plugin_ctx=args.hook_plugin_ctx)
 
         return cls(
             agent=agent_service,
