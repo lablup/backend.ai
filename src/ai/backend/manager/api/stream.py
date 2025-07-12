@@ -499,12 +499,10 @@ async def stream_proxy(
 
     redis_live = root_ctx.valkey_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
-    conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
     async def update_connection_tracker() -> None:
         """Update connection tracker with current timestamp."""
-        timestamp = await redis_live.get_server_time()
-        await redis_live._client.client.zadd(conn_tracker_key, {conn_tracker_val: timestamp})
+        await redis_live.update_app_connection_tracker(kernel_id, service, stream_id)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -525,7 +523,7 @@ async def stream_proxy(
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
             app_ctx.active_session_ids[kernel_id] += 1
-            await redis_live.update_connection_tracker(kernel_id, conn_tracker_val)
+            await redis_live.update_connection_tracker(kernel_id, service, stream_id)
             await root_ctx.idle_checker_host.update_app_streaming_status(
                 kernel_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
@@ -536,7 +534,7 @@ async def stream_proxy(
             app_ctx.active_session_ids[kernel_id] -= 1
             if app_ctx.active_session_ids[kernel_id] <= 0:
                 del app_ctx.active_session_ids[kernel_id]
-            await redis_live.remove_connection_tracker(kernel_id, conn_tracker_val)
+            await redis_live.remove_connection_tracker(kernel_id, service, stream_id)
             remaining_count = await redis_live.count_active_connections(str(kernel_id))
             if remaining_count == 0:
                 await root_ctx.idle_checker_host.update_app_streaming_status(

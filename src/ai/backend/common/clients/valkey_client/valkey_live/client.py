@@ -215,32 +215,69 @@ class ValkeyLiveClient:
     async def update_connection_tracker(
         self,
         session_id: str,
-        connection_id: str,
+        service: str,
+        stream_id: str,
     ) -> None:
         """
         Update connection tracker with current timestamp.
 
         :param session_id: The session ID to track connections for.
-        :param connection_id: The connection ID to add/update.
+        :param service: The service name.
+        :param stream_id: The stream ID.
         """
         current_time = await self.get_server_time()
+        connection_id = self._active_app_connection_value(
+            kernel_id=session_id,
+            service=service,
+            stream_id=stream_id,
+        )
         tracker_key = self._active_app_connection_key(session_id)
         await self._client.client.zadd(tracker_key, {connection_id: current_time})
+
+    @valkey_decorator()
+    async def update_app_connection_tracker(
+        self,
+        kernel_id: str,
+        service: str,
+        stream_id: str,
+    ) -> None:
+        """
+        Update app connection tracker for a specific kernel, service, and stream.
+
+        :param kernel_id: The kernel ID.
+        :param service: The service name.
+        :param stream_id: The stream ID.
+        """
+        tracker_key = self._active_app_connection_key(kernel_id)  # TODO: Check if this is correct
+        tracker_val = self._active_app_connection_value(
+            kernel_id=kernel_id,
+            service=service,
+            stream_id=stream_id,
+        )
+        current_time = await self.get_server_time()
+        await self._client.client.zadd(tracker_key, {tracker_val: current_time})
 
     @valkey_decorator()
     async def remove_connection_tracker(
         self,
         session_id: str,
-        connection_id: str,
+        service: str,
+        stream_id: str,
     ) -> int:
         """
         Remove connection from tracker.
 
         :param session_id: The session ID to remove connection from.
-        :param connection_id: The connection ID to remove.
+        :param service: The service name.
+        :param stream_id: The stream ID.
         :return: Number of connections removed.
         """
         tracker_key = self._active_app_connection_key(session_id)
+        connection_id = self._active_app_connection_value(
+            kernel_id=session_id,
+            service=service,
+            stream_id=stream_id,
+        )
         return await self._client.client.zrem(tracker_key, [connection_id])
 
     @valkey_decorator()
@@ -449,3 +486,19 @@ class ValkeyLiveClient:
         :return: The key for active app connections.
         """
         return f"session.{session_id}.active_app_connections"
+
+    def _active_app_connection_value(
+        self,
+        kernel_id: str,
+        service: str,
+        stream_id: str,
+    ) -> str:
+        """
+        Generate the value for tracking active app connections.
+
+        :param kernel_id: The kernel ID.
+        :param service: The service name.
+        :param stream_id: The stream ID.
+        :return: The value for active app connections.
+        """
+        return f"{kernel_id}:{service}:{stream_id}"
