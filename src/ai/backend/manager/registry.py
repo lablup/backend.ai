@@ -256,9 +256,9 @@ class AgentRegistry:
         config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
-        valkey_stat_client: ValkeyStatClient,
+        valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
-        redis_image: ValkeyImageClient,
+        valkey_image: ValkeyImageClient,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -272,9 +272,9 @@ class AgentRegistry:
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
-        self.valkey_stat_client = valkey_stat_client
+        self.valkey_stat = valkey_stat
         self.valkey_live = valkey_live
-        self.valkey_image = redis_image
+        self.valkey_image = valkey_image
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -286,7 +286,7 @@ class AgentRegistry:
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
-            valkey_stat_client,
+            valkey_stat,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -2146,7 +2146,7 @@ class AgentRegistry:
                 str(ak): len(concurrency.compute_session_ids)
                 for ak, concurrency in access_key_to_concurrency_used.items()
             }
-            await self.valkey_stat_client.update_concurrency_by_fullscan(access_key_to_count)
+            await self.valkey_stat.update_concurrency_by_fullscan(access_key_to_count)
         else:
             # Update keypair resource usage for keypairs with running containers.
             # Prepare separate maps for compute and system concurrency
@@ -2162,15 +2162,11 @@ class AgentRegistry:
 
             # Update compute concurrency
             if compute_concurrency_map:
-                await self.valkey_stat_client.update_compute_concurrency_by_map(
-                    compute_concurrency_map
-                )
+                await self.valkey_stat.update_compute_concurrency_by_map(compute_concurrency_map)
 
             # Update system concurrency
             if system_concurrency_map:
-                await self.valkey_stat_client.update_system_concurrency_by_map(
-                    system_concurrency_map
-                )
+                await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
 
     async def destroy_session_lowlevel(
         self,
@@ -2327,7 +2323,7 @@ class AgentRegistry:
             target_session = cast(SessionRow, target_session)
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
-                await self.valkey_stat_client.decrement_keypair_concurrency(
+                await self.valkey_stat.decrement_keypair_concurrency(
                     access_key=str(access_key),
                     is_private=is_private,
                 )
@@ -2464,7 +2460,7 @@ class AgentRegistry:
                                 to_be_terminated.append(kernel)
 
                             async def _update() -> None:
-                                kern_stat = await self.valkey_stat_client.get_kernel_statistics(
+                                kern_stat = await self.valkey_stat.get_kernel_statistics(
                                     str(kernel.id)
                                 )
                                 async with self.db.begin_session() as db_sess:
@@ -2562,7 +2558,7 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                last_stat = await self.valkey_stat_client.get_kernel_statistics(
+                                last_stat = await self.valkey_stat.get_kernel_statistics(
                                     str(kernel.id),
                                 )
                                 if last_stat is not None:
@@ -3139,7 +3135,7 @@ class AgentRegistry:
         log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat_client.get_kernel_statistics(raw_kernel_id)
+            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
             if kern_stat is None:
                 log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
                 continue
@@ -3393,7 +3389,7 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-        last_stat = await self.valkey_stat_client.get_kernel_statistics(str(kernel_id))
+        last_stat = await self.valkey_stat.get_kernel_statistics(str(kernel_id))
         now = datetime.now(tzutc())
 
         async def _get_and_transit(
@@ -3429,7 +3425,7 @@ class AgentRegistry:
                 "recalculate concurrency used in kernel termination (ak: {})",
                 access_key,
             )
-            await recalc_concurrency_used(db_session, self.valkey_stat_client, access_key)
+            await recalc_concurrency_used(db_session, self.valkey_stat, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,
@@ -3461,7 +3457,7 @@ class AgentRegistry:
         kernel_ids: Sequence[KernelId],
     ) -> Mapping[KernelId, str]:
         kernel_ids_str = [str(kernel_id) for kernel_id in kernel_ids]
-        commit_statuses = await self.valkey_stat_client.get_kernel_commit_statuses(kernel_ids_str)
+        commit_statuses = await self.valkey_stat.get_kernel_commit_statuses(kernel_ids_str)
 
         return {
             kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
@@ -3573,7 +3569,7 @@ class AgentRegistry:
         kernel_id: KernelId,
     ) -> Optional[AbuseReport]:
         kern_id = str(kernel_id)
-        result = await self.valkey_stat_client.get_abuse_report(kern_id)
+        result = await self.valkey_stat.get_abuse_report(kern_id)
         if result is None:
             return None
         return {

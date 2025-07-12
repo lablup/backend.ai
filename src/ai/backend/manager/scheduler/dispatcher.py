@@ -780,9 +780,7 @@ class SchedulerDispatcher(aobject):
         max_container_count = int(raw_value)
 
         agent_ids = [str(ag.id) for ag in candidate_agents]
-        raw_counts = await self.registry.valkey_stat_client.get_agent_container_counts_batch(
-            agent_ids
-        )
+        raw_counts = await self.registry.valkey_stat.get_agent_container_counts_batch(agent_ids)
 
         def _check(cnt: int) -> bool:
             return max_container_count > cnt
@@ -2098,6 +2096,4 @@ async def _rollback_predicate_mutations(
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
     log.debug("recalculate concurrency used in rollback predicates (ak: {})", session.access_key)
-    await recalc_concurrency_used(
-        db_sess, sched_ctx.registry.valkey_stat_client, session.access_key
-    )
+    await recalc_concurrency_used(db_sess, sched_ctx.registry.valkey_stat, session.access_key)

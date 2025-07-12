@@ -497,12 +497,12 @@ async def stream_proxy(
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-    redis_live = root_ctx.valkey_live
+    valkey_live = root_ctx.valkey_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
 
     async def update_connection_tracker() -> None:
         """Update connection tracker with current timestamp."""
-        await redis_live.update_app_connection_tracker(kernel_id, service, stream_id)
+        await valkey_live.update_app_connection_tracker(kernel_id, service, stream_id)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -523,7 +523,7 @@ async def stream_proxy(
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
             app_ctx.active_session_ids[kernel_id] += 1
-            await redis_live.update_connection_tracker(kernel_id, service, stream_id)
+            await valkey_live.update_connection_tracker(kernel_id, service, stream_id)
             await root_ctx.idle_checker_host.update_app_streaming_status(
                 kernel_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
@@ -534,8 +534,8 @@ async def stream_proxy(
             app_ctx.active_session_ids[kernel_id] -= 1
             if app_ctx.active_session_ids[kernel_id] <= 0:
                 del app_ctx.active_session_ids[kernel_id]
-            await redis_live.remove_connection_tracker(kernel_id, service, stream_id)
-            remaining_count = await redis_live.count_active_connections(str(kernel_id))
+            await valkey_live.remove_connection_tracker(kernel_id, service, stream_id)
+            remaining_count = await valkey_live.count_active_connections(str(kernel_id))
             if remaining_count == 0:
                 await root_ctx.idle_checker_host.update_app_streaming_status(
                     kernel_id,
@@ -659,7 +659,7 @@ async def handle_kernel_terminating(
 
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
-    redis_live = root_ctx.valkey_live
+    valkey_live = root_ctx.valkey_live
     try:
         while True:
             try:
@@ -678,16 +678,16 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                 else:
                     raise e
             async with app_ctx.conn_tracker_lock:
-                now = await redis_live.get_server_time()
+                now = await valkey_live.get_server_time()
                 for session_id in app_ctx.active_session_ids.keys():
-                    prev_remaining_count = await redis_live.count_active_connections(
+                    prev_remaining_count = await valkey_live.count_active_connections(
                         str(session_id)
                     )
-                    removed_count = await redis_live.remove_stale_connections(
+                    removed_count = await valkey_live.remove_stale_connections(
                         str(session_id),
                         now - no_packet_timeout.total_seconds(),
                     )
-                    remaining_count = await redis_live.count_active_connections(str(session_id))
+                    remaining_count = await valkey_live.count_active_connections(str(session_id))
                     log.debug(
                         f"conn_tracker: gc {session_id} "
                         f"removed/remaining = {removed_count}/{remaining_count}",

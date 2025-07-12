@@ -45,7 +45,7 @@ async def test_handle_heartbeat(
     # Mock redis_live methods since redis_helper is no longer used
     mock_redis_live = MagicMock()
     mock_redis_live.update_agent_last_seen = AsyncMock()
-    mocker.patch.object(registry, "redis_live", mock_redis_live)
+    mocker.patch.object(registry, "valkey_live", mock_redis_live)
     image_data = zlib.compress(
         msgpack.packb([
             ("index.docker.io/lablup/python:3.6-ubuntu18.04",),

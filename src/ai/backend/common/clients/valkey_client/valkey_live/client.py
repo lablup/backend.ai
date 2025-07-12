@@ -1,9 +1,8 @@
 import logging
+from collections.abc import Mapping
 from typing import (
     Any,
     Final,
-    List,
-    Mapping,
     Optional,
     Self,
     cast,
@@ -337,8 +336,8 @@ class ValkeyLiveClient:
 
     @valkey_decorator()
     async def get_session_statistics_batch(
-        self, session_ids: List[str]
-    ) -> List[Optional[dict[str, int]]]:
+        self, session_ids: list[str]
+    ) -> list[Optional[dict[str, int]]]:
         """
         Get session statistics (requests and last response time) for multiple sessions.
 
@@ -360,7 +359,7 @@ class ValkeyLiveClient:
         results = await self.get_multiple_live_data(keys)
 
         # Process results in pairs (requests, last_response_time)
-        stats: List[Optional[dict[str, int]]] = []
+        stats: list[Optional[dict[str, int]]] = []
         for i in range(0, len(results), 2):
             requests_result = results[i]
             last_response_result = results[i + 1]
@@ -378,7 +377,7 @@ class ValkeyLiveClient:
         return stats
 
     @valkey_decorator()
-    async def scan_agent_last_seen(self) -> List[tuple[str, float]]:
+    async def scan_agent_last_seen(self) -> list[tuple[str, float]]:
         """
         Scan all agent last seen entries.
 
@@ -407,7 +406,7 @@ class ValkeyLiveClient:
         return results
 
     @valkey_decorator()
-    async def scan_keys(self, pattern: str) -> List[str]:
+    async def scan_keys(self, pattern: str) -> list[str]:
         """
         Scan keys matching pattern.
 
@@ -432,7 +431,7 @@ class ValkeyLiveClient:
 
     @valkey_decorator()
     async def hset_with_expiry(
-        self, key: str, mapping: dict[str, str], expiry_seconds: int
+        self, key: str, mapping: Mapping[str, str], expiry_seconds: int
     ) -> None:
         """
         Set hash fields with expiry.

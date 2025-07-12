@@ -1,10 +1,9 @@
 import json
 import logging
+from collections.abc import Mapping
 from typing import (
     Any,
     Final,
-    List,
-    Mapping,
     Optional,
     Self,
     Sequence,
@@ -206,7 +205,7 @@ class ValkeyStatClient:
         return f"{_CONTAINER_COUNT_PREFIX}.{agent_id}"
 
     @valkey_decorator()
-    async def get_kernel_commit_statuses(self, kernel_ids: List[str]) -> List[Optional[bytes]]:
+    async def get_kernel_commit_statuses(self, kernel_ids: list[str]) -> list[Optional[bytes]]:
         """
         Get commit statuses for multiple kernels efficiently.
 
@@ -250,7 +249,7 @@ class ValkeyStatClient:
         )
 
     @valkey_decorator()
-    async def get_session_statistics_batch(self, session_ids: List[str]) -> List[Optional[dict]]:
+    async def get_session_statistics_batch(self, session_ids: list[str]) -> list[Optional[dict]]:
         """
         Get statistics for multiple sessions efficiently.
 
@@ -283,8 +282,8 @@ class ValkeyStatClient:
 
     @valkey_decorator()
     async def get_user_kernel_statistics_batch(
-        self, kernel_ids: List[str]
-    ) -> List[Optional[bytes]]:
+        self, kernel_ids: list[str]
+    ) -> list[Optional[bytes]]:
         """
         Get raw kernel statistics for multiple kernels for user service operations.
 
@@ -294,7 +293,7 @@ class ValkeyStatClient:
         return await self._get_multiple_keys(kernel_ids)
 
     @valkey_decorator()
-    async def get_agent_statistics_batch(self, agent_ids: List[str]) -> list[Optional[dict]]:
+    async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[Optional[dict]]:
         """
         Get agent statistics for multiple agents.
 
@@ -323,7 +322,7 @@ class ValkeyStatClient:
         return stats
 
     @valkey_decorator()
-    async def get_agent_container_counts_batch(self, agent_ids: List[str]) -> List[int]:
+    async def get_agent_container_counts_batch(self, agent_ids: list[str]) -> list[int]:
         """
         Get container counts for multiple agents.
 
@@ -438,8 +437,8 @@ class ValkeyStatClient:
 
     @valkey_decorator()
     async def get_inference_replica_statistics_batch(
-        self, endpoint_replica_pairs: List[tuple[str, str]]
-    ) -> List[Optional[dict]]:
+        self, endpoint_replica_pairs: list[tuple[str, str]]
+    ) -> list[Optional[dict]]:
         """
         Get inference replica statistics for multiple endpoint-replica pairs.
 
@@ -721,7 +720,7 @@ class ValkeyStatClient:
         await self._client.client.set(key, str(concurrency_used))
 
     @valkey_decorator()
-    async def _get_multiple_keys(self, keys: List[str]) -> List[Optional[bytes]]:
+    async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple keys efficiently using batch operations.
 
@@ -762,7 +761,7 @@ class ValkeyStatClient:
     @valkey_decorator()
     async def update_kernel_commit_statuses(
         self,
-        kernel_ids: List[str],
+        kernel_ids: list[str],
         expire_sec: int,
     ) -> None:
         """
@@ -791,7 +790,7 @@ class ValkeyStatClient:
     async def register_session_ids_for_status_update(
         self,
         status_set_key: str,
-        session_ids: List[bytes],
+        session_ids: list[bytes],
     ) -> None:
         """
         Register session IDs for status updates using set operations.
@@ -810,7 +809,7 @@ class ValkeyStatClient:
     async def get_and_clear_session_ids_for_status_update(
         self,
         status_set_key: str,
-    ) -> List[bytes]:
+    ) -> list[bytes]:
         """
         Get all session IDs from the status set and clear it atomically.
 
@@ -830,13 +829,13 @@ class ValkeyStatClient:
 
         # Pop all members
         result = await self._client.client.spop(status_set_key)
-        return cast(List[bytes], result or [])
+        return cast(list[bytes], result or [])
 
     @valkey_decorator()
     async def remove_session_ids_from_status_update(
         self,
         status_set_key: str,
-        session_ids: List[bytes],
+        session_ids: list[bytes],
     ) -> int:
         """
         Remove session IDs from the status update set.
@@ -996,7 +995,7 @@ class ValkeyStatClient:
     @valkey_decorator()
     async def update_compute_concurrency_by_map(
         self,
-        concurrency_map: dict[str, int],
+        concurrency_map: Mapping[str, int],
     ) -> None:
         """
         Update compute concurrency values from a map of access keys to concurrency counts.
@@ -1016,7 +1015,7 @@ class ValkeyStatClient:
     @valkey_decorator()
     async def update_system_concurrency_by_map(
         self,
-        concurrency_map: dict[str, int],
+        concurrency_map: Mapping[str, int],
     ) -> None:
         """
         Update system (SFTP) concurrency values from a map of access keys to concurrency counts.
@@ -1036,7 +1035,7 @@ class ValkeyStatClient:
     @valkey_decorator()
     async def update_concurrency_by_fullscan(
         self,
-        access_key_to_concurrency: dict[str, int],
+        access_key_to_concurrency: Mapping[str, int],
     ) -> None:
         """
         Update concurrency values by doing a full scan and setting all keys.

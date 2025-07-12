@@ -900,7 +900,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     AgentId(agent_id)
                 )
                 key = f"gpu_alloc_map.{agent_id}"
-                await graph_ctx.registry.valkey_stat_client.setex(
+                await graph_ctx.registry.valkey_stat.setex(
                     name=key,
                     value=dump_json_str(alloc_map),
                     time=GPU_ALLOC_MAP_CACHE_PERIOD,

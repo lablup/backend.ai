@@ -69,7 +69,7 @@ async def check_concurrency(
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
-    ok, concurrency_used = await sched_ctx.registry.valkey_stat_client.check_keypair_concurrency(
+    ok, concurrency_used = await sched_ctx.registry.valkey_stat.check_keypair_concurrency(
         redis_key,
         max_concurrent_sessions,
     )
