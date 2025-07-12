@@ -158,7 +158,11 @@ def get_wsl_version() -> int:
 
 # Detect upon module load.
 try:
-    current_provider = asyncio.run(detect_cloud())
+    try:
+        loop = asyncio.get_running_loop()
+        current_provider = loop.run_until_complete(detect_cloud())
+    except RuntimeError:
+        current_provider = asyncio.run(detect_cloud())
 except Exception as e:
     log.warning(f"Failed to detect cloud provider: {e}")
     current_provider = None
