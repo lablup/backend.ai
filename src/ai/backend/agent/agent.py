@@ -8,7 +8,6 @@ import re
 import shutil
 import signal
 import sys
-import textwrap
 import time
 import traceback
 import weakref
@@ -51,7 +50,6 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from redis.asyncio import Redis
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
@@ -70,8 +68,9 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
@@ -737,8 +736,6 @@ class AbstractAgent(
     images: Mapping[str, ScannedImage]
     port_pool: set[int]
 
-    redis: Redis
-
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
@@ -824,15 +821,15 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_pool = await ValkeyStreamClient.create(
+        self.redis_stream_client = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM),
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
         )
-        self.redis_stat_pool = redis_helper.get_redis_object(
+        self.valkey_stat_client = await ValkeyStatClient.create(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="stat",
-            db=REDIS_STATISTICS_DB,
+            human_readable_name="agent.stat",
+            db_id=REDIS_STATISTICS_DB,
         )
 
         self.background_task_manager = BackgroundTaskManager(
@@ -857,17 +854,13 @@ class AbstractAgent(
         log.info("Slot types: {!r}", known_slot_types)
         self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
-        async def _pipeline(r: Redis):
-            pipe = r.pipeline()
-            for metadata in metadatas:
-                await pipe.hset(
-                    "computer.metadata",
-                    metadata["slot_name"],
-                    dump_json_str(metadata),
-                )
-            return pipe
+        # Use ValkeyStatClient batch operations for better performance
+        field_value_map = {}
+        for metadata in metadatas:
+            field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
 
-        await redis_helper.execute(self.redis_stat_pool, _pipeline)
+        if field_value_map:
+            await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
         self.affinity_map = AffinityMap.build(all_devices)
 
@@ -996,8 +989,8 @@ class AbstractAgent(
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
         await self.event_dispatcher.close()
-        await self.redis_stream_pool.close()
-        await self.redis_stat_pool.close()
+        await self.redis_stream_client.close()
+        await self.valkey_stat_client.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config["debug"]["log-heartbeats"]:
@@ -1070,27 +1063,10 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent(
-            """
-        local key_and_value = {}
-        for i, k in pairs(KEYS) do
-            key_and_value[i*2-1] = k
-            key_and_value[i*2] = 'ongoing'
-        end
-        if next(key_and_value) ~= nil then
-            redis.call('MSET', unpack(key_and_value))
-            for i, k in pairs(KEYS) do
-                redis.call('EXPIRE', k, ARGV[1])
-            end
-        end
-        """
-        )
-        await redis_helper.execute_script(
-            self.redis_stat_pool,
-            "check_kernel_commit_statuses",
-            commit_status_script,
-            [f"kernel.{kern}.commit" for kern in commit_kernels],
-            [COMMIT_STATUS_EXPIRE],
+        # Update kernel commit statuses using ValkeyStatClient
+        await self.valkey_stat_client.update_kernel_commit_statuses(
+            list(commit_kernels),
+            COMMIT_STATUS_EXPIRE,
         )
 
     async def heartbeat(self, interval: float):
@@ -1161,7 +1137,7 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await self.redis_stream_pool.enqueue_container_logs(
+                        await self.redis_stream_client.enqueue_container_logs(
                             container_id,
                             stored_chunk,
                         )
@@ -1174,7 +1150,7 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await self.redis_stream_pool.enqueue_container_logs(
+                await self.redis_stream_client.enqueue_container_logs(
                     container_id,
                     chunk_buffer.getvalue(),
                 )
@@ -1796,8 +1772,9 @@ class AbstractAgent(
             )
 
     async def set_container_count(self, container_count: int) -> None:
-        await redis_helper.execute(
-            self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
+        await self.valkey_stat_client.set_agent_container_count(
+            agent_id=str(self.id),
+            container_count=container_count,
         )
 
     @abstractmethod
@@ -1921,36 +1898,8 @@ class AbstractAgent(
             for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
 
-            hash_name = "abuse_report"
-            abuse_report_script = textwrap.dedent(
-                """
-                local key = KEYS[1]
-                local new_report = cjson.decode(ARGV[1])
-
-                -- Delete dangling reports
-                local all_report = redis.call('HKEYS', key)
-                if all_report ~= nil and next(all_report) ~= nil then
-                    for _, v in ipairs(all_report) do
-                        if next(all_report) == nil or not new_report[v] then
-                            redis.call('HDEL', key, v)
-                        end
-                    end
-                end
-
-                -- Update new reports
-                if next(new_report) ~= nil then
-                    for kern_id, report_val in pairs(new_report) do
-                        redis.call('HSET', key, kern_id, report_val)
-                    end
-                end
-            """
-            )
-            await redis_helper.execute_script(
-                self.redis_stat_pool,
-                "report_abusing_kernels",
-                abuse_report_script,
-                [hash_name],
-                [dump_json_str(abuse_report)],
+            await self.valkey_stat_client.update_abuse_report(
+                abuse_report,
             )
 
     @abstractmethod

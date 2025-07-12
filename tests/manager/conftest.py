@@ -927,7 +927,7 @@ async def registry_ctx(mocker):
     mock_dbconn.begin = MagicMock(return_value=mock_dbconn_ctx)
     mock_dbsess.execute = AsyncMock(return_value=mock_dbresult)
     mock_dbsess.begin_session = AsyncMock(return_value=mock_dbsess_ctx)
-    mock_redis_stat = MagicMock()
+    mock_valkey_stat_client = MagicMock()
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
     # Create a mock ValkeyImageClient that satisfies the type requirements
@@ -939,7 +939,6 @@ async def registry_ctx(mocker):
     mock_redis_image.remove_agent_image = AsyncMock()
     mock_redis_image.remove_agent = AsyncMock()
     mock_redis_image.clear_all_images = AsyncMock()
-    mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.anycast_event = AsyncMock()
@@ -952,10 +951,9 @@ async def registry_ctx(mocker):
     registry = AgentRegistry(
         config_provider=mock_config_provider,
         db=mock_db,
-        redis_stat=mock_redis_stat,
-        redis_live=mock_redis_live,
-        redis_image=mock_redis_image,
-        redis_stream=mock_redis_stream,
+        valkey_stat=mock_valkey_stat_client,
+        valkey_live=mock_redis_live,
+        valkey_image=mock_redis_image,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,

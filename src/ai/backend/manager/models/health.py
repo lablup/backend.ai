@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import socket
 from typing import TYPE_CHECKING, Optional, cast
@@ -10,18 +11,15 @@ from pydantic import (
     BaseModel,
     Field,
 )
-from redis.asyncio import ConnectionPool
 from sqlalchemy.pool import Pool
 
-from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.types import (
-    RedisConnectionInfo,
-    RedisHelperConfig,
-)
+from ai.backend.common import msgpack
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..api.context import RootContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
     "SQLAlchemyConnectionInfo",
@@ -41,28 +39,6 @@ _sqlalchemy_pool_type_names = (
     "SingletonThreadPool",
     "StaticPool",
 )
-
-
-_read_manager_status_script = """
-local cursor = "0"
-local pattern = KEYS[1]
-local matched_keys = {}
-
-repeat
-    local scan_result = redis.call("SCAN", cursor, "MATCH", pattern)
-    cursor = scan_result[1]
-    for i, key in ipairs(scan_result[2]) do
-        table.insert(matched_keys, key)
-    end
-until cursor == "0"
-
-if #matched_keys == 0 then
-    return {} -- Early return if no keys found
-end
-
-return redis.call("MGET", unpack(matched_keys))
-"""
-
 
 MANAGER_STATUS_KEY = "manager.status"
 
@@ -119,37 +95,8 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
 
 
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
-    unified_config = root_ctx.config_provider.config
-
-    redis_connection_infos: tuple[RedisConnectionInfo, ...] = (
-        root_ctx.redis_live,
-        root_ctx.redis_stat,
-        root_ctx.redis_stream,
-        root_ctx.redis_lock,
-    )
-    redis_objects = []
-    for info in redis_connection_infos:
-        err_msg = None
-        num_connections = None
-        try:
-            pool = cast(ConnectionPool, info.client.connection_pool)
-            num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
-            max_connections = pool.max_connections
-        except Exception as e:
-            redis_config = cast(
-                RedisHelperConfig, unified_config.redis.redis_helper_config.model_dump()
-            )
-            max_connections = redis_config["max_connections"]
-            err_msg = f"Cannot get connection info from `{info.name}`. (e:{str(e)})"
-        redis_objects.append(
-            RedisObjectConnectionInfo(
-                name=info.name,
-                max_connections=max_connections,
-                num_connections=num_connections,
-                err_msg=err_msg,
-            )
-        )
-    return redis_objects
+    log.warning("get_redis_object_info_list is deprecated.")
+    return []
 
 
 async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
@@ -168,14 +115,13 @@ async def report_manager_status(root_ctx: RootContext) -> None:
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
-    await redis_helper.execute(
-        root_ctx.redis_stat,
-        lambda r: r.set(
-            _get_connection_status_key(cxn_info.node_id, cxn_info.pid),
-            _data,
-            ex=lifetime,
-        ),
-    )
+    if lifetime is not None:
+        await root_ctx.valkey_stat.set_manager_status(
+            node_id=cxn_info.node_id,
+            pid=cxn_info.pid,
+            status_data=_data,
+            lifetime=lifetime,
+        )
 
 
 async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInfoOfProcess]:
@@ -184,12 +130,8 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
     try:
         _raw_value = cast(
             list[bytes] | None,
-            await redis_helper.execute_script(
-                root_ctx.redis_stat,
-                "read_manager_status",
-                _read_manager_status_script,
-                [f"{MANAGER_STATUS_KEY}*"],
-                [],
+            await root_ctx.valkey_stat.scan_and_get_manager_status(
+                f"{MANAGER_STATUS_KEY}*",
             ),
         )
     except (asyncio.TimeoutError, redis.exceptions.ConnectionError):

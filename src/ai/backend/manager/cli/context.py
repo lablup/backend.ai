@@ -13,6 +13,7 @@ import click
 
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
@@ -137,7 +138,7 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 @attrs.define(auto_attribs=True, frozen=True, slots=True)
 class RedisConnectionSet:
     live: RedisConnectionInfo
-    stat: RedisConnectionInfo
+    stat: ValkeyStatClient
     image: ValkeyImageClient
     stream: RedisConnectionInfo
 
@@ -155,10 +156,10 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         name="mgr_cli.live",
         db=REDIS_LIVE_DB,
     )
-    redis_stat = redis_helper.get_redis_object(
+    valkey_stat_client = await ValkeyStatClient.create(
         etcd_redis_config.profile_target(RedisRole.STATISTICS),
-        name="mgr_cli.stat",
-        db=REDIS_STATISTICS_DB,
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="mgr_cli.stat",
     )
     redis_image = await ValkeyImageClient.create(
         etcd_redis_config.profile_target(RedisRole.IMAGE),
@@ -172,11 +173,11 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     )
     yield RedisConnectionSet(
         live=redis_live,
-        stat=redis_stat,
+        stat=valkey_stat_client,
         image=redis_image,
         stream=redis_stream,
     )
     await redis_stream.close()
     await redis_image.close()
-    await redis_stat.close()
+    await valkey_stat_client.close()
     await redis_live.close()
