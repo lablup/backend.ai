@@ -52,14 +52,14 @@ def is_containerized() -> bool:
         return False
 
 
-async def _detect_aws(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
+async def _detect_aws(session: aiohttp.ClientSession) -> CloudProvider:
     async with session.get(
         "http://169.254.169.254/latest/meta-data/",
     ):
         return CloudProvider.AWS
 
 
-async def _detect_azure(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
+async def _detect_azure(session: aiohttp.ClientSession) -> CloudProvider:
     async with session.get(
         "http://169.254.169.254/metadata/instance/compute",
         params={"api-version": "2021-02-01"},
@@ -68,7 +68,7 @@ async def _detect_azure(session: aiohttp.ClientSession) -> Optional[CloudProvide
         return CloudProvider.AZURE
 
 
-async def _detect_gcp(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
+async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
     async with session.get(
         "http://169.254.169.254/computeMetadata/v1/instance/id",
         headers={"Metadata-Flavor": "Google"},
