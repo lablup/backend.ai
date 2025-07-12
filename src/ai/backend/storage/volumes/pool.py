@@ -8,7 +8,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
 
-from ..config import StorageProxyUnifiedConfig
+from ..config.unified import StorageProxyUnifiedConfig
 from ..exception import InvalidVolumeError
 from ..types import VolumeInfo
 from .abc import AbstractVolume

@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
-from ai.backend.storage.config import load_local_config
+from ai.backend.storage.config.loaders import load_local_config
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
 

@@ -56,7 +56,8 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
-from .config import StorageProxyUnifiedConfig, load_local_config, load_shared_config
+from .config.loaders import load_local_config, make_etcd
+from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .watcher import WatcherClient, main_job
 
@@ -133,7 +134,7 @@ async def server_main(
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
     metric_registry = CommonMetricRegistry()
     try:
-        etcd = load_shared_config(local_config)
+        etcd = make_etcd(local_config)
         try:
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),

@@ -28,7 +28,8 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
-from .config import StorageProxyUnifiedConfig, load_local_config, load_shared_config
+from .config.loaders import load_local_config, make_etcd
+from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
@@ -225,7 +226,7 @@ async def check_and_upgrade(
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
 ):
-    etcd = load_shared_config(local_config)
+    etcd = make_etcd(local_config)
     redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )

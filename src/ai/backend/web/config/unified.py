@@ -1142,3 +1142,7 @@ class WebServerUnifiedConfig(BaseModel):
         Debug configuration.
         """,
     )
+
+    # TODO: Remove me after changing config injection logic
+    class Config:
+        extra = "allow"

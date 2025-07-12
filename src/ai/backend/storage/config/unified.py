@@ -628,3 +628,7 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
+
+    # TODO: Remove me after changing config injection logic
+    class Config:
+        extra = "allow"

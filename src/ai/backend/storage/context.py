@@ -26,7 +26,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .api.client import init_client_app
 from .api.manager import init_internal_app, init_manager_app
-from .config import StorageProxyUnifiedConfig
+from .config.unified import StorageProxyUnifiedConfig
 from .exception import InvalidVolumeError
 from .plugin import (
     BasePluginContext,
