@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import socket
 from typing import TYPE_CHECKING, Optional, cast
@@ -13,10 +14,12 @@ from pydantic import (
 from sqlalchemy.pool import Pool
 
 from ai.backend.common import msgpack
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..api.context import RootContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
     "SQLAlchemyConnectionInfo",
@@ -92,58 +95,7 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
 
 
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
-    # unified_config = root_ctx.config_provider.config
-    # TODO: Use a more unified way to get Redis connection info.
-    # redis_connection_infos: tuple[Union[RedisConnectionInfo, "ValkeyStatClient"], ...] = (
-    #     root_ctx.redis_live,
-    #     root_ctx.valkey_stat_client,
-    #     root_ctx.redis_stream,
-    # )
-    # redis_objects = []
-    # for info in redis_connection_infos:
-    #     err_msg = None
-    #     num_connections = None
-    #     try:
-    #         # ValkeyStatClient doesn't have connection_pool attribute
-    #         if hasattr(info, "execute"):  # ValkeyStatClient
-    #             # For ValkeyStatClient, we can't get connection pool info
-    #             num_connections = -1
-    #             max_connections = -1
-    #         else:
-    #             pool = cast(ConnectionPool, info.client.connection_pool)
-    #             num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
-    #             max_connections = pool.max_connections
-    #     except Exception as e:
-    #         redis_config = cast(
-    #             RedisHelperConfig, unified_config.redis.redis_helper_config.model_dump()
-    #         )
-    #         max_connections = redis_config["max_connections"]
-    #         err_msg = f"Cannot get connection info from `{info.name}`. (e:{str(e)})"
-    #     redis_objects.append(
-    #         RedisObjectConnectionInfo(
-    #             name=info.name,
-    #             max_connections=max_connections,
-    #             num_connections=num_connections,
-    #             err_msg=err_msg,
-    #         )
-    #     )
-
-    # # Add ValkeyStreamLockClient health check
-    # err_msg = None
-    # try:
-    #     await root_ctx.valkey_stream_lock.ping()
-    # except Exception as e:
-    #     err_msg = f"Cannot ping valkey_stream_lock. (e:{str(e)})"
-
-    # redis_objects.append(
-    #     RedisObjectConnectionInfo(
-    #         name="valkey_stream_lock",
-    #         max_connections=None,
-    #         num_connections=None,
-    #         err_msg=err_msg,
-    #     )
-    # )
-
+    log.warning("get_redis_object_info_list is deprecated.")
     return []
 
 
