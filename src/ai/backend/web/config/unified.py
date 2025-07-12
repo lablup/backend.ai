@@ -765,13 +765,13 @@ class APIConfig(BaseModel):
         """,
         examples=["api.example.com"],
     )
-    endpoint: str = Field(
-        default="http://127.0.0.1:8080",
+    endpoint: CommaSeparatedStrList = Field(
+        default_factory=lambda: CommaSeparatedStrList("http://127.0.0.1:8080"),
         min_length=1,
         description="""
         API endpoint URL.
         """,
-        examples=["http://127.0.0.1:8080"],
+        examples=["http://127.0.0.1:8080,http://api.example.com:8080"],
     )
     text: str = Field(
         default="Backend.AI API",

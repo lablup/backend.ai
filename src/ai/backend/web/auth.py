@@ -16,7 +16,7 @@ async def get_api_session(
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    api_endpoint = str(config.api.endpoint)
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
     session = await get_session(request)
@@ -63,7 +63,7 @@ async def get_anonymous_session(
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    api_endpoint = str(config.api.endpoint)
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
     api_config = APIConfig(
