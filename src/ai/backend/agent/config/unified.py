@@ -871,6 +871,6 @@ class AgentUnifiedConfig(BaseModel):
         serialization_alias="docker-extra",
     )
 
-    model_config = ConfigDict(
-        extra="allow",
-    )
+    # TODO: Remove me after changing config injection logic
+    class Config:
+        extra = "allow"
