@@ -50,6 +50,7 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.resources import scan_gpu_alloc_map
+from ai.backend.agent.stats import StatModes
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -124,8 +125,11 @@ from .config.unified import (
     AgentUnifiedConfig,
     APIConfig,
     ContainerLogsConfig,
+    ContainerSandboxType,
     DockerExtraConfig,
+    EventLoopType,
     KernelLifecyclesConfig,
+    ScratchType,
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -1258,6 +1262,7 @@ async def server_main(
         agent_updates["id"] = await identity.get_instance_id()
     if not local_config.agent.instance_type:
         agent_updates["instance_type"] = await identity.get_instance_type()
+    local_config.container.krunner_volumes = krunner_volumes
 
     if agent_updates:
         new_agent_config = local_config.agent.model_copy(update=agent_updates)
@@ -1476,22 +1481,22 @@ def main(
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
-        cfg_obj = AgentUnifiedConfig.model_validate(raw_cfg)
-        cfg = cfg_obj.model_dump(by_alias=True)
-        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
-            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
-                cfg["container"]["scratch-nfs-address"] is None
-                or cfg["container"]["scratch-nfs-options"] is None
+        unified_conf = AgentUnifiedConfig.model_validate(raw_cfg)
+        if unified_conf.agent.backend == AgentBackend.KUBERNETES:
+            if unified_conf.container.scratch_type == "k8s-nfs" and (
+                unified_conf.container.scratch_nfs_address is None
+                or unified_conf.container.scratch_nfs_options is None
             ):
                 raise ValueError(
                     "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
                 )
-        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
+        elif unified_conf.agent.backend == AgentBackend.DOCKER:
             DockerExtraConfig.model_validate(raw_cfg.get("container", {}))
-        if "debug" in cfg and cfg["debug"]["enabled"]:
+
+        if unified_conf.debug.enabled:
+            cfg = unified_conf.model_dump(by_alias=True)
             print("== Agent configuration ==")
             pprint(cfg)
-        cfg["_src"] = cfg_src_path
     except Exception as e:
         print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(str(e), file=sys.stderr)
@@ -1499,11 +1504,14 @@ def main(
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()
-    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+    if (
+        unified_conf.container.sandbox_type == ContainerSandboxType.JAIL
+        and current_arch != "x86_64"
+    ):
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = cfg["agent"]["rpc-listen-addr"]["host"]
+    rpc_host = unified_conf.agent.rpc_listen_addr.host
     if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
         rpc_host.is_unspecified or rpc_host.is_link_local
     ):
@@ -1514,14 +1522,14 @@ def main(
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["stats-type"] == "cgroup":
+    if os.getuid() != 0 and unified_conf.container.stats_type == StatModes.CGROUP:
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+    if os.getuid() != 0 and unified_conf.container.scratch_type == ScratchType.HOSTFILE:
         print(
             "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
@@ -1529,7 +1537,7 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-        if cfg["debug"]["coredump"]["enabled"]:
+        if unified_conf.debug.coredump.enabled:
             if not sys.platform.startswith("linux"):
                 print(
                     "ConfigurationError: Storing container coredumps is only supported in Linux.",
@@ -1545,19 +1553,19 @@ def main(
                     file=sys.stderr,
                 )
                 raise click.Abort()
-            cfg["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
+            unified_conf.debug.coredump.corepath = Path(core_pattern).parent
 
-        cfg["agent"]["pid-file"].write_text(str(os.getpid()))
-        image_commit_path = cfg["agent"]["image-commit-path"]
+        unified_conf.agent.pid_file.write_text(str(os.getpid()))
+        image_commit_path = unified_conf.agent.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
-        ipc_base_path = cfg["agent"]["ipc-base-path"]
+        ipc_base_path = unified_conf.agent.ipc_base_path
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg["logging"]["endpoint"] = log_endpoint
+        unified_conf.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                cfg["logging"],
+                unified_conf.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -1566,7 +1574,7 @@ def main(
                 },
             )
             with logger:
-                ns = cfg["etcd"]["namespace"]
+                ns = unified_conf.etcd.namespace
                 setproctitle(f"backend.ai: agent {ns}")
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
@@ -1574,8 +1582,7 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
-
-                if cfg["agent"]["event-loop"] == "uvloop":
+                if unified_conf.agent.event_loop == EventLoopType.UVLOOP:
                     import uvloop
 
                     uvloop.install()
@@ -1583,14 +1590,14 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
-                    args=(cfg_obj, log_endpoint),
+                    args=(unified_conf, log_endpoint),
                     wait_timeout=5.0,
                 )
                 log.info("exit.")
         finally:
-            if cfg["agent"]["pid-file"].is_file():
+            if unified_conf.agent.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg["agent"]["pid-file"].unlink()
+                unified_conf.agent.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

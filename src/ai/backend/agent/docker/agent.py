@@ -103,7 +103,7 @@ from ..agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
-from ..config.unified import AgentUnifiedConfig
+from ..config.unified import AgentUnifiedConfig, ContainerSandboxType
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel
@@ -1067,7 +1067,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
             update_nested_dict(container_config, c)
-        if self.local_config.container.sandbox_type == "jail":
+        if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
             update_nested_dict(
                 container_config,
                 {

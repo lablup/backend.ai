@@ -1,4 +1,1 @@
-python_sources(
-    name="src",
-    sources=["*.py"],
-)
+python_sources(name="src")
