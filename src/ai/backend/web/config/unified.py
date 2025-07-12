@@ -21,13 +21,13 @@ from ai.backend.common.typed_validators import (
 
 
 class ServiceMode(enum.StrEnum):
-    webui = "webui"
-    static = "static"
+    WEBUI = "webui"
+    STATIC = "static"
 
 
 class ForceEndpointProtocol(enum.StrEnum):
-    https = "https"
-    http = "http"
+    HTTPS = "https"
+    HTTP = "http"
 
 
 class WebSocketProxyConfig(BaseModel):
@@ -98,7 +98,7 @@ class ServiceConfig(BaseModel):
         serialization_alias="ssl-privkey",
     )
     static_path: Path = Field(
-        default=Path(__file__).parent.parent / "static",
+        default_factory=lambda: Path(__file__).parent.parent / "static",
         description="""
         Path to static files directory.
         Contains web UI assets and other static resources.
@@ -118,7 +118,7 @@ class ServiceConfig(BaseModel):
         serialization_alias="force-endpoint-protocol",
     )
     mode: ServiceMode = Field(
-        default=ServiceMode.webui,
+        default=ServiceMode.WEBUI,
         description="""
         Service mode.
         'webui' serves the full web UI, 'static' serves only static files.
