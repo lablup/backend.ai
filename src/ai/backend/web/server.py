@@ -49,11 +49,11 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
-from .config import config_iv
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
@@ -94,7 +94,8 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
-    static_path = request.app["config"]["service"]["static_path"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     try:
         file_path.relative_to(static_path)
@@ -120,15 +121,17 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 async def config_ini_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
-    scheme = config["service"]["force_endpoint_protocol"]
-    if scheme is None:
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    force_protocol = config.service.force_endpoint_protocol
+    if force_protocol is None:
         scheme = request.scheme
+    else:
+        scheme = str(force_protocol)
     j2env: jinja2.Environment = request.app["j2env"]
     tpl = j2env.get_template("config_ini.toml.j2")
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config,
+        "config": config.model_dump(),
     })
     return web.Response(text=config_content, content_type="text/plain")
 
@@ -136,15 +139,17 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 async def config_toml_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
-    scheme = config["service"]["force_endpoint_protocol"]
-    if scheme is None:
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    force_protocol = config.service.force_endpoint_protocol
+    if force_protocol is None:
         scheme = request.scheme
+    else:
+        scheme = str(force_protocol)
     j2env: jinja2.Environment = request.app["j2env"]
     tpl = j2env.get_template("config.toml.j2")
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config,
+        "config": config.model_dump(),
     })
     return web.Response(text=config_content, content_type="text/plain")
 
@@ -153,8 +158,8 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
-    config = request.app["config"]
-    static_path = config["service"]["static_path"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
     try:
@@ -174,7 +179,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def update_password_no_auth(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
     client_ip = get_client_ip(request)
     try:
         text = await request.text()
@@ -205,18 +210,18 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
 
     try:
         anon_api_config = APIConfig(
-            domain=config["api"]["domain"],
-            endpoint=config["api"]["endpoint"][0],
+            domain=config.api.domain,
+            endpoint=str(config.api.endpoint[0]),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"]["ssl_verify"],
+            skip_sslcert_validation=not config.api.ssl_verify,
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             result = await api_session.Auth.update_password_no_auth(
-                config["api"]["domain"],
+                config.api.domain,
                 creds["username"],
                 creds["current_password"],
                 creds["new_password"],
@@ -272,7 +277,7 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 
 async def login_handler(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
@@ -319,7 +324,7 @@ async def login_handler(request: web.Request) -> web.Response:
     }
 
     redis: Redis = request.app["redis"]
-    BLOCK_TIME = config["session"]["login_block_time"]
+    BLOCK_TIME = config.session.login_block_time
 
     async def _get_login_history():
         login_history = await redis.get(
@@ -350,7 +355,7 @@ async def login_handler(request: web.Request) -> web.Response:
         await redis.set(key, value, ex=BLOCK_TIME)
 
     # Block login if there are too many consecutive failed login attempts.
-    ALLOWED_FAIL_COUNT = config["session"]["login_allowed_fail_count"]
+    ALLOWED_FAIL_COUNT = config.session.login_allowed_fail_count
     login_time = time.time()
     login_history = await _get_login_history()
     last_login_attempt = login_history.get("last_login_attempt", 0)
@@ -377,12 +382,12 @@ async def login_handler(request: web.Request) -> web.Response:
 
     try:
         anon_api_config = APIConfig(
-            domain=config["api"]["domain"],
-            endpoint=config["api"]["endpoint"][0],
+            domain=config.api.domain,
+            endpoint=str(config.api.endpoint[0]),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"]["ssl_verify"],
+            skip_sslcert_validation=not config.api.ssl_verify,
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
@@ -475,8 +480,8 @@ async def logout_handler(request: web.Request) -> web.Response:
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
-    config = request.app["config"]
-    login_session_extension_sec = cast(int, config["session"]["login_session_extension_sec"])
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    login_session_extension_sec = cast(int, config.session.login_session_extension_sec)
 
     current = get_time()
     session = await get_session(request)
@@ -499,7 +504,7 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
     stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
 
@@ -516,7 +521,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
 
     # Check if auth token is delivered via request body or cookie.
     rqst_data: dict[str, Any] = await request.json()
-    auth_token_name = config["api"]["auth_token_name"]
+    auth_token_name = config.api.auth_token_name
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:
         auth_token = request.cookies.get(auth_token_name)
@@ -538,12 +543,12 @@ async def token_login_handler(request: web.Request) -> web.Response:
     }
     try:
         anon_api_config = APIConfig(
-            domain=config["api"]["domain"],
-            endpoint=config["api"]["endpoint"][0],
+            domain=config.api.domain,
+            endpoint=str(config.api.endpoint[0]),
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"]["ssl_verify"],
+            skip_sslcert_validation=not config.api.ssl_verify,
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
@@ -633,9 +638,10 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
+    config = cast(WebServerUnifiedConfig, _args[0])
     log_endpoint = _args[1]
     logger = Logger(
-        _args[0]["logging"],
+        config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -657,14 +663,16 @@ async def server_main(
     pidx: int,
     args: Sequence[Any],
 ) -> AsyncIterator[Any]:
-    config = args[0]
+    config = cast(WebServerUnifiedConfig, args[0])
     app = web.Application(
         middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
     )
     app["config"] = config
-    request_policy_config: list[str] = config["security"]["request_policies"]
-    response_policy_config: list[str] = config["security"]["response_policies"]
-    csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = config["security"]["csp"]
+    request_policy_config: list[str] = config.security.request_policies
+    response_policy_config: list[str] = config.security.response_policies
+    csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = (
+        config.security.csp.model_dump() if config.security.csp else None
+    )
     app["security_policy"] = SecurityPolicy.from_config(
         request_policy_config, response_policy_config, csp_policy_config
     )
@@ -687,7 +695,7 @@ async def server_main(
         keepalive_options[_TCP_KEEPCNT] = 3
 
     etcd_resdis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config["session"]["redis"]
+        config.session.redis.model_dump()
     )
     app["redis"] = redis_helper.get_redis_object(
         etcd_resdis_config.profile_target(RedisRole.STATISTICS),
@@ -696,15 +704,15 @@ async def server_main(
         socket_keepalive_options=keepalive_options,
     ).client
 
-    if pidx == 0 and config["session"]["flush_on_startup"]:
+    if pidx == 0 and config.session.flush_on_startup:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
 
-    if config["session"]["login_session_extension_sec"] is None:
-        config["session"]["login_session_extension_sec"] = config["session"]["max_age"]
+    if config.session.login_session_extension_sec is None:
+        config.session.login_session_extension_sec = config.session.max_age
     redis_storage = RedisStorage(
         app["redis"],
-        max_age=config["session"]["max_age"],
+        max_age=config.session.max_age,
     )
 
     setup_session(app, redis_storage)
@@ -720,16 +728,21 @@ async def server_main(
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
-    pipeline_api_endpoint = config["pipeline"]["endpoint"]
-    pipeline_handler = partial(web_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint)
+    pipeline_api_endpoint = str(config.pipeline.endpoint)
+    pipeline_api_ws_endpoint = pipeline_api_endpoint.replace("http", "ws", 1)
+    pipeline_handler = partial(
+        web_handler, is_anonymous=True, api_endpoint=str(pipeline_api_endpoint)
+    )
     pipeline_login_handler = partial(
         web_handler,
         is_anonymous=False,
-        api_endpoint=pipeline_api_endpoint,
+        api_endpoint=str(pipeline_api_endpoint),
         http_headers_to_forward_extra={"X-BackendAI-SessionID"},
     )
     pipeline_websocket_handler = partial(
-        websocket_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint.with_scheme("ws")
+        websocket_handler,
+        is_anonymous=True,
+        api_endpoint=pipeline_api_ws_endpoint,
     )
 
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
@@ -774,14 +787,14 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
-    if config["service"]["mode"] == "webui":
+    if config.service.mode == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         fallback_handler = console_handler
-    elif config["service"]["mode"] == "static":
+    elif config.service.mode == "static":
         fallback_handler = static_handler
     else:
-        raise ValueError("Unrecognized service.mode", config["service"]["mode"])
+        raise ValueError("Unrecognized service.mode", config.service.mode)
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
 
     app.on_shutdown.append(server_shutdown)
@@ -794,32 +807,32 @@ async def server_main(
     app.on_response_prepare.append(on_prepare)
 
     ssl_ctx = None
-    if config["service"]["ssl_enabled"]:
+    if config.service.ssl_enabled:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
-            str(config["service"]["ssl_cert"]),
-            str(config["service"]["ssl_privkey"]),
+            str(config.service.ssl_cert),
+            str(config.service.ssl_privkey),
         )
 
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(
         runner,
-        str(config["service"]["ip"]),
-        config["service"]["port"],
+        str(config.service.ip),
+        config.service.port,
         backlog=1024,
         reuse_port=True,
         ssl_context=ssl_ctx,
     )
     await site.start()
 
-    if config["otel"]["enabled"]:
+    if config.otel.enabled:
         otel_spec = OpenTelemetrySpec(
             service_id=uuid4(),
             service_name="webserver",
             service_version=__version__,
-            log_level=config["otel"]["log-level"],
-            endpoint=config["otel"]["endpoint"],
+            log_level=config.otel.log_level,
+            endpoint=config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
 
@@ -871,19 +884,20 @@ def main(
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    cfg = config.check(raw_cfg, config_iv)
-    config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
+    cfg = WebServerUnifiedConfig.model_validate(raw_cfg)
+    if cfg.pipeline.frontend_endpoint is None:
+        cfg.pipeline.frontend_endpoint = str(cfg.pipeline.endpoint)
 
     if ctx.invoked_subcommand is None:
-        cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
-        ipc_base_path = cfg["webserver"]["ipc-base-path"]
+        cfg.webserver.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = cfg.webserver.ipc_base_path
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg["logging"]["endpoint"] = log_endpoint
+        cfg.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                cfg["logging"],
+                cfg.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -892,9 +906,7 @@ def main(
                 },
             )
             with logger:
-                setproctitle(
-                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
-                )
+                setproctitle(f"backend.ai: webserver {cfg.service.ip}:{cfg.service.port}")
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
@@ -902,9 +914,9 @@ def main(
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
-                    pprint(cfg)
-                log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
-                if cfg["webserver"]["event-loop"] == "uvloop":
+                    pprint(cfg.model_dump())
+                log.info("serving at {0}:{1}", cfg.service.ip, cfg.service.port)
+                if cfg.webserver.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -918,9 +930,9 @@ def main(
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg["webserver"]["pid-file"].is_file():
+            if cfg.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg["webserver"]["pid-file"].unlink()
+                cfg.webserver.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

@@ -5,9 +5,10 @@ import inspect
 import logging
 import socket
 import time
+
+# Import ValkeyStatClient with TYPE_CHECKING to avoid circular imports
 from typing import (
     Any,
-    AsyncGenerator,
     Awaitable,
     Callable,
     Mapping,
@@ -22,7 +23,7 @@ import redis.exceptions
 import yarl
 from glide import GlideClient, GlideClientConfiguration, NodeAddress, ServerCredentials
 from redis.asyncio import ConnectionPool, Redis
-from redis.asyncio.client import Pipeline, PubSub
+from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
@@ -35,10 +36,6 @@ from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
     "execute",
-    "subscribe",
-    "blpop",
-    "read_stream",
-    "read_stream_by_group",
     "get_redis_object",
 )
 
@@ -70,115 +67,13 @@ _default_conn_pool_opts: Mapping[str, Any] = {
     # "timeout": 20.0,  # for redis-py 5.0+
 }
 
-_scripts: dict[str, str] = {}
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ConnectionNotAvailable(Exception):
-    pass
-
-
-async def subscribe(
-    channel: PubSub,
-    *,
-    reconnect_poll_interval: float = 0.3,
-) -> AsyncGenerator[Any, None]:
-    """
-    An async-generator wrapper for pub-sub channel subscription.
-    It automatically recovers from server shutdowns until explicitly cancelled.
-    """
-
-    async def _reset_chan():
-        channel.connection = None
-        try:
-            await channel.ping()
-        except redis.exceptions.ConnectionError:
-            pass
-        else:
-            assert channel.connection is not None
-            await channel.on_connect(channel.connection)
-
-    while True:
-        try:
-            if not channel.connection:
-                raise ConnectionNotAvailable
-            message = await channel.get_message(ignore_subscribe_messages=True, timeout=10.0)
-            if message is not None:
-                yield message["data"]
-        except (
-            MasterNotFoundError,
-            SlaveNotFoundError,
-            redis.exceptions.ConnectionError,
-            redis.exceptions.ReadOnlyError,
-            ConnectionResetError,
-            ConnectionNotAvailable,
-        ):
-            await asyncio.sleep(reconnect_poll_interval)
-            await _reset_chan()
-            continue
-        except redis.exceptions.ResponseError as e:
-            if len(e.args) > 0 and e.args[0].upper().startswith("NOREPLICAS "):
-                await asyncio.sleep(reconnect_poll_interval)
-                await _reset_chan()
-                continue
-            raise
-        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
-            continue
-        except asyncio.CancelledError:
-            raise
-        finally:
-            await asyncio.sleep(0)
-
-
-async def blpop(
-    redis_obj: RedisConnectionInfo,
-    key: str,
-    *,
-    service_name: Optional[str] = None,
-) -> AsyncGenerator[bytes, None]:
-    """
-    An async-generator wrapper for blpop (blocking left pop).
-    It automatically recovers from server shutdowns until explicitly cancelled.
-    """
-
-    redis_client = redis_obj.client
-    service_name = service_name or redis_obj.service_name
-    reconnect_poll_interval = float(
-        cast(str, redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
-    )
-
-    while True:
-        try:
-            raw_msg = await redis_client.blpop(key, timeout=10.0)
-            if not raw_msg:
-                continue
-            yield raw_msg[1]
-        except (
-            MasterNotFoundError,
-            SlaveNotFoundError,
-            redis.exceptions.ConnectionError,
-            redis.exceptions.ReadOnlyError,
-            ConnectionResetError,
-        ):
-            await asyncio.sleep(reconnect_poll_interval)
-            continue
-        except redis.exceptions.ResponseError as e:
-            if e.args[0].upper().startswith("NOREPLICAS "):
-                await asyncio.sleep(reconnect_poll_interval)
-                continue
-            raise
-        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
-            continue
-        except asyncio.CancelledError:
-            raise
-        finally:
-            await asyncio.sleep(0)
-
-
+# Leaving it as is since the CLI is still using redis-py version 4.x
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis], Awaitable[Any]],
+    func: Callable[[Union[Redis, Any]], Awaitable[Any]],
     *,
     service_name: Optional[str] = None,
     encoding: Optional[str] = None,
@@ -282,180 +177,6 @@ async def execute(
             raise
         finally:
             await asyncio.sleep(0)
-
-
-async def execute_script(
-    redis_obj: RedisConnectionInfo,
-    script_id: str,
-    script: str,
-    keys: Sequence[str],
-    args: Sequence[
-        Union[bytes, memoryview, str, int, float]
-    ],  # redis.asyncio.connection.EncodableT
-) -> Any:
-    """
-    Auto-load and execute the given script.
-    It uses the hash keys for scripts so that it does not send the whole
-    script every time but only at the first time.
-
-    Args:
-        conn: A Redis connection or pool with the commands mixin.
-        script_id: A human-readable identifier for the script.
-            This can be arbitrary string but must be unique for each script.
-        script: The script content.
-        keys: The Redis keys that will be passed to the script.
-        args: The arguments that will be passed to the script.
-    """
-    script_hash = _scripts.get(script_id, "x")
-    while True:
-        try:
-            ret = await execute(
-                redis_obj,
-                lambda r: r.evalsha(
-                    script_hash,
-                    len(keys),
-                    *keys,
-                    *args,
-                ),
-            )
-            break
-        except redis.exceptions.NoScriptError:
-            # Redis may have been restarted.
-            script_hash = await execute(redis_obj, lambda r: r.script_load(script))
-            _scripts[script_id] = script_hash
-        except redis.exceptions.ResponseError as e:
-            if "NOSCRIPT" in e.args[0]:
-                # Redis may have been restarted.
-                script_hash = await execute(redis_obj, lambda r: r.script_load(script))
-                _scripts[script_id] = script_hash
-            else:
-                raise
-            continue
-    return ret
-
-
-async def read_stream(
-    r: RedisConnectionInfo,
-    stream_key: str,
-    *,
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, Any], None]:
-    """
-    A high-level wrapper for the XREAD command.
-    """
-    last_id = b"$"
-    while True:
-        try:
-            reply = await execute(
-                r,
-                lambda r: r.xread(
-                    {stream_key: last_id},
-                    block=block_timeout,
-                ),
-                command_timeout=block_timeout / 1000,
-            )
-            if not reply:
-                continue
-            # Keep some latest messages so that other manager
-            # processes to have chances of fetching them.
-            await execute(
-                r,
-                lambda r: r.xtrim(
-                    stream_key,
-                    maxlen=128,
-                    approximate=True,
-                ),
-            )
-            for msg_id, msg_data in reply[0][1]:
-                try:
-                    yield msg_id, msg_data
-                finally:
-                    last_id = msg_id
-        except asyncio.CancelledError:
-            raise
-
-
-async def read_stream_by_group(
-    r: RedisConnectionInfo,
-    stream_key: str,
-    group_name: str,
-    consumer_id: str,
-    *,
-    autoclaim_idle_timeout: int = 1_000,  # in msec
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, Any], None]:
-    """
-    A high-level wrapper for the XREADGROUP command
-    combined with XAUTOCLAIM and XGROUP_CREATE.
-    """
-    while True:
-        try:
-            messages = []
-            autoclaim_start_id = b"0-0"
-            while True:
-                reply = await execute(
-                    r,
-                    lambda r: r.execute_command(
-                        "XAUTOCLAIM",
-                        stream_key,
-                        group_name,
-                        consumer_id,
-                        str(autoclaim_idle_timeout),
-                        autoclaim_start_id,
-                    ),
-                    command_timeout=autoclaim_idle_timeout / 1000,
-                )
-                for msg_id, msg_data in reply[1]:
-                    messages.append((msg_id, msg_data))
-                if reply[0] == b"0-0":
-                    break
-                autoclaim_start_id = reply[0]
-            reply = await execute(
-                r,
-                lambda r: r.xreadgroup(
-                    group_name,
-                    consumer_id,
-                    {stream_key: b">"},  # fetch messages not seen by other consumers
-                    block=block_timeout,
-                ),
-                command_timeout=block_timeout / 1000,
-            )
-            if len(reply) == 0:
-                continue
-            assert reply[0][0].decode() == stream_key
-            for msg_id, msg_data in reply[0][1]:
-                messages.append((msg_id, msg_data))
-            await execute(
-                r,
-                lambda r: r.xack(
-                    stream_key,
-                    group_name,
-                    *(msg_id for msg_id, msg_data in reply[0][1]),
-                ),
-            )
-            for msg_id, msg_data in messages:
-                yield msg_id, msg_data
-        except asyncio.CancelledError:
-            raise
-        except redis.exceptions.ResponseError as e:
-            if e.args[0].startswith("NOGROUP "):
-                try:
-                    await execute(
-                        r,
-                        lambda r: r.xgroup_create(
-                            stream_key,
-                            group_name,
-                            "$",
-                            mkstream=True,
-                        ),
-                    )
-                except redis.exceptions.ResponseError as e:
-                    if e.args[0].startswith("BUSYGROUP "):
-                        pass
-                    else:
-                        raise
-                continue
-            raise
 
 
 def get_redis_object(
@@ -595,11 +316,3 @@ async def create_valkey_client(
         pubsub_subscriptions=pubsub_subscriptions,
     )
     return await GlideClient.create(config)
-
-
-async def ping_redis_connection(redis_client: Redis) -> bool:
-    try:
-        return await redis_client.ping()
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
-        raise e

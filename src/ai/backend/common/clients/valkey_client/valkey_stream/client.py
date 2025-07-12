@@ -1,8 +1,7 @@
-import asyncio
 import logging
-import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, List, Mapping, Optional, ParamSpec, Self, TypeVar, cast
+from typing import Any, Optional, Self, cast
 
 from glide import (
     Batch,
@@ -17,10 +16,9 @@ from glide import (
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
+    valkey_decorator,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.metrics.metric import ClientMetricObserver, ClientType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -37,7 +35,7 @@ class StreamMessage:
     payload: Mapping[bytes, bytes]
 
     @classmethod
-    def from_list(cls, msg_id: bytes, list_payload: List[List[bytes]]) -> Self:
+    def from_list(cls, msg_id: bytes, list_payload: list[list[bytes]]) -> Self:
         payload = {k: v for k, v in list_payload}
         return cls(msg_id=msg_id, payload=payload)
 
@@ -46,66 +44,6 @@ class StreamMessage:
 class AutoClaimMessage:
     next_start_id: bytes
     messages: list[StreamMessage]
-
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def valkey_decorator(
-    *,
-    retry_count: int = 3,
-    retry_delay: float = 0.1,
-) -> Callable[
-    [Callable[P, Awaitable[R]]],
-    Callable[P, Awaitable[R]],
-]:
-    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-        observer = ClientMetricObserver.instance()
-
-        async def wrapper(*args, **kwargs) -> R:
-            log.debug("Calling {}", func.__name__)
-            start = time.perf_counter()
-            for attempt in range(retry_count):
-                try:
-                    observer.observe_client_operation_triggered(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                    )
-                    res = await func(*args, **kwargs)
-                    observer.observe_client_operation(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                        success=True,
-                        duration=time.perf_counter() - start,
-                    )
-                    return res
-                except Exception as e:
-                    if attempt < retry_count - 1:
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    log.exception(
-                        "Error in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                        func.__name__,
-                        args,
-                        kwargs,
-                        retry_count,
-                        e,
-                    )
-                    observer.observe_client_operation(
-                        client_type=ClientType.VALKEY,
-                        operation=func.__name__,
-                        success=False,
-                        duration=time.perf_counter() - start,
-                    )
-                    raise e
-            raise UnreachableError(
-                f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
-            )
-
-        return wrapper
-
-    return decorator
 
 
 class ValkeyStreamClient:
@@ -268,7 +206,7 @@ class ValkeyStreamClient:
         :param payload: The payload to re-add to the stream.
         :raises: GlideClientError if the message cannot be requeued.
         """
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.xack(stream_key, group_name, [message_id])
         values = [(k, v) for k, v in payload.items()]
         tx.xadd(
@@ -313,7 +251,7 @@ class ValkeyStreamClient:
         if len(res) < 2:
             return None
         next_start_id = cast(bytes, res[0])
-        msgs = cast(Mapping[bytes, List[List[bytes]]], res[1])
+        msgs = cast(Mapping[bytes, list[list[bytes]]], res[1])
         messages = [
             StreamMessage.from_list(msg_id=key, list_payload=msg) for key, msg in msgs.items()
         ]
@@ -409,7 +347,7 @@ class ValkeyStreamClient:
         :raises: GlideClientError if the logs cannot be enqueued.
         """
         key = self._container_log_key(container_id)
-        tx = self._create_batch(is_atomic=True)
+        tx = self._create_batch()
         tx.rpush(
             key,
             [logs],

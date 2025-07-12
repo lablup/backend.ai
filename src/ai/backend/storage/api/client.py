@@ -32,7 +32,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
@@ -120,7 +120,7 @@ async def check_status(request: web.Request) -> web.StreamResponse:
 
 async def download(request: web.Request) -> web.StreamResponse:
     ctx: RootContext = request.app["ctx"]
-    secret = ctx.local_config["storage-proxy"]["secret"]
+    secret = ctx.local_config.storage_proxy.secret
 
     class Params(TypedDict):
         token: DownloadTokenData
@@ -284,7 +284,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
     Check the availability of an upload session.
     """
     ctx: RootContext = request.app["ctx"]
-    secret = ctx.local_config["storage-proxy"]["secret"]
+    secret = ctx.local_config.storage_proxy.secret
 
     class Params(TypedDict):
         token: UploadTokenData
@@ -317,7 +317,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     Perform the chunk upload.
     """
     ctx: RootContext = request.app["ctx"]
-    secret = ctx.local_config["storage-proxy"]["secret"]
+    secret = ctx.local_config.storage_proxy.secret
 
     class Params(TypedDict):
         token: UploadTokenData
@@ -392,7 +392,7 @@ async def tus_options(request: web.Request) -> web.Response:
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
     headers["Tus-Max-Size"] = str(
-        int(ctx.local_config["storage-proxy"]["max-upload-size"]),
+        int(BinarySize.from_str(ctx.local_config.storage_proxy.max_upload_size)),
     )
     headers["X-Content-Type-Options"] = "nosniff"
     return web.Response(headers=headers)
