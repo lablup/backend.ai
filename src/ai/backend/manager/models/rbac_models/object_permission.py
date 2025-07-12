@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .role import RoleRow
 
 
-class EntityPermissionRow(Base):
+class ObjectPermissionRow(Base):
     __tablename__ = "entity_permissions"
 
     id: uuid.UUID = IDColumn()
@@ -41,6 +41,6 @@ class EntityPermissionRow(Base):
 
     role_row: RoleRow = relationship(
         "RoleRow",
-        back_populates="entity_permission_rows",
-        primaryjoin="RoleRow.id == foreign(EntityPermissionRow.role_id)",
+        back_populates="object_permission_rows",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
     )

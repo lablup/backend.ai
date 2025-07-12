@@ -20,7 +20,7 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from .entity_permission import EntityPermissionRow
+    from .object_permission import ObjectPermissionRow
     from .scope_permission import ScopePermissionRow
     from .user_role import UserRoleRow
 
@@ -66,8 +66,8 @@ class RoleRow(Base):
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(ScopePermissionRow.role_id)",
     )
-    entity_permission_rows: list[EntityPermissionRow] = relationship(
-        "EntityPermissionRow",
+    object_permission_rows: list[ObjectPermissionRow] = relationship(
+        "ObjectPermissionRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(EntityPermissionRow.role_id)",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
     )

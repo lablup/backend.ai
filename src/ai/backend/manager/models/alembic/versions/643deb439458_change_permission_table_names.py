@@ -20,9 +20,9 @@ def upgrade() -> None:
     op.drop_constraint("pk_role_permissions", "scope_permissions", type_="primary")
     op.create_primary_key("pk_scope_permissions", "scope_permissions", ["id"])
 
-    op.rename_table("resource_permissions", "entity_permissions")
-    op.drop_constraint("pk_resource_permissions", "entity_permissions", type_="primary")
-    op.create_primary_key("pk_entity_permissions", "entity_permissions", ["id"])
+    op.rename_table("resource_permissions", "object_permissions")
+    op.drop_constraint("pk_resource_permissions", "object_permissions", type_="primary")
+    op.create_primary_key("pk_object_permissions", "object_permissions", ["id"])
 
 
 def downgrade() -> None:
@@ -30,6 +30,6 @@ def downgrade() -> None:
     op.drop_constraint("pk_scope_permissions", "role_permissions", type_="primary")
     op.create_primary_key("pk_role_permissions", "role_permissions", ["id"])
 
-    op.rename_table("entity_permissions", "resource_permissions")
-    op.drop_constraint("pk_entity_permissions", "resource_permissions", type_="primary")
+    op.rename_table("object_permissions", "resource_permissions")
+    op.drop_constraint("pk_object_permissions", "resource_permissions", type_="primary")
     op.create_primary_key("pk_resource_permissions", "resource_permissions", ["id"])
