@@ -53,45 +53,27 @@ def is_containerized() -> bool:
 
 
 async def _detect_aws(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
-    try:
-        async with session.get(
-            "http://169.254.169.254/latest/meta-data/",
-        ) as resp:
-            if resp.status == 200:
-                text = await resp.text()
-                if "ami-id" in text or "instance-id" in text:
-                    return CloudProvider.AWS
-        return None
-    except (aiohttp.ClientError, asyncio.TimeoutError):
-        return None
+    async with session.get(
+        "http://169.254.169.254/latest/meta-data/",
+    ) as resp:
+        return CloudProvider.AWS
 
 
 async def _detect_azure(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
-    try:
-        async with session.get(
-            "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
-            headers={"Metadata": "true"},
-        ) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                if "compute" in data:
-                    return CloudProvider.AZURE
-        return None
-    except (aiohttp.ClientError, asyncio.TimeoutError):
-        return None
+    async with session.get(
+        "http://169.254.169.254/metadata/instance/compute",
+        params={"api-version": "2021-02-01"},
+        headers={"Metadata": "true"},
+    ) as resp:
+        return CloudProvider.AZURE
 
 
 async def _detect_gcp(session: aiohttp.ClientSession) -> Optional[CloudProvider]:
-    try:
-        async with session.get(
-            "http://169.254.169.254/computeMetadata/v1/instance/id",
-            headers={"Metadata-Flavor": "Google"},
-        ) as resp:
-            if resp.status == 200 and resp.headers.get("Metadata-Flavor") == "Google":
-                return CloudProvider.GCP
-        return None
-    except (aiohttp.ClientError, asyncio.TimeoutError):
-        return None
+    async with session.get(
+        "http://169.254.169.254/computeMetadata/v1/instance/id",
+        headers={"Metadata-Flavor": "Google"},
+    ) as resp:
+        return CloudProvider.GCP
 
 
 async def detect_cloud() -> Optional[CloudProvider]:
@@ -99,7 +81,10 @@ async def detect_cloud() -> Optional[CloudProvider]:
     Detect the cloud provider using asyncio.staggered_race()
     to get the fastest returning result from multiple metadata URL detectors.
     """
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(connect=0.3)) as session:
+    async with aiohttp.ClientSession(
+        raise_for_status=True,
+        timeout=aiohttp.ClientTimeout(connect=0.3),
+    ) as session:
         detection_tasks = [
             functools.partial(_detect_aws, session),
             functools.partial(_detect_azure, session),
@@ -215,14 +200,14 @@ def _define_functions():
                 return f"amazon/{region}"
 
         case CloudProvider.AZURE:
-            # ref: https://docs.microsoft.com/azure/virtual-machines/virtual-machines-instancemetadataservice-overview
+            # ref: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-serviceb
             _metadata_prefix = "http://169.254.169.254/metadata/instance"
 
             async def _get_instance_id() -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
-                    params={"version": "2017-03-01"},
+                    params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
                 if data is None:
@@ -234,19 +219,19 @@ def _define_functions():
                 data = await curl(
                     _metadata_prefix,
                     None,
-                    params={"version": "2017-03-01"},
+                    params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
                 if data is None:
                     return "127.0.0.1"
                 o = json.loads(data)
-                return o["network"]["interface"][0]["ipv4"]["ipaddress"][0]["ipaddress"]
+                return o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
 
             async def _get_instance_type() -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
-                    params={"version": "2017-03-01"},
+                    params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
                 if data is None:
@@ -258,7 +243,7 @@ def _define_functions():
                 data = await curl(
                     _metadata_prefix,
                     None,
-                    params={"version": "2017-03-01"},
+                    params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
                 if data is None:
