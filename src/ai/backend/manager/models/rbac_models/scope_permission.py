@@ -44,6 +44,6 @@ class ScopePermissionRow(Base):
 
     role_row: RoleRow = relationship(
         "RoleRow",
-        back_populates="role_permission_rows",
-        primaryjoin="RoleRow.id == foreign(RolePermissionRow.role_id)",
+        back_populates="scope_permission_rows",
+        primaryjoin="RoleRow.id == foreign(ScopePermissionRow.role_id)",
     )

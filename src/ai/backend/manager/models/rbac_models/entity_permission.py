@@ -41,6 +41,6 @@ class EntityPermissionRow(Base):
 
     role_row: RoleRow = relationship(
         "RoleRow",
-        back_populates="resource_permission_rows",
-        primaryjoin="RoleRow.id == foreign(ResourcePermissionRow.role_id)",
+        back_populates="entity_permission_rows",
+        primaryjoin="RoleRow.id == foreign(EntityPermissionRow.role_id)",
     )
