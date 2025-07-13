@@ -24,7 +24,6 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
-    DealiasImageActionNoSuchAliasError,
     DealiasImageActionResult,
 )
 from ai.backend.manager.services.image.actions.forget_image import (
@@ -132,9 +131,6 @@ class ImageService:
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
         result = await self._image_repository.delete_image_alias(action.alias)
-        if result is None:
-            raise DealiasImageActionNoSuchAliasError()
-
         image_id, alias_data = result
         return DealiasImageActionResult(
             image_id=image_id,

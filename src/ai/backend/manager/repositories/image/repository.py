@@ -13,6 +13,7 @@ from ai.backend.manager.errors.exceptions import (
     AliasImageActionValueError,
     ForgetImageForbiddenError,
     ForgetImageNotFoundError,
+    ImageAliasNotFound,
     ModifyImageActionValueError,
 )
 from ai.backend.manager.models.image import (
@@ -92,15 +93,16 @@ class ImageRepository:
             raise ForgetImageForbiddenError()
         return image_row
 
-    async def _get_image_alias_by_name(
-        self, session: SASession, alias: str
-    ) -> Optional[ImageAliasRow]:
+    async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
         Private method to get an image alias by name using an existing session.
         """
-        return await session.scalar(
+        image_alias_row = await session.scalar(
             sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
         )
+        if not image_alias_row:
+            raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
+        return image_alias_row
 
     async def get_image_by_id(
         self, image_id: UUID, load_aliases: bool = False
@@ -177,19 +179,15 @@ class ImageRepository:
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e))
 
-    async def get_image_alias(self, alias: str) -> Optional[ImageAliasData]:
+    async def get_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
-            if not row:
-                return None
             data = ImageAliasData(id=row.id, alias=row.alias)
         return data
 
-    async def delete_image_alias(self, alias: str) -> Optional[tuple[UUID, ImageAliasData]]:
+    async def delete_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
-            if not existing_alias:
-                return None
             image_id = existing_alias.image_id
             alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias)
             await session.delete(existing_alias)

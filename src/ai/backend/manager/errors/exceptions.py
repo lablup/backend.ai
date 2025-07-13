@@ -353,6 +353,18 @@ class ImageNotFound(ObjectNotFound):
         )
 
 
+class ImageAliasNotFound(ObjectNotFound):
+    object_name = "image alias"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE_ALIAS,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class DomainNotFound(ObjectNotFound):
     object_name = "domain"
 
