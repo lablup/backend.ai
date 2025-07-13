@@ -579,34 +579,42 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        async for msg in self._msg_queue.consume_queue():  # type: ignore
-            if self._closed:
-                return
-            decoded_event_name = msg.payload[b"name"].decode()
-            post_callback = _ConsumerPostCallback(
-                msg.msg_id,
-                self._msg_queue,
-                len(self._consumers[decoded_event_name]),
-            )
+        try:
+            async for msg in self._msg_queue.consume_queue():  # type: ignore
+                if self._closed:
+                    return
+                decoded_event_name = msg.payload[b"name"].decode()
+                post_callback = _ConsumerPostCallback(
+                    msg.msg_id,
+                    self._msg_queue,
+                    len(self._consumers[decoded_event_name]),
+                )
 
-            await self.dispatch_consumers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-                [post_callback],
-            )
+                await self.dispatch_consumers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                    [post_callback],
+                )
+        except:
+            log.exception("_consume_loop():")
+            raise
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
-            if self._closed:
-                return
-            decoded_event_name = msg.payload[b"name"].decode()
-            await self.dispatch_subscribers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-            )
+        try:
+            async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+                if self._closed:
+                    return
+                decoded_event_name = msg.payload[b"name"].decode()
+                await self.dispatch_subscribers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                )
+        except:
+            log.exception("_subscribe_loop():")
+            raise
 
 
 class EventProducer:

@@ -121,11 +121,7 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint: bool = False,
-        status_filter: list[RouteStatus] = [
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
-            RouteStatus.PROVISIONING,
-        ],
+        status_filter: list[RouteStatus] = list(RouteStatus.active_route_statuses),
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,

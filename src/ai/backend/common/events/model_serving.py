@@ -82,3 +82,36 @@ class RouteCreatedEvent(RouteCreationEvent):
     @override
     def event_name(cls) -> str:
         return "route_created"
+
+
+class RouteTerminatingEvent(RouteCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "route_terminating"
+
+
+@dataclass
+class EndpointSessionListUpdatedEvent(AbstractEvent):
+    route_id: uuid.UUID
+    endpoint_id: uuid.UUID
+
+    def serialize(self) -> tuple:
+        return (str(self.route_id), str(self.endpoint_id))
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]), uuid.UUID(value[1]))
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_ROUTE
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.route_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None

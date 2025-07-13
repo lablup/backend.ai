@@ -1,14 +1,16 @@
 import asyncio
 import logging
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common import redis_helper
 from ai.backend.common.events.kernel import (
     KernelLifecycleEventReason,
 )
@@ -32,37 +34,48 @@ from ai.backend.common.events.session import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
+    RedisConnectionInfo,
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.model_serving.types import RouteConnectionInfo
 
-from ...models.endpoint import EndpointLifecycle, EndpointRow
+from ...models.endpoint import EndpointRow
+from ...models.kernel import KernelRow
 from ...models.routing import RouteStatus, RoutingRow
 from ...models.session import KernelLoadingStrategy, SessionRow, SessionStatus
 from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    is_db_retry_error,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SessionEventHandler:
+    _registry: AgentRegistry
+    _db: ExtendedAsyncSAEngine
+    _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    _idle_checker_host: IdleCheckerHost
+
+    _redis_live: RedisConnectionInfo
+
     def __init__(
         self,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
         idle_checker_host: IdleCheckerHost,
+        redis_live: RedisConnectionInfo,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
         self._idle_checker_host = idle_checker_host
+        self._redis_live = redis_live
 
     async def _handle_started_or_cancelled(
         self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
@@ -213,87 +226,77 @@ class SessionEventHandler:
             if session.session_type == SessionTypes.INFERENCE:
 
                 async def _update() -> None:
-                    new_routes: list[RoutingRow]
                     async with self._db.begin_session() as db_sess:
                         route = await RoutingRow.get_by_session(
                             db_sess, session.id, load_endpoint=True
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                        if isinstance(event, SessionCancelledEvent):
-                            update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
-                            if "error" in session.status_data:
-                                if session.status_data["error"]["name"] == "MultiAgentError":
-                                    errors = session.status_data["error"]["collection"]
-                                else:
-                                    errors = [session.status_data["error"]]
-                                update_data["error_data"] = {
-                                    "type": "session_cancelled",
-                                    "errors": errors,
-                                    "session_id": session.id,
+                        match event:
+                            case SessionCancelledEvent():
+                                update_data: dict[str, Any] = {
+                                    "status": RouteStatus.FAILED_TO_START
                                 }
-                            query = (
-                                sa.update(RoutingRow)
-                                .values(update_data)
-                                .where(RoutingRow.id == route.id)
-                            )
-                            await db_sess.execute(query)
-                            query = (
-                                sa.update(EndpointRow)
-                                .values({"retries": endpoint.retries + 1})
-                                .where(EndpointRow.id == endpoint.id)
-                            )
-                            await db_sess.execute(query)
-                        elif isinstance(event, SessionTerminatedEvent):
-                            query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
-                            await db_sess.execute(query)
-                            if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
-                                new_routes = [
-                                    r
-                                    for r in endpoint.routings
-                                    if r.id != route.id and r.status == RouteStatus.HEALTHY
-                                ]
-                                try:
-                                    await self._registry.update_appproxy_endpoint_routes(
-                                        db_sess, endpoint, new_routes
-                                    )
-                                except Exception as e:
-                                    if is_db_retry_error(e):
-                                        raise
-                                    log.warning(
-                                        "failed to communicate with AppProxy endpoint: {}", str(e)
-                                    )
-                            await db_sess.commit()
-                        else:
-                            new_route_status: Optional[RouteStatus] = None
-                            if isinstance(event, SessionTerminatingEvent):
-                                new_route_status = RouteStatus.TERMINATING
-
-                            if new_route_status:
+                                if "error" in session.status_data:
+                                    if session.status_data["error"]["name"] == "MultiAgentError":
+                                        errors = session.status_data["error"]["collection"]
+                                    else:
+                                        errors = [session.status_data["error"]]
+                                    update_data["error_data"] = {
+                                        "type": "session_cancelled",
+                                        "errors": errors,
+                                        "session_id": session.id,
+                                    }
                                 query = (
                                     sa.update(RoutingRow)
+                                    .values(update_data)
                                     .where(RoutingRow.id == route.id)
-                                    .values({"status": new_route_status})
                                 )
                                 await db_sess.execute(query)
-
-                                new_routes = [
-                                    r
-                                    for r in endpoint.routings
-                                    if r.id != route.id and r.status == RouteStatus.HEALTHY
-                                ]
-                                if new_route_status == RouteStatus.HEALTHY:
-                                    new_routes.append(route)
-                                try:
-                                    await self._registry.update_appproxy_endpoint_routes(
-                                        db_sess, endpoint, new_routes
-                                    )
-                                except Exception as e:
-                                    if is_db_retry_error(e):
-                                        raise
-                                    log.warning(
-                                        "failed to communicate with AppProxy endpoint: {}", str(e)
-                                    )
-                            await db_sess.commit()
+                                query = (
+                                    sa.update(EndpointRow)
+                                    .values({"retries": endpoint.retries + 1})
+                                    .where(EndpointRow.id == endpoint.id)
+                                )
+                                await db_sess.execute(query)
+                            case SessionTerminatedEvent():
+                                query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
+                                await db_sess.execute(query)
+                            case SessionStartedEvent() | SessionTerminatingEvent():
+                                target_kernels = await KernelRow.batch_load_by_session_id(
+                                    db_sess,
+                                    [
+                                        r.session_id
+                                        for r in endpoint.routings
+                                        if r.status in RouteStatus.active_route_statuses
+                                    ],
+                                )
+                                connection_info: defaultdict[
+                                    str, dict[str, RouteConnectionInfo]
+                                ] = defaultdict()
+                                for kernel in target_kernels:
+                                    for port_info in kernel.service_ports:
+                                        if port_info["is_inference"]:
+                                            connection_info[port_info["name"]][str(kernel.id)] = (
+                                                RouteConnectionInfo(
+                                                    port_info["name"],
+                                                    kernel.kernel_host,
+                                                    port_info["host_ports"][0],
+                                                )
+                                            )
+                                await redis_helper.execute(
+                                    self._redis_live,
+                                    lambda r: r.delete(
+                                        f"endpoint.{endpoint.id}.route_connection_info"
+                                    ),
+                                )
+                                await redis_helper.execute(
+                                    self._redis_live,
+                                    lambda r: r.hset(
+                                        f"endpoint.{endpoint.id}.route_connection_info",
+                                        dict(connection_info),
+                                    ),
+                                )
+                        await db_sess.commit()
 
                 await execute_with_retry(_update)
 
