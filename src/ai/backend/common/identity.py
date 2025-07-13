@@ -262,11 +262,20 @@ def _define_functions():
             _metadata_prefix = "http://169.254.169.254/computeMetadata/v1/"
 
             async def _get_instance_id() -> str:
-                return await curl(
+                vm_id = await curl(
                     _metadata_prefix + "instance/id",
-                    lambda: f"i-{socket.gethostname()}",
+                    None,
                     headers={"Metadata-Flavor": "Google"},
                 )
+                if vm_id is None:
+                    return f"i-{socket.gethostname()}"
+                vm_name = await curl(
+                    _metadata_prefix + "instance/name",
+                    None,
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, 'big')[-5:]).decode().lower()
+                return f"i-{vm_name}-{vm_id_hash}"
 
             async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
                 return await curl(
@@ -276,19 +285,20 @@ def _define_functions():
                 )
 
             async def _get_instance_type() -> str:
-                return await curl(
+                value = await curl(
                     _metadata_prefix + "instance/machine-type",
                     "unknown",
                     headers={"Metadata-Flavor": "Google"},
                 )
+                return value.rsplit("/")[-1]
 
             async def _get_instance_region() -> str:
-                zone = await curl(
+                value = await curl(
                     _metadata_prefix + "instance/zone",
                     "unknown",
                     headers={"Metadata-Flavor": "Google"},
                 )
-                region = zone.rsplit("-", 1)[0]
+                region = value.rsplit("/")[-1]
                 return f"google/{region}"
 
         case _:
