@@ -274,7 +274,7 @@ def _define_functions():
                     None,
                     headers={"Metadata-Flavor": "Google"},
                 )
-                vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, 'big')[-5:]).decode().lower()
+                vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
             async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
