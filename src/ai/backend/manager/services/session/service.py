@@ -12,11 +12,8 @@ from urllib.parse import urlparse
 import aiohttp
 import aiotools
 import multidict
-import sqlalchemy as sa
 import trafaret as t
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.bgtask.types import BgtaskStatus
@@ -42,7 +39,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
-    AccessKey,
     DispatchResult,
     ImageAlias,
     ImageRegistry,
@@ -54,8 +50,6 @@ from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.session import (
     CustomizedImageVisibilityScope,
     drop_undefined,
-    find_dependency_sessions,
-    find_dependent_sessions,
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
@@ -73,13 +67,8 @@ from ai.backend.manager.errors.exceptions import (
     UnknownImageReferenceError,
 )
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow, groups
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
-from ai.backend.manager.models.kernel import (
-    KernelRow,
-)
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -87,9 +76,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
     SessionStatus,
 )
-from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
@@ -204,16 +191,12 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesActionResult,
 )
 from ai.backend.manager.types import UserScope
-from ai.backend.manager.utils import query_userinfo
-
-from ...data.image.types import ImageStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 @dataclass
 class SessionServiceArgs:
-    db: ExtendedAsyncSAEngine
     agent_registry: AgentRegistry
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
@@ -225,7 +208,6 @@ class SessionServiceArgs:
 
 
 class SessionService:
-    _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
     _event_fetcher: EventFetcher
@@ -241,7 +223,6 @@ class SessionService:
         self,
         args: SessionServiceArgs,
     ) -> None:
-        self._db = args.db
         self._agent_registry = args.agent_registry
         self._event_hub = args.event_hub
         self._event_fetcher = args.event_fetcher
@@ -262,13 +243,11 @@ class SessionService:
         myself = asyncio.current_task()
         assert myself is not None
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
 
         resp: Mapping[str, Any] = await asyncio.shield(
             self._rpc_ptask_group.create_task(
@@ -287,13 +266,11 @@ class SessionService:
         code = action.code
         options = action.options or {}
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         try:
             await self._agent_registry.increment_session_usage(session)
             resp = await self._agent_registry.get_completions(session, code, opts=options)
@@ -319,14 +296,11 @@ class SessionService:
         if image_visibility != CustomizedImageVisibilityScope.USER:
             raise InvalidAPIParameters(f"Unsupported visibility scope {image_visibility}")
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=[selectinload(SessionRow.group)],
-            )
+        session = await self._session_repository.get_session_with_group(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
 
         project: GroupRow = session.group
         if not project.container_registry:
@@ -337,35 +311,17 @@ class SessionService:
         registry_hostname = project.container_registry["registry"]
         registry_project = project.container_registry["project"]
 
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(ContainerRegistryRow)
-                .where(
-                    (ContainerRegistryRow.registry_name == registry_hostname)
-                    & (ContainerRegistryRow.project == registry_project)
-                )
-                .options(
-                    load_only(
-                        ContainerRegistryRow.url,
-                        ContainerRegistryRow.username,
-                        ContainerRegistryRow.password,
-                        ContainerRegistryRow.project,
-                    )
-                )
+        registry_conf = await self._session_repository.get_container_registry(
+            registry_hostname, registry_project
+        )
+        if not registry_conf:
+            raise InvalidAPIParameters(
+                f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-            registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
-
-            if not registry_conf:
-                raise InvalidAPIParameters(
-                    f"Project {registry_project} not found in registry {registry_hostname}."
-                )
-
-        async with self._db.begin_readonly_session() as db_sess:
-            image_row = await ImageRow.resolve(
-                db_sess,
-                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
-            )
+        image_row = await self._session_repository.resolve_image([
+            ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
+        ])
 
         base_image_ref = image_row.image_ref
 
@@ -388,55 +344,42 @@ class SessionService:
                 f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
             )
 
-            async with self._db.begin_readonly_session() as sess:
-                # check if user has passed its limit of customized image count
-                query = (
-                    sa.select([sa.func.count()])
-                    .select_from(ImageRow)
-                    .where(
-                        (
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{image_visibility.value}:{image_owner_id}"
-                        )
-                    )
-                    .where(ImageRow.status == ImageStatus.ALIVE)
+            # check if user has passed its limit of customized image count
+            existing_image_count = await self._session_repository.get_customized_image_count(
+                image_visibility.value, str(image_owner_id)
+            )
+
+            customized_image_count_limit = action.max_customized_image_count
+            if customized_image_count_limit <= existing_image_count:
+                raise QuotaExceeded(
+                    extra_msg="You have reached your customized image count quota",
+                    extra_data={
+                        "limit": customized_image_count_limit,
+                        "current": existing_image_count,
+                    },
                 )
-                existing_image_count = await sess.scalar(query)
 
-                customized_image_count_limit = action.max_customized_image_count
-                if customized_image_count_limit <= existing_image_count:
-                    raise QuotaExceeded(
-                        extra_msg="You have reached your customized image count quota",
-                        extra_data={
-                            "limit": customized_image_count_limit,
-                            "current": existing_image_count,
-                        },
-                    )
+            # check if image with same name exists and reuse ID it if is
+            existing_row = await self._session_repository.get_existing_customized_image(
+                new_canonical, image_visibility.value, str(image_owner_id), image_name
+            )
 
-                # check if image with same name exists and reuse ID it if is
-                query = sa.select(ImageRow).where(
-                    sa.and_(
-                        ImageRow.name.like(f"{new_canonical}%"),
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{image_visibility.value}:{image_owner_id}",
-                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                        == image_name,
-                        ImageRow.status == ImageStatus.ALIVE,
-                    )
+            customized_image_id: str
+            kern_features: list[str]
+            if existing_row is not None:
+                from ai.backend.manager.models.image import ImageRow
+
+                existing_image: ImageRow = existing_row
+                labels = existing_image.labels or {}
+                kern_features_str = labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE)
+                kern_features = (
+                    kern_features_str.split() if kern_features_str else [DEFAULT_KERNEL_FEATURE]
                 )
-                existing_row = await sess.scalar(query)
-
-                customized_image_id: str
-                kern_features: list[str]
-                if existing_row:
-                    kern_features = existing_row.labels.get(
-                        LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
-                    ).split()
-                    customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
-                    log.debug("reusing existing customized image ID {}", customized_image_id)
-                else:
-                    kern_features = [DEFAULT_KERNEL_FEATURE]
-                    customized_image_id = str(uuid.uuid4())
+                customized_image_id = labels.get(LabelName.CUSTOMIZED_ID, str(uuid.uuid4()))
+                log.debug("reusing existing customized image ID {}", customized_image_id)
+            else:
+                kern_features = [DEFAULT_KERNEL_FEATURE]
+                customized_image_id = str(uuid.uuid4())
                 # Remove PRIVATE label for customized images
                 kern_features = [
                     feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
@@ -538,8 +481,7 @@ class SessionService:
 
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
-            rescan_result = await rescan_images(
-                self._db,
+            rescan_result = await self._session_repository.rescan_images(
                 new_image_ref.canonical,
                 registry_project,
                 reporter=reporter,
@@ -577,36 +519,24 @@ class SessionService:
         max_wait_seconds = action.max_wait_seconds
         tag = action.tag
 
-        async with self._db.begin_readonly() as conn:
-            query = (
-                sa.select([session_templates.c.template])
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
-                )
+        template = await self._session_repository.get_template_by_id(template_id)
+        log.debug("task template: {}", template)
+        if not template:
+            raise TaskTemplateNotFound
+
+        try:
+            _, group_id, resource_policy = await self._session_repository.query_userinfo(
+                user_id,
+                requester_access_key,
+                user_role,
+                domain_name,
+                keypair_resource_policy,
+                domain_name,
+                group_name,
+                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
             )
-            template = await conn.scalar(query)
-            log.debug("task template: {}", template)
-            if not template:
-                raise TaskTemplateNotFound
-
-            try:
-                _owner_uuid, group_id, resource_policy = await query_userinfo(
-                    conn,
-                    user_id,
-                    requester_access_key,
-                    user_role,
-                    domain_name,
-                    keypair_resource_policy,
-                    domain_name,
-                    group_name,
-                    query_on_behalf_of=(
-                        None if owner_access_key is undefined else owner_access_key
-                    ),
-                )
-
-            except ValueError as e:
-                raise InvalidAPIParameters(str(e))
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e))
 
         try:
             resp = await self._agent_registry.create_cluster(
@@ -670,31 +600,25 @@ class SessionService:
         callback_url = action.params.callback_url
         reuse_if_exists = action.params.reuse_if_exists
 
-        async with self._db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await query_userinfo(
-                conn,
-                user_id,
-                requester_access_key,
-                user_role,
-                domain_name,
-                keypair_resource_policy,
-                domain_name,
-                group_name,
-                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
-            )
+        owner_uuid, group_id, resource_policy = await self._session_repository.query_userinfo(
+            user_id,
+            requester_access_key,
+            user_role,
+            domain_name,
+            keypair_resource_policy,
+            domain_name,
+            group_name,
+            query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+        )
 
         try:
-            async with self._db.begin_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageIdentifier(
-                            image,
-                            architecture,
-                        ),
-                        ImageAlias(image),
-                    ],
-                )
+            image_row = await self._session_repository.resolve_image([
+                ImageIdentifier(
+                    image,
+                    architecture,
+                ),
+                ImageAlias(image),
+            ])
 
             resp = await self._agent_registry.create_session(
                 session_name,
@@ -744,31 +668,16 @@ class SessionService:
         keypair_resource_policy = action.keypair_resource_policy
         requester_access_key = action.requester_access_key
 
-        async with self._db.begin_readonly() as conn:
-            query = (
-                sa.select([session_templates])
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
-                )
-            )
-            result = await conn.execute(query)
-            template_info = result.fetchone()
-            template = template_info["template"]
-            if not template:
-                raise TaskTemplateNotFound
+        template_info = await self._session_repository.get_template_info_by_id(template_id)
+        if not template_info:
+            raise TaskTemplateNotFound
+        template = template_info["template"]
 
-            group_name = None
-            if template_info["domain_name"] and template_info["group_id"]:
-                query = (
-                    sa.select([groups.c.name])
-                    .select_from(groups)
-                    .where(
-                        (groups.c.domain_name == template_info["domain_name"])
-                        & (groups.c.id == template_info["group_id"]),
-                    )
-                )
-                group_name = await conn.scalar(query)
+        group_name = None
+        if template_info["domain_name"] and template_info["group_id"]:
+            group_name = await self._session_repository.get_group_name_by_domain_and_id(
+                template_info["domain_name"], template_info["group_id"]
+            )
 
         if isinstance(template, str):
             template = load_json(template)
@@ -832,6 +741,7 @@ class SessionService:
             params = overwritten_param_check.check(param_from_template)
         except RuntimeError as e1:
             log.exception(e1)
+            raise InvalidAPIParameters("Error while validating template")
         except t.DataError as e2:
             log.debug("Error: {0}", str(e2))
             raise InvalidAPIParameters("Error while validating template")
@@ -887,31 +797,25 @@ class SessionService:
         reuse_if_exists = params["reuse_if_exists"]
         domain_name = params["domain_name"]
 
-        async with self._db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await query_userinfo(
-                conn,
-                user_id,
-                requester_access_key,
-                user_role,
-                domain_name,
-                keypair_resource_policy,
-                domain_name,
-                params["group_name"],
-                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
-            )
+        owner_uuid, group_id, resource_policy = await self._session_repository.query_userinfo(
+            user_id,
+            requester_access_key,
+            user_role,
+            domain_name,
+            keypair_resource_policy,
+            domain_name,
+            params["group_name"],
+            query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+        )
 
         try:
-            async with self._db.begin_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageIdentifier(
-                            image,
-                            architecture,
-                        ),
-                        ImageAlias(image),
-                    ],
-                )
+            image_row = await self._session_repository.resolve_image([
+                ImageIdentifier(
+                    image,
+                    architecture,
+                ),
+                ImageAlias(image),
+            ])
 
             resp = await self._agent_registry.create_session(
                 session_name,
@@ -959,30 +863,32 @@ class SessionService:
         recursive = action.recursive
 
         if recursive:
-            async with self._db.begin_readonly_session() as db_sess:
-                dependent_session_ids = await find_dependent_sessions(
-                    session_name,
-                    db_sess,
-                    owner_access_key,
-                    allow_stale=True,
-                )
+            dependent_session_ids = await self._session_repository.find_dependent_sessions(
+                session_name,
+                owner_access_key,
+                allow_stale=True,
+            )
 
-                target_session_references: list[str | uuid.UUID] = [
-                    *dependent_session_ids,
-                    session_name,
-                ]
-                sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
-                    *[
-                        SessionRow.get_session(
-                            db_sess,
-                            name_or_id,
-                            owner_access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                        )
-                        for name_or_id in target_session_references
-                    ],
-                    return_exceptions=True,
-                )
+            target_session_references: list[str | uuid.UUID] = [
+                *dependent_session_ids,
+                session_name,
+            ]
+
+            async def get_session_safe(name_or_id):
+                try:
+                    return await self._session_repository.get_session_validated(
+                        name_or_id,
+                        owner_access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                        allow_stale=True,
+                    )
+                except Exception as e:
+                    return e
+
+            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
+                *[get_session_safe(name_or_id) for name_or_id in target_session_references],
+                return_exceptions=True,
+            )
 
             last_stats = await asyncio.gather(
                 *[
@@ -1001,13 +907,11 @@ class SessionService:
 
             return DestroySessionActionResult(result=last_stats, destroyed_sessions=sessions)
         else:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                )
+            session = await self._session_repository.get_session_validated(
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+            )
             last_stat = await self._agent_registry.destroy_session(
                 session,
                 forced=forced,
@@ -1025,13 +929,11 @@ class SessionService:
         user_id = action.user_id
         file = action.file
         try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
+            session = await self._session_repository.get_session_validated(
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
             await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.download_single(session, owner_access_key, file)
         except (ValueError, FileNotFoundError):
@@ -1052,13 +954,11 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         files = action.files
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         try:
             assert len(files) <= 5, "Too many files"
             await self._agent_registry.increment_session_usage(session)
@@ -1097,13 +997,11 @@ class SessionService:
         api_version = action.api_version
 
         resp = {}
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         try:
             await self._agent_registry.increment_session_usage(session)
 
@@ -1197,13 +1095,11 @@ class SessionService:
     ) -> GetAbusingReportActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         kernel = session.main_kernel
         report = await self._agent_registry.get_abusing_report(kernel.id)
         return GetAbusingReportActionResult(result=report, session_row=session)
@@ -1212,13 +1108,11 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
 
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
@@ -1232,33 +1126,31 @@ class SessionService:
         owner_access_key = action.owner_access_key
         kernel_id = action.kernel_id
 
-        async with self._db.begin_readonly_session() as db_sess:
-            compute_session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                allow_stale=True,
-                kernel_loading_strategy=(
-                    KernelLoadingStrategy.MAIN_KERNEL_ONLY
-                    if kernel_id is None
-                    else KernelLoadingStrategy.ALL_KERNELS
-                ),
-            )
+        compute_session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            allow_stale=True,
+            kernel_loading_strategy=(
+                KernelLoadingStrategy.MAIN_KERNEL_ONLY
+                if kernel_id is None
+                else KernelLoadingStrategy.ALL_KERNELS
+            ),
+        )
 
-            if compute_session.status in DEAD_SESSION_STATUSES:
-                if kernel_id is None:
-                    # Get logs from the main kernel
-                    kernel_id = compute_session.main_kernel.id
-                    kernel_log = compute_session.main_kernel.container_log
-                else:
-                    # Get logs from the specific kernel
-                    kernel_row = compute_session.get_kernel_by_id(kernel_id)
-                    kernel_log = kernel_row.container_log
-                if kernel_log is not None:
-                    # Get logs from database record
-                    log.debug("returning log from database record")
-                    resp["result"]["logs"] = kernel_log.decode("utf-8")
-                    return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+        if compute_session.status in DEAD_SESSION_STATUSES:
+            if kernel_id is None:
+                # Get logs from the main kernel
+                kernel_id = compute_session.main_kernel.id
+                kernel_log = compute_session.main_kernel.container_log
+            else:
+                # Get logs from the specific kernel
+                kernel_row = compute_session.get_kernel_by_id(kernel_id)
+                kernel_log = kernel_row.container_log
+            if kernel_log is not None:
+                # Get logs from database record
+                log.debug("returning log from database record")
+                resp["result"]["logs"] = kernel_log.decode("utf-8")
+                return GetContainerLogsActionResult(result=resp, session_row=compute_session)
 
         registry = self._agent_registry
         await registry.increment_session_usage(compute_session)
@@ -1275,15 +1167,22 @@ class SessionService:
         root_session_name = action.root_session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_readonly_session() as db_session:
-            # TODO: Move `find_dependency_sessions` impl to Service layer
-            dependency_graph = await find_dependency_sessions(
-                root_session_name, db_session, owner_access_key
-            )
-            session_id = dependency_graph["session_id"]
-            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session = await db_session.scalar(stmt)
+        dependency_graph = await self._session_repository.find_dependency_sessions(
+            root_session_name, owner_access_key
+        )
 
+        session_id = (
+            dependency_graph.get("session_id") if isinstance(dependency_graph, dict) else None
+        )
+        if session_id:
+            if isinstance(session_id, list) and session_id:
+                session_id = session_id[0]
+            session = await self._session_repository.get_session_by_id(str(session_id))
+        else:
+            session = None
+
+        if session is None:
+            raise SessionNotFound
         return GetDependencyGraphActionResult(result=dependency_graph, session_row=session)
 
     async def get_direct_access_info(
@@ -1292,13 +1191,11 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_session() as db_sess:
-            sess = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        sess = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         resp = {}
         sess_type = cast(SessionTypes, sess.session_type)
         if sess_type in PRIVATE_SESSION_TYPES:
@@ -1328,13 +1225,11 @@ class SessionService:
         owner_access_key = action.owner_access_key
 
         resp = {}
-        async with self._db.begin_session() as db_sess:
-            sess = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        sess = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         await self._agent_registry.increment_session_usage(sess)
         resp["domainName"] = sess.domain_name
         resp["groupId"] = str(sess.group_id)
@@ -1380,14 +1275,12 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session_row = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.NONE,
-            )
-            result = session_row.status_history
+        session_row = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        )
+        result = session_row.status_history
 
         return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
 
@@ -1395,13 +1288,11 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.interrupt_session(session)
 
@@ -1413,13 +1304,11 @@ class SessionService:
         user_id = action.user_id
         path = action.path
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
 
         resp: MutableMapping[str, Any] = {}
         try:
@@ -1443,12 +1332,10 @@ class SessionService:
         owner_access_key = action.owner_access_key
 
         matches: list[dict[str, Any]] = []
-        async with self._db.begin_readonly_session() as db_sess:
-            sessions = await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
-            )
+        sessions = await self._session_repository.match_sessions(
+            id_or_name_prefix,
+            owner_access_key,
+        )
         if sessions:
             matches.extend(
                 {
@@ -1465,32 +1352,16 @@ class SessionService:
         owner_access_key = action.owner_access_key
         new_name = action.new_name
 
-        async with self._db.begin_session() as db_sess:
-            try:
-                sess = await SessionRow.get_session(
-                    db_sess,
-                    new_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                )
-            except SessionNotFound:
-                pass
-            else:
-                raise InvalidAPIParameters(
-                    f"Duplicate session name. Session(id:{sess.id}) already has name({sess.name})"
-                )
-            compute_session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+        try:
+            compute_session = await self._session_repository.update_session_name(
+                session_name, new_name, owner_access_key
             )
             if compute_session.status != SessionStatus.RUNNING:
                 raise InvalidAPIParameters("Can't change name of not running session")
-            compute_session.name = new_name
-            for kernel in compute_session.kernels:
-                kernel.session_name = new_name
-            await db_sess.commit()
+        except ValueError as e:
+            if "already exists" in str(e):
+                raise InvalidAPIParameters(str(e))
+            raise
 
         return RenameSessionActionResult(result=None, session_row=compute_session)
 
@@ -1498,13 +1369,11 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        async with self._db.begin_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+        )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)
         return RestartSessionActionResult(result=None, session_row=session)
@@ -1514,13 +1383,11 @@ class SessionService:
         owner_access_key = action.owner_access_key
         service_name = action.service_name
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
         await self._agent_registry.shutdown_service(session, service_name)
         return ShutdownServiceActionResult(result=None, session_row=session)
 
@@ -1534,31 +1401,18 @@ class SessionService:
         envs = action.envs
         login_session_token = action.login_session_token
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await asyncio.shield(
-                self._database_ptask_group.create_task(
-                    SessionRow.get_session(
-                        db_sess,
-                        session_name,
-                        access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                        eager_loading_op=[
-                            selectinload(SessionRow.routing).options(noload("*")),
-                        ],
-                    ),
+        session = await asyncio.shield(
+            self._database_ptask_group.create_task(
+                self._session_repository.get_session_with_routing_minimal(
+                    session_name,
+                    access_key,
                 )
             )
-
-        query = (
-            sa.select([scaling_groups.c.wsproxy_addr])
-            .select_from(scaling_groups)
-            .where((scaling_groups.c.name == session.scaling_group_name))
         )
 
-        async with self._db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
+            session.scaling_group_name
+        )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
         wsproxy_status = await query_wsproxy_status(wsproxy_addr)
@@ -1653,13 +1507,11 @@ class SessionService:
 
         loop = asyncio.get_event_loop()
 
-        async with self._db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
+        session = await self._session_repository.get_session_validated(
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
 
         await self._agent_registry.increment_session_usage(session)
         file_count = 0
@@ -1693,49 +1545,9 @@ class SessionService:
         props = action.modifier
         session_name = action.modifier.name.optional_value()
 
-        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
-            if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
-
-            if session_name:
-                # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
-                    )
-                except SessionNotFound:
-                    pass
-                else:
-                    raise ValueError(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
-                    )
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-
-            session_row = await db_session.scalar(select_stmt)
-            to_update = props.fields_to_update()
-            for key, value in to_update.items():
-                setattr(session_row, key, value)
-
-            if session_name:
-                await db_session.execute(
-                    sa.update(KernelRow)
-                    .values(session_name=session_name)
-                    .where(KernelRow.session_id == session_id)
-                )
-            return session_row
-
-        async with self._db.connect() as db_conn:
-            session_row = await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+        session_row = await self._session_repository.modify_session(
+            str(session_id), props.fields_to_update(), session_name
+        )
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
 
@@ -1748,12 +1560,15 @@ class SessionService:
         user_role = action.user_role
         session_id = action.session_id
 
-        async with self._db.begin_readonly_session() as db_session:
-            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
-            if session_row.user_uuid != user_id and user_role not in (
-                UserRole.ADMIN,
-                UserRole.SUPERADMIN,
-            ):
+        if user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            session_row = (
+                await self._admin_session_repository.get_session_to_determine_status_force(
+                    session_id
+                )
+            )
+        else:
+            session_row = await self._session_repository.get_session_to_determine_status(session_id)
+            if session_row.user_uuid != user_id:
                 log.warning(
                     f"You are not allowed to transit others's sessions status, skip (s:{session_id})"
                 )
@@ -1778,18 +1593,22 @@ class SessionService:
         session_ids = action.session_ids
         accessible_session_ids: list[SessionId] = []
 
-        async with self._db.begin_readonly_session() as db_session:
-            for sid in session_ids:
-                session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
-                if session_row.user_uuid == user_id or user_role in (
-                    UserRole.ADMIN,
-                    UserRole.SUPERADMIN,
-                ):
-                    accessible_session_ids.append(sid)
-                else:
-                    log.warning(
-                        f"You are not allowed to transit others's sessions status, skip (s:{sid})"
+        for sid in session_ids:
+            if user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+                accessible_session_ids.append(sid)
+            else:
+                try:
+                    session_row = await self._session_repository.get_session_to_determine_status(
+                        sid
                     )
+                    if session_row.user_uuid == user_id:
+                        accessible_session_ids.append(sid)
+                    else:
+                        log.warning(
+                            f"You are not allowed to transit others's sessions status, skip (s:{sid})"
+                        )
+                except Exception:
+                    log.warning(f"Session not found or access denied, skip (s:{sid})")
 
         now = datetime.now(tzutc())
         if accessible_session_ids:

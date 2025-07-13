@@ -163,7 +163,6 @@ class Services:
         )
         session_service = SessionService(
             SessionServiceArgs(
-                db=args.db,
                 agent_registry=args.agent_registry,
                 event_fetcher=args.event_fetcher,
                 background_task_manager=args.background_task_manager,
