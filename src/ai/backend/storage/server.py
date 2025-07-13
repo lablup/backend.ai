@@ -294,7 +294,7 @@ async def server_main(
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
                     live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-                    service_discovery = RedisServiceDiscovery(
+                    service_discovery = await RedisServiceDiscovery.create(
                         args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
                     )
 

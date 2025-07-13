@@ -1356,7 +1356,7 @@ async def server_main(
             await agent.read_agent_config()
             redis_profile_target = RedisProfileTarget.from_dict(agent._redis_config)
             live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-            service_discovery = RedisServiceDiscovery(
+            service_discovery = await RedisServiceDiscovery.create(
                 args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
             )
 
