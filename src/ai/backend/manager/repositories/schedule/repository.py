@@ -1,6 +1,6 @@
 import itertools
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Iterable, Optional
 
 import sqlalchemy as sa
@@ -23,6 +23,7 @@ from ai.backend.manager.models import (
     SessionStatus,
     recalc_agent_resource_occupancy,
 )
+from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
 from ai.backend.manager.models.kernel import recalc_concurrency_used
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -744,18 +745,15 @@ class ScheduleRepository:
             await self._autoscale_endpoints(session)
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
-        from datetime import UTC, timedelta
-
-        from ai.backend.manager.models import EndpointAutoScalingRuleRow, EndpointRow
-
         current_datetime = datetime.now(tz=UTC)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
+        # TODO: Check this implementation
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
-        endpoints = await EndpointRow.batch_load(
-            session, [rule.endpoint for rule in rules], load_routes=True
-        )
-        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        # endpoints = await EndpointRow.batch_load(
+        #     session, [rule.endpoint for rule in rules], load_routes=True
+        # )
+        # endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
 
         # For now, we'll just update the last_triggered_at and replicas
         # The actual metric evaluation logic should stay in the service layer

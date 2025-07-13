@@ -11,7 +11,7 @@ from collections.abc import (
 )
 from contextvars import ContextVar
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from functools import partial
 from typing import (
@@ -1068,7 +1068,6 @@ class SchedulerDispatcher(aobject):
         lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
-                now = datetime.now(timezone.utc)
                 known_slot_types = (
                     await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
                 )
