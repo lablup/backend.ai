@@ -178,6 +178,9 @@ class CoreDumpConfig(BaseModel):
             )
         return self._core_path
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class DebugConfig(BaseModel):
     enabled: bool = Field(
@@ -690,9 +693,9 @@ class ContainerConfig(BaseModel):
         serialization_alias="swarm-enabled",
     )
 
-    model_config = ConfigDict(
-        extra="allow",
-    )
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
 
     @field_validator("port_range", mode="before")
     @classmethod
@@ -740,9 +743,9 @@ class ResourceConfig(BaseModel):
         serialization_alias="affinity-policy",
     )
 
-    model_config = ConfigDict(
-        extra="allow",
-    )
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
 
     @field_validator("affinity_policy", mode="before")
     @classmethod
@@ -799,6 +802,9 @@ class ContainerLogsConfig(BaseModel):
         validation_alias=AliasChoices("chunk-size", "chunk_size"),
         serialization_alias="chunk-size",
     )
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class APIConfig(BaseModel):
