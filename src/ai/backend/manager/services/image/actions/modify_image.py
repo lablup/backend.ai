@@ -84,16 +84,3 @@ class ModifyImageActionUnknownImageReferenceError(BackendAIError):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.NOT_FOUND,
         )
-
-
-class ModifyImageActionValueError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/invalid-parameters"
-    error_title = "Invalid parameters for image modification."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )

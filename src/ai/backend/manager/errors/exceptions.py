@@ -984,7 +984,7 @@ class UnknownImageReferenceError(ObjectNotFound):
         )
 
 
-class ForgetImageActionGenericForbiddenError(BackendError):
+class ForgetImageForbiddenError(BackendError):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
     error_title = "Access to this resource is forbidden."
 
@@ -994,6 +994,19 @@ class ForgetImageActionGenericForbiddenError(BackendError):
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ForgetImageNotFoundError(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/generic-not-found"
+    error_title = "The image you are trying to delete does not exist."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
@@ -1037,6 +1050,19 @@ class ModifyImageActionValueError(BackendError, web.HTTPBadRequest):
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ForgetImageIdObjectNotFoundError(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/image-not-found"
+    error_title = "Image not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 

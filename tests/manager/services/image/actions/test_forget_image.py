@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from ai.backend.manager.errors.exceptions import (
-    ForgetImageActionGenericForbiddenError,
+    ForgetImageForbiddenError,
     ImageNotFound,
 )
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus
@@ -45,7 +45,7 @@ from ...test_utils import TestScenario
                 reference=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
             ),
-            ForgetImageActionGenericForbiddenError,
+            ForgetImageForbiddenError,
         ),
         TestScenario.failure(
             "Image not found",

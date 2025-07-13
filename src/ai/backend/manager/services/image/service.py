@@ -4,7 +4,9 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import ImageNotFound
+from ai.backend.manager.errors.exceptions import (
+    ImageNotFound,
+)
 from ai.backend.manager.models.image import (
     ImageIdentifier,
 )
@@ -43,7 +45,6 @@ from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import (
-    PurgeImageActionByIdObjectNotFoundError,
     PurgeImageByIdAction,
     PurgeImageByIdActionResult,
 )
@@ -165,8 +166,6 @@ class ImageService:
             image_data = await self._admin_image_repository.delete_image_with_aliases_force(
                 action.image_id
             )
-            if not image_data:
-                raise PurgeImageActionByIdObjectNotFoundError()
             return PurgeImageByIdActionResult(image=image_data)
 
         # Regular users need ownership validation
@@ -183,8 +182,6 @@ class ImageService:
             image_data = await self._admin_image_repository.untag_image_from_registry_force(
                 action.image_id
             )
-            if not image_data:
-                raise ImageNotFound
             return UntagImageFromRegistryActionResult(image=image_data)
 
         # Regular users need ownership validation

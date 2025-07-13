@@ -11,7 +11,8 @@ from ai.backend.manager.data.image.types import ImageAliasData, ImageData, Resca
 from ai.backend.manager.errors.exceptions import (
     AliasImageActionDBError,
     AliasImageActionValueError,
-    ForgetImageActionGenericForbiddenError,
+    ForgetImageForbiddenError,
+    ForgetImageNotFoundError,
     ModifyImageActionValueError,
 )
 from ai.backend.manager.models.image import (
@@ -86,9 +87,9 @@ class ImageRepository:
         """
         image_row = await self._get_image_by_id(session, image_id, load_aliases)
         if not image_row:
-            raise ForgetImageActionGenericForbiddenError()
+            raise ForgetImageNotFoundError()
         if not image_row.is_owned_by(user_id):
-            raise ForgetImageActionGenericForbiddenError()
+            raise ForgetImageForbiddenError()
         return image_row
 
     async def _get_image_alias_by_name(
@@ -123,7 +124,7 @@ class ImageRepository:
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
             if not row.is_owned_by(user_id):
-                raise ForgetImageActionGenericForbiddenError()
+                raise ForgetImageForbiddenError()
             await row.mark_as_deleted(session)
             data = row.to_dataclass()
         return data
