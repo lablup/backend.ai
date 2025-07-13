@@ -301,10 +301,10 @@ async def test_create_domain(
 
 @pytest.mark.asyncio
 async def test_create_model_store_after_domain_created(
-    processors: DomainProcessors, database_engine
+    processors: DomainProcessors, database_engine, admin_user
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(creator=DomainCreator(name=domain_name), user_info=admin_user())
+    action = CreateDomainAction(creator=DomainCreator(name=domain_name), user_info=admin_user)
 
     await processors.create_domain.wait_for_complete(action)
 
@@ -431,6 +431,7 @@ async def test_delete_domain(
 async def test_delete_domain_in_db(
     processors: DomainProcessors,
     database_engine,
+    admin_user,
 ) -> None:
     async with create_domain(database_engine, "test-delete-domain-in-db") as domain_name:
         async with database_engine.begin_session() as session:
@@ -441,7 +442,7 @@ async def test_delete_domain_in_db(
             )
 
         await processors.delete_domain.wait_for_complete(
-            DeleteDomainAction(name=domain_name, user_info=admin_user())
+            DeleteDomainAction(name=domain_name, user_info=admin_user)
         )
 
         async with database_engine.begin_session() as session:
@@ -508,13 +509,15 @@ async def test_purge_domain(
 
 
 @pytest.mark.asyncio
-async def test_purge_domain_in_db(processors: DomainProcessors, database_engine) -> None:
+async def test_purge_domain_in_db(
+    processors: DomainProcessors, database_engine, admin_user
+) -> None:
     domain_name = "test-purge-domain-in-db"
     # create domain
     async with create_domain(database_engine, domain_name):
         # delete domain(soft delete) and delete model-store group
         await processors.delete_domain.wait_for_complete(
-            DeleteDomainAction(name=domain_name, user_info=admin_user())
+            DeleteDomainAction(name=domain_name, user_info=admin_user)
         )
         async with database_engine.begin_session() as session:
             await session.execute(
@@ -528,7 +531,7 @@ async def test_purge_domain_in_db(processors: DomainProcessors, database_engine)
 
         # purge domain
         await processors.purge_domain.wait_for_complete(
-            PurgeDomainAction(name=domain_name, user_info=admin_user())
+            PurgeDomainAction(name=domain_name, user_info=admin_user)
         )
         async with database_engine.begin_session() as session:
             domain = await session.scalar(sa.select(DomainRow).where(DomainRow.name == domain_name))
