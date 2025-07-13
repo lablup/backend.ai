@@ -816,20 +816,12 @@ class ValkeyStatClient:
         :param status_set_key: The key for the status set.
         :return: List of encoded session IDs.
         """
-        # Use batch operations to get count, then pop all members
-        batch = self._create_batch()
-        batch.scard(status_set_key)
-
-        # Execute first to get the count
-        results = await self._client.client.exec(batch, raise_on_error=True)
-        count = results[0] if results else 0
-
+        count = await self._client.client.scard(status_set_key)
         if count == 0:
             return []
-
         # Pop all members
-        result = await self._client.client.spop(status_set_key)
-        return cast(list[bytes], result or [])
+        results = await self._client.client.spop_count(status_set_key, count)
+        return list(results)
 
     @valkey_decorator()
     async def remove_session_ids_from_status_update(

@@ -70,12 +70,11 @@ async def redis_discovery(redis_container):
         ),
     )
 
-    discovery = RedisServiceDiscovery(
+    discovery = await RedisServiceDiscovery.create(
         args=RedisServiceDiscoveryArgs(
             redis_target=redis_target,
         ),
     )
-    await discovery.connect()
     try:
         # Flush the database to ensure clean state
         await discovery._valkey_client._client.client.flushdb()

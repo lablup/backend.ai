@@ -33,7 +33,6 @@ from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import StageObserver
 from ai.backend.common.types import (
     PID,
-    AgentId,
     ContainerId,
     DeviceId,
     KernelId,
@@ -389,7 +388,7 @@ class StatContext:
         metric_key: MetricKey,
         measure: Measurement,
     ) -> None:
-        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        agent_id = self.agent.id
         value_pairs = [
             (CURRENT_METRIC_KEY, str(measure.value)),
         ]
@@ -472,7 +471,7 @@ class StatContext:
                             )
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
-        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        agent_id = self.agent.id
         device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
         flattened_metrics: list[FlattenedDeviceMetric] = []
         for metric_key, per_device in self.device_metrics.items():
@@ -517,10 +516,10 @@ class StatContext:
             "node": node_metrics,
             "devices": device_metrics,
         }
-        if self.agent.local_config["debug"]["log-stats"]:
+        if self.agent.local_config.debug.log_stats:
             log.debug(
                 "stats: node_updates: {0}: {1}",
-                self.agent.local_config["agent"]["id"],
+                self.agent.id,
                 redis_agent_updates["node"],
             )
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
@@ -531,7 +530,7 @@ class StatContext:
         )
 
         # Use ValkeyStatClient set method with expiration
-        agent_id = self.agent.local_config["agent"]["id"]
+        agent_id = self.agent.id
         await self.agent.valkey_stat_client.set(
             agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
         )
@@ -542,7 +541,7 @@ class StatContext:
         metric_key: MetricKey,
         measure: Measurement,
     ) -> None:
-        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        agent_id = self.agent.id
         session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
         value_pairs = [
             (CURRENT_METRIC_KEY, str(measure.value)),
@@ -651,7 +650,7 @@ class StatContext:
 
         kernel_updates: list[FlattenedKernelMetric] = []
         kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
-        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        agent_id = self.agent.id
         for kernel_id in updated_kernel_ids:
             session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
             metrics = self.kernel_metrics[kernel_id]
@@ -682,7 +681,7 @@ class StatContext:
                         value_pairs,
                     )
                 )
-            if self.agent.local_config["debug"]["log-stats"]:
+            if self.agent.local_config.debug.log_stats:
                 log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
@@ -834,7 +833,7 @@ class StatContext:
                             log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
                             continue
                     serializable_table[pid] = serializable_metrics
-                if self.agent.local_config["debug"]["log-stats"]:
+                if self.agent.local_config.debug.log_stats:
                     log.debug(
                         "stats: process_updates: \ncontainer_id: {}\n{}",
                         cid,
