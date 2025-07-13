@@ -16,8 +16,7 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
-from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -73,6 +72,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 @dataclass
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
+    repositories: Repositories
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
@@ -116,6 +116,7 @@ class Services:
             args.agent_registry,
             args.config_provider,
         )
+        repositories = args.repositories
         domain_service = DomainService(args.db)
         group_service = GroupService(
             args.db, args.storage_manager, args.config_provider, args.valkey_stat_client
@@ -123,10 +124,9 @@ class Services:
         user_service = UserService(
             args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
         )
-
-        image_repository = ImageRepository(args.db)
-        admin_image_repository = AdminImageRepository(args.db)
-        image_service = ImageService(args.agent_registry, image_repository, admin_image_repository)
+        image_service = ImageService(
+            args.agent_registry, repositories.image.repository, repositories.image.admin_repository
+        )
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
             args.db, args.config_provider, args.storage_manager, args.background_task_manager
