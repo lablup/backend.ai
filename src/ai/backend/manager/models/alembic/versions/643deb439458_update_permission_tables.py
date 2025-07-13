@@ -26,6 +26,8 @@ def upgrade() -> None:
     op.create_primary_key("pk_object_permissions", "object_permissions", ["id"])
 
     op.drop_column("user_roles", "state")
+    op.drop_column("user_roles", "expires_at")
+    op.drop_column("user_roles", "deleted_at")
     op.alter_column("roles", "state", new_column_name="status")
     op.add_column(
         "scope_permissions",
@@ -64,6 +66,14 @@ def downgrade() -> None:
             nullable=False,
             server_default="active",
         ),
+    )
+    op.add_column(
+        "user_roles",
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "user_roles",
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.alter_column("roles", "status", new_column_name="state")
     op.drop_column("role_permissions", "status")

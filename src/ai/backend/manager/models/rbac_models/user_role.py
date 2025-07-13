@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
 )
 
 import sqlalchemy as sa
@@ -34,12 +33,6 @@ class UserRoleRow(Base):
     )  # Null if granted by system
     granted_at: datetime = sa.Column(
         "granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    expires_at: Optional[datetime] = sa.Column(
-        "expires_at", sa.DateTime(timezone=True), nullable=True
-    )
-    deleted_at: Optional[datetime] = sa.Column(
-        "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
 
     role_row: RoleRow = relationship(
