@@ -4,7 +4,7 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.exception import UnknownImageReference
+from ai.backend.common.exception import InvalidResourceLimit, UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -172,6 +172,19 @@ class ImageService:
                 except UnknownImageReference:
                     raise ModifyImageActionUnknownImageReferenceError
                 to_update = props.fields_to_update()
+                resource_labels = image_row.get_resources_from_labels()
+
+                for label_key, resource_label in resource_labels.items():
+                    min_in_label = resource_label.get("min", None)
+                    min_to_update = (
+                        to_update.get("_resources", {}).get(label_key, {}).get("min", None)
+                    )
+
+                    # TODO: Consider slot types
+                    if min_in_label and min_to_update:
+                        if min_to_update < min_in_label:
+                            raise InvalidResourceLimit()
+
                 for key, value in to_update.items():
                     setattr(image_row, key, value)
         except (ValueError, sa.exc.DBAPIError):
