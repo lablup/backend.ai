@@ -31,195 +31,7 @@ def _wrap_comment(text: str, width: int = 80) -> str:
     return "\n".join(wrapped_lines)
 
 
-def _get_field_comment(field_schema: dict[str, Any]) -> str:
-    """Generate comment for a field based on its schema."""
-    comment_parts = []
-
-    # Add description
-    if "description" in field_schema:
-        comment_parts.append(field_schema["description"].strip())
-
-    # Add examples
-    if "examples" in field_schema:
-        examples_str = ", ".join(str(ex) for ex in field_schema["examples"])
-        comment_parts.append(f"Examples: {examples_str}")
-
-    return "\n".join(comment_parts)
-
-
-def _get_default_from_schema(field_schema: dict[str, Any]) -> Any:
-    """Get default value from JSON schema."""
-    if "default" in field_schema:
-        return field_schema["default"]
-
-    # Handle different types with appropriate defaults
-    field_type = field_schema.get("type")
-    if field_type == "string":
-        return ""
-    elif field_type == "integer":
-        return 0
-    elif field_type == "number":
-        return 0.0
-    elif field_type == "boolean":
-        return False
-    elif field_type == "array":
-        return []
-    elif field_type == "object":
-        return {}
-
-    return None
-
-
-def _generate_config_from_schema(
-    schema: dict[str, Any], definitions: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
-    """Generate configuration dictionary from JSON schema."""
-    if definitions is None:
-        definitions = schema.get("$defs", {})
-
-    config: dict[str, Any] = {}
-    properties = schema.get("properties", {})
-
-    for field_name, field_schema in properties.items():
-        # Handle references to other schemas
-        if "$ref" in field_schema:
-            ref_name = field_schema["$ref"].split("/")[-1]
-            if ref_name in definitions:
-                ref_schema = definitions[ref_name]
-                # Only recurse if it's an object type (likely a BaseModel)
-                if ref_schema.get("type") == "object":
-                    config[field_name] = _generate_config_from_schema(ref_schema, definitions)
-                else:
-                    config[field_name] = _get_default_from_schema(ref_schema)
-            else:
-                config[field_name] = None
-
-        # Handle allOf (used for inheritance)
-        elif "allOf" in field_schema:
-            merged_schema = {}
-            for sub_schema in field_schema["allOf"]:
-                if "$ref" in sub_schema:
-                    ref_name = sub_schema["$ref"].split("/")[-1]
-                    if ref_name in definitions:
-                        ref_schema = definitions[ref_name]
-                        merged_schema.update(ref_schema)
-                else:
-                    merged_schema.update(sub_schema)
-
-            if merged_schema.get("type") == "object":
-                config[field_name] = _generate_config_from_schema(merged_schema, definitions)
-            else:
-                config[field_name] = _get_default_from_schema(merged_schema)
-
-        # Handle anyOf/oneOf (used for Union types)
-        elif "anyOf" in field_schema or "oneOf" in field_schema:
-            variants = field_schema.get("anyOf", field_schema.get("oneOf", []))
-
-            # Find the first non-null variant
-            for variant in variants:
-                if variant.get("type") != "null":
-                    if "$ref" in variant:
-                        ref_name = variant["$ref"].split("/")[-1]
-                        if ref_name in definitions:
-                            ref_schema = definitions[ref_name]
-                            if ref_schema.get("type") == "object":
-                                config[field_name] = _generate_config_from_schema(
-                                    ref_schema, definitions
-                                )
-                            else:
-                                config[field_name] = _get_default_from_schema(ref_schema)
-                        else:
-                            config[field_name] = None
-                    else:
-                        if variant.get("type") == "object":
-                            config[field_name] = _generate_config_from_schema(variant, definitions)
-                        else:
-                            config[field_name] = _get_default_from_schema(variant)
-                    break
-            else:
-                # All variants are null or no suitable variant found
-                config[field_name] = None
-
-        # Handle object type (nested models)
-        elif field_schema.get("type") == "object":
-            config[field_name] = _generate_config_from_schema(field_schema, definitions)
-
-        # Handle primitive types
-        else:
-            config[field_name] = _get_default_from_schema(field_schema)
-
-    return config
-
-
-def _add_field_comments_from_schema(
-    toml_str: str, schema: dict[str, Any], definitions: Optional[dict[str, Any]] = None
-) -> str:
-    """Add comments to TOML string based on JSON schema."""
-    if definitions is None:
-        definitions = schema.get("$defs", {})
-
-    lines = toml_str.split("\n")
-    commented_lines = []
-    current_section = None
-    current_schema = schema
-
-    for line in lines:
-        line = line.rstrip()
-
-        # Detect section headers
-        if line.startswith("[") and line.endswith("]"):
-            current_section = line[1:-1]
-            commented_lines.append("")
-            commented_lines.append(line)
-
-            # Navigate to the schema for this section
-            current_schema = schema
-            section_parts = current_section.split(".")
-            for part in section_parts:
-                properties = current_schema.get("properties", {})
-                if part in properties:
-                    field_schema = properties[part]
-                    # Resolve references
-                    if "$ref" in field_schema:
-                        ref_name = field_schema["$ref"].split("/")[-1]
-                        if ref_name in definitions:
-                            current_schema = definitions[ref_name]
-                    elif field_schema.get("type") == "object":
-                        current_schema = field_schema
-            continue
-
-        # Skip empty lines
-        if not line.strip():
-            commented_lines.append(line)
-            continue
-
-        # Extract field name from key = value line
-        if "=" in line:
-            key = line.split("=")[0].strip()
-            field_name = key.strip('"')
-
-            # Find the field schema
-            properties = current_schema.get("properties", {})
-            if field_name in properties:
-                field_schema = properties[field_name]
-
-                # Resolve references for comment extraction
-                if "$ref" in field_schema:
-                    ref_name = field_schema["$ref"].split("/")[-1]
-                    if ref_name in definitions:
-                        field_schema = definitions[ref_name]
-
-                # Add comment if description exists
-                comment = _get_field_comment(field_schema)
-                if comment:
-                    commented_lines.append(_wrap_comment(comment))
-
-        commented_lines.append(line)
-
-    return "\n".join(commented_lines)
-
-
-def generate_sample_config(model_class: Type[BaseModel]) -> str:
+def _generate_sample_config(model_class: Type[BaseModel]) -> str:
     """
     Generate a sample TOML configuration file from a Pydantic model.
 
@@ -229,19 +41,239 @@ def generate_sample_config(model_class: Type[BaseModel]) -> str:
     Returns:
         A string containing the TOML configuration with comments
     """
-    # Get JSON schema from the model
     schema = model_class.model_json_schema()
 
-    # Generate configuration dictionary from schema
-    config_dict = _generate_config_from_schema(schema)
+    def _get_field_info(model_cls: Type[BaseModel], field_name: str) -> dict[str, Any]:
+        """Extract field information from Pydantic model including Field metadata."""
+        field_info = {}
+        if hasattr(model_cls, "model_fields"):
+            # Try to find field by name or alias
+            field = None
+            if field_name in model_cls.model_fields:
+                field = model_cls.model_fields[field_name]
+            else:
+                # Search by alias (serialization_alias or validation_alias)
+                for finfo in model_cls.model_fields.values():
+                    if (
+                        hasattr(finfo, "serialization_alias")
+                        and finfo.serialization_alias == field_name
+                    ):
+                        field = finfo
+                        break
+                    if hasattr(finfo, "validation_alias"):
+                        alias_choices = finfo.validation_alias
+                        if hasattr(alias_choices, "choices") and field_name in getattr(
+                            alias_choices, "choices", []
+                        ):
+                            field = finfo
+                            break
 
-    # Generate basic TOML
-    toml_str = toml.dumps(config_dict)
+            if field:
+                field_info["description"] = field.description
 
-    # Add comments based on schema
-    commented_toml = _add_field_comments_from_schema(toml_str, schema)
+                # Handle default values properly, including enums and default_factory
+                if field.default is not ...:
+                    default_val = field.default
+                    # If it's an enum, get its value
+                    if hasattr(default_val, "value"):
+                        field_info["default"] = default_val.value
+                    else:
+                        field_info["default"] = default_val
+                elif hasattr(field, "default_factory") and field.default_factory is not None:
+                    # Handle default_factory case - create instance to get defaults
+                    try:
+                        factory_instance = field.default_factory()
+                        if hasattr(factory_instance, "model_dump"):
+                            # It's a Pydantic model, get its default values
+                            field_info["factory_defaults"] = factory_instance.model_dump()
+                    except Exception:
+                        # If factory fails, just set to None
+                        pass
+                    field_info["default"] = None
+                else:
+                    field_info["default"] = None
 
-    return commented_toml
+                field_info["examples"] = getattr(field, "examples", None)
+        return field_info
+
+    def _process_property(
+        prop_name: str,
+        prop_schema: dict[str, Any],
+        required: bool = False,
+        indent: int = 0,
+        model_cls: Optional[Type[BaseModel]] = None,
+    ) -> list[str]:
+        """Process a single property and return TOML lines with comments."""
+        lines = []
+        indent_str = "  " * indent
+
+        # Get field information from Pydantic model if available
+        field_info = {}
+        if model_cls:
+            field_info = _get_field_info(model_cls, prop_name)
+
+        # Add description as comment if available
+        description = field_info.get("description") or prop_schema.get("description")
+        if description:
+            comment_lines = _wrap_comment(description)
+            for line in comment_lines.split("\n"):
+                lines.append(f"{indent_str}{line}")
+
+        # Get the value to use - prioritize Field examples over schema examples
+        value = None
+
+        # Try Field examples first
+        if field_info.get("examples"):
+            value = field_info["examples"][0]
+        elif (
+            field_info.get("default") is not None
+            and str(field_info["default"]) != "PydanticUndefined"
+        ):
+            value = field_info["default"]
+        # Fall back to schema examples
+        elif "example" in prop_schema:
+            value = prop_schema["example"]
+        elif "examples" in prop_schema and prop_schema["examples"]:
+            value = prop_schema["examples"][0]
+        elif "default" in prop_schema:
+            value = prop_schema["default"]
+        else:
+            # Generate default based on type
+            prop_type = prop_schema.get("type", "string")
+            if prop_type == "string":
+                value = ""
+            elif prop_type == "integer":
+                value = 0
+            elif prop_type == "number":
+                value = 0.0
+            elif prop_type == "boolean":
+                value = False
+            elif prop_type == "array":
+                value = []
+            elif prop_type == "object":
+                value = {}
+            else:
+                value = None
+
+        # Format the property line
+        if value is not None:
+            if isinstance(value, dict):
+                # Skip inline dict representation, will be handled as section
+                return lines
+            else:
+                # Use example values when available, comment out only if no example and not required
+                should_comment = not required and (
+                    not field_info.get("examples")
+                    and "example" not in prop_schema
+                    and "examples" not in prop_schema
+                )
+                prefix = "# " if should_comment else ""
+                lines.append(
+                    f"{indent_str}{prefix}{prop_name} = {toml.dumps({prop_name: value}).strip().split(' = ', 1)[1]}"
+                )
+
+        return lines
+
+    def _process_schema(
+        schema_dict: dict[str, Any],
+        path: Optional[list[str]] = None,
+        parent_required: Optional[list[str]] = None,
+        model_cls: Optional[Type[BaseModel]] = None,
+    ) -> list[str]:
+        """Recursively process schema and generate TOML lines."""
+        if path is None:
+            path = []
+        if parent_required is None:
+            parent_required = []
+
+        lines = []
+        properties = schema_dict.get("properties", {})
+        required = schema_dict.get("required", [])
+
+        # Group properties by type
+        simple_props = {}
+        object_props = {}
+
+        for prop_name, prop_schema in properties.items():
+            if "$ref" in prop_schema:
+                # Resolve reference
+                ref_path = prop_schema["$ref"].split("/")
+                if ref_path[0] == "#" and len(ref_path) > 1:
+                    resolved = schema
+                    for part in ref_path[1:]:
+                        resolved = resolved.get(part, {})
+                    prop_schema = resolved
+
+            prop_type = prop_schema.get("type", "")
+
+            if prop_type == "object" or "properties" in prop_schema:
+                object_props[prop_name] = prop_schema
+            else:
+                simple_props[prop_name] = prop_schema
+
+        # Add simple properties first
+        for prop_name, prop_schema in simple_props.items():
+            is_required = prop_name in required or prop_name in parent_required
+            prop_lines = _process_property(
+                prop_name, prop_schema, required=is_required, indent=len(path), model_cls=model_cls
+            )
+            if prop_lines:
+                lines.extend(prop_lines)
+
+        # Add object properties as sections
+        for prop_name, prop_schema in object_props.items():
+            if lines and lines[-1].strip():  # Add blank line before section
+                lines.append("")
+
+            # Add section comment
+            if "description" in prop_schema:
+                comment_lines = _wrap_comment(prop_schema["description"])
+                lines.extend(comment_lines.split("\n"))
+
+            # Add section header
+            section_path = path + [prop_name]
+            section_header = "[" + ".".join(section_path) + "]"
+            lines.append(section_header)
+
+            # Process nested properties - try to get nested model class
+            nested_model_cls = None
+            if model_cls and hasattr(model_cls, "model_fields"):
+                field_info = _get_field_info(model_cls, prop_name)
+                if field_info:
+                    # First try to find the field by name or alias
+                    field = None
+                    if prop_name in model_cls.model_fields:
+                        field = model_cls.model_fields[prop_name]
+                    else:
+                        # Search by alias
+                        for finfo in model_cls.model_fields.values():
+                            if (
+                                hasattr(finfo, "serialization_alias")
+                                and finfo.serialization_alias == prop_name
+                            ):
+                                field = finfo
+                                break
+
+                    if field:
+                        if hasattr(field, "annotation") and hasattr(field.annotation, "__origin__"):
+                            # Handle generic types
+                            args = getattr(field.annotation, "__args__", ())
+                            if args and hasattr(args[0], "model_fields"):
+                                nested_model_cls = args[0]
+                        elif hasattr(field.annotation, "model_fields"):
+                            nested_model_cls = field.annotation
+
+            nested_lines = _process_schema(
+                prop_schema, path=section_path, parent_required=required, model_cls=nested_model_cls
+            )
+            lines.extend(nested_lines)
+
+        return lines
+
+    # Process the root schema
+    lines = _process_schema(schema, model_cls=model_class)
+
+    return "\n".join(lines)
 
 
 def generate_sample_config_file(
@@ -255,10 +287,11 @@ def generate_sample_config_file(
         output_path: Path where the configuration file will be written
         header_comment: Optional header comment to add at the top of the file
     """
-    config_content = generate_sample_config(model_class)
+    config_content = _generate_sample_config(model_class)
 
     with open(output_path, "w") as f:
         if header_comment:
             f.write(_wrap_comment(header_comment))
             f.write("\n\n")
         f.write(config_content)
+        f.write("\n")

@@ -8,8 +8,8 @@ import pathlib
 
 import click
 
-from ai.backend.common.configs.sample_generator import generate_sample_config_file
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.common.configs.sample_generator import generate_sample_config_file
 
 from .context import CLIContext
 

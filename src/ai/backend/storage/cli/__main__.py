@@ -2,8 +2,6 @@ import click
 
 from ai.backend.common.cli import LazyGroup
 
-from .config import cli as config_cli
-
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.pass_context

@@ -6,345 +6,218 @@
 #
 # Generated automatically from the WebServerUnifiedConfig schema.
 
+# Logging configuration.
+# logging = ""
 
 [service]
-# IP address to bind the webserver service.
-# Use '0.0.0.0' to bind to all interfaces.
-# Examples: 0.0.0.0, 127.0.0.1
-ip = "0.0.0.0"
-# Port number to bind the webserver service.
-# Must be between 1 and 65535.
-# Examples: 8080, 8081
-port = 8080
-# Whether to enable SSL/TLS for the webserver.
-# When enabled, requires ssl_cert and ssl_privkey to be set.
-# Examples: True, False
-ssl_enabled = false
-# Path to SSL certificate file.
-# Required when ssl_enabled is True.
-# Examples: /path/to/cert.pem
-ssl_cert = ""
-# Path to SSL private key file.
-# Required when ssl_enabled is True.
-# Examples: /path/to/privkey.pem
-ssl_privkey = ""
-# Path to static files directory.
-# Contains web UI assets and other static resources.
-# Examples: /path/to/static
-static_path = ""
-# Force a specific protocol for API endpoints.
-# Useful when running behind a reverse proxy.
-# Examples: None, https, http
-force_endpoint_protocol = ""
-mode = ""
-# Whether to enable user signup functionality.
-# Examples: True, False
-enable_signup = false
-# Whether to allow anonymous users to change passwords.
-# Examples: True, False
-allow_anonymous_change_password = false
-# Whether to allow project resource monitoring.
-# Examples: True, False
-allow_project_resource_monitor = false
-# Whether to allow users to change signin mode.
-# Examples: True, False
-allow_change_signin_mode = false
-# Whether to allow manual image name specification for sessions.
-# Examples: True, False
-allow_manual_image_name_for_session = false
-# Whether to allow signup without email confirmation.
-# Examples: True, False
-allow_signup_without_confirmation = false
-# Whether to always enqueue compute sessions.
-# Examples: True, False
-always_enqueue_compute_session = false
-# Whether to enable debug mode for the web UI.
-# Examples: True, False
-webui_debug = false
-# Whether to mask user information in the UI.
-# Examples: True, False
-mask_user_info = false
-# List of single sign-on vendors to enable.
-# Examples: None, ['google', 'github']
-single_sign_on_vendors = ""
-# SSO realm name for single sign-on.
-# Examples: , example-realm
-sso_realm_name = ""
-# Whether to enable container commit functionality.
-# Examples: True, False
-enable_container_commit = false
-# Whether to hide agent information in the UI.
-# Examples: True, False
-hide_agents = true
-# URL for app download.
-# Examples: , https://example.com/download
-app_download_url = ""
-# Whether to allow app download panel in the UI.
-# Examples: True, False
-allow_app_download_panel = true
-# Whether to enable two-factor authentication.
-# Examples: True, False
-enable_2FA = false
-# Whether to force two-factor authentication for all users.
-# Examples: True, False
-force_2FA = false
-# System SSH image name.
-# Examples: , ubuntu:22.04
-system_SSH_image = ""
-# Whether to use directory-based usage tracking.
-# Examples: True, False
-directory_based_usage = false
-# Whether to allow custom resource allocation.
-# Examples: True, False
-allow_custom_resource_allocation = true
-# Education app name prefix.
-# Examples: , edu-
-edu_appname_prefix = ""
-# Whether to enable extended login sessions.
-# Examples: True, False
-enable_extend_login_session = false
-# Whether directory size is visible in the UI.
-# Examples: True, False
-is_directory_size_visible = true
-# Whether to enable interactive login account switching.
-# Examples: True, False
-enable_interactive_login_account_switch = true
-# Default file browser image name.
-# Examples: , filebrowser:latest
-default_file_browser_image = ""
-
-
-[security]
-# List of request security policies.
-# Examples: []
-request_policies = []
-# List of response security policies.
-# Examples: []
-response_policies = []
-
-
-[resources]
-# Whether to open ports to public.
-# Examples: True, False
-open_port_to_public = false
-# Whether to allow non-authenticated TCP connections.
-# Examples: True, False
-allow_non_auth_tcp = false
-# Whether to allow preferred port selection.
-# Examples: True, False
-allow_preferred_port = false
-# Maximum CPU cores per container.
-# Examples: 64, 128
-max_cpu_cores_per_container = 64
-# Maximum memory per container in GB.
-# Examples: 64, 128
-max_memory_per_container = 64
-# Maximum CUDA devices per container.
-# Examples: 16, 32
-max_cuda_devices_per_container = 16
-# Maximum CUDA shares per container.
-# Examples: 16, 32
-max_cuda_shares_per_container = 16
-# Maximum ROCm devices per container.
-# Examples: 10, 20
-max_rocm_devices_per_container = 10
-# Maximum TPU devices per container.
-# Examples: 8, 16
-max_tpu_devices_per_container = 8
-# Maximum IPU devices per container.
-# Examples: 8, 16
-max_ipu_devices_per_container = 8
-# Maximum Atom devices per container.
-# Examples: 8, 16
-max_atom_devices_per_container = 8
-# Maximum Gaudi2 devices per container.
-# Examples: 8, 16
-max_gaudi2_devices_per_container = 8
-# Maximum Atom Plus devices per container.
-# Examples: 8, 16
-max_atom_plus_devices_per_container = 8
-# Maximum Warboy devices per container.
-# Examples: 8, 16
-max_warboy_devices_per_container = 8
-# Maximum shared memory per container in GB.
-# Examples: 2.0, 4.0
-max_shm_per_container = 2.0
-# Maximum file upload size in bytes.
-# Examples: 4294967296, 8589934592
-max_file_upload_size = 4294967296
-
-
-[environments]
-# List of allowed environments.
-# Examples: None, ['python', 'r', 'julia']
-allowlist = ""
-# Whether to show non-installed images.
-# Examples: True, False
-show_non_installed_images = false
-
-
-[plugin]
-# List of page plugins.
-# Examples: None, ['dashboard', 'settings']
-page = ""
-
-
-[pipeline]
-# Pipeline service endpoint URL.
-# Examples: http://127.0.0.1:9500
-endpoint = ""
-# Frontend endpoint URL for pipeline service.
-# Examples: None, http://127.0.0.1:9501
-frontend_endpoint = ""
-
-
-[ui]
-# Default environment for new sessions.
-# Examples: None, python:3.9-ubuntu20.04
-default_environment = ""
-# Default environment for import operations.
-# Examples: None, python:3.9-ubuntu20.04
-default_import_environment = ""
-# List of blocked menu items.
-# Examples: None, ['admin', 'billing']
-menu_blocklist = ""
-# List of inactive menu items.
-# Examples: None, ['maintenance', 'experimental']
-menu_inactivelist = ""
-# Whether to enable model folders functionality.
-# Examples: True, False
-enable_model_folders = true
-
-
-[api]
-# API domain name.
-# Examples: api.example.com
-domain = "default"
-# API endpoint URL.
-# Examples: http://127.0.0.1:8080,http://api.example.com:8080
-endpoint = ""
-# API text description.
-# Examples: Backend.AI API
-text = "Backend.AI API"
-# Whether to verify SSL certificates for API calls.
-# Examples: True, False
-ssl_verify = true
-# Authentication token name.
-# Examples: sToken, authToken
-auth_token_name = "sToken"
-
-
-[session]
-# Session maximum age in seconds.
-# Examples: 604800, 1209600
-max_age = 604800
-# Login session extension in seconds.
-# Examples: None, 3600
-login_session_extension_sec = 0
-# Whether to flush sessions on startup.
-# Examples: True, False
-flush_on_startup = false
-# Login block time in seconds.
-# Examples: 1200, 3600
-login_block_time = 1200
-# Allowed login failure count.
-# Examples: 10, 5
-login_allowed_fail_count = 10
-# Whether to enable auto logout.
-# Examples: True, False
-auto_logout = false
-# Maximum count for preopen ports.
-# Examples: 10, 20
-max_count_for_preopen_ports = 10
-
-
-[license]
-# License edition.
-# Examples: Open Source, Enterprise
-edition = "Open Source"
-# License valid since date.
-# Examples: , 2023-01-01
-valid_since = ""
-# License valid until date.
-# Examples: , 2024-01-01
-valid_until = ""
-
-
-[webserver]
-event_loop = ""
-# IPC base path.
-# Examples: /tmp/backend.ai/ipc
-ipc_base_path = "/tmp/backend.ai/ipc"
-# Process ID file path.
-# Examples: /var/run/webserver.pid
-pid_file = "/dev/null"
-
-
-[otel]
-# Whether to enable OpenTelemetry.
-# Examples: True, False
-enabled = false
-log_level = ""
-# OpenTelemetry endpoint.
-# Examples: http://127.0.0.1:4317
-endpoint = "http://127.0.0.1:4317"
-
-
-[debug]
-# Whether to enable debug mode.
-# Examples: True, False
-enabled = false
-
+  # IP address to bind the webserver service.
+  # Use '0.0.0.0' to bind to all interfaces.
+  ip = "0.0.0.0"
+  # Port number to bind the webserver service.
+  # Must be between 1 and 65535.
+  port = 8080
+  # Whether to enable SSL/TLS for the webserver.
+  # When enabled, requires ssl_cert and ssl_privkey to be set.
+  ssl_enabled = true
+  # Path to SSL certificate file.
+  # Required when ssl_enabled is True.
+  ssl_cert = "/path/to/cert.pem"
+  # Path to SSL private key file.
+  # Required when ssl_enabled is True.
+  ssl_privkey = "/path/to/privkey.pem"
+  # Path to static files directory.
+  # Contains web UI assets and other static resources.
+  static_path = "/path/to/static"
+  # Force a specific protocol for API endpoints.
+  # Useful when running behind a reverse proxy.
+  # Service mode.
+  # 'webui' serves the full web UI, 'static' serves only static files.
+  mode = "webui"
+  # Whether to enable user signup functionality.
+  enable_signup = true
+  # Whether to allow anonymous users to change passwords.
+  allow_anonymous_change_password = true
+  # Whether to allow project resource monitoring.
+  allow_project_resource_monitor = true
+  # Whether to allow users to change signin mode.
+  allow_change_signin_mode = true
+  # Whether to allow manual image name specification for sessions.
+  allow_manual_image_name_for_session = true
+  # Whether to allow signup without email confirmation.
+  allow_signup_without_confirmation = true
+  # Whether to always enqueue compute sessions.
+  always_enqueue_compute_session = true
+  # Whether to enable debug mode for the web UI.
+  webui_debug = true
+  # Whether to mask user information in the UI.
+  mask_user_info = true
+  # List of single sign-on vendors to enable.
+  # SSO realm name for single sign-on.
+  sso_realm_name = ""
+  # Whether to enable container commit functionality.
+  enable_container_commit = true
+  # Whether to hide agent information in the UI.
+  hide_agents = true
+  # URL for app download.
+  app_download_url = ""
+  # Whether to allow app download panel in the UI.
+  allow_app_download_panel = true
+  # Whether to enable two-factor authentication.
+  enable_2FA = true
+  # Whether to force two-factor authentication for all users.
+  force_2FA = true
+  # System SSH image name.
+  system_SSH_image = ""
+  # Whether to use directory-based usage tracking.
+  directory_based_usage = true
+  # Whether to allow custom resource allocation.
+  allow_custom_resource_allocation = true
+  # Education app name prefix.
+  edu_appname_prefix = ""
+  # Whether to enable extended login sessions.
+  enable_extend_login_session = true
+  # Whether directory size is visible in the UI.
+  is_directory_size_visible = true
+  # Whether to enable interactive login account switching.
+  enable_interactive_login_account_switch = true
+  # Default file browser image name.
+  default_file_browser_image = ""
 
 [service.wsproxy]
-# WebSocket proxy URL.
-# Used to proxy WebSocket connections through a separate service.
-# Leave empty to disable WebSocket proxy.
-# Examples: , ws://localhost:8080
-url = ""
+    # WebSocket proxy URL.
+    # Used to proxy WebSocket connections through a separate service.
+    # Leave empty to disable WebSocket proxy.
+    url = ""
 
+[security]
+  # List of request security policies.
+  request_policies = []
+  # List of response security policies.
+  response_policies = []
+  # Content Security Policy configuration.
 
-[security.csp]
-default_src = []
-connect_src = []
-img_src = []
-media_src = []
-font_src = []
-script_src = []
-style_src = []
-frame_src = []
-object_src = []
-frame_ancestors = []
-form_action = []
+[resources]
+  # Whether to open ports to public.
+  open_port_to_public = true
+  # Whether to allow non-authenticated TCP connections.
+  allow_non_auth_tcp = true
+  # Whether to allow preferred port selection.
+  allow_preferred_port = true
+  # Maximum CPU cores per container.
+  max_cpu_cores_per_container = 64
+  # Maximum memory per container in GB.
+  max_memory_per_container = 64
+  # Maximum CUDA devices per container.
+  max_cuda_devices_per_container = 16
+  # Maximum CUDA shares per container.
+  max_cuda_shares_per_container = 16
+  # Maximum ROCm devices per container.
+  max_rocm_devices_per_container = 10
+  # Maximum TPU devices per container.
+  max_tpu_devices_per_container = 8
+  # Maximum IPU devices per container.
+  max_ipu_devices_per_container = 8
+  # Maximum Atom devices per container.
+  max_atom_devices_per_container = 8
+  # Maximum Gaudi2 devices per container.
+  max_gaudi2_devices_per_container = 8
+  # Maximum Atom Plus devices per container.
+  max_atom_plus_devices_per_container = 8
+  # Maximum Warboy devices per container.
+  max_warboy_devices_per_container = 8
+  # Maximum shared memory per container in GB.
+  max_shm_per_container = 2.0
+  # Maximum file upload size in bytes.
+  max_file_upload_size = 4294967296
 
+[environments]
+  # List of allowed environments.
+  # Whether to show non-installed images.
+  show_non_installed_images = true
+
+[plugin]
+  # List of page plugins.
+
+[pipeline]
+  # Pipeline service endpoint URL.
+  endpoint = "http://127.0.0.1:9500"
+  # Frontend endpoint URL for pipeline service.
+
+[ui]
+  # Default environment for new sessions.
+  # Default environment for import operations.
+  # List of blocked menu items.
+  # List of inactive menu items.
+  # Whether to enable model folders functionality.
+  enable_model_folders = true
+
+[api]
+  # API domain name.
+  domain = "api.example.com"
+  # API endpoint URL.
+  endpoint = "http://127.0.0.1:8080,http://api.example.com:8080"
+  # API text description.
+  text = "Backend.AI API"
+  # Whether to verify SSL certificates for API calls.
+  ssl_verify = true
+  # Authentication token name.
+  auth_token_name = "sToken"
+
+[session]
+  # Session maximum age in seconds.
+  max_age = 604800
+  # Login session extension in seconds.
+  # Whether to flush sessions on startup.
+  flush_on_startup = true
+  # Login block time in seconds.
+  login_block_time = 1200
+  # Allowed login failure count.
+  login_allowed_fail_count = 10
+  # Whether to enable auto logout.
+  auto_logout = true
+  # Maximum count for preopen ports.
+  max_count_for_preopen_ports = 10
 
 [session.redis]
-# Redis database number.
-# Examples: 0, 1
-db = 0
-# Redis sentinel addresses.
-# Examples: None, [{'host': '127.0.0.1', 'port': 26379}]
-sentinel = []
-# Redis service name for sentinel.
-# Examples: None, mymaster
-service_name = ""
-# Redis password.
-# Examples: None, password
-password = ""
-
-
-[session.redis.addr]
-host = ""
-port = 0
-
+    # Redis server address.
+    # Redis database number.
+    db = 0
+    # Redis sentinel addresses.
+    # Redis service name for sentinel.
+    # Redis password.
 
 [session.redis.redis_helper_config]
-# Socket timeout in seconds.
-# Examples: 5.0, 10.0
-socket_timeout = 5.0
-# Socket connection timeout in seconds.
-# Examples: 2.0, 5.0
-socket_connect_timeout = 2.0
-# Reconnect poll timeout in seconds.
-# Examples: 0.3, 1.0
-reconnect_poll_timeout = 0.3
+      # Socket timeout in seconds.
+      socket_timeout = 5.0
+      # Socket connection timeout in seconds.
+      socket_connect_timeout = 2.0
+      # Reconnect poll timeout in seconds.
+      reconnect_poll_timeout = 0.3
+
+[license]
+  # License edition.
+  edition = "Open Source"
+  # License valid since date.
+  valid_since = ""
+  # License valid until date.
+  valid_until = ""
+
+[webserver]
+  # Event loop type.
+  event_loop = "asyncio"
+  # IPC base path.
+  ipc_base_path = "/tmp/backend.ai/ipc"
+  # Process ID file path.
+  pid_file = "/var/run/webserver.pid"
+
+[otel]
+  # Whether to enable OpenTelemetry.
+  enabled = true
+  # OpenTelemetry log level.
+  log_level = "INFO"
+  # OpenTelemetry endpoint.
+  endpoint = "http://127.0.0.1:4317"
+
+[debug]
+  # Whether to enable debug mode.
+  enabled = true

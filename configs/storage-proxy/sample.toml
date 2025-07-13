@@ -6,267 +6,214 @@
 #
 # Generated automatically from the StorageProxyUnifiedConfig schema.
 
+# Logging system configuration.
+# Controls how logs are formatted, filtered, and stored.
+# logging = ""
 
 [storage-proxy]
-# Base directory path for inter-process communication files.
-# Used for Unix domain sockets and other IPC mechanisms.
-# Examples: /tmp/backend.ai/ipc
-ipc-base-path = "/tmp/backend.ai/ipc"
-# Unique identifier for this storage-proxy node.
-# Used for service discovery and coordination.
-# Examples: storage-proxy-1
-node-id = ""
-# Number of worker processes to spawn.
-# Defaults to the number of CPU cores available.
-# Examples: 1, 4
-num-proc = 12
-# Path to the file where the process ID will be written.
-# Set to /dev/null to disable this feature.
-# Examples: /var/run/storage-proxy.pid
-pid-file = "/dev/null"
-event-loop = ""
-# Maximum number of entries to scan in directory operations.
-# Prevents excessive memory usage when scanning large directories.
-# Examples: 1000, 5000
-scandir-limit = 1000
-# Maximum size allowed for file uploads.
-# Prevents storage exhaustion from large uploads.
-# Examples: 100g, 500g
-max-upload-size = "100g"
-# Secret key for generating JWT tokens.
-# Used for authenticating client requests.
-# Examples: jwt-secret-key
-secret = ""
-# Session expiration time.
-# Controls how long JWT tokens remain valid.
-# Examples: 1h, 24h
-session-expire = 0
-# User ID to run the storage-proxy process as.
-# Defaults to the UID of the current file's owner.
-# Examples: 501
-user = ""
-# Group ID to run the storage-proxy process as.
-# Defaults to the GID of the current file's owner.
-# Examples: 20
-group = ""
-# Port for the aiomonitor terminal UI.
-# Allows connecting to a debugging console.
-# Examples: 38300
-aiomonitor-termui-port = 38300
-# Port for the aiomonitor web UI.
-# Provides a web-based monitoring interface.
-# Examples: 39300
-aiomonitor-webui-port = 39300
-# Path prefix for watcher input sockets.
-# Used for communication with watcher processes.
-# Examples: /tmp/backend.ai/watcher
-watcher-insock-path-prefix = ""
-# Path prefix for watcher output sockets.
-# Used for communication with watcher processes.
-# Examples: /tmp/backend.ai/watcher
-watcher-outsock-path-prefix = ""
-# Whether to use watcher processes.
-# Enables additional monitoring capabilities.
-# Examples: True, False
-use-watcher = false
-# Whether to use experimental Redis-based event dispatcher.
-# May provide better performance for event handling.
-# Examples: True, False
-use-experimental-redis-event-dispatcher = false
-
+  # Base directory path for inter-process communication files.
+  # Used for Unix domain sockets and other IPC mechanisms.
+  ipc-base-path = "/tmp/backend.ai/ipc"
+  # Unique identifier for this storage-proxy node.
+  # Used for service discovery and coordination.
+  node-id = "storage-proxy-1"
+  # Number of worker processes to spawn.
+  # Defaults to the number of CPU cores available.
+  num-proc = 1
+  # Path to the file where the process ID will be written.
+  # Set to /dev/null to disable this feature.
+  pid-file = "/var/run/storage-proxy.pid"
+  # Event loop implementation to use.
+  # 'asyncio' is the standard library implementation.
+  # 'uvloop' is a faster alternative but may have compatibility issues.
+  event-loop = "asyncio"
+  # Maximum number of entries to scan in directory operations.
+  # Prevents excessive memory usage when scanning large directories.
+  scandir-limit = 1000
+  # Maximum size allowed for file uploads.
+  # Prevents storage exhaustion from large uploads.
+  max-upload-size = "100g"
+  # Secret key for generating JWT tokens.
+  # Used for authenticating client requests.
+  secret = "jwt-secret-key"
+  # Session expiration time.
+  # Controls how long JWT tokens remain valid.
+  session-expire = "1h"
+  # User ID to run the storage-proxy process as.
+  # Defaults to the UID of the current file's owner.
+  user = 501
+  # Group ID to run the storage-proxy process as.
+  # Defaults to the GID of the current file's owner.
+  group = 20
+  # Port for the aiomonitor terminal UI.
+  # Allows connecting to a debugging console.
+  aiomonitor-termui-port = 38300
+  # Port for the aiomonitor web UI.
+  # Provides a web-based monitoring interface.
+  aiomonitor-webui-port = 39300
+  # Path prefix for watcher input sockets.
+  # Used for communication with watcher processes.
+  watcher-insock-path-prefix = "/tmp/backend.ai/watcher"
+  # Path prefix for watcher output sockets.
+  # Used for communication with watcher processes.
+  watcher-outsock-path-prefix = "/tmp/backend.ai/watcher"
+  # Whether to use watcher processes.
+  # Enables additional monitoring capabilities.
+  use-watcher = true
+  # Whether to use experimental Redis-based event dispatcher.
+  # May provide better performance for event handling.
+  use-experimental-redis-event-dispatcher = true
 
 [pyroscope]
-# Whether to enable Pyroscope profiling.
-# When enabled, performance profiling data will be sent to a Pyroscope server.
-# Useful for debugging performance issues, but adds some overhead.
-# Examples: True, False
-enabled = false
-# Application name to use in Pyroscope.
-# This name will identify this storage-proxy instance in Pyroscope UI.
-# Required if Pyroscope is enabled.
-# Examples: backendai-storage-proxy
-app-name = ""
-# Address of the Pyroscope server.
-# Must include the protocol (http or https) and port if non-standard.
-# Required if Pyroscope is enabled.
-# Examples: http://localhost:4040
-server-addr = ""
-# Sampling rate for Pyroscope profiling.
-# Higher values collect more data but increase overhead.
-# Balance based on your performance monitoring needs.
-# Examples: 10, 100, 1000
-sample-rate = 0
+  # Whether to enable Pyroscope profiling.
+  # When enabled, performance profiling data will be sent to a Pyroscope server.
+  # Useful for debugging performance issues, but adds some overhead.
+  enabled = true
+  # Application name to use in Pyroscope.
+  # This name will identify this storage-proxy instance in Pyroscope UI.
+  # Required if Pyroscope is enabled.
+  app-name = "backendai-storage-proxy"
+  # Address of the Pyroscope server.
+  # Must include the protocol (http or https) and port if non-standard.
+  # Required if Pyroscope is enabled.
+  server-addr = "http://localhost:4040"
+  # Sampling rate for Pyroscope profiling.
+  # Higher values collect more data but increase overhead.
+  # Balance based on your performance monitoring needs.
+  sample-rate = 10
 
-
-[volume]
-
-
-[debug]
-# Master switch for debug mode.
-# When enabled, activates various debugging features.
-# Should be disabled in production for security and performance.
-# Examples: True, False
-enabled = false
-# Whether to enable asyncio debug mode.
-# Helps detect problems like coroutines never awaited.
-# Adds significant overhead, use only during development.
-# Examples: True, False
-asyncio = false
-# Enable enhanced task information in aiomonitor.
-# Provides more detailed information about running asyncio tasks.
-# Examples: True, False
-enhanced-aiomonitor-task-info = false
-# Whether to log all internal events.
-# Very verbose, but useful for debugging event-related issues.
-# Examples: True, False
-log-events = false
-
-
-[service-discovery]
-type = ""
-
-
-[otel]
-# Whether to enable OpenTelemetry for tracing or logging.
-# When enabled, traces or logs will be collected and sent to the configured OTLP
-# endpoint.
-# Examples: True, False
-enabled = false
-# Log level for OpenTelemetry.
-# Controls the verbosity of logs generated by OpenTelemetry.
-# Examples: DEBUG, INFO, WARN, ERROR
-log-level = "INFO"
-# OTLP endpoint for sending traces.
-# Should include the protocol, host and port of the OTLP receiver.
-# Examples: http://localhost:4317, http://otel-collector:4317
-endpoint = "http://127.0.0.1:4317"
-
-
-[etcd]
-# Namespace prefix for etcd keys used by Backend.AI.
-# Allows multiple Backend.AI clusters to share the same etcd cluster.
-# All Backend.AI related keys will be stored under this namespace.
-# Examples: local, backend
-namespace = "ETCD_NAMESPACE"
-# Username for authenticating with etcd.
-# Optional if etcd doesn't require authentication.
-# Should be set along with password for secure deployments.
-# Examples: backend, manager
-user = ""
-# Password for authenticating with etcd.
-# Optional if etcd doesn't require authentication.
-# Can be a direct password or environment variable reference.
-# Examples: develove, ETCD_PASSWORD
-password = ""
-
-
+[api]
 [api.client]
-# Whether to enable SSL/TLS for client API connections.
-# Required for secure communication with clients.
-# Examples: True, False
-ssl-enabled = false
-# Path to the SSL certificate file for client API.
-# Required if ssl_enabled is True.
-# Examples: /etc/ssl/certs/storage-proxy.crt
-ssl-cert = ""
-# Path to the SSL private key file for client API.
-# Required if ssl_enabled is True.
-# Examples: /etc/ssl/private/storage-proxy.key
-ssl-privkey = ""
-
-
-[api.manager]
-# Whether to enable SSL/TLS for manager API connections.
-# Required for secure communication with managers.
-# Examples: True, False
-ssl-enabled = false
-# Path to the SSL certificate file for manager API.
-# Required if ssl_enabled is True.
-# Examples: /etc/ssl/certs/storage-proxy.crt
-ssl-cert = ""
-# Path to the SSL private key file for manager API.
-# Required if ssl_enabled is True.
-# Examples: /etc/ssl/private/storage-proxy.key
-ssl-privkey = ""
-# Secret key for authenticating managers with the storage-proxy.
-# Must be shared between manager and storage-proxy instances.
-# Examples: manager-secret-key
-secret = ""
-
-
-[etcd.addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
-
+    # Whether to enable SSL/TLS for client API connections.
+    # Required for secure communication with clients.
+    ssl-enabled = true
+    # Path to the SSL certificate file for client API.
+    # Required if ssl_enabled is True.
+    ssl-cert = "/etc/ssl/certs/storage-proxy.crt"
+    # Path to the SSL private key file for client API.
+    # Required if ssl_enabled is True.
+    ssl-privkey = "/etc/ssl/private/storage-proxy.key"
 
 [api.client.service-addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
 
+[api.manager]
+    # Whether to enable SSL/TLS for manager API connections.
+    # Required for secure communication with managers.
+    ssl-enabled = true
+    # Path to the SSL certificate file for manager API.
+    # Required if ssl_enabled is True.
+    ssl-cert = "/etc/ssl/certs/storage-proxy.crt"
+    # Path to the SSL private key file for manager API.
+    # Required if ssl_enabled is True.
+    ssl-privkey = "/etc/ssl/private/storage-proxy.key"
+    # Secret key for authenticating managers with the storage-proxy.
+    # Must be shared between manager and storage-proxy instances.
+    secret = "manager-secret-key"
 
 [api.manager.service-addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
-
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
 
 [api.manager.announce-addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
-
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
 
 [api.manager.announce-internal-addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
-
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
 
 [api.manager.internal-addr]
-# Host address of the service.
-# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-# all interfaces.
-# Examples: 127.0.0.1
-host = ""
-# Port number of the service.
-# Must be between 1 and 65535.
-# Ports below 1024 require root/admin privileges.
-# Examples: 8080
-port = 0
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
+
+# Volume configuration.
+# Defines available storage backends and their settings.
+[volume]
+
+[debug]
+  # Master switch for debug mode.
+  # When enabled, activates various debugging features.
+  # Should be disabled in production for security and performance.
+  enabled = true
+  # Whether to enable asyncio debug mode.
+  # Helps detect problems like coroutines never awaited.
+  # Adds significant overhead, use only during development.
+  asyncio = true
+  # Enable enhanced task information in aiomonitor.
+  # Provides more detailed information about running asyncio tasks.
+  enhanced-aiomonitor-task-info = true
+  # Whether to log all internal events.
+  # Very verbose, but useful for debugging event-related issues.
+  log-events = true
+
+[service-discovery]
+  # Type of service discovery to use.
+  type = "etcd"
+
+[otel]
+  # Whether to enable OpenTelemetry for tracing or logging.
+  # When enabled, traces or logs will be collected and sent to the configured OTLP
+  # endpoint.
+  enabled = true
+  # Log level for OpenTelemetry.
+  # Controls the verbosity of logs generated by OpenTelemetry.
+  log-level = "DEBUG"
+  # OTLP endpoint for sending traces.
+  # Should include the protocol, host and port of the OTLP receiver.
+  endpoint = "http://localhost:4317"
+
+[etcd]
+  # Namespace prefix for etcd keys used by Backend.AI.
+  # Allows multiple Backend.AI clusters to share the same etcd cluster.
+  # All Backend.AI related keys will be stored under this namespace.
+  namespace = "local"
+  # Username for authenticating with etcd.
+  # Optional if etcd doesn't require authentication.
+  # Should be set along with password for secure deployments.
+  user = "backend"
+  # Password for authenticating with etcd.
+  # Optional if etcd doesn't require authentication.
+  # Can be a direct password or environment variable reference.
+  password = "develove"
+
+[etcd.addr]
+    # Host address of the service.
+    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+    # all interfaces.
+    host = "127.0.0.1"
+    # Port number of the service.
+    # Must be between 1 and 65535.
+    # Ports below 1024 require root/admin privileges.
+    port = 8080
