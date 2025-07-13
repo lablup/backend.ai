@@ -12,6 +12,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -54,11 +55,13 @@ def mock_action_monitor() -> ActionMonitor:
 def processors(
     database_fixture, database_engine, service_mock_args, mock_action_monitor
 ) -> GroupProcessors:
+    group_repository = GroupRepository(db=database_engine)
     group_service = GroupService(
         db=database_engine,
         storage_manager=service_mock_args["storage_manager"],
         config_provider=service_mock_args["config_provider"],
         valkey_stat_client=service_mock_args["valkey_stat_client"],
+        group_repository=group_repository,
     )
     return GroupProcessors(group_service, [mock_action_monitor])
 

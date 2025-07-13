@@ -8,6 +8,9 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.keypair_resource_policy.repository import (
+    KeypairResourcePolicyRepository,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
@@ -26,12 +29,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class KeypairResourcePolicyService:
     _db: ExtendedAsyncSAEngine
+    _keypair_resource_policy_repository: KeypairResourcePolicyRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
     ) -> None:
         self._db = db
+        self._keypair_resource_policy_repository = keypair_resource_policy_repository
 
     async def create_keypair_resource_policy(
         self, action: CreateKeyPairResourcePolicyAction

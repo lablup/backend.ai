@@ -64,6 +64,8 @@ from ai.backend.manager.models.utils import (
     execute_with_txn_retry,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -105,6 +107,8 @@ class UserService:
     _storage_manager: StorageSessionManager
     _valkey_stat_client: ValkeyStatClient
     _agent_registry: AgentRegistry
+    _user_repository: UserRepository
+    _admin_user_repository: AdminUserRepository
 
     def __init__(
         self,
@@ -112,10 +116,14 @@ class UserService:
         storage_manager: StorageSessionManager,
         valkey_stat_client: ValkeyStatClient,
         agent_registry: AgentRegistry,
+        user_repository: UserRepository,
+        admin_user_repository: AdminUserRepository,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._valkey_stat_client = valkey_stat_client
+        self._user_repository = user_repository
+        self._admin_user_repository = admin_user_repository
         self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
