@@ -25,6 +25,15 @@ if TYPE_CHECKING:
 
 class ScopePermissionRow(Base):
     __tablename__ = "scope_permissions"
+    __table_args__ = (
+        sa.Index("ix_role_id_entity_type_scope_id", "status", "role_id", "entity_type", "scope_id"),
+        sa.UniqueConstraint(
+            "entity_type",
+            "operation",
+            "scope_id",
+            name="uq_scope_permissions_entity_operation_scope_id",
+        ),
+    )
 
     id: uuid.UUID = IDColumn()
     status: PermissionStatus = sa.Column(

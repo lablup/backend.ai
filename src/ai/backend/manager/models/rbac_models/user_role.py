@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 class UserRoleRow(Base):
     __tablename__ = "user_roles"
+    __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 
     id: uuid.UUID = IDColumn()
     user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)

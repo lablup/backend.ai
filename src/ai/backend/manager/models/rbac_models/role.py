@@ -35,6 +35,7 @@ class RoleStatus(enum.StrEnum):
 
 class RoleRow(Base):
     __tablename__ = "roles"
+    __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
     id: uuid.UUID = IDColumn()
     name: str = sa.Column("name", sa.String(64), nullable=False)
