@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import enum
 import logging
 import secrets
@@ -14,7 +13,6 @@ from typing import (
     Callable,
     Coroutine,
     Generic,
-    Mapping,
     Optional,
     Protocol,
     Type,
@@ -30,17 +28,18 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.contexts.request_id import current_request_id, with_request_id
+from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.user_id import current_user_id
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,
     MessageId,
+    MessageMetadata,
     MessagePayload,
     MQMessage,
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import msgpack
 from ..types import (
     AgentId,
 )
@@ -508,7 +507,7 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
-        metadata: Optional[Mapping[str, str]] = None,
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
             return
@@ -531,12 +530,21 @@ class EventDispatcher(EventDispatcherGroup):
                 if self._log_events:
                     log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
 
-                # Set request_id context from metadata if available
-                request_id = None
-                if metadata and "request_id" in metadata:
-                    request_id = metadata["request_id"]
-
-                with with_request_id(request_id):
+                # Apply all context variables from metadata if available
+                if metadata:
+                    with metadata.apply_context():
+                        if asyncio.iscoroutinefunction(cb):
+                            # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                            await cb(evh.context, source, event)  # type: ignore
+                        else:
+                            cb(evh.context, source, event)  # type: ignore
+                        for post_callback in post_callbacks:
+                            await post_callback.done()
+                        self._metric_observer.observe_event_success(
+                            event_type=event_type,
+                            duration=time.perf_counter() - start,
+                        )
+                else:
                     if asyncio.iscoroutinefunction(cb):
                         # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
                         await cb(evh.context, source, event)  # type: ignore
@@ -573,7 +581,7 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
-        metadata: Optional[Mapping[str, str]] = None,
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
@@ -588,7 +596,7 @@ class EventDispatcher(EventDispatcherGroup):
         event_name: str,
         source: AgentId,
         args: tuple,
-        metadata: Optional[Mapping[str, str]] = None,
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
@@ -653,7 +661,6 @@ class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
     _source: AgentId
-    _source_bytes: bytes
     _log_events: bool
 
     def __init__(
@@ -666,7 +673,6 @@ class EventProducer:
         self._closed = False
         self._msg_queue = msg_queue
         self._source = source
-        self._source_bytes = source.encode()
         self._log_events = log_events
 
     async def close(self) -> None:
@@ -680,22 +686,20 @@ class EventProducer:
     ) -> None:
         if self._closed:
             return
-        source_bytes = self._source_bytes
+        source = self._source
         if source_override is not None:
-            source_bytes = source_override.encode()
+            source = source_override
 
         # Capture current request_id and other metadata
-        metadata = {}
         request_id = current_request_id()
-        if request_id is not None:
-            metadata["request_id"] = request_id
-
-        raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
-            b"metadata": msgpack.packb(metadata),
-        }
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=source,
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_anycast()
         await self._msg_queue.send(raw_event)
 
     async def broadcast_event(
@@ -708,20 +712,17 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
-
         # Capture current request_id and other metadata
-        metadata = {}
         request_id = current_request_id()
-        if request_id is not None:
-            metadata["request_id"] = request_id
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
 
-        raw_event = {
-            "name": event.event_name(),
-            "source": source,
-            "args": args,
-            "metadata": base64.b64encode(msgpack.packb(metadata)).decode("ascii"),
-        }
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=source,
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_broadcast()
         await self._msg_queue.broadcast(raw_event)
 
     async def broadcast_event_with_cache(
@@ -733,20 +734,17 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
-
         # Capture current request_id and other metadata
-        metadata = {}
         request_id = current_request_id()
-        if request_id is not None:
-            metadata["request_id"] = request_id
-
-        raw_event = {
-            "name": event.event_name(),
-            "source": str(self._source),
-            "args": args,
-            "metadata": base64.b64encode(msgpack.packb(metadata)).decode("ascii"),
-        }
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=str(self._source),
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_broadcast()
         await self._msg_queue.broadcast_with_cache(
             cache_id,
             raw_event,

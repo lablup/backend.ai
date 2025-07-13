@@ -1,8 +1,12 @@
 import base64
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from typing import Mapping, Optional, Self, cast
+from typing import Iterator, Mapping, Optional, Self, cast
 
 from ai.backend.common import msgpack
+from ai.backend.common.contexts.request_id import with_request_id
+from ai.backend.common.contexts.user_id import with_user_id
+from ai.backend.common.json import dump_json, load_json
 
 _DEFAULT_RETRY_FIELD = b"_retry_count"
 _DEFAULT_MAX_RETRIES = 3
@@ -43,9 +47,32 @@ class MQMessage:
 @dataclass
 class MessageMetadata:
     request_id: Optional[str] = None
-    source: Optional[str] = None
-    timestamp: Optional[str] = None
     user_id: Optional[str] = None
+
+    def serialize(self) -> bytes:
+        """
+        Serialize the metadata to bytes.
+        """
+        return dump_json(self)
+
+    @classmethod
+    def deserialize(cls, data: str | bytes) -> Self:
+        """
+        Deserialize the metadata from bytes.
+        """
+        return cls(**load_json(data))
+
+    @contextmanager
+    def apply_context(self) -> Iterator[None]:
+        """
+        Context manager to apply all context variables stored in metadata.
+        """
+        with ExitStack() as stack:
+            if self.request_id:
+                stack.enter_context(with_request_id(self.request_id))
+            if self.user_id:
+                stack.enter_context(with_user_id(self.user_id))
+            yield
 
 
 @dataclass
@@ -53,9 +80,9 @@ class MessagePayload:
     name: str
     source: str
     args: tuple[bytes, ...]
-    metadata: Optional[Mapping[str, str]] = None
+    metadata: Optional[MessageMetadata] = None
 
-    def serialize_anycast(self) -> Mapping[bytes, bytes]:
+    def serialize_anycast(self) -> dict[bytes, bytes]:
         """
         Serialize the message payload to a dictionary.
         """
@@ -65,10 +92,10 @@ class MessagePayload:
             b"args": msgpack.packb(self.args),
         }
         if self.metadata:
-            result[b"metadata"] = msgpack.packb(self.metadata)
+            result[b"metadata"] = self.metadata.serialize()
         return result
 
-    def serialize_broadcast(self) -> Mapping[str, str]:
+    def serialize_broadcast(self) -> dict[str, str]:
         """
         Serialize the message payload to a dictionary.
         The keys are bytes and the values are bytes.
@@ -80,7 +107,7 @@ class MessagePayload:
             "args": args,
         }
         if self.metadata:
-            result["metadata"] = base64.b64encode(msgpack.packb(self.metadata)).decode("ascii")
+            result["metadata"] = self.metadata.serialize().decode("utf-8")
         return result
 
     @classmethod
@@ -91,7 +118,7 @@ class MessagePayload:
         """
         metadata = None
         if b"metadata" in payload:
-            metadata = msgpack.unpackb(payload[b"metadata"])
+            metadata = MessageMetadata.deserialize(payload[b"metadata"])
         return cls(
             name=payload[b"name"].decode("utf-8"),
             source=payload[b"source"].decode("utf-8"),
@@ -108,8 +135,7 @@ class MessagePayload:
         args_bytes = base64.b64decode(payload["args"])
         metadata = None
         if "metadata" in payload:
-            metadata_bytes = base64.b64decode(payload["metadata"])
-            metadata = msgpack.unpackb(metadata_bytes)
+            metadata = MessageMetadata.deserialize(payload["metadata"])
         return cls(
             name=payload["name"],
             source=payload["source"],
