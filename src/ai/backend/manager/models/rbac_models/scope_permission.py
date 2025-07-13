@@ -20,6 +20,7 @@ from ..base import (
 from .types import PermissionStatus
 
 if TYPE_CHECKING:
+    from .association_scopes_entities import AssociationScopesEntitiesRow
     from .role import RoleRow
 
 
@@ -64,4 +65,9 @@ class ScopePermissionRow(Base):
         "RoleRow",
         back_populates="scope_permission_rows",
         primaryjoin="RoleRow.id == foreign(ScopePermissionRow.role_id)",
+    )
+    mapped_entity_rows: list[AssociationScopesEntitiesRow] = relationship(
+        "AssociationScopesEntitiesRow",
+        back_populates="scope_permission_row",
+        primaryjoin="ScopePermissionRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
     )
