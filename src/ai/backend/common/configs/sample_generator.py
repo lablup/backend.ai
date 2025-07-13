@@ -82,7 +82,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 elif hasattr(field, "default_factory") and field.default_factory is not None:
                     # Handle default_factory case - create instance to get defaults
                     try:
-                        factory_instance = field.default_factory()
+                        factory_instance = field.default_factory()  # type: ignore
                         if hasattr(factory_instance, "model_dump"):
                             # It's a Pydantic model, get its default values
                             field_info["factory_defaults"] = factory_instance.model_dump()
