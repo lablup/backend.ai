@@ -107,7 +107,6 @@ class VFolderService:
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
         user_uuid = action.user_uuid
-        keypair_resource_policy = action.keypair_resource_policy
         domain_name = action.domain_name
         group_id_or_name = action.group_id_or_name
         folder_host = action.folder_host
