@@ -74,11 +74,6 @@ Generated automatically from the AgentUnifiedConfig schema.
         )
         click.echo(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        # stack trace print
-
-        import traceback
-        traceback.print_exc()
-
         click.echo(f"Error generating sample configuration: {e}", err=True)
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 

@@ -266,14 +266,21 @@ class DebugConfig(BaseModel):
         serialization_alias="log-docker-events",
     )
     coredump: CoreDumpConfig = Field(
-        default_factory=CoreDumpConfig,
+        default_factory=lambda: CoreDumpConfig(_core_path=None),
         description="Core dump configuration",
     )
 
 
 class AgentConfig(BaseModel):
     backend: AgentBackend = Field(
-        description="Backend mode for the agent",
+        description=textwrap.dedent("""
+        Backend type for the agent.
+        This determines how the agent interacts with the underlying infrastructure.
+        Available options are:
+        - `docker`: Uses Docker as the backend.
+        - `kubernetes`: Uses Kubernetes as the backend.
+        - `dummy`: A dummy backend for testing purposes.
+        """),
         examples=[item.value for item in AgentBackend],
         validation_alias=AliasChoices("backend", "mode"),
         serialization_alias="backend",

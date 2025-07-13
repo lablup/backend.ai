@@ -1,381 +1,366 @@
-[etcd]
-namespace = "local"                         # env: BACKEND_NAMESPACE
-addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
-user = ""                                   # env: BACKEND_ETCD_USER
-password = ""				    # env: BACKEND_ETCD_PASSWORD
+# Backend.AI Agent Configuration Sample
+#
+# This is a sample configuration file for the Backend.AI Agent.
+# All configuration options are documented with their descriptions,
+# default values, and examples.
+#
+# Generated automatically from the AgentUnifiedConfig schema.
 
 
 [agent]
-# Agent mode; required
-# One of: "kubernetes", "docker"
-mode = "docker"
-
-# Change the reported host/address of the agent.
-# The manager will use this value to connect to the agent.
-# If host is an empty string, the agent tries to auto-detect it with a fallback to "127.0.0.1".
-# For mobile environments such as developer laptops which roam around different networks,
-# it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
-rpc-listen-addr = { host = "", port = 6001 }
-# Address where manager will actually try to establish connection.
-# Must be set if agent RPC layer is behind NAT.
-advertised-rpc-addr = { host = "", port = 6001 }
-# env: BACKEND_AGENT_HOST_OVERRIDE
-# env: BACKEND_AGENT_PORT
-
-# Set the agent's private and public keypair to sign the RPC responses.
-# The agent's public key is sent to the manager via heartbeats.
-# [default: unset]
-# rpc-auth-agent-keypair = "agent.key_secret"
-
-# Set the manager's public key to validate and accept RPC calls from the manager.
-# Only effective when rpc-auth-agent-keypair is set.
-# [default: unset]
-# rpc-auth-manager-public-key = "manager.key"
-
-# The port number of agent socket which provides access to host-side information
-# to the containers (such as PID conversion).
+backend = ""
+# Whether to enable SSL
+# Examples: True, False
+ssl-enabled = false
+# Path to SSL certificate file
+# Examples: /path/to/cert.pem
+ssl-cert = ""
+# Path to SSL private key file
+# Examples: /path/to/key.pem
+ssl-key = ""
+# Path to RPC auth manager public key
+# Examples: /path/to/public.key
+rpc-auth-manager-public-key = ""
+# Path to RPC auth agent keypair
+# Examples: /path/to/keypair.key
+rpc-auth-agent-keypair = ""
+# Agent socket port
+# Examples: 6007
 agent-sock-port = 6007
-
-# The base directory to put domain sockets for IPC.
-# Normally you don't have to change it.
-# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
-#       you must change this to a directory under your *home* directory.
-# ipc-base-path = "/tmp/backend.ai/ipc"
-
-# Override the name of this agent.
-# If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",
-# like "i-hostname".  The "i-" prefix is not mandatory, though.
-# This affects the per-node configuration scope.
-# id = "i-something-special"
-
-# Set the scaling group (aka resource group) of this agent.
-# This affects the per-sgroup configuration scope.
+# Agent ID
+# Examples: agent-001
+id = ""
+# Base path for IPC
+# Examples: /tmp/backend.ai/ipc
+ipc-base-path = "/tmp/backend.ai/ipc"
+# Base path for variable data
+# Examples: ./var/lib/backend.ai
+var-base-path = "var/lib/backend.ai"
+# Mount path for containers
+# Examples: /mnt/backend.ai
+mount-path = ""
+# Whether to enable cohabiting storage proxy
+# Examples: True, False
+cohabiting-storage-proxy = true
+# Public host address
+# Examples: backend.ai
+public-host = ""
+# Region name
+# Examples: us-east-1
+region = ""
+# Instance type
+# Examples: m5.large
+instance-type = ""
+# Scaling group name
+# Examples: default, gpu-group
 scaling-group = "default"
-
-# Set the type of scaling group (aka resource group) of this agent.
-# - "compute": The agent hosts computing workloads, facing the internal cluster nodes.
-# - "storage": The agent hosts storage-access containers, directly facing public/user-side netweorks.
-# [default: "compute"]
-# scaling-group-type = "compute"
-
-# Set the volume mount path for the agent node.
-# mount-path = "/vfroot"
-
-# A boolean flag to indicate if there is any cohabiting storage proxy within the same node.
-# If is there any cohabiting storage proxy, then events such as mount or umount will be ignored. [default: true]
-# cohabiting-storage-proxy = true
-
-# Create a PID file so that daemon managers could keep track of us.
-# If set to an empty string, it does NOT create the PID file.
-# pid-file = "./agent.pid"             # env: BACKEND_PID_FILE
-
-# One of: "asyncio", "uvloop"
-# This changes the event loop backend.
-# uvloop is a fast libuv-based implementation but sometimes has
-# compatibility issues.
-# event-loop = "uvloop"
-
-# A boolean flag to check and wait until at least one manager instances are running
-# when the agent starts up. [default: false]
-# skip-manager-detection = false
-
-# The host container metadata server is going to bind. Defaults to 0.0.0.0.
+scaling-group-type = ""
+# Path to PID file
+# Examples: /var/run/agent.pid
+pid-file = "/dev/null"
+event-loop = ""
+# Whether to skip manager detection
+# Examples: True, False
+skip-manager-detection = false
+# Port for aiomonitor terminal UI
+# Examples: 38200
+aiomonitor-termui-port = 38200
+# Port for aiomonitor web UI
+# Examples: 39200
+aiomonitor-webui-port = 39200
+# Metadata server bind host
+# Examples: 0.0.0.0
 metadata-server-bind-host = "0.0.0.0"
-
-# The port number of container metadata server. Defaults to 40128.
-# Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
+# Metadata server port
+# Examples: 40128
 metadata-server-port = 40128
-
-# The port number for aiomonitor.
-# aiomonitor-termui-port = 38200
-# aiomonitor-webui-port = 39200
-
-# Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
-# open-source CUDA plugins in the mono-repo source installation.
-# Regardless of this config, CPUPlugin and MemoryPlugin are always enabled.
-# example: ["ai.backend.accelerator.cuda_mock"]
-# allow-compute-plugins = []
-# block-compute-plugins = []
-
-# This directory is used to store the last registry file.
-# var-base-path = "/var/lib/backend.ai"
-
-# The IP or Text URL that use to access publicly
-# Defaults to [container].advertised-host value when not specified
-# public-host = ""
-
-# The directory to look up abusing kernel reports generated by watchers
-# abuse-report-path = "/tmp/backend.ai/abuse-reports"
-# Automatically terminates abusing containers
-# force-terminate-abusing-containers = false
-#
-# By combining `abuse-report-path` and `force-terminate-abusing-containers` options,
-# the following scenarios can be supported:
-# | abuse-report-path | force-terminate-abusing-containers | Effect
-# |-------------------|------------------------------------|------------------------
-# | Not set           | false                              | No abuse detection
-# | Not set           | true                               | No abuse detection
-# | Set               | false                              | Abuse detection only
-# | Set               | true                               | Abuse detection & auto-termination
-
-# Limit the maximum concurrency of kernel creation tasks per each `create_kernels()` RPC call (1 to 32, default 4)
-# If this value is set too high, the container runtime (Docker) may fail with "context deadline exceeded" under
-# certain conditions such as spawning a large number of containers for a multi-node cluster session.
-# kernel-creation-concurrency = 4
+# Allowed compute plugins
+# Examples: ['cuda', 'rocm']
+allow-compute-plugins = []
+# Blocked compute plugins
+# Examples: ['cpu']
+block-compute-plugins = []
+# Allowed network plugins
+# Examples: ['overlay']
+allow-network-plugins = []
+# Blocked network plugins
+# Examples: ['host']
+block-network-plugins = []
+# Path for image commit
+# Examples: ./tmp/backend.ai/commit
+image-commit-path = "tmp/backend.ai/commit"
+# Path for abuse reports
+# Examples: /var/log/backend.ai/abuse
+abuse-report-path = ""
+# Whether to force terminate abusing containers
+# Examples: True, False
+force-terminate-abusing-containers = false
+# Kernel creation concurrency
+# Examples: 4, 8
+kernel-creation-concurrency = 4
+# Whether to use experimental Redis event dispatcher
+# Examples: True, False
+use-experimental-redis-event-dispatcher = false
+# Docker mode detected based on kernel version (linuxkit/native)
+# Examples: linuxkit, native
+docker-mode = ""
 
 
 [container]
-# The port range to expose public service ports.
-# If too small, this may limit the maximum number of containers
-# allowed to run simultaneously.
-port-range = [30000, 31000]  # env: BACKEND_CONTAINER_PORT_RANGE
-
-# The UID/GID to be set to the container's main process.
-# If not specified, it uses the same user which the agent runs as.
-# This configurations could be replaced with the configurations in etcd
-# (config/container/kernel-uid, config/container/kernel-gid).
+# Kernel user ID
+# Examples: 1000, -1
 kernel-uid = -1
+# Kernel group ID
+# Examples: 1000, -1
 kernel-gid = -1
-
-# Change the reported host/address of the containers.
-# The manager will use this value to connect to containers.
-# If empty or unspecified, the agent tries to auto-detect it with a fallback to
-# "agent.rpc-listen-addr.host" value.  When auto-detcting, it uses the etcd's
-# "config/network/subnet/container" key to limit the candidate IP addresses bound
-# to the current host.
-# For mobile environments such as developer laptops which roam around different networks,
-# it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
-# bind-host = "127.0.0.1"   # env: BACKEND_KERNEL_HOST_OVERRIDE
-
-# Alias string to tell manager as a "kernel-host" value.
-# Useful when wsproxy can't access kernel with bind-host IP.
-# Optional, defaults to "bind-host" value when not specified.
-# advertised-host ""
-
-# One of: "docker", "cgroup"
-# "docker" uses the Docker API to retrieve container statistics.
-# "cgroup" makes the agent to control the creation/destruction of container cgroups so
-# that it can safely retrieve the last-moment statistics even when containers die
-# unexpectedley. But this requires the agent to be run as root.
-stats-type = "docker"
-
-# One of: "docker", "jail".
-# "docker" uses the Docker's default apparmor and seccomp profiles.
-# "jail" uses Backend.AI Jail to programmatically filter syscalls.
-sandbox-type = "docker"
-
-# Only meaningful when sandbox-type = "jail"
-# Additional arguments passed to the jail executable in containers.
+# Bind host for containers
+# Examples: 0.0.0.0,
+bind-host = ""
+# Advertised host for containers
+# Examples: 192.168.1.100
+advertised-host = ""
+# Port range for containers
+# Examples: [30000, 31000]
+port-range = [ 30000, 31000,]
+# Statistics type
+# Examples: cgroup, docker
+stats-type = ""
+sandbox-type = ""
+# Jail arguments
+# Examples: ['--mount', '/tmp']
 jail-args = []
-
-# One of: "hostdir", "hostfile", "memory", "k8s-nfs"
-# "hostdir": creates an empty host directory and mount it as /home/work of containers.
-# "hostfile": creates an empty sparse file and mount it as /home/work of containers using loop. But this requires the agent to be run as root.
-# "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
-# "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
-scratch-type = "hostdir"        # env: BACKEND_SANDBOX_TYPE
-
-# Only meaningful when scratch-type is "hostdir" or "k8s-nfs".
-# "hostdir": If not exists, it is auto-created.
-# "k8s-nfs": Source NFS device should be mounted to this location.
-scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
-
-# Limit the maximum size of the scratch space.
-# If set zero, it is unlimited.
-scratch-size = "10G"
-
-# Enable legacy swarm mode.
-# This should be true to let this agent handles multi-container session.
-swarm-enabled = false
-
-# Only meaningful when scratch-type is "k8s-nfs".
-# Mount point of source NFS disk should match with scratch-root folder's mount point.
+scratch-type = ""
+# Scratch root directory
+# Examples: ./scratches
+scratch-root = "scratches"
+# Scratch size
+# Examples: 1G, 500M
+scratch-size = 0
+# Scratch NFS address
+# Examples: 192.168.1.100:/export
 scratch-nfs-address = ""
-
-# Only meaningful when scratch-type is "k8s-nfs".
+# Scratch NFS options
+# Examples: rw,sync
 scratch-nfs-options = ""
-
-# Allow using an alternate Docker bridge network
-# alternative-bridge = ""
-
-[watcher]
-# The address to accept the watcher API requests
-service-addr = { host = "127.0.0.1", port = 6009 }
-# env: BACKEND_WATCHER_SERVICE_IP
-# env: BACKEND_WATCHER_SERVICE_PORT
-
-# SSL configuration for the watcher's HTTP endpoint
-ssl-enabled = false
-ssl-cert = ""
-ssl-key = ""
-
-# The target systemd service name to watch and control.
-target-service = "backendai-agent.service"
-
-# If "reload" is supported, set true.
-soft-reset-available = false
+# Alternative bridge network
+# Examples: br-backend
+alternative-bridge = ""
+# Whether to enable Docker Swarm mode.
+# This allows the agent to manage containers in a Docker Swarm cluster.
+# When enabled, the agent will use Docker Swarm APIs to manage containers,
+# networks, and services.
+# This field is only used when backend is set to 'docker'.
+# Examples: True, False
+swarm-enabled = false
 
 
 [pyroscope]
-enabled = true
-app-name = "backendai-half-agent"
-server-addr = "http://localhost:4040"
-sample-rate = 100
-
-
-[logging]
-# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
-# Set the global logging level.
-level = "INFO"
-
-# Multi-choice of: "console", "logstash", "file", "graylog"
-# For each choice, there must be a "logging.<driver>" section
-# in this config file as exemplified below.
-drivers = ["console", "file"]
-
-
-[logging.console]
-# If set true, use ANSI colors if the console is a terminal.
-# If set false, always disable the colored output in console logs.
-colored = true
-
-# One of: "simple", "verbose"
-format = "simple"
-
-
-[logging.file]
-# The log file path and filename pattern.
-# All messages are wrapped in single-line JSON objects.
-# Rotated logs may have additional suffixes.
-# For production, "/var/log/backend.ai" is recommended.
-path = "./logs"
-filename = "agent.log"
-
-# The maximum number of rotated logs.
-backup-count = 5
-
-# The log file size to begin rotation.
-rotation-size = "10M"
-
-
-[logging.logstash]
-# The endpoint to publish logstash records.
-endpoint = { host = "localhost", port = 9300 }
-
-# One of: "zmq.push", "zmq.pub", "tcp", "udp"
-protocol = "tcp"
-
-# SSL configs when protocol = "tcp"
-ssl-enabled = true
-ssl-verify = true
-
-
-[logging.graylog]
-host = "127.0.0.1"
-port = 12201
-
-# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
-ssl-verify = false
-ca-certs = ""
-keyfile = ""
-certfile = ""
-
-# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
-# fqdn = false
-# localname = "agent"
-
-
-# Specify additional package namespaces to include in the logs
-# and their individual log levels.
-# Note that the actual logging level applied is the conjunction of the global logging level and the
-# logging levels specified here for each namespace.
-[logging.pkg-ns]
-"" = "WARNING"
-"aiodocker" = "INFO"
-"aiotools" = "INFO"
-"aiohttp" = "INFO"
-"ai.backend" = "INFO"
-# "callosum.lower.zeromq" = "DEBUG"  # for details of RPC auth & logs
+# Whether to enable Pyroscope profiling
+# Examples: True, False
+enabled = false
+# Application name to use in Pyroscope
+# Examples: backendai-agent
+app-name = ""
+# Address of the Pyroscope server
+# Examples: http://localhost:4040
+server-addr = ""
+# Sampling rate for Pyroscope profiling
+# Examples: 10, 100
+sample-rate = 0
 
 
 [resource]
-# The amount of CPU cores reserved for the agent and the OS.
-# This will be subtracted from the resource capacity reported to the manager.
+# Reserved CPU cores
+# Examples: 1, 2
 reserved-cpu = 1
+# Reserved memory
+# Examples: 1G, 2G
+reserved-mem = 1073741824
+# Reserved disk space
+# Examples: 8G, 16G
+reserved-disk = 8589934592
+# Resource allocation order
+# Examples: ['cuda', 'rocm', 'tpu', 'cpu', 'mem']
+allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+affinity-policy = 0
 
-# The amount of memory reserved for the agent and the OS.
-# This will be subtracted from the resource capacity reported to the manager.
-reserved-mem = "1G"
 
-# The amount of disk space reserved for the agent and the OS.
-# This will be subtracted from the resource capacity reported to the manager.
-reserved-disk = "8G"
+[otel]
+# Whether to enable OpenTelemetry
+# Examples: True, False
+enabled = false
+# Log level for OpenTelemetry
+# Examples: DEBUG, INFO, WARN, ERROR
+log-level = "INFO"
+# OTLP endpoint for sending traces
+# Examples: http://127.0.0.1:4317
+endpoint = "http://127.0.0.1:4317"
 
-# The order of device allocation.
-allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
-# How we mix up devices from multiple different NUMA nodes?
-# Options: PREFER_SINGLE_NODE, INTERLEAVED
-affinity-policy = "INTERLEAVED"
+[service-discovery]
+type = ""
 
 
 [debug]
-# Enable or disable the debug-level logging.
+# Master switch for debug mode
+# Examples: True, False
 enabled = false
-
-# If set true, it does not actually delete the containers after they terminate or are terminated
-# so that developers can inspect the container logs.
-# This is useful for debugging errors that make containers to terminate immediately after kernel
-# launches, due to bugs in initialization steps such as jail.
-skip-container-deletion = false
-
-# Enable or disable the asyncio debug mode.
+# Whether to enable asyncio debug mode
+# Examples: True, False
 asyncio = false
-
-# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
-enhanced-aiomonitor-task-info = false
-
-# Enable the debug mode of the kernel-runner.
+# Whether to enable kernel runner debug mode
+# Examples: True, False
 kernel-runner = false
-
-# Include debug-level logs for internal events.
-log-events = false
-
-# Include debug-level logs for detailed kernel creation configs and their resource spec.
-log-kernel-config = false
-
-# Include debug-level logs for allocation maps.
-log-alloc-map = false
-
-# Include debug-level logs for statistics.
+# Enable enhanced task information in aiomonitor
+# Examples: True, False
+enhanced-aiomonitor-task-info = false
+# Whether to skip container deletion for debugging
+# Examples: True, False
+skip-container-deletion = false
+# Whether to log statistics
+# Examples: True, False
 log-stats = false
-
-# Include debug-level logs for heartbeats
+# Whether to log kernel configuration
+# Examples: True, False
+log-kernel-config = false
+# Whether to log allocation map
+# Examples: True, False
+log-alloc-map = false
+# Whether to log all internal events
+# Examples: True, False
+log-events = false
+# Whether to log heartbeats
+# Examples: True, False
 log-heartbeats = false
-
-# Set the interval of agent heartbeats in seconds.
+# Heartbeat interval in seconds
+# Examples: 20.0, 30.0
 heartbeat-interval = 20.0
-
-# Include debug-level logs for docker event stream.
+# Whether to log Docker events
+# Examples: True, False
 log-docker-events = false
 
+
+[etcd]
+# Etcd namespace
+# Examples: local, backend
+namespace = ""
+# Etcd username
+# Examples: backend
+user = ""
+# Etcd password
+# Examples: PASSWORD
+password = ""
+
+
+[container-logs]
+# Maximum length of container logs
+# Examples: 10M, 50M
+max-length = 10485760
+# Chunk size for container logs
+# Examples: 64K, 128K
+chunk-size = 65536
+
+
+[api]
+# Image pull timeout in seconds
+# Examples: 7200.0, 3600.0
+pull-timeout = 0.0
+# Image push timeout in seconds
+# Examples: 7200.0, 3600.0
+push-timeout = 0.0
+
+
+[kernel-lifecycles]
+# Number of init polling attempts
+# Examples: 10, 20
+init-polling-attempt = 10
+# Init polling timeout in seconds
+# Examples: 60.0, 120.0
+init-polling-timeout-sec = 60.0
+# Init timeout in seconds
+# Examples: 60.0, 120.0
+init-timeout-sec = 60.0
+
+
+[agent.rpc-listen-addr]
+# Host address of the service.
+# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+# all interfaces.
+# Examples: 127.0.0.1
+host = ""
+# Port number of the service.
+# Must be between 1 and 65535.
+# Ports below 1024 require root/admin privileges.
+# Examples: 8080
+port = 0
+
+
+[agent.service-addr]
+# Host address of the service.
+# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+# all interfaces.
+# Examples: 127.0.0.1
+host = ""
+# Port number of the service.
+# Must be between 1 and 65535.
+# Ports below 1024 require root/admin privileges.
+# Examples: 8080
+port = 0
+
+
+[agent.announce-addr]
+# Host address of the service.
+# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+# all interfaces.
+# Examples: 127.0.0.1
+host = ""
+# Port number of the service.
+# Must be between 1 and 65535.
+# Ports below 1024 require root/admin privileges.
+# Examples: 8080
+port = 0
+
+
+[agent.advertised-rpc-addr]
+host = ""
+port = 0
+
+
+[agent.sync-container-lifecycles]
+# Whether to enable container lifecycle synchronization
+# Examples: True, False
+enabled = true
+# Synchronization interval in seconds
+# Examples: 10.0, 30.0
+interval = 10.0
+
+
+[container.krunner-volumes]
+
+
 [debug.coredump]
-# If set true, enable coredumps in containers. Only supported in Linux.
-# (This option is not related to the agent itself.)
-# IMPORTANT: You must set /proc/sys/kernel/core_pattern to an absolute path which is available
-#            inside both the host and containers.
-#            If the system's core_pattern is set to a pipe (e.g., appport) or a relative path,
-#            the agent will report a configuration error upon startup.
+# Whether to enable core dump collection
+# Examples: True, False
 enabled = false
-
-# Set a host directory to store coredumps, which will be auto-created.
-# Inside the directory, coredumps are saved at container-ID-prefixed directories.
-# It will be mounted as the parent directory of /proc/sys/kernel/core_pattern
-path = "/var/crash/backend.ai"
-
-# Set the maximum number of recent container coredumps in the coredump directory.
-# Oldest coredumps are deleted if there is more than this number of coredumps.
+# Directory path for storing core dumps
+# Examples: ./coredumps
+path = "coredumps"
+# Number of core dump backups to retain
+# Examples: 10, 20
 backup-count = 10
+# Maximum size limit for core dumps
+# Examples: 64M, 128M
+size-limit = 67108864
 
-# Set the maximum size of coredumps from containers.
-size-limit = "64M"
+
+[etcd.addr]
+# Host address of the service.
+# Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+# all interfaces.
+# Examples: 127.0.0.1
+host = ""
+# Port number of the service.
+# Must be between 1 and 65535.
+# Ports below 1024 require root/admin privileges.
+# Examples: 8080
+port = 0
