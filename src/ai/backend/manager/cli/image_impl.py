@@ -6,10 +6,8 @@ from typing import Any, Optional
 
 import click
 import sqlalchemy as sa
-from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
 
-from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
@@ -39,34 +37,23 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
-
-                async def _build_scard_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
-                    for item in items:
-                        await pipe.scard(item.name)
-                    return pipe
-
-                installed_counts = await redis_helper.execute(
-                    redis_conn_set.image, _build_scard_pipeline
+                image_canonicals = [item.name for item in items]
+                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(
+                    image_canonicals
                 )
                 installed_items = []
 
-                async def _build_smembers_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
-                    for item, installed_count in zip(items, installed_counts):
-                        if installed_count > 0:
-                            installed_items.append(item)
-                            await pipe.smembers(item.name)
-                    return pipe
+                for item, installed_count in zip(items, installed_counts):
+                    if installed_count > 0:
+                        installed_items.append(item)
 
-                agents_per_installed_items = await redis_helper.execute(
-                    redis_conn_set.image,
-                    _build_smembers_pipeline,
+                installed_canonicals = [item.name for item in installed_items]
+                agents_per_installed_items = await redis_conn_set.image.get_agents_for_images(
+                    installed_canonicals
                 )
+
                 for item, installed_agents in zip(installed_items, agents_per_installed_items):
-                    formatted_installed_agents = " ".join(
-                        map(lambda s: s.decode(), installed_agents)
-                    )
+                    formatted_installed_agents = " ".join(installed_agents)
                     if short:
                         displayed_items.append((
                             item.image_ref.canonical,
@@ -127,7 +114,9 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def purge_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
+async def purge_image(
+    cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
+):
     async with (
         connect_database(cli_ctx.get_bootstrap_config().db) as db,
         db.begin_session() as session,
@@ -142,6 +131,10 @@ async def purge_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
                 filter_by_statuses=None,
             )
             await session.delete(image_row)
+
+            if remove_from_registry:
+                await image_row.untag_image_from_registry(db=db, session=session)
+
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception as e:

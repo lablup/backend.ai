@@ -4,12 +4,15 @@ import asyncio
 import inspect
 from typing import (
     Any,
+    AsyncContextManager,
     Awaitable,
     Callable,
     Collection,
+    Protocol,
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     cast,
 )
 
@@ -37,6 +40,20 @@ async def cancel_tasks(
             task.cancel()
             cancelled_tasks.append(task)
     return await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+
+
+async def cancel_task(task: asyncio.Task) -> None:
+    """
+    Cancel the given task and wait for its completion.
+    """
+    being_canceled = task.cancel()
+    if not being_canceled:
+        # the task is already cancelled or done
+        return
+    await asyncio.sleep(0)  # yield to the event loop
+    if task.done():
+        return
+    await task
 
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]
@@ -119,3 +136,26 @@ class AsyncBarrier:
         self.count = 0
         # FIXME: if there are waiting coroutines, let them
         #        raise BrokenBarrierError like threading.Barrier
+
+
+class SupportsAsyncClose(Protocol):
+    async def close(self) -> None: ...
+
+
+_SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
+
+
+class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+    """
+    contextlib.closing calls close(), and aiotools.aclosing() calls aclose().
+    This context manager calls close() as a coroutine.
+    """
+
+    def __init__(self, obj: _SupportsAsyncCloseT) -> None:
+        self.obj = obj
+
+    async def __aenter__(self) -> _SupportsAsyncCloseT:
+        return self.obj
+
+    async def __aexit__(self, *exc_info) -> None:
+        await self.obj.close()

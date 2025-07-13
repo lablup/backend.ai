@@ -4,7 +4,6 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import (
-    Any,
     AsyncIterator,
     Final,
     Mapping,
@@ -27,6 +26,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .api.client import init_client_app
 from .api.manager import init_internal_app, init_manager_app
+from .config.unified import StorageProxyUnifiedConfig
 from .exception import InvalidVolumeError
 from .plugin import (
     BasePluginContext,
@@ -104,7 +104,7 @@ class ServiceContext:
 
     def __init__(
         self,
-        local_config: Mapping[str, Any],
+        local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -122,7 +122,7 @@ class RootContext:
     volumes: dict[str, AbstractVolume]
     pid: int
     etcd: AsyncEtcd
-    local_config: Mapping[str, Any]
+    local_config: StorageProxyUnifiedConfig
     dsn: str | None
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
@@ -135,7 +135,7 @@ class RootContext:
         pid: int,
         pidx: int,
         node_id: str,
-        local_config: Mapping[str, Any],
+        local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         *,
         event_producer: EventProducer,
@@ -179,16 +179,16 @@ class RootContext:
         }
         await self.init_storage_plugin()
         self.manager_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
-            StorageManagerWebappPluginContext(self.etcd, self.local_config),
+            StorageManagerWebappPluginContext(self.etcd, self.local_config.model_dump()),
             self.manager_api_app,
         )
         self.client_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
-            StorageClientWebappPluginContext(self.etcd, self.local_config),
+            StorageClientWebappPluginContext(self.etcd, self.local_config.model_dump()),
             self.client_api_app,
         )
 
     async def init_storage_plugin(self) -> None:
-        plugin_ctx = StoragePluginContext(self.etcd, self.local_config)
+        plugin_ctx = StoragePluginContext(self.etcd, self.local_config.model_dump())
         await plugin_ctx.init()
         self.storage_plugin_ctx = plugin_ctx
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
@@ -208,7 +208,7 @@ class RootContext:
         return plugin_ctx
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
-        return {name: VolumeInfo(**info) for name, info in self.local_config["volume"].items()}
+        return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         for volume in self.volumes.values():
@@ -225,14 +225,14 @@ class RootContext:
             yield self.volumes[name]
         else:
             try:
-                volume_config = self.local_config["volume"][name]
+                volume_config = self.local_config.volume[name]
             except KeyError:
                 raise InvalidVolumeError(name)
-            volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
+            volume_cls: Type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
-                local_config=self.local_config,
-                mount_path=Path(volume_config["path"]),
-                options=volume_config["options"] or {},
+                local_config=self.local_config.model_dump(by_alias=True),
+                mount_path=Path(volume_config.path),
+                options=volume_config.options or {},
                 etcd=self.etcd,
                 event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,

@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import AccessKey, RedisConnectionInfo
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import (
@@ -41,7 +42,7 @@ from .test_utils import TestScenario
 
 @pytest.fixture
 def mock_redis_connection():
-    mock_redis_connection = MagicMock(spec=RedisConnectionInfo)
+    mock_redis_connection = MagicMock(spec=ValkeyStatClient)
     return mock_redis_connection
 
 
@@ -65,8 +66,12 @@ def processors(
     mock_redis_connection,
     mock_action_monitor,
 ) -> UserProcessors:
+    agent_registry_mock = MagicMock()
     user_service = UserService(
-        db=database_engine, storage_manager=mock_storage_manager, redis_stat=mock_redis_connection
+        db=database_engine,
+        storage_manager=mock_storage_manager,
+        valkey_stat_client=mock_redis_connection,
+        agent_registry=agent_registry_mock,
     )
     return UserProcessors(user_service=user_service, action_monitors=[mock_action_monitor])
 
@@ -462,10 +467,7 @@ async def test_purge_user(
 ) -> None:
     delete_user_email = "test-delete-user@email.com"
 
-    async def mock_execute(*args, **kwargs):
-        return None
-
-    mocker.patch("ai.backend.common.redis_helper.execute", side_effect=mock_execute)
+    # No need to patch since mock_redis_connection now has the correct spec
 
     async with create_user(
         email=delete_user_email, name="test-delete-user", domain_name="default"

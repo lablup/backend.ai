@@ -149,6 +149,7 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
@@ -192,6 +193,7 @@ class ErrorDetail(enum.StrEnum):
     # Client Error
     BAD_REQUEST = "bad-request"
     NOT_FOUND = "not-found"
+    GONE = "gone"  # The resource is gone.
     # Conflict means the request conflicts with the current state of the server.
     CONFLICT = "conflict"
     # Already Exists means the resource already exists.

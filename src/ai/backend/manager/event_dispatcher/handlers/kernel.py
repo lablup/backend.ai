@@ -3,17 +3,17 @@ from io import BytesIO
 
 import sqlalchemy as sa
 
-from ai.backend.common import redis_helper
-from ai.backend.common.events.kernel import (
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -31,7 +31,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KernelEventHandler:
-    def __init__(self, registry: AgentRegistry, db: ExtendedAsyncSAEngine) -> None:
+    _valkey_stream: ValkeyStreamClient
+    _registry: AgentRegistry
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(
+        self, valkey_stream: ValkeyStreamClient, registry: AgentRegistry, db: ExtendedAsyncSAEngine
+    ) -> None:
+        self._valkey_stream = valkey_stream
         self._registry = registry
         self._db = db
 
@@ -43,12 +50,8 @@ class KernelEventHandler:
     ) -> None:
         # The log data is at most 10 MiB.
         log_buffer = BytesIO()
-        log_key = f"containerlog.{event.container_id}"
         try:
-            list_size = await redis_helper.execute(
-                self._registry.redis_stream,
-                lambda r: r.llen(log_key),
-            )
+            list_size = await self._valkey_stream.container_log_len(container_id=event.container_id)
             if list_size is None:
                 # The log data is expired due to a very slow event delivery.
                 # (should never happen!)
@@ -59,13 +62,14 @@ class KernelEventHandler:
                 return
             for _ in range(list_size):
                 # Read chunk-by-chunk to allow interleaving with other Redis operations.
-                chunk = await redis_helper.execute(
-                    self._registry.redis_stream, lambda r: r.lpop(log_key)
+                chunks = await self._valkey_stream.pop_container_logs(
+                    container_id=event.container_id
                 )
-                if chunk is None:  # maybe missing
+                if chunks is None:  # maybe missing
                     log_buffer.write(b"(container log unavailable)\n")
                     break
-                log_buffer.write(chunk)
+                for chunk in chunks:
+                    log_buffer.write(chunk)
             try:
                 log_data = log_buffer.getvalue()
 
@@ -81,10 +85,7 @@ class KernelEventHandler:
                 await execute_with_retry(_update_log)
             finally:
                 # Clear the log data from Redis when done.
-                await redis_helper.execute(
-                    self._registry.redis_stream,
-                    lambda r: r.delete(log_key),
-                )
+                await self._valkey_stream.clear_container_logs(container_id=event.container_id)
         finally:
             log_buffer.close()
 
@@ -93,11 +94,11 @@ class KernelEventHandler:
         context: None,
         source: AgentId,
         event: (
-            KernelPreparingEvent
-            | KernelPullingEvent
-            | KernelCreatingEvent
-            | KernelStartedEvent
-            | KernelCancelledEvent
+            KernelPreparingAnycastEvent
+            | KernelPullingAnycastEvent
+            | KernelCreatingAnycastEvent
+            | KernelStartedAnycastEvent
+            | KernelCancelledAnycastEvent
         ),
     ) -> None:
         """
@@ -115,32 +116,32 @@ class KernelEventHandler:
             event.kernel_id,
         )
         match event:
-            case KernelPreparingEvent():
+            case KernelPreparingAnycastEvent():
                 # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
                 pass
-            case KernelPullingEvent(kernel_id, session_id, reason=reason):
+            case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-            case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+            case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_creating(
                         db_conn, kernel_id, session_id, reason
                     )
-            case KernelStartedEvent(
+            case KernelStartedAnycastEvent(
                 kernel_id, session_id, reason=reason, creation_info=creation_info
             ):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_running(
                         db_conn, kernel_id, session_id, reason, creation_info
                     )
-            case KernelCancelledEvent():
+            case KernelCancelledAnycastEvent():
                 log.warning(f"Kernel cancelled, {event.reason = }")
 
     async def handle_kernel_preparing(
         self,
         context: None,
         source: AgentId,
-        event: KernelPreparingEvent,
+        event: KernelPreparingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_preparing: ev:{} k:{}",
@@ -153,7 +154,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelPullingEvent,
+        event: KernelPullingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_pulling: ev:{} k:{}",
@@ -169,7 +170,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelCreatingEvent,
+        event: KernelCreatingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_creating: ev:{} k:{}",
@@ -185,7 +186,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelStartedEvent,
+        event: KernelStartedAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_started: ev:{} k:{}",
@@ -201,7 +202,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelCancelledEvent,
+        event: KernelCancelledAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_cancelled: ev:{} k:{}",
@@ -213,7 +214,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelTerminatingEvent,
+        event: KernelTerminatingAnycastEvent,
     ) -> None:
         # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
         pass
@@ -222,7 +223,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelTerminatedEvent,
+        event: KernelTerminatedAnycastEvent,
     ) -> None:
         async with self._db.connect() as db_conn:
             await self._registry.mark_kernel_terminated(

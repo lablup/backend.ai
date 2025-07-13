@@ -376,7 +376,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_INDEX})
+        rqst_args["headers"].update({
+            "Accept": ", ".join([self.MEDIA_TYPE_OCI_INDEX, self.MEDIA_TYPE_OCI_MANIFEST])
+        })
 
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:

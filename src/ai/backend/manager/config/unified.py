@@ -1727,7 +1727,7 @@ class VolumeProxyConfig(BaseModel):
         List of SFTP scaling groups that the volume is mapped to.
         Controls which scaling groups can create SFTP sessions for this volume.
         """,
-        examples=[None, ["group-1", "group-2"]],
+        examples=["group-1,group-2"],
         validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
         serialization_alias="sftp_scaling_groups",
     )
@@ -1755,12 +1755,12 @@ class VolumesConfig(BaseModel):
         serialization_alias="default_host",
     )
     exposed_volume_info: CommaSeparatedStrList = Field(
-        default=CommaSeparatedStrList(["percentage"]),
+        default_factory=lambda: CommaSeparatedStrList("percentage"),
         description="""
         Controls what volume information is exposed to users.
         Options include "percentage" for disk usage percentage.
         """,
-        examples=[["percentage"], ["percentage", "bytes"]],
+        examples=["percentage", "percentage,bytes"],
         validation_alias=AliasChoices("exposed_volume_info", "exposed-volume-info"),
         serialization_alias="exposed_volume_info",
     )
@@ -2003,6 +2003,10 @@ class ManagerUnifiedConfig(BaseModel):
         Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
+
+    # TODO: Remove me after changing the method of loading the license server address in the plugins
+    class Config:
+        extra = "allow"
 
     def __repr__(self):
         return pformat(self.model_dump())

@@ -19,9 +19,8 @@ import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
@@ -202,7 +201,9 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 
     if force_kill:
-        await root_ctx.registry.kill_all_sessions()
+        # It supposed to kill all running sessions and kernels
+        # but there is no RPC to do that.
+        pass
     await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(status)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -268,7 +269,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
                 raise InstanceNotFound()
         if schedulable:
             # trigger scheduler
-            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
     else:
         raise GenericBadRequest("Unknown scheduler operation")
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -284,13 +285,13 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     match params["event"]:
         case SchedulerEvent.SCHEDULE:
-            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
         case SchedulerEvent.CHECK_PRECOND:
-            await root_ctx.event_producer.produce_event(DoCheckPrecondEvent())
+            await root_ctx.event_producer.anycast_event(DoCheckPrecondEvent())
         case SchedulerEvent.START_SESSION:
-            await root_ctx.event_producer.produce_event(DoStartSessionEvent())
+            await root_ctx.event_producer.anycast_event(DoStartSessionEvent())
         case SchedulerEvent.SCALE_SERVICES:
-            await root_ctx.event_producer.produce_event(DoScaleEvent())
+            await root_ctx.event_producer.anycast_event(DoScaleEvent())
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -301,10 +302,8 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
 
     scheduler_status = {}
     for event in SchedulerEvent:
-        scheduler_status[event.value] = await redis_helper.execute(
-            root_ctx.redis_live,
-            lambda r: r.hgetall(f"manager.{manager_id}.{event.value}"),
-            encoding="utf-8",
+        scheduler_status[event.value] = await root_ctx.valkey_live.get_scheduler_metadata(
+            f"manager.{manager_id}.{event.value}"
         )
 
     return web.json_response(scheduler_status)

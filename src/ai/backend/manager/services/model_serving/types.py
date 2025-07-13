@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Mapping, Optional, Self, Sequence, override
 
 import yarl
-from pydantic import AnyUrl, HttpUrl
+from pydantic import AnyUrl, BaseModel, Field, HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
@@ -56,7 +56,7 @@ class MountOption:
 @dataclass
 class RouteInfo:
     route_id: uuid.UUID
-    session_id: uuid.UUID
+    session_id: Optional[uuid.UUID]
     traffic_ratio: float
 
 
@@ -85,7 +85,7 @@ class ServiceConfig:
             "model_definition_path": self.model_definition_path,
             "model_mount_destination": self.model_mount_destination,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
-            "environ": self.environ,
+            "environ": self.environ if self.environ is not None else {},
             "scaling_group": self.scaling_group,
             "resources": self.resources,
             "resource_opts": self.resource_opts,
@@ -436,3 +436,56 @@ class EndpointAutoScalingRuleModifier(PartialModifier):
         self.min_replicas.update_dict(to_update, "min_replicas")
         self.max_replicas.update_dict(to_update, "max_replicas")
         return to_update
+
+
+class ImageEnvironment(BaseModel):
+    image: str = Field(
+        description="""
+        Container image to use for the model service.
+        """,
+        examples=[
+            "myregistry/myimage:latest",
+        ],
+    )
+    architecture: str = Field(
+        description="""
+        Architecture of the container image.
+        """,
+        examples=[
+            "x86_64",
+            "arm64",
+        ],
+    )
+
+
+class ModelServiceDefinition(BaseModel):
+    environment: Optional[ImageEnvironment] = Field(
+        default=None,
+        description="""
+        Environment in which the model service will run.
+        """,
+        examples=[
+            {
+                "image": "myregistry/myimage:latest",
+                "architecture": "x86_64",
+            }
+        ],
+    )
+    resource_slots: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Resource slots used by the model service session.
+        """,
+        examples=[
+            {"cpu": 1, "mem": "2gb"},
+        ],
+    )
+    environ: Optional[dict[str, str]] = Field(
+        default=None,
+        description="""
+        Environment variables to set for the model service.
+        """,
+        examples=[
+            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
+        ],
+    )

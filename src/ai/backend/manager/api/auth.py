@@ -15,10 +15,7 @@ import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
@@ -484,20 +481,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
 
-            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                last_call_time_key = f"kp:{access_key}:last_call_time"
-                await pipe.set(last_call_time_key, now)
-                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -517,21 +501,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             )
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
-
-            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                last_call_time_key = f"kp:{access_key}:last_call_time"
-                await pipe.set(last_call_time_key, now)
-                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass

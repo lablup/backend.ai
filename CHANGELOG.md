@@ -16,6 +16,147 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.11.0 (2025-07-09)
+
+### Features
+* Add Model Service Endpoint Health check, and Authentication test ([#4774](https://github.com/lablup/backend.ai/issues/4774))
+* Add Model Service Replicas Scale success, fail test ([#4777](https://github.com/lablup/backend.ai/issues/4777))
+* Implement `UserResourcePolicy` CRUD SDK functions ([#4782](https://github.com/lablup/backend.ai/issues/4782))
+* Implement ValkeyStreamClient for managing Valkey Streams ([#4792](https://github.com/lablup/backend.ai/issues/4792))
+* Add more filterspecs to `ImageNode` ([#4803](https://github.com/lablup/backend.ai/issues/4803))
+* Add `environ` to `service-definition.toml` schema ([#4826](https://github.com/lablup/backend.ai/issues/4826))
+* Print warning message when `bootstrap.sh` exists, but is not executable ([#4829](https://github.com/lablup/backend.ai/issues/4829))
+* Add a new webserver configuration option `default_file_browser_image` to specify a default file browser image. ([#4836](https://github.com/lablup/backend.ai/issues/4836))
+* Implement the `VFolder.get_id` SDK function to query a vfolder's ID by its name. ([#4856](https://github.com/lablup/backend.ai/issues/4856))
+* Add VFolder soft-delete, restore, and purge tests ([#4873](https://github.com/lablup/backend.ai/issues/4873))
+* Add VFolder upload, and download file tests ([#4877](https://github.com/lablup/backend.ai/issues/4877))
+* Add VFolder file list, rename, move, deletion tests ([#4884](https://github.com/lablup/backend.ai/issues/4884))
+* Add VFolder clone test ([#4885](https://github.com/lablup/backend.ai/issues/4885))
+* Add VFolder invitation test ([#4903](https://github.com/lablup/backend.ai/issues/4903))
+* Make Endpoint GQL Query filterable by endpoint owner's UUID ([#4907](https://github.com/lablup/backend.ai/issues/4907))
+* Reduce dangling kernel logging in Agent ([#4912](https://github.com/lablup/backend.ai/issues/4912))
+* Add `exclude_tags` to tester.toml to exclude tests requiring extra config from default runs, improving the accessibility of the Tester package ([#4914](https://github.com/lablup/backend.ai/issues/4914))
+* Observe count of trigger and result Agent stat collection task ([#4926](https://github.com/lablup/backend.ai/issues/4926))
+* Add expiration time to login history Redis keys to reduce Redis memory usage. ([#4939](https://github.com/lablup/backend.ai/issues/4939))
+* Add aliases to Agent `announce-addr`, `service-addr` configurations ([#4940](https://github.com/lablup/backend.ai/issues/4940))
+* Add Agent stat stage metric ([#4944](https://github.com/lablup/backend.ai/issues/4944))
+* Built-in WSProxy exposes advertised address ([#4975](https://github.com/lablup/backend.ai/issues/4975))
+* Implement ValkeySentinelClient with connection management and master monitoring ([#4987](https://github.com/lablup/backend.ai/issues/4987))
+* Add JSON log formatter for OTEL ([#4991](https://github.com/lablup/backend.ai/issues/4991))
+* Add configuration management CLI commands and sample generator ([#5019](https://github.com/lablup/backend.ai/issues/5019))
+
+### Fixes
+* Fix GQL endpoint list resolver sorting by lifecycle_stage ([#4776](https://github.com/lablup/backend.ai/issues/4776))
+* Improve logging for inspecting missing containers ([#4784](https://github.com/lablup/backend.ai/issues/4784))
+* Allow None type of session id in `RouteInfo` preventing pydantic type error when querying `ModelService.get_info` right after creating model service ([#4786](https://github.com/lablup/backend.ai/issues/4786))
+* Status code is missing when the `Accept` header is not set to `application/json` in the wsproxy exception middleware ([#4788](https://github.com/lablup/backend.ai/issues/4788))
+* Fix Agent Memory plugin to handle multiple IO device stat ([#4789](https://github.com/lablup/backend.ai/issues/4789))
+* Fix invalid state error when setting kernel termination future ([#4791](https://github.com/lablup/backend.ai/issues/4791))
+* Fix wrong exit code when `BaseRunner.query()` fails ([#4798](https://github.com/lablup/backend.ai/issues/4798))
+* Fix model service creation failing due to parameter validation by excluding None values in model service create SDK request ([#4799](https://github.com/lablup/backend.ai/issues/4799))
+* Name session test using `test_id` in failure cases ([#4831](https://github.com/lablup/backend.ai/issues/4831))
+* Fix incorrect query filter definition in GQL image node ([#4843](https://github.com/lablup/backend.ai/issues/4843))
+* Fix compute plugin's `cleanup()` method not being called upon agent shutdown ([#4851](https://github.com/lablup/backend.ai/issues/4851))
+* Prevent model service creation with project type vfolder ([#4852](https://github.com/lablup/backend.ai/issues/4852))
+* Fixed auto scaling rule processing to skip deleted model services, preventing unnecessary operations ([#4875](https://github.com/lablup/backend.ai/issues/4875))
+* Allow GQL modify_user mutation to update users `main_access_key` ([#4879](https://github.com/lablup/backend.ai/issues/4879))
+* Skip logging agent status heartbeat to event logs ([#4895](https://github.com/lablup/backend.ai/issues/4895))
+* Fix wrong error message when vfolder invitation row not found ([#4906](https://github.com/lablup/backend.ai/issues/4906))
+* Return null for empty `unmanaged_path` field in vfolder GQL type ([#4913](https://github.com/lablup/backend.ai/issues/4913))
+* Ensure endpoints are properly cleaned up during group purge operations ([#4917](https://github.com/lablup/backend.ai/issues/4917))
+* Handle `NoSuchProcess` properly when gather process memory stat ([#4922](https://github.com/lablup/backend.ai/issues/4922))
+* Skip kernel destroy when agent shutdown ([#4923](https://github.com/lablup/backend.ai/issues/4923))
+* Check if Agent is daemon process before query docker netstat ([#4929](https://github.com/lablup/backend.ai/issues/4929))
+* Handle invalid moving statistics value ([#4934](https://github.com/lablup/backend.ai/issues/4934))
+* Skip exporter containers when detecting postgres container in dbshell command ([#4935](https://github.com/lablup/backend.ai/issues/4935))
+* Wrong indent in Agent container stat function ([#4946](https://github.com/lablup/backend.ai/issues/4946))
+* Fix broken tester's `PlainTextFilesUploader` in macOS ([#4953](https://github.com/lablup/backend.ai/issues/4953))
+* Remove `session`, `kernel`'s foreign key constraints with `users`, `keypairs`, and fix `PurgeUser` GQL mutation not working when active compute session exist ([#4954](https://github.com/lablup/backend.ai/issues/4954))
+* Change to use json.dumps in Agent to properly serialize yarl types ([#4957](https://github.com/lablup/backend.ai/issues/4957))
+* Fixed cache read failure in Message Queue ([#4968](https://github.com/lablup/backend.ai/issues/4968))
+* Handle unexpected errors in EventDispatcher consume and subscribe loops ([#5009](https://github.com/lablup/backend.ai/issues/5009))
+* Fix incorrect filetype check of `PureStorage` VFolder ([#5018](https://github.com/lablup/backend.ai/issues/5018))
+
+### Documentation Updates
+* Add extra documentation to `tester` package's `README.md` ([#4845](https://github.com/lablup/backend.ai/issues/4845))
+
+### External Dependency Updates
+* Fix aiodns version to 3.2.0 ([#4950](https://github.com/lablup/backend.ai/issues/4950))
+
+### Miscellaneous
+* Consolidate halfstack compose files to main config ([#4839](https://github.com/lablup/backend.ai/issues/4839))
+* Add `metric` to sample Etcd config ([#4886](https://github.com/lablup/backend.ai/issues/4886))
+
+
+## 25.10.1 (2025-06-25)
+
+### Features
+* Configure the logging module's config file to use Pydantic ([#2834](https://github.com/lablup/backend.ai/issues/2834))
+* Add installed field to GQL image node query schema ([#4757](https://github.com/lablup/backend.ai/issues/4757))
+
+### Fixes
+* Fixed optional field handling in `AutoScalingRule` modify action by replacing `None` with `Undefined` ([#1636](https://github.com/lablup/backend.ai/issues/1636))
+* Cool down Redis error logs `AttributeError: 'NoneType' object has no attribute 'get'` ([#4795](https://github.com/lablup/backend.ai/issues/4795))
+* Fix wrong `Accept` Header on `HarborRegistryV2._process_oci_index()` ([#4807](https://github.com/lablup/backend.ai/issues/4807))
+
+
+## 25.10.0 (2025-06-23)
+
+### Features
+* Add `image purge` CLI command for hard deleting `ImageRow`. ([#3951](https://github.com/lablup/backend.ai/issues/3951))
+* Add `service-definition.toml` handling logic in the ModelServing creation service ([#4220](https://github.com/lablup/backend.ai/issues/4220))
+* Implement test specification management and execution framework ([#4614](https://github.com/lablup/backend.ai/issues/4614))
+* Add creation wrappers for each session type and test cases for session creation ([#4654](https://github.com/lablup/backend.ai/issues/4654))
+* Add Tester configuration, and template for config injection ([#4661](https://github.com/lablup/backend.ai/issues/4661))
+* Add `ComputeSessionNode` query method in compute session sdk to offer detail info about session ([#4669](https://github.com/lablup/backend.ai/issues/4669))
+* Replace hardcoded bgtask status event codes with `BgtaskStatus` enum values ([#4671](https://github.com/lablup/backend.ai/issues/4671))
+* Agent sends container status through heartbeat ([#4677](https://github.com/lablup/backend.ai/issues/4677))
+* Add session rename test verifying success renaming and prevent duplicate renaming ([#4680](https://github.com/lablup/backend.ai/issues/4680))
+* Add parametrize functionality in tester spec ([#4692](https://github.com/lablup/backend.ai/issues/4692))
+* Add session status history retrieval test validating history not empty and contains valid statuses ([#4697](https://github.com/lablup/backend.ai/issues/4697))
+* Add session dependency graph retrieval test validating dependency graphs between sessions ([#4698](https://github.com/lablup/backend.ai/issues/4698))
+* Improve Exporter to easily check error information when an error occurs ([#4701](https://github.com/lablup/backend.ai/issues/4701))
+* Add metric for sync container lifecycle task ([#4704](https://github.com/lablup/backend.ai/issues/4704))
+* Add python code execution tests to Tester ([#4709](https://github.com/lablup/backend.ai/issues/4709))
+* Add Container purge RPC to agent ([#4710](https://github.com/lablup/backend.ai/issues/4710))
+* Add session imagify, commit test to Tester ([#4713](https://github.com/lablup/backend.ai/issues/4713))
+* Manager purges kernels and containers with mismatched status between DB and agent heartbeat ([#4717](https://github.com/lablup/backend.ai/issues/4717))
+* Add session creation test using various options ([#4729](https://github.com/lablup/backend.ai/issues/4729))
+* Add vfolder mounted session tests verifying file upload and downloads ([#4732](https://github.com/lablup/backend.ai/issues/4732))
+* Add additional logging to kernel creation and termination ([#4737](https://github.com/lablup/backend.ai/issues/4737))
+* Add `EndpointTemplate` for testing Model Service ([#4744](https://github.com/lablup/backend.ai/issues/4744))
+* Add `runtime_variant` parameter to Service creation SDK function and CLI command ([#4749](https://github.com/lablup/backend.ai/issues/4749))
+* Agent heartbeat handler queries Kernel ids instead of Agent id ([#4766](https://github.com/lablup/backend.ai/issues/4766))
+
+### Improvements
+* Refactor event dispatchers registration of idle checkers ([#4516](https://github.com/lablup/backend.ai/issues/4516))
+* Differenciate consume and subscribe events ([#4620](https://github.com/lablup/backend.ai/issues/4620))
+
+### Fixes
+* Add missing event handler for SessionCheckingPrecondEvent ([#4619](https://github.com/lablup/backend.ai/issues/4619))
+* Fix manager config models being validated only by alias ([#4624](https://github.com/lablup/backend.ai/issues/4624))
+* Support more Accept headers in `BaseContainerRegistry.scan_tag` ([#4627](https://github.com/lablup/backend.ai/issues/4627))
+* Resolve broken image rescanning on macOS due to `aiotools` upstream issue ([#4628](https://github.com/lablup/backend.ai/issues/4628))
+* Fix container utilization metric service config reload not working ([#4640](https://github.com/lablup/backend.ai/issues/4640))
+* Update container ports validation to catch omitted or empty list cases, preventing potential `IndexError` ([#4656](https://github.com/lablup/backend.ai/issues/4656))
+* Prevent remount NFS path ([#4663](https://github.com/lablup/backend.ai/issues/4663))
+* Agent skips failure of code runner initialization ([#4679](https://github.com/lablup/backend.ai/issues/4679))
+* Fix Session Rename API to block duplicate session names for the same user ([#4690](https://github.com/lablup/backend.ai/issues/4690))
+* Update `endpoints.destroyed_at` column when serving is terminated ([#4696](https://github.com/lablup/backend.ai/issues/4696))
+* Fix license config not included in PluginConfig after Pydantic migration ([#4718](https://github.com/lablup/backend.ai/issues/4718))
+* Fix broken `untag_image_from_registry` SDK method ([#4720](https://github.com/lablup/backend.ai/issues/4720))
+* Include `image_id` to `message` field of `imagify` REST API's bgtask response ([#4723](https://github.com/lablup/backend.ai/issues/4723))
+* Close code runner of agent gracefully ([#4740](https://github.com/lablup/backend.ai/issues/4740))
+* Allow `ComputeSession` SDK methods to identify sessions by id ([#4750](https://github.com/lablup/backend.ai/issues/4750))
+* Skip gathering metrics of non-existent processes ([#4753](https://github.com/lablup/backend.ai/issues/4753))
+* Fix kernel runner and agent rpc server return code completion result ([#4754](https://github.com/lablup/backend.ai/issues/4754))
+* Use correct attribute `routings` instead of `routes` for endpoints ([#4756](https://github.com/lablup/backend.ai/issues/4756))
+
+### Miscellaneous
+* Remove `enable2FA` config from webserver ([#4653](https://github.com/lablup/backend.ai/issues/4653))
+* Ensure the `Vite` build tool, required by the `backend.ai-ui` package, is installed before building the WebUI ([#4725](https://github.com/lablup/backend.ai/issues/4725))
+
+
 ## 25.9.1 (2025-06-05)
 
 ### Features

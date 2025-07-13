@@ -627,6 +627,7 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
+  pushd ./packages/backend.ai-ui && pnpm install && popd
   pnpm i
   make compile
   cd ../../../..
@@ -844,13 +845,10 @@ setup_environment() {
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
   else
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
-    if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-      SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-    fi
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
     cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"

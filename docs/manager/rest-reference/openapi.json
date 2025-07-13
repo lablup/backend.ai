@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.9.1",
+    "version": "25.11.0",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -852,7 +852,6 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/MountOptionModel"
             },
-            "default": {},
             "description": "Specifications about extra VFolders mounted to model service session. MODEL type VFolders are not allowed to be attached to model service session with this option.",
             "propertyNames": {
               "format": "uuid"
@@ -1081,10 +1080,17 @@
             "type": "string"
           },
           "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Unique ID referencing the inference session.",
-            "format": "uuid",
-            "title": "Session Id",
-            "type": "string"
+            "title": "Session Id"
           },
           "traffic_ratio": {
             "minimum": 0,

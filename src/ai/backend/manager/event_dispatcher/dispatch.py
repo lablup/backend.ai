@@ -1,74 +1,76 @@
 from dataclasses import dataclass
 
-from ai.backend.common.events.agent import (
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.events.dispatcher import (
+    CoalescingOptions,
+    EventDispatcher,
+)
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
+    AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.bgtask import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    CoalescingOptions,
-    EventDispatcher,
-)
-from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.idle import DoIdleCheckEvent
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.idle.anycast import DoIdleCheckEvent
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
+    RouteCreatedAnycastEvent,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
-    ExecutionCancelledEvent,
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
-    SessionCancelledEvent,
-    SessionCheckingPrecondEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
+    ExecutionCancelledAnycastEvent,
+    ExecutionFinishedAnycastEvent,
+    ExecutionStartedAnycastEvent,
+    ExecutionTimeoutAnycastEvent,
+    SessionCancelledAnycastEvent,
+    SessionCheckingPrecondAnycastEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+    SessionStartedAnycastEvent,
+    SessionSuccessAnycastEvent,
+    SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
@@ -89,6 +91,7 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -119,7 +122,9 @@ class Dispatchers:
             args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
         )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
-        self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
+        self._kernel_event_handler = KernelEventHandler(
+            args.valkey_stream, args.agent_registry, args.db
+        )
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
@@ -180,6 +185,12 @@ class Dispatchers:
         event_dispatcher.consume(
             AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
+        event_dispatcher.consume(
+            AgentStatusHeartbeat,
+            None,
+            self._agent_event_handler.handle_agent_container_heartbeat,
+            name="agent.status_heartbeat",
+        )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
@@ -226,43 +237,43 @@ class Dispatchers:
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
-            KernelPreparingEvent,
+            KernelPreparingAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_preparing,
             name="api.session.kprep",
         )
         evd.consume(
-            KernelPullingEvent,
+            KernelPullingAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_pulling,
             name="api.session.kpull",
         )
         evd.consume(
-            KernelCreatingEvent,
+            KernelCreatingAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_creating,
             name="api.session.kcreat",
         )
         evd.consume(
-            KernelStartedEvent,
+            KernelStartedAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_started,
             name="api.session.kstart",
         )
         evd.consume(
-            KernelCancelledEvent,
+            KernelCancelledAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_cancelled,
             name="api.session.kstart",
         )
         evd.consume(
-            KernelTerminatingEvent,
+            KernelTerminatingAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_terminating,
             name="api.session.kterming",
         )
         evd.consume(
-            KernelTerminatedEvent,
+            KernelTerminatedAnycastEvent,
             None,
             self._kernel_event_handler.handle_kernel_terminated,
             name="api.session.kterm",
@@ -276,12 +287,12 @@ class Dispatchers:
 
     def _dispatch_model_serving_events(self, event_dispatcher: EventDispatcher) -> None:
         event_dispatcher.consume(
-            ModelServiceStatusEvent,
+            ModelServiceStatusAnycastEvent,
             None,
             self._model_serving_event_handler.handle_model_service_status_update,
         )
         event_dispatcher.consume(
-            RouteCreatedEvent, None, self._model_serving_event_handler.handle_route_creation
+            RouteCreatedAnycastEvent, None, self._model_serving_event_handler.handle_route_creation
         )
 
     def _dispatch_schedule_events(self, event_dispatcher: EventDispatcher) -> None:
@@ -290,14 +301,14 @@ class Dispatchers:
             "max_batch_size": 32,
         }
         event_dispatcher.consume(
-            SessionEnqueuedEvent,
+            SessionEnqueuedAnycastEvent,
             None,
             self._schedule_event_handler.handle_session_enqueued,
             coalescing_opts,
             name="dispatcher.schedule/enqueue",
         )
         event_dispatcher.consume(
-            SessionTerminatedEvent,
+            SessionTerminatedAnycastEvent,
             None,
             self._schedule_event_handler.handle_session_terminated,
             coalescing_opts,
@@ -336,63 +347,69 @@ class Dispatchers:
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
-            SessionStartedEvent,
+            SessionStartedAnycastEvent,
             None,
             self._session_event_handler.handle_session_started,
             name="api.session.sstart",
         )
         evd.consume(
-            SessionCancelledEvent,
+            SessionCancelledAnycastEvent,
             None,
             self._session_event_handler.handle_session_cancelled,
             name="api.session.scancel",
         )
         evd.consume(
-            SessionTerminatingEvent,
+            SessionTerminatingAnycastEvent,
             None,
             self._session_event_handler.handle_session_terminating,
             name="api.session.sterming",
         )
         evd.consume(
-            SessionTerminatedEvent,
+            SessionTerminatedAnycastEvent,
             None,
             self._session_event_handler.handle_session_terminated,
             name="api.session.sterm",
         )
-        evd.consume(SessionEnqueuedEvent, None, self._session_event_handler.invoke_session_callback)
         evd.consume(
-            SessionScheduledEvent, None, self._session_event_handler.invoke_session_callback
+            SessionEnqueuedAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
-            SessionCheckingPrecondEvent,
+            SessionScheduledAnycastEvent, None, self._session_event_handler.invoke_session_callback
+        )
+        evd.consume(
+            SessionCheckingPrecondAnycastEvent,
             None,
             self._session_event_handler.invoke_session_callback,
         )
         evd.consume(
-            SessionPreparingEvent, None, self._session_event_handler.invoke_session_callback
+            SessionPreparingAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
-        evd.consume(SessionSuccessEvent, None, self._session_event_handler.handle_batch_result)
-        evd.consume(SessionFailureEvent, None, self._session_event_handler.handle_batch_result)
         evd.consume(
-            ExecutionStartedEvent,
+            SessionSuccessAnycastEvent, None, self._session_event_handler.handle_batch_result
+        )
+        evd.consume(
+            SessionFailureAnycastEvent, None, self._session_event_handler.handle_batch_result
+        )
+        evd.consume(
+            ExecutionStartedAnycastEvent,
             None,
             self._session_event_handler.handle_execution_started,
             name="session_execution.started",
         )
         evd.consume(
-            ExecutionFinishedEvent,
+            ExecutionFinishedAnycastEvent,
             None,
             self._session_event_handler.handle_execution_finished,
             name="session_execution.finished",
         )
         evd.consume(
-            ExecutionTimeoutEvent,
+            ExecutionTimeoutAnycastEvent,
             None,
             self._session_event_handler.handle_execution_timeout,
             name="session_execution.timeout",
         )
         evd.consume(
-            ExecutionCancelledEvent,
+            ExecutionCancelledAnycastEvent,
             None,
             self._session_event_handler.handle_execution_cancelled,
             name="session_execution.cancelled",

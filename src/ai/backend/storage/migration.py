@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Optional, TypedDict
+from typing import AsyncIterator, Iterator, Optional, TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -18,7 +18,6 @@ import more_itertools
 import tqdm
 import yarl
 
-from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
@@ -29,7 +28,8 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
-from .config import load_local_config, load_shared_config
+from .config.loaders import load_local_config, make_etcd
+from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
@@ -220,45 +220,43 @@ upgrade_handlers = {
 
 
 async def check_and_upgrade(
-    local_config: dict[str, Any],
+    local_config: StorageProxyUnifiedConfig,
     dsn: str,
     outfile: str,
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
 ):
-    etcd = load_shared_config(local_config)
+    etcd = make_etcd(local_config)
     redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
-    node_id = local_config["storage-proxy"]["node-id"]
-    redis_mq = RedisQueue(
-        stream_redis,
+    node_id = local_config.storage_proxy.node_id
+    redis_mq = await RedisQueue.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys=None,
+            subscribe_channels=None,
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
     event_producer = EventProducer(
         redis_mq,
         source=AGENTID_STORAGE,
-        log_events=local_config["debug"]["log-events"],
+        log_events=local_config.debug.log_events,
     )
     event_dispatcher = EventDispatcher(
         redis_mq,
-        log_events=local_config["debug"]["log-events"],
+        log_events=local_config.debug.log_events,
     )
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
-        node_id=local_config["storage-proxy"]["node-id"],
+        node_id=local_config.storage_proxy.node_id,
         local_config=local_config,
         etcd=etcd,
         dsn=dsn,
@@ -341,7 +339,7 @@ def main(
     Pass - as OUTFILE to print results to STDOUT.
     """
     local_config = load_local_config(config_path, debug=debug)
-    with LocalLogger(local_config["logging"]):
+    with LocalLogger(local_config.logging):
         asyncio.run(
             check_and_upgrade(
                 local_config,

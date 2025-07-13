@@ -1,16 +1,16 @@
 import logging
 
-from ai.backend.common.events.agent import AgentStartedEvent
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
-    SessionEnqueuedEvent,
-    SessionTerminatedEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionTerminatedAnycastEvent,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
@@ -25,12 +25,12 @@ class ScheduleEventHandler:
         self._scheduler_dispatcher = scheduler_dispatcher
 
     async def handle_session_enqueued(
-        self, context: None, agent_id: str, ev: SessionEnqueuedEvent
+        self, context: None, agent_id: str, ev: SessionEnqueuedAnycastEvent
     ) -> None:
         await self._scheduler_dispatcher.schedule(ev.event_name())
 
     async def handle_session_terminated(
-        self, context: None, agent_id: str, ev: SessionTerminatedEvent
+        self, context: None, agent_id: str, ev: SessionTerminatedAnycastEvent
     ) -> None:
         await self._scheduler_dispatcher.schedule(ev.event_name())
 

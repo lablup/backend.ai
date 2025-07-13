@@ -201,7 +201,7 @@ class VirtualFolderNode(graphene.ObjectType):
             group=row.group_row.id if row.group_row else None,
             group_name=row.group_row.name if row.group_row else None,
             creator=row.creator,
-            unmanaged_path=row.unmanaged_path,
+            unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
             permission=row.permission,
             ownership_type=row.ownership_type,

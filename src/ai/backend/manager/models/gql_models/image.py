@@ -11,6 +11,7 @@ from typing import (
     List,
     Optional,
     Self,
+    cast,
     overload,
 )
 from uuid import UUID
@@ -20,20 +21,19 @@ import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphql import Undefined, UndefinedType
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
     DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -126,6 +126,9 @@ __all__ = (
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
     "name": ("name", None),
+    "namespace": ("image", None),
+    "tag": ("tag", None),
+    "status": (EnumFieldItem("status", ImageStatus), None),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", dtparse),
@@ -133,13 +136,16 @@ _queryfilter_fieldspec: FieldSpecType = {
     "registry_id": ("registry_id", None),
     "architecture": ("architecture", None),
     "is_local": ("is_local", None),
-    "type": ("session_type", ImageType),
+    "type": (EnumFieldItem("type", ImageType), None),
     "accelerators": ("accelerators", None),
 }
 
 _queryorder_colmap: ColumnMapType = {
     "id": ("id", None),
     "name": ("name", None),
+    "namespace": ("image", None),
+    "tag": ("tag", None),
+    "status": ("status", None),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", None),
@@ -235,16 +241,8 @@ class Image(graphene.ObjectType):
         row: ImageRow,
     ) -> Image:
         # TODO: add architecture
-        _installed_agents = await redis_helper.execute(
-            ctx.redis_image,
-            lambda r: r.smembers(row.name),
-        )
-        installed_agents: List[str] = []
-        for agent_id in _installed_agents:
-            if isinstance(agent_id, bytes):
-                installed_agents.append(agent_id.decode())
-            else:
-                installed_agents.append(agent_id)
+        _installed_agents = await ctx.valkey_image.get_agents_for_image(row.name)
+        installed_agents: List[str] = list(_installed_agents)
         return cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -253,21 +251,11 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
-        async def _pipe(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.smembers(row.name)
-            return pipe
+        image_canonicals = [row.name for row in rows]
+        results = await ctx.valkey_image.get_agents_for_images(image_canonicals)
 
-        results = await redis_helper.execute(ctx.redis_image, _pipe)
         for idx, row in enumerate(rows):
-            installed_agents: List[str] = []
-            _installed_agents = results[idx]
-            for agent_id in _installed_agents:
-                if isinstance(agent_id, bytes):
-                    installed_agents.append(agent_id.decode())
-                else:
-                    installed_agents.append(agent_id)
+            installed_agents: List[str] = list(results[idx])
             yield cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -464,6 +452,37 @@ class ImageNode(graphene.ObjectType):
         ImagePermissionValueField,
         description=f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}.",
     )
+    installed = graphene.Boolean(
+        description="Added in 25.11.0. Indicates if the image is installed on any Agent."
+    )
+
+    @property
+    def _canonical(self) -> str:
+        image_ref = ImageRef(
+            self.base_image_name,
+            self.project,
+            self.tag,
+            self.registry,
+            self.architecture,
+            self.is_local,
+        )
+        return image_ref.canonical
+
+    @classmethod
+    async def _batch_load_installed_agents(
+        cls, ctx: GraphQueryContext, full_names: Sequence[str]
+    ) -> list[set[AgentId]]:
+        results = await ctx.valkey_image.get_agents_for_images(list(full_names))
+        return [{AgentId(agent_id) for agent_id in agents} for agents in results]
+
+    async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, self._batch_load_installed_agents
+        )
+        agent_ids = await loader.load(self._canonical)
+        agent_ids = cast(Optional[set[AgentId]], agent_ids)
+        return agent_ids is not None and len(agent_ids) > 0
 
     @classmethod
     async def batch_load_by_name_and_arch(
@@ -795,6 +814,17 @@ class ForgetImage(graphene.Mutation):
         )
 
 
+class PurgeImageOptions(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    remove_from_registry = graphene.Boolean(
+        default_value=False,
+        description="Untag the deleted image from the registry. Only available in the HarborV2 registry.",
+    )
+
+
 class PurgeImageById(graphene.Mutation):
     """Added in 25.4.0."""
 
@@ -806,6 +836,11 @@ class PurgeImageById(graphene.Mutation):
 
     class Arguments:
         image_id = graphene.String(required=True)
+        options = PurgeImageOptions(
+            required=False,
+            default_value={"remove_from_registry": False},
+            description="Added in 25.10.0.",
+        )
 
     image = graphene.Field(ImageNode)
 
@@ -814,6 +849,7 @@ class PurgeImageById(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
+        options: PurgeImageOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
@@ -827,11 +863,20 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
+        if options.remove_from_registry:
+            await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+                UntagImageFromRegistryAction(
+                    user_id=ctx.user["uuid"],
+                    client_role=ctx.user["role"],
+                    image_id=image_uuid,
+                )
+            )
+
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Added in 24.03.1"""
+    """Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,

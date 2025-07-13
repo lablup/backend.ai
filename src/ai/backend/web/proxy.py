@@ -16,6 +16,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .stats import WebStats
@@ -136,8 +137,12 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         if not request.can_read_body:  # designated as encrypted but has an empty payload
             request["payload"] = ""
             return await handler(request)
-        config = request.app["config"]
-        scheme = config["service"]["force_endpoint_protocol"]
+        config = cast(WebServerUnifiedConfig, request.app["config"])
+        scheme = (
+            str(config.service.force_endpoint_protocol)
+            if config.service.force_endpoint_protocol
+            else None
+        )
         if scheme is None:
             scheme = request.scheme
         api_endpoint = f"{scheme}://{request.host}"
@@ -270,7 +275,8 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             content = request.content
             if path == "auth/signup":
                 body = await request.json()
-                body["domain"] = request.app["config"]["api"]["domain"]
+                config = cast(WebServerUnifiedConfig, request.app["config"])
+                body["domain"] = config.api.domain
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
             fill_forwarding_hdrs_to_api_session(request, api_session)
@@ -340,7 +346,8 @@ async def websocket_handler(
 
     # Choose a specific Manager endpoint for persistent web app connection.
     should_save_session = False
-    configured_endpoints = request.app["config"]["api"]["endpoint"]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    configured_endpoints = config.api.endpoint
     if session.get("api_endpoints", {}).get(app):
         stringified_endpoints = [str(e) for e in configured_endpoints]
         if session["api_endpoints"][app] in stringified_endpoints:
@@ -375,7 +382,8 @@ async def websocket_handler(
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
-                    extension_sec = request.app["config"]["session"]["login_session_extension_sec"]
+                    config = cast(WebServerUnifiedConfig, request.app["config"])
+                    extension_sec = config.session.login_session_extension_sec
                     await storage.save_session(request, down_conn, session, extension_sec)
                 return down_conn
     except asyncio.CancelledError:

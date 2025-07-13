@@ -8,7 +8,6 @@ import logging
 import re
 import secrets
 import time
-import typing
 import uuid
 import zlib
 from collections import defaultdict
@@ -20,7 +19,6 @@ from collections.abc import (
 )
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -46,7 +44,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -56,53 +53,56 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.docker import ImageRef, LabelName
-from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
-    DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
+from ai.backend.common.events.event_types.kernel.anycast import (
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
-    KernelLifecycleEventReason,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
+    RouteCreatedAnycastEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
+    SessionCancelledAnycastEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+    SessionStartedAnycastEvent,
+    SessionSuccessAnycastEvent,
+    SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
-from ai.backend.common.events.vfolder import (
-    VFolderDeletionFailureEvent,
-    VFolderDeletionSuccessEvent,
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -119,6 +119,7 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
     CommitStatus,
+    ContainerKernelId,
     DeviceId,
     HardwareMetadata,
     ImageAlias,
@@ -128,7 +129,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
-    RedisConnectionInfo,
     ResourceSlot,
     RuntimeVariant,
     SessionEnqueueingConfig,
@@ -145,6 +145,9 @@ from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.services.model_serving.types import RouteConnectionInfo
 from ai.backend.manager.utils import query_userinfo
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.exceptions import (
@@ -204,10 +207,8 @@ from .models import (
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
-    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFAULT,
-    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
@@ -215,11 +216,9 @@ from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
-    reenter_txn,
     reenter_txn_session,
     sql_json_merge,
 )
-from .models.vfolder import VFolderOperationStatus, update_vfolder_status
 from .types import UserScope
 
 if TYPE_CHECKING:
@@ -261,10 +260,9 @@ class AgentRegistry:
         config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
-        redis_stat: RedisConnectionInfo,
-        redis_live: RedisConnectionInfo,
-        redis_image: RedisConnectionInfo,
-        redis_stream: RedisConnectionInfo,
+        valkey_stat: ValkeyStatClient,
+        valkey_live: ValkeyLiveClient,
+        valkey_image: ValkeyImageClient,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -278,10 +276,9 @@ class AgentRegistry:
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
-        self.redis_stat = redis_stat
-        self.redis_live = redis_live
-        self.redis_image = redis_image
-        self.redis_stream = redis_stream
+        self.valkey_stat = valkey_stat
+        self.valkey_live = valkey_live
+        self.valkey_image = valkey_image
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -293,7 +290,7 @@ class AgentRegistry:
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
-            redis_stat,
+            valkey_stat,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -485,7 +482,8 @@ class AgentRegistry:
                 "sessionId": str(sess.id),
                 "sessionName": str(sess.name),
                 "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,
+                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
+                "servicePorts": sess.main_kernel.service_ports,
                 "created": False,
             }
         except SessionNotFound:
@@ -1366,8 +1364,9 @@ class AgentRegistry:
             "POST_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
         )
-        await self.event_producer.produce_event(
-            SessionEnqueuedEvent(session_id, session_creation_id),
+        await self.event_producer.anycast_and_broadcast_event(
+            SessionEnqueuedAnycastEvent(session_id, session_creation_id),
+            SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
         )
         return session_id
 
@@ -2134,61 +2133,45 @@ class AgentRegistry:
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
+        await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
 
-        # Update keypair resource usage for keypairs with running containers.
-        async def _update(r: Redis):
-            updates: dict[str, int] = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                updates |= concurrency.to_cnt_map()
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
-        async def _update_by_fullscan(r: Redis):
-            updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.compute_session_ids)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.system_concurrency_used_key)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
+    async def _update_concurrency(
+        self,
+        access_key_to_concurrency_used: Mapping[AccessKey, ConcurrencyUsed],
+        do_fullscan: bool,
+    ) -> None:
+        """Update concurrency values in valkey based on the current state."""
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
         _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update_by_fullscan,
-            )
+            # Convert ConcurrencyUsed objects to simple access_key -> count mapping
+            # For fullscan, we need both compute and system concurrency counts
+            access_key_to_count = {
+                str(ak): len(concurrency.compute_session_ids)
+                for ak, concurrency in access_key_to_concurrency_used.items()
+            }
+            await self.valkey_stat.update_concurrency_by_fullscan(access_key_to_count)
         else:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update,
-            )
+            # Update keypair resource usage for keypairs with running containers.
+            # Prepare separate maps for compute and system concurrency
+            compute_concurrency_map = {}
+            system_concurrency_map = {}
+            for concurrency in access_key_to_concurrency_used.values():
+                compute_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.compute_session_ids
+                )
+                system_concurrency_map[str(concurrency.access_key)] = len(
+                    concurrency.system_session_ids
+                )
+
+            # Update compute concurrency
+            if compute_concurrency_map:
+                await self.valkey_stat.update_compute_concurrency_by_map(compute_concurrency_map)
+
+            # Update system concurrency
+            if system_concurrency_map:
+                await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
 
     async def destroy_session_lowlevel(
         self,
@@ -2245,6 +2228,7 @@ class AgentRegistry:
 
         :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
         :param reason: Reason to destroy a session if client wants to specify it manually.
+        :param user_role: Role of the user who requested the session destruction.
         """
         session_id = session.id
         if not reason:
@@ -2344,16 +2328,9 @@ class AgentRegistry:
             target_session = cast(SessionRow, target_session)
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
-                if is_private:
-                    kp_key = "keypair.sftp_concurrency_used"
-                else:
-                    kp_key = "keypair.concurrency_used"
-                await redis_helper.execute(
-                    self.redis_stat,
-                    lambda r: r.incrby(
-                        f"{kp_key}.{access_key}",
-                        -1,
-                    ),
+                await self.valkey_stat.decrement_keypair_concurrency(
+                    access_key=str(access_key),
+                    is_private=is_private,
                 )
 
             match target_session.status:
@@ -2392,8 +2369,9 @@ class AgentRegistry:
                         await SessionRow.set_session_status(
                             self.db, session_id, SessionStatus.TERMINATING
                         )
-                        await self.event_producer.produce_event(
-                            SessionTerminatingEvent(session_id, reason),
+                        await self.event_producer.anycast_and_broadcast_event(
+                            SessionTerminatingAnycastEvent(session_id, reason),
+                            SessionTerminatingBroadcastEvent(session_id, reason),
                         )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
@@ -2410,8 +2388,9 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
-                    await self.event_producer.produce_event(
-                        SessionTerminatingEvent(session_id, reason),
+                    await self.event_producer.anycast_and_broadcast_event(
+                        SessionTerminatingAnycastEvent(session_id, reason),
+                        SessionTerminatingBroadcastEvent(session_id, reason),
                     )
 
             kernel_list = target_session.kernels
@@ -2438,8 +2417,8 @@ class AgentRegistry:
                                 reason=reason,
                                 status_changed_at=now,
                             )
-                            await self.event_producer.produce_event(
-                                KernelCancelledEvent(kernel.id, session_id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelCancelledAnycastEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
@@ -2450,8 +2429,13 @@ class AgentRegistry:
                                     reason=reason,
                                     status_changed_at=now,
                                 )
-                                await self.event_producer.produce_event(
-                                    SessionCancelledEvent(
+                                await self.event_producer.anycast_and_broadcast_event(
+                                    SessionCancelledAnycastEvent(
+                                        session_id,
+                                        target_session.creation_id,
+                                        reason,
+                                    ),
+                                    SessionCancelledBroadcastEvent(
                                         session_id,
                                         target_session.creation_id,
                                         reason,
@@ -2481,9 +2465,8 @@ class AgentRegistry:
                                 to_be_terminated.append(kernel)
 
                             async def _update() -> None:
-                                kern_stat = await redis_helper.execute(
-                                    self.redis_stat,
-                                    lambda r: r.get(str(kernel.id)),
+                                kern_stat = await self.valkey_stat.get_kernel_statistics(
+                                    str(kernel.id)
                                 )
                                 async with self.db.begin_session() as db_sess:
                                     values = {
@@ -2500,7 +2483,7 @@ class AgentRegistry:
                                         ),
                                     }
                                     if kern_stat:
-                                        values["last_stat"] = msgpack.unpackb(kern_stat)
+                                        values["last_stat"] = kern_stat
                                     await db_sess.execute(
                                         sa.update(KernelRow)
                                         .values(**values)
@@ -2508,8 +2491,8 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
-                                KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
 
@@ -2538,8 +2521,8 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
-                                KernelTerminatingEvent(kernel.id, target_session.id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelTerminatingAnycastEvent(kernel.id, target_session.id, reason),
                             )
 
                     if kernel.agent_addr is None:
@@ -2580,11 +2563,10 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis_helper.execute(
-                                    self.redis_stat, lambda r: r.get(str(kernel.id))
+                                last_stat = await self.valkey_stat.get_kernel_statistics(
+                                    str(kernel.id),
                                 )
-                                if raw_last_stat is not None:
-                                    last_stat = msgpack.unpackb(raw_last_stat)
+                                if last_stat is not None:
                                     last_stat["version"] = 2
                             except asyncio.TimeoutError:
                                 pass
@@ -2601,8 +2583,8 @@ class AgentRegistry:
             if per_agent_tasks:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             for kernel in to_be_terminated:
-                await self.event_producer.produce_event(
-                    KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                await self.event_producer.anycast_event(
+                    KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                 )
             await self.hook_plugin_ctx.notify(
                 "POST_DESTROY_SESSION",
@@ -2754,8 +2736,9 @@ class AgentRegistry:
 
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
-        await self.event_producer.produce_event(
-            SessionStartedEvent(session.id, session.creation_id),
+        await self.event_producer.anycast_and_broadcast_event(
+            SessionStartedAnycastEvent(session.id, session.creation_id),
+            SessionStartedBroadcastEvent(session.id, session.creation_id),
         )
 
         if session.session_type == SessionTypes.BATCH:
@@ -2828,14 +2811,16 @@ class AgentRegistry:
         session: SessionRow,
         text: str,
         opts: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+    ) -> CodeCompletionResp:
         async with handle_session_exception(self.db, "execute", session.id):
             async with self.agent_cache.rpc_context(
                 session.main_kernel.agent,
                 invoke_timeout=10,
                 order_key=session.main_kernel.id,
             ) as rpc:
-                return await rpc.call.get_completions(str(session.main_kernel.id), text, opts)
+                # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
+                result = await rpc.call.get_completions(str(session.main_kernel.id), text, opts)
+                return CodeCompletionResp.from_dict(result)
 
     async def start_service(
         self,
@@ -2939,25 +2924,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def kill_all_sessions_in_agent(self, agent_id, agent_addr):
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            coro = rpc.call.clean_all_kernels("manager-freeze-force-kill")
-            return await coro
-
-    async def kill_all_sessions(self, conn=None):
-        async with reenter_txn(self.db, conn, {"postgresql_readonly": True}) as conn:
-            query = sa.select([agents.c.id, agents.c.addr]).where(
-                agents.c.status == AgentStatus.ALIVE
-            )
-            result = await conn.execute(query)
-            rows = result.fetchall()
-        tasks = []
-        for row in rows:
-            tasks.append(
-                self.kill_all_sessions_in_agent(row["id"], row["addr"]),
-            )
-        await asyncio.gather(*tasks, return_exceptions=True)
-
     async def handle_heartbeat(self, agent_id, agent_info):
         now = datetime.now(tzutc())
         slot_key_and_units = {
@@ -2973,10 +2939,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis_helper.execute(
-                self.redis_live,
-                lambda r: r.hset("agent.last_seen", agent_id, now.timestamp()),
-            )
+            await self.valkey_live.update_agent_last_seen(agent_id, now.timestamp())
 
             # Check and update status of the agent record in DB
             async def _update() -> None:
@@ -3109,7 +3072,7 @@ class AgentRegistry:
                 return
 
             if instance_rejoin:
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     AgentStartedEvent("revived"),
                     source_override=agent_id,
                 )
@@ -3118,13 +3081,7 @@ class AgentRegistry:
             images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             image_canonicals = set(img_info[0] for img_info in images)
 
-            async def _pipe_builder(r: Redis):
-                pipe = r.pipeline()
-                for image_canonical in image_canonicals:
-                    await pipe.sadd(image_canonical, agent_id)
-                return pipe
-
-            await redis_helper.execute(self.redis_image, _pipe_builder)
+            await self.valkey_image.add_agent_to_images(agent_id, image_canonicals)
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
@@ -3134,22 +3091,10 @@ class AgentRegistry:
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for image_canonical in image_canonicals:
-                await pipe.srem(image_canonical, agent_id)
-            return pipe
-
-        await redis_helper.execute(self.redis_image, _pipe_builder)
+        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis_helper.execute(self.redis_live, lambda r: r.hdel("agent.last_seen", agent_id))
-
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            async for imgname in r.scan_iter():
-                await pipe.srem(imgname, agent_id)
-            return pipe
+        await self.valkey_live.remove_agent_last_seen(agent_id)
 
         async def _update() -> None:
             async with self.db.begin() as conn:
@@ -3184,7 +3129,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await redis_helper.execute(self.redis_image, _pipe_builder)
+        await self.valkey_image.remove_agent_from_all_images(agent_id)
         await execute_with_retry(_update)
 
     async def sync_kernel_stats(
@@ -3195,15 +3140,12 @@ class AgentRegistry:
         log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis_helper.execute(
-                self.redis_stat,
-                lambda r: r.get(raw_kernel_id),
-            )
+            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
             if kern_stat is None:
                 log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
                 continue
             else:
-                per_kernel_updates[kernel_id] = msgpack.unpackb(kern_stat)
+                per_kernel_updates[kernel_id] = kern_stat
 
         async def _update():
             async with self.db.begin() as conn:
@@ -3452,19 +3394,7 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-
-        kern_stat = cast(
-            bytes | None,
-            await redis_helper.execute(
-                self.redis_stat,
-                lambda r: r.get(str(kernel_id)),
-            ),
-        )
-        if kern_stat is not None:
-            last_stat = msgpack.unpackb(kern_stat)
-        else:
-            last_stat = None
-
+        last_stat = await self.valkey_stat.get_kernel_statistics(str(kernel_id))
         now = datetime.now(tzutc())
 
         async def _get_and_transit(
@@ -3500,7 +3430,7 @@ class AgentRegistry:
                 "recalculate concurrency used in kernel termination (ak: {})",
                 access_key,
             )
-            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            await recalc_concurrency_used(db_session, self.valkey_stat, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,
@@ -3531,13 +3461,8 @@ class AgentRegistry:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> Mapping[KernelId, str]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for kernel_id in kernel_ids:
-                await pipe.get(f"kernel.{kernel_id}.commit")
-            return pipe
-
-        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+        kernel_ids_str = [str(kernel_id) for kernel_id in kernel_ids]
+        commit_statuses = await self.valkey_stat.get_kernel_commit_statuses(kernel_ids_str)
 
         return {
             kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
@@ -3648,14 +3573,9 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
     ) -> Optional[AbuseReport]:
-        hash_name = "abuse_report"
-        abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.hgetall(hash_name),
-            encoding="utf-8",
-        )
         kern_id = str(kernel_id)
-        if abusing_report is None or (result := abusing_report.get(kern_id)) is None:
+        result = await self.valkey_stat.get_abuse_report(kern_id)
+        if result is None:
             return None
         return {
             "kernel": kern_id,
@@ -3831,6 +3751,28 @@ class AgentRegistry:
             ):
                 pass
 
+    async def purge_containers(
+        self,
+        agent_id: AgentId,
+        container_kernel_ids: Iterable[ContainerKernelId],
+    ) -> None:
+        serialized = [entry.serialize() for entry in container_kernel_ids]
+        if not serialized:
+            return
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.purge_containers(serialized)
+
+    async def drop_kernel_registry(
+        self,
+        agent_id: AgentId,
+        kernel_ids: Iterable[KernelId],
+    ) -> None:
+        kernel_id_list = list(kernel_ids)  # Parse the iterable to a list for serialization
+        if not kernel_id_list:
+            return
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.drop_kernel_registry(kernel_id_list)
+
 
 async def handle_image_pull_started(
     context: AgentRegistry,
@@ -3867,13 +3809,11 @@ async def handle_image_pull_failed(
 async def handle_kernel_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: (
-        KernelPreparingEvent
-        | KernelPullingEvent
-        | KernelCreatingEvent
-        | KernelStartedEvent
-        | KernelCancelledEvent
-    ),
+    event: KernelPreparingAnycastEvent
+    | KernelPullingAnycastEvent
+    | KernelCreatingAnycastEvent
+    | KernelStartedAnycastEvent
+    | KernelCancelledAnycastEvent,
 ) -> None:
     """
     Update the database and perform post_create_kernel() upon
@@ -3890,34 +3830,36 @@ async def handle_kernel_creation_lifecycle(
         event.kernel_id,
     )
     match event:
-        case KernelPreparingEvent():
+        case KernelPreparingAnycastEvent():
             # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
             pass
-        case KernelPullingEvent(kernel_id, session_id, reason=reason):
+        case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-        case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+        case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_creating(db_conn, kernel_id, session_id, reason)
-        case KernelStartedEvent(kernel_id, session_id, reason=reason, creation_info=creation_info):
+        case KernelStartedAnycastEvent(
+            kernel_id, session_id, reason=reason, creation_info=creation_info
+        ):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_running(
                     db_conn, kernel_id, session_id, reason, creation_info
                 )
-        case KernelCancelledEvent():
+        case KernelCancelledAnycastEvent():
             log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelTerminatingAnycastEvent | KernelTerminatedAnycastEvent,
 ) -> None:
     match event:
-        case KernelTerminatingEvent():
+        case KernelTerminatingAnycastEvent():
             # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
             pass
-        case KernelTerminatedEvent(kernel_id, session_id, reason, exit_code):
+        case KernelTerminatedAnycastEvent(kernel_id, session_id, reason, exit_code):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
@@ -3935,7 +3877,7 @@ async def handle_kernel_heartbeat(
 async def handle_session_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionStartedEvent | SessionCancelledEvent,
+    event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
@@ -3944,10 +3886,10 @@ async def handle_session_creation_lifecycle(
     if event.creation_id not in context.session_creation_tracker:
         return
     log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, SessionStartedEvent):
+    if isinstance(event, SessionStartedAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
-    elif isinstance(event, SessionCancelledEvent):
+    elif isinstance(event, SessionCancelledAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
 
@@ -3959,16 +3901,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     context: AgentRegistry,
     agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
+    event: SessionTerminatingAnycastEvent | SessionTerminatedAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     match event:
-        case SessionTerminatingEvent():
+        case SessionTerminatingAnycastEvent():
             pass
-        case SessionTerminatedEvent(session_id=session_id):
+        case SessionTerminatedAnycastEvent(session_id=session_id):
             await context.clean_session(session_id)
 
     await invoke_session_callback(context, agent_id, event)
@@ -3993,7 +3935,7 @@ async def handle_destroy_session(
 async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
-    event: ModelServiceStatusEvent,
+    event: ModelServiceStatusAnycastEvent,
 ) -> None:
     log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
@@ -4028,20 +3970,22 @@ async def invoke_session_callback(
     context: AgentRegistry,
     source: AgentId,
     event: (
-        SessionEnqueuedEvent
-        | SessionScheduledEvent
-        | SessionPreparingEvent
-        | SessionStartedEvent
-        | SessionCancelledEvent
-        | SessionTerminatingEvent
-        | SessionTerminatedEvent
-        | SessionSuccessEvent
-        | SessionFailureEvent
+        SessionEnqueuedAnycastEvent
+        | SessionScheduledAnycastEvent
+        | SessionPreparingAnycastEvent
+        | SessionStartedAnycastEvent
+        | SessionCancelledAnycastEvent
+        | SessionTerminatingAnycastEvent
+        | SessionTerminatedAnycastEvent
+        | SessionSuccessAnycastEvent
+        | SessionFailureAnycastEvent
     ),
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     try:
-        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
+        allow_stale = isinstance(
+            event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
+        )
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -4062,7 +4006,7 @@ async def invoke_session_callback(
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
                     match event:
-                        case SessionCancelledEvent():
+                        case SessionCancelledAnycastEvent():
                             update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                             if "error" in session.status_data:
                                 if session.status_data["error"]["name"] == "MultiAgentError":
@@ -4086,10 +4030,10 @@ async def invoke_session_callback(
                                 .where(EndpointRow.id == endpoint.id)
                             )
                             await db_sess.execute(query)
-                        case SessionTerminatedEvent():
+                        case SessionTerminatedAnycastEvent():
                             query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                             await db_sess.execute(query)
-                        case SessionStartedEvent() | SessionTerminatingEvent():
+                        case SessionStartedAnycastEvent() | SessionTerminatingAnycastEvent():
                             target_kernels = await KernelRow.batch_load_by_session_id(
                                 db_sess,
                                 [
@@ -4112,11 +4056,11 @@ async def invoke_session_callback(
                                             )
                                         )
                             await redis_helper.execute(
-                                context.redis_live,
+                                context.valkey_live,
                                 lambda r: r.delete(f"endpoint.{endpoint.id}.route_connection_info"),
                             )
                             await redis_helper.execute(
-                                context.redis_live,
+                                context.valkey_live,
                                 lambda r: r.hset(
                                     f"endpoint.{endpoint.id}.route_connection_info",
                                     dict(connection_info),
@@ -4173,15 +4117,15 @@ async def invoke_session_callback(
 async def handle_batch_result(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
 ) -> None:
     """
     Update the database according to the batch-job completion results
     """
     match event:
-        case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionSuccessAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, True, exit_code)
-        case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionFailureAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, False, exit_code)
     async with context.db.begin_session() as db_sess:
         try:
@@ -4249,7 +4193,7 @@ async def handle_agent_images_remove(
 async def handle_route_creation(
     context: AgentRegistry,
     source: AgentId,
-    event: RouteCreatedEvent,
+    event: RouteCreatedAnycastEvent,
 ) -> None:
     endpoint: EndpointRow | None = None
 
@@ -4441,78 +4385,6 @@ async def check_scaling_group(
             raise ScalingGroupNotFound(err_msg)
     assert scaling_group is not None
     return scaling_group
-
-
-async def handle_kernel_log(
-    context: AgentRegistry,
-    source: AgentId,
-    event: DoSyncKernelLogsEvent,
-) -> None:
-    # The log data is at most 10 MiB.
-    log_buffer = BytesIO()
-    log_key = f"containerlog.{event.container_id}"
-    try:
-        list_size = await redis_helper.execute(
-            context.redis_stream,
-            lambda r: r.llen(log_key),
-        )
-        if list_size is None:
-            # The log data is expired due to a very slow event delivery.
-            # (should never happen!)
-            log.warning(
-                "tried to store console logs for cid:{}, but the data is expired",
-                event.container_id,
-            )
-            return
-        for _ in range(list_size):
-            # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(context.redis_stream, lambda r: r.lpop(log_key))
-            if chunk is None:  # maybe missing
-                log_buffer.write(b"(container log unavailable)\n")
-                break
-            log_buffer.write(chunk)
-        try:
-            log_data = log_buffer.getvalue()
-
-            async def _update_log() -> None:
-                async with context.db.begin() as conn:
-                    update_query = (
-                        sa.update(kernels)
-                        .values(container_log=log_data)
-                        .where(kernels.c.id == event.kernel_id)
-                    )
-                    await conn.execute(update_query)
-
-            await execute_with_retry(_update_log)
-        finally:
-            # Clear the log data from Redis when done.
-            await redis_helper.execute(
-                context.redis_stream,
-                lambda r: r.delete(log_key),
-            )
-    finally:
-        log_buffer.close()
-
-
-async def handle_vfolder_deletion_success(
-    context: AgentRegistry,
-    source: AgentId,
-    ev: VFolderDeletionSuccessEvent,
-) -> None:
-    await update_vfolder_status(
-        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_COMPLETE, do_log=True
-    )
-
-
-async def handle_vfolder_deletion_failure(
-    context: AgentRegistry,
-    source: AgentId,
-    ev: VFolderDeletionFailureEvent,
-) -> None:
-    log.exception(f"Failed to delete vfolder (vfid:{ev.vfid}, msg:{ev.message})")
-    await update_vfolder_status(
-        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_ERROR, do_log=True
-    )
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

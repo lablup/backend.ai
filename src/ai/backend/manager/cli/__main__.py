@@ -124,7 +124,20 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
-        container_name = candidate_container_names.decode().splitlines()[0].strip()
+        container_name = None
+        name_list = candidate_container_names.decode("utf-8").splitlines()
+        for name in name_list:
+            if "exporter" in name:
+                continue  # Skip exporter containers
+            container_name = name
+            break
+        if not container_name:
+            click.echo(
+                "Could not find the halfstack postgres container. "
+                "Please set the container name explicitly.",
+                err=True,
+            )
+            sys.exit(ExitCode.FAILURE)
     elif container_name == "-":
         # Use the host-provided psql command
         cmd = [
@@ -397,6 +410,11 @@ def agent():
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.scheduler:cli")
 def scheduler():
     """Command set for scheduler related operations."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.config:cli")
+def config():
+    """Command set for configuration management."""
 
 
 if __name__ == "__main__":

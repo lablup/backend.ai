@@ -5,7 +5,7 @@ import os
 import shutil
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple, override
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
 
 import pkg_resources
 import zmq
@@ -17,6 +17,7 @@ from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
@@ -152,10 +153,10 @@ class KubernetesKernel(AbstractKernel):
                     return False
         return True
 
-    async def get_completions(self, text: str, opts: Mapping[str, Any]):
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
-        return {"status": "finished", "completions": result}
+        return CodeCompletionResp(result=result)
 
     async def check_status(self):
         assert self.runner is not None
@@ -510,7 +511,7 @@ async def copy_runner_files(scratch_path: Path) -> None:
     shutil.copytree(helpers_path.resolve(), destination_path / "helpers")
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner

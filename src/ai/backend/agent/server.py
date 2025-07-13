@@ -51,23 +51,32 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.resources import scan_gpu_alloc_map
-from ai.backend.common import config, identity, msgpack, redis_helper, utils
+from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
+from ai.backend.common.dto.agent.response import (
+    AbstractAgentResp,
+    CodeCompletionResp,
+    DropKernelRegistryResp,
+    PurgeContainersResp,
+    PurgeImagesResp,
+)
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
-    KernelLifecycleEventReason,
-    KernelTerminatedEvent,
+from ai.backend.common.events.event_types.kernel.anycast import (
+    KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelTerminatedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -93,6 +102,8 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
+    ContainerId,
+    ContainerKernelId,
     HardwareMetadata,
     HostPortPair,
     ImageConfig,
@@ -571,12 +582,17 @@ class AgentRPCServer(aobject):
         for kid, sid in kernel_session_ids:
             if kid not in self.agent.kernel_registry:
                 # produce KernelTerminatedEvent
-                await self.agent.produce_event(
-                    KernelTerminatedEvent(
+                await self.agent.anycast_and_broadcast_event(
+                    KernelTerminatedAnycastEvent(
                         kid,
                         sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
-                    )
+                    ),
+                    KernelTerminatedBroadcastEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    ),
                 )
 
         kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
@@ -622,7 +638,7 @@ class AgentRPCServer(aobject):
             )
             if need_to_pull:
                 log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,
@@ -641,7 +657,7 @@ class AgentRPCServer(aobject):
                     log.exception(
                         f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
                     )
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -651,7 +667,7 @@ class AgentRPCServer(aobject):
                     )
                 except Exception as e:
                     log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -661,7 +677,7 @@ class AgentRPCServer(aobject):
                     )
                 else:
                     log.info(f"Image pull succeeded {img_ref}")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -671,7 +687,7 @@ class AgentRPCServer(aobject):
                     )
             else:
                 log.debug(f"No need to pull image {img_ref}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,
@@ -775,17 +791,47 @@ class AgentRPCServer(aobject):
         )
         return await done
 
+    @rpc_function_v2
+    @collect_error
+    async def purge_containers(
+        self,
+        container_kernel_ids: list[tuple[str, str]],
+    ) -> PurgeContainersResp:
+        str_kernel_ids = [str(kid) for _, kid in container_kernel_ids]
+        log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
+        kernel_container_pairs = [
+            ContainerKernelId(
+                ContainerId(cid),
+                KernelId(UUID(kid)),
+            )
+            for cid, kid in container_kernel_ids
+        ]
+        asyncio.create_task(self.agent.purge_containers(kernel_container_pairs))
+        return PurgeContainersResp()
+
+    @rpc_function_v2
+    @collect_error
+    async def drop_kernel_registry(
+        self,
+        kernel_ids: list[UUID],
+    ) -> DropKernelRegistryResp:
+        str_kernel_ids = [str(kid) for kid in kernel_ids]
+        log.info("rpc::drop_kernel_registry(kernel_ids:{0})", str_kernel_ids)
+        kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
+        asyncio.create_task(self.agent.clean_kernel_objects(kernel_ids_to_purge))
+        return DropKernelRegistryResp()
+
     @rpc_function
     @collect_error
     async def interrupt_kernel(self, kernel_id: str):
         log.info("rpc::interrupt_kernel(k:{0})", kernel_id)
         await self.agent.interrupt_kernel(KernelId(UUID(kernel_id)))
 
-    @rpc_function
+    @rpc_function_v2
     @collect_error
-    async def get_completions(self, kernel_id: str, text: str, opts: dict):
+    async def get_completions(self, kernel_id: str, text: str, opts: dict) -> CodeCompletionResp:
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
-        await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
+        return await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
 
     @rpc_function
     @collect_error
@@ -1152,7 +1198,7 @@ async def server_main(
     kernel_mod = importlib.import_module(
         f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
     )
-    krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
+    krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
     local_config["container"]["krunner-volumes"] = krunner_volumes
@@ -1247,13 +1293,8 @@ async def server_main(
             await agent.read_agent_config()
             redis_profile_target = RedisProfileTarget.from_dict(local_config["redis"])
             live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-            redis_live = redis_helper.get_redis_object(
-                live_redis_target,
-                name="agent.live",
-                db=REDIS_LIVE_DB,
-            )
             service_discovery = RedisServiceDiscovery(
-                args=RedisServiceDiscoveryArgs(redis=redis_live)
+                args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
             )
 
     sd_loop = ServiceDiscoveryLoop(

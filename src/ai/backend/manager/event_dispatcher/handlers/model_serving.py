@@ -4,9 +4,9 @@ from typing import Any, Optional
 import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
+    RouteCreatedAnycastEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -44,7 +44,7 @@ class ModelServingEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: ModelServiceStatusEvent,
+        event: ModelServiceStatusAnycastEvent,
     ) -> None:
         log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
         try:
@@ -78,7 +78,7 @@ class ModelServingEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: RouteCreatedEvent,
+        event: RouteCreatedAnycastEvent,
     ) -> None:
         endpoint: Optional[EndpointRow] = None
 

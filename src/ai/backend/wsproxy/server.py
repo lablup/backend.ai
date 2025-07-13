@@ -130,6 +130,7 @@ async def exception_middleware(
                 "error.jinja2",
                 request,
                 ex.body_dict,
+                status=ex.status_code,
             )
     except web.HTTPException as ex:
         if ex.status_code == 404:
@@ -183,7 +184,13 @@ async def hello(request: web.Request) -> web.Response:
 
 async def status(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
-    return web.json_response({"api_version": "v2"})
+    root_ctx: RootContext = request.app["_root.context"]
+
+    config = root_ctx.local_config.wsproxy
+    return web.json_response({
+        "api_version": "v2",
+        "advertise_address": config.advertised_api_addr,
+    })
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:

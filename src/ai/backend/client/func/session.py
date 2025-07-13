@@ -27,7 +27,7 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
-from ai.backend.client.output.fields import session_fields
+from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode, SessionTypes
@@ -46,7 +46,12 @@ from ..request import (
 )
 from ..session import api_session
 from ..types import set_if_set
-from ..utils import ProgressReportingReader
+from ..utils import (
+    ProgressReportingReader,
+    create_connection_field,
+    flatten_connection,
+    to_global_id,
+)
 from ..utils import dedent as _d
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -62,6 +67,34 @@ _default_list_fields = (
     session_fields["status_changed"],
     session_fields["result"],
     session_fields["abusing_reports"],
+)
+
+# TODO: Need to add more kernel node fields to the detail fields as not all fields are included
+_default_kernel_node_detail_fields = (
+    kernel_node_fields["row_id"],
+    kernel_node_fields["image_reference"],
+    kernel_node_fields["status"],
+    kernel_node_fields["created_at"],
+    kernel_node_fields["agent_id"],
+)
+
+_default_session_node_detail_fields = (
+    session_node_fields["id"],
+    session_node_fields["tag"],
+    session_node_fields["name"],
+    session_node_fields["type"],
+    session_node_fields["priority"],
+    session_node_fields["cluster_mode"],
+    session_node_fields["domain_name"],
+    session_node_fields["user_id"],
+    session_node_fields["status"],
+    session_node_fields["created_at"],
+    session_node_fields["terminated_at"],
+    session_node_fields["resource_opts"],
+    session_node_fields["scaling_group"],
+    session_node_fields["vfolder_mounts"],
+    session_node_fields["image_references"],
+    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),  # type: ignore
 )
 
 
@@ -545,6 +578,18 @@ class ComputeSession(BaseFunction):
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
 
+    @property
+    def session_identifier(self) -> str:
+        """
+        Returns the session identifier, preferring the session ID if available,
+        otherwise falling back to the session name.
+        """
+        if self.id:
+            return str(self.id)
+        if self.name:
+            return self.name
+        raise ValueError("Session must have either an ID or a name.")
+
     @api_function
     async def update(
         self,
@@ -598,7 +643,7 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "DELETE",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -618,7 +663,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "PATCH",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch():
@@ -635,7 +680,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/rename",
+            f"/{prefix}/{self.session_identifier}/rename",
             params=params,
         )
         async with rqst.fetch():
@@ -652,7 +697,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/commit",
+            f"/{prefix}/{self.session_identifier}/commit",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -670,7 +715,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/imagify",
+            f"/{prefix}/{self.session_identifier}/imagify",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -689,7 +734,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/interrupt",
+            f"/{prefix}/{self.session_identifier}/interrupt",
             params=params,
         )
         async with rqst.fetch():
@@ -718,7 +763,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/complete",
+            f"/{prefix}/{self.session_identifier}/complete",
             params=params,
         )
         rqst.set_json({
@@ -744,14 +789,57 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def get_logs(self, kernel_id: UUID | None = None):
+    async def detail(
+        self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
+    ) -> dict:
+        """
+        Retrieves a detailed information about the compute session.
+        This is similar to :func:`get_info`, but includes more information
+        such as the information about all kernels in the session,
+        the list of vfolders mounted to the session, and so on.
+        """
+        query = _d("""
+            query($id: GlobalIDField!) {
+                compute_session_node(id: $id) {
+                    $fields
+                }
+            }
+        """)
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the detail() method."
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"id": to_global_id("compute_session_node", self.id)}
+        data = await api_session.get().Admin._query(query, variables)
+        compute_session_data = data["compute_session_node"]
+
+        field_mappings = {
+            "row_id": "id",
+            "kernel_nodes": "kernels",
+        }
+        result = {}
+        for key, value in compute_session_data.items():
+            if key.endswith("_nodes") and isinstance(value, dict):
+                flattened_data = flatten_connection(value)
+                new_key = field_mappings.get(key, key)
+                result[new_key] = flattened_data
+                continue
+
+            new_key = field_mappings.get(key, key)
+            result[new_key] = value
+
+        return result
+
+    @api_function
+    async def get_logs(self, kernel_id: Optional[UUID] = None):
         """
         Retrieves the console log of the compute session container.
         """
@@ -763,7 +851,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/logs",
+            f"/{prefix}/{self.session_identifier}/logs",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -783,7 +871,7 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/dependency-graph",
+            f"/{prefix}/{self.session_identifier}/dependency-graph",
             params=params,
         )
 
@@ -801,7 +889,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/status-history",
+            f"/{prefix}/{self.session_identifier}/status-history",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -847,7 +935,7 @@ class ComputeSession(BaseFunction):
             assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -858,7 +946,7 @@ class ComputeSession(BaseFunction):
         elif mode == "batch":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -875,7 +963,7 @@ class ComputeSession(BaseFunction):
         elif mode == "complete":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -949,10 +1037,9 @@ class ComputeSession(BaseFunction):
                         file_path, base_path
                     )
                     raise ValueError(msg) from None
-
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}/upload",
+                f"/{prefix}/{self.session_identifier}/upload",
                 params=params,
             )
             rqst.attach_files(attachments)
@@ -981,7 +1068,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/download",
+            f"/{prefix}/{self.session_identifier}/download",
             params=params,
         )
         rqst.set_json({
@@ -1037,7 +1124,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/files",
+            f"/{prefix}/{self.session_identifier}/files",
             params=params,
         )
         rqst.set_json({
@@ -1072,7 +1159,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/abusing-report",
+            f"/{prefix}/{self.session_identifier}/abusing-report",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -1105,7 +1192,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/start-service",
+            f"/{prefix}/{self.session_identifier}/start-service",
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:

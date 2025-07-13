@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import uuid
-from collections.abc import Container, Mapping
+from collections.abc import Callable, Container, Iterable, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -11,6 +12,7 @@ from typing import (
     Any,
     AsyncIterator,
     Optional,
+    Self,
     Sequence,
     TypedDict,
     cast,
@@ -18,20 +20,16 @@ from typing import (
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, noload, relationship, selectinload
+from sqlalchemy.orm import foreign, load_only, noload, relationship, selectinload
 
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -39,6 +37,9 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from ..defs import DEFAULT_ROLE
 from ..errors.exceptions import (
@@ -63,7 +64,13 @@ from .base import (
     URLColumn,
 )
 from .user import users
-from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    execute_with_retry,
+    execute_with_txn_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -108,6 +115,20 @@ class KernelStatus(CIStrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+    @classmethod
+    def having_containers(cls) -> set[KernelStatus]:
+        return {
+            cls.PULLING,
+            cls.CREATING,
+            cls.RUNNING,
+        }
+
+    def have_container(self) -> bool:
+        """
+        Check if the current status is one of the statuses that have containers.
+        """
+        return self in KernelStatus.having_containers()
 
 
 # statuses to consider when calculating current resource usage
@@ -345,6 +366,13 @@ async def handle_kernel_exception(
         raise
 
 
+# Defined for avoiding circular import
+def _get_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(KernelRow.user_uuid)
+
+
 class KernelRow(Base):
     __tablename__ = "kernels"
 
@@ -406,8 +434,8 @@ class KernelRow(Base):
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
-    user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
-    access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
+    user_uuid = sa.Column("user_uuid", GUID, nullable=False)
+    access_key = sa.Column("access_key", sa.String(length=20))
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
@@ -547,7 +575,12 @@ class KernelRow(Base):
     )
     agent_row = relationship("AgentRow", back_populates="kernels")
     group_row = relationship("GroupRow", back_populates="kernels")
-    user_row = relationship("UserRow", back_populates="kernels")
+    user_row = relationship(
+        "UserRow",
+        primaryjoin=_get_user_row_join_condition,
+        back_populates="kernels",
+        foreign_keys="KernelRow.user_uuid",
+    )
 
     @property
     def image_ref(self) -> ImageRef | None:
@@ -573,6 +606,26 @@ class KernelRow(Base):
                 + 1
             )
         return None
+
+    @classmethod
+    async def get_kernels(
+        cls,
+        conditions: Iterable[QueryCondition],
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        stmt = sa.select(KernelRow)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            stmt = stmt.where(condition)
+
+        async def fetch(db_session: SASession) -> list[KernelRow]:
+            return (await db_session.scalars(stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
     @staticmethod
     async def batch_load_by_session_id(
@@ -803,25 +856,12 @@ class KernelStatistics:
     @classmethod
     async def batch_load_by_kernel_impl(
         cls,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """For cases where required to collect kernel metrics in bulk internally"""
-
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for sess_id in session_ids:
-                await pipe.get(str(sess_id))
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(redis_stat, _build_pipeline)
-        for result in results:
-            if result is not None:
-                stats.append(msgpack.unpackb(result))
-            else:
-                stats.append(None)
-        return stats
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
 
     @classmethod
     async def batch_load_by_kernel(
@@ -830,7 +870,7 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.redis_stat, session_ids)
+        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(
@@ -838,32 +878,13 @@ class KernelStatistics:
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
-            for sess_id in session_ids:
-                await pipe.mget([
-                    f"session.{sess_id}.requests",
-                    f"session.{sess_id}.last_response_time",
-                ])
-            return pipe
-
-        stats = []
-        results = await redis_helper.execute(ctx.redis_live, _build_pipeline)
-        for result in results:
-            if result[0] is not None and result[1] is not None:
-                requests = int(result[0])
-                last_response_ms = int(result[1])
-            else:
-                requests = 0
-                last_response_ms = 0
-            stats.append({"requests": int(requests), "last_response_ms": last_response_ms})
-
-        return stats
+        session_ids_str = [str(sess_id) for sess_id in session_ids]
+        return await ctx.valkey_live.get_session_statistics_batch(session_ids_str)
 
 
 async def recalc_concurrency_used(
     db_sess: SASession,
-    redis_stat: RedisConnectionInfo,
+    valkey_stat_client: ValkeyStatClient,
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
@@ -893,17 +914,80 @@ async def recalc_concurrency_used(
         assert isinstance(concurrency_used, int)
         assert isinstance(sftp_concurrency_used, int)
 
-    await redis_helper.execute(
-        redis_stat,
-        lambda r: r.set(
-            f"keypair.concurrency_used.{access_key}",
-            concurrency_used,
-        ),
+    await valkey_stat_client.set_keypair_concurrency(
+        access_key=str(access_key),
+        concurrency_used=concurrency_used,
+        is_private=False,
     )
-    await redis_helper.execute(
-        redis_stat,
-        lambda r: r.set(
-            f"keypair.sftp_concurrency_used.{access_key}",
-            sftp_concurrency_used,
-        ),
+    await valkey_stat_client.set_keypair_concurrency(
+        access_key=str(access_key),
+        concurrency_used=sftp_concurrency_used,
+        is_private=True,
     )
+
+
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[..., QueryConditionCallable]
+
+
+class ConditionMerger(enum.Enum):
+    AND = "AND"
+    OR = "OR"
+
+    @property
+    def to_sql_operator(self) -> Callable:
+        match self:
+            case ConditionMerger.AND:
+                return sa.and_
+            case ConditionMerger.OR:
+                return sa.or_
+
+
+def _append_condition(
+    condition: Optional[sa.sql.expression.BinaryExpression],
+    new_condition: sa.sql.expression.BinaryExpression,
+    operator: ConditionMerger,
+) -> sa.sql.expression.BinaryExpression:
+    return (
+        operator.to_sql_operator(condition, new_condition)
+        if condition is not None
+        else new_condition
+    )
+
+
+def by_status(
+    status: Iterable[KernelStatus],
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_status(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.status.in_(status), operator)
+
+    return _by_status
+
+
+def by_agent_id(
+    agent_id: str,
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_agent_id(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.agent == agent_id, operator)
+
+    return _by_agent_id
+
+
+def by_kernel_ids(
+    kernel_ids: Iterable[KernelId],
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_kernel_ids(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.id.in_(kernel_ids), operator)
+
+    return _by_kernel_ids

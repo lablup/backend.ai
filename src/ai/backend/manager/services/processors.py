@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -73,7 +74,8 @@ class ServiceArgs:
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
-    redis_stat: RedisConnectionInfo
+    valkey_stat_client: ValkeyStatClient
+    event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -114,9 +116,11 @@ class Services:
         )
         domain_service = DomainService(args.db)
         group_service = GroupService(
-            args.db, args.storage_manager, args.config_provider, args.redis_stat
+            args.db, args.storage_manager, args.config_provider, args.valkey_stat_client
         )
-        user_service = UserService(args.db, args.storage_manager, args.redis_stat)
+        user_service = UserService(
+            args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
+        )
         image_service = ImageService(args.db, args.agent_registry)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
@@ -130,6 +134,7 @@ class Services:
             SessionServiceArgs(
                 db=args.db,
                 agent_registry=args.agent_registry,
+                event_fetcher=args.event_fetcher,
                 background_task_manager=args.background_task_manager,
                 event_hub=args.event_hub,
                 error_monitor=args.error_monitor,

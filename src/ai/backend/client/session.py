@@ -34,6 +34,8 @@ __all__ = (
     "api_session",
 )
 
+from contextlib import asynccontextmanager as actxmgr
+
 from ..common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
@@ -275,6 +277,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Model",
         "QuotaScope",
         "Network",
+        "UserResourcePolicy",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -322,6 +325,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.storage import Storage
         from .func.system import System
         from .func.user import User
+        from .func.user_resource_policy import UserResourcePolicy
         from .func.vfolder import VFolderByName
 
         self.System = System
@@ -353,6 +357,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Model = Model
         self.QuotaScope = QuotaScope
         self.Network = Network
+        self.UserResourcePolicy = UserResourcePolicy
 
     @property
     def proxy_mode(self) -> bool:
@@ -533,3 +538,13 @@ class AsyncSession(BaseSession):
     async def __aexit__(self, *exc_info) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
+
+
+# TODO: Remove this after refactoring session management with contextvars
+@actxmgr
+async def set_api_context(session):
+    token = api_session.set(session)
+    try:
+        yield
+    finally:
+        api_session.reset(token)

@@ -33,14 +33,13 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.events.volume import (
+from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
-    VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,
 )
@@ -50,7 +49,14 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ItemResult,
+    QuotaScopeID,
+    ResultSet,
+    VolumeMountableNodeType,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
@@ -87,7 +93,7 @@ async def token_auth_middleware(
         if not token:
             raise web.HTTPForbidden()
         ctx: RootContext = request.app["ctx"]
-        if token != ctx.local_config["api"]["manager"]["secret"]:
+        if token != ctx.local_config.api.manager.secret:
             raise web.HTTPForbidden()
     return await handler(request)
 
@@ -424,7 +430,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 msg = str(e) if e.strerror is None else e.strerror
                 msg = f"{msg} (errno:{e.errno})"
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         msg,
@@ -432,7 +438,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 )
             except Exception as e:
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         str(e),
@@ -442,7 +448,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
             else:
                 log.info(f"VFolder deletion task successed. (vfid:{vfid})")
-                await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
+                await ctx.event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid))
 
         try:
             async with ctx.get_volume(params["volume"]) as volume:
@@ -1048,11 +1054,11 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
-            ctx.local_config["storage-proxy"]["secret"],
+            ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
         return web.json_response(
@@ -1094,11 +1100,11 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
-            ctx.local_config["storage-proxy"]["secret"],
+            ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
         return web.json_response(
@@ -1275,7 +1281,7 @@ async def handle_volume_mount(
         return
     err_msg: str | None = None
     mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    volume_mount_path = str(context.local_config.volume[event.volume_backend_name].path)
     mount_path = Path(volume_mount_path, event.dir_name)
     mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
     resp = await context.watcher.request_task(mount_task)
@@ -1283,7 +1289,7 @@ async def handle_volume_mount(
         # Produce volume mounted event with error message.
         # And skip chown.
         err_msg = resp.body
-        await context.event_producer.produce_event(
+        await context.event_producer.broadcast_event(
             VolumeMounted(
                 str(context.node_id),
                 VolumeMountableNodeType.STORAGE_PROXY,
@@ -1299,7 +1305,7 @@ async def handle_volume_mount(
     resp = await context.watcher.request_task(chown_task)
     if not resp.succeeded:
         err_msg = resp.body
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
@@ -1322,7 +1328,7 @@ async def handle_volume_umount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    volume_mount_path = str(context.local_config.volume[event.volume_backend_name].path)
     mount_path = Path(volume_mount_path, event.dir_name)
     umount_task = UmountTask.from_event(
         event,
@@ -1334,7 +1340,7 @@ async def handle_volume_umount(
     err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,

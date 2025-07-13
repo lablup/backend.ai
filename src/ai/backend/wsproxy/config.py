@@ -5,16 +5,12 @@ import sys
 import types
 import typing
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import click
 from pydantic import (
-    BaseModel,
-    ByteSize,
-    ConfigDict,
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
@@ -24,48 +20,23 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
-from ai.backend.logging import LogFormat, LogLevel
+from ai.backend.common.config import BaseConfigModel
+from ai.backend.logging import LogLevel
+from ai.backend.logging.config_pydantic import LoggingConfig
 
 from .types import EventLoopType, ProxyProtocol
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 
 
-class BaseSchema(BaseModel):
-    model_config = ConfigDict(
-        validate_by_name=True,
-        from_attributes=True,
-        use_enum_values=True,
-    )
-
-
-class HostPortPair(BaseSchema):
-    host: Annotated[str, Field(examples=["127.0.0.1"])]
-    port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
-
-    def __repr__(self) -> str:
-        return f"{self.host}:{self.port}"
-
-    def __str__(self) -> str:
-        return self.__repr__()
-
-    def __getitem__(self, *args) -> int | str:
-        if args[0] == 0:
-            return self.host
-        elif args[0] == 1:
-            return self.port
-        else:
-            raise KeyError(*args)
-
-
 @dataclass
 class UserID:
-    default_uid: int | None = None
+    default_uid: Optional[int] = None
 
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: Optional[int | str],
     ) -> int:
         if value is None:
             assert cls.default_uid, "value is None but default_uid not provided"
@@ -201,170 +172,31 @@ class GroupID:
         )
 
 
-class LogDriver(StrEnum):
-    CONSOLE = "console"
-    LOGSTASH = "logstash"
-    FILE = "file"
-    GRAYLOG = "graylog"
+class DebugConfig(BaseConfigModel):
+    enabled: bool = Field(default=False)
+    asyncio: bool = Field(default=False)
+    enhanced_aiomonitor_task_info: bool = Field(default=False)
+    log_events: bool = Field(default=False)
 
 
-class LogstashProtocol(StrEnum):
-    ZMQ_PUSH = "zmq.push"
-    ZMQ_PUB = "zmq.pub"
-    TCP = "tcp"
-    UDP = "udp"
+class WSProxyConfig(BaseConfigModel):
+    ipc_base_path: Path = Field(
+        default=Path("/tmp/backend.ai/ipc"),
+        description="Directory to store temporary UNIX sockets.",
+    )
+    event_loop: EventLoopType = Field(
+        default=EventLoopType.ASYNCIO,
+        description="Type of event loop to use.",
+    )
+    pid_file: Path = Field(
+        default=Path(os.devnull),
+        description="Place to store process PID.",
+        examples=["/run/backend.ai/wsproxy/wsproxy.pid"],
+    )
 
-
-default_pkg_ns = {"": "WARNING", "ai.backend": "DEBUG", "tests": "DEBUG", "aiohttp": "INFO"}
-
-
-class ConsoleLogConfig(BaseSchema):
-    colored: Annotated[
-        bool | None, Field(default=None, description="Opt to print colorized log.", examples=[True])
-    ]
-    format: Annotated[
-        LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
-    ]
-
-
-class FileLogConfig(BaseSchema):
-    path: Annotated[Path, Field(description="Path to store log.", examples=["/var/log/backend.ai"])]
-    filename: Annotated[str, Field(description="Log file name.", examples=["wsproxy.log"])]
-    backup_count: Annotated[
-        int, Field(description="Number of outdated log files to retain.", default=5)
-    ]
-    rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default=10 * 1024 * 1024)
-    ]
-    format: Annotated[
-        LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
-    ]
-
-
-class LogstashConfig(BaseSchema):
-    endpoint: Annotated[
-        HostPortPair,
-        Field(
-            description="Connection information of logstash node.",
-            examples=[HostPortPair(host="127.0.0.1", port=8001)],
-        ),
-    ]
-    protocol: Annotated[
-        LogstashProtocol,
-        Field(
-            description="Protocol to communicate with logstash server.",
-            default=LogstashProtocol.TCP,
-        ),
-    ]
-    ssl_enabled: Annotated[
-        bool, Field(description="Use TLS to communicate with logstash server.", default=True)
-    ]
-    ssl_verify: Annotated[
-        bool,
-        Field(
-            description="Verify validity of TLS certificate when communicating with logstash.",
-            default=True,
-        ),
-    ]
-
-
-class GraylogConfig(BaseSchema):
-    host: Annotated[str, Field(description="Graylog hostname.", examples=["127.0.0.1"])]
-    port: Annotated[int, Field(description="Graylog server port number.", examples=[8000])]
-    level: Annotated[LogLevel, Field(description="Log level.", default=LogLevel.INFO)]
-    ssl_verify: Annotated[
-        bool,
-        Field(
-            description="Verify validity of TLS certificate when communicating with logstash.",
-            default=True,
-        ),
-    ]
-    ca_certs: Annotated[
-        str | None,
-        Field(
-            description="Path to Root CA certificate file.",
-            examples=["/etc/ssl/ca.pem"],
-            default=None,
-        ),
-    ]
-    keyfile: Annotated[
-        str | None,
-        Field(
-            description="Path to TLS private key file.",
-            examples=["/etc/backend.ai/graylog/privkey.pem"],
-            default=None,
-        ),
-    ]
-    certfile: Annotated[
-        str | None,
-        Field(
-            description="Path to TLS certificate file.",
-            examples=["/etc/backend.ai/graylog/cert.pem"],
-            default=None,
-        ),
-    ]
-
-
-class PyroscopeConfig(BaseSchema):
-    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
-    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
-    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
-    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
-
-
-class LoggingConfig(BaseSchema):
-    level: Annotated[LogLevel, Field(default=LogLevel.INFO, description="Log level.")]
-    pkg_ns: Annotated[
-        dict[str, LogLevel],
-        Field(
-            description="Override default log level for specific scope of package",
-            default=default_pkg_ns,
-        ),
-    ]
-    drivers: Annotated[
-        list[LogDriver],
-        Field(default=[LogDriver.CONSOLE], description="Array of log drivers to print."),
-    ]
-    console: Annotated[
-        ConsoleLogConfig, Field(default=ConsoleLogConfig(colored=None, format=LogFormat.VERBOSE))
-    ]
-    file: Annotated[FileLogConfig | None, Field(default=None)]
-    logstash: Annotated[LogstashConfig | None, Field(default=None)]
-    graylog: Annotated[GraylogConfig | None, Field(default=None)]
-
-
-class DebugConfig(BaseSchema):
-    enabled: Annotated[bool, Field(default=False)]
-    asyncio: Annotated[bool, Field(default=False)]
-    enhanced_aiomonitor_task_info: Annotated[bool, Field(default=False)]
-    log_events: Annotated[bool, Field(default=False)]
-
-
-class WSProxyConfig(BaseSchema):
-    ipc_base_path: Annotated[
-        Path,
-        Field(
-            default=Path("/tmp/backend.ai/ipc"),
-            description="Directory to store temporary UNIX sockets.",
-        ),
-    ]
-    event_loop: Annotated[
-        EventLoopType,
-        Field(default=EventLoopType.ASYNCIO, description="Type of event loop to use."),
-    ]
-    pid_file: Annotated[
-        Path,
-        Field(
-            default=Path(os.devnull),
-            description="Place to store process PID.",
-            examples=["/run/backend.ai/wsproxy/wsproxy.pid"],
-        ),
-    ]
-
-    id: Annotated[
-        str,
-        Field(default=f"i-{socket.gethostname()}", examples=["i-node01"], description="Node id."),
-    ]
+    id: str = Field(
+        default=f"i-{socket.gethostname()}", examples=["i-node01"], description="Node id."
+    )
     user: Annotated[
         int,
         UserID(default_uid=_file_perm.st_uid),
@@ -376,76 +208,90 @@ class WSProxyConfig(BaseSchema):
         Field(default=_file_perm.st_uid, description="Process group."),
     ]
 
-    bind_host: Annotated[
-        str,
-        Field(
-            default="0.0.0.0",
-            description="Bind address of the port opened on behalf of wsproxy worker",
-        ),
-    ]
-    advertised_host: Annotated[
-        str, Field(examples=["example.com"], description="Hostname to be advertised to client")
-    ]
+    bind_host: str = Field(
+        default="0.0.0.0",
+        description="Bind address of the port opened on behalf of wsproxy worker",
+    )
+    advertised_host: str = Field(
+        examples=["example.com"],
+        description="Hostname to be advertised to client",
+    )
 
-    bind_api_port: Annotated[
-        int, Field(default=5050, description="Port number to bind for API server")
-    ]
-    internal_api_port: Annotated[
-        int, Field(default=15050, description="Port number to bind for internal API server")
-    ]
-    advertised_api_port: Annotated[
-        int | None,
-        Field(default=None, examples=[15050], description="API port number reachable from client"),
-    ]
+    bind_api_port: int = Field(
+        default=5050,
+        description="Port number to bind for API server",
+    )
+    internal_api_port: int = Field(
+        default=15050, description="Port number to bind for internal API server"
+    )
+    advertised_api_port: Optional[int] = Field(
+        default=None,
+        examples=[15050],
+        description="API port number reachable from client",
+    )
 
-    bind_proxy_port_range: Annotated[
-        tuple[int, int],
-        Field(default=[10200, 10300], description="Port number to bind for actual traffic"),
-    ]
-    advertised_proxy_port_range: Annotated[
-        tuple[int, int] | None,
-        Field(
-            default=None,
-            examples=[[20200, 20300]],
-            description="Traffic port range reachable from client",
-        ),
-    ]
+    bind_proxy_port_range: tuple[int, int] = Field(
+        default=(10200, 10300),
+        description="Port number to bind for actual traffic",
+    )
+    advertised_proxy_port_range: Optional[tuple[int, int]] = Field(
+        default=None,
+        examples=[[20200, 20300]],
+        description="Traffic port range reachable from client",
+    )
 
-    protocol: Annotated[
-        ProxyProtocol, Field(default=ProxyProtocol.HTTP, description="Proxy protocol")
-    ]
+    protocol: ProxyProtocol = Field(default=ProxyProtocol.HTTP, description="Proxy protocol")
 
-    jwt_encrypt_key: Annotated[
-        str, Field(examples=["50M3G00DL00KING53CR3T"], description="JWT encryption key")
-    ]
-    permit_hash_key: Annotated[
-        str, Field(examples=["50M3G00DL00KING53CR3T"], description="Permit hash key")
-    ]
+    jwt_encrypt_key: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="JWT encryption key",
+    )
+    permit_hash_key: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="Permit hash key",
+    )
 
-    api_secret: Annotated[str, Field(examples=["50M3G00DL00KING53CR3T"], description="API secret")]
+    api_secret: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="API secret",
+    )
+    aiomonitor_termui_port: int = Field(
+        gt=0,
+        lt=65536,
+        description="Port number for aiomonitor termui server.",
+        default=38500,
+    )
+    aiomonitor_webui_port: int = Field(
+        gt=0,
+        lt=65536,
+        description="Port number for aiomonitor webui server.",
+        default=39500,
+    )
 
-    aiomonitor_termui_port: Annotated[
-        int,
-        Field(
-            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=38500
-        ),
-    ]
-    aiomonitor_webui_port: Annotated[
-        int,
-        Field(
-            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
-        ),
-    ]
+    @property
+    def advertised_api_addr(self) -> str:
+        """
+        Returns the advertised API address.
+        """
+        port = self.advertised_api_port or self.bind_api_port
+        return f"http://{self.advertised_host}:{port}"
 
 
-class ServerConfig(BaseSchema):
+class PyroscopeConfig(BaseConfigModel):
+    enabled: bool = Field(default=False, description="Enable pyroscope profiler.")
+    app_name: Optional[str] = Field(default=None, description="Pyroscope app name.")
+    server_addr: Optional[str] = Field(default=None, description="Pyroscope server address.")
+    sample_rate: Optional[int] = Field(default=None, description="Pyroscope sample rate.")
+
+
+class ServerConfig(BaseConfigModel):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
-    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
-    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
-    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
+    pyroscope: PyroscopeConfig = Field(default_factory=PyroscopeConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    debug: DebugConfig = Field(default_factory=DebugConfig)
 
 
-def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
+def load(config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "wsproxy")
 
@@ -482,7 +328,7 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
+    schema: type[BaseConfigModel] | types.GenericAlias | types.UnionType, parent: list[str] = []
 ) -> dict | list:
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
@@ -490,7 +336,7 @@ def generate_example_json(
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseSchema):
+    elif issubclass(schema, BaseConfigModel):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]

@@ -11,7 +11,7 @@ import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Sequence
+from typing import Any, AsyncGenerator, AsyncIterator, Sequence, cast
 
 import aiomonitor
 import aiotools
@@ -19,15 +19,13 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import redis_helper
 from ai.backend.common.config import (
     ConfigurationError,
-    override_key,
     redis_config_iv,
 )
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
+from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -49,16 +47,17 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import (
     AGENTID_STORAGE,
-    HostPortPair,
     RedisProfileTarget,
     ServiceDiscoveryType,
     safe_print_redis_target,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
-from .config import load_local_config, load_shared_config
+from .config.loaders import load_local_config, make_etcd
+from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .watcher import WatcherClient, main_job
 
@@ -80,9 +79,10 @@ async def server_main_logwrapper(
         asyncio.get_child_watcher()
     except (AttributeError, NotImplementedError):
         pass
+    local_config = cast(StorageProxyUnifiedConfig, _args[0])
     log_endpoint = _args[1]
     logger = Logger(
-        _args[0]["logging"],
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -107,21 +107,21 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    local_config = _args[0]
-    loop.set_debug(local_config["debug"]["asyncio"])
+    local_config = cast(StorageProxyUnifiedConfig, _args[0])
+    loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
         loop,
-        termui_port=local_config["storage-proxy"]["aiomonitor-termui-port"] + pidx,
-        webui_port=local_config["storage-proxy"]["aiomonitor-webui-port"] + pidx,
+        termui_port=local_config.storage_proxy.aiomonitor_termui_port + pidx,
+        webui_port=local_config.storage_proxy.aiomonitor_webui_port + pidx,
         console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+        hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
     )
     Profiler(
         pyroscope_args=PyroscopeArgs(
-            enabled=local_config["pyroscope"]["enabled"],
-            application_name=local_config["pyroscope"]["app-name"],
-            server_address=local_config["pyroscope"]["server-addr"],
-            sample_rate=local_config["pyroscope"]["sample-rate"],
+            enabled=local_config.pyroscope.enabled,
+            application_name=local_config.pyroscope.app_name,
+            server_address=local_config.pyroscope.server_addr,
+            sample_rate=local_config.pyroscope.sample_rate,
         )
     )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
@@ -134,7 +134,7 @@ async def server_main(
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
     metric_registry = CommonMetricRegistry()
     try:
-        etcd = load_shared_config(local_config)
+        etcd = make_etcd(local_config)
         try:
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
@@ -148,14 +148,14 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-        mq = _make_message_queue(
+        mq = await _make_message_queue(
             local_config,
             redis_profile_target,
         )
         event_producer = EventProducer(
             mq,
             source=AGENTID_STORAGE,
-            log_events=local_config["debug"]["log-events"],
+            log_events=local_config.debug.log_events,
         )
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
@@ -164,7 +164,7 @@ async def server_main(
         )
         event_dispatcher = EventDispatcher(
             mq,
-            log_events=local_config["debug"]["log-events"],
+            log_events=local_config.debug.log_events,
             event_observer=metric_registry.event,
         )
         log.info(
@@ -172,14 +172,14 @@ async def server_main(
             pidx,
             safe_print_redis_target(redis_config),
         )
-        if local_config["storage-proxy"]["use-watcher"]:
+        if local_config.storage_proxy.use_watcher:
             if not _is_root():
                 raise ValueError(
                     "Storage proxy must be run as root if watcher is enabled. Else, set"
-                    " `use-wathcer` to false in your local config file."
+                    " `use-watcher` to false in your local config file."
                 )
-            insock_path: str | None = local_config["storage-proxy"]["watcher-insock-path-prefix"]
-            outsock_path: str | None = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
+            outsock_path: str | None = local_config.storage_proxy.watcher_outsock_path_prefix
             if insock_path is None or outsock_path is None:
                 raise ValueError(
                     "Socket path must be not null. Please set valid socket path to"
@@ -192,7 +192,7 @@ async def server_main(
             watcher_client = None
         ctx = RootContext(
             pid=os.getpid(),
-            node_id=local_config["storage-proxy"]["node-id"],
+            node_id=local_config.storage_proxy.node_id,
             pidx=pidx,
             local_config=local_config,
             etcd=etcd,
@@ -211,17 +211,17 @@ async def server_main(
 
             client_ssl_ctx = None
             manager_ssl_ctx = None
-            if local_config["api"]["client"]["ssl-enabled"]:
+            if local_config.api.client.ssl_enabled:
                 client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 client_ssl_ctx.load_cert_chain(
-                    str(local_config["api"]["client"]["ssl-cert"]),
-                    str(local_config["api"]["client"]["ssl-privkey"]),
+                    str(local_config.api.client.ssl_cert),
+                    str(local_config.api.client.ssl_privkey),
                 )
-            if local_config["api"]["manager"]["ssl-enabled"]:
+            if local_config.api.manager.ssl_enabled:
                 manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 manager_ssl_ctx.load_cert_chain(
-                    str(local_config["api"]["manager"]["ssl-cert"]),
-                    str(local_config["api"]["manager"]["ssl-privkey"]),
+                    str(local_config.api.manager.ssl_cert),
+                    str(local_config.api.manager.ssl_privkey),
                 )
             client_api_runner = web.AppRunner(ctx.client_api_app)
             manager_api_runner = web.AppRunner(ctx.manager_api_app)
@@ -229,9 +229,15 @@ async def server_main(
             await client_api_runner.setup()
             await manager_api_runner.setup()
             await internal_api_runner.setup()
-            client_service_addr = local_config["api"]["client"]["service-addr"]
-            manager_service_addr: HostPortPair = local_config["api"]["manager"]["service-addr"]
-            internal_addr = local_config["api"]["manager"]["internal-addr"]
+            client_service_addr = local_config.api.client.service_addr
+            from ai.backend.common.types import HostPortPair as CommonHostPortPair
+
+            manager_service_addr_config = local_config.api.manager.service_addr
+            manager_service_addr = CommonHostPortPair(
+                host=manager_service_addr_config.host,
+                port=manager_service_addr_config.port,
+            )
+            internal_addr = local_config.api.manager.internal_addr
             client_api_site = web.TCPSite(
                 client_api_runner,
                 str(client_service_addr.host),
@@ -259,21 +265,28 @@ async def server_main(
             await manager_api_site.start()
             await internal_api_site.start()
             if _is_root():
-                uid = local_config["storage-proxy"]["user"]
-                gid = local_config["storage-proxy"]["group"]
-                os.setgroups(
-                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-                )
-                os.setgid(gid)
-                os.setuid(uid)
+                uid = local_config.storage_proxy.user
+                gid = local_config.storage_proxy.group
+                if uid is not None and gid is not None:
+                    os.setgroups(
+                        [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+                    )
+                    os.setgid(gid)
+                    os.setuid(uid)
                 log.info("Changed process uid:gid to {}:{}", uid, gid)
             log.info("Started service.")
-            announce_addr: HostPortPair = local_config["api"]["manager"]["announce-addr"]
-            announce_internal_addr: HostPortPair = local_config["api"]["manager"][
-                "announce-internal-addr"
-            ]
+            announce_addr_config = local_config.api.manager.announce_addr
+            announce_addr = CommonHostPortPair(
+                host=announce_addr_config.host,
+                port=announce_addr_config.port,
+            )
+            announce_internal_addr_config = local_config.api.manager.announce_internal_addr
+            announce_internal_addr = CommonHostPortPair(
+                host=announce_internal_addr_config.host,
+                port=announce_internal_addr_config.port,
+            )
 
-            sd_type = local_config["service-discovery"]["type"]
+            sd_type = local_config.service_discovery.type
 
             service_discovery: ServiceDiscovery
             match sd_type:
@@ -281,20 +294,15 @@ async def server_main(
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
                     live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-                    redis_live = redis_helper.get_redis_object(
-                        live_redis_target,
-                        name="storage-proxy.live",
-                        db=REDIS_LIVE_DB,
-                    )
                     service_discovery = RedisServiceDiscovery(
-                        args=RedisServiceDiscoveryArgs(redis=redis_live)
+                        args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
                     )
 
             sd_loop = ServiceDiscoveryLoop(
                 sd_type,
                 service_discovery,
                 ServiceMetadata(
-                    display_name=f"storage-{local_config['storage-proxy']['node-id']}",
+                    display_name=f"storage-{local_config.storage_proxy.node_id}",
                     service_group="storage-proxy",
                     version=VERSION,
                     endpoint=ServiceEndpoint(
@@ -305,6 +313,17 @@ async def server_main(
                     ),
                 ),
             )
+
+            if local_config.otel.enabled:
+                meta = sd_loop.metadata
+                otel_spec = OpenTelemetrySpec(
+                    service_id=meta.id,
+                    service_name=meta.service_group,
+                    service_version=meta.version,
+                    log_level=local_config.otel.log_level,
+                    endpoint=local_config.otel.endpoint,
+                )
+                BraceStyleAdapter.apply_otel(otel_spec)
             await event_dispatcher.start()
             try:
                 yield
@@ -322,35 +341,31 @@ async def server_main(
             m.close()
 
 
-def _make_message_queue(
-    local_config: dict[str, Any],
+async def _make_message_queue(
+    local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
+    node_id = local_config.storage_proxy.node_id
+    args = RedisMQArgs(
+        anycast_stream_key="events",
+        broadcast_channel="events_all",
+        consume_stream_keys=None,
+        subscribe_channels={
+            "events_all",
+        },
+        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=node_id,
         db=REDIS_STREAM_DB,
     )
-    node_id = local_config["storage-proxy"]["node-id"]
-    if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+    if local_config.storage_proxy.use_experimental_redis_event_dispatcher:
         return HiRedisQueue(
             stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
+            args,
         )
-
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
+    return await RedisQueue.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        args,
     )
 
 
@@ -394,27 +409,23 @@ def main(
         )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
-    if debug:
-        log_level = LogLevel.DEBUG
-    override_key(local_config, ("debug", "enabled"), log_level == LogLevel.DEBUG)
-    if log_level != LogLevel.NOTSET:
-        override_key(local_config, ("logging", "level"), log_level)
-        override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
+    # Note: logging configuration is handled separately in Logger class
+    # Debug mode is already set during config loading if needed
 
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
-        local_config["storage-proxy"]["pid-file"].write_text(str(os.getpid()))
-        ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
+        local_config.storage_proxy.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = local_config.storage_proxy.ipc_base_path
         log_sockpath = Path(
             ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        local_config["logging"]["endpoint"] = log_endpoint
+        local_config.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                local_config["logging"],
+                local_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -426,34 +437,32 @@ def main(
                 setproctitle("backend.ai: storage-proxy")
                 log.info("Backend.AI Storage Proxy", VERSION)
                 log.info("Runtime: {0}", env_info())
-                log.info("Node ID: {0}", local_config["storage-proxy"]["node-id"])
+                log.info("Node ID: {0}", local_config.storage_proxy.node_id)
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if local_config["debug"]["enabled"]:
+                if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")
-                if "debug" in local_config and local_config["debug"]["enabled"]:
+                if local_config.debug.enabled:
                     print("== Storage proxy configuration ==")
                     pprint(local_config)
-                if local_config["storage-proxy"]["event-loop"] == "uvloop":
+                if local_config.storage_proxy.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
-                insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
-                outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
-                num_workers = local_config["storage-proxy"]["num-proc"]
+                insock_path_prefix = local_config.storage_proxy.watcher_insock_path_prefix
+                outsock_path_prefix = local_config.storage_proxy.watcher_outsock_path_prefix
+                num_workers = local_config.storage_proxy.num_proc
 
-                if local_config["storage-proxy"]["use-watcher"]:
+                if local_config.storage_proxy.use_watcher:
                     if not _is_root():
                         raise ValueError(
                             "Storage proxy must be run as root if watcher is enabled. Else, set"
-                            " `use-wathcer` to false in your local config file."
+                            " `use-watcher` to false in your local config file."
                         )
-                    insock_path: str | None = local_config["storage-proxy"][
-                        "watcher-insock-path-prefix"
-                    ]
-                    outsock_path: str | None = local_config["storage-proxy"][
-                        "watcher-outsock-path-prefix"
-                    ]
+                    insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
+                    outsock_path: str | None = (
+                        local_config.storage_proxy.watcher_outsock_path_prefix
+                    )
                     if insock_path is None or outsock_path is None:
                         raise ValueError(
                             "Socket path must be not null. Please set valid socket path to"
@@ -477,9 +486,9 @@ def main(
                 )
                 log.info("exit.")
         finally:
-            if local_config["storage-proxy"]["pid-file"].is_file():
+            if local_config.storage_proxy.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                local_config["storage-proxy"]["pid-file"].unlink()
+                local_config.storage_proxy.pid_file.unlink()
     return 0
 
 

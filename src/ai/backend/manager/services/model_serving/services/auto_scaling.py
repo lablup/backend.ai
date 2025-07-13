@@ -7,7 +7,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointRow,
+)
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
@@ -78,6 +82,8 @@ class AutoScalingService:
         async with self._db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await EndpointRow.get(db_session, action.endpoint_id)
+                if row.lifecycle_stage in EndpointLifecycle.inactive_states():
+                    raise EndpointNotFound
             except NoResultFound:
                 raise EndpointNotFound
 
@@ -129,6 +135,8 @@ class AutoScalingService:
                 row = await EndpointAutoScalingRuleRow.get(
                     db_session, action.id, load_endpoint=True
                 )
+                if row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
+                    raise EndpointAutoScalingRuleNotFound
             except NoResultFound:
                 raise EndpointAutoScalingRuleNotFound
 

@@ -11,16 +11,15 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
     LIVE_STATUS,
@@ -33,6 +32,7 @@ from ai.backend.manager.models.resource_usage import (
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
@@ -50,7 +50,10 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
+    PurgeGroupActionActiveEndpointsError,
+    PurgeGroupActionActiveKernelsError,
     PurgeGroupActionResult,
+    PurgeGroupActionVFoldersMountedToActiveKernelsError,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -75,7 +78,7 @@ class MutationResult:
 class GroupService:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
-    _redis_stat: RedisConnectionInfo
+    _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
 
     def __init__(
@@ -83,12 +86,12 @@ class GroupService:
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._config_provider = config_provider
-        self._redis_stat = redis_stat
+        self._valkey_stat_client = valkey_stat_client
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         data = action.input.fields_to_store()
@@ -189,15 +192,12 @@ class GroupService:
 
         async def _pre_func(conn: SAConnection) -> None:
             if await self._group_vfolder_mounted_to_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
-                    "are currently mounted to active sessions. "
-                    "Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with vfolders mounted to active kernels")
+                raise PurgeGroupActionVFoldersMountedToActiveKernelsError()
             if await self._group_has_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Group has some active session. Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with active kernels")
+                raise PurgeGroupActionActiveKernelsError()
+            await self._delete_endpoints(conn, gid)
             await self._delete_vfolders(gid)
             await self._delete_kernels(conn, gid)
             await self._delete_sessions(conn, gid)
@@ -320,6 +320,56 @@ class GroupService:
         stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
         await db_conn.execute(stmt)
 
+    async def _delete_endpoints(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
+        from ai.backend.manager.models.endpoint import EndpointRow
+        from ai.backend.manager.models.routing import RoutingRow
+
+        endpoints = (
+            await db_conn.execute(
+                sa.select(
+                    EndpointRow.id,
+                    sa.case(
+                        (
+                            EndpointRow.lifecycle_stage.in_([
+                                EndpointLifecycle.CREATED,
+                                EndpointLifecycle.DESTROYING,
+                            ]),
+                            True,
+                        ),
+                        else_=False,
+                    ).label("is_active"),
+                ).where(EndpointRow.project == group_id)
+            )
+        ).all()
+
+        if len(endpoints) == 0:
+            return
+
+        active_endpoints = [ep.id for ep in endpoints if ep.is_active]
+        if len(active_endpoints) > 0:
+            log.error(
+                f"Cannot delete group {group_id} because it has active endpoints {active_endpoints}. "
+                "Please delete the endpoints first."
+            )
+            raise PurgeGroupActionActiveEndpointsError()
+
+        endpoint_ids = [ep.id for ep in endpoints]
+        deleted_sessions = await db_conn.execute(
+            sa.delete(SessionRow).where(
+                SessionRow.id.in_(
+                    sa.select(RoutingRow.session).where(
+                        (RoutingRow.endpoint.in_(endpoint_ids)) & (RoutingRow.session.is_not(None))
+                    )
+                )
+            )
+        )
+        log.info(
+            f"Deleted {deleted_sessions.rowcount} sessions associated with endpoints in group {group_id}"
+        )
+
+        await db_conn.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
+        await db_conn.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
+
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]
     ) -> MutationResult:
@@ -352,7 +402,9 @@ class GroupService:
             self._db, start_date, end_date, project_ids=project_ids
         )
         local_tz = self._config_provider.config.system.timezone
-        usage_groups = await parse_resource_usage_groups(kernels, self._redis_stat, local_tz)
+        usage_groups = await parse_resource_usage_groups(
+            kernels, self._valkey_stat_client, local_tz
+        )
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
 
@@ -413,13 +465,8 @@ class GroupService:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
-
-        raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
+        kernel_ids = [str(row["id"]) for row in rows]
+        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone

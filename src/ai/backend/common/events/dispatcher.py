@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import enum
 import logging
 import secrets
@@ -28,7 +29,13 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import (
+    BroadcastMessage,
+    MessageId,
+    MessagePayload,
+    MQMessage,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
@@ -36,7 +43,7 @@ from ..types import (
     AgentId,
 )
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import AbstractEvent
+from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 
 __all__ = (
     "EventCallback",
@@ -54,6 +61,8 @@ class _EventHandlerType(enum.StrEnum):
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
+TSubscirbedEvent = TypeVar("TSubscirbedEvent", bound=AbstractBroadcastEvent)
+TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent)
 TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
 TContext = TypeVar("TContext")
 
@@ -202,28 +211,28 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
     @abstractmethod
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
 
@@ -258,14 +267,14 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
             context,
@@ -280,15 +289,15 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
             context,
@@ -396,16 +405,16 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
         on a single event, only one callable among those will be called.
@@ -443,9 +452,9 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
@@ -453,7 +462,7 @@ class EventDispatcher(EventDispatcherGroup):
         args_matcher: Optional[Callable[[tuple], bool]] = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
 
@@ -579,47 +588,58 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        try:
-            async for msg in self._msg_queue.consume_queue():  # type: ignore
-                if self._closed:
-                    return
-                decoded_event_name = msg.payload[b"name"].decode()
+        async for msg in self._msg_queue.consume_queue():  # type: ignore
+            if self._closed:
+                return
+            try:
+                mq_msg = cast(MQMessage, msg)
+                msg_payload = MessagePayload.from_anycast(mq_msg.payload)
                 post_callback = _ConsumerPostCallback(
-                    msg.msg_id,
+                    mq_msg.msg_id,
                     self._msg_queue,
-                    len(self._consumers[decoded_event_name]),
+                    len(self._consumers[msg_payload.name]),
                 )
-
                 await self.dispatch_consumers(
-                    decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
+                    msg_payload.name,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
                     [post_callback],
                 )
-        except:
-            log.exception("_consume_loop():")
-            raise
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._consume_loop: unexpected-error, {}",
+                    repr(e),
+                )
+                # Do not raise the exception to avoid stopping the loop.
+                # The exception will be handled by the task group.
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        try:
-            async for msg in self._msg_queue.subscribe_queue():  # type: ignore
-                if self._closed:
-                    return
-                decoded_event_name = msg.payload[b"name"].decode()
+        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+            if self._closed:
+                return
+            try:
+                msg = cast(BroadcastMessage, msg)
+                msg_payload = MessagePayload.from_broadcast(msg.payload)
                 await self.dispatch_subscribers(
-                    decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
+                    msg_payload.name,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
                 )
-        except:
-            log.exception("_subscribe_loop():")
-            raise
+            except Exception as e:
+                log.exception(
+                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
+                    repr(e),
+                )
+                # Do not raise the exception to avoid stopping the loop.
+                # The exception will be handled by the task group.
 
 
 class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
+    _source: AgentId
+    _source_bytes: bytes
     _log_events: bool
 
     def __init__(
@@ -631,6 +651,7 @@ class EventProducer:
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
+        self._source = source
         self._source_bytes = source.encode()
         self._log_events = log_events
 
@@ -638,9 +659,9 @@ class EventProducer:
         self._closed = True
         await self._msg_queue.close()
 
-    async def produce_event(
+    async def anycast_event(
         self,
-        event: AbstractEvent,
+        event: AbstractAnycastEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
         if self._closed:
@@ -655,3 +676,56 @@ class EventProducer:
             b"args": msgpack.packb(event.serialize()),
         }
         await self._msg_queue.send(raw_event)
+
+    async def broadcast_event(
+        self,
+        event: AbstractBroadcastEvent,
+        source_override: Optional[AgentId] = None,
+    ) -> None:
+        if self._closed:
+            return
+        source = self._source
+        if source_override is not None:
+            source = source_override
+        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
+        raw_event = {
+            "name": event.event_name(),
+            "source": source,
+            "args": args,
+        }
+        await self._msg_queue.broadcast(raw_event)
+
+    async def broadcast_event_with_cache(
+        self,
+        cache_id: str,
+        event: AbstractBroadcastEvent,
+    ) -> None:
+        """
+        Broadcast a message to all subscribers with cache.
+        The message will be delivered to all subscribers.
+        """
+        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
+        raw_event = {
+            "name": event.event_name(),
+            "source": str(self._source),
+            "args": args,
+        }
+        await self._msg_queue.broadcast_with_cache(
+            cache_id,
+            raw_event,
+        )
+
+    async def anycast_and_broadcast_event(
+        self,
+        anycast_event: AbstractAnycastEvent,
+        broadcast_event: AbstractBroadcastEvent,
+    ) -> None:
+        """
+        Send both anycast and broadcast events.
+
+        Note:
+        Recommend to use `anycast_event` and `broadcast_event` separately.
+        Do not use this method as long as possible.
+        """
+        await self.anycast_event(anycast_event)
+        await self.broadcast_event(broadcast_event)

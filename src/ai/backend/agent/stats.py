@@ -10,7 +10,7 @@ import logging
 import sys
 import time
 import uuid
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -27,11 +27,10 @@ from typing import (
 
 import aiodocker
 import attrs
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.identity import is_containerized
+from ai.backend.common.metrics.metric import StageObserver
 from ai.backend.common.types import (
     PID,
     AgentId,
@@ -179,6 +178,18 @@ class ProcessMeasurement:
     unit_hint: str = "count"
 
 
+def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000")) -> str:
+    """
+    Convert a Decimal value to a string without scientific notation.
+    """
+    try:
+        return str(remove_exponent(value.quantize(exponent)))
+    except DecimalException:
+        # If the value is too large or too small to be represented as a Decimal,
+        # we raise a ValueError to indicate that the value cannot be serialized.
+        raise ValueError(f"Cannot serialize Decimal value: {value}")
+
+
 class MovingStatistics:
     __slots__ = (
         "_sum",
@@ -250,16 +261,25 @@ class MovingStatistics:
         return Decimal(0)
 
     def to_serializable_dict(self) -> MovingStatValue:
-        q = Decimal("0.000")
         return {
-            "min": str(remove_exponent(self.min.quantize(q))),
-            "max": str(remove_exponent(self.max.quantize(q))),
-            "sum": str(remove_exponent(self.sum.quantize(q))),
-            "avg": str(remove_exponent(self.avg.quantize(q))),
-            "diff": str(remove_exponent(self.diff.quantize(q))),
-            "rate": str(remove_exponent(self.rate.quantize(q))),
+            "min": _to_serializable_value(self.min),
+            "max": _to_serializable_value(self.max),
+            "sum": _to_serializable_value(self.sum),
+            "avg": _to_serializable_value(self.avg),
+            "diff": _to_serializable_value(self.diff),
+            "rate": _to_serializable_value(self.rate),
             "version": 2,
         }
+
+    def __str__(self) -> str:
+        return str({
+            "min": self.min,
+            "max": self.max,
+            "sum": self.sum,
+            "avg": self.avg,
+            "diff": self.diff,
+            "rate": self.rate,
+        })
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -282,20 +302,15 @@ class Metric:
             self.current = self.current_hook(self)
 
     def to_serializable_dict(self) -> MetricValue:
-        q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "current": str(remove_exponent(self.current.quantize(q))),
+            "current": _to_serializable_value(self.current),
             "capacity": (
-                str(remove_exponent(self.capacity.quantize(q)))
-                if self.capacity is not None
-                else None
+                _to_serializable_value(self.capacity) if self.capacity is not None else None
             ),
             "pct": (
-                str(
-                    remove_exponent(
-                        (Decimal(self.current) / Decimal(self.capacity) * 100).quantize(q_pct)
-                    )
+                _to_serializable_value(
+                    (Decimal(self.current) / Decimal(self.capacity) * 100), exponent=q_pct
                 )
                 if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
                 else "0.00"
@@ -317,6 +332,7 @@ class StatContext:
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
     _utilization_metric_observer: UtilizationMetricObserver
+    _stage_observer: StageObserver
 
     def __init__(
         self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
@@ -333,6 +349,7 @@ class StatContext:
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
+        self._stage_observer = StageObserver.instance()
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
@@ -393,6 +410,10 @@ class StatContext:
 
         Intended to be used by the agent.
         """
+        self._stage_observer.observe_stage(
+            stage="before_lock",
+            upper_layer="collect_node_stat",
+        )
         async with self._lock:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
@@ -400,7 +421,15 @@ class StatContext:
             _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
             for computer in self.agent.computers.values():
                 _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
+            self._stage_observer.observe_stage(
+                stage="before_gather_measures",
+                upper_layer="collect_node_stat",
+            )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
+            self._stage_observer.observe_stage(
+                stage="before_observe",
+                upper_layer="collect_node_stat",
+            )
             for result in results:
                 if isinstance(result, BaseException):
                     log.error("collect_node_stat(): gather_node_measures() error", exc_info=result)
@@ -450,7 +479,13 @@ class StatContext:
             if metric_key not in device_metrics:
                 device_metrics[metric_key] = {}
             for device_id, obj in per_device.items():
-                metric_value = obj.to_serializable_dict()
+                try:
+                    metric_value = obj.to_serializable_dict()
+                except ValueError:
+                    log.warning(
+                        "Failed to serialize metric (Device Id: {}, {})", device_id, str(obj.stats)
+                    )
+                    continue
                 device_metrics[metric_key][device_id] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
@@ -468,8 +503,18 @@ class StatContext:
                 )
 
         # push to the Redis server
+        node_metrics: dict[MetricKey, MetricValue] = {}
+        for key, obj in self.node_metrics.items():
+            try:
+                node_metrics[key] = obj.to_serializable_dict()
+            except ValueError:
+                log.warning(
+                    "Failed to serialize node metric (Metric key: {}, {})", key, str(obj.stats)
+                )
+                continue
+
         redis_agent_updates = {
-            "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
+            "node": node_metrics,
             "devices": device_metrics,
         }
         if self.agent.local_config["debug"]["log-stats"]:
@@ -480,13 +525,16 @@ class StatContext:
             )
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            await pipe.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
-            await pipe.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)
-            return pipe
+        self._stage_observer.observe_stage(
+            stage="before_report_to_redis",
+            upper_layer="collect_node_stat",
+        )
 
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        # Use ValkeyStatClient set method with expiration
+        agent_id = self.agent.local_config["agent"]["id"]
+        await self.agent.valkey_stat_client.set(
+            agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
+        )
 
     def observe_container_metric(
         self,
@@ -522,6 +570,10 @@ class StatContext:
 
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
+        self._stage_observer.observe_stage(
+            stage="before_lock",
+            upper_layer="collect_container_stat",
+        )
         async with self._lock:
             kernel_id_map: dict[ContainerId, KernelId] = {}
             kernel_obj_map: dict[KernelId, AbstractKernel] = {}
@@ -549,8 +601,16 @@ class StatContext:
                         computer.instance.gather_container_measures(self, container_ids),
                     )
                 )
+            self._stage_observer.observe_stage(
+                stage="before_gather_measures",
+                upper_layer="collect_container_stat",
+            )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_kernel_ids: Set[KernelId] = set()
+            self._stage_observer.observe_stage(
+                stage="before_observe",
+                upper_layer="collect_container_stat",
+            )
             for result in results:
                 if isinstance(result, BaseException):
                     log.error(
@@ -597,7 +657,13 @@ class StatContext:
             metrics = self.kernel_metrics[kernel_id]
             serializable_metrics: dict[MetricKey, MetricValue] = {}
             for key, obj in metrics.items():
-                metric_value = obj.to_serializable_dict()
+                try:
+                    metric_value = obj.to_serializable_dict()
+                except ValueError:
+                    log.warning(
+                        "Failed to serialize metric (Metric key: {}, {})", key, str(obj.stats)
+                    )
+                    continue
                 serializable_metrics[key] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
@@ -621,13 +687,42 @@ class StatContext:
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
-            for kernel_id, update in kernel_serialized_updates:
-                pipe.set(str(kernel_id), update)
-            return pipe
+        self._stage_observer.observe_stage(
+            stage="before_report_to_redis",
+            upper_layer="collect_container_stat",
+        )
 
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        # Use ValkeyStatClient set_multiple_keys for batch operations
+        key_value_map = {str(kernel_id): update for kernel_id, update in kernel_serialized_updates}
+        if key_value_map:
+            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
+
+    async def _get_processes(
+        self, container_id: ContainerId, docker: aiodocker.Docker
+    ) -> list[PID]:
+        """
+        Get the list of PIDs for the given container ID.
+        """
+        return_val: list[PID] = []
+        try:
+            result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+            procs = result["Processes"]
+        except (KeyError, aiodocker.exceptions.DockerError):
+            log.debug(
+                "collect_per_container_process_stat(): cannot find container {}", container_id
+            )
+            return return_val
+
+        for proc in procs:
+            try:
+                return_val.append(PID(int(proc[1])))
+            except (ValueError, KeyError):
+                log.debug(
+                    "collect_per_container_process_stat(): cannot parse PID from {}",
+                    proc,
+                )
+                continue
+        return return_val
 
     async def collect_per_container_process_stat(
         self,
@@ -642,27 +737,30 @@ class StatContext:
         if sys.platform == "darwin":
             return
 
+        self._stage_observer.observe_stage(
+            stage="before_lock",
+            upper_layer="collect_per_container_process_stat",
+        )
         async with self._lock:
-            pid_map = {}
-            pids = []
+            pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
-                    try:
-                        result = await docker._query_json(f"containers/{cid}/top", method="GET")
-                        procs = result["Processes"]
-                        pids = [PID(int(proc[1])) for proc in procs]
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
-                    except (KeyError, aiodocker.exceptions.DockerError):
-                        log.debug(
-                            "collect_per_container_process_stat(): cannot found container {}", cid
-                        )
-                    else:
-                        for unused_pid in unused_pids:
-                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
-                            self.process_metrics[cid].pop(unused_pid, None)
-                    for pid in pids:
-                        pid_map[pid] = cid
-
+                    active_pids = await self._get_processes(cid, docker)
+                    if cid in self.process_metrics:
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
+                        if unused_pids:
+                            log.debug(
+                                "removing pid_metric for {}: {}",
+                                cid,
+                                ", ".join([str(p) for p in unused_pids]),
+                            )
+                            self.process_metrics[cid] = {
+                                pid_: metric
+                                for pid_, metric in self.process_metrics[cid].items()
+                                if pid_ in active_pids
+                            }
+                    for pid_ in active_pids:
+                        pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
@@ -675,7 +773,15 @@ class StatContext:
                         ),
                     )
                 )
+            self._stage_observer.observe_stage(
+                stage="before_gather_measures",
+                upper_layer="collect_per_container_process_stat",
+            )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
+            self._stage_observer.observe_stage(
+                stage="before_observe",
+                upper_layer="collect_per_container_process_stat",
+            )
             updated_cids: Set[ContainerId] = set()
             for result in results:
                 if isinstance(result, BaseException):
@@ -709,24 +815,33 @@ class StatContext:
                         else:
                             self.process_metrics[cid][pid][metric_key].update(measure)
 
-            async def _pipe_builder(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
-                for cid in updated_cids:
-                    serializable_table = {}
-                    for pid in self.process_metrics[cid].keys():
-                        metrics = self.process_metrics[cid][pid]
-                        serializable_metrics = {
-                            str(key): obj.to_serializable_dict() for key, obj in metrics.items()
-                        }
-                        serializable_table[pid] = serializable_metrics
-                    if self.agent.local_config["debug"]["log-stats"]:
-                        log.debug(
-                            "stats: process_updates: \ncontainer_id: {}\n{}",
-                            cid,
-                            serializable_table,
-                        )
-                    serialized_metrics = msgpack.packb(serializable_table)
-                    pipe.set(cid, serialized_metrics, ex=8)
-                return pipe
+            self._stage_observer.observe_stage(
+                stage="before_report_to_redis",
+                upper_layer="collect_per_container_process_stat",
+            )
 
-            await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+            # Use ValkeyStatClient set_multiple_keys for batch operations
+            key_value_map: dict[str, bytes] = {}
+            for cid in updated_cids:
+                serializable_table = {}
+                for pid in self.process_metrics[cid].keys():
+                    metrics = self.process_metrics[cid][pid]
+                    serializable_metrics = {}
+                    for key, obj in metrics.items():
+                        try:
+                            serializable_metrics[str(key)] = obj.to_serializable_dict()
+                        except ValueError:
+                            log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
+                            continue
+                    serializable_table[pid] = serializable_metrics
+                if self.agent.local_config["debug"]["log-stats"]:
+                    log.debug(
+                        "stats: process_updates: \ncontainer_id: {}\n{}",
+                        cid,
+                        serializable_table,
+                    )
+                serialized_metrics = msgpack.packb(serializable_table)
+                key_value_map[str(cid)] = serialized_metrics
+
+            if key_value_map:
+                await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)

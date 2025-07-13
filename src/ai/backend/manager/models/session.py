@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import textwrap
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
@@ -32,19 +31,30 @@ from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
+from sqlalchemy.orm import (
+    contains_eager,
+    foreign,
+    joinedload,
+    load_only,
+    noload,
+    relationship,
+    selectinload,
+)
 
-from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+    SessionStartedAnycastEvent,
+    SessionTerminatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -52,13 +62,15 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
     VFolderMount,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionData
 
@@ -657,6 +669,19 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 }
 
 
+# Defined for avoiding circular import
+def _get_keypair_row_join_condition():
+    from ai.backend.manager.models.keypair import KeyPairRow
+
+    return KeyPairRow.access_key == foreign(SessionRow.access_key)
+
+
+def _get_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(SessionRow.user_uuid)
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -707,10 +732,23 @@ class SessionRow(Base):
     domain = relationship("DomainRow", back_populates="sessions")
     group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
     group = relationship("GroupRow", back_populates="sessions")
-    user_uuid = ForeignKeyIDColumn("user_uuid", "users.uuid", nullable=False)
-    user = relationship("UserRow", back_populates="sessions")
-    access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    access_key_row = relationship("KeyPairRow", back_populates="sessions")
+    user_uuid = sa.Column(
+        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    )
+    user = relationship(
+        "UserRow",
+        primaryjoin=_get_user_row_join_condition,
+        back_populates="sessions",
+        foreign_keys=[user_uuid],
+    )
+
+    access_key = sa.Column("access_key", sa.String(length=20))
+    access_key_row = relationship(
+        "KeyPairRow",
+        primaryjoin=_get_keypair_row_join_condition,
+        back_populates="sessions",
+        foreign_keys=[access_key],
+    )
 
     # `image` column is identical to kernels `image` column.
     images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
@@ -1499,7 +1537,7 @@ class SessionLifecycleManager:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyStatClient,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,
@@ -1561,15 +1599,16 @@ class SessionLifecycleManager:
     ) -> None:
         match session_row.status:
             case SessionStatus.PREPARED:
-                await self.event_producer.produce_event(DoStartSessionEvent())
+                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
                     session_row.creation_id,
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1582,8 +1621,13 @@ class SessionLifecycleManager:
                 if session_row.session_type == SessionTypes.BATCH:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
-                await self.event_producer.produce_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionTerminatedAnycastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
+                    SessionTerminatedBroadcastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
                 )
             case _:
                 pass
@@ -1615,17 +1659,9 @@ class SessionLifecycleManager:
         if not session_ids:
             return
 
-        sadd_session_ids_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local values = ARGV
-        return redis.call('SADD', key, unpack(values))
-        """)
         try:
-            await redis_helper.execute_script(
-                self.redis_obj,
-                "session_status_update",
-                sadd_session_ids_script,
-                [self.status_set_key],
+            await self.redis_obj.register_session_ids_for_status_update(
+                self.status_set_key,
                 [self._encoder(sid) for sid in session_ids],
             )
         except (
@@ -1634,21 +1670,12 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
-        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
+        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
-        pop_all_session_id_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local count = redis.call('SCARD', key)
-        return redis.call('SPOP', key, count)
-        """)
         try:
-            raw_result = await redis_helper.execute_script(
-                self.redis_obj,
-                "pop_all_session_id_to_update_status",
-                pop_all_session_id_script,
-                [self.status_set_key],
-                [],
+            raw_result = await self.redis_obj.get_and_clear_session_ids_for_status_update(
+                self.status_set_key,
             )
         except (
             redis.exceptions.RedisError,
@@ -1663,7 +1690,7 @@ class SessionLifecycleManager:
             try:
                 result.append(self._decoder(raw_session_id))
             except (ValueError, SyntaxError):
-                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
+                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id!r})")
                 continue
 
         async with self.db.begin_readonly_session() as db_session:
@@ -1681,17 +1708,9 @@ class SessionLifecycleManager:
         if not session_ids:
             return 0
 
-        srem_session_ids_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local values = ARGV
-        return redis.call('SREM', key, unpack(values))
-        """)
         try:
-            ret = await redis_helper.execute_script(
-                self.redis_obj,
-                "session_status_update",
-                srem_session_ids_script,
-                [self.status_set_key],
+            ret = await self.redis_obj.remove_session_ids_from_status_update(
+                self.status_set_key,
                 [self._encoder(sid) for sid in session_ids],
             )
         except (

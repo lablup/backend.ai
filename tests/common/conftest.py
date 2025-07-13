@@ -1,4 +1,5 @@
 import asyncio
+import random
 import secrets
 import time
 import uuid
@@ -7,7 +8,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.defs import (
+    REDIS_LIVE_DB,
+    REDIS_RATE_LIMIT_DB,
+    REDIS_STATISTICS_DB,
+    REDIS_STREAM_DB,
+)
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.types import RedisTarget
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -50,6 +63,11 @@ def test_case_ns():
 
 
 @pytest.fixture
+def test_node_id():
+    return f"test-{secrets.token_hex(4)}"
+
+
+@pytest.fixture
 async def etcd(etcd_container, test_ns):  # noqa: F811
     etcd = AsyncEtcd(
         addr=etcd_container[1],
@@ -71,6 +89,116 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
         await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         await etcd.close()
         del etcd
+
+
+@pytest.fixture
+async def test_valkey_live(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyLiveClient.create(
+        redis_target,
+        human_readable_name="test.live",
+        db_id=REDIS_LIVE_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def test_valkey_stream(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyStreamClient.create(
+        redis_target,
+        human_readable_name="event_producer.stream",
+        db_id=REDIS_STREAM_DB,
+        pubsub_channels=["test-broadcast"],
+    )
+    yield client
+
+
+@pytest.fixture
+async def test_valkey_stat(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyStatClient.create(
+        redis_target,
+        human_readable_name="test.stat",
+        db_id=REDIS_STATISTICS_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def test_valkey_rate_limit(redis_container):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    client = await ValkeyRateLimitClient.create(
+        redis_target,
+        human_readable_name="test.rate_limit",
+        db_id=REDIS_RATE_LIMIT_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    redis_mq = await RedisQueue.create(
+        redis_target,
+        RedisMQArgs(
+            anycast_stream_key="events",
+            broadcast_channel="events_broadcast",
+            consume_stream_keys=["events"],
+            subscribe_channels=["events_broadcast"],
+            group_name=f"test-group-{random.randint(0, 1000)}",
+            node_id=test_node_id,
+            db=REDIS_STREAM_DB,
+        ),
+    )
+    try:
+        yield redis_mq
+    finally:
+        await redis_mq.close()
 
 
 @pytest.fixture

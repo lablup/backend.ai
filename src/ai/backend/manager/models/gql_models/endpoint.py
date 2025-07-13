@@ -33,7 +33,6 @@ from ai.backend.manager.models.gql_models.base import ImageRefType
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
@@ -86,32 +85,6 @@ from ..user import UserRole, UserRow
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
-_queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-    "id": ("id", None),
-    "metric_source": ("metric_source", None),
-    "metric_name": ("metric_name", None),
-    "threshold": ("threshold", None),
-    "comparator": ("comparator", None),
-    "step_size": ("step_size", None),
-    "cooldown_seconds": ("cooldown_seconds", None),
-    "created_at": ("created_at", dtparse),
-    "last_triggered_at": ("last_triggered_at", dtparse),
-    "endpoint": ("endpoint", None),
-}
-
-_queryorder_colmap: Mapping[str, OrderSpecItem] = {
-    "id": ("id", None),
-    "metric_source": ("metric_source", None),
-    "metric_name": ("metric_name", None),
-    "threshold": ("threshold", None),
-    "comparator": ("comparator", None),
-    "step_size": ("step_size", None),
-    "cooldown_seconds": ("cooldown_seconds", None),
-    "created_at": ("created_at", None),
-    "last_triggered_at": ("last_triggered_at", None),
-    "endpoint": ("endpoint", None),
-}
-
 
 AutoScalingMetricSourceGQLEnum = graphene.Enum.from_enum(
     AutoScalingMetricSource,
@@ -150,6 +123,32 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     last_triggered_at = GQLDateTime()
 
     endpoint = graphene.UUID(required=True)
+
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("id", None),
+        "metric_source": ("metric_source", None),
+        "metric_name": ("metric_name", None),
+        "threshold": ("threshold", None),
+        "comparator": ("comparator", None),
+        "step_size": ("step_size", None),
+        "cooldown_seconds": ("cooldown_seconds", None),
+        "created_at": ("created_at", dtparse),
+        "last_triggered_at": ("last_triggered_at", dtparse),
+        "endpoint": ("endpoint", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "metric_source": ("metric_source", None),
+        "metric_name": ("metric_name", None),
+        "threshold": ("threshold", None),
+        "comparator": ("comparator", None),
+        "step_size": ("step_size", None),
+        "cooldown_seconds": ("cooldown_seconds", None),
+        "created_at": ("created_at", None),
+        "last_triggered_at": ("last_triggered_at", None),
+        "endpoint": ("endpoint", None),
+    }
 
     @classmethod
     def from_dto(cls, dto: EndpointAutoScalingRuleData) -> Self:
@@ -231,12 +230,12 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
             if filter_expr is not None
             else None
         )
         _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser(_queryorder_colmap))
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
             if order_expr is not None
             else None
         )
@@ -376,7 +375,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                 metric_source=OptionalState.from_graphql(
                     AutoScalingMetricSource(self.metric_source)
                     if self.metric_source is not Undefined
-                    else None,
+                    else Undefined,
                 ),
                 metric_name=OptionalState.from_graphql(
                     self.metric_name,
@@ -387,7 +386,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                 comparator=OptionalState.from_graphql(
                     AutoScalingMetricComparator(self.comparator)
                     if self.comparator is not Undefined
-                    else None,
+                    else Undefined,
                 ),
                 step_size=OptionalState.from_graphql(
                     self.step_size,
@@ -639,14 +638,14 @@ class Endpoint(graphene.ObjectType):
         "resource_group": ("endpoints_resource_group", None),
         "created_at": ("endpoints_created_at", dtparse),
         "retries": ("endpoints_retries", None),
-        "status": ("endpoints_status", None),
         "replicas": ("endpoints_replicas", None),
         "destroyed_at": ("endpoints_destroyed_at", dtparse),
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
-        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "lifecycle_stage": ("endpoints_lifecycle_stage", EndpointLifecycle),
         "open_to_public": ("endpoints_open_to_public", None),
+        "created_user_id": ("users_id", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -656,15 +655,15 @@ class Endpoint(graphene.ObjectType):
         "project": ("endpoints_project", None),
         "resource_group": ("endpoints_resource_group", None),
         "retries": ("endpoints_retries", None),
-        "status": ("endpoints_status", None),
         "replicas": ("endpoints_replicas", None),
         "created_at": ("endpoints_created_at", None),
         "destroyed_at": ("endpoints_destroyed_at", None),
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
-        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "lifecycle_stage": ("endpoints_lifecycle_stage", None),
         "open_to_public": ("endpoints_open_to_public", None),
+        "created_user_id": ("users_id", None),
         "created_user_email": ("users_email", None),
     }
 
