@@ -65,7 +65,7 @@ from ..agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
-from ..config.unified import AgentUnifiedConfig
+from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import (
@@ -872,7 +872,7 @@ class KubernetesAgent(
 
         if len(pv.items) == 0:
             # PV does not exists; create one
-            if self.local_config.container.scratch_type == "k8s-nfs":
+            if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
                 new_pv = NFSPersistentVolume(
                     self.local_config.container.scratch_nfs_address,
                     "backend-ai-static-pv",
@@ -885,7 +885,7 @@ class KubernetesAgent(
                 new_pv.options = [
                     x.strip() for x in self.local_config.container.scratch_nfs_options.split(",")
                 ]
-            elif self.local_config.container.scratch_type == "hostdir":
+            elif self.local_config.container.scratch_type == ScratchType.HOSTDIR:
                 new_pv = HostPathPersistentVolume(
                     self.local_config.container.scratch_root.as_posix(),
                     "backend-ai-static-pv",
@@ -894,8 +894,7 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f"Scratch type {self.local_config['container']['scratch-type']} is not"
-                    " supported",
+                    f"Scratch type {self.local_config.container.scratch_type} is not supported",
                 )
 
             try:
@@ -914,7 +913,7 @@ class KubernetesAgent(
                 "backend-ai-static-pv",
                 capacity,
             )
-            if self.local_config.container.scratch_type == "k8s-nfs":
+            if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
                 new_pvc.label(
                     "backend.ai/backend-ai-scratch-volume",
                     self.local_config.container.scratch_nfs_address,

@@ -157,14 +157,26 @@ class CoreDumpConfig(BaseModel):
         validation_alias=AliasChoices("size-limit", "size_limit"),
         serialization_alias="size-limit",
     )
-    corepath: Optional[Path] = Field(
-        default=None,
-        description=textwrap.dedent("""
-            Path to the core pattern file.
-            It is used to determine where core dumps are stored.
-            This field is set automatically based on the system's core pattern.
-        """),
-    )
+    _core_path: Optional[Path]
+
+    def set_core_path(self, core_path: Path) -> None:
+        """
+        Set the core path for core dumps.
+        This is used to set the core pattern file path.
+        """
+        self._core_path = core_path
+
+    @property
+    def core_path(self) -> Path:
+        """
+        Get the core path for core dumps.
+        If not set, it returns the default path.
+        """
+        if self._core_path is None:
+            raise ValueError(
+                "Core path is not set. Please call set_core_path() before accessing core_path."
+            )
+        return self._core_path
 
 
 class DebugConfig(BaseModel):
@@ -570,7 +582,7 @@ class ContainerConfig(BaseModel):
         default="",
         description="Bind host for containers",
         examples=["0.0.0.0", ""],
-        validation_alias=AliasChoices("bind-host", "bind_host"),
+        validation_alias=AliasChoices("bind-host", "bind_host", "kernel-host"),
         serialization_alias="bind-host",
     )
     advertised_host: Optional[str] = Field(
@@ -899,6 +911,14 @@ class AgentUnifiedConfig(BaseModel):
         description="Kernel lifecycles configuration",
         validation_alias=AliasChoices("kernel-lifecycles", "kernel_lifecycles"),
         serialization_alias="kernel-lifecycles",
+    )
+    plugins: Any = Field(
+        default_factory=lambda: {},
+        description=textwrap.dedent("""
+        Plugins configuration.
+        This field is injected at runtime based on etcd configuration.
+        It is not intended to be set in the configuration file.
+        """),
     )
 
     # TODO: Remove me after changing config injection logic

@@ -103,7 +103,7 @@ from ..agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
-from ..config.unified import AgentUnifiedConfig, ContainerSandboxType
+from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel
@@ -459,7 +459,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]
         if (
             sys.platform.startswith("linux")
-            and self.local_config.container.scratch_type == "memory"
+            and self.local_config.container.scratch_type == ScratchType.MEMORY
         ):
             mounts.append(
                 Mount(
@@ -531,7 +531,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 Mount(
                     MountTypes.BIND,
                     self.local_config.debug.coredump.path,
-                    Path("/tmp/coredumps"),
+                    self.local_config.debug.coredump.core_path,
                     MountPermission.READ_WRITE,
                 )
             )

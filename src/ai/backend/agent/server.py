@@ -425,7 +425,10 @@ class AgentRPCServer(aobject):
         self.debug_server_task = asyncio.create_task(_debug_server_task())
 
         await self.etcd.put("ip", rpc_addr.host, scope=ConfigScopes.NODE)
-        watcher_port = utils.nmget(getattr(self, "_watcher_config", {}), "service-addr.port", None)
+
+        watcher_port = utils.nmget(
+            self.local_config.model_dump(), "watcher.service-addr.port", None
+        )
         if watcher_port is not None:
             await self.etcd.put("watcher_port", watcher_port, scope=ConfigScopes.NODE)
 
@@ -501,6 +504,7 @@ class AgentRPCServer(aobject):
         self.local_config = self.local_config.model_copy(update={"redis": redis_config_dict})
 
         # Fill up vfolder configs from etcd and store as separate attributes
+        # TODO: Integrate vfolder_config into local_config
         self._vfolder_config = config.vfolder_config_iv.check(
             await self.etcd.get_prefix("volumes"),
         )
@@ -1300,35 +1304,28 @@ async def server_main(
         new_agent_config = local_config.agent.model_copy(update={"rpc_listen_addr": new_rpc_addr})
         local_config = local_config.model_copy(update={"agent": new_agent_config})
     # Handle container bind-host configuration
-    container_updates = {}
     if not local_config.container.bind_host:
         log.debug(
             "auto-detecting `container.bind-host` from container subnet config "
             "and agent.rpc-listen-addr"
         )
-        container_updates["bind_host"] = await get_subnet_ip(
+        local_config.container.bind_host = await get_subnet_ip(
             etcd,
             "container",
             fallback_addr=local_config.agent.rpc_listen_addr.host,
         )
-
-    if container_updates:
-        new_container_config = local_config.container.model_copy(update=container_updates)
-        local_config = local_config.model_copy(update={"container": new_container_config})
     log.info("Agent external IP: {}", local_config.agent.rpc_listen_addr.host)
     log.info("Container external IP: {}", local_config.container.bind_host)
     # Update region if not set
     if not local_config.agent.region:
-        new_agent_config = local_config.agent.model_copy(
-            update={"region": await identity.get_instance_region()}
-        )
-        local_config = local_config.model_copy(update={"agent": new_agent_config})
+        local_config.agent.region = await identity.get_instance_region()
     log.info(
         "Node ID: {0} (machine-type: {1}, host: {2})",
         local_config.agent.id,
         local_config.agent.instance_type,
         rpc_addr.host,
     )
+    local_config.plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
 
     # Start RPC server.
     global agent_instance
@@ -1553,7 +1550,7 @@ def main(
                     file=sys.stderr,
                 )
                 raise click.Abort()
-            unified_conf.debug.coredump.corepath = Path(core_pattern).parent
+            unified_conf.debug.coredump.set_core_path(Path(core_pattern).parent)
 
         unified_conf.agent.pid_file.write_text(str(os.getpid()))
         image_commit_path = unified_conf.agent.image_commit_path

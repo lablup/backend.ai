@@ -461,7 +461,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_krunner_info(self) -> tuple[str, str, str, str, str]:
         distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
-            self.local_config.container.model_dump(by_alias=True).get("krunner-volumes", {}), distro
+            self.local_config.container.krunner_volumes or {}, distro
         )
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
@@ -881,13 +881,11 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
-        sync_container_lifecycles_config = (
-            self.local_config.agent.sync_container_lifecycles.model_dump(by_alias=True)
-        )
-        if sync_container_lifecycles_config["enabled"]:
+        sync_container_lifecycles_config = self.local_config.agent.sync_container_lifecycles
+        if sync_container_lifecycles_config.enabled:
             self.timer_tasks.append(
                 aiotools.create_timer(
-                    self.sync_container_lifecycles, sync_container_lifecycles_config["interval"]
+                    self.sync_container_lifecycles, sync_container_lifecycles_config.interval
                 )
             )
 
@@ -2728,17 +2726,13 @@ class AbstractAgent(
                 current_task = asyncio.current_task()
                 assert current_task is not None
                 self._pending_creation_tasks[kernel_id].add(current_task)
-                kernel_init_polling_attempt = cast(
-                    int, self.local_config.kernel_lifecycles.init_polling_attempt
+                kernel_init_polling_attempt = (
+                    self.local_config.kernel_lifecycles.init_polling_attempt
                 )
-                kernel_init_polling_timeout = cast(
-                    float,
-                    self.local_config.kernel_lifecycles.init_polling_timeout_sec,
+                kernel_init_polling_timeout = (
+                    self.local_config.kernel_lifecycles.init_polling_timeout_sec
                 )
-                kernel_init_timeout = cast(
-                    float,
-                    self.local_config.kernel_lifecycles.init_timeout_sec,
-                )
+                kernel_init_timeout = self.local_config.kernel_lifecycles.init_timeout_sec
                 log.info(
                     "create_kernel(kernel:{}, session:{}, container:{}) waiting for kernel service initialization",
                     kernel_id,
