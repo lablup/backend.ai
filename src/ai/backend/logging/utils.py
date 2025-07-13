@@ -12,6 +12,14 @@ __all__ = (
     "enforce_debug_logging",
 )
 
+_TRACE_LEVEL = 5
+_TRACE_LEVEL_NAME = "TRACE"
+
+_module_loaded = False
+def init_logger():
+    global _module_loaded
+    _module_loaded = True
+    logging.addLevelName(_TRACE_LEVEL, _TRACE_LEVEL_NAME)
 
 class BraceMessage:
     __slots__ = ("fmt", "args")
@@ -36,6 +44,9 @@ class BraceStyleAdapter(logging.LoggerAdapter):
             msg, kwargs = self.process(msg, kwargs)
             kwargs["stacklevel"] = kwargs.get("stacklevel", 1) + 1
             self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
+    
+    def trace(self, msg, *args, **kwargs):
+        self.log(_TRACE_LEVEL, msg, *args, **kwargs)
 
     @classmethod
     def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
