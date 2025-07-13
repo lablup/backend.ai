@@ -389,6 +389,45 @@ class GroupNotFound(ObjectNotFound):
         )
 
 
+class GroupHasActiveKernelsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-kernels"
+    error_title = "Group has active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasVFoldersMountedError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
+    error_title = "Group has vfolders mounted to active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasActiveEndpointsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
+    error_title = "Group has active endpoints."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class UserNotFound(ObjectNotFound):
     object_name = "user"
 
