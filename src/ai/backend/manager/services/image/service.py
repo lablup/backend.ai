@@ -142,13 +142,13 @@ class ImageService:
 
         try:
             to_update = props.fields_to_update()
-            image_row = await self._image_repository.update_image_properties(
+            image_data = await self._image_repository.update_image_properties(
                 action.target, action.architecture, to_update
             )
         except UnknownImageReference:
             raise ModifyImageActionUnknownImageReferenceError
 
-        return ModifyImageActionResult(image=image_row)
+        return ModifyImageActionResult(image=image_data)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
@@ -277,7 +277,7 @@ class ImageService:
     async def clear_image_custom_resource_limit(
         self, action: ClearImageCustomResourceLimitAction
     ) -> ClearImageCustomResourceLimitActionResult:
-        image_row = await self._image_repository.clear_image_custom_resource_limit(
+        image_data = await self._image_repository.clear_image_custom_resource_limit(
             action.image_canonical, action.architecture
         )
-        return ClearImageCustomResourceLimitActionResult(image_data=image_row)
+        return ClearImageCustomResourceLimitActionResult(image_data=image_data)

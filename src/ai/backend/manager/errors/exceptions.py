@@ -1065,19 +1065,6 @@ class ModifyImageActionValueError(BackendError, web.HTTPBadRequest):
         )
 
 
-class ForgetImageIdObjectNotFoundError(BackendError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/image-not-found"
-    error_title = "Image not found."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class PurgeImageActionByIdObjectDBError(BackendError, web.HTTPInternalServerError):
     """
     This can occur when the alias of the image you are trying to delete already exists.
