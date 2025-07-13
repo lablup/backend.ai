@@ -11,12 +11,10 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -38,6 +36,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
+from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -80,20 +79,23 @@ class MutationResult:
 class GroupService:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
-    _redis_stat: RedisConnectionInfo
+    _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
+    _group_repository: GroupRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
-        redis_stat: RedisConnectionInfo,
+        valkey_stat_client: ValkeyStatClient,
+        group_repository: GroupRepository,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._config_provider = config_provider
-        self._redis_stat = redis_stat
+        self._valkey_stat_client = valkey_stat_client
+        self._group_repository = group_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         data = action.input.fields_to_store()
@@ -404,7 +406,9 @@ class GroupService:
             self._db, start_date, end_date, project_ids=project_ids
         )
         local_tz = self._config_provider.config.system.timezone
-        usage_groups = await parse_resource_usage_groups(kernels, self._redis_stat, local_tz)
+        usage_groups = await parse_resource_usage_groups(
+            kernels, self._valkey_stat_client, local_tz
+        )
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
 
@@ -465,13 +469,8 @@ class GroupService:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
-
-        raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
+        kernel_ids = [str(row["id"]) for row in rows]
+        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone

@@ -51,6 +51,8 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 # from ai.backend.manager.types import SENTINEL
 from ..actions.base import (
@@ -110,6 +112,8 @@ class VFolderService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
+    _vfolder_repository: VfolderRepository
+    _admin_vfolder_repository: AdminVfolderRepository
 
     def __init__(
         self,
@@ -117,10 +121,14 @@ class VFolderService:
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
+        vfolder_repository: VfolderRepository,
+        admin_vfolder_repository: AdminVfolderRepository,
     ) -> None:
         self._db = db
         self._config_provider = config_provider
         self._storage_manager = storage_manager
+        self._vfolder_repository = vfolder_repository
+        self._admin_vfolder_repository = admin_vfolder_repository
         self._background_task_manager = background_task_manager
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:

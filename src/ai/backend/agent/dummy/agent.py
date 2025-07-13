@@ -44,12 +44,18 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
-    ComputerContext,
     ScanImagesResult,
 )
+from ..config.unified import AgentUnifiedConfig
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
 from ..types import Container, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
@@ -66,7 +72,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
@@ -180,7 +186,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
-            agent_config=self.local_config,
+            agent_config=self.local_config.model_dump(by_alias=True),
             service_ports=service_ports,
             resource_spec=resource_spec,
             environ=environ,
@@ -196,8 +202,8 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         preopen_ports,
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
-        container_bind_host = self.local_config["container"]["bind-host"]
-        advertised_kernel_host = self.local_config["container"].get("advertised-host")
+        container_bind_host = self.local_config.container.bind_host
+        advertised_kernel_host = self.local_config.container.advertised_host
         delay = self.creation_ctx_config["delay"]["start-container"]
         await asyncio.sleep(delay)
         return {
@@ -279,11 +285,14 @@ class DummyAgent(
         return ""
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config, self.dummy_config)
+        return await load_resources(
+            self.etcd, self.local_config.model_dump(by_alias=True), self.dummy_config
+        )
 
     async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(
-            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+            self.local_config.model_dump(by_alias=True),
+            {name: cctx.instance for name, cctx in self.computers.items()},
         )
 
     async def extract_image_command(self, image: str) -> str | None:

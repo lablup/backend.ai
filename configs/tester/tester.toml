@@ -60,3 +60,4 @@ group = "default"
 usage_mode = "general"
 permission = "rw"
 cloneable = true
+share-permission = "ro"

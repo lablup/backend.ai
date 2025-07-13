@@ -1,8 +1,9 @@
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Optional, Self
+from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar
 
 from glide import (
     GlideClient,
@@ -14,6 +15,8 @@ from glide import (
 )
 from redis.asyncio.sentinel import Sentinel
 
+from ai.backend.common.exception import UnreachableError
+from ai.backend.common.metrics.metric import ClientMetricObserver, ClientType
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import HostPortPair, RedisTarget
@@ -325,3 +328,70 @@ def create_valkey_client(
         return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
     standalone_target = ValkeyStandaloneTarget.from_redis_target(target)
     return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def valkey_decorator(
+    *,
+    retry_count: int = 3,
+    retry_delay: float = 0.1,
+) -> Callable[
+    [Callable[P, Awaitable[R]]],
+    Callable[P, Awaitable[R]],
+]:
+    """
+    Decorator for Valkey client operations that adds retry logic and metrics.
+
+    Note: This decorator should only be applied to public methods that are exposed
+    to external users. Internal/private methods should not use this decorator.
+    """
+
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        observer = ClientMetricObserver.instance()
+
+        async def wrapper(*args, **kwargs) -> R:
+            log.trace("Calling {}", func.__name__)
+            start = time.perf_counter()
+            for attempt in range(retry_count):
+                try:
+                    observer.observe_client_operation_triggered(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                    )
+                    res = await func(*args, **kwargs)
+                    observer.observe_client_operation(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                        success=True,
+                        duration=time.perf_counter() - start,
+                    )
+                    return res
+                except Exception as e:
+                    if attempt < retry_count - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    log.exception(
+                        "Error in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                        func.__name__,
+                        args,
+                        kwargs,
+                        retry_count,
+                        e,
+                    )
+                    observer.observe_client_operation(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                        success=False,
+                        duration=time.perf_counter() - start,
+                    )
+                    raise e
+            raise UnreachableError(
+                f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
+            )
+
+        return wrapper
+
+    return decorator

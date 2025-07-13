@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import textwrap
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
@@ -42,7 +41,6 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -64,13 +62,15 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
     VFolderMount,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionData
 
@@ -1537,7 +1537,7 @@ class SessionLifecycleManager:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyStatClient,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,
@@ -1659,17 +1659,9 @@ class SessionLifecycleManager:
         if not session_ids:
             return
 
-        sadd_session_ids_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local values = ARGV
-        return redis.call('SADD', key, unpack(values))
-        """)
         try:
-            await redis_helper.execute_script(
-                self.redis_obj,
-                "session_status_update",
-                sadd_session_ids_script,
-                [self.status_set_key],
+            await self.redis_obj.register_session_ids_for_status_update(
+                self.status_set_key,
                 [self._encoder(sid) for sid in session_ids],
             )
         except (
@@ -1681,18 +1673,9 @@ class SessionLifecycleManager:
         await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
-        pop_all_session_id_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local count = redis.call('SCARD', key)
-        return redis.call('SPOP', key, count)
-        """)
         try:
-            raw_result = await redis_helper.execute_script(
-                self.redis_obj,
-                "pop_all_session_id_to_update_status",
-                pop_all_session_id_script,
-                [self.status_set_key],
-                [],
+            results = await self.redis_obj.get_and_clear_session_ids_for_status_update(
+                self.status_set_key,
             )
         except (
             redis.exceptions.RedisError,
@@ -1700,14 +1683,13 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
-            raw_result = []
-        raw_result = cast(list[bytes], raw_result)
+            results = []
         result: list[SessionId] = []
-        for raw_session_id in raw_result:
+        for raw_session_id in results:
             try:
                 result.append(self._decoder(raw_session_id))
             except (ValueError, SyntaxError):
-                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
+                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id!r})")
                 continue
 
         async with self.db.begin_readonly_session() as db_session:
@@ -1725,17 +1707,9 @@ class SessionLifecycleManager:
         if not session_ids:
             return 0
 
-        srem_session_ids_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local values = ARGV
-        return redis.call('SREM', key, unpack(values))
-        """)
         try:
-            ret = await redis_helper.execute_script(
-                self.redis_obj,
-                "session_status_update",
-                srem_session_ids_script,
-                [self.status_set_key],
+            ret = await self.redis_obj.remove_session_ids_from_status_update(
+                self.status_set_key,
                 [self._encoder(sid) for sid in session_ids],
             )
         except (

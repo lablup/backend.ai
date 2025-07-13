@@ -35,10 +35,14 @@ class ContextName(enum.StrEnum):
     SESSION_IMAGIFY = "session_imagify"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
+
     VFOLDER = "vfolder"
     VFOLDER_UPLOAD_FILES = "vfolder_upload_files"
-
+    VFOLDER_SHARE_META = "vfolder_share_meta"
+    VFOLDER_INVITATION = "vfolder_invitation"
+    VFOLDER_INVITATION_PERMISSION = "vfolder_invitation_permission"
     VFOLDER_UPLOADED_FILES_META = "vfolder_uploaded_files_meta"
+
     CREATED_VFOLDER_META = "created_vfolder_meta"
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
@@ -46,8 +50,7 @@ class ContextName(enum.StrEnum):
     CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
     CREATED_USER_CONTEXT = "created_user_context"
     CREATED_USER_CLIENT_SESSION = "created_user_client_session"
-    VFOLDER_INVITATION = "vfolder_invitation"
-    VFOLDER_INVITATION_PERMISSION = "vfolder_invitation_permission"
+    CREATED_GROUP = "created_group"
 
 
 class BaseTestContext(Generic[T]):

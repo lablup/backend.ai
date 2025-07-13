@@ -4,12 +4,15 @@ import asyncio
 import inspect
 from typing import (
     Any,
+    AsyncContextManager,
     Awaitable,
     Callable,
     Collection,
+    Protocol,
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     cast,
 )
 
@@ -133,3 +136,26 @@ class AsyncBarrier:
         self.count = 0
         # FIXME: if there are waiting coroutines, let them
         #        raise BrokenBarrierError like threading.Barrier
+
+
+class SupportsAsyncClose(Protocol):
+    async def close(self) -> None: ...
+
+
+_SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
+
+
+class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+    """
+    contextlib.closing calls close(), and aiotools.aclosing() calls aclose().
+    This context manager calls close() as a coroutine.
+    """
+
+    def __init__(self, obj: _SupportsAsyncCloseT) -> None:
+        self.obj = obj
+
+    async def __aenter__(self) -> _SupportsAsyncCloseT:
+        return self.obj
+
+    async def __aexit__(self, *exc_info) -> None:
+        await self.obj.close()

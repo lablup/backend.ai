@@ -4,6 +4,9 @@ from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.repository import (
+    ContainerRegistryRepository,
+)
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -30,9 +33,15 @@ from ...data.image.types import ImageStatus
 
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
+    _container_registry_repository: ContainerRegistryRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        container_registry_repository: ContainerRegistryRepository,
+    ) -> None:
         self._db = db
+        self._container_registry_repository = container_registry_repository
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         registry_name = action.registry

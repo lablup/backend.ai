@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
 )
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -64,9 +65,15 @@ class MutationResult:
 
 class DomainService:
     _db: ExtendedAsyncSAEngine
+    _domain_repository: DomainRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        domain_repository: DomainRepository,
+    ) -> None:
         self._db = db
+        self._domain_repository = domain_repository
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
         data = action.creator.fields_to_store()

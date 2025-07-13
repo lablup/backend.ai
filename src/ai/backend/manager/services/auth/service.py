@@ -40,6 +40,7 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -78,14 +79,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AuthService:
     _db: ExtendedAsyncSAEngine
     _hook_plugin_ctx: HookPluginContext
+    _auth_repository: AuthRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         hook_plugin_ctx: HookPluginContext,
+        auth_repository: AuthRepository,
     ) -> None:
         self._db = db
         self._hook_plugin_ctx = hook_plugin_ctx
+        self._auth_repository = auth_repository
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None

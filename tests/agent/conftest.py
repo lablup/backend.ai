@@ -9,7 +9,7 @@ from pathlib import Path
 import aiodocker
 import pytest
 
-from ai.backend.agent.config import agent_local_config_iv
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
@@ -104,11 +104,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {
-            "addr": etcd_addr.to_legacy(),
+            "addr": etcd_addr,
             "namespace": f"ns-{test_id}",
         },
         "redis": {
-            "addr": redis_addr.to_legacy(),
+            "addr": redis_addr,
             "sentinel": None,
             "service_name": None,
             "password": None,
@@ -116,7 +116,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         },
         "plugins": {},
     }
-    cfg = agent_local_config_iv.check(cfg)
+    cfg = AgentUnifiedConfig.model_validate(cfg)
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()
@@ -126,9 +126,9 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     try:
         # Override external database config with the current environment's config.
         fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
-        cfg["etcd"]["addr"] = fs_local_config["etcd"]["addr"]
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "user")
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
+        cfg.etcd.addr = fs_local_config["etcd"]["addr"]
+        _override_if_exists(fs_local_config["etcd"], cfg.etcd.model_dump(), "user")
+        _override_if_exists(fs_local_config["etcd"], cfg.etcd.model_dump(), "password")
     except config.ConfigurationError:
         pass
     yield cfg
