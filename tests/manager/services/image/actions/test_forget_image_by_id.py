@@ -3,12 +3,11 @@ from dataclasses import replace
 
 import pytest
 
+from ai.backend.manager.errors.exceptions import ForgetImageForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.image.actions.forget_image_by_id import (
-    ForgetImageActionByIdGenericForbiddenError,
-    ForgetImageActionByIdObjectNotFoundError,
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
@@ -43,7 +42,7 @@ from ...test_utils import TestScenario
                 client_role=UserRole.USER,
                 image_id=IMAGE_ROW_FIXTURE.id,
             ),
-            ForgetImageActionByIdGenericForbiddenError,
+            ForgetImageForbiddenError,
         ),
         TestScenario.failure(
             "Image not found",
@@ -52,7 +51,7 @@ from ...test_utils import TestScenario
                 client_role=UserRole.SUPERADMIN,
                 image_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),  # wrong image_id
             ),
-            ForgetImageActionByIdObjectNotFoundError,
+            ImageNotFound,
         ),
     ],
 )

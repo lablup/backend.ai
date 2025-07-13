@@ -40,7 +40,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiotools
 import attrs
@@ -206,6 +206,7 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
+from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
@@ -294,7 +295,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     agent_id: AgentId
     event_producer: EventProducer
     kernel_config: KernelCreationConfig
-    local_config: Mapping[str, Any]
+    local_config: AgentUnifiedConfig
     kernel_features: frozenset[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
@@ -310,7 +311,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
@@ -460,7 +461,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_krunner_info(self) -> tuple[str, str, str, str, str]:
         distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
-            self.local_config["container"]["krunner-volumes"], distro
+            self.local_config.container.krunner_volumes or {}, distro
         )
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
@@ -564,7 +565,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
-        if self.local_config["container"]["sandbox-type"] == "jail":
+        if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
             jail_candidates = find_artifacts(
                 f"jail.*.{arch}.bin"
             )  # architecture check is already done when starting agent
@@ -720,7 +721,7 @@ class AbstractAgent(
 ):
     id: AgentId
     loop: asyncio.AbstractEventLoop
-    local_config: Mapping[str, Any]
+    local_config: AgentUnifiedConfig
     etcd: AsyncEtcd
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
@@ -751,7 +752,7 @@ class AbstractAgent(
     def __init__(
         self,
         etcd: AsyncEtcd,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
@@ -762,7 +763,7 @@ class AbstractAgent(
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
-        self.id = AgentId(local_config["agent"]["id"])
+        self.id = AgentId(local_config.agent.id or f"agent-{uuid4()}")
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
         self.kernel_registry = {}
@@ -771,13 +772,15 @@ class AbstractAgent(
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
             self,
-            mode=StatModes(local_config["container"]["stats-type"]),
+            mode=StatModes(local_config.container.stats_type.value)
+            if local_config.container.stats_type
+            else None,
         )
         self.timer_tasks = []
         self.port_pool = set(
             range(
-                local_config["container"]["port-range"][0],
-                local_config["container"]["port-range"][1] + 1,
+                local_config.container.port_range[0],
+                local_config.container.port_range[1] + 1,
             )
         )
         self.stats_monitor = stats_monitor
@@ -799,18 +802,18 @@ class AbstractAgent(
         self.container_lifecycle_queue = asyncio.Queue()
 
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.local_config["redis"]
+            self.local_config.model_dump(by_alias=True)["redis"]
         )
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
         self.event_producer = EventProducer(
             mq,
             source=self.id,
-            log_events=self.local_config["debug"]["log-events"],
+            log_events=self.local_config.debug.log_events,
         )
         self.event_dispatcher = EventDispatcher(
             mq,
-            log_events=self.local_config["debug"]["log-events"],
+            log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_client = await ValkeyStreamClient.create(
@@ -829,7 +832,7 @@ class AbstractAgent(
             bgtask_observer=self._metric_registry.bgtask,
         )
 
-        alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
+        alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
         computers = await self.load_resources()
 
         all_devices: list[AbstractComputeDevice] = []
@@ -874,15 +877,15 @@ class AbstractAgent(
         )
 
         # Prepare heartbeats.
-        heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]
+        heartbeat_interval = self.local_config.debug.heartbeat_interval
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
-        sync_container_lifecycles_config = self.local_config["agent"]["sync-container-lifecycles"]
-        if sync_container_lifecycles_config["enabled"]:
+        sync_container_lifecycles_config = self.local_config.agent.sync_container_lifecycles
+        if sync_container_lifecycles_config.enabled:
             self.timer_tasks.append(
                 aiotools.create_timer(
-                    self.sync_container_lifecycles, sync_container_lifecycles_config["interval"]
+                    self.sync_container_lifecycles, sync_container_lifecycles_config.interval
                 )
             )
 
@@ -891,7 +894,7 @@ class AbstractAgent(
         await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.start()
 
-        if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
+        if abuse_report_path := self.local_config.agent.abuse_report_path:
             log.info(
                 "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
             )
@@ -920,7 +923,7 @@ class AbstractAgent(
         """
         Returns the message queue object.
         """
-        node_id = self.local_config["agent"]["id"]
+        node_id = self.id
         args = RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_all",
@@ -932,7 +935,7 @@ class AbstractAgent(
             node_id=node_id,
             db=REDIS_STREAM_DB,
         )
-        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+        if self.local_config.agent.use_experimental_redis_event_dispatcher:
             return HiRedisQueue(
                 stream_redis_target,
                 args,
@@ -985,11 +988,11 @@ class AbstractAgent(
         await self.valkey_stat_client.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
-        if self.local_config["debug"]["log-heartbeats"]:
+        if self.local_config.debug.log_heartbeats:
             _log = log.debug if isinstance(event, AgentHeartbeatEvent) else log.info
         else:
             _log = (lambda *args: None) if isinstance(event, AgentHeartbeatEvent) else log.info
-        if self.local_config["debug"]["log-events"]:
+        if self.local_config.debug.log_events:
             _log("produce_event({0})", event)
         if isinstance(event, KernelTerminatedAnycastEvent):
             pending_creation_tasks = self._pending_creation_tasks.get(event.kernel_id, None)
@@ -1043,7 +1046,7 @@ class AbstractAgent(
         |_ subdir2
         """
         loop = current_loop()
-        base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        base_commit_path: Path = self.local_config.agent.image_commit_path
         commit_kernels: set[str] = set()
 
         def _map_commit_status() -> None:
@@ -1073,14 +1076,14 @@ class AbstractAgent(
                         slot_type,
                         str(self.slots.get(slot_key, 0)),
                     )
-            if self.local_config["agent"]["advertised-rpc-addr"]:
-                rpc_addr = self.local_config["agent"]["advertised-rpc-addr"]
+            if self.local_config.agent.advertised_rpc_addr:
+                rpc_addr = self.local_config.agent.advertised_rpc_addr
             else:
-                rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
+                rpc_addr = self.local_config.agent.rpc_listen_addr
             agent_info = {
                 "ip": str(rpc_addr.host),
-                "region": self.local_config["agent"]["region"],
-                "scaling_group": self.local_config["agent"]["scaling-group"],
+                "region": self.local_config.agent.region,
+                "scaling_group": self.local_config.agent.scaling_group,
                 "addr": f"tcp://{rpc_addr}",
                 "public_key": self.agent_public_key,
                 "public_host": str(self._get_public_host()),
@@ -1098,9 +1101,7 @@ class AbstractAgent(
                 ),
                 "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
-                "auto_terminate_abusing_kernel": self.local_config["agent"][
-                    "force-terminate-abusing-containers"
-                ],
+                "auto_terminate_abusing_kernel": self.local_config.agent.force_terminate_abusing_containers,
             }
             await self.anycast_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
@@ -1115,7 +1116,7 @@ class AbstractAgent(
         container_id: str,
         async_log_iterator: AsyncGenerator[bytes],
     ) -> None:
-        chunk_size = self.local_config["agent"]["container-logs"]["chunk-size"]
+        chunk_size = self.local_config.container_logs.chunk_size
         log_length = 0
         chunk_buffer = BytesIO()
         chunk_length = 0
@@ -1152,7 +1153,7 @@ class AbstractAgent(
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):
-        if self.local_config["debug"]["log-stats"]:
+        if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         try:
             async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
@@ -1164,7 +1165,7 @@ class AbstractAgent(
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float):
-        if self.local_config["debug"]["log-stats"]:
+        if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         try:
             container_ids: list[ContainerId] = []
@@ -1183,7 +1184,7 @@ class AbstractAgent(
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float):
-        if self.local_config["debug"]["log-stats"]:
+        if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         try:
             container_ids = []
@@ -1199,12 +1200,12 @@ class AbstractAgent(
             raise
 
     def _get_public_host(self) -> str:
-        agent_config: Mapping[str, Any] = self.local_config["agent"]
-        container_config: Mapping[str, Any] = self.local_config["container"]
+        agent_config = self.local_config.agent
+        container_config = self.local_config.container
         return (
-            agent_config.get("public-host")
-            or container_config.get("advertised-host")
-            or container_config["bind-host"]
+            agent_config.public_host
+            or container_config.advertised_host
+            or container_config.bind_host
         )
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1352,7 +1353,7 @@ class AbstractAgent(
 
     def _restore_ports(self, host_ports: Iterable[int]) -> None:
         # Restore used ports to the port pool.
-        port_range = self.local_config["container"]["port-range"]
+        port_range = self.local_config.container.port_range
         # Exclude out-of-range ports, because when the agent restarts
         # with a different port range, existing containers' host ports
         # may not belong to the new port range.
@@ -1497,7 +1498,7 @@ class AbstractAgent(
                     return
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
-                if self.local_config["debug"]["log-events"]:
+                if self.local_config.debug.log_events:
                     log.info(f"lifecycle event: {ev!r}")
                 try:
                     if ev.event == LifecycleEvent.START:
@@ -1840,10 +1841,10 @@ class AbstractAgent(
 
     async def _cleanup_reported_kernels(self, interval: float):
         # dest_path == abuse_report_path
-        dest_path: Path = self.local_config["agent"]["abuse-report-path"]
-        auto_terminate: bool = self.local_config["agent"].get(
-            "force-terminate-abusing-containers", False
-        )
+        dest_path = self.local_config.agent.abuse_report_path
+        if dest_path is None:
+            return
+        auto_terminate = self.local_config.agent.force_terminate_abusing_containers
 
         def _read(path: Path) -> str:
             with open(path, "r") as fr:
@@ -1955,8 +1956,8 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config["agent"]["ipc-base-path"]
-        var_base_path = self.local_config["agent"]["var-base-path"]
+        ipc_base_path = self.local_config.agent.ipc_base_path
+        var_base_path = self.local_config.agent.var_base_path
         last_registry_file = f"last_registry.{self.local_instance_id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
@@ -1970,7 +1971,7 @@ class AbstractAgent(
         except FileNotFoundError:
             pass
         for kernel_obj in self.kernel_registry.values():
-            kernel_obj.agent_config = self.local_config
+            kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
                 await kernel_obj.init(self.event_producer)
             except Exception as e:
@@ -2242,7 +2243,7 @@ class AbstractAgent(
                 )
 
             # Initialize the creation context
-            if self.local_config["debug"]["log-kernel-config"]:
+            if self.local_config.debug.log_kernel_config:
                 log.debug("Kernel creation config: {0}", pretty(kernel_config))
             ctx = await self.init_kernel_context(
                 ownership_data,
@@ -2263,11 +2264,11 @@ class AbstractAgent(
                 environ["LOCAL_USER_ID"] = str(ouid)
             else:
                 if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
+                    uid = self.local_config.container.kernel_uid
                     environ["LOCAL_USER_ID"] = str(uid)
 
             sgids = set(ctx.get_supplementary_gids() or [])
-            kernel_gid: int = self.local_config["container"]["kernel-gid"]
+            kernel_gid: int = self.local_config.container.kernel_gid
             if (ogid := ctx.get_overriding_gid()) is not None:
                 environ["LOCAL_GROUP_ID"] = str(ogid)
                 if KernelFeatures.UID_MATCH in ctx.kernel_features:
@@ -2296,9 +2297,7 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 kernel_config.get("auto_pull", AutoPullBehavior("digest")),
             )
-            image_pull_timeout = cast(
-                float | None, self.local_config["agent"]["api"]["pull-timeout"]
-            )
+            image_pull_timeout = self.local_config.api.pull_timeout
             if do_pull:
                 log.info(
                     "create_kernel(kernel:{}, session:{}) pulling image: {}",
@@ -2365,7 +2364,7 @@ class AbstractAgent(
             # Realize ComputeDevice (including accelerators) allocations.
             if not restarting:
                 alloc_order = [
-                    DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
+                    DeviceName(name) for name in self.local_config.resource.allocation_order
                 ]
                 async with self.resource_lock:
                     try:
@@ -2377,7 +2376,7 @@ class AbstractAgent(
                             resource_spec,
                             alloc_order,
                             self.affinity_map,
-                            self.local_config["resource"]["affinity-policy"],
+                            self.local_config.resource.affinity_policy,
                             allow_fractional_resource_fragmentation=allow_fractional_resource_fragmentation,
                         )
                     except ResourceError:
@@ -2588,19 +2587,17 @@ class AbstractAgent(
                 runtime_path = image_labels.get(LabelName.RUNTIME_PATH, None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
-                if self.local_config["container"]["sandbox-type"] == "jail":
+                if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
                     cmdargs += [
                         "/opt/kernel/jail",
                         # "--policy",
                         # "/etc/backend.ai/jail/policy.yml",
                         # TODO: Update default Jail policy in images
                     ]
-                    if self.local_config["container"]["jail-args"]:
-                        cmdargs += map(
-                            lambda s: s.strip(), self.local_config["container"]["jail-args"]
-                        )
+                    if self.local_config.container.jail_args:
+                        cmdargs += map(lambda s: s.strip(), self.local_config.container.jail_args)
                     cmdargs += ["--"]
-                if self.local_config["debug"]["kernel-runner"]:
+                if self.local_config.debug.kernel_runner:
                     krunner_opts.append("--debug")
                 cmdargs += [
                     "/opt/backend.ai/bin/python",
@@ -2640,7 +2637,7 @@ class AbstractAgent(
                     session_id,
                 )
 
-                if self.local_config["debug"]["log-kernel-config"]:
+                if self.local_config.debug.log_kernel_config:
                     log.info(
                         "kernel starting with resource spec: \n{0}",
                         pretty(attrs.asdict(resource_spec)),
@@ -2729,17 +2726,13 @@ class AbstractAgent(
                 current_task = asyncio.current_task()
                 assert current_task is not None
                 self._pending_creation_tasks[kernel_id].add(current_task)
-                kernel_init_polling_attempt = cast(
-                    int, self.local_config["agent"]["kernel-lifecycles"]["init-polling-attempt"]
+                kernel_init_polling_attempt = (
+                    self.local_config.kernel_lifecycles.init_polling_attempt
                 )
-                kernel_init_polling_timeout = cast(
-                    float,
-                    self.local_config["agent"]["kernel-lifecycles"]["init-polling-timeout-sec"],
+                kernel_init_polling_timeout = (
+                    self.local_config.kernel_lifecycles.init_polling_timeout_sec
                 )
-                kernel_init_timeout = cast(
-                    float,
-                    self.local_config["agent"]["kernel-lifecycles"]["init-timeout-sec"],
-                )
+                kernel_init_timeout = self.local_config.kernel_lifecycles.init_timeout_sec
                 log.info(
                     "create_kernel(kernel:{}, session:{}, container:{}) waiting for kernel service initialization",
                     kernel_id,
@@ -3368,7 +3361,7 @@ class AbstractAgent(
         now = time.monotonic()
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
-        var_base_path = self.local_config["agent"]["var-base-path"]
+        var_base_path = self.local_config.agent.var_base_path
         last_registry_file = f"last_registry.{self.local_instance_id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
@@ -3388,7 +3381,7 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+    if context.local_config.agent.cohabiting_storage_proxy:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
         await context.event_producer.broadcast_event(
             VolumeMounted(
@@ -3400,10 +3393,7 @@ async def handle_volume_mount(
         )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
-    if volume_mount_prefix is None:
-        volume_mount_prefix = "./"
-    real_path = Path(volume_mount_prefix, event.dir_name)
+    real_path = context.local_config.agent.real_mount_path(event.dir_name)
     err_msg: str | None = None
     try:
         await mount(
@@ -3433,7 +3423,7 @@ async def handle_volume_umount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+    if context.local_config.agent.cohabiting_storage_proxy:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
         await context.event_producer.broadcast_event(
             VolumeUnmounted(
@@ -3446,8 +3436,7 @@ async def handle_volume_umount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_prefix = context.local_config["agent"]["mount-path"]
-    real_path = Path(volume_mount_prefix, event.dir_name)
+    real_path = context.local_config.agent.real_mount_path(event.dir_name)
     err_msg: str | None = None
     did_umount = False
     try:

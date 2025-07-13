@@ -103,6 +103,7 @@ from ..agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
+from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel
@@ -247,7 +248,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
@@ -268,8 +269,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             restarting=restarting,
         )
         kernel_id = ownership_data.kernel_id
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
-        tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
+        tmp_dir = (self.local_config.container.scratch_root / f"{kernel_id}_tmp").resolve()
 
         self.scratch_dir = scratch_dir
         self.tmp_dir = tmp_dir
@@ -347,12 +348,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if os.geteuid() == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    valid_uid = (
-                        uid if uid is not None else self.local_config["container"]["kernel-uid"]
-                    )
-                    valid_gid = (
-                        gid if gid is not None else self.local_config["container"]["kernel-gid"]
-                    )
+                    valid_uid = uid if uid is not None else self.local_config.container.kernel_uid
+                    valid_gid = gid if gid is not None else self.local_config.container.kernel_gid
                 else:
                     stat = os.stat(p)
                     valid_uid = uid if uid is not None else stat.st_uid
@@ -363,9 +360,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         loop = current_loop()
 
         # Create the scratch, config, and work directories.
-        scratch_type = self.local_config["container"]["scratch-type"]
-        scratch_root = self.local_config["container"]["scratch-root"]
-        scratch_size = self.local_config["container"]["scratch-size"]
+        scratch_type = self.local_config.container.scratch_type
+        scratch_root = self.local_config.container.scratch_root
+        scratch_size = self.local_config.container.scratch_size
 
         if sys.platform.startswith("linux") and scratch_type == "memory":
             await loop.run_in_executor(None, partial(self.tmp_dir.mkdir, exist_ok=True))
@@ -444,8 +441,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     if KernelFeatures.UID_MATCH in self.kernel_features:
                         chown_scratch(
-                            self.local_config["container"]["kernel-uid"],
-                            self.local_config["container"]["kernel-gid"],
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
                         )
 
             await loop.run_in_executor(None, _clone_dotfiles)
@@ -462,7 +459,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]
         if (
             sys.platform.startswith("linux")
-            and self.local_config["container"]["scratch-type"] == "memory"
+            and self.local_config.container.scratch_type == ScratchType.MEMORY
         ):
             mounts.append(
                 Mount(
@@ -529,12 +526,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
         # debug mounts
-        if self.local_config["debug"]["coredump"]["enabled"]:
+        if self.local_config.debug.coredump.enabled:
             mounts.append(
                 Mount(
                     MountTypes.BIND,
-                    self.local_config["debug"]["coredump"]["path"],
-                    self.local_config["debug"]["coredump"]["core_path"],
+                    self.local_config.debug.coredump.path,
+                    self.local_config.debug.coredump.core_path,
                     MountPermission.READ_WRITE,
                 )
             )
@@ -549,7 +546,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     MountPermission.READ_WRITE,
                 )
             )
-        ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+        ipc_base_path = self.local_config.agent.ipc_base_path
 
         # domain-socket proxy mount
         # (used for special service containers such image importer)
@@ -634,10 +631,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     self.container_configs.append({
                         "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
                     })
-        if self.local_config["container"].get("alternative-bridge") is not None:
+        if self.local_config.container.alternative_bridge is not None:
             self.container_configs.append({
                 "HostConfig": {
-                    "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                    "NetworkMode": self.local_config.container.alternative_bridge,
                 },
             })
         # RDMA mounts
@@ -683,8 +680,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     if KernelFeatures.UID_MATCH in self.kernel_features:
                         chown_keyfile(
-                            self.local_config["container"]["kernel-uid"],
-                            self.local_config["container"]["kernel-gid"],
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
                         )
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
@@ -881,8 +878,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if KernelFeatures.UID_MATCH in self.kernel_features:
                     self._chown_paths_if_root(
                         tmp_paths,
-                        self.local_config["container"]["kernel-uid"],
-                        self.local_config["container"]["kernel-gid"],
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
                     )
 
         kernel_obj = DockerKernel(
@@ -891,7 +888,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.image_ref,
             self.kspec_version,
             cluster_info["network_config"].get("mode", "bridge"),
-            agent_config=self.local_config,
+            agent_config=self.local_config.model_dump(by_alias=True),
             service_ports=service_ports,
             resource_spec=resource_spec,
             environ=environ,
@@ -907,7 +904,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     @property
     @override
     def protected_services(self) -> Sequence[str]:
-        rgtype: ResourceGroupType = self.local_config["agent"]["scaling-group-type"]
+        rgtype: ResourceGroupType = self.local_config.agent.scaling_group_type
         match rgtype:
             case ResourceGroupType.COMPUTE:
                 return ()
@@ -954,8 +951,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         image_labels = self.kernel_config["image"]["labels"]
 
         # PHASE 4: Run!
-        container_bind_host = self.local_config["container"]["bind-host"]
-        advertised_kernel_host = self.local_config["container"].get("advertised-host")
+        container_bind_host = self.local_config.container.bind_host
+        advertised_kernel_host = self.local_config.container.advertised_host
         if len(service_ports) + len(self.repl_ports) > len(self.port_pool):
             raise RuntimeError(
                 f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
@@ -1006,7 +1003,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ],
                 )
 
-        container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
+        container_log_size = self.local_config.container_logs.max_length
         container_log_file_count = 5
         container_log_file_size = BinarySize(container_log_size // container_log_file_count)
 
@@ -1070,7 +1067,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
             update_nested_dict(container_config, c)
-        if self.local_config["container"]["sandbox-type"] == "jail":
+        if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
             update_nested_dict(
                 container_config,
                 {
@@ -1112,14 +1109,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     pass
 
         # The final container config is settled down here.
-        if self.local_config["debug"]["log-kernel-config"]:
+        if self.local_config.debug.log_kernel_config:
             log.debug("full container config: {!r}", pretty(container_config))
 
         async def _rollback_container_creation() -> None:
             await _clean_scratch(
                 loop,
-                self.local_config["container"]["scratch-type"],
-                self.local_config["container"]["scratch-root"],
+                self.local_config.container.scratch_type,
+                self.local_config.container.scratch_root,
                 self.kernel_id,
             )
             self.port_pool.update(host_ports)
@@ -1293,7 +1290,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     def __init__(
         self,
         etcd: AsyncEtcd,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
@@ -1330,9 +1327,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
             kernel_version = docker_version["KernelVersion"]
             if "linuxkit" in kernel_version:
-                self.local_config["agent"]["docker-mode"] = "linuxkit"
+                self.local_config.agent.docker_mode = "linuxkit"
             else:
-                self.local_config["agent"]["docker-mode"] = "native"
+                self.local_config.agent.docker_mode = "native"
             docker_info = await docker.system.info()
             docker_info = dict(docker_info)
             # Assume cgroup v1 if CgroupVersion key is absent
@@ -1352,7 +1349,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
         except (DockerError, KeyError, IndexError):
             self.gwbridge_subnet = None
-        ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+        ipc_base_path = self.local_config.agent.ipc_base_path
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
@@ -1363,7 +1360,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 {
                     "Cmd": [
                         f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
                     ],
                     "HostConfig": {
                         "Mounts": [
@@ -1392,11 +1389,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # For legacy accelerator plugins
         self.docker = Docker()
 
-        self.network_plugin_ctx = NetworkPluginContext(self.etcd, self.local_config)
+        self.network_plugin_ctx = NetworkPluginContext(
+            self.etcd, self.local_config.model_dump(by_alias=True)
+        )
         await self.network_plugin_ctx.init(
             context=self,
-            allowlist=self.local_config["agent"]["allow-network-plugins"],
-            blocklist=self.local_config["agent"]["block-network-plugins"],
+            allowlist=self.local_config.agent.allow_network_plugins,
+            blocklist=self.local_config.agent.block_network_plugins,
         )
 
     async def shutdown(self, stop_signal: signal.Signals):
@@ -1439,11 +1438,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return self.docker_info["CgroupVersion"]
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config)
+        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
 
     async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(
-            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+            self.local_config.model_dump(by_alias=True),
+            {name: cctx.instance for name, cctx in self.computers.items()},
         )
 
     async def extract_image_command(self, image: str) -> Optional[str]:
@@ -1622,7 +1622,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         while True:
             agent_sock = zmq_ctx.socket(zmq.REP)
             try:
-                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
+                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config.agent.agent_sock_port}")
                 while True:
                     msg = await agent_sock.recv_multipart()
                     if not msg:
@@ -1826,7 +1826,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         name: str,
     ) -> bytes:
         loop = current_loop()
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
         return await loop.run_in_executor(
             None,
@@ -1840,11 +1840,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         data: bytes,
     ) -> None:
         loop = current_loop()
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
+
+        def _write_bytes(data: bytes) -> None:
+            (config_dir / name).write_bytes(data)
+
         return await loop.run_in_executor(
             None,
-            (config_dir / name).write_bytes,
+            _write_bytes,
             data,
         )
 
@@ -1934,10 +1938,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         except IOError:
                             pass
 
-            if (
-                not self.local_config["debug"]["skip-container-deletion"]
-                and container_id is not None
-            ):
+            if not self.local_config.debug.skip_container_deletion and container_id is not None:
                 container = docker.containers.container(container_id)
                 try:
                     with timeout(90):
@@ -1959,8 +1960,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if not restarting:
                 await _clean_scratch(
                     loop,
-                    self.local_config["container"]["scratch-type"],
-                    self.local_config["container"]["scratch-root"],
+                    self.local_config.container.scratch_type,
+                    self.local_config.container.scratch_root,
                     kernel_id,
                 )
                 if kernel_obj:
@@ -2058,9 +2059,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             kernel_id = await get_kernel_id_from_container(container_name)
                             if kernel_id is None:
                                 continue
-                            if self.local_config["debug"]["log-docker-events"] and evdata[
-                                "Action"
-                            ] in ("start", "die", "oom"):
+                            if self.local_config.debug.log_docker_events and evdata["Action"] in (
+                                "start",
+                                "die",
+                                "oom",
+                            ):
                                 log.debug(
                                     "docker-event: action={}, actor={}",
                                     evdata["Action"],
