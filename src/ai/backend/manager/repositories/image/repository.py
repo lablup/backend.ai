@@ -1,12 +1,19 @@
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
-from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.errors.exceptions import ForgetImageActionGenericForbiddenError
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, RescanImagesResult
+from ai.backend.manager.errors.exceptions import (
+    AliasImageActionDBError,
+    AliasImageActionValueError,
+    ForgetImageActionGenericForbiddenError,
+    ModifyImageActionValueError,
+)
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -14,16 +21,6 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.image.actions.alias_image import (
-    AliasImageActionDBError,
-    AliasImageActionValueError,
-)
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageActionValueError,
-)
-from ai.backend.manager.services.image.actions.purge_image_by_id import (
-    PurgeImageActionByIdObjectDBError,
-)
 
 
 class ImageRepository:
@@ -43,7 +40,26 @@ class ImageRepository:
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
-            return row.to_dataclass()
+            data = row.to_dataclass()
+        return data
+
+    async def resolve_images_batch(
+        self, identifier_lists: list[list[ImageIdentifier]]
+    ) -> list[ImageData]:
+        """
+        Resolves multiple images by their identifiers in a single database session.
+        Returns a list of ImageData objects.
+        More efficient than multiple individual resolve_image calls.
+        """
+        async with self._db.begin_session() as session:
+            rows: list[ImageRow] = []
+            for identifiers in identifier_lists:
+                row = await self._resolve_image(
+                    session, cast(list[ImageAlias | ImageRef | ImageIdentifier], identifiers)
+                )
+                rows.append(row)
+            data_list = [row.to_dataclass() for row in rows]
+        return data_list
 
     async def _resolve_image(
         self,
@@ -52,9 +68,48 @@ class ImageRepository:
     ) -> ImageRow:
         return await ImageRow.resolve(session, identifiers)
 
-    async def get_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageRow | None:
+    async def _get_image_by_id(
+        self, session: SASession, image_id: UUID, load_aliases: bool = False
+    ) -> Optional[ImageRow]:
+        """
+        Private method to get an image by ID using an existing session.
+        Returns None if image is not found.
+        """
+        return await ImageRow.get(session, image_id, load_aliases=load_aliases)
+
+    async def _validate_image_ownership(
+        self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
+    ) -> ImageRow:
+        """
+        Private method to get an image and validate ownership using an existing session.
+        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        """
+        image_row = await self._get_image_by_id(session, image_id, load_aliases)
+        if not image_row:
+            raise ForgetImageActionGenericForbiddenError()
+        if not image_row.is_owned_by(user_id):
+            raise ForgetImageActionGenericForbiddenError()
+        return image_row
+
+    async def _get_image_alias_by_name(
+        self, session: SASession, alias: str
+    ) -> Optional[ImageAliasRow]:
+        """
+        Private method to get an image alias by name using an existing session.
+        """
+        return await session.scalar(
+            sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
+        )
+
+    async def get_image_by_id(
+        self, image_id: UUID, load_aliases: bool = False
+    ) -> Optional[ImageData]:
         async with self._db.begin_session() as session:
-            return await ImageRow.get(session, image_id, load_aliases=load_aliases)
+            row = await self._get_image_by_id(session, image_id, load_aliases)
+            if not row:
+                return None
+            data = row.to_dataclass()
+        return data
 
     async def soft_delete_user_image(
         self,
@@ -70,49 +125,42 @@ class ImageRepository:
             if not row.is_owned_by(user_id):
                 raise ForgetImageActionGenericForbiddenError()
             await row.mark_as_deleted(session)
-            return row.to_dataclass()
-
-    async def soft_delete_image_force(
-        self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
-    ) -> ImageData:
-        """
-        Marks an image as deleted without checking ownership.
-        This is a forceful deletion and should be used with caution.
-        """
-        # TODO: Separate these methods from ImageRepository for security and clarity. Make a AdminImageRepository.
-        async with self._db.begin_session() as session:
-            row = await self._resolve_image(session, identifiers)
-            await row.mark_as_deleted(session)
-            return row.to_dataclass()
+            data = row.to_dataclass()
+        return data
 
     async def soft_delete_image_by_id(
-        self, image_id: UUID, user_id: UUID | None = None
+        self,
+        image_id: UUID,
+        user_id: UUID,
     ) -> ImageData:
         """
         Marks an image as deleted by its ID.
-        If user_id is provided, checks if the user owns the image.
+        Validates ownership by user_id before deletion.
         Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
         async with self._db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_id)
-            if not image_row:
-                raise ForgetImageActionGenericForbiddenError()
-            if user_id and not image_row.is_owned_by(user_id):
-                raise ForgetImageActionGenericForbiddenError()
+            image_row = await self._validate_image_ownership(session, image_id, user_id)
             await image_row.mark_as_deleted(session)
-            return image_row.to_dataclass()
+            data = image_row.to_dataclass()
+        return data
 
-    async def mark_image_as_deleted(self, image_id: UUID) -> None:
+    async def get_and_validate_image_ownership(
+        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
+    ) -> ImageData:
+        """
+        Gets an image by ID and validates ownership in a single operation.
+        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        """
         async with self._db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_id)
-            if image_row:
-                await image_row.mark_as_deleted(session)
-            if not image_row.is_owned_by(action.user_id):
-                raise ForgetImageActionGenericForbiddenError()
+            image_row = await self._validate_image_ownership(
+                session, image_id, user_id, load_aliases
+            )
+            data = image_row.to_dataclass()
+        return data
 
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
-    ) -> tuple[UUID, ImageAliasRow]:
+    ) -> tuple[UUID, ImageAliasData]:
         try:
             async with self._db.begin_session() as session:
                 image_row = await ImageRow.resolve(
@@ -120,53 +168,77 @@ class ImageRepository:
                 )
                 image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
                 image_row.aliases.append(image_alias)
-                return image_row.id, image_alias
+                row_id = image_row.id
+                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias)
+            return row_id, alias_data
         except ValueError:
             raise AliasImageActionValueError
-        except sa.exc.DBAPIError as e:
-            raise AliasImageActionDBError(e)
+        except DBAPIError as e:
+            raise AliasImageActionDBError(str(e))
 
-    async def get_image_alias(self, alias: str) -> ImageAliasRow | None:
+    async def get_image_alias(self, alias: str) -> Optional[ImageAliasData]:
         async with self._db.begin_session() as session:
-            return await session.scalar(
-                sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
+            row = await self._get_image_alias_by_name(session, alias)
+            if not row:
+                return None
+            data = ImageAliasData(id=row.id, alias=row.alias)
+        return data
+
+    async def delete_image_alias(self, alias: str) -> Optional[tuple[UUID, ImageAliasData]]:
+        async with self._db.begin_session() as session:
+            existing_alias = await self._get_image_alias_by_name(session, alias)
+            if not existing_alias:
+                return None
+            image_id = existing_alias.image_id
+            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias)
+            await session.delete(existing_alias)
+        return image_id, alias_data
+
+    async def scan_image_by_identifier(
+        self, image_canonical: str, architecture: str
+    ) -> RescanImagesResult:
+        """
+        Scans a single image by resolving it first and then scanning.
+        Returns RescanImagesResult with the scanned image data.
+        """
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
+        async with self._db.begin_session() as session:
+            # Resolve the image first
+            image_row = await self._resolve_image(
+                session, [ImageIdentifier(image_canonical, architecture)]
             )
 
-    async def delete_image_alias(self, alias: str) -> ImageAliasRow | None:
-        async with self._db.begin_session() as session:
-            existing_alias = await session.scalar(
-                sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
-            )
-            if existing_alias is not None:
-                await session.delete(existing_alias)
-            return existing_alias
+            # Get the registry info
+            registry_parts = []
+            if image_row.registry:
+                registry_parts.append(image_row.registry)
+            if image_row.project:
+                registry_parts.append(image_row.project)
+            registry_key = "/".join(registry_parts) if registry_parts else ""
 
-    async def delete_image_with_aliases(self, image_id: UUID) -> ImageRow | None:
-        try:
-            async with self._db.begin_session() as session:
-                image_row = await ImageRow.get(session, image_id, load_aliases=True)
-                if image_row:
-                    for alias in image_row.aliases:
-                        await session.delete(alias)
-                    await session.delete(image_row)
-                return image_row
-        except sa.exc.DBAPIError as e:
-            raise PurgeImageActionByIdObjectDBError(e)
+            # Get the registry row
+            registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
+            if not registry_row:
+                raise ValueError(f"Registry not found for image {image_canonical}")
 
-    async def scan_single_image(self, registry_key: str, image_row: ImageRow, image_canonical: str):
-        async with self._db.begin_session() as session:
-            return await scan_single_image(session, registry_key, image_row, image_canonical)
+            # Call the original scan function
+            result = await scan_single_image(self._db, registry_key, registry_row, image_canonical)
 
-    async def untag_image_from_registry(self, image_id: UUID) -> ImageRow | None:
+        return result
+
+    async def untag_image_from_registry(self, image_id: UUID) -> Optional[ImageData]:
         async with self._db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, image_id, load_aliases=True)
-            if image_row:
-                await image_row.untag_image_from_registry(self._db, session)
-            return image_row
+            image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
+            if not image_row:
+                return None
+            await image_row.untag_image_from_registry(self._db, session)
+            data = image_row.to_dataclass()
+        return data
 
     async def update_image_properties(
         self, target: str, architecture: str, properties_to_update: dict
-    ) -> ImageRow:
+    ) -> ImageData:
         try:
             async with self._db.begin_session() as session:
                 image_row = await ImageRow.resolve(
@@ -178,17 +250,51 @@ class ImageRepository:
                 )
                 for key, value in properties_to_update.items():
                     setattr(image_row, key, value)
-                return image_row
-        except (ValueError, sa.exc.DBAPIError):
+                data = image_row.to_dataclass()
+            return data
+        except (ValueError, DBAPIError):
             raise ModifyImageActionValueError
 
     async def clear_image_custom_resource_limit(
         self, image_canonical: str, architecture: str
-    ) -> ImageRow:
+    ) -> ImageData:
         async with self._db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session, [ImageIdentifier(image_canonical, architecture)]
             )
             image_row._resources = {}
-            await session.flush()
-            return image_row
+            data = image_row.to_dataclass()
+        return data
+
+    async def untag_image_from_registry_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
+        """
+        Validates ownership and untags an image from registry in a single operation.
+        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
+        """
+        async with self._db.begin_readonly_session() as session:
+            image_row = await self._validate_image_ownership(
+                session, image_id, user_id, load_aliases=True
+            )
+            await image_row.untag_image_from_registry(self._db, session)
+            data = image_row.to_dataclass()
+        return data
+
+    async def delete_image_with_aliases_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
+        """
+        Deletes an image and all its aliases after validating ownership.
+        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
+        """
+        from ai.backend.manager.errors.exceptions import PurgeImageActionByIdObjectDBError
+
+        try:
+            async with self._db.begin_session() as session:
+                image_row = await self._validate_image_ownership(
+                    session, image_id, user_id, load_aliases=True
+                )
+                data = image_row.to_dataclass()
+                for alias in image_row.aliases:
+                    await session.delete(alias)
+                await session.delete(image_row)
+            return data
+        except DBAPIError as e:
+            raise PurgeImageActionByIdObjectDBError(str(e))

@@ -995,3 +995,63 @@ class ForgetImageActionGenericForbiddenError(BackendError):
             operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class AliasImageActionValueError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-parameters"
+    error_title = "Invalid parameters for image alias."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE_ALIAS,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class AliasImageActionDBError(BackendError, web.HTTPInternalServerError):
+    """
+    This can occur when an image alias with the same value already exists.
+    """
+
+    error_type = "https://api.backend.ai/probs/image-db-error"
+    error_title = "Database error while managing image alias."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE_ALIAS,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class ModifyImageActionValueError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-parameters"
+    error_title = "Invalid parameters for image modification."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PurgeImageActionByIdObjectDBError(BackendError, web.HTTPInternalServerError):
+    """
+    This can occur when the alias of the image you are trying to delete already exists.
+    """
+
+    error_type = "https://api.backend.ai/probs/image-db-error"
+    error_title = "Database error while purging image."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
