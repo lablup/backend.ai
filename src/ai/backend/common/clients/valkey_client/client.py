@@ -353,7 +353,7 @@ def valkey_decorator(
         observer = ClientMetricObserver.instance()
 
         async def wrapper(*args, **kwargs) -> R:
-            log.debug("Calling {}", func.__name__)
+            log.trace("Calling {}", func.__name__)
             start = time.perf_counter()
             for attempt in range(retry_count):
                 try:
