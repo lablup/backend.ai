@@ -162,83 +162,78 @@ class UserService:
         email = action.email
         log.info("Purging all records of the user {0}...", email)
 
-        try:
-            # Check if user exists
-            user_data = await self._admin_user_repository.get_by_email_force(email)
-            if not user_data:
-                raise RuntimeError(f"User not found (email: {email})")
+        # Check if user exists
+        user_data = await self._admin_user_repository.get_by_email_force(email)
+        if not user_data:
+            raise RuntimeError(f"User not found (email: {email})")
 
-            user_uuid = user_data.uuid
+        user_uuid = user_data.uuid
 
-            # Check for active vfolder mounts
-            if await self._admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force(
-                user_uuid
-            ):
-                raise RuntimeError(
-                    "Some of user's virtual folders are mounted to active kernels. "
-                    "Terminate those kernels first.",
-                )
-
-            # Handle shared vfolders migration
-            if action.purge_shared_vfolders.optional_value():
-                await self._admin_user_repository.migrate_shared_vfolders_force(
-                    deleted_user_uuid=user_uuid,
-                    target_user_uuid=action.user_info_ctx.uuid,
-                    target_user_email=action.user_info_ctx.email,
-                )
-
-            # Handle endpoint ownership delegation
-            if action.delegate_endpoint_ownership.optional_value():
-                await self._admin_user_repository.delegate_endpoint_ownership_force(
-                    user_uuid=user_uuid,
-                    target_user_uuid=action.user_info_ctx.uuid,
-                    target_main_access_key=action.user_info_ctx.main_access_key,
-                )
-                await self._admin_user_repository.delete_endpoints_force(
-                    user_uuid=user_uuid,
-                    delete_destroyed_only=True,
-                )
-            else:
-                await self._admin_user_repository.delete_endpoints_force(
-                    user_uuid=user_uuid,
-                    delete_destroyed_only=False,
-                )
-
-            # Handle active sessions
-            if active_sessions := await self._admin_user_repository.retrieve_active_sessions_force(
-                user_uuid
-            ):
-                tasks = [
-                    asyncio.create_task(
-                        self._agent_registry.destroy_session(
-                            session,
-                            forced=True,
-                            reason=KernelLifecycleEventReason.USER_PURGED,
-                        )
-                    )
-                    for session in active_sessions
-                ]
-
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                for sess, result in zip(active_sessions, results):
-                    if isinstance(result, Exception):
-                        log.warning(f"Session {sess.id} not terminated properly: {result}")
-
-            # Delete vfolders
-            await self._admin_user_repository.delete_user_vfolders_force(
-                user_uuid=user_uuid,
-                storage_manager=self._storage_manager,
+        # Check for active vfolder mounts
+        if await self._admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force(
+            user_uuid
+        ):
+            raise RuntimeError(
+                "Some of user's virtual folders are mounted to active kernels. "
+                "Terminate those kernels first.",
             )
 
-            # Finally purge the user completely
-            await self._admin_user_repository.purge_user_force(email)
+        # Handle shared vfolders migration
+        if action.purge_shared_vfolders.optional_value():
+            await self._admin_user_repository.migrate_shared_vfolders_force(
+                deleted_user_uuid=user_uuid,
+                target_user_uuid=action.user_info_ctx.uuid,
+                target_user_email=action.user_info_ctx.email,
+            )
 
-            return PurgeUserActionResult(success=True)
+        # Handle endpoint ownership delegation
+        if action.delegate_endpoint_ownership.optional_value():
+            await self._admin_user_repository.delegate_endpoint_ownership_force(
+                user_uuid=user_uuid,
+                target_user_uuid=action.user_info_ctx.uuid,
+                target_main_access_key=action.user_info_ctx.main_access_key,
+            )
+            await self._admin_user_repository.delete_endpoints_force(
+                user_uuid=user_uuid,
+                delete_destroyed_only=True,
+            )
+        else:
+            await self._admin_user_repository.delete_endpoints_force(
+                user_uuid=user_uuid,
+                delete_destroyed_only=False,
+            )
 
-        except Exception as e:
-            log.error("Failed to purge user {}: {}", email, str(e))
-            return PurgeUserActionResult(success=False)
+        # Handle active sessions
+        if active_sessions := await self._admin_user_repository.retrieve_active_sessions_force(
+            user_uuid
+        ):
+            tasks = [
+                asyncio.create_task(
+                    self._agent_registry.destroy_session(
+                        session,
+                        forced=True,
+                        reason=KernelLifecycleEventReason.USER_PURGED,
+                    )
+                )
+                for session in active_sessions
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for sess, result in zip(active_sessions, results):
+                if isinstance(result, Exception):
+                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+
+        # Delete vfolders
+        await self._admin_user_repository.delete_user_vfolders_force(
+            user_uuid=user_uuid,
+            storage_manager=self._storage_manager,
+        )
+
+        # Finally purge the user completely
+        await self._admin_user_repository.purge_user_force(email)
+
+        return PurgeUserActionResult(success=True)
 
     async def user_month_stats(self, action: UserMonthStatsAction) -> UserMonthStatsActionResult:
         from uuid import UUID
