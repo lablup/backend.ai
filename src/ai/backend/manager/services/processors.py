@@ -117,7 +117,9 @@ class Services:
             args.config_provider,
             repositories.agent.repository,
         )
-        domain_service = DomainService(args.db, repositories.domain.repository)
+        domain_service = DomainService(
+            repositories.domain.repository, repositories.domain.admin_repository
+        )
         group_service = GroupService(
             args.storage_manager,
             args.config_provider,

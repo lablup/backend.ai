@@ -1,20 +1,14 @@
-from typing import Iterable, Optional
+from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.models import groups, users
-from ai.backend.manager.models.domain import DomainRow, domains, get_domains
+from ai.backend.manager.models import groups
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import ProjectType
-from ai.backend.manager.models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    kernels,
-)
-from ai.backend.manager.models.rbac import SystemScope
-from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.services.domain.types import (
     DomainCreator,
@@ -24,16 +18,21 @@ from ai.backend.manager.services.domain.types import (
 )
 
 
-class DomainRepository:
+class AdminDomainRepository:
+    """
+    Repository for admin-specific domain operations that bypass ownership checks.
+    This should only be used by superadmin users.
+    """
+
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def create_domain_validated(self, creator: DomainCreator) -> DomainData:
+    async def create_domain_force(self, creator: DomainCreator) -> DomainData:
         """
-        Creates a new domain with model-store group.
-        Validates domain creation permissions.
+        Creates a new domain with model-store group without permission checks.
+        For superadmin use only.
         """
         async with self._db.begin() as conn:
             data = creator.fields_to_store()
@@ -52,12 +51,12 @@ class DomainRepository:
         assert result is not None
         return result
 
-    async def modify_domain_validated(
+    async def modify_domain_force(
         self, domain_name: str, modifier: DomainModifier
     ) -> Optional[DomainData]:
         """
-        Modifies an existing domain.
-        Validates domain modification permissions.
+        Modifies an existing domain without permission checks.
+        For superadmin use only.
         """
         async with self._db.begin() as conn:
             data = modifier.fields_to_update()
@@ -75,10 +74,10 @@ class DomainRepository:
 
         return DomainData.from_row(row)
 
-    async def soft_delete_domain_validated(self, domain_name: str) -> bool:
+    async def soft_delete_domain_force(self, domain_name: str) -> bool:
         """
-        Soft deletes a domain by setting is_active to False.
-        Validates domain deletion permissions.
+        Soft deletes a domain by setting is_active to False without permission checks.
+        For superadmin use only.
         """
         async with self._db.begin() as conn:
             update_query = (
@@ -87,25 +86,13 @@ class DomainRepository:
             result = await conn.execute(update_query)
             return result.rowcount > 0
 
-    async def purge_domain_validated(self, domain_name: str) -> bool:
+    async def purge_domain_force(self, domain_name: str) -> bool:
         """
-        Permanently deletes a domain after validation checks.
-        Validates domain purge permissions and prerequisites.
+        Permanently deletes a domain without validation checks.
+        For superadmin use only - bypasses all safety checks.
         """
         async with self._db.begin() as conn:
-            # Validate prerequisites
-            if await self._domain_has_active_kernels(conn, domain_name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
-
-            user_count = await self._get_domain_user_count(conn, domain_name)
-            if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
-
-            group_count = await self._get_domain_group_count(conn, domain_name)
-            if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
-
-            # Clean up kernels
+            # Force clean up kernels
             await self._delete_kernels(conn, domain_name)
 
             # Delete domain
@@ -113,12 +100,12 @@ class DomainRepository:
             result = await conn.execute(delete_query)
             return result.rowcount > 0
 
-    async def create_domain_node_validated(
+    async def create_domain_node_force(
         self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
         """
-        Creates a domain node with scaling groups.
-        Validates domain node creation permissions.
+        Creates a domain node with scaling groups without permission checks.
+        For superadmin use only.
         """
         async with self._db.begin_session() as session:
             data = creator.fields_to_store()
@@ -144,7 +131,7 @@ class DomainRepository:
             assert result is not None
             return result
 
-    async def modify_domain_node_validated(
+    async def modify_domain_node_force(
         self,
         domain_name: str,
         modifier_fields: dict,
@@ -152,8 +139,8 @@ class DomainRepository:
         sgroups_to_remove: Optional[set[str]] = None,
     ) -> Optional[DomainData]:
         """
-        Modifies a domain node with scaling group changes.
-        Validates domain node modification permissions.
+        Modifies a domain node with scaling group changes without permission checks.
+        For superadmin use only.
         """
         async with self._db.begin_session() as session:
             if sgroups_to_add is not None:
@@ -213,57 +200,24 @@ class DomainRepository:
         result = await conn.execute(delete_query)
         return result.rowcount
 
-    async def _domain_has_active_kernels(self, conn: SAConnection, domain_name: str) -> bool:
-        """
-        Private method to check if domain has active kernels.
-        """
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.domain_name == domain_name)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            )
-        )
-        active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
-
-    async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
-        """
-        Private method to get user count for a domain.
-        """
-        query = sa.select([sa.func.count()]).where(users.c.domain_name == domain_name)
-        return await conn.scalar(query)
-
-    async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
-        """
-        Private method to get group count for a domain.
-        """
-        query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
-        return await conn.scalar(query)
-
-    async def create_domain_node_with_permissions(
+    async def create_domain_node_with_permissions_force(
         self,
         creator: DomainCreator,
         user_info: UserInfo,
         scaling_groups: Optional[list[str]] = None,
     ) -> DomainData:
         """
-        Creates a domain node with scaling groups and permission checks.
-        Validates scaling group permissions before creating.
+        Creates a domain node with scaling groups without permission checks.
+        For superadmin use only.
         """
 
         async def _insert(db_session: SASession) -> DomainData:
-            if scaling_groups is not None:
-                await self._ensure_sgroup_permission(
-                    user_info, scaling_groups, db_session=db_session
-                )
-            return await self.create_domain_node_validated(creator, scaling_groups)
+            return await self.create_domain_node_force(creator, scaling_groups)
 
         async with self._db.connect() as db_conn:
             return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
 
-    async def modify_domain_node_with_permissions(
+    async def modify_domain_node_with_permissions_force(
         self,
         domain_name: str,
         modifier_fields: dict,
@@ -272,34 +226,12 @@ class DomainRepository:
         sgroups_to_remove: Optional[set[str]] = None,
     ) -> Optional[DomainData]:
         """
-        Modifies a domain node with scaling group changes and permission checks.
-        Validates domain and scaling group permissions.
+        Modifies a domain node with scaling group changes without permission checks.
+        For superadmin use only.
         """
 
         async def _update(db_session: SASession) -> Optional[DomainData]:
-            client_ctx = ClientContext(
-                self._db, user_info.domain_name, user_info.id, user_info.role
-            )
-            domain_models = await get_domains(
-                SystemScope(),
-                DomainPermission.UPDATE_ATTRIBUTE,
-                [domain_name],
-                ctx=client_ctx,
-                db_session=db_session,
-            )
-            if not domain_models:
-                raise ValueError(f"Not allowed to update domain (id:{domain_name})")
-
-            if sgroups_to_add is not None:
-                await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_add, db_session=db_session
-                )
-            if sgroups_to_remove is not None:
-                await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_remove, db_session=db_session
-                )
-
-            return await self.modify_domain_node_validated(
+            return await self.modify_domain_node_force(
                 domain_name,
                 modifier_fields,
                 sgroups_to_add,
@@ -308,23 +240,3 @@ class DomainRepository:
 
         async with self._db.connect() as db_conn:
             return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
-
-    async def _ensure_sgroup_permission(
-        self, user_info: UserInfo, sgroup_names: Iterable[str], *, db_session: SASession
-    ) -> None:
-        """
-        Private method to validate scaling group permissions.
-        """
-        client_ctx = ClientContext(self._db, user_info.domain_name, user_info.id, user_info.role)
-        sgroup_models = await get_scaling_groups(
-            SystemScope(),
-            ScalingGroupPermission.ASSOCIATE_WITH_SCOPES,
-            sgroup_names,
-            db_session=db_session,
-            ctx=client_ctx,
-        )
-        not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
-        if not_allowed_sgroups:
-            raise ValueError(
-                f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
-            )
