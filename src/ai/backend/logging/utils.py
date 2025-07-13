@@ -16,10 +16,18 @@ _TRACE_LEVEL = 5
 _TRACE_LEVEL_NAME = "TRACE"
 
 _module_loaded = False
+
+
 def init_logger():
     global _module_loaded
+    if _module_loaded:
+        return
     _module_loaded = True
     logging.addLevelName(_TRACE_LEVEL, _TRACE_LEVEL_NAME)
+
+
+init_logger()
+
 
 class BraceMessage:
     __slots__ = ("fmt", "args")
@@ -44,7 +52,7 @@ class BraceStyleAdapter(logging.LoggerAdapter):
             msg, kwargs = self.process(msg, kwargs)
             kwargs["stacklevel"] = kwargs.get("stacklevel", 1) + 1
             self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
-    
+
     def trace(self, msg, *args, **kwargs):
         self.log(_TRACE_LEVEL, msg, *args, **kwargs)
 
