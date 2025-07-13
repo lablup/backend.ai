@@ -982,3 +982,16 @@ class UnknownImageReferenceError(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ForgetImageActionGenericForbiddenError(BackendError):
+    error_type = "https://api.backend.ai/probs/generic-forbidden"
+    error_title = "Access to this resource is forbidden."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )

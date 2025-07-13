@@ -12,7 +12,6 @@ from ai.backend.manager.models.image import (
     ImageStatus,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -30,7 +29,6 @@ from ai.backend.manager.services.image.actions.dealias_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
-    ForgetImageActionGenericForbiddenError,
     ForgetImageActionResult,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import (
@@ -79,33 +77,36 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class ImageService:
-    _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
     _image_repository: ImageRepository
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
         image_repository: ImageRepository,
     ) -> None:
-        self._db = db
         self._agent_registry = agent_registry
         self._image_repository = image_repository
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
-        image_row = await self._image_repository.resolve_image(
+        if action.client_role == UserRole.SUPERADMIN:
+            # Superadmin can forget any image without checking ownership
+            data = await self._image_repository.soft_delete_image_force(
+                [
+                    ImageIdentifier(action.reference, action.architecture),
+                    ImageAlias(action.reference),
+                ],
+            )
+            return ForgetImageActionResult(image=data)
+        # Regular users can only forget images they own
+        data = await self._image_repository.soft_delete_user_image(
             [
                 ImageIdentifier(action.reference, action.architecture),
                 ImageAlias(action.reference),
             ],
+            action.user_id,
         )
-        if action.client_role != UserRole.SUPERADMIN:
-            if not image_row.is_owned_by(action.user_id):
-                raise ForgetImageActionGenericForbiddenError()
-        await self._image_repository.mark_image_as_deleted(image_row.id)
-        image_row.status = ImageStatus.DELETED
-        return ForgetImageActionResult(image=image_row.to_dataclass())
+        return ForgetImageActionResult(image=data)
 
     async def forget_image_by_id(
         self, action: ForgetImageByIdAction
@@ -122,7 +123,7 @@ class ImageService:
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         try:
-            image_id, image_alias = await self._image_repository.create_image_alias_and_attach(
+            image_id, image_alias = await self._image_repository.add_image_alias(
                 action.alias, action.image_canonical, action.architecture
             )
         except UnknownImageReference:
@@ -156,11 +157,9 @@ class ImageService:
         return ModifyImageActionResult(image=image_row.to_dataclass())
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
-        _ = action
         raise NotImplementedError
 
     async def unload_image(self, action: UnloadImageAction) -> UnloadImageActionResult:
-        _ = action
         raise NotImplementedError
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
@@ -192,7 +191,7 @@ class ImageService:
         arch = action.image.architecture
 
         image_identifier = ImageIdentifier(image_canonical, arch)
-        image_row = await self._image_repository.resolve_image([image_identifier])
+        image_data = await self._image_repository.resolve_image([image_identifier])
 
         results = await self._agent_registry.purge_images(
             AgentId(agent_id),
@@ -207,9 +206,9 @@ class ImageService:
                 )
 
         return PurgeImageActionResult(
-            purged_image=image_row.to_dataclass(),
+            purged_image=image_data,
             error=error,
-            reserved_bytes=image_row.size_bytes,
+            reserved_bytes=image_data.size_bytes,
         )
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:

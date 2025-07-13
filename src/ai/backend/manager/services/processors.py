@@ -16,6 +16,7 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -121,10 +122,9 @@ class Services:
         user_service = UserService(
             args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
         )
-        from ai.backend.manager.repositories.image.repository import ImageRepository
 
         image_repository = ImageRepository(args.db)
-        image_service = ImageService(args.db, args.agent_registry, image_repository)
+        image_service = ImageService(args.agent_registry, image_repository)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
             args.db, args.config_provider, args.storage_manager, args.background_task_manager

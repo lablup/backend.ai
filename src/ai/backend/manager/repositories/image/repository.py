@@ -1,9 +1,12 @@
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
+from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.errors.exceptions import ForgetImageActionGenericForbiddenError
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -31,21 +34,83 @@ class ImageRepository:
 
     async def resolve_image(
         self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
-    ) -> ImageRow:
+    ) -> ImageData:
+        """
+        Resolves an image by its identifiers, which can be a combination of
+        ImageAlias, ImageRef, or ImageIdentifier.
+        Returns an ImageData object.
+        Raises Exception if the image cannot be resolved.
+        """
         async with self._db.begin_session() as session:
-            return await ImageRow.resolve(session, identifiers)
+            row = await self._resolve_image(session, identifiers)
+            return row.to_dataclass()
+
+    async def _resolve_image(
+        self,
+        session: SASession,
+        identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
+    ) -> ImageRow:
+        return await ImageRow.resolve(session, identifiers)
 
     async def get_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageRow | None:
         async with self._db.begin_session() as session:
             return await ImageRow.get(session, image_id, load_aliases=load_aliases)
+
+    async def soft_delete_user_image(
+        self,
+        identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
+        user_id: UUID,
+    ) -> ImageData:
+        """
+        Marks an image as deleted for a specific user.
+        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
+        """
+        async with self._db.begin_session() as session:
+            row = await self._resolve_image(session, identifiers)
+            if not row.is_owned_by(user_id):
+                raise ForgetImageActionGenericForbiddenError()
+            await row.mark_as_deleted(session)
+            return row.to_dataclass()
+
+    async def soft_delete_image_force(
+        self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
+    ) -> ImageData:
+        """
+        Marks an image as deleted without checking ownership.
+        This is a forceful deletion and should be used with caution.
+        """
+        # TODO: Separate these methods from ImageRepository for security and clarity. Make a AdminImageRepository.
+        async with self._db.begin_session() as session:
+            row = await self._resolve_image(session, identifiers)
+            await row.mark_as_deleted(session)
+            return row.to_dataclass()
+
+    async def soft_delete_image_by_id(
+        self, image_id: UUID, user_id: UUID | None = None
+    ) -> ImageData:
+        """
+        Marks an image as deleted by its ID.
+        If user_id is provided, checks if the user owns the image.
+        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await ImageRow.get(session, image_id)
+            if not image_row:
+                raise ForgetImageActionGenericForbiddenError()
+            if user_id and not image_row.is_owned_by(user_id):
+                raise ForgetImageActionGenericForbiddenError()
+            await image_row.mark_as_deleted(session)
+            return image_row.to_dataclass()
 
     async def mark_image_as_deleted(self, image_id: UUID) -> None:
         async with self._db.begin_session() as session:
             image_row = await ImageRow.get(session, image_id)
             if image_row:
                 await image_row.mark_as_deleted(session)
+            if not image_row.is_owned_by(action.user_id):
+                raise ForgetImageActionGenericForbiddenError()
 
-    async def create_image_alias_and_attach(
+    async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasRow]:
         try:

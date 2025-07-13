@@ -3,13 +3,12 @@ from dataclasses import replace
 
 import pytest
 
-from ai.backend.manager.errors.exceptions import ImageNotFound
+from ai.backend.manager.errors.exceptions import ForgetImageActionGenericForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
-    ForgetImageActionGenericForbiddenError,
     ForgetImageActionResult,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
