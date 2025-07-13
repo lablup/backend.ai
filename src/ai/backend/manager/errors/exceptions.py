@@ -1080,3 +1080,30 @@ class PurgeImageActionByIdObjectDBError(BackendError, web.HTTPInternalServerErro
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+# Model Serving Exceptions
+
+
+class ModelServiceNotFound(ObjectNotFound):
+    object_name = "model service"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RouteNotFound(ObjectNotFound):
+    object_name = "route"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROUTE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

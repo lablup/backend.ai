@@ -1,19 +1,10 @@
-import asyncio
 import decimal
 import logging
-from typing import Any, Awaitable, Callable
-
-import sqlalchemy as sa
-from sqlalchemy.orm.exc import NoResultFound
+from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-)
+from ai.backend.manager.models.endpoint import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
@@ -37,200 +28,171 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
 from ai.backend.manager.services.model_serving.exceptions import (
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
-    GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
-from ai.backend.manager.services.model_serving.services.utils import verify_user_access_scopes
 from ai.backend.manager.services.model_serving.types import (
     EndpointAutoScalingRuleData,
-    MutationResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class AutoScalingService:
-    _db: ExtendedAsyncSAEngine
     _model_serving_repository: ModelServingRepository
     _admin_model_serving_repository: AdminModelServingRepository
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
         model_serving_repository: ModelServingRepository,
         admin_model_serving_repository: AdminModelServingRepository,
     ) -> None:
-        self._db = db
         self._model_serving_repository = model_serving_repository
         self._admin_model_serving_repository = admin_model_serving_repository
 
     async def scale_service_replicas(
         self, action: ScaleServiceReplicasAction
     ) -> ScaleServiceReplicasActionResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            try:
-                endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
-            except NoResultFound:
+        # Get endpoint with access validation
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            endpoint_data = await self._admin_model_serving_repository.get_endpoint_by_id_force(
+                action.service_id
+            )
+            if not endpoint_data:
                 raise ModelServiceNotFound
-        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
-        async with self._db.begin_session() as db_sess:
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == action.service_id)
-                .values({"replicas": action.to})
+            success = await self._admin_model_serving_repository.update_endpoint_replicas_force(
+                action.service_id, action.to
             )
-            await db_sess.execute(query)
-            return ScaleServiceReplicasActionResult(
-                current_route_count=len(endpoint.routings), target_count=action.to
+        else:
+            endpoint_data = await self._model_serving_repository.get_endpoint_by_id_validated(
+                action.service_id,
+                action.requester_ctx.user_id,
+                action.requester_ctx.user_role,
+                action.requester_ctx.domain_name,
             )
+            if not endpoint_data:
+                raise ModelServiceNotFound
+
+            success = await self._model_serving_repository.update_endpoint_replicas_validated(
+                action.service_id,
+                action.to,
+                action.requester_ctx.user_id,
+                action.requester_ctx.user_role,
+                action.requester_ctx.domain_name,
+            )
+
+        if not success:
+            raise ModelServiceNotFound
+
+        return ScaleServiceReplicasActionResult(
+            current_route_count=len(endpoint_data.routings), target_count=action.to
+        )
 
     async def create_endpoint_auto_scaling_rule(
         self, action: CreateEndpointAutoScalingRuleAction
     ) -> CreateEndpointAutoScalingRuleActionResult:
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointRow.get(db_session, action.endpoint_id)
-                if row.lifecycle_stage in EndpointLifecycle.inactive_states():
-                    raise EndpointNotFound
-            except NoResultFound:
-                raise EndpointNotFound
+        try:
+            _threshold = decimal.Decimal(action.creator.threshold)
+        except decimal.InvalidOperation:
+            raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
 
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
+        # Handle optional parameters with default values
+        cooldown_seconds = action.creator.cooldown_seconds or 0
+        min_replicas = action.creator.min_replicas or 1
+        max_replicas = action.creator.max_replicas or 10
 
-            try:
-                _threshold = decimal.Decimal(action.creator.threshold)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
+        # Convert string enums to proper enum types
+        metric_source = AutoScalingMetricSource(action.creator.metric_source)
+        comparator = AutoScalingMetricComparator(action.creator.comparator)
 
-            async def _do_mutate() -> MutationResult:
-                created_rule = await row.create_auto_scaling_rule(
-                    db_session,
-                    action.creator.metric_source,
+        # Create auto scaling rule with access validation
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            created_rule = (
+                await self._admin_model_serving_repository.create_auto_scaling_rule_force(
+                    action.endpoint_id,
+                    metric_source,
                     action.creator.metric_name,
                     _threshold,
-                    action.creator.comparator,
+                    comparator,
                     action.creator.step_size,
-                    cooldown_seconds=action.creator.cooldown_seconds,
-                    min_replicas=action.creator.min_replicas,
-                    max_replicas=action.creator.max_replicas,
+                    cooldown_seconds,
+                    min_replicas,
+                    max_replicas,
                 )
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule created",
-                    data=created_rule,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return CreateEndpointAutoScalingRuleActionResult(
-                success=res.success,
-                data=EndpointAutoScalingRuleData.from_row(res.data),
             )
+        else:
+            created_rule = await self._model_serving_repository.create_auto_scaling_rule_validated(
+                action.endpoint_id,
+                metric_source,
+                action.creator.metric_name,
+                _threshold,
+                comparator,
+                action.creator.step_size,
+                cooldown_seconds,
+                min_replicas,
+                max_replicas,
+                action.requester_ctx.user_id,
+                action.requester_ctx.user_role,
+                action.requester_ctx.domain_name,
+            )
+
+        if not created_rule:
+            raise EndpointNotFound
+
+        return CreateEndpointAutoScalingRuleActionResult(
+            success=True,
+            data=EndpointAutoScalingRuleData.from_row(created_rule),
+        )
 
     async def modify_endpoint_auto_scaling_rule(
         self, action: ModifyEndpointAutoScalingRuleAction
     ) -> ModifyEndpointAutoScalingRuleActionResult:
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(
-                    db_session, action.id, load_endpoint=True
+        fields_to_update: dict[str, Any] = action.modifier.fields_to_update()
+
+        # Update auto scaling rule with access validation
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            updated_rule = (
+                await self._admin_model_serving_repository.update_auto_scaling_rule_force(
+                    action.id, fields_to_update
                 )
-                if row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
-                    raise EndpointAutoScalingRuleNotFound
-            except NoResultFound:
-                raise EndpointAutoScalingRuleNotFound
-
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
-
-            async def _do_mutate() -> MutationResult:
-                fields_to_update: dict[str, Any] = action.modifier.fields_to_update()
-                for key, value in fields_to_update.items():
-                    setattr(row, key, value)
-
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule updated",
-                    data=row,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return ModifyEndpointAutoScalingRuleActionResult(
-                success=res.success,
-                data=EndpointAutoScalingRuleData.from_row(res.data),
             )
+        else:
+            updated_rule = await self._model_serving_repository.update_auto_scaling_rule_validated(
+                action.id,
+                fields_to_update,
+                action.requester_ctx.user_id,
+                action.requester_ctx.user_role,
+                action.requester_ctx.domain_name,
+            )
+
+        if not updated_rule:
+            raise EndpointAutoScalingRuleNotFound
+
+        return ModifyEndpointAutoScalingRuleActionResult(
+            success=True,
+            data=EndpointAutoScalingRuleData.from_row(updated_rule),
+        )
 
     async def delete_endpoint_auto_scaling_rule(
         self, action: DeleteEndpointAutoScalingRuleAction
     ) -> DeleteEndpointAutoScalingRuleActionResult:
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(
-                    db_session, action.id, load_endpoint=True
-                )
-            except NoResultFound:
-                raise EndpointAutoScalingRuleNotFound
-
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
-
-            async def _do_mutate() -> MutationResult:
-                await db_session.delete(row)
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule removed",
-                    data=None,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return DeleteEndpointAutoScalingRuleActionResult(
-                success=res.success,
+        # Delete auto scaling rule with access validation
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            success = await self._admin_model_serving_repository.delete_auto_scaling_rule_force(
+                action.id
+            )
+        else:
+            success = await self._model_serving_repository.delete_auto_scaling_rule_validated(
+                action.id,
+                action.requester_ctx.user_id,
+                action.requester_ctx.user_role,
+                action.requester_ctx.domain_name,
             )
 
-    async def _db_mutation_wrapper(
-        self, _do_mutate: Callable[[], Awaitable[MutationResult]]
-    ) -> MutationResult:
-        try:
-            return await execute_with_retry(_do_mutate)
-        except sa.exc.IntegrityError as e:
-            log.warning("db_mutation_wrapper(): integrity error ({})", repr(e))
-            return MutationResult(success=False, message=f"integrity error: {e}", data=None)
-        except sa.exc.StatementError as e:
-            log.warning(
-                "db_mutation_wrapper(): statement error ({})\n{}",
-                repr(e),
-                e.statement or "(unknown)",
-            )
-            orig_exc = e.orig
-            return MutationResult(success=False, message=str(orig_exc), data=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            raise
-        except Exception:
-            log.exception("db_mutation_wrapper(): other error")
-            raise
+        if not success:
+            raise EndpointAutoScalingRuleNotFound
+
+        return DeleteEndpointAutoScalingRuleActionResult(
+            success=True,
+        )
