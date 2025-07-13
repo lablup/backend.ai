@@ -11,13 +11,13 @@ from typing import (
     cast,
 )
 
-import msgpack
 from glide import (
     Batch,
     ExpirySet,
     ExpiryType,
 )
 
+from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
