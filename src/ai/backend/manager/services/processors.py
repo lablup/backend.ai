@@ -208,7 +208,6 @@ class Services:
             repositories.model_serving.admin_repository,
         )
         auth = AuthService(
-            db=args.db,
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
         )

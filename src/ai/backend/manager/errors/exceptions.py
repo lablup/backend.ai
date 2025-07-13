@@ -277,6 +277,45 @@ class PasswordExpired(BackendError, web.HTTPUnauthorized):
         )
 
 
+class EmailAlreadyExistsError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/email-already-exists"
+    error_title = "Email already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class GroupMembershipNotFoundError(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-membership-not-found"
+    error_title = "User is not a member of the specified group."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserCreationError(BackendError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/user-creation-failed"
+    error_title = "Failed to create user account."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
