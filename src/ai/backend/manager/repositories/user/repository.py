@@ -1,6 +1,6 @@
-from typing import Any, Mapping, Optional
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any, Mapping, Optional
 from uuid import UUID
 
 import msgpack
@@ -14,12 +14,12 @@ from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.exceptions import UserNotFound
+from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
 from ai.backend.manager.models.user import UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models import kernels
 from ai.backend.manager.services.user.type import UserData
 
 
@@ -102,7 +102,10 @@ class UserRepository:
                 conn, created_user.uuid, user_data["domain_name"], group_ids
             )
 
-            return UserData.from_row(created_user)
+            res = UserData.from_row(created_user)
+        if not res:
+            raise RuntimeError("Failed to convert created user row to UserData")
+        return res
 
     async def update_user_validated(
         self,
@@ -157,7 +160,10 @@ class UserRepository:
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
 
-            return UserData.from_row(updated_user)
+            res = UserData.from_row(updated_user)
+        if not res:
+            raise RuntimeError("Failed to convert updated user row to UserData")
+        return res
 
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
         """
@@ -346,7 +352,7 @@ class UserRepository:
         return await self._get_time_binned_monthly_stats(user_uuid, valkey_stat_client)
 
     async def _get_time_binned_monthly_stats(
-        self, 
+        self,
         user_uuid: Optional[UUID],
         valkey_stat_client: ValkeyStatClient,
     ) -> list[dict[str, Any]]:

@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.exceptions import UserNotFound, VFolderOperationFailed
 from ai.backend.manager.models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -15,7 +16,6 @@ from ai.backend.manager.models import (
     kernels,
     vfolder_invitations,
     vfolder_status_map,
-    vfolders,
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_logs import error_logs
@@ -85,7 +85,10 @@ class AdminUserRepository:
             if not created_user:
                 raise RuntimeError("Failed to create user")
 
-            return UserData.from_row(created_user)
+        result = UserData.from_row(created_user)
+        if not result:
+            raise RuntimeError("Failed to convert created user row to UserData")
+        return result
 
     async def update_user_force(
         self,
@@ -107,7 +110,10 @@ class AdminUserRepository:
             if not updated_user:
                 raise UserNotFound()
 
-            return UserData.from_row(updated_user)
+        result = UserData.from_row(updated_user)
+        if not result:
+            raise RuntimeError("Failed to convert updated user row to UserData")
+        return result
 
     async def delete_user_force(self, email: str) -> None:
         """
@@ -213,7 +219,7 @@ class AdminUserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: str,
+        target_main_access_key: AccessKey,
     ) -> None:
         """
         Delegate endpoint ownership to another user.
@@ -245,7 +251,7 @@ class AdminUserRepository:
         Admin-only operation that bypasses ownership validation.
         """
         from ai.backend.manager.repositories.user.repository import UserRepository
-        
+
         # Create a temporary UserRepository instance to reuse the statistics logic
         user_repo = UserRepository(self._db)
         return await user_repo._get_time_binned_monthly_stats(None, valkey_stat_client)
@@ -355,7 +361,7 @@ class AdminUserRepository:
             if name in existing_vfolder_names:
                 name += f"-{uuid4().hex[:10]}"
             migrate_updates.append({"vid": row.id, "vname": name})
-        
+
         if migrate_updates:
             # Remove invitations and vfolder_permissions from target user.
             # Target user will be the new owner, and it does not make sense to have
@@ -397,7 +403,7 @@ class AdminUserRepository:
         Delete user's all virtual folders as well as their physical data.
         """
         import aiotools
-        
+
         target_vfs: list[VFolderDeletionInfo] = []
         async with self._db.begin_session() as db_session:
             await db_session.execute(
@@ -414,6 +420,7 @@ class AdminUserRepository:
             rows = cast(list[VFolderRow], result.fetchall())
             for vf in rows:
                 from ai.backend.common.types import VFolderID
+
                 target_vfs.append(
                     VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )
@@ -426,7 +433,7 @@ class AdminUserRepository:
                 storage_manager,
                 storage_ptask_group,
             )
-        except VFolderOperationFailed as e:
+        except VFolderOperationFailed:
             raise
 
         deleted_count = len(target_vfs)

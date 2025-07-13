@@ -72,7 +72,6 @@ def processors(
     user_repository = UserRepository(db=database_engine)
     admin_user_repository = AdminUserRepository(db=database_engine)
     user_service = UserService(
-        db=database_engine,
         storage_manager=mock_storage_manager,
         valkey_stat_client=mock_redis_connection,
         agent_registry=agent_registry_mock,
