@@ -14,6 +14,10 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ai.backend.manager.repositories.model_serving.admin_repository import (
+    AdminModelServingRepository,
+)
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -48,12 +52,18 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 class AutoScalingService:
     _db: ExtendedAsyncSAEngine
+    _model_serving_repository: ModelServingRepository
+    _admin_model_serving_repository: AdminModelServingRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        model_serving_repository: ModelServingRepository,
+        admin_model_serving_repository: AdminModelServingRepository,
     ) -> None:
         self._db = db
+        self._model_serving_repository = model_serving_repository
+        self._admin_model_serving_repository = admin_model_serving_repository
 
     async def scale_service_replicas(
         self, action: ScaleServiceReplicasAction

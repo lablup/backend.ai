@@ -8,6 +8,9 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.project_resource_policy.repository import (
+    ProjectResourcePolicyRepository,
+)
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
     CreateProjectResourcePolicyActionResult,
@@ -26,12 +29,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ProjectResourcePolicyService:
     _db: ExtendedAsyncSAEngine
+    _project_resource_policy_repository: ProjectResourcePolicyRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
     ) -> None:
         self._db = db
+        self._project_resource_policy_repository = project_resource_policy_repository
 
     async def create_project_resource_policy(
         self, action: CreateProjectResourcePolicyAction

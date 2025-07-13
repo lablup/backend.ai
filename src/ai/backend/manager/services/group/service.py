@@ -36,6 +36,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
+from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -80,6 +81,7 @@ class GroupService:
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
+    _group_repository: GroupRepository
 
     def __init__(
         self,
@@ -87,11 +89,13 @@ class GroupService:
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
+        group_repository: GroupRepository,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
+        self._group_repository = group_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         data = action.input.fields_to_store()

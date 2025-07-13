@@ -24,6 +24,8 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
 )
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
+from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.invite import (
     AcceptInvitationAction,
@@ -60,10 +62,20 @@ from ..types import VFolderInvitationInfo
 class VFolderInviteService:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
+    _vfolder_repository: VfolderRepository
+    _admin_vfolder_repository: AdminVfolderRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine, config_provider: ManagerConfigProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        config_provider: ManagerConfigProvider,
+        vfolder_repository: VfolderRepository,
+        admin_vfolder_repository: AdminVfolderRepository,
+    ) -> None:
         self._db = db
         self._config_provider = config_provider
+        self._vfolder_repository = vfolder_repository
+        self._admin_vfolder_repository = admin_vfolder_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         async with self._db.begin_readonly_session() as db_session:
