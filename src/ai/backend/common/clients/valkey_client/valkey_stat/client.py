@@ -16,6 +16,7 @@ from glide import (
     ExpirySet,
     ExpiryType,
 )
+from msgpack.exceptions import ExtraData, UnpackException
 
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.client import (
@@ -178,7 +179,7 @@ class ValkeyStatClient:
             return None
         try:
             return msgpack.unpackb(result, raw=False)
-        except (msgpack.exceptions.ExtraData, msgpack.exceptions.UnpackException, ValueError):
+        except (ExtraData, UnpackException, ValueError):
             log.warning(
                 "Failed to unpack kernel statistics for ID {}: {}",
                 kernel_id,
@@ -268,8 +269,8 @@ class ValkeyStatClient:
             try:
                 stats.append(msgpack.unpackb(result))
             except (
-                msgpack.exceptions.ExtraData,
-                msgpack.exceptions.UnpackException,
+                ExtraData,
+                UnpackException,
                 ValueError,
             ):
                 log.warning(
@@ -309,8 +310,8 @@ class ValkeyStatClient:
             try:
                 stats.append(msgpack.unpackb(result, ext_hook_mapping=msgpack.uuid_to_str))
             except (
-                msgpack.exceptions.ExtraData,
-                msgpack.exceptions.UnpackException,
+                ExtraData,
+                UnpackException,
                 ValueError,
             ):
                 log.warning(
@@ -413,8 +414,8 @@ class ValkeyStatClient:
             try:
                 stats.append(msgpack.unpackb(result))
             except (
-                msgpack.exceptions.ExtraData,
-                msgpack.exceptions.UnpackException,
+                ExtraData,
+                UnpackException,
                 ValueError,
             ):
                 log.warning(
@@ -462,8 +463,8 @@ class ValkeyStatClient:
             try:
                 stats.append(msgpack.unpackb(result))
             except (
-                msgpack.exceptions.ExtraData,
-                msgpack.exceptions.UnpackException,
+                ExtraData,
+                UnpackException,
                 ValueError,
             ):
                 log.warning(
