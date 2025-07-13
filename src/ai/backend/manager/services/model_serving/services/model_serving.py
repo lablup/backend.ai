@@ -7,6 +7,7 @@ from typing import Awaitable, Callable
 
 import aiohttp
 import tomli
+from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
@@ -122,6 +123,9 @@ from ai.backend.manager.services.model_serving.types import (
     MutationResult,
     RouteInfo,
     ServiceInfo,
+)
+from ai.backend.manager.services.model_serving.types import (
+    EndpointTokenData as ServiceEndpointTokenData,
 )
 from ai.backend.manager.types import MountOptionModel, UserScope
 
@@ -351,7 +355,7 @@ class ModelServingService:
                     ])
                     if endpoint.routings
                     else 0,
-                    service_endpoint=endpoint.url,
+                    service_endpoint=HttpUrl(endpoint.url) if endpoint.url else None,
                     is_public=endpoint.open_to_public,
                 )
                 for endpoint in endpoints
@@ -598,7 +602,7 @@ class ModelServingService:
                 ]
                 if endpoint_data.routings
                 else [],
-                service_endpoint=endpoint_data.url,
+                service_endpoint=HttpUrl(endpoint_data.url) if endpoint_data.url else None,
                 is_public=endpoint_data.open_to_public,
                 runtime_variant=endpoint_data.runtime_variant,
             )
@@ -807,7 +811,17 @@ class ModelServingService:
         if not token_data:
             raise ModelServiceNotFound
 
-        return GenerateTokenActionResult(token_data)
+        # Convert data types
+        service_token_data = ServiceEndpointTokenData(
+            id=token_data.id,
+            token=token_data.token,
+            endpoint=token_data.endpoint,
+            session_owner=token_data.session_owner,
+            domain=token_data.domain,
+            project=token_data.project,
+            created_at=token_data.created_at,
+        )
+        return GenerateTokenActionResult(data=service_token_data)
 
     async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
         # Get endpoint with access validation

@@ -84,7 +84,8 @@ class EndpointData:
             runtime_variant=row.runtime_variant,
             extra_mounts=row.extra_mounts,
             routings=[RoutingData.from_row(routing) for routing in row.routings]
-            if row.routings else None,
+            if row.routings
+            else None,
         )
 
 

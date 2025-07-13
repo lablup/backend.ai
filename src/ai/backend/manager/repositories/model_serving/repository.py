@@ -236,6 +236,8 @@ class ModelServingRepository:
             await session.execute(query)
 
             endpoint = await self._get_endpoint_by_id(session, service_id, load_routes=True)
+            if endpoint is None:
+                raise NoResultFound
             data = EndpointData.from_row(endpoint)
         return data
 
