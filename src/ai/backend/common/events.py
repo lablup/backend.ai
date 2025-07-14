@@ -1376,7 +1376,11 @@ class EventDispatcher:
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
-        for consumer in self._consumers[event_name].copy():
+        consumer_handlers = self._consumers.get(event_name, None)
+        if not consumer_handlers:
+            await self._msg_queue.done(msg_id)
+            return
+        for consumer in consumer_handlers:
             self._consumer_taskgroup.create_task(
                 self._handle(consumer, source, args, msg_id),
             )
