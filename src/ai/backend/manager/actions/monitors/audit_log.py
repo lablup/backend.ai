@@ -2,6 +2,7 @@ import logging
 from typing import Final, override
 
 from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.user_id import current_user_id
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -29,6 +30,7 @@ class AuditLogMonitor(ActionMonitor):
                 created_at=result.meta.started_at,
                 entity_id=result.meta.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
+                user_id=current_user_id(),
                 description=result.meta.description,
                 status=result.meta.status,
                 duration=result.meta.duration,

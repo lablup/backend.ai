@@ -64,6 +64,7 @@ class AuditLogRow(Base):
 
     action_id = sa.Column("action_id", GUID, nullable=False)
     request_id = sa.Column("request_id", sa.String, nullable=True)
+    user_id = sa.Column("user_id", sa.String, nullable=True)
     description = sa.Column("description", sa.String, nullable=False)
     duration = sa.Column("duration", sa.Interval, nullable=True)
 
@@ -83,6 +84,7 @@ class AuditLogRow(Base):
         status: OperationStatus,
         entity_id: Optional[str | uuid.UUID] = None,
         request_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         duration: Optional[timedelta] = None,
     ):
         self.entity_type = entity_type
@@ -90,6 +92,7 @@ class AuditLogRow(Base):
         self.action_id = action_id
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
+        self.user_id = user_id
         self.description = description
         self.duration = duration
         self.status = status
@@ -104,6 +107,7 @@ class AuditLogRow(Base):
             f"entity_id: {self.entity_id}, "
             f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
+            f"user_id: {self.user_id}, "
             f"description: {self.description}, "
             f"duration: {self.duration}, "
             f"status: {self.status.value}"
