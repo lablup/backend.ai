@@ -1654,7 +1654,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                     "i",
                                     (
                                         1
-                                        if self.local_config.container.sandbox_type == "jail"
+                                        if self.local_config.container.sandbox_type
+                                        == ContainerSandboxType.JAIL
                                         else 0
                                     ),
                                 ),
