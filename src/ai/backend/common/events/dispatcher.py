@@ -566,7 +566,13 @@ class EventDispatcher(EventDispatcherGroup):
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
-        for consumer in self._consumers[event_name].copy():
+        consumers_handlers = self._consumers[event_name].copy()
+        if not consumers_handlers:
+            # If there are no consumer handlers, we can just call post callbacks and return.
+            for post_callback in post_callbacks:
+                await post_callback.done()
+            return
+        for consumer in consumers_handlers:
             self._consumer_taskgroup.create_task(
                 self._handle(consumer, source, args, post_callbacks),
             )
