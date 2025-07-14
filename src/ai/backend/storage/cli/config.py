@@ -1,5 +1,5 @@
 """
-Configuration management CLI commands for Backend.AI Manager.
+Configuration management CLI commands for Backend.AI Storage Proxy.
 
 This module provides CLI commands for generating and managing configuration files.
 """
@@ -10,9 +10,7 @@ import click
 import tomli
 
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
-
-from .context import CLIContext
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 
 
 @click.group()
@@ -31,7 +29,7 @@ def cli() -> None:
         writable=True,
         path_type=pathlib.Path,
     ),
-    default="./configs/manager/sample.toml",
+    default="./configs/storage-proxy/sample.toml",
     help="Output path for the generated sample configuration file. (default: sample.toml)",
 )
 @click.option(
@@ -39,18 +37,16 @@ def cli() -> None:
     is_flag=True,
     help="Overwrite the output file if it already exists.",
 )
-@click.pass_obj
 def generate_sample(
-    cli_ctx: CLIContext,
     output: pathlib.Path,
     overwrite: bool,
 ) -> None:
     """
-    Generate a sample configuration file from the ManagerUnifiedConfig schema.
+    Generate a sample configuration file from the StorageProxyUnifiedConfig schema.
 
     This command creates a TOML configuration file with all available options,
     their default values, descriptions, and examples based on the Pydantic
-    model definition of ManagerUnifiedConfig.
+    model definition of StorageProxyUnifiedConfig.
     """
     if output.exists() and not overwrite:
         click.echo(
@@ -60,18 +56,18 @@ def generate_sample(
         return
 
     header_comment = """
-Backend.AI Manager Configuration Sample
+Backend.AI Storage Proxy Configuration Sample
 
-This is a sample configuration file for the Backend.AI Manager.
+This is a sample configuration file for the Backend.AI Storage Proxy.
 All configuration options are documented with their descriptions,
 default values, and examples.
 
-Generated automatically from the ManagerUnifiedConfig schema.
+Generated automatically from the StorageProxyUnifiedConfig schema.
 """
 
     try:
         generate_sample_config_file(
-            ManagerUnifiedConfig, str(output), header_comment=header_comment.strip()
+            StorageProxyUnifiedConfig, str(output), header_comment=header_comment.strip()
         )
         click.echo(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
@@ -90,25 +86,23 @@ Generated automatically from the ManagerUnifiedConfig schema.
         readable=True,
         path_type=pathlib.Path,
     ),
-    default="./configs/manager/halfstack.yaml",
-    help="Path to the configuration file to validate. (default: ./configs/manager/halfstack.yaml)",
+    default="./configs/storage-proxy/halfstack.yaml",
+    help="Path to the configuration file to validate. (default: ./configs/storage-proxy/halfstack.yaml)",
 )
-@click.pass_obj
 def validate(
-    cli_ctx: CLIContext,
     path: pathlib.Path,
 ) -> None:
     """
-    Validate a configuration file using the ManagerUnifiedConfig schema.
+    Validate a configuration file using the StorageProxyUnifiedConfig schema.
     
     This command loads and validates a TOML configuration file against
-    the ManagerUnifiedConfig Pydantic model to ensure it's valid.
+    the StorageProxyUnifiedConfig Pydantic model to ensure it's valid.
     """
     try:
         with open(path, "rb") as f:
             config_data = tomli.load(f)
         
-        config = ManagerUnifiedConfig.model_validate(config_data)
+        config = StorageProxyUnifiedConfig.model_validate(config_data)
         config.model_dump()
         
         click.echo(f"Configuration file '{path}' is valid.")
