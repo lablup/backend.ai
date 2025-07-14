@@ -541,9 +541,9 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     with ExitStack() as stack:
         user_id = request.get("user", {}).get("id")
         if user_id is not None:
-            stack.enter_context(with_user_id(auth_result["user"]["uuid"]))
+            stack.enter_context(with_user_id(str(auth_result["user"]["uuid"])))
         # No matter if authenticated or not, pass-through to the handler.
-        # (if it's required, auth_required decorator will handle the situation.)
+        # (if it's required, `auth_required` decorator will handle the situation.)
         return await handler(request)
 
 
