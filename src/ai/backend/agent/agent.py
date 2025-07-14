@@ -2007,10 +2007,20 @@ class AbstractAgent(
                     # Restore compute resources.
                     async with self.resource_lock:
                         for computer_ctx in self.computers.values():
-                            await computer_ctx.instance.restore_from_container(
-                                container,
-                                computer_ctx.alloc_map,
-                            )
+                            try:
+                                await computer_ctx.instance.restore_from_container(
+                                    container,
+                                    computer_ctx.alloc_map,
+                                )
+                            except FileNotFoundError:
+                                log.warning(
+                                    "scan_running_kernels(): "
+                                    "failed to read kernel resource info; "
+                                    "maybe already terminated (k:{}, c:{})",
+                                    kernel_id,
+                                    container.id,
+                                )
+                                continue
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         session_id,
