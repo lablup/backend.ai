@@ -540,7 +540,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         request.update(auth_result)
 
     with ExitStack() as stack:
-        user_id = request.get("user", {}).get("id")
+        user_id = request.get("user", {}).get("uuid")
         if user_id is not None:
             stack.enter_context(with_user_id(str(user_id)))
             stack.enter_context(
