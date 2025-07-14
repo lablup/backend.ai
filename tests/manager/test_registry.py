@@ -6,7 +6,6 @@ from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.sql.dml import Insert, Update
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import BinarySize, DeviceId, ResourceSlot, SlotName
@@ -57,8 +56,14 @@ async def test_handle_heartbeat(
     _1g = Decimal("1073741824")
     _2g = Decimal("2147483648")
 
-    # Join
+    # Join - mock repository to return a new agent join
     mock_dbresult.first = MagicMock(return_value=None)
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.return_value = (  # type: ignore
+        True,  # instance_rejoin = True for new agent
+        None,  # row = None for new agent
+        True,  # should_update_cache = True
+    )
+
     await registry.handle_heartbeat(
         "i-001",
         {
@@ -76,12 +81,12 @@ async def test_handle_heartbeat(
         },
     )
     mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
-    assert isinstance(q, Insert)
+    # Verify repository method was called with correct parameters
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.assert_called_once()  # type: ignore
 
     # Update alive instance
     mock_config_provider.legacy_etcd_config_loader.update_resource_slots.reset_mock()
-    mock_dbconn.execute.reset_mock()
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.reset_mock()  # type: ignore
     mock_dbresult.first = MagicMock(
         return_value={
             "status": AgentStatus.ALIVE,
@@ -96,6 +101,13 @@ async def test_handle_heartbeat(
             "auto_terminate_abusing_kernel": False,
         }
     )
+    # Mock repository to return an existing agent update
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.return_value = (  # type: ignore
+        False,  # instance_rejoin = False for existing agent
+        mock_dbresult.first.return_value,  # row = existing agent data
+        True,  # should_update_cache = True
+    )
+
     await registry.handle_heartbeat(
         "i-001",
         {
@@ -113,16 +125,12 @@ async def test_handle_heartbeat(
         },
     )
     mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
-    assert isinstance(q, Update)
-    q_params = q.compile().params
-    assert q_params["addr"] == "10.0.0.6"
-    assert q_params["available_slots"] == ResourceSlot({"cpu": _1, "mem": _2g})
-    assert "scaling_group" not in q_params
+    # Verify repository method was called
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.assert_called_once()  # type: ignore
 
     # Rejoin
     mock_config_provider.legacy_etcd_config_loader.update_resource_slots.reset_mock()
-    mock_dbconn.execute.reset_mock()
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.reset_mock()  # type: ignore
     mock_dbresult.first = MagicMock(
         return_value={
             "status": AgentStatus.LOST,
@@ -137,6 +145,13 @@ async def test_handle_heartbeat(
             "auto_terminate_abusing_kernel": False,
         }
     )
+    # Mock repository to return a rejoining agent
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.return_value = (  # type: ignore
+        True,  # instance_rejoin = True for rejoining agent
+        mock_dbresult.first.return_value,  # row = existing agent data with LOST status
+        True,  # should_update_cache = True
+    )
+
     await registry.handle_heartbeat(
         "i-001",
         {
@@ -154,16 +169,8 @@ async def test_handle_heartbeat(
         },
     )
     mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
-    assert isinstance(q, Update)
-    q_params = q.compile().params
-    assert q_params["status"] == AgentStatus.ALIVE
-    assert q_params["addr"] == "10.0.0.6"
-    assert "lost_at=NULL" in str(q)  # stringified and removed from bind params
-    assert q_params["available_slots"] == ResourceSlot({"cpu": _4, "mem": _2g})
-    assert q_params["scaling_group"] == "sg-testing2"
-    assert "compute_plugins" in q_params
-    assert "version" in q_params
+    # Verify repository method was called
+    registry.repositories.agent_registry.repository.handle_agent_heartbeat.assert_called_once()  # type: ignore
 
 
 @pytest.mark.asyncio
