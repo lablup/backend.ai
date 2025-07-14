@@ -763,8 +763,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         if KernelFeatures.UID_MATCH in self.kernel_features:
                             self._chown_paths_if_root(
                                 [self.work_dir / "bootstrap.sh"],
-                                self.local_config["container"]["kernel-uid"],
-                                self.local_config["container"]["kernel-gid"],
+                                self.local_config.container.kernel_uid,
+                                self.local_config.container.kernel_gid,
                             )
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
@@ -843,8 +843,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     else:
                         if KernelFeatures.UID_MATCH in self.kernel_features:
                             chown_idfile(
-                                self.local_config["container"]["kernel-uid"],
-                                self.local_config["container"]["kernel-gid"],
+                                self.local_config.container.kernel_uid,
+                                self.local_config.container.kernel_gid,
                             )
 
                 await loop.run_in_executor(None, _populate_ssh_config)
@@ -1654,7 +1654,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                     "i",
                                     (
                                         1
-                                        if self.local_config["container"]["sandbox-type"] == "jail"
+                                        if self.local_config.container.sandbox_type
+                                        == ContainerSandboxType.JAIL
                                         else 0
                                     ),
                                 ),
