@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import secrets
+from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
@@ -17,6 +18,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
 from ai.backend.common import validators as tx
+from ai.backend.common.contexts.user_id import with_user_id
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -26,6 +28,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.utils import with_log_context_fields
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
@@ -536,9 +539,18 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         # Populate the result to the per-request state dict.
         request.update(auth_result)
 
-    # No matter if authenticated or not, pass-through to the handler.
-    # (if it's required, auth_required decorator will handle the situation.)
-    return await handler(request)
+    with ExitStack() as stack:
+        user_id = request.get("user", {}).get("id")
+        if user_id is not None:
+            stack.enter_context(with_user_id(str(user_id)))
+            stack.enter_context(
+                with_log_context_fields({
+                    "user_id": str(user_id),
+                })
+            )
+        # No matter if authenticated or not, pass-through to the handler.
+        # (if it's required, `auth_required` decorator will handle the situation.)
+        return await handler(request)
 
 
 def auth_required(handler):
