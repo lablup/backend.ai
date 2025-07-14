@@ -438,8 +438,8 @@ type AuditLogNode implements Node {
   """Request ID of the AuditLog"""
   request_id: String
 
-  """Added in 25.12.0, User ID of the AuditLog"""
-  user_id: String
+  """Added in 25.12.0, User ID that triggered the action"""
+  triggered_by: String
 
   """Description of the AuditLog"""
   description: String!

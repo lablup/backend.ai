@@ -1,4 +1,4 @@
-"""Add user_id to AuditLogRow
+"""Add triggered_by to AuditLogRow
 
 Revision ID: a5ef73b01e97
 Revises: 60bcbf00a96e
@@ -17,8 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("audit_logs", sa.Column("user_id", sa.String(), nullable=True))
+    op.add_column("audit_logs", sa.Column("triggered_by", sa.String(), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("audit_logs", "user_id")
+    op.drop_column("audit_logs", "triggered_by")

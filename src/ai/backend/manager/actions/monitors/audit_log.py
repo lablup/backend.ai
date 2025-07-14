@@ -30,7 +30,7 @@ class AuditLogMonitor(ActionMonitor):
                 created_at=result.meta.started_at,
                 entity_id=result.meta.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
-                user_id=current_user_id(),
+                triggered_by=current_user_id(),
                 description=result.meta.description,
                 status=result.meta.status,
                 duration=result.meta.duration,
