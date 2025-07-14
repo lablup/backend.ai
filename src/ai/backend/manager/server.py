@@ -875,6 +875,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
     from .registry import AgentRegistry
+    from .repositories.image.repositories import RepositoryArgs
+    from .repositories.repositories import Repositories
 
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
@@ -883,6 +885,11 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
+
+    # Create repositories
+    repository_args = RepositoryArgs(db=root_ctx.db)
+    repositories = Repositories.create(repository_args)
+
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
@@ -894,6 +901,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
+        repositories,
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,

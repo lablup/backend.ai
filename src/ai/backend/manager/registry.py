@@ -164,9 +164,7 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
     PRIVATE_SESSION_TYPES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    AgentRow,
     AgentStatus,
     EndpointLifecycle,
     EndpointRow,
@@ -212,9 +210,9 @@ from .models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
-    reenter_txn_session,
     sql_json_merge,
 )
+from .repositories.repositories import Repositories
 from .types import UserScope
 
 if TYPE_CHECKING:
@@ -263,6 +261,7 @@ class AgentRegistry:
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
+        repositories: "Repositories",
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -271,6 +270,7 @@ class AgentRegistry:
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
         self.db = db
+        self.repositories = repositories
         self.agent_cache = agent_cache
         self.valkey_stat = valkey_stat
         self.valkey_live = valkey_live
@@ -305,30 +305,22 @@ class AgentRegistry:
         await self.webhook_ptask_group.shutdown()
 
     async def get_instance(self, inst_id: AgentId, field=None):
-        async with self.db.begin_readonly() as conn:
-            cols = [agents.c.id, agents.c.public_key]
-            if field is not None:
-                cols.append(field)
-            query = sa.select(cols).select_from(agents).where(agents.c.id == inst_id)
-            result = await conn.execute(query)
-            row = result.first()
-            if not row:
-                raise InstanceNotFound(inst_id)
-            return row
+        row = await self.repositories.agent_registry.repository.get_instance(inst_id, field)
+        if not row:
+            raise InstanceNotFound(inst_id)
+        return row
 
     async def enumerate_instances(self, check_shadow=True):
-        async with self.db.begin_readonly() as conn:
-            query = sa.select("*").select_from(agents)
-            if check_shadow:
-                query = query.where(agents.c.status == AgentStatus.ALIVE)
-            async for row in await conn.stream(query):
-                yield row
+        async for row in self.repositories.agent_registry.repository.enumerate_instances(
+            check_shadow
+        ):
+            yield row
 
     async def update_instance(self, inst_id, updated_fields):
         async def _update() -> None:
-            async with self.db.begin() as conn:
-                query = sa.update(agents).values(**updated_fields).where(agents.c.id == inst_id)
-                await conn.execute(query)
+            await self.repositories.agent_registry.repository.update_instance(
+                inst_id, updated_fields
+            )
 
         await execute_with_retry(_update)
 
@@ -1792,15 +1784,10 @@ class AgentRegistry:
                             },
                             "network_id": str(scheduled_session.id),
                             "session_type": scheduled_session.session_type.value,
-                            "kernel_id": str(binding.kernel.id),
-                            "session_id": str(scheduled_session.id),
-                            "owner_user_id": str(scheduled_session.user_uuid),
-                            "owner_project_id": None,  # TODO: Implement project-owned sessions
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
                             "cluster_mode": binding.kernel.cluster_mode,
                             "package_directory": tuple(),
-                            "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
                             "uid": binding.kernel.uid,
                             "main_gid": binding.kernel.main_gid,
@@ -1884,108 +1871,56 @@ class AgentRegistry:
     async def get_user_occupancy(self, user_id, *, db_sess=None):
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.user_uuid == user_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-                )
-                zero = ResourceSlot()
-                user_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                user_occupied = ResourceSlot({
-                    key: val for key, val in user_occupied.items() if key in known_slot_types
-                })
-                return user_occupied
-
-        return await execute_with_retry(_query)
+        user_occupied = await self.repositories.agent_registry.repository.get_user_occupancy(
+            user_id, db_sess
+        )
+        # drop no-longer used slot types
+        user_occupied = ResourceSlot({
+            key: val for key, val in user_occupied.items() if key in known_slot_types
+        })
+        return user_occupied
 
     async def get_keypair_occupancy(self, access_key, *, db_sess=None):
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
-                    .where(
-                        (KernelRow.access_key == access_key)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
-                    )
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
-
-        return await execute_with_retry(_query)
+        key_occupied = await self.repositories.agent_registry.repository.get_keypair_occupancy(
+            access_key, db_sess
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
     async def get_domain_occupancy(self, domain_name, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
-                    .where(
-                        (KernelRow.domain_name == domain_name)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
-                    )
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
-
-        return await execute_with_retry(_query)
+        key_occupied = await self.repositories.agent_registry.repository.get_domain_occupancy(
+            domain_name, db_sess
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
     async def get_group_occupancy(self, group_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
-                    .where(
-                        (KernelRow.group_id == group_id)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
-                    )
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
-
-        return await execute_with_retry(_query)
+        key_occupied = await self.repositories.agent_registry.repository.get_group_occupancy(
+            group_id, db_sess
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
     async def update_scaling_group(self, id, scaling_group) -> None:
+        from .models.agent import agents
+
         agent = await self.get_instance(id, agents.c.addr)
         async with self.agent_cache.rpc_context(agent["id"]) as rpc:
             await rpc.call.update_scaling_group(scaling_group)
@@ -2023,23 +1958,12 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
+                diff = actual_allocated_slots - requested_slots
 
                 async def _update_agent_resource() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        select_query = sa.select(AgentRow.occupied_slots).where(
-                            AgentRow.id == agent_id
-                        )
-                        result = await db_sess.execute(select_query)
-                        occupied_slots: ResourceSlot = result.scalar()
-                        diff = actual_allocated_slots - requested_slots
-                        update_query = (
-                            sa.update(AgentRow)
-                            .values(
-                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
-                            )
-                            .where(AgentRow.id == agent_id)
-                        )
-                        await db_sess.execute(update_query)
+                    await self.repositories.agent_registry.repository.update_agent_resource_allocation(
+                        agent_id, diff
+                    )
 
                 await execute_with_retry(_update_agent_resource)
 
@@ -2098,34 +2022,10 @@ class AgentRegistry:
                                     session_row.id
                                 )
 
-                if len(occupied_slots_per_agent) > 0:
-                    # Update occupied_slots for agents with running containers.
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .where(AgentRow.id == sa.bindparam("agent_id"))
-                            .values(occupied_slots=sa.bindparam("occupied_slots"))
-                        ),
-                        [
-                            {"agent_id": aid, "occupied_slots": slots}
-                            for aid, slots in occupied_slots_per_agent.items()
-                        ],
-                    )
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .values(occupied_slots=ResourceSlot({}))
-                            .where(AgentRow.status == AgentStatus.ALIVE)
-                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
-                        )
-                    )
-                else:
-                    query = (
-                        sa.update(AgentRow)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                    )
-                    await db_sess.execute(query)
+                # Update agent resource usage via repository
+                await self.repositories.agent_registry.repository.recalc_agent_resource_usage(
+                    occupied_slots_per_agent
+                )
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
@@ -2940,126 +2840,55 @@ class AgentRegistry:
             # Check and update status of the agent record in DB
             async def _update() -> None:
                 nonlocal instance_rejoin
-                async with self.db.begin() as conn:
-                    fetch_query = (
-                        sa.select([
-                            agents.c.status,
-                            agents.c.addr,
-                            agents.c.public_host,
-                            agents.c.public_key,
-                            agents.c.scaling_group,
-                            agents.c.available_slots,
-                            agents.c.version,
-                            agents.c.compute_plugins,
-                            agents.c.architecture,
-                            agents.c.auto_terminate_abusing_kernel,
-                        ])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                        .with_for_update()
-                    )
-                    result = await conn.execute(fetch_query)
-                    row = result.first()
+                # Prepare agent info for repository
+                heartbeat_agent_info = {
+                    "region": agent_info["region"],
+                    "scaling_group": sgroup,
+                    "available_slots": available_slots,
+                    "addr": agent_info["addr"],
+                    "public_host": agent_info["public_host"],
+                    "public_key": agent_info["public_key"],
+                    "version": agent_info["version"],
+                    "compute_plugins": agent_info["compute_plugins"],
+                    "architecture": agent_info.get("architecture", "x86_64"),
+                }
 
-                    if row is None or row["status"] is None:
-                        # new agent detected!
-                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        insert_query = sa.insert(agents).values({
-                            "id": agent_id,
-                            "status": AgentStatus.ALIVE,
-                            "region": agent_info["region"],
-                            "scaling_group": sgroup,
-                            "available_slots": available_slots,
-                            "occupied_slots": {},
-                            "addr": agent_info["addr"],
-                            "public_host": agent_info["public_host"],
-                            "public_key": agent_info["public_key"],
-                            "first_contact": now,
-                            "lost_at": sa.null(),
-                            "version": agent_info["version"],
-                            "compute_plugins": agent_info["compute_plugins"],
-                            "architecture": agent_info.get("architecture", "x86_64"),
-                            "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                        })
-                        result = await conn.execute(insert_query)
-                        assert result.rowcount == 1
-                    elif row["status"] == AgentStatus.ALIVE:
-                        updates = {}
-                        invalidate_agent_cache = False
-                        if row["available_slots"] != available_slots:
-                            updates["available_slots"] = available_slots
-                        if row["scaling_group"] != sgroup:
-                            updates["scaling_group"] = sgroup
-                        if row["addr"] != current_addr:
-                            updates["addr"] = current_addr
-                            invalidate_agent_cache = True
-                        if row["public_host"] != agent_info["public_host"]:
-                            updates["public_host"] = agent_info["public_host"]
-                        if row["public_key"] != agent_info["public_key"]:
-                            updates["public_key"] = agent_info["public_key"]
-                            invalidate_agent_cache = True
-                        if row["version"] != agent_info["version"]:
-                            updates["version"] = agent_info["version"]
-                        if row["compute_plugins"] != agent_info["compute_plugins"]:
-                            updates["compute_plugins"] = agent_info["compute_plugins"]
-                        if row["architecture"] != agent_info["architecture"]:
-                            updates["architecture"] = agent_info["architecture"]
-                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
-                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
-                        # occupied_slots are updated when kernels starts/terminates
-                        if invalidate_agent_cache:
-                            self.agent_cache.update(
-                                agent_id,
-                                current_addr,
-                                agent_info["public_key"],
-                            )
-                        if updates:
-                            await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                                slot_key_and_units
-                            )
-                            update_query = (
-                                sa.update(agents).values(updates).where(agents.c.id == agent_id)
-                            )
-                            await conn.execute(update_query)
-                    elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        instance_rejoin = True
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        update_query = (
-                            sa.update(agents)
-                            .values({
-                                "status": AgentStatus.ALIVE,
-                                "region": agent_info["region"],
-                                "scaling_group": sgroup,
-                                "addr": agent_info["addr"],
-                                "public_host": agent_info["public_host"],
-                                "public_key": agent_info["public_key"],
-                                "lost_at": sa.null(),
-                                "available_slots": available_slots,
-                                "version": agent_info["version"],
-                                "compute_plugins": agent_info["compute_plugins"],
-                                "architecture": agent_info["architecture"],
-                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                            })
-                            .where(agents.c.id == agent_id)
-                        )
-                        await conn.execute(update_query)
-                    else:
-                        log.error("should not reach here! {0}", type(row["status"]))
+                (
+                    instance_rejoin,
+                    row,
+                    should_update_cache,
+                ) = await self.repositories.agent_registry.repository.handle_agent_heartbeat(
+                    agent_id,
+                    heartbeat_agent_info,
+                    slot_key_and_units,
+                    auto_terminate_abusing_kernel,
+                )
+
+                if row is None:
+                    # New agent detected
+                    log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
+                    await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
+                        slot_key_and_units
+                    )
+                    should_update_cache = True
+                elif instance_rejoin:
+                    # Agent rejoined
+                    log.info("instance_lifecycle: agent {0} rejoined!", agent_id)
+                    await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
+                        slot_key_and_units
+                    )
+                elif should_update_cache:
+                    # Existing agent with updates
+                    await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
+                        slot_key_and_units
+                    )
+
+                if should_update_cache:
+                    self.agent_cache.update(
+                        agent_id,
+                        current_addr,
+                        agent_info["public_key"],
+                    )
 
             try:
                 await execute_with_retry(_update)

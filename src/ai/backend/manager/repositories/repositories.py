@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
+from ai.backend.manager.repositories.agent_registry.repositories import AgentRegistryRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -30,6 +31,7 @@ from ai.backend.manager.repositories.vfolder.repositories import VfolderReposito
 @dataclass
 class Repositories:
     agent: AgentRepositories
+    agent_registry: AgentRegistryRepositories
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
     domain: DomainRepositories
@@ -49,6 +51,7 @@ class Repositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         agent_repositories = AgentRepositories.create(args)
+        agent_registry_repositories = AgentRegistryRepositories.create(args.db)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
@@ -67,6 +70,7 @@ class Repositories:
 
         return cls(
             agent=agent_repositories,
+            agent_registry=agent_registry_repositories,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
             domain=domain_repositories,
