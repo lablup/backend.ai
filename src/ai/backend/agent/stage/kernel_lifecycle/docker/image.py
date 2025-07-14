@@ -75,6 +75,7 @@ class ImagePullSpecGenerator(SpecGenerator[ImagePullSpec]):
         self._args = args
         self._provisioner = ImagePullSpecProvisioner()
 
+    @override
     async def wait_for_spec(self) -> ImagePullSpec:
         return await self._provisioner.setup(self._args)
 

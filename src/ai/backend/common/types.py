@@ -315,6 +315,8 @@ MetricKey = NewType("MetricKey", str)
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
+ClusterRole = NewType("ClusterRole", str)
+
 
 class ContainerStatus(enum.StrEnum):
     RUNNING = "running"
