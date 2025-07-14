@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import MutableMapping, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -311,12 +311,11 @@ class AgentRegistryRepository:
         await session.execute(update_query)
 
     async def recalc_agent_resource_usage(
-        self, occupied_slots_per_agent: dict[str, ResourceSlot]
+        self, occupied_slots_per_agent: MutableMapping[str, ResourceSlot]
     ) -> None:
         """
         Recalculate agent resource usage based on actual kernel occupancy.
         """
-        from ai.backend.manager.models.agent import AgentStatus
 
         async with self._db.begin_session() as session:
             if len(occupied_slots_per_agent) > 0:
