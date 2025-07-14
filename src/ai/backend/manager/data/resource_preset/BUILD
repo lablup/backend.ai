@@ -1,11 +1,1 @@
-python_sources(
-    name="lib",
-    dependencies=[
-        ":resources",
-    ],
-)
-
-resources(
-    name="resources",
-    sources=["**/*.toml", "**/*.yml"],
-)
+python_sources(name="src")

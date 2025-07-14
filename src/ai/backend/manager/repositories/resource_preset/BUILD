@@ -1,11 +1,1 @@
-python_sources(
-    name="lib",
-    dependencies=[
-        "//:reqs#SQLAlchemy",
-        "//src/ai/backend/common:src",
-        "//src/ai/backend/manager/data/resource_preset:lib",
-        "//src/ai/backend/manager/errors:src",
-        "//src/ai/backend/manager/models:src",
-        "//src/ai/backend/manager/services/resource_preset:src",
-    ],
-)
+python_sources(name="src")
