@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, override
 
 from aiohttp import web
 
-from ai.backend.common.clients.session.client import ValkeySessionClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session, extra_config_headers, get_time

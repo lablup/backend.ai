@@ -92,17 +92,6 @@ class ValkeySessionClient:
         )
 
     @valkey_decorator()
-    async def delete_session(self, session_key: str) -> bool:
-        """
-        Delete a session by key.
-
-        :param session_key: The session key to delete.
-        :return: True if the session was deleted, False if it didn't exist.
-        """
-        result = await self._client.client.delete([session_key])
-        return result > 0
-
-    @valkey_decorator()
     async def get_login_history(self, username: str) -> Optional[bytes]:
         """
         Get login failure history for a user.
