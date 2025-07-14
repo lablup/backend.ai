@@ -1,8 +1,8 @@
 """Add user_id to AuditLogRow
 
-Revision ID: 88a86ae26669
-Revises: bf39b34717d4
-Create Date: 2025-07-14 01:56:18.344601
+Revision ID: a5ef73b01e97
+Revises: 60bcbf00a96e
+Create Date: 2025-07-14 02:10:48.791146
 
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "88a86ae26669"
-down_revision = "bf39b34717d4"
+revision = "a5ef73b01e97"
+down_revision = "60bcbf00a96e"
 branch_labels = None
 depends_on = None
 
