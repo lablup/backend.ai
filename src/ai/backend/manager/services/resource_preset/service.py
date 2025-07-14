@@ -1,11 +1,8 @@
 import logging
 from decimal import Decimal
-from typing import Callable, Optional, cast
 
 import sqlalchemy as sa
 import trafaret as t
-from graphene import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
@@ -15,7 +12,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users, groups
@@ -23,10 +19,9 @@ from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.resource_preset import QueryStatement, ResourcePresetRow
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -51,14 +46,6 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
-    return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
-
-
-def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
-    return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
 
 
 class ResourcePresetService:
@@ -88,17 +75,13 @@ class ResourcePresetService:
         if not creator.resource_slots.has_intrinsic_slots():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
-        async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            return await ResourcePresetRow.create(creator, db_session=db_session)
-
-        async with self._db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_create, self._db.begin_session, db_conn)
-        if preset_row is None:
+        preset_data = await self._resource_preset_repository.create_preset_validated(creator)
+        if preset_data is None:
             raise ResourcePresetConflict(
                 f"Duplicate resource preset name (name:{name}, scaling_group:{creator.scaling_group_name})"
             )
 
-        return CreateResourcePresetActionResult(resource_preset=preset_row)
+        return CreateResourcePresetActionResult(resource_preset=preset_data)
 
     async def modify_preset(
         self, action: ModifyResourcePresetAction
@@ -114,32 +97,11 @@ class ResourcePresetService:
             if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
-        async with self._db.begin_session() as db_sess:
-            if preset_id is not None:
-                preset_row = (
-                    await db_sess.execute(
-                        sa.select(
-                            ResourcePresetRow,
-                        ).where(ResourcePresetRow.id == preset_id)
-                    )
-                ).scalar_one_or_none()
-            else:
-                preset_row = (
-                    await db_sess.execute(
-                        sa.select(
-                            ResourcePresetRow,
-                        ).where(ResourcePresetRow.name == name)
-                    )
-                ).scalar_one_or_none()
+        preset_data = await self._resource_preset_repository.modify_preset_validated(
+            preset_id, name, modifier
+        )
 
-            if preset_row is None:
-                raise ObjectNotFound("Resource preset not found")
-            to_update = modifier.fields_to_update()
-            for key, value in to_update.items():
-                setattr(preset_row, key, value)
-            await db_sess.flush()
-
-        return ModifyResourcePresetActionResult(resource_preset=preset_row)
+        return ModifyResourcePresetActionResult(resource_preset=preset_data)
 
     async def delete_preset(
         self, action: DeleteResourcePresetAction
@@ -150,54 +112,29 @@ class ResourcePresetService:
         if preset_id is None and name is None:
             raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
 
-        async with self._db.begin_session() as db_sess:
-            if preset_id is not None:
-                preset_row = (
-                    await db_sess.execute(
-                        sa.select(
-                            ResourcePresetRow,
-                        ).where(ResourcePresetRow.id == preset_id)
-                    )
-                ).scalar_one_or_none()
-            else:
-                preset_row = (
-                    await db_sess.execute(
-                        sa.select(
-                            ResourcePresetRow,
-                        ).where(ResourcePresetRow.name == name)
-                    )
-                ).scalar_one_or_none()
+        preset_data = await self._resource_preset_repository.delete_preset_validated(
+            preset_id, name
+        )
 
-            if preset_row is None:
-                raise ObjectNotFound("Resource preset not found")
-
-            await db_sess.delete(preset_row)
-
-        return DeleteResourcePresetActionResult(resource_preset=preset_row)
+        return DeleteResourcePresetActionResult(resource_preset=preset_data)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(ResourcePresetRow)
-            query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
-            scaling_group_name = action.scaling_group
-            if scaling_group_name is not None:
-                query_condition = sa.or_(
-                    query_condition, ResourcePresetRow.scaling_group_name == scaling_group_name
-                )
-            query = query.where(query_condition)
-            presets = []
-            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-            async for row in await db_session.stream_scalars(query):
-                row = cast(ResourcePresetRow, row)
-                preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
-                presets.append({
-                    "id": str(row.id),
-                    "name": row.name,
-                    "shared_memory": str(row.shared_memory) if row.shared_memory else None,
-                    "resource_slots": preset_slots.to_json(),
-                })
+        await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        preset_data_list = await self._resource_preset_repository.list_presets(action.scaling_group)
 
-            return ListResourcePresetsResult(presets=presets)
+        presets = []
+        for preset_data in preset_data_list:
+            preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+            presets.append({
+                "id": str(preset_data.id),
+                "name": preset_data.name,
+                "shared_memory": str(preset_data.shared_memory)
+                if preset_data.shared_memory
+                else None,
+                "resource_slots": preset_slots.to_json(),
+            })
+
+        return ListResourcePresetsResult(presets=presets)
 
     async def check_presets(
         self, action: CheckResourcePresetsAction
@@ -336,31 +273,27 @@ class ResourcePresetService:
                 sgroup_remaining[slot] = min(keypair_remaining[slot], sgroup_remaining[slot])
 
             # Fetch all resource presets in the current scaling group.
-            resource_preset_query = sa.select(ResourcePresetRow)
-            query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
-            if action.scaling_group is not None:
-                query_condition = sa.or_(
-                    query_condition,
-                    ResourcePresetRow.scaling_group_name == action.scaling_group,
-                )
-            resource_preset_query = resource_preset_query.where(query_condition)
+            preset_data_list = await self._resource_preset_repository.list_presets(
+                action.scaling_group
+            )
 
             presets = []
-            async for row in await SASession(conn).stream_scalars(resource_preset_query):
+            for preset_data in preset_data_list:
                 # Check if there are any agent that can allocate each preset.
-                row = cast(ResourcePresetRow, row)
                 allocatable = False
-                preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
+                preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
                 for agent_slot in agent_slots:
                     if agent_slot >= preset_slots and keypair_remaining >= preset_slots:
                         allocatable = True
                         break
                 presets.append({
-                    "id": str(row.id),
-                    "name": row.name,
+                    "id": str(preset_data.id),
+                    "name": preset_data.name,
                     "resource_slots": preset_slots.to_json(),
                     "shared_memory": (
-                        str(row.shared_memory) if row.shared_memory is not None else None
+                        str(preset_data.shared_memory)
+                        if preset_data.shared_memory is not None
+                        else None
                     ),
                     "allocatable": allocatable,
                 })
