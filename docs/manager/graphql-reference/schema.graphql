@@ -1736,7 +1736,7 @@ type Endpoint implements Item {
   destroyed_at: DateTime
   routings: [Routing]
   retries: Int
-  status: String
+  status: EndpointStatus
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
 
@@ -1762,6 +1762,17 @@ type Routing implements Item {
 
   """Added in 24.12.0."""
   live_stat: JSONString
+}
+
+"""Added in 25.12.0."""
+enum EndpointStatus {
+  READY
+  PROVISIONING
+  HEALTHY
+  UNHEALTHY
+  DESTROYING
+  DESTROYED
+  DEGRADED
 }
 
 type InferenceSessionError {
