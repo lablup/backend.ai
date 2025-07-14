@@ -7,6 +7,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.common.contexts.user_id import with_user_id
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.logging.utils import with_log_context_fields
 
 _DEFAULT_RETRY_FIELD = b"_retry_count"
 _DEFAULT_MAX_RETRIES = 3
@@ -68,10 +69,15 @@ class MessageMetadata:
         Context manager to apply all context variables stored in metadata.
         """
         with ExitStack() as stack:
+            log_fields: dict[str, str] = {}
             if self.request_id:
                 stack.enter_context(with_request_id(self.request_id))
+                log_fields["request_id"] = self.request_id
             if self.user_id:
                 stack.enter_context(with_user_id(self.user_id))
+                log_fields["user_id"] = self.user_id
+            if log_fields:
+                stack.enter_context(with_log_context_fields(log_fields))
             yield
 
 
