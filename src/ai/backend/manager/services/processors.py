@@ -17,6 +17,7 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -72,6 +73,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 @dataclass
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
+    repositories: Repositories
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
@@ -110,28 +112,57 @@ class Services:
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
+        repositories = args.repositories
         agent_service = AgentService(
             args.db,
             args.etcd,
             args.agent_registry,
             args.config_provider,
+            repositories.agent.repository,
         )
-        domain_service = DomainService(args.db)
+        domain_service = DomainService(args.db, repositories.domain.repository)
         group_service = GroupService(
-            args.db, args.storage_manager, args.config_provider, args.valkey_stat_client
+            args.db,
+            args.storage_manager,
+            args.config_provider,
+            args.valkey_stat_client,
+            repositories.group.repository,
         )
         user_service = UserService(
-            args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
+            args.db,
+            args.storage_manager,
+            args.valkey_stat_client,
+            args.agent_registry,
+            repositories.user.repository,
+            repositories.user.admin_repository,
         )
-        image_service = ImageService(args.db, args.agent_registry)
-        container_registry_service = ContainerRegistryService(args.db)
+        image_service = ImageService(
+            args.agent_registry, repositories.image.repository, repositories.image.admin_repository
+        )
+        container_registry_service = ContainerRegistryService(
+            args.db, repositories.container_registry.repository
+        )
         vfolder_service = VFolderService(
-            args.db, args.config_provider, args.storage_manager, args.background_task_manager
+            args.db,
+            args.config_provider,
+            args.storage_manager,
+            args.background_task_manager,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
         )
         vfolder_file_service = VFolderFileService(
-            args.db, args.config_provider, args.storage_manager
+            args.db,
+            args.config_provider,
+            args.storage_manager,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
         )
-        vfolder_invite_service = VFolderInviteService(args.db, args.config_provider)
+        vfolder_invite_service = VFolderInviteService(
+            args.db,
+            args.config_provider,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
+        )
         session_service = SessionService(
             SessionServiceArgs(
                 db=args.db,
@@ -141,15 +172,28 @@ class Services:
                 event_hub=args.event_hub,
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
+                session_repository=repositories.session.repository,
+                admin_session_repository=repositories.session.admin_repository,
             )
         )
-        keypair_resource_policy_service = KeypairResourcePolicyService(args.db)
-        user_resource_policy_service = UserResourcePolicyService(args.db)
-        project_resource_policy_service = ProjectResourcePolicyService(args.db)
-        resource_preset_service = ResourcePresetService(
-            args.db, args.agent_registry, args.config_provider
+        keypair_resource_policy_service = KeypairResourcePolicyService(
+            args.db, repositories.keypair_resource_policy.repository
         )
-        utilization_metric_service = UtilizationMetricService(args.config_provider)
+        user_resource_policy_service = UserResourcePolicyService(
+            args.db, repositories.user_resource_policy.repository
+        )
+        project_resource_policy_service = ProjectResourcePolicyService(
+            args.db, repositories.project_resource_policy.repository
+        )
+        resource_preset_service = ResourcePresetService(
+            args.db,
+            args.agent_registry,
+            args.config_provider,
+            repositories.resource_preset.repository,
+        )
+        utilization_metric_service = UtilizationMetricService(
+            args.config_provider, repositories.metric.repository
+        )
         model_serving_service = ModelServingService(
             db=args.db,
             agent_registry=args.agent_registry,
@@ -158,9 +202,19 @@ class Services:
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
+            model_serving_repository=repositories.model_serving.repository,
+            admin_model_serving_repository=repositories.model_serving.admin_repository,
         )
-        model_serving_auto_scaling = AutoScalingService(args.db)
-        auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)
+        model_serving_auto_scaling = AutoScalingService(
+            args.db,
+            repositories.model_serving.repository,
+            repositories.model_serving.admin_repository,
+        )
+        auth = AuthService(
+            db=args.db,
+            hook_plugin_ctx=args.hook_plugin_ctx,
+            auth_repository=repositories.auth.repository,
+        )
 
         return cls(
             agent=agent_service,

@@ -3,11 +3,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.manager.errors.exceptions import ImageNotFound
+from ai.backend.manager.errors.exceptions import (
+    ForgetImageForbiddenError,
+    ImageNotFound,
+)
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
-    UntagImageFromRegistryActionGenericForbiddenError,
     UntagImageFromRegistryActionResult,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
@@ -56,7 +58,7 @@ HARBOR2_REGISTRY_FIXTURE_DICT["type"] = "harbor2"
                 client_role=UserRole.USER,
                 image_id=IMAGE_ROW_FIXTURE.id,
             ),
-            UntagImageFromRegistryActionGenericForbiddenError,
+            ForgetImageForbiddenError,
         ),
         TestScenario.failure(
             "Image not found",

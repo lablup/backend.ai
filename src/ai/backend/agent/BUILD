@@ -11,6 +11,7 @@ python_sources(
         "src/ai/backend/agent/docker:src",  # not auto-inferred
         "src/ai/backend/agent/dummy:src",  # not auto-inferred
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
+        "src/ai/backend/agent/config:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
         "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
@@ -62,7 +63,7 @@ python_distribution(
     ),
     entry_points={
         "backendai_cli_v10": {
-            "ag": "ai.backend.agent.cli:main",
+            "ag": "ai.backend.agent.cli.__main__:main",
             "ag.start-server": "ai.backend.agent.server:main",
         },
         "backendai_network_agent_v1": {

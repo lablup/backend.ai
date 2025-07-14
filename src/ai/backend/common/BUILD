@@ -31,6 +31,7 @@ python_distribution(
         "src/ai/backend/common/clients/valkey_client/valkey_image:src",
         "src/ai/backend/common/clients/valkey_client/valkey_live:src",
         "src/ai/backend/common/clients/valkey_client/valkey_rate_limit:src",
+        "src/ai/backend/common/clients/valkey_client/valkey_session:src",
         "src/ai/backend/common/clients/valkey_client/valkey_stat:src",
         "src/ai/backend/common/clients/valkey_client/valkey_stream:src",
         "src/ai/backend/common/configs:src",

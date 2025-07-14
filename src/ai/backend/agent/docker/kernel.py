@@ -21,6 +21,7 @@ from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
@@ -596,8 +597,8 @@ LinuxKit_CMD_EXEC_PREFIX = [
 ]
 
 
-async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) -> None:
-    if local_config["agent"]["docker-mode"] == "linuxkit":
+async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig) -> None:
+    if local_config.agent.docker_mode == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
         proxy_worker_binary = pkg_resources.resource_filename(
@@ -605,7 +606,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
-        server_port = local_config["agent"]["metadata-server-port"]
+        server_port = local_config.agent.metadata_server_port
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(
             "linuxkit-nsenter:latest",

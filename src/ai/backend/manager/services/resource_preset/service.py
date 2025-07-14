@@ -28,6 +28,7 @@ from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -64,16 +65,19 @@ class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
+    _resource_preset_repository: ResourcePresetRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
         config_provider: ManagerConfigProvider,
+        resource_preset_repository: ResourcePresetRepository,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
         self._config_provider = config_provider
+        self._resource_preset_repository = resource_preset_repository
 
     async def create_preset(
         self, action: CreateResourcePresetAction

@@ -817,20 +817,12 @@ class ValkeyStatClient:
         :param status_set_key: The key for the status set.
         :return: List of encoded session IDs.
         """
-        # Use batch operations to get count, then pop all members
-        batch = self._create_batch()
-        batch.scard(status_set_key)
-
-        # Execute first to get the count
-        results = await self._client.client.exec(batch, raise_on_error=True)
-        count = results[0] if results else 0
-
+        count = await self._client.client.scard(status_set_key)
         if count == 0:
             return []
-
         # Pop all members
-        result = await self._client.client.spop(status_set_key)
-        return cast(list[bytes], result or [])
+        results = await self._client.client.spop_count(status_set_key, count)
+        return list(results)
 
     @valkey_decorator()
     async def remove_session_ids_from_status_update(
@@ -865,7 +857,7 @@ class ValkeyStatClient:
         cursor = b"0"
         keys: list[bytes] = []
         while True:
-            result = await self._client.client.hscan(hash_name, str(cursor))
+            result = await self._client.client.hscan(hash_name, cursor)
             cursor = cast(bytes, result[0])
             current_keys = cast(list[bytes], result[1])
             keys.extend(current_keys)
@@ -883,7 +875,7 @@ class ValkeyStatClient:
         cursor = b"0"
         matched_keys: list[bytes] = []
         while True:
-            result = await self._client.client.scan(cursor.decode(), match=pattern, count=1000)
+            result = await self._client.client.scan(cursor, match=pattern)
             cursor = cast(bytes, result[0])
             keys = cast(list[bytes], result[1])
             matched_keys.extend(keys)
@@ -962,7 +954,7 @@ class ValkeyStatClient:
         matched_keys: list[bytes] = []
 
         while True:
-            result = await self._client.client.scan(str(cursor), match=pattern)
+            result = await self._client.client.scan(cursor, match=pattern)
             cursor = cast(bytes, result[0])
             keys = cast(list[bytes], result[1])
             matched_keys.extend(keys)

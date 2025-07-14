@@ -123,6 +123,8 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
+from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
 from ai.backend.manager.service.container_registry.harbor import (
@@ -627,10 +629,16 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    repositories = Repositories.create(
+        args=RepositoryArgs(
+            db=root_ctx.db,
+        )
+    )
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
                 db=root_ctx.db,
+                repositories=repositories,
                 etcd=root_ctx.etcd,
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
@@ -674,7 +682,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             )
         case ServiceDiscoveryType.REDIS:
             live_redis_target = root_ctx.redis_profile_target.profile_target(RedisRole.LIVE)
-            root_ctx.service_discovery = RedisServiceDiscovery(
+            root_ctx.service_discovery = await RedisServiceDiscovery.create(
                 RedisServiceDiscoveryArgs(redis_target=live_redis_target)
             )
 

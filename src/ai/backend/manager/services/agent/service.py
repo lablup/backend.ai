@@ -14,6 +14,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -47,6 +48,7 @@ class AgentService:
     _etcd: AsyncEtcd
     _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
+    _agent_repository: AgentRepository
 
     def __init__(
         self,
@@ -54,11 +56,13 @@ class AgentService:
         etcd: AsyncEtcd,
         agent_registry: AgentRegistry,
         config_provider: ManagerConfigProvider,
+        agent_repository: AgentRepository,
     ) -> None:
         self._db = db
         self._etcd = etcd
         self._agent_registry = agent_registry
         self._config_provider = config_provider
+        self._agent_repository = agent_repository
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """

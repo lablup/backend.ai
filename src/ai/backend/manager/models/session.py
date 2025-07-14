@@ -1698,7 +1698,7 @@ class SessionLifecycleManager:
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         try:
-            raw_result = await self.valkey_stat.get_and_clear_session_ids_for_status_update(
+            results = await self.valkey_stat.get_and_clear_session_ids_for_status_update(
                 self.status_set_key,
             )
         except (
@@ -1707,10 +1707,9 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
-            raw_result = []
-        raw_result = cast(list[bytes], raw_result)
+            results = []
         result: list[SessionId] = []
-        for raw_session_id in raw_result:
+        for raw_session_id in results:
             try:
                 result.append(self._decoder(raw_session_id))
             except (ValueError, SyntaxError):

@@ -21,6 +21,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -78,6 +79,7 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
+    repositories: Repositories
     processors: Processors
     event_hub: EventHub
     message_queue: AbstractMessageQueue

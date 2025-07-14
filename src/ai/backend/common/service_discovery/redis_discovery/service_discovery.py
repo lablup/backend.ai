@@ -1,7 +1,7 @@
 import json
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Self, Sequence
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
@@ -22,53 +22,42 @@ class RedisServiceDiscoveryArgs:
 
 
 class RedisServiceDiscovery(ServiceDiscovery):
-    _valkey_client: Optional[ValkeyLiveClient]
+    _valkey_client: ValkeyLiveClient
     _ttl: int
     _prefix: str
 
-    def __init__(self, args: RedisServiceDiscoveryArgs) -> None:
+    def __init__(self, valkey_client: ValkeyLiveClient, args: RedisServiceDiscoveryArgs) -> None:
         self._redis_target = args.redis_target
         self._db_id = args.db_id
         self._ttl = args.ttl
         self._prefix = args.prefix
-        self._valkey_client = None  # Will be initialized in connect()
+        self._valkey_client = valkey_client
 
-    async def connect(self) -> None:
-        """Initialize the ValkeyLiveClient connection."""
-        if self._valkey_client is None:
-            self._valkey_client = await ValkeyLiveClient.create(
-                self._redis_target,
-                db_id=self._db_id,
-                human_readable_name="service_discovery",
-            )
+    @classmethod
+    async def create(cls, args: RedisServiceDiscoveryArgs) -> Self:
+        valkey_client = await ValkeyLiveClient.create(
+            args.redis_target,
+            db_id=args.db_id,
+            human_readable_name="service_discovery",
+        )
+        return cls(valkey_client, args)
 
     async def close(self) -> None:
         """Close the ValkeyLiveClient connection."""
-        if self._valkey_client is not None:
-            await self._valkey_client.close()
-            self._valkey_client = None
+        await self._valkey_client.close()
 
     async def _hsetex(self, key: str, mapping: dict[str, Any]) -> None:
         """Set hash fields with expiry using ValkeyLiveClient."""
-        if self._valkey_client is None:
-            raise RuntimeError("ValkeyLiveClient not initialized. Call connect() first.")
-
         # Convert values to JSON strings
         json_mapping = {k: dump_json_str(v) for k, v in mapping.items()}
         await self._valkey_client.hset_with_expiry(key, json_mapping, self._ttl)
 
     async def _scan_keys(self, pattern: str) -> list[str]:
         """Scan keys matching pattern using ValkeyLiveClient."""
-        if self._valkey_client is None:
-            raise RuntimeError("ValkeyLiveClient not initialized. Call connect() first.")
-
         return await self._valkey_client.scan_keys(pattern)
 
     async def _hget_json(self, name: str) -> ServiceMetadata:
         """Get hash fields and parse JSON values using ValkeyLiveClient."""
-        if self._valkey_client is None:
-            raise RuntimeError("ValkeyLiveClient not initialized. Call connect() first.")
-
         raw_hash = await self._valkey_client.hgetall_str(name)
         if not raw_hash:
             raise ValueError(f"Service key {name} not found.")
@@ -85,9 +74,6 @@ class RedisServiceDiscovery(ServiceDiscovery):
 
     async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
         """Unregister a service using ValkeyLiveClient."""
-        if self._valkey_client is None:
-            raise RuntimeError("ValkeyLiveClient not initialized. Call connect() first.")
-
         key = self._service_prefix(service_group, service_id)
         await self._valkey_client.delete_key(key)
 

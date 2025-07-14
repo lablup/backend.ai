@@ -91,6 +91,8 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -218,6 +220,8 @@ class SessionServiceArgs:
     event_hub: EventHub
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
+    session_repository: SessionRepository
+    admin_session_repository: AdminSessionRepository
 
 
 class SessionService:
@@ -228,6 +232,8 @@ class SessionService:
     _event_hub: EventHub
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
+    _session_repository: SessionRepository
+    _admin_session_repository: AdminSessionRepository
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -242,6 +248,8 @@ class SessionService:
         self._background_task_manager = args.background_task_manager
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
+        self._session_repository = args.session_repository
+        self._admin_session_repository = args.admin_session_repository
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()

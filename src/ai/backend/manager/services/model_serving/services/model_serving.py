@@ -62,6 +62,10 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.model_serving.admin_repository import (
+    AdminModelServingRepository,
+)
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -138,6 +142,8 @@ class ModelServingService:
     _event_dispatcher: EventDispatcher
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
+    _model_serving_repository: ModelServingRepository
+    _admin_model_serving_repository: AdminModelServingRepository
 
     _valkey_live: ValkeyLiveClient
 
@@ -150,6 +156,8 @@ class ModelServingService:
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_live: ValkeyLiveClient,
+        model_serving_repository: ModelServingRepository,
+        admin_model_serving_repository: AdminModelServingRepository,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -158,6 +166,8 @@ class ModelServingService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_live = valkey_live
+        self._model_serving_repository = model_serving_repository
+        self._admin_model_serving_repository = admin_model_serving_repository
 
     async def _fetch_file_from_storage_proxy(
         self,
