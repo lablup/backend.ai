@@ -50,15 +50,11 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-)
 from ai.backend.common.json import load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
     KernelId,
-    ModelServiceStatus,
     ServicePort,
     SessionId,
     SessionTypes,
@@ -1116,18 +1112,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         case b"model-service-result":
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
-                            response = load_json(msg_data)
-                            event = ModelServiceStatusAnycastEvent(
-                                self.kernel_id,
-                                self.session_id,
-                                response["model_name"],
-                                (
-                                    ModelServiceStatus.HEALTHY
-                                    if response["is_healthy"]
-                                    else ModelServiceStatus.UNHEALTHY
-                                ),
-                            )
-                            await self.event_producer.anycast_event(event)
+                            # no-op
+                            pass
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":

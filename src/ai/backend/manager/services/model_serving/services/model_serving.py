@@ -12,8 +12,8 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
@@ -38,7 +38,6 @@ from ai.backend.common.types import (
     ImageAlias,
     MountPermission,
     MountTypes,
-    RedisConnectionInfo,
     RuntimeVariant,
     SessionTypes,
 )
@@ -140,7 +139,7 @@ class ModelServingService:
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
 
-    _redis_live: RedisConnectionInfo
+    _valkey_live: ValkeyLiveClient
 
     def __init__(
         self,
@@ -150,7 +149,7 @@ class ModelServingService:
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
-        redis_live: RedisConnectionInfo,
+        valkey_live: ValkeyLiveClient,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -158,7 +157,7 @@ class ModelServingService:
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
         self._config_provider = config_provider
-        self._redis_live = redis_live
+        self._valkey_live = valkey_live
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -314,6 +313,7 @@ class ModelServingService:
                 open_to_public=action.creator.open_to_public,
                 runtime_variant=action.creator.runtime_variant,
             )
+            endpoint.url = await self._agent_registry.create_appproxy_endpoint(db_sess, endpoint)
             db_sess.add(endpoint)
             await db_sess.flush()
             endpoint_id = endpoint.id
@@ -640,19 +640,14 @@ class ModelServingService:
                 self._db, action.requester_ctx, route.endpoint_row.session_owner
             )
 
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id == action.route_id)
-                .values({"traffic_ratio": action.traffic_ratio})
+            route.traffic_ratio = action.traffic_ratio
+            await self._valkey_live.store_live_data(
+                f"endpoint.{action.service_id}.session.{route.session}.traffic_ratio",
+                str(action.traffic_ratio),
             )
-            await db_sess.execute(query)
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    f"endpoint.{action.service_id}.route.{action.route_id}.traffic_ratio",
-                    action.traffic_ratio,
-                ),
-            )
+
+            await self._agent_registry.notify_endpoint_route_update_to_appproxy(route.endpoint_row)
+            await db_sess.commit()
 
         return UpdateRouteActionResult(success=True)
 
@@ -747,10 +742,7 @@ class ModelServingService:
                 raise ModelServiceNotFound
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
-        async with self._db.begin_session() as db_sess:
-            await self._agent_registry.update_appproxy_endpoint_routes(
-                db_sess, endpoint, [r for r in endpoint.routings]
-            )
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint)
 
         return ForceSyncActionResult(success=True)
 

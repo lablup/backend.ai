@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import (
     Container,
     Mapping,
@@ -15,6 +16,7 @@ from typing import (
     List,
     Optional,
     Self,
+    TypeAlias,
     cast,
 )
 from uuid import UUID, uuid4
@@ -89,6 +91,8 @@ __all__ = (
     "EndpointAutoScalingRuleRow",
 )
 
+
+ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -530,6 +534,34 @@ class EndpointRow(Base):
         )
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
+
+    async def generate_redis_route_info(
+        self, db_sess: AsyncSession
+    ) -> ModelServiceSerializableConnectionInfo:
+        from .kernel import KernelRow
+        from .routing import RoutingRow
+
+        active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        target_kernels = await KernelRow.batch_load_by_session_id(
+            db_sess,
+            [
+                r.session
+                for r in active_routes
+                if r.status in RouteStatus.active_route_statuses() and r.session
+            ],
+        )
+        session_id_to_route_map = {r.session: r for r in active_routes}
+        connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+        for kernel in target_kernels:
+            for port_info in kernel.service_ports:
+                if port_info["is_inference"]:
+                    connection_info[port_info["name"]].append({
+                        "session_id": str(kernel.session_id),
+                        "route_id": str(session_id_to_route_map[kernel.session_id].id),
+                        "kernel_host": kernel.kernel_host,
+                        "kernel_port": port_info["host_ports"][0],
+                    })
+        return connection_info
 
 
 class EndpointTokenRow(Base):

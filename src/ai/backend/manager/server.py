@@ -635,6 +635,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
                 valkey_stat_client=root_ctx.valkey_stat,
+                valkey_live=root_ctx.valkey_live,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,

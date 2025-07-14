@@ -4,6 +4,7 @@ import asyncio
 import base64
 import copy
 import itertools
+import json
 import logging
 import re
 import secrets
@@ -31,7 +32,6 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import urlparse
 
 import aiodocker
 import aiohttp
@@ -51,7 +51,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from typeguard import check_type
 from yarl import URL
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -83,6 +83,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.model_serving.anycast import (
+    EndpointRouteListUpdatedEvent,
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
 )
@@ -143,7 +144,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.services.model_serving.types import RouteConnectionInfo
 from ai.backend.manager.utils import query_userinfo
 
 if TYPE_CHECKING:
@@ -291,6 +291,7 @@ class AgentRegistry:
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
             valkey_stat,
+            valkey_live,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -3619,7 +3620,7 @@ class AgentRegistry:
         self,
         db_sess: AsyncSession,
         endpoint: EndpointRow,
-    ) -> None:
+    ) -> str:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
@@ -3664,71 +3665,7 @@ class AgentRegistry:
             ) as resp:
                 resp.raise_for_status()
                 endpoint_json = await resp.json()
-                async with self.db.begin_session() as db_sess:
-                    query = (
-                        sa.update(EndpointRow)
-                        .values({"url": endpoint_json["endpoint"]})
-                        .where(EndpointRow.id == endpoint.id)
-                    )
-                    await db_sess.execute(query)
-
-    async def update_appproxy_endpoint_routes(
-        self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
-    ) -> None:
-        target_sessions = await SessionRow.list_sessions(
-            db_sess,
-            [r.session for r in active_routes],
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
-        query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
-            .select_from(scaling_groups)
-            .where((scaling_groups.c.name == endpoint.resource_group))
-        )
-
-        result = await db_sess.execute(query)
-        sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
-        wsproxy_api_token = sgroup["wsproxy_api_token"]
-
-        session_id_to_route_map = {r.session: r for r in active_routes}
-        inference_apps: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
-        for target_session in target_sessions:
-            if target_session.main_kernel.kernel_host is None:
-                kernel_host = urlparse(target_session.main_kernel.agent_addr).hostname
-            else:
-                kernel_host = target_session.main_kernel.kernel_host
-            assert kernel_host is not None
-            for port_info in target_session.main_kernel.service_ports:
-                if not port_info["is_inference"]:
-                    continue
-                inference_apps[port_info["name"]].append({
-                    "session_id": str(target_session.id),
-                    "route_id": str(session_id_to_route_map[target_session.id].id),
-                    "kernel_host": kernel_host,
-                    "kernel_port": port_info["host_ports"][0],
-                    "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
-                })
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/routes",
-                json={
-                    "apps": inference_apps,
-                },  # TODO: support for multiple inference apps
-                headers={
-                    "X-BackendAI-Token": wsproxy_api_token,
-                },
-            ) as resp:
-                resp.raise_for_status()
-                endpoint_json = await resp.json()
-                async with self.db.begin_session() as db_sess:
-                    query = (
-                        sa.update(EndpointRow)
-                        .values({"url": endpoint_json["endpoint"]})
-                        .where(EndpointRow.id == endpoint.id)
-                    )
-                    await db_sess.execute(query)
+                return endpoint_json["endpoint"]
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
@@ -3750,6 +3687,19 @@ class AgentRegistry:
                 },
             ):
                 pass
+
+    async def notify_endpoint_route_update_to_appproxy(self, endpoint: EndpointRow) -> None:
+        async with self.db.begin_readonly_session() as db_sess:
+            connection_info = await endpoint.generate_redis_route_info(db_sess)
+
+        await self.valkey_live.delete_key(f"endpoint.{endpoint.id}.route_connection_info")
+        await self.valkey_live.store_live_data(
+            f"endpoint.{endpoint.id}.route_connection_info",
+            json.dumps(connection_info),
+            ex=3600,
+        )
+
+        await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
 
     async def purge_containers(
         self,
@@ -4039,32 +3989,26 @@ async def invoke_session_callback(
                                 [
                                     r.session_id
                                     for r in endpoint.routings
-                                    if r.status in RouteStatus.active_route_statuses
+                                    if r.status in RouteStatus.active_route_statuses()
                                 ],
                             )
-                            connection_info: defaultdict[str, dict[str, RouteConnectionInfo]] = (
+                            connection_info: defaultdict[str, dict[str, tuple[str, int]]] = (
                                 defaultdict()
                             )
                             for kernel in target_kernels:
                                 for port_info in kernel.service_ports:
                                     if port_info["is_inference"]:
                                         connection_info[port_info["name"]][str(kernel.id)] = (
-                                            RouteConnectionInfo(
-                                                port_info["name"],
-                                                kernel.kernel_host,
-                                                port_info["host_ports"][0],
-                                            )
+                                            kernel.kernel_host,
+                                            port_info["host_ports"][0],
                                         )
-                            await redis_helper.execute(
-                                context.valkey_live,
-                                lambda r: r.delete(f"endpoint.{endpoint.id}.route_connection_info"),
+                            await context.valkey_live.delete_key(
+                                f"endpoint.{endpoint.id}.route_connection_info"
                             )
-                            await redis_helper.execute(
-                                context.valkey_live,
-                                lambda r: r.hset(
-                                    f"endpoint.{endpoint.id}.route_connection_info",
-                                    dict(connection_info),
-                                ),
+                            await context.valkey_live.store_live_data(
+                                f"endpoint.{endpoint.id}.route_connection_info",
+                                json.dumps(connection_info),
+                                ex=3600,
                             )
                     await db_sess.commit()
 

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -10,7 +9,6 @@ import sqlalchemy as sa
 import yarl
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common import redis_helper
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     ExecutionCancelledAnycastEvent,
@@ -34,17 +32,14 @@ from ai.backend.common.events.kernel import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
-    RedisConnectionInfo,
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.services.model_serving.types import RouteConnectionInfo
 
 from ...models.endpoint import EndpointRow
-from ...models.kernel import KernelRow
 from ...models.routing import RouteStatus, RoutingRow
 from ...models.session import KernelLoadingStrategy, SessionRow, SessionStatus
 from ...models.utils import (
@@ -61,21 +56,17 @@ class SessionEventHandler:
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     _idle_checker_host: IdleCheckerHost
 
-    _redis_live: RedisConnectionInfo
-
     def __init__(
         self,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
         idle_checker_host: IdleCheckerHost,
-        redis_live: RedisConnectionInfo,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
         self._idle_checker_host = idle_checker_host
-        self._redis_live = redis_live
 
     async def _handle_started_or_cancelled(
         self,
@@ -267,44 +258,6 @@ class SessionEventHandler:
                                     .where(EndpointRow.id == endpoint.id)
                                 )
                                 await db_sess.execute(query)
-                            case SessionTerminatedAnycastEvent():
-                                query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
-                                await db_sess.execute(query)
-                            case SessionStartedAnycastEvent() | SessionTerminatingAnycastEvent():
-                                target_kernels = await KernelRow.batch_load_by_session_id(
-                                    db_sess,
-                                    [
-                                        r.session_id
-                                        for r in endpoint.routings
-                                        if r.status in RouteStatus.active_route_statuses
-                                    ],
-                                )
-                                connection_info: defaultdict[
-                                    str, dict[str, RouteConnectionInfo]
-                                ] = defaultdict()
-                                for kernel in target_kernels:
-                                    for port_info in kernel.service_ports:
-                                        if port_info["is_inference"]:
-                                            connection_info[port_info["name"]][str(kernel.id)] = (
-                                                RouteConnectionInfo(
-                                                    port_info["name"],
-                                                    kernel.kernel_host,
-                                                    port_info["host_ports"][0],
-                                                )
-                                            )
-                                await redis_helper.execute(
-                                    self._redis_live,
-                                    lambda r: r.delete(
-                                        f"endpoint.{endpoint.id}.route_connection_info"
-                                    ),
-                                )
-                                await redis_helper.execute(
-                                    self._redis_live,
-                                    lambda r: r.hset(
-                                        f"endpoint.{endpoint.id}.route_connection_info",
-                                        dict(connection_info),
-                                    ),
-                                )
                         await db_sess.commit()
 
                 await execute_with_retry(_update)
