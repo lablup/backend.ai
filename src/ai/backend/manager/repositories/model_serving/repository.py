@@ -1,11 +1,22 @@
+import asyncio
 import uuid
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.docker import ImageRef
+from ai.backend.common.types import (
+    ClusterMode,
+    MountPermission,
+    MountTypes,
+    RuntimeVariant,
+    SessionTypes,
+)
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     EndpointTokenData,
@@ -13,6 +24,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingGroupData,
     UserData,
 )
+from ai.backend.manager.errors.exceptions import EndpointNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -20,14 +32,26 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
+    ModelServicePredicateChecker,
 )
+from ai.backend.manager.models.group import resolve_group_name_or_id
+from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
+from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
+from ai.backend.manager.services.model_serving.types import MutationResult
+from ai.backend.manager.types import MountOptionModel, UserScope
+
+if TYPE_CHECKING:
+    from ai.backend.manager.registry import AgentRegistry
 
 
 class ModelServingRepository:
@@ -111,10 +135,10 @@ class ModelServingRepository:
         """
         Create a new endpoint after validation.
         """
-        async with self._db.begin_session() as session:
-            session.add(endpoint_row)
-            await session.flush()
-            await session.refresh(endpoint_row)
+        async with self._db.begin_session() as db_sess:
+            db_sess.add(endpoint_row)
+            await db_sess.flush()
+            await db_sess.refresh(endpoint_row)
             data = EndpointData.from_row(endpoint_row)
         return data
 
@@ -587,3 +611,257 @@ class ModelServingRepository:
                 return True
             except NoResultFound:
                 return False
+
+    async def resolve_group_id(
+        self, domain_name: str, group_name_or_id: str | uuid.UUID
+    ) -> Optional[uuid.UUID]:
+        """
+        Resolve group name or ID to group ID.
+        """
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            assert conn is not None
+            return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
+
+    async def get_session_by_id(
+        self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
+    ) -> Optional[SessionRow]:
+        """
+        Get session by ID with specified kernel loading strategy.
+        """
+        async with self._db.begin_readonly_session() as session:
+            try:
+                return await SessionRow.get_session(
+                    session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
+                )
+            except NoResultFound:
+                return None
+
+    async def update_appproxy_endpoint_routes(
+        self, agent_registry: "AgentRegistry", endpoint_row: EndpointRow
+    ) -> None:
+        """
+        Update AppProxy endpoint routes using agent registry.
+        """
+        async with self._db.begin_session() as db_sess:
+            healthy_routes = (
+                [r for r in endpoint_row.routings if r.status == RouteStatus.HEALTHY]
+                if endpoint_row.routings
+                else []
+            )
+            await agent_registry.update_appproxy_endpoint_routes(
+                db_sess, endpoint_row, healthy_routes
+            )
+
+    async def resolve_image_for_endpoint_creation(
+        self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
+    ) -> ImageRow:
+        """
+        Resolve image for endpoint creation.
+        This is a special case where we need the actual ImageRow object
+        because EndpointRow constructor requires it.
+        """
+        async with self._db.begin_readonly_session() as session:
+            return await ImageRow.resolve(session, identifiers)
+
+    async def modify_endpoint(
+        self,
+        action: ModifyEndpointAction,
+        agent_registry: "AgentRegistry",
+        legacy_etcd_config_loader: LegacyEtcdLoader,
+        storage_manager: StorageSessionManager,
+    ) -> MutationResult:
+        """
+        Modify an endpoint with all validations and checks.
+        This method handles all database operations for endpoint modification.
+        """
+
+        async def _do_mutate() -> MutationResult:
+            async with self._db.begin_session() as db_session:
+                try:
+                    endpoint_row = await EndpointRow.get(
+                        db_session,
+                        action.endpoint_id,
+                        load_session_owner=True,
+                        load_model=True,
+                        load_routes=True,
+                    )
+                    match action.requester_ctx.user_role:
+                        case UserRole.SUPERADMIN:
+                            pass
+                        case UserRole.ADMIN:
+                            domain_name = action.requester_ctx.domain_name
+                            if endpoint_row.domain != domain_name:
+                                raise EndpointNotFound
+                        case _:
+                            user_id = action.requester_ctx.user_id
+                            if endpoint_row.session_owner != user_id:
+                                raise EndpointNotFound
+                except NoResultFound:
+                    raise EndpointNotFound
+                if endpoint_row.lifecycle_stage in (
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ):
+                    raise InvalidAPIParameters("Cannot update endpoint marked for removal")
+
+                fields_to_update = action.modifier.fields_to_update()
+                for key, value in fields_to_update.items():
+                    setattr(endpoint_row, key, value)
+
+                fields_to_update_require_none_check = (
+                    action.modifier.fields_to_update_require_none_check()
+                )
+                for key, value in fields_to_update_require_none_check.items():
+                    if value is not None:
+                        setattr(endpoint_row, key, value)
+
+                image_ref = action.modifier.image.optional_value()
+                if image_ref is not None:
+                    image_name = image_ref.name
+                    arch = image_ref.architecture.value()
+                    # This needs to happen within the transaction
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
+                    )
+                    endpoint_row.image = image_row.id
+
+                session_owner: UserRow = endpoint_row.session_owner_row
+
+                conn = await db_session.connection()
+                assert conn
+
+                await ModelServicePredicateChecker.check_scaling_group(
+                    conn,
+                    endpoint_row.resource_group,
+                    session_owner.main_access_key,
+                    endpoint_row.domain,
+                    endpoint_row.project,
+                )
+
+                user_scope = UserScope(
+                    domain_name=endpoint_row.domain,
+                    group_id=endpoint_row.project,
+                    user_uuid=session_owner.uuid,
+                    user_role=session_owner.role,
+                )
+
+                resource_policy = await self.get_keypair_resource_policy(
+                    session_owner.resource_policy
+                )
+                if not resource_policy:
+                    raise InvalidAPIParameters("Resource policy not found")
+                extra_mounts_input = action.modifier.extra_mounts.optional_value()
+                if extra_mounts_input is not None:
+                    extra_mounts = {
+                        mount.vfolder_id.value(): MountOptionModel(
+                            mount_destination=(
+                                mount.mount_destination.value()
+                                if mount.mount_destination.optional_value() is not None
+                                else None
+                            ),
+                            type=MountTypes(mount.type.value())
+                            if mount.type.optional_value() is not None
+                            else MountTypes.BIND,
+                            permission=(
+                                MountPermission(mount.permission.value())
+                                if mount.permission.optional_value() is not None
+                                else None
+                            ),
+                        )
+                        for mount in extra_mounts_input
+                    }
+                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                        conn,
+                        legacy_etcd_config_loader,
+                        storage_manager,
+                        endpoint_row.model,
+                        endpoint_row.model_mount_destination,
+                        extra_mounts,
+                        user_scope,
+                        resource_policy,
+                    )
+                    endpoint_row.extra_mounts = vfolder_mounts
+
+                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    await ModelServicePredicateChecker.validate_model_definition(
+                        storage_manager,
+                        endpoint_row.model_row,
+                        endpoint_row.model_definition_path,
+                    )
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
+
+                # This needs to happen within the transaction for validation
+                image_row = await ImageRow.resolve(
+                    db_session,
+                    [
+                        ImageIdentifier(
+                            endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                        ),
+                    ],
+                )
+
+                await agent_registry.create_session(
+                    "",
+                    image_row.image_ref,
+                    user_scope,
+                    session_owner.main_access_key,
+                    resource_policy,
+                    SessionTypes.INFERENCE,
+                    {
+                        "mounts": [
+                            endpoint_row.model,
+                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
+                        ],
+                        "mount_map": {
+                            endpoint_row.model: endpoint_row.model_mount_destination,
+                            **{
+                                m.vfid.folder_id: m.kernel_path.as_posix()
+                                for m in endpoint_row.extra_mounts
+                            },
+                        },
+                        "mount_options": {
+                            m.vfid.folder_id: {"permission": m.mount_perm}
+                            for m in endpoint_row.extra_mounts
+                        },
+                        "environ": endpoint_row.environ,
+                        "scaling_group": endpoint_row.resource_group,
+                        "resources": endpoint_row.resource_slots,
+                        "resource_opts": endpoint_row.resource_opts,
+                        "preopen_ports": None,
+                        "agent_list": None,
+                    },
+                    ClusterMode(endpoint_row.cluster_mode),
+                    endpoint_row.cluster_size,
+                    bootstrap_script=endpoint_row.bootstrap_script,
+                    startup_command=endpoint_row.startup_command,
+                    tag=endpoint_row.tag,
+                    callback_url=endpoint_row.callback_url,
+                    sudo_session_enabled=session_owner.sudo_session_enabled,
+                    dry_run=True,
+                )
+
+                await db_session.commit()
+                return MutationResult(
+                    success=True,
+                    message="success",
+                    data=EndpointData.from_row(endpoint_row),
+                )
+
+        try:
+            return await execute_with_retry(_do_mutate)
+        except IntegrityError as e:
+            return MutationResult(success=False, message=f"integrity error: {e}", data=None)
+        except StatementError as e:
+            orig_exc = e.orig
+            return MutationResult(success=False, message=str(orig_exc), data=None)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            raise
+        except Exception:
+            raise
