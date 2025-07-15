@@ -3678,7 +3678,7 @@ class AgentRegistry:
             )
 
             for model_info in model_definition["models"]:
-                if health_check_info := model_info.get("service", {}).get("health_check"):
+                if health_check_info := (model_info.get("service") or {}).get("health_check"):
                     _info = HealthCheckConfig(
                         path=health_check_info["path"],
                         interval=health_check_info["interval"],
