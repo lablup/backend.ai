@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import sqlalchemy as sa
@@ -39,19 +39,23 @@ from ai.backend.manager.errors.exceptions import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 
-from ...models.endpoint import EndpointLifecycle, EndpointRow
+from ...models.endpoint import EndpointRow
 from ...models.routing import RouteStatus, RoutingRow
 from ...models.session import KernelLoadingStrategy, SessionRow, SessionStatus
 from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    is_db_retry_error,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SessionEventHandler:
+    _registry: AgentRegistry
+    _db: ExtendedAsyncSAEngine
+    _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    _idle_checker_host: IdleCheckerHost
+
     def __init__(
         self,
         registry: AgentRegistry,
@@ -222,87 +226,47 @@ class SessionEventHandler:
             if session.session_type == SessionTypes.INFERENCE:
 
                 async def _update() -> None:
-                    new_routes: list[RoutingRow]
                     async with self._db.begin_session() as db_sess:
                         route = await RoutingRow.get_by_session(
                             db_sess, session.id, load_endpoint=True
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                        if isinstance(event, SessionCancelledAnycastEvent):
-                            update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
-                            if "error" in session.status_data:
-                                if session.status_data["error"]["name"] == "MultiAgentError":
-                                    errors = session.status_data["error"]["collection"]
-                                else:
-                                    errors = [session.status_data["error"]]
-                                update_data["error_data"] = {
-                                    "type": "session_cancelled",
-                                    "errors": errors,
-                                    "session_id": session.id,
+                        match event:
+                            case SessionCancelledAnycastEvent():
+                                update_data: dict[str, Any] = {
+                                    "status": RouteStatus.FAILED_TO_START
                                 }
-                            query = (
-                                sa.update(RoutingRow)
-                                .values(update_data)
-                                .where(RoutingRow.id == route.id)
-                            )
-                            await db_sess.execute(query)
-                            query = (
-                                sa.update(EndpointRow)
-                                .values({"retries": endpoint.retries + 1})
-                                .where(EndpointRow.id == endpoint.id)
-                            )
-                            await db_sess.execute(query)
-                        elif isinstance(event, SessionTerminatedAnycastEvent):
-                            query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
-                            await db_sess.execute(query)
-                            if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
-                                new_routes = [
-                                    r
-                                    for r in endpoint.routings
-                                    if r.id != route.id and r.status == RouteStatus.HEALTHY
-                                ]
-                                try:
-                                    await self._registry.update_appproxy_endpoint_routes(
-                                        db_sess, endpoint, new_routes
-                                    )
-                                except Exception as e:
-                                    if is_db_retry_error(e):
-                                        raise
-                                    log.warning(
-                                        "failed to communicate with AppProxy endpoint: {}", str(e)
-                                    )
-                            await db_sess.commit()
-                        else:
-                            new_route_status: Optional[RouteStatus] = None
-                            if isinstance(event, SessionTerminatingAnycastEvent):
-                                new_route_status = RouteStatus.TERMINATING
-
-                            if new_route_status:
+                                if "error" in session.status_data:
+                                    if session.status_data["error"]["name"] == "MultiAgentError":
+                                        errors = session.status_data["error"]["collection"]
+                                    else:
+                                        errors = [session.status_data["error"]]
+                                    update_data["error_data"] = {
+                                        "type": "session_cancelled",
+                                        "errors": errors,
+                                        "session_id": session.id,
+                                    }
                                 query = (
                                     sa.update(RoutingRow)
+                                    .values(update_data)
                                     .where(RoutingRow.id == route.id)
-                                    .values({"status": new_route_status})
                                 )
                                 await db_sess.execute(query)
+                                query = (
+                                    sa.update(EndpointRow)
+                                    .values({"retries": endpoint.retries + 1})
+                                    .where(EndpointRow.id == endpoint.id)
+                                )
+                                await db_sess.execute(query)
+                            case SessionTerminatedAnycastEvent():
+                                query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
+                                await db_sess.execute(query)
+                            case SessionStartedAnycastEvent() | SessionTerminatingAnycastEvent():
+                                await self._registry.notify_endpoint_route_update_to_appproxy(
+                                    endpoint
+                                )
 
-                                new_routes = [
-                                    r
-                                    for r in endpoint.routings
-                                    if r.id != route.id and r.status == RouteStatus.HEALTHY
-                                ]
-                                if new_route_status == RouteStatus.HEALTHY:
-                                    new_routes.append(route)
-                                try:
-                                    await self._registry.update_appproxy_endpoint_routes(
-                                        db_sess, endpoint, new_routes
-                                    )
-                                except Exception as e:
-                                    if is_db_retry_error(e):
-                                        raise
-                                    log.warning(
-                                        "failed to communicate with AppProxy endpoint: {}", str(e)
-                                    )
-                            await db_sess.commit()
+                        await db_sess.commit()
 
                 await execute_with_retry(_update)
 

@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     RuntimeVariant,
+    VFolderID,
     VFolderMount,
     VFolderUsageMode,
 )
@@ -73,7 +74,7 @@ from ai.backend.manager.services.model_serving.types import (
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..errors.exceptions import InvalidAPIParameters, VFolderNotFound
 from ..models import (
-    ModelServicePredicateChecker,
+    ModelServiceHelper,
     UserRole,
     UserRow,
     query_accessible_vfolders,
@@ -520,7 +521,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_readonly() as conn:
-        checked_scaling_group = await ModelServicePredicateChecker.check_scaling_group(
+        checked_scaling_group = await ModelServiceHelper.check_scaling_group(
             conn,
             params.config.scaling_group,
             owner_access_key,
@@ -578,7 +579,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
         model_id = folder_row["id"]
 
-        vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+        vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
             conn,
             root_ctx.config_provider.legacy_etcd_config_loader,
             root_ctx.storage_manager,
@@ -595,10 +596,18 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         )
 
     if params.runtime_variant == RuntimeVariant.CUSTOM:
-        yaml_path = await ModelServicePredicateChecker.validate_model_definition(
+        vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
+        yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
             root_ctx.storage_manager,
-            folder_row,
+            folder_row["host"],
+            vfid,
             params.config.model_definition_path,
+        )
+        await ModelServiceHelper.validate_model_definition(
+            root_ctx.storage_manager,
+            folder_row["host"],
+            vfid,
+            yaml_path,
         )
     else:
         if (
