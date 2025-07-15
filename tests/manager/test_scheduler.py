@@ -27,8 +27,6 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.scheduler.agent_selector import (
     DispersedAgentSelector,
@@ -628,11 +626,7 @@ async def test_manually_assign_agent_available(
     test_valkey_live = MagicMock()
     test_valkey_stat = MagicMock()
 
-    mock_repositories = MagicMock(spec=Repositories)
-    mock_schedule_repositories = MagicMock(spec=ScheduleRepositories)
     mock_schedule_repository = MagicMock(spec=ScheduleRepository)
-    mock_schedule_repositories.repository = mock_schedule_repository
-    mock_repositories.schedule = mock_schedule_repositories
 
     dispatcher = SchedulerDispatcher(
         config_provider=mock_config_provider,
@@ -642,7 +636,7 @@ async def test_manually_assign_agent_available(
         registry=registry,
         valkey_live=test_valkey_live,
         valkey_stat=test_valkey_stat,
-        repositories=mock_repositories,
+        schedule_repository=mock_schedule_repository,
     )
 
     # manually assigned agent has None capacity
