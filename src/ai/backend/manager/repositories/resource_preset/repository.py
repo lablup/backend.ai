@@ -4,6 +4,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
@@ -13,6 +15,9 @@ from ai.backend.manager.services.resource_preset.types import (
     ResourcePresetModifier,
 )
 
+# Layer-specific decorator for resource_preset repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.RESOURCE_PRESET)
+
 
 class ResourcePresetRepository:
     _db: ExtendedAsyncSAEngine
@@ -20,6 +25,7 @@ class ResourcePresetRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def create_preset_validated(
         self, creator: ResourcePresetCreator
     ) -> Optional[ResourcePresetData]:
@@ -34,6 +40,7 @@ class ResourcePresetRepository:
             data = preset_row.to_dataclass()
         return data
 
+    @repository_decorator()
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
         Gets a resource preset by ID.
@@ -46,6 +53,7 @@ class ResourcePresetRepository:
             data = preset_row.to_dataclass()
         return data
 
+    @repository_decorator()
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
         Gets a resource preset by name.
@@ -58,6 +66,7 @@ class ResourcePresetRepository:
             data = preset_row.to_dataclass()
         return data
 
+    @repository_decorator()
     async def get_preset_by_id_or_name(
         self, preset_id: Optional[UUID], name: Optional[str]
     ) -> ResourcePresetData:
@@ -79,6 +88,7 @@ class ResourcePresetRepository:
             data = preset_row.to_dataclass()
         return data
 
+    @repository_decorator()
     async def modify_preset_validated(
         self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
     ) -> ResourcePresetData:
@@ -104,6 +114,7 @@ class ResourcePresetRepository:
             data = preset_row.to_dataclass()
         return data
 
+    @repository_decorator()
     async def delete_preset_validated(
         self, preset_id: Optional[UUID], name: Optional[str]
     ) -> ResourcePresetData:
@@ -127,6 +138,7 @@ class ResourcePresetRepository:
             await session.delete(preset_row)
         return data
 
+    @repository_decorator()
     async def list_presets(
         self, scaling_group_name: Optional[str] = None
     ) -> list[ResourcePresetData]:

@@ -2,10 +2,15 @@ from typing import Any, Mapping
 
 import sqlalchemy as sa
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+# Layer-specific decorator for project_resource_policy repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.PROJECT_RESOURCE_POLICY)
 
 
 class ProjectResourcePolicyRepository:
@@ -14,6 +19,7 @@ class ProjectResourcePolicyRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def create(self, fields: Mapping[str, Any]) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             db_row = ProjectResourcePolicyRow(**fields)
@@ -21,6 +27,7 @@ class ProjectResourcePolicyRepository:
             await db_sess.flush()
             return db_row.to_dataclass()
 
+    @repository_decorator()
     async def get_by_name(self, name: str) -> ProjectResourcePolicyData:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
@@ -30,6 +37,7 @@ class ProjectResourcePolicyRepository:
                 raise ObjectNotFound(f"Project resource policy with name {name} not found.")
             return row.to_dataclass()
 
+    @repository_decorator()
     async def update(self, name: str, fields: Mapping[str, Any]) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
@@ -42,6 +50,7 @@ class ProjectResourcePolicyRepository:
             await db_sess.flush()
             return row.to_dataclass()
 
+    @repository_decorator()
     async def delete(self, name: str) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)

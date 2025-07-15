@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId
 from ai.backend.manager.models import (
     AgentRow,
@@ -31,6 +33,9 @@ from ai.backend.manager.models.utils import (
     sql_json_merge,
 )
 from ai.backend.manager.scheduler.types import AgentAllocationContext, SchedulingContext
+
+# Layer-specific decorator for schedule repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
 
 
 class ScheduleRepository:
@@ -180,6 +185,7 @@ class ScheduleRepository:
     ) -> None:
         await recalc_concurrency_used(session, sched_ctx.registry.valkey_stat, sess_row.access_key)
 
+    @repository_decorator()
     async def get_schedulable_scaling_groups(self) -> list[str]:
         async with self._db.begin_readonly_session() as session:
             query = (
@@ -190,6 +196,7 @@ class ScheduleRepository:
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
 
+    @repository_decorator()
     async def get_scaling_group_info(self, sgroup_name: str) -> tuple[str, ScalingGroupOpts]:
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(
@@ -202,6 +209,7 @@ class ScheduleRepository:
                 raise ValueError(f'Scaling group "{sgroup_name}" not found!')
             return row.scheduler, row.scheduler_opts
 
+    @repository_decorator()
     async def list_managed_sessions(
         self,
         sgroup_name: str,
@@ -210,12 +218,14 @@ class ScheduleRepository:
         async with self._db.begin_readonly_session() as session:
             return await self._list_managed_sessions(session, sgroup_name, pending_timeout)
 
+    @repository_decorator()
     async def get_endpoint_for_session(self, session_id: SessionId) -> Optional[uuid.UUID]:
         async with self._db.begin_readonly_session() as session:
             return await session.scalar(
                 sa.select(RoutingRow.endpoint).where(RoutingRow.session == session_id)
             )
 
+    @repository_decorator()
     async def get_kernel_count_per_agent_at_endpoint(
         self,
         endpoint_id: uuid.UUID,
@@ -226,6 +236,7 @@ class ScheduleRepository:
                 session, endpoint_id, filter_by_statuses
             )
 
+    @repository_decorator()
     async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> list[AgentRow]:
         async with self._db.begin_readonly_session() as session:
             from ai.backend.manager.models import list_schedulable_agents_by_sgroup
@@ -233,10 +244,12 @@ class ScheduleRepository:
             result = await list_schedulable_agents_by_sgroup(session, sgroup_name)
             return list(result)
 
+    @repository_decorator()
     async def get_session_by_id(self, session_id: SessionId) -> Optional[SessionRow]:
         async with self._db.begin_readonly_session() as session:
             return await SessionRow.get_session_by_id(session, session_id)
 
+    @repository_decorator()
     async def get_schedulable_session_with_kernels_and_agents(
         self, session_id: SessionId
     ) -> Optional[SessionRow]:
@@ -259,12 +272,14 @@ class ScheduleRepository:
             session, session_id, eager_loading_op=eager_loading_op
         )
 
+    @repository_decorator()
     async def apply_cancellation(
         self, session_ids: list[SessionId], reason: str = "pending-timeout"
     ) -> None:
         async with self._db.begin_session() as session:
             await self._apply_cancellation(session, session_ids, reason)
 
+    @repository_decorator()
     async def update_session_predicate_failure(
         self,
         sched_ctx: SchedulingContext,
@@ -289,6 +304,7 @@ class ScheduleRepository:
             if pending_sess.is_private:
                 await self._apply_cancellation(session, [pending_sess.id])
 
+    @repository_decorator()
     async def update_session_status_data(
         self,
         pending_sess: SessionRow,
@@ -320,6 +336,7 @@ class ScheduleRepository:
             )
             await session.execute(session_query)
 
+    @repository_decorator()
     async def get_agent_available_slots(
         self, agent_id: AgentId
     ) -> tuple[ResourceSlot, ResourceSlot]:
@@ -335,6 +352,7 @@ class ScheduleRepository:
                 raise RuntimeError(f"No such agent exist in DB: {agent_id}")
             return result
 
+    @repository_decorator()
     async def reserve_agent(
         self,
         scaling_group: str,
@@ -347,6 +365,7 @@ class ScheduleRepository:
                 session, scaling_group, agent_id, requested_slots, extra_conds
             )
 
+    @repository_decorator()
     async def update_kernel_status_with_error(
         self,
         kernel_id: str,
@@ -364,6 +383,7 @@ class ScheduleRepository:
             )
             await session.execute(query)
 
+    @repository_decorator()
     async def finalize_scheduled_session(
         self,
         session_id: SessionId,
@@ -612,6 +632,7 @@ class ScheduleRepository:
             for agent_id in affected_agents:
                 await recalc_agent_resource_occupancy(db_session, agent_id)
 
+    @repository_decorator()
     async def transit_scheduled_to_preparing(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
             return await self._transit_scheduled_to_preparing(session)
@@ -632,6 +653,7 @@ class ScheduleRepository:
             row.set_status(SessionStatus.PREPARING, status_changed_at=now)
         return scheduled_sessions
 
+    @repository_decorator()
     async def mark_sessions_and_kernels_creating(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
             return await self._mark_sessions_and_kernels_creating(session)
@@ -650,6 +672,7 @@ class ScheduleRepository:
             row.set_status(SessionStatus.CREATING, status_changed_at=now)
         return session_rows
 
+    @repository_decorator()
     async def clean_zombie_routes(self) -> int:
         async with self._db.begin_session() as session:
             return await self._clean_zombie_routes(session)
@@ -675,6 +698,7 @@ class ScheduleRepository:
             return result.rowcount
         return 0
 
+    @repository_decorator()
     async def create_routing_rows(self, endpoint_create_data: list[tuple]) -> list[uuid.UUID]:
         async with self._db.begin_session() as session:
             return await self._create_routing_rows(session, endpoint_create_data)
@@ -699,6 +723,7 @@ class ScheduleRepository:
         await session.commit()
         return created_routes
 
+    @repository_decorator()
     async def destroy_terminated_endpoints_and_routes(
         self, endpoints_to_mark_terminated: set, already_destroyed_sessions: list[SessionId]
     ) -> None:
@@ -727,6 +752,7 @@ class ScheduleRepository:
         query = sa.delete(RoutingRow).where(RoutingRow.session.in_(already_destroyed_sessions))
         await session.execute(query)
 
+    @repository_decorator()
     async def get_container_info_for_destroyed_kernels(self, session_id: SessionId) -> dict:
         async with self._db.begin_readonly_session() as session:
             return await self._get_container_info_for_destroyed_kernels(session, session_id)
@@ -740,6 +766,7 @@ class ScheduleRepository:
         rows = (await session.execute(query)).fetchall()
         return {row["id"]: row["container_id"] for row in rows}
 
+    @repository_decorator()
     async def autoscale_endpoints(self) -> None:
         async with self._db.begin_session(commit_on_end=True) as session:
             await self._autoscale_endpoints(session)
@@ -764,6 +791,7 @@ class ScheduleRepository:
                 # This is just a placeholder - actual logic would be moved here
                 pass
 
+    @repository_decorator()
     async def get_endpoints_for_scaling(self) -> list:
         async with self._db.begin_readonly_session() as session:
             return await self._get_endpoints_for_scaling(session)
@@ -779,6 +807,7 @@ class ScheduleRepository:
         )
         return endpoints
 
+    @repository_decorator()
     async def get_sessions_to_destroy_for_scaling(
         self, route_sessions: list[SessionId]
     ) -> list[SessionRow]:
@@ -806,6 +835,7 @@ class ScheduleRepository:
         result = await session.execute(query)
         return result.scalars().all()
 
+    @repository_decorator()
     async def delete_appproxy_endpoints_readonly(
         self, endpoints_to_mark_terminated: set, registry
     ) -> None:
