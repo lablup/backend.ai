@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
+from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -37,6 +38,7 @@ from ai.backend.common.types import (
     ImageAlias,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     RuntimeVariant,
     SessionTypes,
 )
@@ -47,7 +49,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServicePredicateChecker,
+    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
@@ -138,6 +140,8 @@ class ModelServingService:
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
 
+    _redis_live: RedisConnectionInfo
+
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
@@ -146,6 +150,7 @@ class ModelServingService:
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
+        redis_live: RedisConnectionInfo,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -153,6 +158,7 @@ class ModelServingService:
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
         self._config_provider = config_provider
+        self._redis_live = redis_live
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -308,6 +314,7 @@ class ModelServingService:
                 open_to_public=action.creator.open_to_public,
                 runtime_variant=action.creator.runtime_variant,
             )
+            endpoint.url = await self._agent_registry.create_appproxy_endpoint(db_sess, endpoint)
             db_sess.add(endpoint)
             await db_sess.flush()
             endpoint_id = endpoint.id
@@ -634,21 +641,18 @@ class ModelServingService:
                 self._db, action.requester_ctx, route.endpoint_row.session_owner
             )
 
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id == action.route_id)
-                .values({"traffic_ratio": action.traffic_ratio})
+            route.traffic_ratio = action.traffic_ratio
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.set(
+                    f"endpoint.{action.service_id}.session.{route.session}.traffic_ratio",
+                    str(action.traffic_ratio),
+                    ex=3600,
+                ),
             )
-            await db_sess.execute(query)
-            endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
-            try:
-                await self._agent_registry.update_appproxy_endpoint_routes(
-                    db_sess,
-                    endpoint,
-                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY],
-                )
-            except aiohttp.ClientError as e:
-                log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+
+            await self._agent_registry.notify_endpoint_route_update_to_appproxy(route.endpoint_row)
+            await db_sess.commit()
 
         return UpdateRouteActionResult(success=True)
 
@@ -743,10 +747,7 @@ class ModelServingService:
                 raise ModelServiceNotFound
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
-        async with self._db.begin_session() as db_sess:
-            await self._agent_registry.update_appproxy_endpoint_routes(
-                db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-            )
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint)
 
         return ForceSyncActionResult(success=True)
 
@@ -805,7 +806,7 @@ class ModelServingService:
                 conn = await db_session.connection()
                 assert conn
 
-                await ModelServicePredicateChecker.check_scaling_group(
+                await ModelServiceHelper.check_scaling_group(
                     conn,
                     endpoint_row.resource_group,
                     session_owner.main_access_key,
@@ -848,7 +849,7 @@ class ModelServingService:
                         )
                         for mount in extra_mounts_input
                     }
-                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                    vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
                         conn,
                         self._config_provider.legacy_etcd_config_loader,
                         self._storage_manager,
@@ -861,10 +862,19 @@ class ModelServingService:
                     endpoint_row.extra_mounts = vfolder_mounts
 
                 if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
-                    await ModelServicePredicateChecker.validate_model_definition(
+                    model_definition_path = (
+                        await ModelServiceHelper.validate_model_definition_file_exists(
+                            self._storage_manager,
+                            endpoint_row.model_row.host,
+                            endpoint_row.model_row.vfid,
+                            endpoint_row.model_definition_path,
+                        )
+                    )
+                    await ModelServiceHelper.validate_model_definition(
                         self._storage_manager,
-                        endpoint_row.model_row,
-                        endpoint_row.model_definition_path,
+                        endpoint_row.model_row.host,
+                        endpoint_row.model_row.vfid,
+                        model_definition_path,
                     )
                 elif (
                     endpoint_row.runtime_variant != RuntimeVariant.CMD

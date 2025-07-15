@@ -117,6 +117,7 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ComputeSessionPermission
+from .routing import RouteStatus, RoutingRow
 from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
@@ -1537,13 +1538,15 @@ class SessionLifecycleManager:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        redis_obj: RedisConnectionInfo,
+        redis_stat: RedisConnectionInfo,
+        redis_live: RedisConnectionInfo,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,
     ) -> None:
         self.db = db
-        self.redis_obj = redis_obj
+        self.redis_stat = redis_stat
+        self.redis_live = redis_live
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
         self.registry = registry
@@ -1618,9 +1621,24 @@ class SessionLifecycleManager:
                         session_row.access_key,
                     ),
                 )
-                if session_row.session_type == SessionTypes.BATCH:
-                    await self.registry.trigger_batch_execution(session_row)
+                match session_row.session_type:
+                    case SessionTypes.BATCH:
+                        await self.registry.trigger_batch_execution(session_row)
+                    case SessionTypes.INFERENCE:
+                        await self.handle_inference_session_update(session_row)
+            case SessionStatus.TERMINATING:
+                if session_row.session_type == SessionTypes.INFERENCE:
+                    async with self.db.begin_session() as db_sess:
+                        route = await RoutingRow.get_by_session(db_sess, session_row.id)
+                        route.status = RouteStatus.TERMINATING
+                        await db_sess.commit()
+                    await self.handle_inference_session_update(session_row)
             case SessionStatus.TERMINATED:
+                if session_row.session_type == SessionTypes.INFERENCE:
+                    async with self.db.begin_session() as db_sess:
+                        query = sa.delete(RoutingRow).where(RoutingRow.session == session_row.id)
+                        await db_sess.execute(query)
+                        await db_sess.commit()
                 await self.event_producer.anycast_and_broadcast_event(
                     SessionTerminatedAnycastEvent(
                         session_row.id, session_row.main_kernel.status_info
@@ -1631,6 +1649,11 @@ class SessionLifecycleManager:
                 )
             case _:
                 pass
+
+    async def handle_inference_session_update(self, session: SessionRow) -> None:
+        async with self.db.begin_readonly_session() as db_sess:
+            route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+        await self.registry.notify_endpoint_route_update_to_appproxy(route.endpoint_row)
 
     async def transit_session_status(
         self,
@@ -1666,7 +1689,7 @@ class SessionLifecycleManager:
         """)
         try:
             await redis_helper.execute_script(
-                self.redis_obj,
+                self.redis_stat,
                 "session_status_update",
                 sadd_session_ids_script,
                 [self.status_set_key],
@@ -1688,7 +1711,7 @@ class SessionLifecycleManager:
         """)
         try:
             raw_result = await redis_helper.execute_script(
-                self.redis_obj,
+                self.redis_stat,
                 "pop_all_session_id_to_update_status",
                 pop_all_session_id_script,
                 [self.status_set_key],
@@ -1732,7 +1755,7 @@ class SessionLifecycleManager:
         """)
         try:
             ret = await redis_helper.execute_script(
-                self.redis_obj,
+                self.redis_stat,
                 "session_status_update",
                 srem_session_ids_script,
                 [self.status_set_key],
