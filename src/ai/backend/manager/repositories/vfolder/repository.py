@@ -452,9 +452,7 @@ class VfolderRepository:
                 user_row.container_uid,
             )
 
-    async def _get_vfolder_by_id(
-        self, session: SASession, vfolder_id: uuid.UUID
-    ) -> VFolderRow:
+    async def _get_vfolder_by_id(self, session: SASession, vfolder_id: uuid.UUID) -> VFolderRow:
         """
         Private method to get a VFolder by ID using an existing session.
         Raises VFolderNotFound if not found.

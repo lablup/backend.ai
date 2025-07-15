@@ -29,9 +29,7 @@ class UserRepository:
         self._db = db
 
     @repository_decorator()
-    async def get_by_email_validated(
-        self, email: str, requester_uuid: Optional[UUID]
-    ) -> UserData:
+    async def get_by_email_validated(self, email: str, requester_uuid: Optional[UUID]) -> UserData:
         """
         Get user by email with ownership validation.
         Raises UserNotFound if user not found or access denied.
@@ -63,7 +61,9 @@ class UserRepository:
             return result
 
     @repository_decorator()
-    async def create_user_validated(self, user_creator: UserCreator, group_ids: list[str]) -> UserData:
+    async def create_user_validated(
+        self, user_creator: UserCreator, group_ids: list[str]
+    ) -> UserData:
         """
         Create a new user with default keypair and group associations.
         """

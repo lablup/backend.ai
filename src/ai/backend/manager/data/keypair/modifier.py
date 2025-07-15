@@ -8,7 +8,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class KeyPairModifier(PartialModifier):
     """Modifier for keypair operations."""
-    
+
     secret_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     user: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
@@ -18,7 +18,7 @@ class KeyPairModifier(PartialModifier):
     num_queries: OptionalState[int] = field(default_factory=OptionalState.nop)
     ssh_public_key: TriState[str] = field(default_factory=TriState.nop)
     bootstrap_script: TriState[str] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

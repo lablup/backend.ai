@@ -8,7 +8,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class EndpointCreator(Creator):
     """Creator for model serving endpoint operations."""
-    
+
     name: str
     project: UUID
     domain: str
@@ -20,7 +20,7 @@ class EndpointCreator(Creator):
     cluster_mode: str = "single-node"
     cluster_size: int = 1
     environ: Optional[dict[str, str]] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {
@@ -44,11 +44,11 @@ class EndpointCreator(Creator):
 @dataclass
 class RoutingCreator(Creator):
     """Creator for model serving routing operations."""
-    
+
     endpoint: UUID
     session: UUID
     traffic_ratio: float = 1.0
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
@@ -61,11 +61,11 @@ class RoutingCreator(Creator):
 @dataclass
 class EndpointTokenCreator(Creator):
     """Creator for endpoint token operations."""
-    
+
     token: str
     endpoint: UUID
     session: UUID
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {

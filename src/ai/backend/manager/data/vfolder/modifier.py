@@ -9,7 +9,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class VFolderModifier(PartialModifier):
     """Modifier for vfolder operations."""
-    
+
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     host: OptionalState[str] = field(default_factory=OptionalState.nop)
     quota_scope_id: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -20,7 +20,7 @@ class VFolderModifier(PartialModifier):
     group: TriState[UUID] = field(default_factory=TriState.nop)
     unmanaged_path: TriState[str] = field(default_factory=TriState.nop)
     cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -40,11 +40,11 @@ class VFolderModifier(PartialModifier):
 @dataclass
 class VFolderPermissionModifier(PartialModifier):
     """Modifier for vfolder permission operations."""
-    
+
     vfolder: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     user: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -57,12 +57,12 @@ class VFolderPermissionModifier(PartialModifier):
 @dataclass
 class VFolderInvitationModifier(PartialModifier):
     """Modifier for vfolder invitation operations."""
-    
+
     vfolder: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     inviter: OptionalState[str] = field(default_factory=OptionalState.nop)
     invitee: OptionalState[str] = field(default_factory=OptionalState.nop)
     permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

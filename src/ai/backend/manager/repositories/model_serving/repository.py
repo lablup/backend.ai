@@ -19,6 +19,10 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.model_serving.creator import (
+    EndpointCreator,
+    EndpointTokenCreator,
+)
 from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     EndpointTokenData,
@@ -26,7 +30,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingGroupData,
     UserData,
 )
-from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.errors.model_serving import EndpointNotFound, ModelServingNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -74,17 +78,17 @@ class ModelServingRepository:
         Returns None if endpoint doesn't exist or user doesn't have access.
         """
         async with self._db.begin_readonly_session() as session:
-            endpoint = await self._get_endpoint_by_id(
-                session, endpoint_id, load_routes=True, load_session_owner=True, load_model=True
-            )
-            if not endpoint:
-                return None
+            try:
+                endpoint = await self._get_endpoint_by_id(
+                    session, endpoint_id, load_routes=True, load_session_owner=True, load_model=True
+                )
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return None
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                data = EndpointData.from_row(endpoint)
+                return data
+            except EndpointNotFound:
                 return None
-
-            data = EndpointData.from_row(endpoint)
-        return data
 
     @repository_decorator()
     async def get_endpoint_by_name_validated(
@@ -95,11 +99,12 @@ class ModelServingRepository:
         Returns None if endpoint doesn't exist or user doesn't own it.
         """
         async with self._db.begin_readonly_session() as session:
-            endpoint = await self._get_endpoint_by_name(session, name, user_id)
-            if not endpoint:
+            try:
+                endpoint = await self._get_endpoint_by_name(session, name, user_id)
+                data = EndpointData.from_row(endpoint)
+                return data
+            except EndpointNotFound:
                 return None
-            data = EndpointData.from_row(endpoint)
-        return data
 
     @repository_decorator()
     async def list_endpoints_by_owner_validated(
@@ -141,11 +146,13 @@ class ModelServingRepository:
             return existing_endpoint is None
 
     @repository_decorator()
-    async def create_endpoint_validated(self, endpoint_row: EndpointRow) -> EndpointData:
+    async def create_endpoint_validated(self, endpoint_creator: EndpointCreator) -> EndpointData:
         """
-        Create a new endpoint after validation.
+        Create a new endpoint using EndpointCreator.
         """
         async with self._db.begin_session() as db_sess:
+            endpoint_data = endpoint_creator.fields_to_store()
+            endpoint_row = EndpointRow(**endpoint_data)
             db_sess.add(endpoint_row)
             await db_sess.flush()
             await db_sess.refresh(endpoint_row)
@@ -167,24 +174,26 @@ class ModelServingRepository:
         Returns True if updated, False if not found or no access.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
-            if not endpoint:
+            try:
+                endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return False
+
+                update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
+                if lifecycle_stage == EndpointLifecycle.DESTROYED:
+                    update_values["destroyed_at"] = sa.func.now()
+                if replicas is not None:
+                    update_values["replicas"] = replicas
+
+                query = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id == endpoint_id)
+                    .values(update_values)
+                )
+                await session.execute(query)
+                return True
+            except EndpointNotFound:
                 return False
-
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
-                return False
-
-            update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
-            if lifecycle_stage == EndpointLifecycle.DESTROYED:
-                update_values["destroyed_at"] = sa.func.now()
-            if replicas is not None:
-                update_values["replicas"] = replicas
-
-            query = (
-                sa.update(EndpointRow).where(EndpointRow.id == endpoint_id).values(update_values)
-            )
-            await session.execute(query)
-        return True
 
     @repository_decorator()
     async def clear_endpoint_errors_validated(
@@ -195,11 +204,11 @@ class ModelServingRepository:
         Returns True if cleared, False if not found or no access.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
-            if not endpoint:
-                return False
-
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            try:
+                endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return False
+            except EndpointNotFound:
                 return False
 
             # Delete failed routes
@@ -305,20 +314,26 @@ class ModelServingRepository:
 
     @repository_decorator()
     async def create_endpoint_token_validated(
-        self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
+        self,
+        token_creator: EndpointTokenCreator,
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
     ) -> Optional[EndpointTokenData]:
         """
-        Create endpoint token with access validation.
+        Create endpoint token with access validation using EndpointTokenCreator.
         Returns token data if created, None if no access to endpoint.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
-            if not endpoint:
+            token_data = token_creator.fields_to_store()
+            try:
+                endpoint = await self._get_endpoint_by_id(session, token_data["endpoint"])
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return None
+            except EndpointNotFound:
                 return None
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
-                return None
-
+            token_row = EndpointTokenRow(**token_data)
             session.add(token_row)
             await session.commit()
             await session.refresh(token_row)
@@ -366,32 +381,40 @@ class ModelServingRepository:
         load_routes: bool = False,
         load_session_owner: bool = False,
         load_model: bool = False,
-    ) -> Optional[EndpointRow]:
+    ) -> EndpointRow:
         """
         Private method to get endpoint by ID using an existing session.
+        Raises EndpointNotFound if not found.
         """
         try:
-            return await EndpointRow.get(
+            endpoint = await EndpointRow.get(
                 session,
                 endpoint_id,
                 load_routes=load_routes,
                 load_session_owner=load_session_owner,
                 load_model=load_model,
             )
+            if not endpoint:
+                raise EndpointNotFound()
+            return endpoint
         except NoResultFound:
-            return None
+            raise EndpointNotFound()
 
     async def _get_endpoint_by_name(
         self, session: SASession, name: str, user_id: uuid.UUID
-    ) -> Optional[EndpointRow]:
+    ) -> EndpointRow:
         """
         Private method to get endpoint by name and owner using an existing session.
+        Raises EndpointNotFound if not found.
         """
         query = sa.select(EndpointRow).where(
             (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
         )
         result = await session.execute(query)
-        return result.scalar()
+        endpoint = result.scalar()
+        if not endpoint:
+            raise EndpointNotFound()
+        return endpoint
 
     async def _get_route_by_id(
         self,
@@ -399,16 +422,20 @@ class ModelServingRepository:
         route_id: uuid.UUID,
         load_endpoint: bool = False,
         load_session: bool = False,
-    ) -> Optional[RoutingRow]:
+    ) -> RoutingRow:
         """
         Private method to get route by ID using an existing session.
+        Raises ModelServingNotFound if not found.
         """
         try:
-            return await RoutingRow.get(
+            route = await RoutingRow.get(
                 session, route_id, load_endpoint=load_endpoint, load_session=load_session
             )
+            if not route:
+                raise ModelServingNotFound()
+            return route
         except NoResultFound:
-            return None
+            raise ModelServingNotFound()
 
     def _validate_endpoint_access(
         self, endpoint: EndpointRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
@@ -492,20 +519,20 @@ class ModelServingRepository:
         Returns True if updated, False if not found or no access.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
-            if not endpoint:
-                return False
+            try:
+                endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return False
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                query = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id == endpoint_id)
+                    .values({"replicas": replicas})
+                )
+                await session.execute(query)
+                return True
+            except EndpointNotFound:
                 return False
-
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values({"replicas": replicas})
-            )
-            await session.execute(query)
-        return True
 
     @repository_decorator()
     async def get_auto_scaling_rule_by_id_validated(
@@ -555,11 +582,11 @@ class ModelServingRepository:
         Returns the created rule if successful, None if no access.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
-            if not endpoint:
-                return None
-
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            try:
+                endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+                if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+                    return None
+            except EndpointNotFound:
                 return None
 
             if endpoint.lifecycle_stage in EndpointLifecycle.inactive_states():

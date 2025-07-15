@@ -8,11 +8,11 @@ from ai.backend.manager.types import Creator
 @dataclass
 class ResourcePresetCreator(Creator):
     """Creator for resource preset operations."""
-    
+
     name: str
     resource_slots: ResourceSlot
     shared_memory: Optional[int] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {

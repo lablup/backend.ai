@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.types import Creator
 
@@ -7,7 +7,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class ContainerRegistryCreator(Creator):
     """Creator for container registry operations."""
-    
+
     url: str
     registry_name: str
     project: str
@@ -15,7 +15,7 @@ class ContainerRegistryCreator(Creator):
     password: str
     type: str = "harbor"
     ssl_verify: bool = True
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {

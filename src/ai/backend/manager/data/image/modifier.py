@@ -8,7 +8,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class ImageModifier(PartialModifier):
     """Modifier for image operations."""
-    
+
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     registry: OptionalState[str] = field(default_factory=OptionalState.nop)
     tag: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -18,7 +18,7 @@ class ImageModifier(PartialModifier):
     size_bytes: OptionalState[int] = field(default_factory=OptionalState.nop)
     labels: TriState[dict[str, str]] = field(default_factory=TriState.nop)
     resources: TriState[dict[str, Any]] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -37,10 +37,10 @@ class ImageModifier(PartialModifier):
 @dataclass
 class ImageAliasModifier(PartialModifier):
     """Modifier for image alias operations."""
-    
+
     alias: OptionalState[str] = field(default_factory=OptionalState.nop)
     target: OptionalState[str] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

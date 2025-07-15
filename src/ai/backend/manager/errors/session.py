@@ -14,8 +14,6 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
-from .common import ObjectNotFound
-
 
 class SessionCreationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/session-creation-failed"

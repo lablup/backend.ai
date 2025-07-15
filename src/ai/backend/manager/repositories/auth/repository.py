@@ -7,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.auth.creator import AuthCreator, SSHKeypairCreator
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     UserCreationError,
+    UserNotFound,
 )
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.keypair import keypairs
@@ -30,37 +32,42 @@ class AuthRepository:
     @repository_decorator()
     async def get_user_by_email_validated(self, email: str, domain_name: str) -> Optional[UserData]:
         async with self._db.begin() as conn:
-            row = await self._get_user_by_email(conn, email, domain_name)
-            if not row:
+            try:
+                row = await self._get_user_by_email(conn, email, domain_name)
+                return self._user_row_to_data(row)
+            except UserNotFound:
                 return None
-            return self._user_row_to_data(row)
 
-    async def _get_user_by_email(
-        self, session: SASession, email: str, domain_name: str
-    ) -> Optional[UserRow]:
+    async def _get_user_by_email(self, session: SASession, email: str, domain_name: str) -> UserRow:
+        """
+        Private method to get user by email and domain.
+        Raises UserNotFound if not found.
+        """
         query = (
             sa.select(users)
             .select_from(users)
             .where((users.c.email == email) & (users.c.domain_name == domain_name))
         )
         result = await session.execute(query)
-        return result.first()
+        user_row = result.first()
+        if not user_row:
+            raise UserNotFound(f"User {email} not found in domain {domain_name}")
+        return user_row
 
     @repository_decorator()
     async def get_group_membership_validated(
         self, group_id: UUID, user_id: UUID
     ) -> GroupMembershipData:
         async with self._db.begin() as conn:
-            membership = await self._get_group_membership(conn, group_id, user_id)
-            if not membership:
-                raise GroupMembershipNotFoundError(
-                    extra_msg="No such project or you are not the member of it."
-                )
-            return membership
+            return await self._get_group_membership(conn, group_id, user_id)
 
     async def _get_group_membership(
         self, session: SASession, group_id: UUID, user_id: UUID
-    ) -> Optional[GroupMembershipData]:
+    ) -> GroupMembershipData:
+        """
+        Private method to get group membership.
+        Raises GroupMembershipNotFoundError if not found.
+        """
         query = (
             sa.select([association_groups_users.c.group_id, association_groups_users.c.user_id])
             .select_from(association_groups_users)
@@ -72,7 +79,9 @@ class AuthRepository:
         result = await session.execute(query)
         row = result.first()
         if not row:
-            return None
+            raise GroupMembershipNotFoundError(
+                extra_msg="No such project or you are not the member of it."
+            )
         return GroupMembershipData(group_id=row.group_id, user_id=row.user_id)
 
     @repository_decorator()
@@ -86,13 +95,14 @@ class AuthRepository:
     @repository_decorator()
     async def create_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_creator: AuthCreator,
+        keypair_creator: SSHKeypairCreator,
         group_name: str,
         domain_name: str,
     ) -> UserData:
         async with self._db.begin() as conn:
             # Create user
+            user_data = user_creator.fields_to_store()
             query = users.insert().values(user_data)
             result = await conn.execute(query)
             if result.rowcount == 0:
@@ -104,6 +114,7 @@ class AuthRepository:
             user_row = result.first()
 
             # Create keypair
+            keypair_data = keypair_creator.fields_to_store()
             keypair_data["user"] = user_row.uuid
             keypair_query = keypairs.insert().values(keypair_data)
             await conn.execute(keypair_query)
@@ -128,14 +139,14 @@ class AuthRepository:
         self, email: str, domain_name: str, full_name: str
     ) -> bool:
         async with self._db.begin() as conn:
-            user_row = await self._get_user_by_email(conn, email, domain_name)
-            if not user_row:
+            try:
+                await self._get_user_by_email(conn, email, domain_name)
+                data = {"full_name": full_name}
+                update_query = users.update().values(data).where(users.c.email == email)
+                await conn.execute(update_query)
+                return True
+            except UserNotFound:
                 return False
-
-            data = {"full_name": full_name}
-            update_query = users.update().values(data).where(users.c.email == email)
-            await conn.execute(update_query)
-            return True
 
     @repository_decorator()
     async def update_user_password_validated(self, email: str, password: str) -> None:

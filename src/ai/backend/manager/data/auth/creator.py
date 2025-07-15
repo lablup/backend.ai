@@ -7,12 +7,12 @@ from ai.backend.manager.types import Creator
 @dataclass
 class AuthCreator(Creator):
     """Creator for authentication-related operations."""
-    
+
     # Add fields based on authentication needs
     user_id: str
     domain_name: str
     is_active: bool = True
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
@@ -25,12 +25,12 @@ class AuthCreator(Creator):
 @dataclass
 class SSHKeypairCreator(Creator):
     """Creator for SSH keypair operations."""
-    
+
     user_id: str
     public_key: str
     private_key: Optional[str] = None
     name: Optional[str] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {

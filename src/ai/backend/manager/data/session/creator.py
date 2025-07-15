@@ -9,7 +9,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class SessionCreator(Creator):
     """Creator for session operations."""
-    
+
     id: SessionId
     name: str
     access_key: AccessKey
@@ -23,7 +23,7 @@ class SessionCreator(Creator):
     environ: Optional[dict[str, str]] = None
     mounts: Optional[list[str]] = None
     bootstrap_script: Optional[str] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {
@@ -50,7 +50,7 @@ class SessionCreator(Creator):
 @dataclass
 class KernelCreator(Creator):
     """Creator for kernel operations."""
-    
+
     id: UUID
     session_id: SessionId
     cluster_role: str
@@ -58,7 +58,7 @@ class KernelCreator(Creator):
     image: str
     resource_slots: ResourceSlot
     local_rank: int = 0
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {

@@ -9,7 +9,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class VFolderCreator(Creator):
     """Creator for vfolder operations."""
-    
+
     id: UUID
     name: str
     host: str
@@ -23,7 +23,7 @@ class VFolderCreator(Creator):
     group: Optional[UUID] = None
     unmanaged_path: Optional[str] = None
     cloneable: bool = False
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {
@@ -50,12 +50,12 @@ class VFolderCreator(Creator):
 @dataclass
 class VFolderPermissionCreator(Creator):
     """Creator for vfolder permission operations."""
-    
+
     id: UUID
     vfolder: UUID
     user: UUID
     permission: VFolderPermission
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
@@ -69,13 +69,13 @@ class VFolderPermissionCreator(Creator):
 @dataclass
 class VFolderInvitationCreator(Creator):
     """Creator for vfolder invitation operations."""
-    
+
     id: UUID
     vfolder: UUID
     inviter: str
     invitee: str
     permission: VFolderPermission
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {

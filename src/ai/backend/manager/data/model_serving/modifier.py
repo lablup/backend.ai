@@ -8,7 +8,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class EndpointModifier(PartialModifier):
     """Modifier for model serving endpoint operations."""
-    
+
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     model: OptionalState[str] = field(default_factory=OptionalState.nop)
     model_version: OptionalState[int] = field(default_factory=OptionalState.nop)
@@ -17,7 +17,7 @@ class EndpointModifier(PartialModifier):
     cluster_mode: OptionalState[str] = field(default_factory=OptionalState.nop)
     cluster_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     environ: TriState[dict[str, str]] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -35,11 +35,11 @@ class EndpointModifier(PartialModifier):
 @dataclass
 class RoutingModifier(PartialModifier):
     """Modifier for model serving routing operations."""
-    
+
     endpoint: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     session: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     traffic_ratio: OptionalState[float] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -52,11 +52,11 @@ class RoutingModifier(PartialModifier):
 @dataclass
 class EndpointTokenModifier(PartialModifier):
     """Modifier for endpoint token operations."""
-    
+
     token: OptionalState[str] = field(default_factory=OptionalState.nop)
     endpoint: OptionalState[UUID] = field(default_factory=OptionalState.nop)
     session: OptionalState[UUID] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

@@ -1,4 +1,4 @@
-from typing import Optional, cast
+from typing import cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -9,13 +9,15 @@ from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ImageAlias
+from ai.backend.manager.data.image.creator import ImageAliasCreator
+from ai.backend.manager.data.image.modifier import ImageModifier
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, RescanImagesResult
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
     ForgetImageForbiddenError,
-    ForgetImageNotFoundError,
     ImageAliasNotFound,
+    ImageNotFound,
     ModifyImageActionValueError,
 )
 from ai.backend.manager.models.image import (
@@ -79,23 +81,24 @@ class ImageRepository:
 
     async def _get_image_by_id(
         self, session: SASession, image_id: UUID, load_aliases: bool = False
-    ) -> Optional[ImageRow]:
+    ) -> ImageRow:
         """
         Private method to get an image by ID using an existing session.
-        Returns None if image is not found.
+        Raises ImageNotFound if image is not found.
         """
-        return await ImageRow.get(session, image_id, load_aliases=load_aliases)
+        image_row = await ImageRow.get(session, image_id, load_aliases=load_aliases)
+        if not image_row:
+            raise ImageNotFound()
+        return image_row
 
     async def _validate_image_ownership(
         self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
     ) -> ImageRow:
         """
         Private method to get an image and validate ownership using an existing session.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        Raises ForgetImageNotFoundError if image doesn't exist, ForgetImageForbiddenError if user doesn't own it.
         """
         image_row = await self._get_image_by_id(session, image_id, load_aliases)
-        if not image_row:
-            raise ForgetImageNotFoundError()
         if not image_row.is_owned_by(user_id):
             raise ForgetImageForbiddenError()
         return image_row
@@ -112,13 +115,9 @@ class ImageRepository:
         return image_alias_row
 
     @repository_decorator()
-    async def get_image_by_id(
-        self, image_id: UUID, load_aliases: bool = False
-    ) -> Optional[ImageData]:
+    async def get_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         async with self._db.begin_session() as session:
             row = await self._get_image_by_id(session, image_id, load_aliases)
-            if not row:
-                return None
             data = row.to_dataclass()
         return data
 
@@ -174,18 +173,19 @@ class ImageRepository:
 
     @repository_decorator()
     async def add_image_alias(
-        self, alias: str, image_canonical: str, architecture: str
+        self, alias_creator: ImageAliasCreator, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
         try:
             async with self._db.begin_session() as session:
                 image_row = await ImageRow.resolve(
                     session, [ImageIdentifier(image_canonical, architecture)]
                 )
-                image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
+                alias_data = alias_creator.fields_to_store()
+                image_alias = ImageAliasRow(alias=alias_data["alias"], image_id=image_row.id)
                 image_row.aliases.append(image_alias)
                 row_id = image_row.id
-                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias)
-            return row_id, alias_data
+                alias_result = ImageAliasData(id=image_alias.id, alias=image_alias.alias)
+            return row_id, alias_result
         except ValueError:
             raise AliasImageActionValueError
         except DBAPIError as e:
@@ -253,7 +253,7 @@ class ImageRepository:
 
     @repository_decorator()
     async def update_image_properties(
-        self, target: str, architecture: str, properties_to_update: dict
+        self, target: str, architecture: str, image_modifier: ImageModifier
     ) -> ImageData:
         try:
             async with self._db.begin_session() as session:
@@ -264,6 +264,7 @@ class ImageRepository:
                         ImageAlias(target),
                     ],
                 )
+                properties_to_update = image_modifier.fields_to_update()
                 for key, value in properties_to_update.items():
                     setattr(image_row, key, value)
                 data = image_row.to_dataclass()

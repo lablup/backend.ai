@@ -457,7 +457,9 @@ class SessionRepository:
         except SessionNotFound:
             raise
 
-    async def _get_session_by_id(self, db_sess: AsyncSession, session_id: str | SessionId) -> SessionRow:
+    async def _get_session_by_id(
+        self, db_sess: AsyncSession, session_id: str | SessionId
+    ) -> SessionRow:
         """Private method to get session by ID. Raises SessionNotFound if not found."""
         stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
         session_row = await db_sess.scalar(stmt)

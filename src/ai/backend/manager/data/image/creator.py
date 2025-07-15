@@ -8,7 +8,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class ImageCreator(Creator):
     """Creator for image operations."""
-    
+
     name: str
     registry: str
     tag: str
@@ -18,7 +18,7 @@ class ImageCreator(Creator):
     size_bytes: int = 0
     labels: Optional[dict[str, str]] = None
     resources: Optional[dict[str, Any]] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {
@@ -40,10 +40,10 @@ class ImageCreator(Creator):
 @dataclass
 class ImageAliasCreator(Creator):
     """Creator for image alias operations."""
-    
+
     alias: str
     target: str
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {

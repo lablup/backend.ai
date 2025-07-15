@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 @dataclass
 class ContainerRegistryModifier(PartialModifier):
     """Modifier for container registry operations."""
-    
+
     url: OptionalState[str] = field(default_factory=OptionalState.nop)
     registry_name: OptionalState[str] = field(default_factory=OptionalState.nop)
     project: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -15,7 +15,7 @@ class ContainerRegistryModifier(PartialModifier):
     password: OptionalState[str] = field(default_factory=OptionalState.nop)
     type: OptionalState[str] = field(default_factory=OptionalState.nop)
     ssl_verify: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

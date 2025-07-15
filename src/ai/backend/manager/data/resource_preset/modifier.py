@@ -8,11 +8,11 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class ResourcePresetModifier(PartialModifier):
     """Modifier for resource preset operations."""
-    
+
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     resource_slots: OptionalState[ResourceSlot] = field(default_factory=OptionalState.nop)
     shared_memory: TriState[int] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

@@ -8,7 +8,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class UserModifier(PartialModifier):
     """Modifier for user operations."""
-    
+
     username: OptionalState[str] = field(default_factory=OptionalState.nop)
     password: OptionalState[str] = field(default_factory=OptionalState.nop)
     need_password_change: OptionalState[bool] = field(default_factory=OptionalState.nop)
@@ -25,7 +25,7 @@ class UserModifier(PartialModifier):
     container_uid: TriState[int] = field(default_factory=TriState.nop)
     container_main_gid: TriState[int] = field(default_factory=TriState.nop)
     container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

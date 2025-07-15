@@ -8,7 +8,7 @@ from ai.backend.manager.types import Creator
 @dataclass
 class KeyPairCreator(Creator):
     """Creator for keypair operations."""
-    
+
     access_key: str
     secret_key: str
     user: UUID
@@ -19,7 +19,7 @@ class KeyPairCreator(Creator):
     num_queries: int = 0
     ssh_public_key: Optional[str] = None
     bootstrap_script: Optional[str] = None
-    
+
     @override
     def fields_to_store(self) -> dict[str, Any]:
         to_store = {

@@ -7,10 +7,10 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class AuthModifier(PartialModifier):
     """Modifier for authentication-related operations."""
-    
+
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -22,11 +22,11 @@ class AuthModifier(PartialModifier):
 @dataclass
 class SSHKeypairModifier(PartialModifier):
     """Modifier for SSH keypair operations."""
-    
+
     public_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     private_key: TriState[str] = field(default_factory=TriState.nop)
     name: TriState[str] = field(default_factory=TriState.nop)
-    
+
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
