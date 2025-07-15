@@ -1272,6 +1272,16 @@ class ClusterSSHKeyPair(TypedDict):
     private_key: str  # PEM-encoded string
 
 
+@dataclass
+class ContainerSSHKeyPair:
+    """
+    Represents a container SSH key pair.
+    """
+
+    public_key: str
+    private_key: str
+
+
 class ComputedDeviceCapacity(TypedDict):
     mem: NotRequired[BinarySize]
     proc: NotRequired[int]

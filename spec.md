@@ -42,7 +42,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.1: Bootstrap Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/bootstrap.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `BootstrapProvisioner`: Handle bootstrap script creation
   - `BootstrapStage`: Manage bootstrap provisioner
 - **Key responsibilities**:
@@ -51,7 +52,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.2: Config Files Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/config_files.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `ConfigFileProvisioner`: Create environment and resource configuration files
   - `ConfigFileStage`: Manage config file provisioner
 - **Key responsibilities**:
@@ -61,7 +63,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.3: Credentials Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/credentials.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `CredentialsProvisioner`: Handle Docker credentials and authentication
   - `CredentialsStage`: Manage credentials provisioner
 - **Key responsibilities**:
@@ -69,7 +72,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.4: Container SSH Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/container_ssh.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `ContainerSSHProvisioner`: Set up SSH keys inside container work directory
   - `ContainerSSHStage`: Manage container SSH provisioner
 - **Key responsibilities**:
@@ -80,7 +84,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.5: Dotfiles Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/dotfiles.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `DotfilesProvisioner`: Process and install dotfiles
   - `DotfilesStage`: Manage dotfiles provisioner
 - **Key responsibilities**:
@@ -90,7 +95,8 @@ The current `prepare_container()` function in `src/ai/backend/agent/docker/agent
 
 ##### Task 2.1.6: Kernel Object Creation Stage
 - **File**: `src/ai/backend/agent/stage/kernel_lifecycle/docker/kernel_object.py`
-- **Classes to implement**:
+- **Status**: ✅ Completed
+- **Classes implemented**:
   - `KernelObjectProvisioner`: Create final DockerKernel object
   - `KernelObjectStage`: Manage kernel object provisioner
 - **Key responsibilities**:
@@ -222,5 +228,7 @@ The recommended stage execution order for kernel creation:
 
 ## Directions
 - DO NOT use `ai.backend.agent.AbstractAgent` or its subclass in stage refactored codes
+- DO NOT use Mixin class
+- If a function becomes too long (exceeding approximately 40 lines), consider separating the function according to its purpose. Also, avoid using inner functions
 - No need to add example codes
 - No need to write test codes
