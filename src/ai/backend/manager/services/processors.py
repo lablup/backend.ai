@@ -120,11 +120,10 @@ class Services:
         )
         domain_service = DomainService(args.db, repositories.domain.repository)
         group_service = GroupService(
-            args.db,
             args.storage_manager,
             args.config_provider,
             args.valkey_stat_client,
-            repositories.group.repository,
+            repositories.group,
         )
         user_service = UserService(
             args.db,

@@ -632,6 +632,9 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     repositories = Repositories.create(
         args=RepositoryArgs(
             db=root_ctx.db,
+            storage_manager=root_ctx.storage_manager,
+            config_provider=root_ctx.config_provider,
+            valkey_stat_client=root_ctx.valkey_stat,
         )
     )
     root_ctx.processors = Processors.create(
