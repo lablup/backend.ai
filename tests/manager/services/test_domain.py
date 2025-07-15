@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator
+from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
@@ -55,7 +56,12 @@ from .test_utils import TestScenario
 
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
-    repository_args = RepositoryArgs(db=database_engine)
+    repository_args = RepositoryArgs(
+        db=database_engine,
+        storage_manager=MagicMock(),  # Not used by DomainRepositories
+        config_provider=MagicMock(),  # Not used by DomainRepositories
+        valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
+    )
     domain_repositories = DomainRepositories.create(repository_args)
     domain_service = DomainService(
         repository=domain_repositories.repository,
