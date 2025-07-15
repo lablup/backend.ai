@@ -175,13 +175,13 @@ class Services:
             )
         )
         keypair_resource_policy_service = KeypairResourcePolicyService(
-            args.db, repositories.keypair_resource_policy.repository
+            repositories.resource_policy.keypair_resource_policy
         )
         user_resource_policy_service = UserResourcePolicyService(
-            args.db, repositories.user_resource_policy.repository
+            repositories.resource_policy.user_resource_policy
         )
         project_resource_policy_service = ProjectResourcePolicyService(
-            args.db, repositories.project_resource_policy.repository
+            repositories.resource_policy.project_resource_policy
         )
         resource_preset_service = ResourcePresetService(
             args.db,
