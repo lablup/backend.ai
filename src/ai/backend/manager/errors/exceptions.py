@@ -1266,3 +1266,21 @@ class RouteNotFound(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class DomainDataProcessingError(BackendError, web.HTTPInternalServerError):
+    """
+    Error that occurs when processing domain data fails.
+    This includes failures in converting database rows to domain data objects.
+    """
+
+    error_type = "https://api.backend.ai/probs/domain-data-processing-error"
+    error_title = "Failed to process domain data."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

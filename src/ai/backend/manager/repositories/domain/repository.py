@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.manager.errors.exceptions import DomainDataProcessingError
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -47,9 +48,11 @@ class DomainRepository:
             if result.rowcount != 1 or row is None:
                 raise RuntimeError(f"No domain created. rowcount: {result.rowcount}, data: {data}")
 
-        assert row is not None
+        if row is None:
+            raise DomainDataProcessingError("Failed to retrieve created domain row")
         result = DomainData.from_row(row)
-        assert result is not None
+        if result is None:
+            raise DomainDataProcessingError("Failed to convert domain row to DomainData")
         return result
 
     async def modify_domain_validated(
@@ -138,10 +141,10 @@ class DomainRepository:
 
             await session.commit()
             if domain_row is None:
-                raise RuntimeError(f"Failed to create domain node: {creator.name}")
-            assert domain_row is not None
+                raise DomainDataProcessingError(f"Failed to retrieve created domain node: {creator.name}")
             result = DomainData.from_row(domain_row)
-            assert result is not None
+            if result is None:
+                raise DomainDataProcessingError(f"Failed to convert domain node row to DomainData: {creator.name}")
             return result
 
     async def modify_domain_node_validated(
