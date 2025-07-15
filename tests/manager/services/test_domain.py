@@ -11,6 +11,10 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.domain.repositories import (
+    DomainRepositories,
+    RepositoryArgs,
+)
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -51,11 +55,6 @@ from .test_utils import TestScenario
 
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
-    from ai.backend.manager.repositories.domain.repositories import (
-        DomainRepositories,
-        RepositoryArgs,
-    )
-
     repository_args = RepositoryArgs(db=database_engine)
     domain_repositories = DomainRepositories.create(repository_args)
     domain_service = DomainService(
