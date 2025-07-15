@@ -45,7 +45,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.storage_proxy import StorageProxyClient
+from ai.backend.manager.clients.storage_proxy.client import StorageProxyClient
 from ai.backend.manager.config.unified import VolumesConfig
 
 from ..errors.api import InvalidAPIParameters
