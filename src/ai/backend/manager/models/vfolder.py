@@ -68,6 +68,7 @@ from ..defs import (
 from ..errors.exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
+    VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -1456,6 +1457,8 @@ async def initiate_vfolder_deletion(
         except (VFolderOperationFailed, InvalidAPIParameters) as e:
             if e.status == 410:
                 already_deleted.append(vfolder_info)
+        except VFolderGone:
+            already_deleted.append(vfolder_info)
     if already_deleted:
         vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
 
