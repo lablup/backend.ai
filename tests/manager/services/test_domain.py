@@ -1,7 +1,8 @@
-import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator
+from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
@@ -11,7 +12,10 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.domain.repositories import (
+    DomainRepositories,
+    RepositoryArgs,
+)
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -52,10 +56,16 @@ from .test_utils import TestScenario
 
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
-    domain_repository = DomainRepository(db=database_engine)
-    domain_service = DomainService(
+    repository_args = RepositoryArgs(
         db=database_engine,
-        domain_repository=domain_repository,
+        storage_manager=MagicMock(),  # Not used by DomainRepositories
+        config_provider=MagicMock(),  # Not used by DomainRepositories
+        valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
+    )
+    domain_repositories = DomainRepositories.create(repository_args)
+    domain_service = DomainService(
+        repository=domain_repositories.repository,
+        admin_repository=domain_repositories.admin_repository,
     )
     return DomainProcessors(domain_service, [])
 
@@ -63,7 +73,7 @@ def processors(database_fixture, database_engine) -> DomainProcessors:
 @pytest.fixture
 def admin_user() -> UserInfo:
     return UserInfo(
-        id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+        id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
         role=UserRole.ADMIN,
         domain_name="default",
     )
@@ -110,7 +120,7 @@ async def create_domain(
                     dotfiles=b"\x90",
                 ),
                 user_info=UserInfo(
-                    id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
@@ -141,7 +151,7 @@ async def create_domain(
                     description="Test domain",
                 ),
                 user_info=UserInfo(
-                    id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
@@ -166,7 +176,7 @@ async def test_create_domain_node(
             ModifyDomainNodeAction(
                 name="test-modify-domain-node",
                 user_info=UserInfo(
-                    id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
@@ -196,7 +206,7 @@ async def test_create_domain_node(
             ModifyDomainNodeAction(
                 name="not-exist-domain",
                 user_info=UserInfo(
-                    id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
@@ -211,7 +221,7 @@ async def test_create_domain_node(
             ModifyDomainNodeAction(
                 name="not-exist-domain",
                 user_info=UserInfo(
-                    id=uuid.UUID("dfa9da54-4b28-432f-be29-c0d680c7a412"),
+                    id=UUID("dfa9da54-4b28-432f-be29-c0d680c7a412"),
                     role=UserRole.USER,
                     domain_name="default",
                 ),
@@ -243,6 +253,11 @@ async def test_modify_domain_node(
                     name="test-create-domain",
                     description="Test domain",
                 ),
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=DomainData(
@@ -268,6 +283,11 @@ async def test_modify_domain_node(
                     name="default",
                     description="Test domain",
                 ),
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=None,
@@ -286,10 +306,10 @@ async def test_create_domain(
 
 @pytest.mark.asyncio
 async def test_create_model_store_after_domain_created(
-    processors: DomainProcessors, database_engine
+    processors: DomainProcessors, database_engine, admin_user
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(creator=DomainCreator(name=domain_name))
+    action = CreateDomainAction(creator=DomainCreator(name=domain_name), user_info=admin_user)
 
     await processors.create_domain.wait_for_complete(action)
 
@@ -311,6 +331,11 @@ async def test_create_model_store_after_domain_created(
             "Modify domain",
             ModifyDomainAction(
                 domain_name="test-modify-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
                 modifier=DomainModifier(
                     description=TriState.update("Domain Description Modified"),
                 ),
@@ -336,6 +361,11 @@ async def test_create_model_store_after_domain_created(
             "Modify a domain not exists",
             ModifyDomainAction(
                 domain_name="not-exist-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
                 modifier=DomainModifier(
                     description=TriState.update("Domain Description Modified"),
                 ),
@@ -365,6 +395,11 @@ async def test_modify_domain(
             "Delete a domain",
             DeleteDomainAction(
                 name="test-delete-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             DeleteDomainActionResult(
                 success=True,
@@ -375,6 +410,11 @@ async def test_modify_domain(
             "Delete a domain not exists",
             DeleteDomainAction(
                 name="not-exist-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             DeleteDomainActionResult(
                 success=False,
@@ -396,6 +436,7 @@ async def test_delete_domain(
 async def test_delete_domain_in_db(
     processors: DomainProcessors,
     database_engine,
+    admin_user,
 ) -> None:
     async with create_domain(database_engine, "test-delete-domain-in-db") as domain_name:
         async with database_engine.begin_session() as session:
@@ -405,7 +446,9 @@ async def test_delete_domain_in_db(
                 )
             )
 
-        await processors.delete_domain.wait_for_complete(DeleteDomainAction(name=domain_name))
+        await processors.delete_domain.wait_for_complete(
+            DeleteDomainAction(name=domain_name, user_info=admin_user)
+        )
 
         async with database_engine.begin_session() as session:
             domain = await session.scalar(
@@ -433,6 +476,11 @@ async def test_delete_domain_in_db(
             "Purge a domain",
             PurgeDomainAction(
                 name="test-purge-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             PurgeDomainActionResult(
                 success=True,
@@ -443,6 +491,11 @@ async def test_delete_domain_in_db(
             "Purge a domain not exists",
             PurgeDomainAction(
                 name="not-exist-domain",
+                user_info=UserInfo(
+                    id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                ),
             ),
             PurgeDomainActionResult(
                 success=False,
@@ -461,12 +514,16 @@ async def test_purge_domain(
 
 
 @pytest.mark.asyncio
-async def test_purge_domain_in_db(processors: DomainProcessors, database_engine) -> None:
+async def test_purge_domain_in_db(
+    processors: DomainProcessors, database_engine, admin_user
+) -> None:
     domain_name = "test-purge-domain-in-db"
     # create domain
     async with create_domain(database_engine, domain_name):
         # delete domain(soft delete) and delete model-store group
-        await processors.delete_domain.wait_for_complete(DeleteDomainAction(name=domain_name))
+        await processors.delete_domain.wait_for_complete(
+            DeleteDomainAction(name=domain_name, user_info=admin_user)
+        )
         async with database_engine.begin_session() as session:
             await session.execute(
                 sa.update(GroupRow)
@@ -478,7 +535,9 @@ async def test_purge_domain_in_db(processors: DomainProcessors, database_engine)
             assert domain is not None
 
         # purge domain
-        await processors.purge_domain.wait_for_complete(PurgeDomainAction(name=domain_name))
+        await processors.purge_domain.wait_for_complete(
+            PurgeDomainAction(name=domain_name, user_info=admin_user)
+        )
         async with database_engine.begin_session() as session:
             domain = await session.scalar(sa.select(DomainRow).where(DomainRow.name == domain_name))
 
