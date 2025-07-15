@@ -2,21 +2,17 @@ import logging
 from collections import defaultdict
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import ObjectNotFound
-from ai.backend.manager.internal_types.permission_controller.id import (
+from ai.backend.manager.data.permission_controller.id import (
     ObjectId,
     ScopeId,
 )
+from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
     AssignRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.check_permission import (
-    CheckPermissionAction,
-    CheckPermissionActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
@@ -72,31 +68,6 @@ class PermissionControllerService:
         data = await self._repository.assign_role(action.input)
 
         return AssignRoleActionResult(success=True, data=data)
-
-    async def check_permission(self, action: CheckPermissionAction) -> CheckPermissionActionResult:
-        roles = await self._repository.get_active_roles(action.user_id)
-        target_object_id = ObjectId(
-            entity_type=action.target_entity_type,
-            entity_id=action.target_entity_id,
-        )
-        for role in roles:
-            for scope_perm in role.scope_permissions:
-                if scope_perm.operation != action.operation:
-                    continue
-                for entity in scope_perm.mapped_entities:
-                    obj_id = ObjectId(
-                        entity_type=scope_perm.entity_type,
-                        entity_id=entity.entity_id,
-                    )
-                    if obj_id == target_object_id:
-                        return CheckPermissionActionResult(has_permission=True)
-            for object_perm in role.object_permissions:
-                if object_perm.operation != action.operation:
-                    continue
-                if object_perm.object_id == target_object_id:
-                    return CheckPermissionActionResult(has_permission=True)
-
-        return CheckPermissionActionResult(has_permission=False)
 
     async def list_access(self, action: ListAccessAction) -> ListAccessActionResult:
         roles = await self._repository.get_active_roles(action.user_id)

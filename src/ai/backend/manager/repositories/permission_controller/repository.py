@@ -2,10 +2,14 @@ import uuid
 from typing import Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.errors.exceptions import ObjectNotFound
-from ai.backend.manager.internal_types.permission_controller.role import (
+from ai.backend.manager.data.permission_controller.id import (
+    ObjectId,
+)
+from ai.backend.manager.data.permission_controller.role import (
+    PermissionCheckInput,
     RoleCreateInput,
     RoleData,
     RoleDataWithPermissions,
@@ -13,9 +17,10 @@ from ai.backend.manager.internal_types.permission_controller.role import (
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
-from ai.backend.manager.internal_types.permission_controller.status import (
+from ai.backend.manager.data.permission_controller.status import (
     RoleStatus,
 )
+from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...models.rbac_models.object_permission import ObjectPermissionRow
@@ -61,11 +66,14 @@ class PermissionControllerRepository:
             await db_session.commit()
         return role_row.to_data()
 
+    async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> Optional[RoleRow]:
+        stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
+        role_row = await db_session.scalar(stmt)
+        return cast(Optional[RoleRow], role_row)
+
     async def update_role(self, data: RoleUpdateInput) -> RoleData:
         async with self._db.begin_session() as db_session:
-            stmt = sa.select(RoleRow).where(RoleRow.id == data.id)
-            role_row = await db_session.scalar(stmt)
-            role_row = cast(Optional[RoleRow], role_row)
+            role_row = await self._get_role(data.id, db_session)
             if role_row is None:
                 raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
             role_row.update(data)
@@ -73,9 +81,7 @@ class PermissionControllerRepository:
 
     async def delete_role(self, data: RoleDeleteInput) -> RoleData:
         async with self._db.begin_session() as db_session:
-            stmt = sa.select(RoleRow).where(RoleRow.id == data.id)
-            role_row = await db_session.scalar(stmt)
-            role_row = cast(Optional[RoleRow], role_row)
+            role_row = await self._get_role(data.id, db_session)
             if role_row is None:
                 raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
             role_row.status = RoleStatus.DELETED
@@ -90,9 +96,7 @@ class PermissionControllerRepository:
 
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
-            result = await db_session.scalar(stmt)
-            result = cast(Optional[RoleRow], result)
+            result = await self._get_role(role_id, db_session)
             if result is None:
                 return None
             return result.to_data()
@@ -118,3 +122,28 @@ class PermissionControllerRepository:
             result = await db_session.scalars(query)
             result = cast(list[RoleRow], result)
             return [role.to_data_with_permissions() for role in result]
+
+    async def check_permission(self, data: PermissionCheckInput) -> bool:
+        roles = await self.get_active_roles(data.user_id)
+        target_object_id = ObjectId(
+            entity_type=data.target_entity_type,
+            entity_id=data.target_entity_id,
+        )
+        for role in roles:
+            for scope_perm in role.scope_permissions:
+                if scope_perm.operation != data.operation:
+                    continue
+                for entity in scope_perm.mapped_entities:
+                    obj_id = ObjectId(
+                        entity_type=scope_perm.entity_type,
+                        entity_id=entity.entity_id,
+                    )
+                    if obj_id == target_object_id:
+                        return True
+            for object_perm in role.object_permissions:
+                if object_perm.operation != data.operation:
+                    continue
+                if object_perm.object_id == target_object_id:
+                    return True
+
+        return False

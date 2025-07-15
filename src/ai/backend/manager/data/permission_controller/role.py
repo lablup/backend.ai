@@ -61,6 +61,14 @@ class RoleDataWithPermissions:
 
 
 @dataclass
+class PermissionCheckInput:
+    user_id: uuid.UUID
+    operation: str
+    target_entity_type: str
+    target_entity_id: str
+
+
+@dataclass
 class UserRoleAssignmentInput:
     user_id: uuid.UUID
     role_id: uuid.UUID
