@@ -5,6 +5,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -30,6 +32,9 @@ from ai.backend.manager.models.vfolder import (
     query_accessible_vfolders,
 )
 
+# Layer-specific decorator for vfolder repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.VFOLDER)
+
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
@@ -37,6 +42,7 @@ class VfolderRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def get_by_id_validated(
         self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str
     ) -> VFolderData:
@@ -71,6 +77,7 @@ class VfolderRepository:
 
             return self._vfolder_row_to_data(vfolder_row)
 
+    @repository_decorator()
     async def get_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderData]:
         """
         Get a VFolder by ID without validation.
@@ -82,6 +89,7 @@ class VfolderRepository:
                 return None
             return self._vfolder_row_to_data(vfolder_row)
 
+    @repository_decorator()
     async def list_accessible_vfolders(
         self,
         user_id: uuid.UUID,
@@ -120,6 +128,7 @@ class VfolderRepository:
 
             return VFolderListResult(vfolders=vfolder_access_infos)
 
+    @repository_decorator()
     async def create_vfolder(self, params: VFolderCreateParams) -> VFolderData:
         """
         Create a new VFolder with the given parameters.
@@ -154,6 +163,7 @@ class VfolderRepository:
                 raise VFolderNotFound()
             return self._vfolder_row_to_data(created_vfolder)
 
+    @repository_decorator()
     async def create_vfolder_with_permission(
         self, params: VFolderCreateParams, create_owner_permission: bool = False
     ) -> VFolderData:
@@ -200,6 +210,7 @@ class VfolderRepository:
                 raise VFolderNotFound()
             return self._vfolder_row_to_data(created_vfolder)
 
+    @repository_decorator()
     async def update_vfolder_attribute(
         self, vfolder_id: uuid.UUID, field_updates: dict[str, Any]
     ) -> VFolderData:
@@ -219,6 +230,7 @@ class VfolderRepository:
             await session.flush()
             return self._vfolder_row_to_data(vfolder_row)
 
+    @repository_decorator()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:
         """
         Get all permissions for a VFolder.
@@ -240,6 +252,7 @@ class VfolderRepository:
                 for row in permission_rows
             ]
 
+    @repository_decorator()
     async def create_vfolder_permission(
         self,
         vfolder_id: uuid.UUID,
@@ -268,6 +281,7 @@ class VfolderRepository:
                 permission=permission,
             )
 
+    @repository_decorator()
     async def delete_vfolder_permission(self, vfolder_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """
         Delete a VFolder permission entry.
@@ -279,6 +293,7 @@ class VfolderRepository:
             )
             await session.execute(query)
 
+    @repository_decorator()
     async def get_vfolder_invitations_by_vfolder(
         self, vfolder_id: uuid.UUID
     ) -> list[VFolderInvitationData]:
@@ -305,6 +320,7 @@ class VfolderRepository:
                 for row in invitation_rows
             ]
 
+    @repository_decorator()
     async def count_vfolders_by_user(self, user_id: uuid.UUID) -> int:
         """
         Count VFolders owned by a user (excluding hard deleted ones).
@@ -323,6 +339,7 @@ class VfolderRepository:
             result = await session.scalar(query)
             return result or 0
 
+    @repository_decorator()
     async def count_vfolders_by_group(self, group_id: uuid.UUID) -> int:
         """
         Count VFolders owned by a group (excluding hard deleted ones).
@@ -341,6 +358,7 @@ class VfolderRepository:
             result = await session.scalar(query)
             return result or 0
 
+    @repository_decorator()
     async def check_vfolder_name_exists(
         self,
         name: str,
@@ -372,6 +390,7 @@ class VfolderRepository:
 
             return len(vfolder_dicts) > 0
 
+    @repository_decorator()
     async def get_user_info(self, user_id: uuid.UUID) -> Optional[tuple[UserRole, str]]:
         """
         Get user role and domain name for a user.
@@ -383,6 +402,7 @@ class VfolderRepository:
                 return None
             return user_row.role, user_row.domain_name
 
+    @repository_decorator()
     async def get_user_email_by_id(self, user_id: uuid.UUID) -> Optional[str]:
         """
         Get user email by user ID.
@@ -394,6 +414,7 @@ class VfolderRepository:
                 return None
             return user_row.email
 
+    @repository_decorator()
     async def get_users_by_ids(self, user_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, str]]:
         """
         Get user info for multiple user IDs.
@@ -404,6 +425,7 @@ class VfolderRepository:
             user_rows = result.scalars().all()
             return [(row.uuid, row.email) for row in user_rows]
 
+    @repository_decorator()
     async def get_group_resource_info(
         self, group_id_or_name: Union[str, uuid.UUID], domain_name: str
     ) -> Optional[tuple[uuid.UUID, int, int, ProjectType]]:
@@ -444,6 +466,7 @@ class VfolderRepository:
                 group_row.type,
             )
 
+    @repository_decorator()
     async def get_user_resource_info(
         self, user_id: uuid.UUID
     ) -> Optional[tuple[int, int, Optional[int]]]:
@@ -530,6 +553,7 @@ class VfolderRepository:
             status=row.status,
         )
 
+    @repository_decorator()
     async def check_user_has_vfolder_permission(
         self, vfolder_id: uuid.UUID, user_ids: list[uuid.UUID]
     ) -> bool:
@@ -560,6 +584,7 @@ class VfolderRepository:
             count = await session.scalar(count_query)
             return count > 0
 
+    @repository_decorator()
     async def get_user_by_email(self, email: str) -> Optional[tuple[uuid.UUID, str]]:
         """
         Get user info by email.
@@ -571,6 +596,7 @@ class VfolderRepository:
                 return None
             return user_row.uuid, user_row.domain_name
 
+    @repository_decorator()
     async def get_users_by_emails(self, emails: list[str]) -> list[tuple[uuid.UUID, str]]:
         """
         Get user info for multiple emails.
@@ -581,6 +607,7 @@ class VfolderRepository:
             user_rows = result.scalars().all()
             return [(row.uuid, row.email) for row in user_rows]
 
+    @repository_decorator()
     async def count_vfolder_with_name_for_user(self, user_id: uuid.UUID, vfolder_name: str) -> int:
         """
         Count VFolders with the given name accessible to the user.
@@ -612,6 +639,7 @@ class VfolderRepository:
             result = await session.scalar(query)
             return result or 0
 
+    @repository_decorator()
     async def check_pending_invitation_exists(
         self, vfolder_id: uuid.UUID, inviter_email: str, invitee_email: str
     ) -> bool:
@@ -633,6 +661,7 @@ class VfolderRepository:
             result = await session.scalar(query)
             return result > 0
 
+    @repository_decorator()
     async def create_vfolder_invitation(
         self,
         vfolder_id: uuid.UUID,
@@ -663,6 +692,7 @@ class VfolderRepository:
             except sa_exc.DataError:
                 return None
 
+    @repository_decorator()
     async def get_invitation_by_id(
         self, invitation_id: uuid.UUID
     ) -> Optional[VFolderInvitationData]:
@@ -689,6 +719,7 @@ class VfolderRepository:
                 modified_at=invitation_row.modified_at,
             )
 
+    @repository_decorator()
     async def update_invitation_state(
         self, invitation_id: uuid.UUID, new_state: VFolderInvitationState
     ) -> None:
@@ -703,6 +734,7 @@ class VfolderRepository:
             )
             await session.execute(query)
 
+    @repository_decorator()
     async def update_invitation_permission(
         self, invitation_id: uuid.UUID, inviter_email: str, permission: VFolderPermission
     ) -> None:
@@ -723,6 +755,7 @@ class VfolderRepository:
             )
             await session.execute(query)
 
+    @repository_decorator()
     async def get_pending_invitations_for_user(
         self, user_email: str
     ) -> list[tuple[VFolderInvitationData, VFolderData]]:
