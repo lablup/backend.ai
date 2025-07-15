@@ -798,6 +798,87 @@ class VFolderPermissionError(BackendError, web.HTTPBadRequest):
         )
 
 
+class VFolderInvitationNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
+    error_title = "Virtual folder invitation not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER_INVITATION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VFolderCreationFailure(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
+    error_title = "Virtual folder creation failed."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderGrantAlreadyExists(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
+    error_title = "Virtual folder grant already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class VFolderInvalidParameter(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-invalid-parameter"
+    error_title = "Invalid parameter for virtual folder operation."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ProjectNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/project-not-found"
+    error_title = "Project not found."
+
+    def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
+        self._project_id = project_id
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class Forbidden(BackendError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/forbidden"
+    error_title = "Forbidden operation."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."

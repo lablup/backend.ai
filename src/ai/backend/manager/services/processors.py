@@ -138,7 +138,6 @@ class Services:
             args.db, repositories.container_registry.repository
         )
         vfolder_service = VFolderService(
-            args.db,
             args.config_provider,
             args.storage_manager,
             args.background_task_manager,
@@ -146,14 +145,12 @@ class Services:
             repositories.vfolder.admin_repository,
         )
         vfolder_file_service = VFolderFileService(
-            args.db,
             args.config_provider,
             args.storage_manager,
             repositories.vfolder.repository,
             repositories.vfolder.admin_repository,
         )
         vfolder_invite_service = VFolderInviteService(
-            args.db,
             args.config_provider,
             repositories.vfolder.repository,
             repositories.vfolder.admin_repository,

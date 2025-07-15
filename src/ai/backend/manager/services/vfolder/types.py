@@ -8,6 +8,7 @@ from typing import (
 
 from ai.backend.manager.models.vfolder import (
     QuotaScopeID,
+    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderUsageMode,
@@ -31,7 +32,7 @@ class VFolderBaseInfo:
 
 @dataclass
 class VFolderOwnershipInfo:
-    creator_email: str
+    creator_email: Optional[str]
     is_owner: bool
     ownership_type: VFolderOwnershipType
     user_uuid: Optional[uuid.UUID]
@@ -54,7 +55,7 @@ class VFolderInvitationInfo:
     mount_permission: VFolderMountPermission
     created_at: datetime
     modified_at: Optional[datetime]
-    status: VFolderOperationStatus
+    status: VFolderInvitationState
 
     def to_json(self) -> dict[str, Any]:
         return {
