@@ -95,10 +95,6 @@ AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
     AutoScalingMetricComparator,
     description="The comparator used to compare the metric value with the threshold. Added in 25.1.0.",
 )
-EndpointStatusGQLEnum = graphene.Enum.from_enum(
-    EndpointStatus,
-    description="Added in 25.12.0.",
-)
 
 
 class EndpointAutoScalingRuleNode(graphene.ObjectType):
@@ -628,7 +624,7 @@ class Endpoint(graphene.ObjectType):
 
     routings = graphene.List(Routing)
     retries = graphene.Int()
-    status = graphene.Field(EndpointStatusGQLEnum)
+    status = graphene.String()
 
     lifecycle_stage = graphene.String()
 
