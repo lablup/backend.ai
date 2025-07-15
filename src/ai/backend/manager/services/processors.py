@@ -112,7 +112,6 @@ class Services:
     def create(cls, args: ServiceArgs) -> Self:
         repositories = args.repositories
         agent_service = AgentService(
-            args.db,
             args.etcd,
             args.agent_registry,
             args.config_provider,
