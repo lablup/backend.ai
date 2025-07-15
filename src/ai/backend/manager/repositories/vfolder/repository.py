@@ -773,7 +773,7 @@ class VfolderRepository:
         Convert vfolder dictionary from query_accessible_vfolders to VFolderData.
         """
         return VFolderData(
-            id=uuid.UUID(vfolder_dict["id"]),
+            id=vfolder_dict["id"],
             name=vfolder_dict["name"],
             host=vfolder_dict["host"],
             domain_name=vfolder_dict["domain_name"],
