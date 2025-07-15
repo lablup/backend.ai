@@ -32,6 +32,9 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 
 # Update sample config files
 ./backend.ai mgr config generate-sample --overwrite
+./backend.ai ag config generate-sample --overwrite
+./backend.ai storage config generate-sample --overwrite
+./backend.ai web config generate-sample --overwrite
 
 git add -A
 git commit -m "release: $TARGET_VERSION"

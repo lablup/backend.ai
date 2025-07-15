@@ -110,59 +110,101 @@ class Services:
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
+        repositories = args.repositories
         agent_service = AgentService(
-            args.db,
             args.etcd,
             args.agent_registry,
             args.config_provider,
+            repositories.agent.repository,
         )
-        repositories = args.repositories
-        domain_service = DomainService(args.db)
+        domain_service = DomainService(
+            repositories.domain.repository, repositories.domain.admin_repository
+        )
         group_service = GroupService(
-            args.db, args.storage_manager, args.config_provider, args.valkey_stat_client
+            args.storage_manager,
+            args.config_provider,
+            args.valkey_stat_client,
+            repositories.group,
         )
         user_service = UserService(
-            args.db, args.storage_manager, args.valkey_stat_client, args.agent_registry
+            args.storage_manager,
+            args.valkey_stat_client,
+            args.agent_registry,
+            repositories.user.repository,
+            repositories.user.admin_repository,
         )
         image_service = ImageService(
             args.agent_registry, repositories.image.repository, repositories.image.admin_repository
         )
-        container_registry_service = ContainerRegistryService(args.db)
+        container_registry_service = ContainerRegistryService(
+            args.db,
+            repositories.container_registry.repository,
+            repositories.container_registry.admin_repository,
+        )
         vfolder_service = VFolderService(
-            args.db, args.config_provider, args.storage_manager, args.background_task_manager
+            args.config_provider,
+            args.storage_manager,
+            args.background_task_manager,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
         )
         vfolder_file_service = VFolderFileService(
-            args.db, args.config_provider, args.storage_manager
+            args.config_provider,
+            args.storage_manager,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
         )
-        vfolder_invite_service = VFolderInviteService(args.db, args.config_provider)
+        vfolder_invite_service = VFolderInviteService(
+            args.config_provider,
+            repositories.vfolder.repository,
+            repositories.vfolder.admin_repository,
+        )
         session_service = SessionService(
             SessionServiceArgs(
-                db=args.db,
                 agent_registry=args.agent_registry,
                 event_fetcher=args.event_fetcher,
                 background_task_manager=args.background_task_manager,
                 event_hub=args.event_hub,
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
+                session_repository=repositories.session.repository,
+                admin_session_repository=repositories.session.admin_repository,
             )
         )
-        keypair_resource_policy_service = KeypairResourcePolicyService(args.db)
-        user_resource_policy_service = UserResourcePolicyService(args.db)
-        project_resource_policy_service = ProjectResourcePolicyService(args.db)
-        resource_preset_service = ResourcePresetService(
-            args.db, args.agent_registry, args.config_provider
+        keypair_resource_policy_service = KeypairResourcePolicyService(
+            repositories.keypair_resource_policy.repository
         )
-        utilization_metric_service = UtilizationMetricService(args.config_provider)
+        user_resource_policy_service = UserResourcePolicyService(
+            repositories.user_resource_policy.repository
+        )
+        project_resource_policy_service = ProjectResourcePolicyService(
+            repositories.project_resource_policy.repository
+        )
+        resource_preset_service = ResourcePresetService(
+            args.db,
+            args.agent_registry,
+            args.config_provider,
+            repositories.resource_preset.repository,
+        )
+        utilization_metric_service = UtilizationMetricService(
+            args.config_provider, repositories.metric.repository
+        )
         model_serving_service = ModelServingService(
-            db=args.db,
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
+            repositories=repositories.model_serving,
         )
-        model_serving_auto_scaling = AutoScalingService(args.db)
-        auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)
+        model_serving_auto_scaling = AutoScalingService(
+            repositories.model_serving.repository,
+            repositories.model_serving.admin_repository,
+        )
+        auth = AuthService(
+            hook_plugin_ctx=args.hook_plugin_ctx,
+            auth_repository=repositories.auth.repository,
+        )
 
         return cls(
             agent=agent_service,

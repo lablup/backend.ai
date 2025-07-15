@@ -1,29 +1,24 @@
 import asyncio
-from typing import (
-    Optional,
-    cast,
-)
 
-import sqlalchemy as sa
-from sqlalchemy.orm import contains_eager
-
-from ai.backend.common.types import (
-    VFolderHostPermission,
-)
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.errors.exceptions import (
+    Forbidden,
+    InsufficientPrivilege,
+    InternalServerError,
+    VFolderAlreadyExists,
+    VFolderGrantAlreadyExists,
+    VFolderInvalidParameter,
+    VFolderInvitationNotFound,
+    VFolderNotFound,
+)
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
-    VFolderInvitationRow,
     VFolderInvitationState,
     VFolderOwnershipType,
-    VFolderPermissionRow,
-    VFolderRow,
-    VFolderStatusSet,
-    ensure_host_permission_allowed,
-    vfolder_status_map,
 )
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
+from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.invite import (
     AcceptInvitationAction,
@@ -39,16 +34,6 @@ from ..actions.invite import (
     UpdateInvitationAction,
     UpdateInvitationActionResult,
 )
-from ..exceptions import (
-    Forbidden,
-    InsufficientPrivilege,
-    InternalServerError,
-    VFolderAlreadyExists,
-    VFolderGrantAlreadyExists,
-    VFolderInvalidParameter,
-    VFolderInvitationNotFound,
-    VFolderNotFound,
-)
 from ..types import VFolderInvitationInfo
 
 # TODO: Detach privilege check from the service.
@@ -58,184 +43,117 @@ from ..types import VFolderInvitationInfo
 
 
 class VFolderInviteService:
-    _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
+    _vfolder_repository: VfolderRepository
+    _admin_vfolder_repository: AdminVfolderRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine, config_provider: ManagerConfigProvider) -> None:
-        self._db = db
+    def __init__(
+        self,
+        config_provider: ManagerConfigProvider,
+        vfolder_repository: VfolderRepository,
+        admin_vfolder_repository: AdminVfolderRepository,
+    ) -> None:
         self._config_provider = config_provider
+        self._vfolder_repository = vfolder_repository
+        self._admin_vfolder_repository = admin_vfolder_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
-        async with self._db.begin_readonly_session() as db_session:
-            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            vfolder_row = await db_session.scalar(query_vfolder)
-            vfolder_row = cast(VFolderRow, vfolder_row)
+        # Get VFolder data
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        if not vfolder_data:
+            raise VFolderNotFound()
 
-            inviter_user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
-            )
-            inviter_user_row = cast(UserRow, inviter_user_row)
-            invitee_user_rows = await db_session.scalars(
-                sa.select(UserRow).where(UserRow.uuid.in_(action.invitee_user_uuids))
-            )
-            invitee_user_rows = cast(list[UserRow], invitee_user_rows.all())
-        if vfolder_row.name.startswith("."):
+        if vfolder_data.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        # Get inviter email
+        inviter_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
+        if not inviter_email:
+            raise VFolderNotFound()
+
+        # Get invitee user info by UUIDs
+        invitee_users = await self._vfolder_repository.get_users_by_ids(action.invitee_user_uuids)
+
+        # Check if users already have permission
+        has_permission = await self._vfolder_repository.check_user_has_vfolder_permission(
+            action.vfolder_uuid, action.invitee_user_uuids
         )
-        async with self._db.begin_session() as db_session:
-            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            vfolder_row = await db_session.scalar(query_vfolder)
-            vfolder_row = cast(VFolderRow, vfolder_row)
-            await ensure_host_permission_allowed(
-                db_session.bind,
-                vfolder_row.host,
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_uuid=action.user_uuid,
-                resource_policy=action.keypair_resource_policy,
-                domain_name=vfolder_row.domain_name,
-                permission=VFolderHostPermission.INVITE_OTHERS,
+        if has_permission:
+            raise VFolderGrantAlreadyExists(
+                "Invitation to this VFolder already sent out to target user"
             )
 
-            # Prevent inviting user who already share the target folder.
-            j = sa.join(
-                VFolderPermissionRow, VFolderRow, VFolderRow.id == VFolderPermissionRow.vfolder
-            )
-            count_query = (
-                sa.select(sa.func.count())
-                .select_from(j)
-                .where(
-                    sa.and_(
-                        sa.or_(
-                            VFolderPermissionRow.user.in_(action.invitee_user_uuids),
-                            VFolderRow.user.in_(action.invitee_user_uuids),
-                        ),
-                        VFolderPermissionRow.vfolder == action.vfolder_uuid,
-                    )
-                )
-            )
-            count = await db_session.scalar(count_query)
-            if count > 0:
-                raise VFolderGrantAlreadyExists(
-                    "Invitation to this VFolder already sent out to target user"
-                )
+        # Create invitations
+        invited_ids = []
 
-            # Create invitation.
-            invited_ids = []
-            inviter = inviter_user_row.email
-            for invitee in set([row.email for row in invitee_user_rows]):
-                # Do not create invitation if already exists.
-                query = (
-                    sa.select(sa.func.count())
-                    .select_from(VFolderInvitationRow)
-                    .where(
-                        (VFolderInvitationRow.inviter == inviter)
-                        & (VFolderInvitationRow.invitee == invitee)
-                        & (VFolderInvitationRow.vfolder == action.vfolder_uuid)
-                        & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
-                    )
-                )
-                result = await db_session.scalar(query)
-                if result > 0:
-                    continue
+        for _, user_email in invitee_users:
+            # Check if invitation already exists
+            invitation_exists = await self._vfolder_repository.check_pending_invitation_exists(
+                action.vfolder_uuid, inviter_email, user_email
+            )
+            if invitation_exists:
+                continue
 
-                # TODO: insert multiple values with one query.
-                #       insert().values([{}, {}, ...]) does not work:
-                #       sqlalchemy.exc.CompileError: The 'default' dialect with current
-                #       database version settings does not support in-place multirow
-                #       inserts.
-                query = sa.insert(
-                    VFolderInvitationRow,
-                    {
-                        "permission": action.mount_permission,
-                        "vfolder": action.vfolder_uuid,
-                        "inviter": inviter,
-                        "invitee": invitee,
-                        "state": VFolderInvitationState.PENDING,
-                    },
-                )
-                try:
-                    await db_session.execute(query)
-                    invited_ids.append(invitee)
-                except sa.exc.DataError:
-                    pass
+            # Create invitation
+            result = await self._vfolder_repository.create_vfolder_invitation(
+                action.vfolder_uuid,
+                inviter_email,
+                user_email,
+                action.mount_permission,
+            )
+            if result:
+                invited_ids.append(result)
+
+        # Convert email strings to UUIDs by looking up invitee user IDs
+        invited_user_ids = []
+        for email in invited_ids:
+            user_info = await self._vfolder_repository.get_user_by_email(email)
+            if user_info:
+                user_id, _ = user_info
+                invited_user_ids.append(user_id)
+
         return InviteVFolderActionResult(
-            vfolder_uuid=action.vfolder_uuid, invitation_ids=invited_ids
+            vfolder_uuid=action.vfolder_uuid, invitation_ids=invited_user_ids
         )
 
     async def accept_invitation(
         self, action: AcceptInvitationAction
     ) -> AcceptInvitationActionResult:
-        async with self._db.begin_session() as db_session:
-            # Get invitation.
-            query = sa.select(VFolderInvitationRow).where(
-                sa.and_(
-                    VFolderInvitationRow.id == action.invitation_id,
-                    VFolderInvitationRow.state == VFolderInvitationState.PENDING,
-                )
-            )
-            invitation_row = await db_session.scalar(query)
-            invitation_row = cast(VFolderInvitationRow, invitation_row)
-            if invitation_row is None:
-                raise VFolderInvitationNotFound
+        # Get invitation
+        invitation_data = await self._vfolder_repository.get_invitation_by_id(action.invitation_id)
+        if not invitation_data:
+            raise VFolderInvitationNotFound
 
-            # Get target user.
-            query = sa.select(UserRow).where(UserRow.email == invitation_row.invitee)
-            user_row = await db_session.scalar(query)
-            user_row = cast(UserRow, user_row)
+        # Get target user by email
+        user_info = await self._vfolder_repository.get_user_by_email(invitation_data.invitee)
+        if not user_info:
+            raise VFolderNotFound
+        user_id, _ = user_info
 
-            # Get target virtual folder.
-            query = sa.select(VFolderRow).where(VFolderRow.id == invitation_row.vfolder)
-            target_vfolder = await db_session.scalar(query)
-            target_vfolder = cast(Optional[VFolderRow], target_vfolder)
-            if target_vfolder is None:
-                raise VFolderNotFound
+        # Get target vfolder
+        vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
+        if not vfolder_data:
+            raise VFolderNotFound
 
-            # Prevent accepting vfolder with duplicated name.
-            j = sa.join(
-                VFolderRow,
-                VFolderPermissionRow,
-                VFolderRow.id == VFolderPermissionRow.vfolder,
-                isouter=True,
-            )
-            query = (
-                sa.select(sa.func.count())
-                .select_from(j)
-                .where(
-                    sa.and_(
-                        sa.or_(
-                            VFolderRow.user == user_row.uuid,
-                            VFolderPermissionRow.user == user_row.uuid,
-                        ),
-                        VFolderRow.name == target_vfolder.name,
-                        VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]),
-                    )
-                )
-            )
-            result = await db_session.scalar(query)
-            if result > 0:
-                raise VFolderAlreadyExists
+        # Prevent accepting vfolder with duplicated name
+        count = await self._vfolder_repository.count_vfolder_with_name_for_user(
+            user_id, vfolder_data.name
+        )
+        if count > 0:
+            raise VFolderAlreadyExists
 
-            # Create permission relation between the vfolder and the invitee.
-            query = sa.insert(
-                VFolderPermissionRow,
-                {
-                    "permission": VFolderMountPermission(invitation_row.permission),
-                    "vfolder": invitation_row.vfolder,
-                    "user": user_row.uuid,
-                },
-            )
-            await db_session.execute(query)
+        # Create permission relation between the vfolder and the invitee
+        await self._vfolder_repository.create_vfolder_permission(
+            invitation_data.vfolder,
+            user_id,
+            VFolderMountPermission(invitation_data.permission),
+        )
 
-            # Clear used invitation.
-            query = (
-                sa.update(VFolderInvitationRow)
-                .where(VFolderInvitationRow.id == action.invitation_id)
-                .values(state=VFolderInvitationState.ACCEPTED)
-            )
-            await db_session.execute(query)
+        # Mark invitation as accepted
+        await self._vfolder_repository.update_invitation_state(
+            action.invitation_id, VFolderInvitationState.ACCEPTED
+        )
+
         return AcceptInvitationActionResult(action.invitation_id)
 
     async def reject_invitation(
@@ -243,102 +161,84 @@ class VFolderInviteService:
         action: RejectInvitationAction,
     ) -> RejectInvitationActionResult:
         try:
-            async with self._db.begin_session() as db_session:
-                query = sa.select(VFolderInvitationRow).where(
-                    (VFolderInvitationRow.id == action.invitation_id)
-                    & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
-                )
-                invitation_row = await db_session.scalar(query)
-                invitation_row = cast(Optional[VFolderInvitationRow], invitation_row)
-                requester_query = sa.select(UserRow).where(
-                    UserRow.uuid == action.requester_user_uuid
-                )
-                user_row = await db_session.scalar(requester_query)
-                user_row = cast(UserRow, user_row)
-                if invitation_row is None:
-                    raise VFolderInvitationNotFound
-                if user_row.email == invitation_row.inviter:
-                    state = VFolderInvitationState.CANCELED
-                elif user_row.email == invitation_row.invitee:
-                    state = VFolderInvitationState.REJECTED
-                else:
-                    raise Forbidden("Cannot change other user's invitaiton")
-                query = (
-                    sa.update(VFolderInvitationRow)
-                    .values(state=state)
-                    .where(VFolderInvitationRow.id == action.invitation_id)
-                )
-                await db_session.execute(query)
-        except sa.exc.IntegrityError as e:
-            raise InternalServerError(f"integrity error: {e}")
+            # Get invitation
+            invitation_data = await self._vfolder_repository.get_invitation_by_id(
+                action.invitation_id
+            )
+            if not invitation_data:
+                raise VFolderInvitationNotFound
+
+            # Get requester user email
+            requester_email = await self._vfolder_repository.get_user_email_by_id(
+                action.requester_user_uuid
+            )
+            if not requester_email:
+                raise VFolderNotFound
+
+            # Determine new state based on who is rejecting
+            if requester_email == invitation_data.inviter:
+                state = VFolderInvitationState.CANCELED
+            elif requester_email == invitation_data.invitee:
+                state = VFolderInvitationState.REJECTED
+            else:
+                raise Forbidden("Cannot change other user's invitation")
+
+            # Update invitation state
+            await self._vfolder_repository.update_invitation_state(action.invitation_id, state)
+
         except (asyncio.CancelledError, asyncio.TimeoutError):
             raise
         except Exception as e:
-            raise InternalServerError(f"unexpected error: {e}")
+            if not isinstance(e, (VFolderInvitationNotFound, VFolderNotFound, Forbidden)):
+                raise InternalServerError(f"unexpected error: {e}")
+            raise
         return RejectInvitationActionResult(action.invitation_id)
 
     async def update_invitation(
         self, action: UpdateInvitationAction
     ) -> UpdateInvitationActionResult:
-        inv_id = action.invitation_id
-        async with self._db.begin_session() as db_session:
-            user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == action.requester_user_uuid)
-            )
-            user_row = cast(UserRow, user_row)
-            query = (
-                sa.update(VFolderInvitationRow)
-                .values(permission=action.mount_permission)
-                .where(
-                    sa.and_(
-                        VFolderInvitationRow.id == inv_id,
-                        VFolderInvitationRow.inviter == user_row.email,
-                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
-                    )
-                )
-            )
-            await db_session.execute(query)
-        return UpdateInvitationActionResult(inv_id)
+        # Get requester email
+        requester_email = await self._vfolder_repository.get_user_email_by_id(
+            action.requester_user_uuid
+        )
+        if not requester_email:
+            raise VFolderNotFound()
+
+        # Update invitation permission (only by inviter)
+        await self._vfolder_repository.update_invitation_permission(
+            action.invitation_id, requester_email, action.mount_permission
+        )
+
+        return UpdateInvitationActionResult(action.invitation_id)
 
     async def list_invitation(self, action: ListInvitationAction) -> ListInvitationActionResult:
-        async with self._db.begin_session() as db_session:
-            user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == action.requester_user_uuid)
-            )
-            user_row = cast(UserRow, user_row)
-            j = sa.join(
-                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            )
-            query = (
-                sa.select(VFolderInvitationRow)
-                .select_from(j)
-                .where(
-                    sa.and_(
-                        VFolderInvitationRow.invitee == user_row.email,
-                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
-                    )
-                )
-                .options(
-                    contains_eager(VFolderInvitationRow.vfolder_row),
-                )
-            )
-            invitations_rows = await db_session.scalars(query)
-            invitations_rows = cast(list[VFolderInvitationRow], invitations_rows.all())
+        # Get requester email
+        requester_email = await self._vfolder_repository.get_user_email_by_id(
+            action.requester_user_uuid
+        )
+        if not requester_email:
+            raise VFolderNotFound()
+
+        # Get pending invitations with vfolder info
+        invitation_vfolder_pairs = await self._vfolder_repository.get_pending_invitations_for_user(
+            requester_email
+        )
+
         invs_info: list[VFolderInvitationInfo] = []
-        for inv in invitations_rows:
-            # TODO: Check query result
+        for invitation_data, vfolder_data in invitation_vfolder_pairs:
             info = VFolderInvitationInfo(
-                id=inv.id,
-                vfolder_id=inv.vfolder,
-                vfolder_name=inv.vfolder_row.name,
-                invitee_user_email=inv.invitee,
-                inviter_user_email=inv.inviter,
-                mount_permission=inv.permission,
-                created_at=inv.created_at,
-                modified_at=inv.modified_at,
-                status=inv.state,
+                id=invitation_data.id,
+                vfolder_id=invitation_data.vfolder,
+                vfolder_name=vfolder_data.name,
+                invitee_user_email=invitation_data.invitee,
+                inviter_user_email=invitation_data.inviter,
+                mount_permission=invitation_data.permission,
+                created_at=invitation_data.created_at,
+                modified_at=invitation_data.modified_at,
+                status=VFolderInvitationState.PENDING,  # All returned invitations are pending
             )
             invs_info.append(info)
+
         return ListInvitationActionResult(
             requester_user_uuid=action.requester_user_uuid, info=invs_info
         )
@@ -346,32 +246,31 @@ class VFolderInviteService:
     async def leave_invited_vfolder(
         self, action: LeaveInvitedVFolderAction
     ) -> LeaveInvitedVFolderActionResult:
-        async with self._db.begin_session() as db_session:
-            vfolder_row = await db_session.scalar(
-                sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            )
-            vfolder_row = cast(VFolderRow, vfolder_row)
-            requester_user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == action.requester_user_uuid)
-            )
-            requester_user_row = cast(UserRow, requester_user_row)
-            if vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
-                raise VFolderInvalidParameter("Cannot leave a group vfolder.")
+        # Get vfolder info
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        if not vfolder_data:
+            raise VFolderNotFound()
 
-            if action.shared_user_uuid:
-                # Allow only superadmin to leave the shared vfolder of others.
-                if (action.requester_user_uuid != action.shared_user_uuid) and (
-                    requester_user_row.role != UserRole.SUPERADMIN
-                ):
-                    raise InsufficientPrivilege("Insufficient permission.")
-                user_uuid = action.shared_user_uuid
-            else:
-                user_uuid = action.requester_user_uuid
+        if vfolder_data.ownership_type == VFolderOwnershipType.GROUP:
+            raise VFolderInvalidParameter("Cannot leave a group vfolder.")
 
-            query = (
-                sa.delete(VFolderPermissionRow)
-                .where(VFolderPermissionRow.vfolder == action.vfolder_uuid)
-                .where(VFolderPermissionRow.user == user_uuid)
-            )
-            await db_session.execute(query)
-        return LeaveInvitedVFolderActionResult(vfolder_row.id)
+        # Get requester info
+        requester_info = await self._vfolder_repository.get_user_info(action.requester_user_uuid)
+        if not requester_info:
+            raise VFolderNotFound()
+        requester_role, _ = requester_info
+
+        if action.shared_user_uuid:
+            # Allow only superadmin to leave the shared vfolder of others.
+            if (action.requester_user_uuid != action.shared_user_uuid) and (
+                requester_role != UserRole.SUPERADMIN
+            ):
+                raise InsufficientPrivilege("Insufficient permission.")
+            user_uuid = action.shared_user_uuid
+        else:
+            user_uuid = action.requester_user_uuid
+
+        # Delete vfolder permission
+        await self._vfolder_repository.delete_vfolder_permission(action.vfolder_uuid, user_uuid)
+
+        return LeaveInvitedVFolderActionResult(vfolder_data.id)

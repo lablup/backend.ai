@@ -178,6 +178,9 @@ class CoreDumpConfig(BaseModel):
             )
         return self._core_path
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class DebugConfig(BaseModel):
     enabled: bool = Field(
@@ -263,14 +266,21 @@ class DebugConfig(BaseModel):
         serialization_alias="log-docker-events",
     )
     coredump: CoreDumpConfig = Field(
-        default_factory=CoreDumpConfig,
+        default_factory=lambda: CoreDumpConfig(_core_path=None),
         description="Core dump configuration",
     )
 
 
 class AgentConfig(BaseModel):
     backend: AgentBackend = Field(
-        description="Backend mode for the agent",
+        description=textwrap.dedent("""
+        Backend type for the agent.
+        This determines how the agent interacts with the underlying infrastructure.
+        Available options are:
+        - `docker`: Uses Docker as the backend.
+        - `kubernetes`: Uses Kubernetes as the backend.
+        - `dummy`: A dummy backend for testing purposes.
+        """),
         examples=[item.value for item in AgentBackend],
         validation_alias=AliasChoices("backend", "mode"),
         serialization_alias="backend",
@@ -690,9 +700,9 @@ class ContainerConfig(BaseModel):
         serialization_alias="swarm-enabled",
     )
 
-    model_config = ConfigDict(
-        extra="allow",
-    )
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
 
     @field_validator("port_range", mode="before")
     @classmethod
@@ -740,9 +750,9 @@ class ResourceConfig(BaseModel):
         serialization_alias="affinity-policy",
     )
 
-    model_config = ConfigDict(
-        extra="allow",
-    )
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
 
     @field_validator("affinity_policy", mode="before")
     @classmethod
@@ -799,6 +809,9 @@ class ContainerLogsConfig(BaseModel):
         validation_alias=AliasChoices("chunk-size", "chunk_size"),
         serialization_alias="chunk-size",
     )
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class APIConfig(BaseModel):

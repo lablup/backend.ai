@@ -857,7 +857,7 @@ class ValkeyStatClient:
         cursor = b"0"
         keys: list[bytes] = []
         while True:
-            result = await self._client.client.hscan(hash_name, str(cursor))
+            result = await self._client.client.hscan(hash_name, cursor)
             cursor = cast(bytes, result[0])
             current_keys = cast(list[bytes], result[1])
             keys.extend(current_keys)
@@ -875,7 +875,7 @@ class ValkeyStatClient:
         cursor = b"0"
         matched_keys: list[bytes] = []
         while True:
-            result = await self._client.client.scan(str(cursor), match=pattern)
+            result = await self._client.client.scan(cursor, match=pattern)
             cursor = cast(bytes, result[0])
             keys = cast(list[bytes], result[1])
             matched_keys.extend(keys)
@@ -954,7 +954,7 @@ class ValkeyStatClient:
         matched_keys: list[bytes] = []
 
         while True:
-            result = await self._client.client.scan(str(cursor), match=pattern)
+            result = await self._client.client.scan(cursor, match=pattern)
             cursor = cast(bytes, result[0])
             keys = cast(list[bytes], result[1])
             matched_keys.extend(keys)

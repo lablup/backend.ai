@@ -63,6 +63,9 @@ class AuditLogNode(graphene.ObjectType):
     entity_id = graphene.String(required=False, description="Entity ID of the AuditLog")
     created_at = graphene.DateTime(required=True, description="The time the AuditLog was reported")
     request_id = graphene.String(required=False, description="Request ID of the AuditLog")
+    triggered_by = graphene.String(
+        required=False, description="Added in 25.12.0, User ID that triggered the action"
+    )
     description = graphene.String(required=True, description="Description of the AuditLog")
     duration = graphene.String(
         required=False, description="Duration taken to perform the operation"
@@ -76,6 +79,7 @@ class AuditLogNode(graphene.ObjectType):
         "entity_id": ("entity_id", None),
         "created_at": ("created_at", dtparse),
         "request_id": ("request_id", None),
+        "triggered_by": ("triggered_by", None),
         "description": ("description", None),
         "duration": ("duration", lambda duration: timedelta(seconds=float(duration))),
         "status": ("status", OperationStatus),
@@ -88,6 +92,7 @@ class AuditLogNode(graphene.ObjectType):
         "entity_id": ("entity_id", None),
         "created_at": ("created_at", None),
         "request_id": ("request_id", None),
+        "triggered_by": ("triggered_by", None),
         "description": ("description", None),
         "duration": ("duration", None),
         "status": ("status", None),
@@ -104,6 +109,7 @@ class AuditLogNode(graphene.ObjectType):
             created_at=row.created_at,
             action_id=row.action_id,
             request_id=row.request_id,
+            triggered_by=row.triggered_by,
             description=row.description,
             duration=row.duration,
             status=row.status,

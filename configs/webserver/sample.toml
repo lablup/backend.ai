@@ -1,0 +1,223 @@
+# Backend.AI Web Server Configuration Sample
+#
+# This is a sample configuration file for the Backend.AI Web Server.
+# All configuration options are documented with their descriptions,
+# default values, and examples.
+#
+# Generated automatically from the WebServerUnifiedConfig schema.
+
+# Logging configuration.
+# logging = ""
+
+[service]
+  # IP address to bind the webserver service.
+  # Use '0.0.0.0' to bind to all interfaces.
+  ip = "0.0.0.0"
+  # Port number to bind the webserver service.
+  # Must be between 1 and 65535.
+  port = 8080
+  # Whether to enable SSL/TLS for the webserver.
+  # When enabled, requires ssl_cert and ssl_privkey to be set.
+  ssl_enabled = true
+  # Path to SSL certificate file.
+  # Required when ssl_enabled is True.
+  ssl_cert = "/path/to/cert.pem"
+  # Path to SSL private key file.
+  # Required when ssl_enabled is True.
+  ssl_privkey = "/path/to/privkey.pem"
+  # Path to static files directory.
+  # Contains web UI assets and other static resources.
+  static_path = "/path/to/static"
+  # Force a specific protocol for API endpoints.
+  # Useful when running behind a reverse proxy.
+  # Service mode.
+  # 'webui' serves the full web UI, 'static' serves only static files.
+  mode = "webui"
+  # Whether to enable user signup functionality.
+  enable_signup = true
+  # Whether to allow anonymous users to change passwords.
+  allow_anonymous_change_password = true
+  # Whether to allow project resource monitoring.
+  allow_project_resource_monitor = true
+  # Whether to allow users to change signin mode.
+  allow_change_signin_mode = true
+  # Whether to allow manual image name specification for sessions.
+  allow_manual_image_name_for_session = true
+  # Whether to allow signup without email confirmation.
+  allow_signup_without_confirmation = true
+  # Whether to always enqueue compute sessions.
+  always_enqueue_compute_session = true
+  # Whether to enable debug mode for the web UI.
+  webui_debug = true
+  # Whether to mask user information in the UI.
+  mask_user_info = true
+  # List of single sign-on vendors to enable.
+  # SSO realm name for single sign-on.
+  sso_realm_name = ""
+  # Whether to enable container commit functionality.
+  enable_container_commit = true
+  # Whether to hide agent information in the UI.
+  hide_agents = true
+  # URL for app download.
+  app_download_url = ""
+  # Whether to allow app download panel in the UI.
+  allow_app_download_panel = true
+  # Whether to enable two-factor authentication.
+  enable_2FA = true
+  # Whether to force two-factor authentication for all users.
+  force_2FA = true
+  # System SSH image name.
+  system_SSH_image = ""
+  # Whether to use directory-based usage tracking.
+  directory_based_usage = true
+  # Whether to allow custom resource allocation.
+  allow_custom_resource_allocation = true
+  # Education app name prefix.
+  edu_appname_prefix = ""
+  # Whether to enable extended login sessions.
+  enable_extend_login_session = true
+  # Whether directory size is visible in the UI.
+  is_directory_size_visible = true
+  # Whether to enable interactive login account switching.
+  enable_interactive_login_account_switch = true
+  # Default file browser image name.
+  default_file_browser_image = ""
+
+[service.wsproxy]
+    # WebSocket proxy URL.
+    # Used to proxy WebSocket connections through a separate service.
+    # Leave empty to disable WebSocket proxy.
+    url = ""
+
+[security]
+  # List of request security policies.
+  request_policies = []
+  # List of response security policies.
+  response_policies = []
+  # Content Security Policy configuration.
+
+[resources]
+  # Whether to open ports to public.
+  open_port_to_public = true
+  # Whether to allow non-authenticated TCP connections.
+  allow_non_auth_tcp = true
+  # Whether to allow preferred port selection.
+  allow_preferred_port = true
+  # Maximum CPU cores per container.
+  max_cpu_cores_per_container = 64
+  # Maximum memory per container in GB.
+  max_memory_per_container = 64
+  # Maximum CUDA devices per container.
+  max_cuda_devices_per_container = 16
+  # Maximum CUDA shares per container.
+  max_cuda_shares_per_container = 16
+  # Maximum ROCm devices per container.
+  max_rocm_devices_per_container = 10
+  # Maximum TPU devices per container.
+  max_tpu_devices_per_container = 8
+  # Maximum IPU devices per container.
+  max_ipu_devices_per_container = 8
+  # Maximum Atom devices per container.
+  max_atom_devices_per_container = 8
+  # Maximum Gaudi2 devices per container.
+  max_gaudi2_devices_per_container = 8
+  # Maximum Atom Plus devices per container.
+  max_atom_plus_devices_per_container = 8
+  # Maximum Warboy devices per container.
+  max_warboy_devices_per_container = 8
+  # Maximum shared memory per container in GB.
+  max_shm_per_container = 2.0
+  # Maximum file upload size in bytes.
+  max_file_upload_size = 4294967296
+
+[environments]
+  # List of allowed environments.
+  # Whether to show non-installed images.
+  show_non_installed_images = true
+
+[plugin]
+  # List of page plugins.
+
+[pipeline]
+  # Pipeline service endpoint URL.
+  endpoint = "http://127.0.0.1:9500"
+  # Frontend endpoint URL for pipeline service.
+
+[ui]
+  # Default environment for new sessions.
+  # Default environment for import operations.
+  # List of blocked menu items.
+  # List of inactive menu items.
+  # Whether to enable model folders functionality.
+  enable_model_folders = true
+
+[api]
+  # API domain name.
+  domain = "api.example.com"
+  # API endpoint URL.
+  endpoint = "http://127.0.0.1:8080,http://api.example.com:8080"
+  # API text description.
+  text = "Backend.AI API"
+  # Whether to verify SSL certificates for API calls.
+  ssl_verify = true
+  # Authentication token name.
+  auth_token_name = "sToken"
+
+[session]
+  # Session maximum age in seconds.
+  max_age = 604800
+  # Login session extension in seconds.
+  # Whether to flush sessions on startup.
+  flush_on_startup = true
+  # Login block time in seconds.
+  login_block_time = 1200
+  # Allowed login failure count.
+  login_allowed_fail_count = 10
+  # Whether to enable auto logout.
+  auto_logout = true
+  # Maximum count for preopen ports.
+  max_count_for_preopen_ports = 10
+
+[session.redis]
+    # Redis server address.
+    # Redis database number.
+    db = 0
+    # Redis sentinel addresses.
+    # Redis service name for sentinel.
+    # Redis password.
+
+[session.redis.redis_helper_config]
+      # Socket timeout in seconds.
+      socket_timeout = 5.0
+      # Socket connection timeout in seconds.
+      socket_connect_timeout = 2.0
+      # Reconnect poll timeout in seconds.
+      reconnect_poll_timeout = 0.3
+
+[license]
+  # License edition.
+  edition = "Open Source"
+  # License valid since date.
+  valid_since = ""
+  # License valid until date.
+  valid_until = ""
+
+[webserver]
+  # Event loop type.
+  event_loop = "asyncio"
+  # IPC base path.
+  ipc_base_path = "/tmp/backend.ai/ipc"
+  # Process ID file path.
+  pid_file = "/var/run/webserver.pid"
+
+[otel]
+  # Whether to enable OpenTelemetry.
+  enabled = true
+  # OpenTelemetry log level.
+  log_level = "INFO"
+  # OpenTelemetry endpoint.
+  endpoint = "http://127.0.0.1:4317"
+
+[debug]
+  # Whether to enable debug mode.
+  enabled = true

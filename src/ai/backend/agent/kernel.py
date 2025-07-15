@@ -426,6 +426,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> NextResult:
         assert self.runner is not None
         try:
+            log.info(
+                "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
+                self.kernel_id,
+                run_id,
+                mode,
+                opts,
+            )
             await self.runner.attach_output_queue(run_id)
             try:
                 if mode == "batch":
@@ -988,7 +995,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.resume_output_queue()
+            self.next_output_queue()
             return result
         except BuildFinished as e:
             result = {
@@ -998,7 +1005,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.resume_output_queue()
+            self.next_output_queue()
             return result
         except RunFinished as e:
             result = {
@@ -1046,6 +1053,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.pending_queues[run_id] = (activated, q)
         else:
             activated, q = self.pending_queues[run_id]
+        log.info(
+            "CodeRunner.attach_output_queue(k:{0}, run_id:{1}, is running event set:{2})",
+            self.kernel_id,
+            run_id,
+            activated.is_set(),
+        )
         if self.output_queue is None:
             self.output_queue = q
         else:

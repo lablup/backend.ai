@@ -629,16 +629,11 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
-    repositories = Repositories.create(
-        args=RepositoryArgs(
-            db=root_ctx.db,
-        )
-    )
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
                 db=root_ctx.db,
-                repositories=repositories,
+                repositories=root_ctx.repositories,
                 etcd=root_ctx.etcd,
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
@@ -816,6 +811,20 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    repositories = Repositories.create(
+        args=RepositoryArgs(
+            db=root_ctx.db,
+            storage_manager=root_ctx.storage_manager,
+            config_provider=root_ctx.config_provider,
+            valkey_stat_client=root_ctx.valkey_stat,
+        )
+    )
+    root_ctx.repositories = repositories
+    yield
+
+
+@actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = NetworkPluginContext(
         root_ctx.etcd,
@@ -907,7 +916,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
-    root_ctx.scheduler_dispatcher = await SchedulerDispatcher.new(
+    root_ctx.scheduler_dispatcher = await SchedulerDispatcher.create(
         root_ctx.config_provider,
         root_ctx.etcd,
         root_ctx.event_producer,
@@ -915,6 +924,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.registry,
         root_ctx.valkey_live,
         root_ctx.valkey_stat,
+        root_ctx.repositories.schedule.repository,
     )
     yield
     await root_ctx.scheduler_dispatcher.close()
@@ -1154,6 +1164,7 @@ def build_root_app(
             message_queue_ctx,
             event_producer_ctx,
             storage_manager_ctx,
+            repositories_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             network_plugin_ctx,

@@ -626,7 +626,7 @@ class DomainInput(graphene.InputObjectType):
     )
     integration_id = graphene.String(required=False, default_value=None)
 
-    def to_action(self, domain_name: str) -> CreateDomainAction:
+    def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
         def value_or_none(value):
             return value if value is not Undefined else None
 
@@ -640,6 +640,7 @@ class DomainInput(graphene.InputObjectType):
                 allowed_docker_registries=value_or_none(self.allowed_docker_registries),
                 integration_id=value_or_none(self.integration_id),
             ),
+            user_info=user_info,
         )
 
 
@@ -661,9 +662,10 @@ class ModifyDomainInput(graphene.InputObjectType):
             return converter(field_value)
         return field_value
 
-    def to_action(self, domain_name: str) -> ModifyDomainAction:
+    def to_action(self, domain_name: str, user_info: UserInfo) -> ModifyDomainAction:
         return ModifyDomainAction(
             domain_name=domain_name,
+            user_info=user_info,
             modifier=DomainModifier(
                 name=OptionalState[str].from_graphql(self.name),
                 description=TriState[str].from_graphql(
@@ -709,7 +711,13 @@ class CreateDomain(graphene.Mutation):
     ) -> CreateDomain:
         ctx: GraphQueryContext = info.context
 
-        action: CreateDomainAction = props.to_action(name)
+        user_info: UserInfo = UserInfo(
+            id=ctx.user["uuid"],
+            role=ctx.user["role"],
+            domain_name=ctx.user["domain_name"],
+        )
+
+        action: CreateDomainAction = props.to_action(name, user_info)
         res = await ctx.processors.domain.create_domain.wait_for_complete(action)
 
         domain_data: Optional[DomainData] = res.domain_data
@@ -742,7 +750,13 @@ class ModifyDomain(graphene.Mutation):
     ) -> ModifyDomain:
         ctx: GraphQueryContext = info.context
 
-        action = props.to_action(name)
+        user_info: UserInfo = UserInfo(
+            id=ctx.user["uuid"],
+            role=ctx.user["role"],
+            domain_name=ctx.user["domain_name"],
+        )
+
+        action = props.to_action(name, user_info)
         res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
 
         domain_data: Optional[DomainData] = res.domain_data
@@ -771,7 +785,13 @@ class DeleteDomain(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
 
-        action = DeleteDomainAction(name)
+        user_info: UserInfo = UserInfo(
+            id=ctx.user["uuid"],
+            role=ctx.user["role"],
+            domain_name=ctx.user["domain_name"],
+        )
+
+        action = DeleteDomainAction(name, user_info)
         res = await ctx.processors.domain.delete_domain.wait_for_complete(action)
 
         return cls(ok=res.success, msg=res.description)
@@ -797,7 +817,13 @@ class PurgeDomain(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
         ctx: GraphQueryContext = info.context
 
-        action = PurgeDomainAction(name)
+        user_info: UserInfo = UserInfo(
+            id=ctx.user["uuid"],
+            role=ctx.user["role"],
+            domain_name=ctx.user["domain_name"],
+        )
+
+        action = PurgeDomainAction(name, user_info)
         res = await ctx.processors.domain.purge_domain.wait_for_complete(action)
 
         return cls(ok=res.success, msg=res.description)

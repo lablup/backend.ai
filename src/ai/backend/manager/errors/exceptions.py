@@ -277,6 +277,45 @@ class PasswordExpired(BackendError, web.HTTPUnauthorized):
         )
 
 
+class EmailAlreadyExistsError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/email-already-exists"
+    error_title = "Email already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class GroupMembershipNotFoundError(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-membership-not-found"
+    error_title = "User is not a member of the specified group."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserCreationError(BackendError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/user-creation-failed"
+    error_title = "Failed to create user account."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
@@ -386,6 +425,45 @@ class GroupNotFound(ObjectNotFound):
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupHasActiveKernelsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-kernels"
+    error_title = "Group has active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasVFoldersMountedError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
+    error_title = "Group has vfolders mounted to active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasActiveEndpointsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
+    error_title = "Group has active endpoints."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -710,6 +788,87 @@ class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
 class VFolderPermissionError(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-permission-error"
     error_title = "The virtual folder does not permit the specified permission."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class VFolderInvitationNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
+    error_title = "Virtual folder invitation not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER_INVITATION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VFolderCreationFailure(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
+    error_title = "Virtual folder creation failed."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderGrantAlreadyExists(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
+    error_title = "Virtual folder grant already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class VFolderInvalidParameter(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-invalid-parameter"
+    error_title = "Invalid parameter for virtual folder operation."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ProjectNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/project-not-found"
+    error_title = "Project not found."
+
+    def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
+        self._project_id = project_id
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class Forbidden(BackendError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/forbidden"
+    error_title = "Forbidden operation."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -1078,5 +1237,50 @@ class PurgeImageActionByIdObjectDBError(BackendError, web.HTTPInternalServerErro
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+# Model Serving Exceptions
+
+
+class ModelServiceNotFound(ObjectNotFound):
+    object_name = "model service"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RouteNotFound(ObjectNotFound):
+    object_name = "route"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROUTE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DomainDataProcessingError(BackendError, web.HTTPInternalServerError):
+    """
+    Error that occurs when processing domain data fails.
+    This includes failures in converting database rows to domain data objects.
+    """
+
+    error_type = "https://api.backend.ai/probs/domain-data-processing-error"
+    error_title = "Failed to process domain data."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )

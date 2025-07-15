@@ -261,8 +261,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
+                    uid = self.local_config.container.kernel_uid
+                    gid = self.local_config.container.kernel_gid
                     if os.geteuid() == 0:  # only possible when I am root.
                         os.chown(self.work_dir, uid, gid)
                         os.chown(self.work_dir / ".jupyter", uid, gid)
@@ -545,8 +545,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
+                        uid = self.local_config.container.kernel_uid
+                        gid = self.local_config.container.kernel_gid
                         if os.geteuid() == 0:
                             os.chown(self.work_dir / "bootstrap.sh", uid, gid)
 
