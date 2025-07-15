@@ -179,6 +179,20 @@ class ProcessMeasurement:
     unit_hint: str = "count"
 
 
+def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000")) -> str:
+    """
+    Convert a Decimal value to a string without scientific notation.
+    """
+    try:
+        quantized = value.quantize(exponent)
+    except DecimalException:
+        return str(value)
+    try:
+        return str(remove_exponent(quantized))
+    except DecimalException:
+        return str(quantized)
+
+
 class MovingStatistics:
     __slots__ = (
         "_sum",
