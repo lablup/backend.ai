@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.11.1 (2025-07-15)
+
+### Fixes
+* Wrong `service ports` field name of Session creation response ([#5047](https://github.com/lablup/backend.ai/issues/5047))
+* Fix GraphQL resolver for compute session to return only a unique set of vfolder mount names ([#5056](https://github.com/lablup/backend.ai/issues/5056))
+* Fix unbound `vfolder_id` when model-type folder is used in service `extra_mounts` ([#5059](https://github.com/lablup/backend.ai/issues/5059))
+* Manager correctly handles already-deleted VFolders ([#5080](https://github.com/lablup/backend.ai/issues/5080))
+* Enable continuous code execution tasks to work properly in Agent ([#5112](https://github.com/lablup/backend.ai/issues/5112))
+* Enable Agent starts if scratch already cleaned before destroy container ([#5118](https://github.com/lablup/backend.ai/issues/5118))
+* Handle empty consumer handlers in EventDispatcher to avoid retry ([#5136](https://github.com/lablup/backend.ai/issues/5136))
+* Relax Decimal serialization of Agent stats ([#5142](https://github.com/lablup/backend.ai/issues/5142))
+
+
 ## 25.11.0 (2025-07-09)
 
 ### Features
