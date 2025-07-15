@@ -11,7 +11,9 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions, find_dependent_sessions
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.session.modifier import SessionModifier
 from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.session import SessionNameDuplicate
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
@@ -46,7 +48,7 @@ class SessionRepository:
         eager_loading_op: Optional[list] = None,
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
-            return await SessionRow.get_session(
+            return await self._get_session_validated(
                 db_sess,
                 session_name_or_id,
                 owner_access_key,
@@ -270,24 +272,19 @@ class SessionRepository:
     async def get_session_by_id(
         self,
         session_id: str | SessionId,
-    ) -> Optional[SessionRow]:
+    ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            return await db_session.scalar(stmt)
+            return await self._get_session_by_id(db_session, session_id)
 
     @repository_decorator()
     async def modify_session(
         self,
         session_id: str | SessionId,
-        modifier_fields: dict,
+        session_modifier: SessionModifier,
         session_name: Optional[str] = None,
-    ) -> Optional[SessionRow]:
-        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
-            if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
+    ) -> SessionRow:
+        async def _update(db_session: AsyncSession) -> SessionRow:
+            session_row = await self._get_session_by_id(db_session, session_id)
 
             if session_name:
                 # Check the owner of the target session has any session with the same name
@@ -300,7 +297,7 @@ class SessionRepository:
                 except SessionNotFound:
                     pass
                 else:
-                    raise ValueError(
+                    raise SessionNameDuplicate(
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
@@ -312,6 +309,10 @@ class SessionRepository:
             )
 
             session_row = await db_session.scalar(select_stmt)
+            if not session_row:
+                raise SessionNotFound()
+
+            modifier_fields = session_modifier.fields_to_update()
             for key, value in modifier_fields.items():
                 setattr(session_row, key, value)
 
@@ -431,3 +432,35 @@ class SessionRepository:
                     selectinload(SessionRow.routing).options(noload("*")),
                 ],
             )
+
+    # Private methods for better error handling and code reuse
+
+    async def _get_session_validated(
+        self,
+        db_sess: AsyncSession,
+        session_name_or_id: str | SessionId,
+        owner_access_key: AccessKey,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        allow_stale: bool = False,
+        eager_loading_op: Optional[list] = None,
+    ) -> SessionRow:
+        """Private method to get session with validation. Raises SessionNotFound if not found."""
+        try:
+            return await SessionRow.get_session(
+                db_sess,
+                session_name_or_id,
+                owner_access_key,
+                kernel_loading_strategy=kernel_loading_strategy,
+                allow_stale=allow_stale,
+                eager_loading_op=eager_loading_op,
+            )
+        except SessionNotFound:
+            raise
+
+    async def _get_session_by_id(self, db_sess: AsyncSession, session_id: str | SessionId) -> SessionRow:
+        """Private method to get session by ID. Raises SessionNotFound if not found."""
+        stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+        session_row = await db_sess.scalar(stmt)
+        if not session_row:
+            raise SessionNotFound()
+        return session_row

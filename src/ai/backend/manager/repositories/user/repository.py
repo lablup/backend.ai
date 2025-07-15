@@ -1,28 +1,22 @@
-from datetime import datetime, timedelta
-from decimal import Decimal
-from typing import Any, Mapping, Optional
+from datetime import datetime
+from typing import Any, Optional
 from uuid import UUID
 
-import msgpack
 import sqlalchemy as sa
-from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.auth import UserNotFound
-from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
-from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
 from ai.backend.manager.models.user import UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.user.type import UserData
+from ai.backend.manager.services.user.modifier import UserModifier
+from ai.backend.manager.services.user.type import UserCreator, UserData
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
@@ -37,42 +31,45 @@ class UserRepository:
     @repository_decorator()
     async def get_by_email_validated(
         self, email: str, requester_uuid: Optional[UUID]
-    ) -> Optional[UserData]:
+    ) -> UserData:
         """
         Get user by email with ownership validation.
-        Returns None if user not found or access denied.
+        Raises UserNotFound if user not found or access denied.
         """
         async with self._db.begin_session() as session:
             user_row = await self._get_user_by_email(session, email)
-            if not user_row:
-                return None
             if not self._validate_user_access(user_row, requester_uuid):
-                return None
-            return UserData.from_row(user_row)
+                raise UserNotFound()
+            result = UserData.from_row(user_row)
+            if not result:
+                raise UserNotFound()
+            return result
 
     @repository_decorator()
     async def get_by_uuid_validated(
         self, user_uuid: UUID, requester_uuid: Optional[UUID]
-    ) -> Optional[UserData]:
+    ) -> UserData:
         """
         Get user by UUID with ownership validation.
-        Returns None if user not found or access denied.
+        Raises UserNotFound if user not found or access denied.
         """
         async with self._db.begin_session() as session:
             user_row = await self._get_user_by_uuid(session, user_uuid)
-            if not user_row:
-                return None
             if not self._validate_user_access(user_row, requester_uuid):
-                return None
-            return UserData.from_row(user_row)
+                raise UserNotFound()
+            result = UserData.from_row(user_row)
+            if not result:
+                raise UserNotFound()
+            return result
 
     @repository_decorator()
-    async def create_user_validated(self, user_data: dict, group_ids: list[str]) -> UserData:
+    async def create_user_validated(self, user_creator: UserCreator, group_ids: list[str]) -> UserData:
         """
         Create a new user with default keypair and group associations.
         """
         async with self._db.begin() as conn:
             # Insert user
+            user_data = user_creator.fields_to_store()
             user_insert_query = sa.insert(users).values(user_data)
             query = user_insert_query.returning(user_insert_query.table)
             result = await conn.execute(query)
@@ -84,8 +81,8 @@ class UserRepository:
             # Create default keypair
             email = user_data["email"]
             keypair_creator = KeyPairCreator(
-                is_active=(user_data["status"] == UserStatus.ACTIVE),
-                is_admin=user_data["role"] in ["superadmin", "admin"],
+                is_active=(user_data.get("status") == UserStatus.ACTIVE),
+                is_admin=user_data.get("role") in ["superadmin", "admin"],
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
@@ -119,7 +116,7 @@ class UserRepository:
     async def update_user_validated(
         self,
         email: str,
-        updates: dict,
+        user_modifier: UserModifier,
         group_ids: Optional[list[str]],
         requester_uuid: Optional[UUID],
     ) -> UserData:
@@ -136,6 +133,8 @@ class UserRepository:
                 raise UserNotFound()
 
             prev_role = current_user.role
+
+            updates = user_modifier.fields_to_update()
 
             # Handle main_access_key validation
             if "main_access_key" in updates:
@@ -200,13 +199,19 @@ class UserRepository:
                 .where(users.c.email == email)
             )
 
-    async def _get_user_by_email(self, session: SASession, email: str) -> Optional[UserRow]:
-        """Private method to get user by email."""
-        return await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+    async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
+        """Private method to get user by email. Raises UserNotFound if not found."""
+        user = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+        if not user:
+            raise UserNotFound()
+        return user
 
-    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> Optional[UserRow]:
-        """Private method to get user by UUID."""
-        return await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
+        """Private method to get user by UUID. Raises UserNotFound if not found."""
+        user = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        if not user:
+            raise UserNotFound()
+        return user
 
     async def _get_user_by_email_with_conn(self, conn, email: str) -> Optional[UserRow]:
         """Private method to get user by email using connection."""
@@ -352,29 +357,17 @@ class UserRepository:
             await conn.execute(sa.insert(association_groups_users).values(values))
 
     @repository_decorator()
-    async def get_user_time_binned_monthly_stats(
+    async def get_user_kernels_for_stats(
         self,
         user_uuid: UUID,
-        valkey_stat_client: ValkeyStatClient,
+        start_date: datetime,
     ) -> list[dict[str, Any]]:
         """
-        Generate time-binned (15 min) stats for the last one month for a specific user.
+        Get user kernels for statistics generation.
+        This method only handles DB queries, statistics processing should be done in service layer.
         """
-        return await self._get_time_binned_monthly_stats(user_uuid, valkey_stat_client)
-
-    async def _get_time_binned_monthly_stats(
-        self,
-        user_uuid: Optional[UUID],
-        valkey_stat_client: ValkeyStatClient,
-    ) -> list[dict[str, Any]]:
-        """
-        Generate time-binned (15 min) stats for the last one month.
-        """
-        # Get all or user kernels for the last month from DB.
-        time_window = 900  # 15 min
-        stat_length = 2880  # 15 * 4 * 24 * 30
-        now = datetime.now(tzutc())
-        start_date = now - timedelta(days=30)
+        from ai.backend.manager.models import kernels
+        from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 
         async with self._db.begin_readonly() as conn:
             query = (
@@ -387,89 +380,20 @@ class UserRepository:
                 .select_from(kernels)
                 .where(
                     (kernels.c.terminated_at >= start_date)
-                    & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES)),
+                    & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+                    & (kernels.c.user_uuid == user_uuid)
                 )
                 .order_by(sa.asc(kernels.c.created_at))
             )
-            if user_uuid is not None:
-                query = query.where(kernels.c.user_uuid == user_uuid)
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        # Build time-series of time-binned stats.
-        start_date_ts = start_date.timestamp()
-        time_series_list: list[dict[str, Any]] = [
-            {
-                "date": start_date_ts + (idx * time_window),
-                "num_sessions": {
-                    "value": 0,
-                    "unit_hint": "count",
-                },
-                "cpu_allocated": {
-                    "value": 0,
-                    "unit_hint": "count",
-                },
-                "mem_allocated": {
-                    "value": 0,
-                    "unit_hint": "bytes",
-                },
-                "gpu_allocated": {
-                    "value": 0,
-                    "unit_hint": "count",
-                },
-                "io_read_bytes": {
-                    "value": 0,
-                    "unit_hint": "bytes",
-                },
-                "io_write_bytes": {
-                    "value": 0,
-                    "unit_hint": "bytes",
-                },
-                "disk_used": {
-                    "value": 0,
-                    "unit_hint": "bytes",
-                },
-            }
-            for idx in range(stat_length)
-        ]
-
-        kernel_ids = [str(row["id"]) for row in rows]
-        raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
-
-        for row, raw_stat in zip(rows, raw_stats):
-            if raw_stat is not None:
-                last_stat = msgpack.unpackb(raw_stat)
-                io_read_byte = int(nmget(last_stat, "io_read.current", 0))
-                io_write_byte = int(nmget(last_stat, "io_write.current", 0))
-                disk_used = int(nmget(last_stat, "io_scratch_size.stats.max", 0, "/"))
-            else:
-                io_read_byte = 0
-                io_write_byte = 0
-                disk_used = 0
-
-            occupied_slots: Mapping[str, Any] = row.occupied_slots
-            kernel_created_at: float = row.created_at.timestamp()
-            kernel_terminated_at: float = row.terminated_at.timestamp()
-            cpu_value = int(occupied_slots.get("cpu", 0))
-            mem_value = int(occupied_slots.get("mem", 0))
-            cuda_device_value = int(occupied_slots.get("cuda.devices", 0))
-            cuda_share_value = Decimal(occupied_slots.get("cuda.shares", 0))
-
-            start_index = int((kernel_created_at - start_date_ts) // time_window)
-            end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
-            if start_index < 0:
-                start_index = 0
-            for time_series in time_series_list[start_index:end_index]:
-                time_series["num_sessions"]["value"] += 1
-                time_series["cpu_allocated"]["value"] += cpu_value
-                time_series["mem_allocated"]["value"] += mem_value
-                time_series["gpu_allocated"]["value"] += cuda_device_value
-                time_series["gpu_allocated"]["value"] += cuda_share_value
-                time_series["io_read_bytes"]["value"] += io_read_byte
-                time_series["io_write_bytes"]["value"] += io_write_byte
-                time_series["disk_used"]["value"] += disk_used
-
-        # Change Decimal type to float to serialize to JSON
-        for time_series in time_series_list:
-            time_series["gpu_allocated"]["value"] = float(time_series["gpu_allocated"]["value"])
-        return time_series_list
+            return [
+                {
+                    "id": str(row.id),
+                    "created_at": row.created_at,
+                    "terminated_at": row.terminated_at,
+                    "occupied_slots": row.occupied_slots,
+                }
+                for row in rows
+            ]

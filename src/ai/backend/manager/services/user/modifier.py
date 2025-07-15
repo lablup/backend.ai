@@ -1,0 +1,48 @@
+from dataclasses import dataclass, field
+from typing import Any, override
+
+from ai.backend.manager.models.user import UserStatus
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+
+
+@dataclass
+class UserModifier(PartialModifier):
+    """Modifier for user operations."""
+    
+    username: OptionalState[str] = field(default_factory=OptionalState.nop)
+    password: OptionalState[str] = field(default_factory=OptionalState.nop)
+    need_password_change: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    full_name: TriState[str] = field(default_factory=TriState.nop)
+    description: TriState[str] = field(default_factory=TriState.nop)
+    is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
+    role: OptionalState[str] = field(default_factory=OptionalState.nop)
+    allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
+    totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    resource_policy: OptionalState[str] = field(default_factory=OptionalState.nop)
+    sudo_session_enabled: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    main_access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
+    container_uid: TriState[int] = field(default_factory=TriState.nop)
+    container_main_gid: TriState[int] = field(default_factory=TriState.nop)
+    container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
+    
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.username.update_dict(to_update, "username")
+        self.password.update_dict(to_update, "password")
+        self.need_password_change.update_dict(to_update, "need_password_change")
+        self.full_name.update_dict(to_update, "full_name")
+        self.description.update_dict(to_update, "description")
+        self.is_active.update_dict(to_update, "is_active")
+        self.status.update_dict(to_update, "status")
+        self.role.update_dict(to_update, "role")
+        self.allowed_client_ip.update_dict(to_update, "allowed_client_ip")
+        self.totp_activated.update_dict(to_update, "totp_activated")
+        self.resource_policy.update_dict(to_update, "resource_policy")
+        self.sudo_session_enabled.update_dict(to_update, "sudo_session_enabled")
+        self.main_access_key.update_dict(to_update, "main_access_key")
+        self.container_uid.update_dict(to_update, "container_uid")
+        self.container_main_gid.update_dict(to_update, "container_main_gid")
+        self.container_gids.update_dict(to_update, "container_gids")
+        return to_update

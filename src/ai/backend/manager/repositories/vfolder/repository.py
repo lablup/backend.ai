@@ -7,9 +7,13 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.vfolder.creator import (
+    VFolderCreator,
+    VFolderPermissionCreator,
+)
+from ai.backend.manager.data.vfolder.modifier import VFolderModifier
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
-    VFolderCreateParams,
     VFolderData,
     VFolderInvitationData,
     VFolderListResult,
@@ -51,8 +55,6 @@ class VfolderRepository:
         """
         async with self._db.begin_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
-                raise VFolderNotFound()
 
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
@@ -76,15 +78,13 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @repository_decorator()
-    async def get_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderData]:
+    async def get_by_id(self, vfolder_id: uuid.UUID) -> VFolderData:
         """
         Get a VFolder by ID without validation.
-        Returns VFolderData if found, None otherwise.
+        Raises VFolderNotFound if not found.
         """
         async with self._db.begin_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
-                return None
             return self._vfolder_row_to_data(vfolder_row)
 
     @repository_decorator()
@@ -127,90 +127,53 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @repository_decorator()
-    async def create_vfolder(self, params: VFolderCreateParams) -> VFolderData:
+    async def create_vfolder(self, vfolder_creator: VFolderCreator) -> VFolderData:
         """
-        Create a new VFolder with the given parameters.
+        Create a new VFolder with the given creator.
         Returns the created VFolderData.
         """
         async with self._db.begin_session() as session:
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
+            insert_values = vfolder_creator.fields_to_store()
 
             query = sa.insert(VFolderRow, insert_values)
             result = await session.execute(query)
             assert result.rowcount == 1
 
             # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
+            created_vfolder = await self._get_vfolder_by_id(session, vfolder_creator.id)
             return self._vfolder_row_to_data(created_vfolder)
 
     @repository_decorator()
     async def create_vfolder_with_permission(
-        self, params: VFolderCreateParams, create_owner_permission: bool = False
+        self,
+        vfolder_creator: VFolderCreator,
+        permission_creator: Optional[VFolderPermissionCreator] = None,
     ) -> VFolderData:
         """
-        Create a new VFolder with the given parameters and optionally create owner permission.
+        Create a new VFolder with the given creator and optionally create owner permission.
         Returns the created VFolderData.
         """
         async with self._db.begin_session() as session:
             # Create the VFolder
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
+            insert_values = vfolder_creator.fields_to_store()
 
             query = sa.insert(VFolderRow, insert_values)
             result = await session.execute(query)
             assert result.rowcount == 1
 
             # Create owner permission if requested
-            if create_owner_permission and params.user:
-                permission_insert = sa.insert(VFolderPermissionRow).values({
-                    "user": params.user,
-                    "vfolder": params.id.hex,
-                    "permission": VFolderPermission.OWNER_PERM,
-                })
+            if permission_creator:
+                permission_values = permission_creator.fields_to_store()
+                permission_insert = sa.insert(VFolderPermissionRow).values(permission_values)
                 await session.execute(permission_insert)
 
             # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
+            created_vfolder = await self._get_vfolder_by_id(session, vfolder_creator.id)
             return self._vfolder_row_to_data(created_vfolder)
 
     @repository_decorator()
     async def update_vfolder_attribute(
-        self, vfolder_id: uuid.UUID, field_updates: dict[str, Any]
+        self, vfolder_id: uuid.UUID, vfolder_modifier: VFolderModifier
     ) -> VFolderData:
         """
         Update VFolder attributes.
@@ -218,9 +181,8 @@ class VfolderRepository:
         """
         async with self._db.begin_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
-                raise VFolderNotFound()
 
+            field_updates = vfolder_modifier.fields_to_update()
             for key, value in field_updates.items():
                 if hasattr(vfolder_row, key):
                     setattr(vfolder_row, key, value)
@@ -492,13 +454,17 @@ class VfolderRepository:
 
     async def _get_vfolder_by_id(
         self, session: SASession, vfolder_id: uuid.UUID
-    ) -> Optional[VFolderRow]:
+    ) -> VFolderRow:
         """
         Private method to get a VFolder by ID using an existing session.
+        Raises VFolderNotFound if not found.
         """
         query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
         result = await session.execute(query)
-        return result.scalar()
+        vfolder_row = result.scalar()
+        if not vfolder_row:
+            raise VFolderNotFound()
+        return vfolder_row
 
     async def _validate_vfolder_ownership(
         self, session: SASession, vfolder_id: uuid.UUID, user_id: uuid.UUID
