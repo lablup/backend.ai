@@ -71,13 +71,12 @@ from ai.backend.common.types import (
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionData
 
 from ..defs import DEFAULT_ROLE
-from ..errors.exceptions import (
-    AgentError,
-    BackendError,
+from ..errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -88,6 +87,7 @@ from ..errors.exceptions import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
+from ..exceptions import AgentError
 from .base import (
     GUID,
     Base,
@@ -503,7 +503,7 @@ async def handle_session_exception(
         if error_callback:
             await error_callback()
         raise exc_class("FAILURE", e) from None
-    except BackendError:
+    except BackendAIError:
         # silently re-raise to make them handled by gateway http handlers
         raise
     except Exception as e:

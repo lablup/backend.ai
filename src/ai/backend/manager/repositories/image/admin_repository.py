@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.image import (
     ImageNotFound,
     PurgeImageActionByIdObjectDBError,
 )

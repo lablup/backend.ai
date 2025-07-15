@@ -113,7 +113,7 @@ class GroupService:
             return DeleteGroupActionResult(data=None, success=False)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        from ai.backend.manager.errors.exceptions import (
+        from ai.backend.manager.errors.resource import (
             GroupHasActiveEndpointsError,
             GroupHasActiveKernelsError,
             GroupHasVFoldersMountedError,

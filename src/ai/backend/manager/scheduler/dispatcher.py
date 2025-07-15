@@ -75,12 +75,12 @@ from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
-from ..errors.exceptions import (
+from ..errors.common import (
     GenericBadRequest,
     GenericForbidden,
-    InstanceNotAvailable,
-    SessionNotFound,
 )
+from ..errors.kernel import SessionNotFound
+from ..errors.resource import InstanceNotAvailable
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,

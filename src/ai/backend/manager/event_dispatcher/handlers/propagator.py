@@ -1,7 +1,7 @@
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
-from ai.backend.manager.errors.exceptions import InternalServerError
+from ai.backend.manager.errors.common import InternalServerError
 
 
 class PropagatorEventHandler:

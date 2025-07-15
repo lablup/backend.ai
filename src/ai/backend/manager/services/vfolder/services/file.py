@@ -2,7 +2,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import VFolderInvalidParameter
+from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,

@@ -90,13 +90,11 @@ if TYPE_CHECKING:
     from .storage import StorageSessionManager
 
 from ..data.image.types import ImageStatus
-from ..errors.exceptions import (
-    ImageNotFound,
-    InsufficientPrivilege,
-    InvalidAPIParameters,
-    ObjectNotFound,
-    TooManyKernelsFound,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InsufficientPrivilege
+from ..errors.common import ObjectNotFound
+from ..errors.image import ImageNotFound
+from ..errors.kernel import TooManyKernelsFound
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .gql_models.agent import (

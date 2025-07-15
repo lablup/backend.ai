@@ -1,10 +1,9 @@
 import asyncio
 
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import (
-    Forbidden,
-    InsufficientPrivilege,
-    InternalServerError,
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import Forbidden, InternalServerError
+from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderGrantAlreadyExists,
     VFolderInvalidParameter,

@@ -58,11 +58,13 @@ from ai.backend.manager.services.model_serving.types import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...errors.exceptions import (
-    EndpointNotFound,
-    EndpointTokenNotFound,
+from ...errors.common import (
     GenericForbidden,
     ObjectNotFound,
+)
+from ...errors.service import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
 )
 from ..base import (
     FilterExprArg,

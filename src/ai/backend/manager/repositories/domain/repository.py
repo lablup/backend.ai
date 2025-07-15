@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.errors.exceptions import DomainDataProcessingError
+from ai.backend.manager.errors.resource import DomainDataProcessingError
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType

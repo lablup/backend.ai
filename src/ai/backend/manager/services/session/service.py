@@ -53,18 +53,22 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
-from ai.backend.manager.errors.exceptions import (
-    AppNotFound,
+from ai.backend.manager.errors.common import (
     GenericForbidden,
     InternalServerError,
+    ServiceUnavailable,
+)
+from ai.backend.manager.errors.image import UnknownImageReferenceError
+from ai.backend.manager.errors.kernel import (
     KernelNotReady,
     QuotaExceeded,
-    ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
-    TaskTemplateNotFound,
     TooManySessionsMatched,
-    UnknownImageReferenceError,
+)
+from ai.backend.manager.errors.resource import (
+    AppNotFound,
+    TaskTemplateNotFound,
 )
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.group import GroupRow

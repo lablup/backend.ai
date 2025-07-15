@@ -11,13 +11,13 @@ from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import (
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import GenericForbidden
+from ..errors.resource import GroupNotFound
+from ..errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
-    GenericForbidden,
-    GroupNotFound,
-    InvalidAPIParameters,
 )
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,

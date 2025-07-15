@@ -15,7 +15,7 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.exceptions import UserNotFound
+from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
