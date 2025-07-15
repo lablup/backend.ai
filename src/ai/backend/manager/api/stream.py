@@ -382,7 +382,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
         if not ws.closed:
             await ws.send_json({
                 "status": "error",
-                "msg": f"BackendAIError: {e!r}",
+                "msg": f"BackendError: {e!r}",
             })
         raise
     except asyncio.CancelledError:
