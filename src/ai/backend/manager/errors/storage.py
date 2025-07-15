@@ -305,15 +305,6 @@ class StorageRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage-request-error"
     error_title = "Storage request failed."
 
-    def __init__(
-        self,
-        extra_msg: Optional[str] = None,
-        status_code: Optional[int] = None,
-        extra_data: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self.status_code = status_code
-        super().__init__(extra_msg, extra_data)
-
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
