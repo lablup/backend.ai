@@ -159,6 +159,42 @@ class AppNotFound(ObjectNotFound):
         )
 
 
+class KeyPairResourcePolicyNotFound(ObjectNotFound):
+    object_name = "keypair resource policy"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ProjectResourcePolicyNotFound(ObjectNotFound):
+    object_name = "project resource policy"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserResourcePolicyNotFound(ObjectNotFound):
+    object_name = "user resource policy"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
     """
     Error that occurs when processing domain data fails.

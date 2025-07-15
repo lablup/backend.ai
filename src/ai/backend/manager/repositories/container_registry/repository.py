@@ -28,10 +28,7 @@ class ContainerRegistryRepository:
         project: Optional[str] = None,
     ) -> ContainerRegistryData:
         async with self._db.begin_readonly_session() as session:
-            result = await self._get_by_registry_and_project(session, registry_name, project)
-            if not result:
-                raise ContainerRegistryNotFound()
-            return result
+            return await self._get_by_registry_and_project(session, registry_name, project)
 
     @repository_decorator()
     async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
@@ -63,10 +60,7 @@ class ContainerRegistryRepository:
             await session.execute(update_stmt)
 
             # Return registry data
-            result = await self._get_by_registry_and_project(session, registry_name, project)
-            if not result:
-                raise ContainerRegistryNotFound()
-            return result
+            return await self._get_by_registry_and_project(session, registry_name, project)
 
     @repository_decorator()
     async def get_known_registries(self) -> dict[str, str]:
@@ -115,7 +109,11 @@ class ContainerRegistryRepository:
         session: SASession,
         registry_name: str,
         project: Optional[str] = None,
-    ) -> Optional[ContainerRegistryData]:
+    ) -> ContainerRegistryData:
+        """
+        Private method to get container registry by name and project.
+        Raises ContainerRegistryNotFound if not found.
+        """
         stmt = sa.select(ContainerRegistryRow).where(
             ContainerRegistryRow.registry_name == registry_name,
         )
@@ -123,7 +121,9 @@ class ContainerRegistryRepository:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
         row = await session.scalar(stmt)
-        return row.to_dataclass() if row else None
+        if not row:
+            raise ContainerRegistryNotFound()
+        return row.to_dataclass()
 
     async def _get_by_registry_name(
         self,
