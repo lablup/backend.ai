@@ -1,32 +1,31 @@
 from dataclasses import dataclass
 from typing import Optional, override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.internal_types.permission_controller.role import (
-    UserRoleAssignmentData,
-    UserRoleAssignmentInput,
-)
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
-class AssignRoleAction(RoleAction):
-    input: UserRoleAssignmentInput
+class CheckPermissionAction(RoleAction):
+    user_id: UUID
+    operation: str
+    target_entity_type: str
+    target_entity_id: str
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.input.user_id)
+        return str(self.user_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "assign"
+        return "check_permission"
 
 
 @dataclass
-class AssignRoleActionResult(BaseActionResult):
-    success: bool
-    data: Optional[UserRoleAssignmentData]
+class CheckPermissionActionResult(BaseActionResult):
+    has_permission: bool
 
     @override
     def entity_id(self) -> Optional[str]:

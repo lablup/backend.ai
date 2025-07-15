@@ -1,0 +1,118 @@
+import logging
+from collections import defaultdict
+
+from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.exceptions import ObjectNotFound
+from ai.backend.manager.internal_types.permission_controller.id import (
+    ObjectId,
+    ScopeId,
+)
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
+from ai.backend.manager.services.permission_contoller.actions.assign_role import (
+    AssignRoleAction,
+    AssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.check_permission import (
+    CheckPermissionAction,
+    CheckPermissionActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.create_role import (
+    CreateRoleAction,
+    CreateRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.delete_role import (
+    DeleteRoleAction,
+    DeleteRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.list_access import (
+    ListAccessAction,
+    ListAccessActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_role import (
+    UpdateRoleAction,
+    UpdateRoleActionResult,
+)
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class PermissionControllerService:
+    _repository: PermissionControllerRepository
+
+    def __init__(self, repository: PermissionControllerRepository) -> None:
+        self._repository = repository
+
+    async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
+        result = await self._repository.create_role(action.input)
+        return CreateRoleActionResult(
+            data=result,
+            success=True,
+        )
+
+    async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
+        try:
+            result = await self._repository.update_role(action.input)
+        except ObjectNotFound:
+            return UpdateRoleActionResult(data=None, success=False)
+        return UpdateRoleActionResult(
+            data=result,
+            success=True,
+        )
+
+    async def delete_role(self, action: DeleteRoleAction) -> DeleteRoleActionResult:
+        try:
+            _ = await self._repository.delete_role(action.input)
+        except ObjectNotFound:
+            return DeleteRoleActionResult(success=False)
+        return DeleteRoleActionResult(success=True)
+
+    async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
+        data = await self._repository.assign_role(action.input)
+
+        return AssignRoleActionResult(success=True, data=data)
+
+    async def check_permission(self, action: CheckPermissionAction) -> CheckPermissionActionResult:
+        roles = await self._repository.get_active_roles(action.user_id)
+        target_object_id = ObjectId(
+            entity_type=action.target_entity_type,
+            entity_id=action.target_entity_id,
+        )
+        for role in roles:
+            for scope_perm in role.scope_permissions:
+                if scope_perm.operation != action.operation:
+                    continue
+                for entity in scope_perm.mapped_entities:
+                    obj_id = ObjectId(
+                        entity_type=scope_perm.entity_type,
+                        entity_id=entity.entity_id,
+                    )
+                    if obj_id == target_object_id:
+                        return CheckPermissionActionResult(has_permission=True)
+            for object_perm in role.object_permissions:
+                if object_perm.operation != action.operation:
+                    continue
+                if object_perm.object_id == target_object_id:
+                    return CheckPermissionActionResult(has_permission=True)
+
+        return CheckPermissionActionResult(has_permission=False)
+
+    async def list_access(self, action: ListAccessAction) -> ListAccessActionResult:
+        roles = await self._repository.get_active_roles(action.user_id)
+
+        scope_allowed_operations: defaultdict[ScopeId, set[str]] = defaultdict(set)
+        object_allowed_operations: defaultdict[ObjectId, set[str]] = defaultdict(set)
+        for role in roles:
+            for scope_perm in role.scope_permissions:
+                if scope_perm.operation != action.operation:
+                    continue
+                scope_allowed_operations[scope_perm.scope_id].add(scope_perm.operation)
+            for object_perm in role.object_permissions:
+                if object_perm.operation != action.operation:
+                    continue
+                object_allowed_operations[object_perm.object_id].add(object_perm.operation)
+        return ListAccessActionResult(
+            scope_allowed_operations=dict(scope_allowed_operations),
+            object_allowed_operations=dict(object_allowed_operations),
+        )

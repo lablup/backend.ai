@@ -9,6 +9,8 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.manager.internal_types.permission_controller.id import ObjectId
+
 from ..base import (
     Base,
     IDColumn,
@@ -57,3 +59,9 @@ class AssociationScopesEntitiesRow(Base):
         back_populates="mapped_entity_rows",
         primaryjoin="ScopePermissionRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
     )
+
+    def object_id(self) -> ObjectId:
+        """
+        Convert the association to a tuple of ScopeId and ObjectId.
+        """
+        return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)

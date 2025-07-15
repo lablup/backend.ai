@@ -11,6 +11,11 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.manager.internal_types.permission_controller.role import (
+    UserRoleAssignmentData,
+    UserRoleAssignmentInput,
+)
+
 from ..base import (
     GUID,
     Base,
@@ -46,3 +51,18 @@ class UserRoleRow(Base):
         back_populates="role_assignments",
         primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
     )
+
+    def to_data(self) -> UserRoleAssignmentData:
+        return UserRoleAssignmentData(
+            user_id=self.user_id,
+            role_id=self.role_id,
+            granted_by=self.granted_by,
+        )
+
+    @classmethod
+    def from_input(cls, input: UserRoleAssignmentInput) -> UserRoleRow:
+        return cls(
+            user_id=input.user_id,
+            role_id=input.role_id,
+            granted_by=input.granted_by,
+        )
