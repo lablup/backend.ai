@@ -2,8 +2,8 @@ from typing import Any, Mapping
 
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
