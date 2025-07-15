@@ -11,11 +11,11 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.internal_types.permission_controller.id import ObjectId
-from ai.backend.manager.internal_types.permission_controller.object_permission import (
+from ai.backend.manager.data.permission_controller.id import ObjectId
+from ai.backend.manager.data.permission_controller.object_permission import (
     ObjectPermissionData,
 )
-from ai.backend.manager.internal_types.permission_controller.status import PermissionStatus
+from ai.backend.manager.data.permission_controller.status import PermissionStatus
 
 from ..base import (
     GUID,

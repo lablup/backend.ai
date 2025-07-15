@@ -11,12 +11,12 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.internal_types.permission_controller.id import ScopeId
-from ai.backend.manager.internal_types.permission_controller.scope_permission import (
+from ai.backend.manager.data.permission_controller.id import ScopeId
+from ai.backend.manager.data.permission_controller.scope_permission import (
     ScopePermissionData,
     ScopePermissionDataWithEntity,
 )
-from ai.backend.manager.internal_types.permission_controller.status import PermissionStatus
+from ai.backend.manager.data.permission_controller.status import PermissionStatus
 
 from ..base import (
     GUID,
