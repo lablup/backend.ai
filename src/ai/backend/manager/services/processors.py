@@ -120,11 +120,10 @@ class Services:
         )
         domain_service = DomainService(args.db, repositories.domain.repository)
         group_service = GroupService(
-            args.db,
             args.storage_manager,
             args.config_provider,
             args.valkey_stat_client,
-            repositories.group.repository,
+            repositories.group,
         )
         user_service = UserService(
             args.db,
@@ -208,7 +207,6 @@ class Services:
             repositories.model_serving.admin_repository,
         )
         auth = AuthService(
-            db=args.db,
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
         )

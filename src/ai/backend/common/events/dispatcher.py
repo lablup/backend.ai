@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import enum
 import logging
 import secrets
@@ -29,16 +28,18 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
+from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.user_id import current_user_id
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,
     MessageId,
+    MessageMetadata,
     MessagePayload,
     MQMessage,
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import msgpack
 from ..types import (
     AgentId,
 )
@@ -506,6 +507,7 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
             return
@@ -527,17 +529,33 @@ class EventDispatcher(EventDispatcherGroup):
                     return
                 if self._log_events:
                     log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
-                if asyncio.iscoroutinefunction(cb):
-                    # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                    await cb(evh.context, source, event)  # type: ignore
+
+                # Apply all context variables from metadata if available
+                if metadata:
+                    with metadata.apply_context():
+                        if asyncio.iscoroutinefunction(cb):
+                            # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                            await cb(evh.context, source, event)  # type: ignore
+                        else:
+                            cb(evh.context, source, event)  # type: ignore
+                        for post_callback in post_callbacks:
+                            await post_callback.done()
+                        self._metric_observer.observe_event_success(
+                            event_type=event_type,
+                            duration=time.perf_counter() - start,
+                        )
                 else:
-                    cb(evh.context, source, event)  # type: ignore
-                for post_callback in post_callbacks:
-                    await post_callback.done()
-                self._metric_observer.observe_event_success(
-                    event_type=event_type,
-                    duration=time.perf_counter() - start,
-                )
+                    if asyncio.iscoroutinefunction(cb):
+                        # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                        await cb(evh.context, source, event)  # type: ignore
+                    else:
+                        cb(evh.context, source, event)  # type: ignore
+                    for post_callback in post_callbacks:
+                        await post_callback.done()
+                    self._metric_observer.observe_event_success(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
         except Exception as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
@@ -563,12 +581,19 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
-        for consumer in self._consumers[event_name].copy():
+        consumers_handlers = self._consumers[event_name].copy()
+        if not consumers_handlers:
+            # If there are no consumer handlers, we can just call post callbacks and return.
+            for post_callback in post_callbacks:
+                await post_callback.done()
+            return
+        for consumer in consumers_handlers:
             self._consumer_taskgroup.create_task(
-                self._handle(consumer, source, args, post_callbacks),
+                self._handle(consumer, source, args, post_callbacks, metadata),
             )
             await asyncio.sleep(0)
 
@@ -577,12 +602,13 @@ class EventDispatcher(EventDispatcherGroup):
         event_name: str,
         source: AgentId,
         args: tuple,
+        metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
         for subscriber in self._subscribers[event_name].copy():
             self._subscriber_taskgroup.create_task(
-                self._handle(subscriber, source, args),
+                self._handle(subscriber, source, args, tuple(), metadata),
             )
             await asyncio.sleep(0)
 
@@ -604,6 +630,7 @@ class EventDispatcher(EventDispatcherGroup):
                     AgentId(msg_payload.source),
                     msg_payload.args,
                     [post_callback],
+                    msg_payload.metadata,
                 )
             except Exception as e:
                 log.exception(
@@ -625,6 +652,7 @@ class EventDispatcher(EventDispatcherGroup):
                     msg_payload.name,
                     AgentId(msg_payload.source),
                     msg_payload.args,
+                    msg_payload.metadata,
                 )
             except Exception as e:
                 log.exception(
@@ -639,7 +667,6 @@ class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
     _source: AgentId
-    _source_bytes: bytes
     _log_events: bool
 
     def __init__(
@@ -652,7 +679,6 @@ class EventProducer:
         self._closed = False
         self._msg_queue = msg_queue
         self._source = source
-        self._source_bytes = source.encode()
         self._log_events = log_events
 
     async def close(self) -> None:
@@ -666,15 +692,20 @@ class EventProducer:
     ) -> None:
         if self._closed:
             return
-        source_bytes = self._source_bytes
+        source = self._source
         if source_override is not None:
-            source_bytes = source_override.encode()
+            source = source_override
 
-        raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
-        }
+        # Capture current request_id and other metadata
+        request_id = current_request_id()
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=source,
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_anycast()
         await self._msg_queue.send(raw_event)
 
     async def broadcast_event(
@@ -687,12 +718,17 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
-        raw_event = {
-            "name": event.event_name(),
-            "source": source,
-            "args": args,
-        }
+        # Capture current request_id and other metadata
+        request_id = current_request_id()
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=source,
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_broadcast()
         await self._msg_queue.broadcast(raw_event)
 
     async def broadcast_event_with_cache(
@@ -704,12 +740,17 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
-        raw_event = {
-            "name": event.event_name(),
-            "source": str(self._source),
-            "args": args,
-        }
+        # Capture current request_id and other metadata
+        request_id = current_request_id()
+        user_id = current_user_id()
+        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
+        raw_event = MessagePayload(
+            name=event.event_name(),
+            source=str(self._source),
+            args=event.serialize(),
+            metadata=metadata,
+        ).serialize_broadcast()
         await self._msg_queue.broadcast_with_cache(
             cache_id,
             raw_event,

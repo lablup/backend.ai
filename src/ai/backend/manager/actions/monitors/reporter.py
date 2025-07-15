@@ -1,6 +1,7 @@
 from typing import Final, override
 
 from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.user_id import current_user_id
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
@@ -23,6 +24,7 @@ class ReporterMonitor(ActionMonitor):
             entity_id=action.entity_id(),
             entity_type=action.entity_type(),
             request_id=current_request_id(),
+            triggered_by=current_user_id(),
             operation_type=action.operation_type(),
             created_at=meta.started_at,
         )
@@ -35,6 +37,7 @@ class ReporterMonitor(ActionMonitor):
             action_type=action.spec().type(),
             entity_id=result.meta.entity_id,
             request_id=current_request_id() or _BLANK_ID,
+            triggered_by=current_user_id(),
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
             status=result.meta.status,

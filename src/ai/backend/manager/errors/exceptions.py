@@ -277,6 +277,45 @@ class PasswordExpired(BackendError, web.HTTPUnauthorized):
         )
 
 
+class EmailAlreadyExistsError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/email-already-exists"
+    error_title = "Email already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class GroupMembershipNotFoundError(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-membership-not-found"
+    error_title = "User is not a member of the specified group."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserCreationError(BackendError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/user-creation-failed"
+    error_title = "Failed to create user account."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
@@ -386,6 +425,45 @@ class GroupNotFound(ObjectNotFound):
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupHasActiveKernelsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-kernels"
+    error_title = "Group has active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasVFoldersMountedError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
+    error_title = "Group has vfolders mounted to active kernels."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class GroupHasActiveEndpointsError(BackendError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
+    error_title = "Group has active endpoints."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 

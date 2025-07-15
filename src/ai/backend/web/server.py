@@ -25,14 +25,14 @@ import click
 import jinja2
 import tomli
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common import config, redis_helper
-from ai.backend.common.defs import RedisRole
+from ai.backend.common import config
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.manager.auth.field import (
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
@@ -323,20 +323,18 @@ async def login_handler(request: web.Request) -> web.Response:
         "data": None,
     }
 
-    redis: Redis = request.app["redis"]
+    valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
     async def _get_login_history():
-        login_history = await redis.get(
-            f"login_history_{creds['username']}",
-        )
-        if not login_history:
+        login_history_bytes = await valkey_client.get_login_history(creds["username"])
+        if not login_history_bytes:
             login_history = {
                 "last_login_attempt": 0,
                 "login_fail_count": 0,
             }
         else:
-            login_history = json.loads(login_history)
+            login_history = json.loads(login_history_bytes)
         if login_history["last_login_attempt"] < 0:
             login_history["last_login_attempt"] = 0
         if login_history["login_fail_count"] < 0:
@@ -347,12 +345,11 @@ async def login_handler(request: web.Request) -> web.Response:
         """
         Set login history per email (not in browser session).
         """
-        key = f"login_history_{creds['username']}"
         value = json.dumps({
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await redis.set(key, value, ex=BLOCK_TIME)
+        await valkey_client.set_login_block(creds["username"], value, BLOCK_TIME)
 
     # Block login if there are too many consecutive failed login attempts.
     ALLOWED_FAIL_COUNT = config.session.login_allowed_fail_count
@@ -697,21 +694,25 @@ async def server_main(
     etcd_resdis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
         config.session.redis.model_dump()
     )
-    app["redis"] = redis_helper.get_redis_object(
-        etcd_resdis_config.profile_target(RedisRole.STATISTICS),
-        name="web.session",
-        socket_keepalive=True,
-        socket_keepalive_options=keepalive_options,
-    ).client
+    redis_target = etcd_resdis_config.profile_target(RedisRole.STATISTICS)
+
+    # Create ValkeySessionClient for session management
+    valkey_session_client = await ValkeySessionClient.create(
+        redis_target=redis_target,
+        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+        human_readable_name="web.session",
+    )
+    # Keep app["redis"] key for compatibility
+    app["redis"] = valkey_session_client
 
     if pidx == 0 and config.session.flush_on_startup:
-        await app["redis"].flushdb()
+        await valkey_session_client.flush_all_sessions()
         log.info("flushed session storage.")
 
     if config.session.login_session_extension_sec is None:
         config.session.login_session_extension_sec = config.session.max_age
     redis_storage = RedisStorage(
-        app["redis"],
+        valkey_session_client,
         max_age=config.session.max_age,
     )
 
