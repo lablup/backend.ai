@@ -1,5 +1,5 @@
 from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.errors.exceptions import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,

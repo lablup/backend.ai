@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.image import (
     ForgetImageForbiddenError,
     ImageNotFound,
 )

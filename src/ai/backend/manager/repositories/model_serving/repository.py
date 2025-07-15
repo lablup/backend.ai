@@ -26,7 +26,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingGroupData,
     UserData,
 )
-from ai.backend.manager.errors.exceptions import EndpointNotFound
+from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,

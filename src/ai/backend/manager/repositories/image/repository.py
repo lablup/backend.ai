@@ -10,7 +10,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, RescanImagesResult
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
     ForgetImageForbiddenError,
@@ -303,7 +303,7 @@ class ImageRepository:
         Deletes an image and all its aliases after validating ownership.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
-        from ai.backend.manager.errors.exceptions import PurgeImageActionByIdObjectDBError
+        from ai.backend.manager.errors.image import PurgeImageActionByIdObjectDBError
 
         try:
             async with self._db.begin_session() as session:

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.exceptions import ObjectNotFound
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.resource_preset.types import (

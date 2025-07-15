@@ -12,7 +12,7 @@ from ai.backend.common.types import SlotName, SlotTypes, current_resource_slots
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.defs import INTRINSIC_SLOTS
-from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 current_vfolder_types: ContextVar[list[str]] = ContextVar("current_vfolder_types")
 

@@ -12,7 +12,7 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import RateLimitExceeded
+from ..errors.api import RateLimitExceeded
 from .context import RootContext
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 

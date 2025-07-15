@@ -15,10 +15,8 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderListResult,
     VFolderPermissionData,
 )
-from ai.backend.manager.errors.exceptions import (
-    ObjectNotFound,
-    VFolderNotFound,
-)
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

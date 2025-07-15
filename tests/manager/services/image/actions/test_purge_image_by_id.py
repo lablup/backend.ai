@@ -3,7 +3,7 @@ import uuid
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.exceptions import ForgetImageForbiddenError, ImageNotFound
+from ai.backend.manager.errors.image import ForgetImageForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

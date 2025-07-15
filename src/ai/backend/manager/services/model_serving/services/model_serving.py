@@ -36,7 +36,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.constant import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.service import (
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,

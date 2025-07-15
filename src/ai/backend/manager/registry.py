@@ -144,20 +144,19 @@ from ai.backend.manager.utils import query_userinfo
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
+from ai.backend.common.exception import BackendAIError
+
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from .errors.exceptions import (
-    BackendError,
-    GenericForbidden,
-    ImageNotFound,
-    InstanceNotFound,
-    InvalidAPIParameters,
+from .errors.api import InvalidAPIParameters
+from .errors.common import GenericForbidden, RejectedByHook
+from .errors.image import ImageNotFound
+from .errors.kernel import (
     QuotaExceeded,
-    RejectedByHook,
-    ScalingGroupNotFound,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
 )
+from .errors.resource import InstanceNotFound, ScalingGroupNotFound
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1112,7 +1111,7 @@ class AgentRegistry:
             service_ports = parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
                 labels.get("ai.backend.endpoint-ports", ""),
-                BackendError,
+                BackendAIError,
             )
             preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
 

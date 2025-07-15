@@ -95,6 +95,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
@@ -109,11 +110,8 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.exceptions import (
-    BackendError,
-    InsufficientPrivilege,
-    InvalidAPIParameters,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InsufficientPrivilege
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
@@ -820,7 +818,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
                 agent_id=agent_id,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
     return web.json_response({}, status=HTTPStatus.OK)
@@ -1151,7 +1149,7 @@ async def get_info(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("GET_INFO: exception")
         raise
     return web.json_response(result.result, status=HTTPStatus.OK)
@@ -1177,7 +1175,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("RESTART: exception")
         raise
     except Exception:
@@ -1231,7 +1229,7 @@ async def interrupt(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("INTERRUPT: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1289,7 +1287,7 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
                 service_name=service_name,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1438,7 +1436,7 @@ async def upload_files(request: web.Request) -> web.Response:
                 reader=reader,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("UPLOAD_FILES: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1580,7 +1578,7 @@ async def get_container_logs(
                 kernel_id=kernel_id,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception(
             "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
             requester_access_key,

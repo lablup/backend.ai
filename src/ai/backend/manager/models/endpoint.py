@@ -52,11 +52,8 @@ from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.types import MountOptionModel, UserScope
 
-from ..errors.exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
-    ServiceUnavailable,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import ObjectNotFound, ServiceUnavailable
 from .base import (
     GUID,
     Base,
