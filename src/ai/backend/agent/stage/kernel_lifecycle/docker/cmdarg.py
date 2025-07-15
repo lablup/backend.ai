@@ -5,6 +5,7 @@ from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
+    ProvisionStage,
 )
 
 
@@ -63,3 +64,10 @@ class CmdArgProvisioner(Provisioner[CmdArgSpec, CmdArgResult]):
     @override
     async def teardown(self, resource: CmdArgResult) -> None:
         pass
+
+
+class CmdArgStage(ProvisionStage[CmdArgSpec, CmdArgResult]):
+    """
+    Stage for generating command-line arguments for the kernel runner.
+    This stage prepares the command arguments based on the provided specifications.
+    """
