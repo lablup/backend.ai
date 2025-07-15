@@ -135,7 +135,9 @@ class Services:
             args.agent_registry, repositories.image.repository, repositories.image.admin_repository
         )
         container_registry_service = ContainerRegistryService(
-            args.db, repositories.container_registry.repository
+            args.db,
+            repositories.container_registry.repository,
+            repositories.container_registry.admin_repository,
         )
         vfolder_service = VFolderService(
             args.config_provider,
