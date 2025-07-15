@@ -141,10 +141,14 @@ class DomainRepository:
 
             await session.commit()
             if domain_row is None:
-                raise DomainDataProcessingError(f"Failed to retrieve created domain node: {creator.name}")
+                raise DomainDataProcessingError(
+                    f"Failed to retrieve created domain node: {creator.name}"
+                )
             result = DomainData.from_row(domain_row)
             if result is None:
-                raise DomainDataProcessingError(f"Failed to convert domain node row to DomainData: {creator.name}")
+                raise DomainDataProcessingError(
+                    f"Failed to convert domain node row to DomainData: {creator.name}"
+                )
             return result
 
     async def modify_domain_node_validated(
