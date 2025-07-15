@@ -915,7 +915,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.registry,
         root_ctx.valkey_live,
         root_ctx.valkey_stat,
-        root_ctx.repositories,
+        root_ctx.repositories.schedule.repository,
     )
     yield
     await root_ctx.scheduler_dispatcher.close()

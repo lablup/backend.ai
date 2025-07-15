@@ -96,7 +96,7 @@ from ..models.utils import (
     retry_txn,
 )
 from ..registry import AgentRegistry
-from ..repositories.repositories import Repositories
+from ..repositories.schedule.repository import ScheduleRepository
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -192,7 +192,7 @@ class SchedulerDispatcher(aobject):
     config_provider: ManagerConfigProvider
     registry: AgentRegistry
     etcd: AsyncEtcd
-    repositories: Repositories
+    schedule_repository: ScheduleRepository
 
     event_producer: EventProducer
     schedule_timer: GlobalTimer
@@ -213,7 +213,7 @@ class SchedulerDispatcher(aobject):
         registry: AgentRegistry,
         valkey_live: ValkeyLiveClient,
         valkey_stat: ValkeyStatClient,
-        repositories: Repositories,
+        schedule_repository: ScheduleRepository,
     ) -> None:
         self.config_provider = config_provider
         self.etcd = etcd
@@ -222,7 +222,7 @@ class SchedulerDispatcher(aobject):
         self.lock_factory = lock_factory
         self._valkey_live = valkey_live
         self._valkey_stat = valkey_stat
-        self.repositories = repositories
+        self.schedule_repository = schedule_repository
 
     @classmethod
     async def create(
@@ -234,7 +234,7 @@ class SchedulerDispatcher(aobject):
         registry: AgentRegistry,
         valkey_live: ValkeyLiveClient,
         valkey_stat: ValkeyStatClient,
-        repositories: Repositories,
+        schedule_repository: ScheduleRepository,
     ) -> SchedulerDispatcher:
         instance = cls(
             config_provider,
@@ -244,7 +244,7 @@ class SchedulerDispatcher(aobject):
             registry,
             valkey_live,
             valkey_stat,
-            repositories,
+            schedule_repository,
         )
         await instance.__ainit__()
         return instance
@@ -345,7 +345,7 @@ class SchedulerDispatcher(aobject):
             # as its individual steps are composed of many short-lived transactions.
             async with self.lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
                 schedulable_scaling_groups = (
-                    await self.repositories.schedule.repository.get_schedulable_scaling_groups()
+                    await self.schedule_repository.get_schedulable_scaling_groups()
                 )
                 for sgroup_name in schedulable_scaling_groups:
                     try:
@@ -402,15 +402,13 @@ class SchedulerDispatcher(aobject):
                     sgroup_opts.enforce_spreading_endpoint_replica
                     and SessionTypes(args.pending_session_type) == SessionTypes.INFERENCE
                 ):
-                    endpoint_id = (
-                        await self.repositories.schedule.repository.get_endpoint_for_session(
-                            SessionId(args.pending_session_id)
-                        )
+                    endpoint_id = await self.schedule_repository.get_endpoint_for_session(
+                        SessionId(args.pending_session_id)
                     )
                     if endpoint_id:
                         dynamic_config[
                             "kernel_counts_at_same_endpoint"
-                        ] = await self.repositories.schedule.repository.get_kernel_count_per_agent_at_endpoint(
+                        ] = await self.schedule_repository.get_kernel_count_per_agent_at_endpoint(
                             endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
                         )
 
@@ -454,13 +452,13 @@ class SchedulerDispatcher(aobject):
         (
             scheduler_name,
             sgroup_opts,
-        ) = await self.repositories.schedule.repository.get_scaling_group_info(sgroup_name)
+        ) = await self.schedule_repository.get_scaling_group_info(sgroup_name)
         scheduler = self._load_scheduler(LoadSchedulerArgs(scheduler_name, sgroup_opts))
         (
             existing_sessions,
             pending_sessions,
             cancelled_sessions,
-        ) = await self.repositories.schedule.repository.list_managed_sessions(
+        ) = await self.schedule_repository.list_managed_sessions(
             sgroup_name, scheduler.sgroup_opts.pending_timeout
         )
         await self.flush_cancelled_sessions(cancelled_sessions)
@@ -478,10 +476,8 @@ class SchedulerDispatcher(aobject):
         while len(pending_sessions) > 0:
             # Part 1: Choose the pending session to try scheduling.
 
-            candidate_agents = (
-                await self.repositories.schedule.repository.get_schedulable_agents_by_sgroup(
-                    sgroup_name
-                )
+            candidate_agents = await self.schedule_repository.get_schedulable_agents_by_sgroup(
+                sgroup_name
             )
             total_capacity = sum((ag.available_slots for ag in candidate_agents), ResourceSlot())
             picked_session_id = scheduler.pick_session(
@@ -581,7 +577,7 @@ class SchedulerDispatcher(aobject):
             if failed_predicates:
                 log.debug(log_fmt + "predicate-checks-failed (temporary)", *log_args)
 
-                await self.repositories.schedule.repository.update_session_predicate_failure(
+                await self.schedule_repository.update_session_predicate_failure(
                     sched_ctx, pending_sess, status_update_data
                 )
                 if pending_sess.is_private:
@@ -601,14 +597,16 @@ class SchedulerDispatcher(aobject):
                 # We need to retry the scheduling afterwards.
                 continue
             else:
-                await self.repositories.schedule.repository.update_session_status_data(
+                await self.schedule_repository.update_session_status_data(
                     pending_sess, status_update_data
                 )
 
             # Part 4: Assign agent(s) via the agent selector.
 
-            schedulable_sess = await self.repositories.schedule.repository.get_schedulable_session_with_kernels_and_agents(
-                pending_sess.id
+            schedulable_sess = (
+                await self.schedule_repository.get_schedulable_session_with_kernels_and_agents(
+                    pending_sess.id
+                )
             )
 
             if schedulable_sess is None:
@@ -744,9 +742,7 @@ class SchedulerDispatcher(aobject):
                     (
                         available_slots,
                         occupied_slots,
-                    ) = await self.repositories.schedule.repository.get_agent_available_slots(
-                        agent_id
-                    )
+                    ) = await self.schedule_repository.get_agent_available_slots(agent_id)
 
                     for key in available_slots.keys():
                         if (
@@ -779,7 +775,7 @@ class SchedulerDispatcher(aobject):
                     )
                 agent_id = cand_agent_id
 
-            agent_alloc_ctx = await self.repositories.schedule.repository.reserve_agent(
+            agent_alloc_ctx = await self.schedule_repository.reserve_agent(
                 sgroup_name,
                 agent_id,
                 sess_ctx.requested_slots,
@@ -788,7 +784,7 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "no-available-instances", *log_args)
 
             async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
-                await self.repositories.schedule.repository._update_session_scheduling_failure(
+                await self.schedule_repository._update_session_scheduling_failure(
                     sched_ctx, sess_ctx, exc.extra_msg
                 )
 
@@ -802,7 +798,7 @@ class SchedulerDispatcher(aobject):
             exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
 
             async def _update_generic_failure() -> None:
-                await self.repositories.schedule.repository._update_session_generic_failure(
+                await self.schedule_repository._update_session_generic_failure(
                     sched_ctx, sess_ctx, exc_data
                 )
 
@@ -810,7 +806,7 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
-            await self.repositories.schedule.repository._finalize_single_node_session(
+            await self.schedule_repository._finalize_single_node_session(
                 sess_ctx.id, sgroup_name, agent_alloc_ctx
             )
 
@@ -853,9 +849,7 @@ class SchedulerDispatcher(aobject):
                         (
                             available_slots,
                             occupied_slots,
-                        ) = await self.repositories.schedule.repository.get_agent_available_slots(
-                            agent.id
-                        )
+                        ) = await self.schedule_repository.get_agent_available_slots(agent.id)
 
                         for key in available_slots.keys():
                             if (
@@ -918,18 +912,18 @@ class SchedulerDispatcher(aobject):
                     async def _reserve() -> None:
                         nonlocal agent_alloc_ctx, candidate_agents
                         async with agent_db_sess.begin_nested():
-                            agent_alloc_ctx = (
-                                await self.repositories.schedule.repository._reserve_agent(
-                                    agent_db_sess,
-                                    sgroup_name,
-                                    agent_id,
-                                    kernel.requested_slots,
-                                    extra_conds=agent_query_extra_conds,
-                                )
+                            agent_alloc_ctx = await self.schedule_repository._reserve_agent(
+                                agent_db_sess,
+                                sgroup_name,
+                                agent_id,
+                                kernel.requested_slots,
+                                extra_conds=agent_query_extra_conds,
                             )
                             # Update the agent data to schedule the next kernel in the session
-                            candidate_agents = await self.repositories.schedule.repository.get_schedulable_agents_by_sgroup(
-                                sgroup_name
+                            candidate_agents = (
+                                await self.schedule_repository.get_schedulable_agents_by_sgroup(
+                                    sgroup_name
+                                )
                             )
 
                     await execute_with_retry(_reserve)
@@ -937,10 +931,8 @@ class SchedulerDispatcher(aobject):
                     log.debug(log_fmt + "no-available-instances", *log_args)
 
                     async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
-                        await (
-                            self.repositories.schedule.repository._update_kernel_scheduling_failure(
-                                sched_ctx, sess_ctx, kernel.id, exc.extra_msg
-                            )
+                        await self.schedule_repository._update_kernel_scheduling_failure(
+                            sched_ctx, sess_ctx, kernel.id, exc.extra_msg
                         )
 
                     await execute_with_retry(partial(_update_sched_failure, sched_failure))
@@ -953,7 +945,7 @@ class SchedulerDispatcher(aobject):
                     exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
 
                     async def _update_generic_failure() -> None:
-                        await self.repositories.schedule.repository._update_multinode_kernel_generic_failure(
+                        await self.schedule_repository._update_multinode_kernel_generic_failure(
                             sched_ctx, sess_ctx, kernel.id, exc_data
                         )
 
@@ -967,7 +959,7 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
-            await self.repositories.schedule.repository.finalize_scheduled_session(
+            await self.schedule_repository.finalize_scheduled_session(
                 sess_ctx.id, sgroup_name, kernel_agent_bindings
             )
 
@@ -1004,9 +996,7 @@ class SchedulerDispatcher(aobject):
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
 
-                scheduled_sessions = (
-                    await self.repositories.schedule.repository.transit_scheduled_to_preparing()
-                )
+                scheduled_sessions = await self.schedule_repository.transit_scheduled_to_preparing()
                 log.debug(
                     "check_precond(): checking-precond {} session(s)", len(scheduled_sessions)
                 )
@@ -1077,7 +1067,7 @@ class SchedulerDispatcher(aobject):
                 )
 
                 scheduled_sessions = (
-                    await self.repositories.schedule.repository.mark_sessions_and_kernels_creating()
+                    await self.schedule_repository.mark_sessions_and_kernels_creating()
                 )
 
                 log.debug("starting(): starting {} session(s)", len(scheduled_sessions))
@@ -1122,7 +1112,7 @@ class SchedulerDispatcher(aobject):
 
     async def _autoscale_endpoints(self) -> None:
         # This method has been moved to repository
-        await self.repositories.schedule.repository.autoscale_endpoints()
+        await self.schedule_repository.autoscale_endpoints()
 
     async def scale_services(
         self,
@@ -1141,18 +1131,16 @@ class SchedulerDispatcher(aobject):
             },
         )
 
-        await execute_with_retry(
-            lambda: self.repositories.schedule.repository.autoscale_endpoints()
-        )
+        await execute_with_retry(lambda: self.schedule_repository.autoscale_endpoints())
 
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
-        rowcount = await self.repositories.schedule.repository.clean_zombie_routes()
+        rowcount = await self.schedule_repository.clean_zombie_routes()
         if rowcount > 0:
             log.info("Cleared {} zombie routes", rowcount)
 
-        endpoints = await self.repositories.schedule.repository.get_endpoints_for_scaling()
+        endpoints = await self.schedule_repository.get_endpoints_for_scaling()
         for endpoint in endpoints:
             active_routings = [
                 r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses()
@@ -1203,7 +1191,7 @@ class SchedulerDispatcher(aobject):
 
         ids_of_session_to_destroy = [r.session for r in routes_to_destroy]
         target_sessions_to_destroy = (
-            await self.repositories.schedule.repository.get_sessions_to_destroy_for_scaling(
+            await self.schedule_repository.get_sessions_to_destroy_for_scaling(
                 ids_of_session_to_destroy
             )
         )
@@ -1232,9 +1220,7 @@ class SchedulerDispatcher(aobject):
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
             endpoint_create_data.append((endpoint, expand_count))
-        created_routes = await self.repositories.schedule.repository.create_routing_rows(
-            endpoint_create_data
-        )
+        created_routes = await self.schedule_repository.create_routing_rows(endpoint_create_data)
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
         await self._valkey_live.add_scheduler_metadata(
@@ -1246,12 +1232,12 @@ class SchedulerDispatcher(aobject):
         )
 
         await execute_with_retry(
-            lambda: self.repositories.schedule.repository.destroy_terminated_endpoints_and_routes(
+            lambda: self.schedule_repository.destroy_terminated_endpoints_and_routes(
                 endpoints_to_mark_terminated, already_destroyed_sessions
             )
         )
 
-        await self.repositories.schedule.repository.delete_appproxy_endpoints_readonly(
+        await self.schedule_repository.delete_appproxy_endpoints_readonly(
             endpoints_to_mark_terminated, self.registry
         )
 
@@ -1283,7 +1269,7 @@ class SchedulerDispatcher(aobject):
             #       SCHEDULED and retry within some limit using status_data.
 
             async def _mark_session_cancelled() -> None:
-                await self.repositories.schedule.repository._mark_session_cancelled(
+                await self.schedule_repository._mark_session_cancelled(
                     sched_ctx, session, status_data
                 )
 
@@ -1302,7 +1288,7 @@ class SchedulerDispatcher(aobject):
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
-                cid_map = await self.repositories.schedule.repository.get_container_info_for_destroyed_kernels(
+                cid_map = await self.schedule_repository.get_container_info_for_destroyed_kernels(
                     session.id
                 )
                 destroyed_kernels = [
@@ -1331,7 +1317,7 @@ class SchedulerDispatcher(aobject):
             return
         session_ids = [item.id for item in cancelled_sessions]
 
-        await self.repositories.schedule.repository.apply_cancellation(session_ids)
+        await self.schedule_repository.apply_cancellation(session_ids)
         for item in cancelled_sessions:
             await self.event_producer.anycast_and_broadcast_event(
                 SessionCancelledAnycastEvent(
