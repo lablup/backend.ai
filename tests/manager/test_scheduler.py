@@ -27,12 +27,12 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.scheduler.agent_selector import (
     DispersedAgentSelector,
 )
 from ai.backend.manager.scheduler.dispatcher import (
     SchedulerDispatcher,
-    _list_managed_sessions,
     load_scheduler,
 )
 from ai.backend.manager.scheduler.drf import DRFScheduler
@@ -549,7 +549,10 @@ async def test_pending_timeout() -> None:
         ScalingGroupOpts(pending_timeout=timedelta(seconds=86400 * 2)),
         {},
     )
-    _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
+    from unittest.mock import Mock
+
+    repository = ScheduleRepository(db=Mock())
+    _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",
         pending_timeout=scheduler.sgroup_opts.pending_timeout,
@@ -562,7 +565,7 @@ async def test_pending_timeout() -> None:
         ScalingGroupOpts(pending_timeout=timedelta(seconds=0)),
         {},
     )
-    _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
+    _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",
         pending_timeout=scheduler.sgroup_opts.pending_timeout,
@@ -604,7 +607,7 @@ async def test_manually_assign_agent_available(
     # Mock the recalc_concurrency_used function since it uses ValkeyStatClient
     mock_recalc_concurrency_used = AsyncMock()
     mocker.patch(
-        "ai.backend.manager.scheduler.dispatcher.recalc_concurrency_used",
+        "ai.backend.manager.repositories.schedule.repository.recalc_concurrency_used",
         mock_recalc_concurrency_used,
     )
     sgroup_opts = ScalingGroupOpts()
@@ -622,6 +625,9 @@ async def test_manually_assign_agent_available(
     mock_etcd = DummyEtcd()
     test_valkey_live = MagicMock()
     test_valkey_stat = MagicMock()
+
+    mock_schedule_repository = MagicMock(spec=ScheduleRepository)
+
     dispatcher = SchedulerDispatcher(
         config_provider=mock_config_provider,
         etcd=mock_etcd,  # type: ignore
@@ -630,6 +636,7 @@ async def test_manually_assign_agent_available(
         registry=registry,
         valkey_live=test_valkey_live,
         valkey_stat=test_valkey_stat,
+        schedule_repository=mock_schedule_repository,
     )
 
     # manually assigned agent has None capacity
