@@ -186,17 +186,14 @@ class Services:
             args.config_provider, repositories.metric.repository
         )
         model_serving_service = ModelServingService(
-            db=args.db,
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
-            model_serving_repository=repositories.model_serving.repository,
-            admin_model_serving_repository=repositories.model_serving.admin_repository,
+            repositories=repositories.model_serving,
         )
         model_serving_auto_scaling = AutoScalingService(
-            args.db,
             repositories.model_serving.repository,
             repositories.model_serving.admin_repository,
         )
