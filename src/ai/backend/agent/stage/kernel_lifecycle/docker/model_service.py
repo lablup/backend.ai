@@ -129,11 +129,6 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             service_ports=service_ports,
         )
 
-    async def _extract_image_command(self, image_canonical: str) -> Optional[str]:
-        async with closing_async(Docker()) as docker:
-            result = await docker.images.get(image_canonical)
-            return result["Config"].get("Cmd")
-
     async def _get_model_definition(self, spec: ModelServiceSpec) -> ModelDefinition:
         image_command = spec.image_command
         model_folder = spec.model_vfolder_mount

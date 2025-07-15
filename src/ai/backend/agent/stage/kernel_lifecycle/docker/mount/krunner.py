@@ -269,19 +269,19 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
                 hook_paths = await computer_ctx.instance.get_hooks(
                     runner_info.distro, runner_info.architecture
                 )
-            for hook_path in hook_paths:
-                if hook_path in already_injected_hooks:
-                    continue
-                container_hook_path = f"/opt/kernel/{hook_path.name}"
-                already_injected_hooks.add(hook_path)
-                mounts.append(
-                    Mount(
-                        MountTypes.BIND,
-                        hook_path,
-                        Path(container_hook_path),
-                        MountPermission.READ_ONLY,
+                for hook_path in hook_paths:
+                    if hook_path in already_injected_hooks:
+                        continue
+                    container_hook_path = f"/opt/kernel/{hook_path.name}"
+                    already_injected_hooks.add(hook_path)
+                    mounts.append(
+                        Mount(
+                            MountTypes.BIND,
+                            hook_path,
+                            Path(container_hook_path),
+                            MountPermission.READ_ONLY,
+                        )
                     )
-                )
         return mounts
 
     @cached(
