@@ -889,7 +889,7 @@ class Endpoint(graphene.ObjectType):
         except NoResultFound:
             raise EndpointNotFound
 
-    async def resolve_status(self, info: graphene.ResolveInfo) -> EndpointStatus:
+    async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
             case EndpointLifecycle.DESTROYED.name:
                 return EndpointStatus.DESTROYED
