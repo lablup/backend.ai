@@ -126,7 +126,6 @@ class Services:
             repositories.group,
         )
         user_service = UserService(
-            args.db,
             args.storage_manager,
             args.valkey_stat_client,
             args.agent_registry,
