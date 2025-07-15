@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
+from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -37,6 +38,7 @@ from ai.backend.common.types import (
     ImageAlias,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     RuntimeVariant,
     SessionTypes,
 )
@@ -146,6 +148,7 @@ class ModelServingService:
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
+        redis_live: RedisConnectionInfo,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -153,6 +156,7 @@ class ModelServingService:
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
         self._config_provider = config_provider
+        self._redis_live = redis_live
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -640,16 +644,13 @@ class ModelServingService:
                 .values({"traffic_ratio": action.traffic_ratio})
             )
             await db_sess.execute(query)
-            endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
-            try:
-                await self._agent_registry.update_appproxy_endpoint_routes(
-                    db_sess,
-                    endpoint,
-                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY],
-                )
-            except aiohttp.ClientError as e:
-                log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
-
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.set(
+                    f"endpoint.{action.service_id}.route.{action.route_id}.traffic_ratio",
+                    action.traffic_ratio,
+                ),
+            )
         return UpdateRouteActionResult(success=True)
 
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
@@ -745,7 +746,7 @@ class ModelServingService:
 
         async with self._db.begin_session() as db_sess:
             await self._agent_registry.update_appproxy_endpoint_routes(
-                db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+                db_sess, endpoint, [r for r in endpoint.routings]
             )
 
         return ForceSyncActionResult(success=True)

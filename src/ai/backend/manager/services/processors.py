@@ -74,6 +74,7 @@ class ServiceArgs:
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
+    redis_live: RedisConnectionInfo
     redis_stat: RedisConnectionInfo
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
@@ -155,6 +156,7 @@ class Services:
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
+            redis_live=args.redis_live,
         )
         model_serving_auto_scaling = AutoScalingService(args.db)
         auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)

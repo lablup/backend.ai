@@ -646,6 +646,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 etcd=root_ctx.etcd,
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
+                redis_live=root_ctx.redis_live,
                 redis_stat=root_ctx.redis_stat,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
@@ -747,6 +748,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.redis_live,
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.event_hub,

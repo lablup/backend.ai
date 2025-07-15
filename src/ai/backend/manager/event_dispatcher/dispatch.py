@@ -72,6 +72,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
@@ -91,6 +92,7 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    redis_live: RedisConnectionInfo
     valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
     event_hub: EventHub
@@ -132,6 +134,7 @@ class Dispatchers:
             args.db,
             args.event_dispatcher_plugin_ctx,
             args.idle_checker_host,
+            args.redis_live,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)

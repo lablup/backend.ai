@@ -3689,6 +3689,63 @@ class AgentRegistry:
                     break
         return _info
 
+    async def create_appproxy_endpoint(
+        self,
+        db_sess: AsyncSession,
+        endpoint: EndpointRow,
+    ) -> None:
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == endpoint.resource_group))
+        )
+
+        result = await db_sess.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_api_token = sgroup["wsproxy_api_token"]
+
+        model = await VFolderRow.get(db_sess, endpoint.model)
+
+        health_check_information = await self.get_health_check_info(endpoint, model)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
+                json={
+                    "version": "v2",
+                    "service_name": endpoint.name,
+                    "tags": {
+                        "session": {
+                            "user_uuid": str(endpoint.session_owner),
+                            "group_id": str(endpoint.project),
+                            "domain_name": endpoint.domain,
+                        },
+                        "endpoint": {
+                            "id": str(endpoint.id),
+                            "runtime_variant": endpoint.runtime_variant.value,
+                            "existing_url": str(endpoint.url) if endpoint.url else None,
+                        },
+                    },
+                    "open_to_public": endpoint.open_to_public,
+                    "health_check": health_check_information.model_dump(mode="json")
+                    if health_check_information
+                    else None,
+                },  # TODO: support for multiple inference apps
+                headers={
+                    "X-BackendAI-Token": wsproxy_api_token,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                endpoint_json = await resp.json()
+                async with self.db.begin_session() as db_sess:
+                    query = (
+                        sa.update(EndpointRow)
+                        .values({"url": endpoint_json["endpoint"]})
+                        .where(EndpointRow.id == endpoint.id)
+                    )
+                    await db_sess.execute(query)
+
     async def update_appproxy_endpoint_routes(
         self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
     ) -> None:
@@ -3728,31 +3785,11 @@ class AgentRegistry:
                     "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
                 })
 
-        health_check_information = await self.get_health_check_info(endpoint, model)
-
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
+                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/routes",
                 json={
-                    "version": "v2",
-                    "service_name": endpoint.name,
-                    "tags": {
-                        "session": {
-                            "user_uuid": str(endpoint.session_owner),
-                            "group_id": str(endpoint.project),
-                            "domain_name": endpoint.domain,
-                        },
-                        "endpoint": {
-                            "id": str(endpoint.id),
-                            "runtime_variant": endpoint.runtime_variant.value,
-                            "existing_url": str(endpoint.url) if endpoint.url else None,
-                        },
-                    },
                     "apps": inference_apps,
-                    "open_to_public": endpoint.open_to_public,
-                    "health_check": health_check_information.model_dump(mode="json")
-                    if health_check_information
-                    else None,
                 },  # TODO: support for multiple inference apps
                 headers={
                     "X-BackendAI-Token": wsproxy_api_token,

@@ -482,3 +482,10 @@ class ModelServiceDefinition(BaseModel):
             {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
         ],
     )
+
+
+@dataclass
+class RouteConnectionInfo:
+    app: str
+    kernel_host: str
+    kernel_port: int
