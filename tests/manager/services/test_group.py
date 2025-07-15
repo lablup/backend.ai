@@ -60,7 +60,6 @@ def processors(
     group_repository = GroupRepository(
         db=database_engine,
         config_provider=service_mock_args["config_provider"],
-        valkey_stat_client=service_mock_args["valkey_stat_client"],
     )
     admin_group_repository = AdminGroupRepository(
         db=database_engine, storage_manager=service_mock_args["storage_manager"]

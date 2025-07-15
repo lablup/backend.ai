@@ -116,9 +116,15 @@ class ImageService:
         return ForgetImageByIdActionResult(image=data)
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
+        from ai.backend.manager.data.image.creator import ImageAliasCreator
+        
+        alias_creator = ImageAliasCreator(
+            alias=action.alias,
+            target=action.image_canonical
+        )
         try:
             image_id, image_alias = await self._image_repository.add_image_alias(
-                action.alias, action.image_canonical, action.architecture
+                alias_creator, action.image_canonical, action.architecture
             )
         except UnknownImageReference:
             raise ImageNotFound
@@ -139,9 +145,8 @@ class ImageService:
         props = action.modifier
 
         try:
-            to_update = props.fields_to_update()
             image_data = await self._image_repository.update_image_properties(
-                action.target, action.architecture, to_update
+                action.target, action.architecture, props
             )
         except UnknownImageReference:
             raise ModifyImageActionUnknownImageReferenceError

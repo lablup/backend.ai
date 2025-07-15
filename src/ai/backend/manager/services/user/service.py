@@ -68,40 +68,24 @@ class UserService:
         self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        username = action.input.username if action.input.username else action.input.email
-        _status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if action.input.status is None and action.input.is_active is not None:
-            _status = UserStatus.ACTIVE if action.input.is_active else UserStatus.INACTIVE
-        if action.input.status is not None:
-            _status = action.input.status
-        group_ids = [] if action.input.group_ids is None else action.input.group_ids
-
-        user_data = {
-            "username": username,
-            "email": action.input.email,
-            "password": action.input.password,
-            "need_password_change": action.input.need_password_change,
-            "full_name": action.input.full_name,
-            "description": action.input.description,
-            "status": _status,
-            "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": action.input.domain_name,
-            "role": action.input.role,
-            "allowed_client_ip": action.input.allowed_client_ip,
-            "totp_activated": action.input.totp_activated,
-            "resource_policy": action.input.resource_policy,
-            "sudo_session_enabled": action.input.sudo_session_enabled,
-        }
-        if action.input.container_uid is not None:
-            user_data["container_uid"] = action.input.container_uid
-        if action.input.container_main_gid is not None:
-            user_data["container_main_gid"] = action.input.container_main_gid
-        if action.input.container_gids is not None:
-            user_data["container_gids"] = action.input.container_gids
+        # Prepare UserCreator with proper defaults
+        user_creator = action.input
+        
+        # Set username to email if not provided
+        if not user_creator.username:
+            user_creator.username = user_creator.email
+        
+        # Set status based on is_active if status is not provided
+        if user_creator.status is None and user_creator.is_active is not None:
+            user_creator.status = UserStatus.ACTIVE if user_creator.is_active else UserStatus.INACTIVE
+        elif user_creator.status is None:
+            user_creator.status = UserStatus.ACTIVE
+        
+        group_ids = user_creator.group_ids if user_creator.group_ids is not None else []
 
         try:
             user_data_result = await self._user_repository.create_user_validated(
-                user_data, group_ids
+                user_creator, group_ids
             )
             return CreateUserActionResult(
                 data=user_data_result,
@@ -115,26 +99,16 @@ class UserService:
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         email = action.email
-        data = action.modifier.fields_to_update()
-        if data.get("password") is None:
-            data.pop("password", None)
-
         group_ids = action.group_ids.optional_value()
 
-        if not data and group_ids is None:
+        # Check if there's anything to update
+        if not action.modifier and group_ids is None:
             return ModifyUserActionResult(data=None, success=False)
-        if data.get("status") is None and data.get("is_active") is not None:
-            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
-
-        if data.get("password") is not None:
-            from datetime import datetime
-
-            data["password_changed_at"] = datetime.now()
 
         try:
             user_data_result = await self._user_repository.update_user_validated(
                 email=email,
-                updates=data,
+                user_modifier=action.modifier,
                 group_ids=group_ids,
                 requester_uuid=None,  # No user context available in ModifyUserAction
             )
@@ -236,13 +210,119 @@ class UserService:
         return PurgeUserActionResult(success=True)
 
     async def user_month_stats(self, action: UserMonthStatsAction) -> UserMonthStatsActionResult:
+        from datetime import datetime, timedelta
         from uuid import UUID
 
-        stats = await self._user_repository.get_user_time_binned_monthly_stats(
-            user_uuid=UUID(action.user_id),
-            valkey_stat_client=self._valkey_stat_client,
+        from dateutil.tz import tzutc
+
+        # Get raw kernel data from repository
+        user_uuid = UUID(action.user_id)
+        start_date = datetime.now(tzutc()) - timedelta(days=30)
+
+        kernels = await self._user_repository.get_user_kernels_for_stats(
+            user_uuid=user_uuid,
+            start_date=start_date,
         )
-        return UserMonthStatsActionResult(stats=stats)
+
+        # Process statistics using ValkeyStatClient
+        stats = await self._process_user_time_binned_monthly_stats(kernels)
+        return UserMonthStatsActionResult(stats=[stats])
+
+    async def _process_user_time_binned_monthly_stats(self, kernels: list[dict]) -> dict[str, Any]:
+        """
+        Process user time-binned monthly statistics.
+        This method recreates the statistics processing logic that was moved from repository.
+        """
+        from datetime import datetime, timedelta
+        from decimal import Decimal
+
+        import msgpack
+        from dateutil.tz import tzutc
+
+        from ai.backend.common.types import ResourceSlot
+
+        # Constants
+        TIME_WINDOW = 900  # 15 minutes in seconds
+        DATA_LENGTH = 2880  # 15 min × 4 × 24 × 30 days
+        now = datetime.now(tzutc())
+
+        # Initialize statistics structure
+        stats = {
+            "num_sessions": [0] * DATA_LENGTH,
+            "cpu_allocated": [0] * DATA_LENGTH,
+            "mem_allocated": [0] * DATA_LENGTH,
+            "gpu_allocated": [0] * DATA_LENGTH,
+            "io_read_bytes": [0] * DATA_LENGTH,
+            "io_write_bytes": [0] * DATA_LENGTH,
+            "disk_used": [0] * DATA_LENGTH,
+        }
+
+        if not kernels:
+            return stats
+
+        # Get kernel IDs for statistics fetching
+        kernel_ids = [kernel["id"] for kernel in kernels]
+
+        # Fetch raw statistics from ValkeyStatClient
+        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
+
+        # Process each kernel
+        for idx, kernel in enumerate(kernels):
+            created_at = kernel["created_at"]
+            terminated_at = kernel["terminated_at"]
+            occupied_slots = ResourceSlot.from_json(kernel["occupied_slots"])
+
+            # Calculate time range for this kernel
+            start_time = max(created_at, now - timedelta(days=30))
+            end_time = terminated_at if terminated_at else now
+
+            # Calculate time bin indices
+            start_bin = max(
+                0, int((start_time - (now - timedelta(days=30))).total_seconds() // TIME_WINDOW)
+            )
+            end_bin = min(
+                DATA_LENGTH - 1,
+                int((end_time - (now - timedelta(days=30))).total_seconds() // TIME_WINDOW),
+            )
+
+            # Process raw statistics for this kernel
+            kernel_stats = raw_stats[idx] if idx < len(raw_stats) else None
+
+            # Add resource allocations to time bins
+            for bin_idx in range(start_bin, end_bin + 1):
+                stats["num_sessions"][bin_idx] += 1
+                stats["cpu_allocated"][bin_idx] += int(occupied_slots.get("cpu", 0))
+                stats["mem_allocated"][bin_idx] += int(occupied_slots.get("mem", 0))
+
+                # Handle GPU allocation (both CUDA devices and shares)
+                gpu_count = 0
+                gpu_count += len(occupied_slots.get("cuda.devices", []))
+                gpu_count += int(occupied_slots.get("cuda.shares", 0))
+                stats["gpu_allocated"][bin_idx] += gpu_count
+
+                # Process I/O and disk statistics if available
+                if kernel_stats:
+                    try:
+                        # Unpack msgpack-encoded statistics
+                        unpacked_stats = msgpack.unpackb(kernel_stats, raw=False)
+
+                        # Extract I/O statistics
+                        io_read = unpacked_stats.get(f"io_read_bytes_{bin_idx}", 0)
+                        io_write = unpacked_stats.get(f"io_write_bytes_{bin_idx}", 0)
+                        disk_used = unpacked_stats.get(f"disk_used_{bin_idx}", 0)
+
+                        stats["io_read_bytes"][bin_idx] += int(io_read)
+                        stats["io_write_bytes"][bin_idx] += int(io_write)
+                        stats["disk_used"][bin_idx] += int(disk_used)
+                    except Exception:
+                        # Continue if statistics unpacking fails
+                        pass
+
+        # Convert any Decimal types to float for JSON serialization
+        for key in stats:
+            stats[key] = [float(x) if isinstance(x, Decimal) else x for x in stats[key]]
+
+        return stats
 
     async def admin_month_stats(self, action: AdminMonthStatsAction) -> AdminMonthStatsActionResult:
         stats = await self._admin_user_repository.get_admin_time_binned_monthly_stats_force(

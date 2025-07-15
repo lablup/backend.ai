@@ -32,26 +32,44 @@ class UserCreator(Creator):
     container_gids: Optional[list[int]] = None
 
     def fields_to_store(self) -> dict[str, Any]:
-        return {
+        fields = {
             "email": self.email,
             "username": self.username,
             "password": self.password,
             "need_password_change": self.need_password_change,
             "domain_name": self.domain_name,
-            "full_name": self.full_name,
-            "description": self.description,
-            "is_active": self.is_active,
-            "status": self.status,
-            "role": self.role,
-            "allowed_client_ip": self.allowed_client_ip,
-            "totp_activated": self.totp_activated,
-            "resource_policy": self.resource_policy,
-            "sudo_session_enabled": self.sudo_session_enabled,
-            "group_ids": self.group_ids,
-            "container_uid": self.container_uid,
-            "container_main_gid": self.container_main_gid,
-            "container_gids": self.container_gids,
+            "status_info": "admin-requested",  # user mutation is only for admin
         }
+        
+        # Optional fields
+        if self.full_name is not None:
+            fields["full_name"] = self.full_name
+        if self.description is not None:
+            fields["description"] = self.description
+        if self.status is not None:
+            fields["status"] = self.status
+        if self.role is not None:
+            fields["role"] = self.role
+        if self.allowed_client_ip is not None:
+            fields["allowed_client_ip"] = self.allowed_client_ip
+        if self.totp_activated is not None:
+            fields["totp_activated"] = self.totp_activated
+        if self.resource_policy is not None:
+            fields["resource_policy"] = self.resource_policy
+        if self.sudo_session_enabled is not None:
+            fields["sudo_session_enabled"] = self.sudo_session_enabled
+        if self.container_uid is not None:
+            fields["container_uid"] = self.container_uid
+        if self.container_main_gid is not None:
+            fields["container_main_gid"] = self.container_main_gid
+        if self.container_gids is not None:
+            fields["container_gids"] = self.container_gids
+        
+        # Note: is_active and group_ids are handled separately
+        # is_active is converted to status in the service layer
+        # group_ids are handled through separate association table
+        
+        return fields
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa

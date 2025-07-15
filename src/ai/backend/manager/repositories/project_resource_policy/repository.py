@@ -19,7 +19,9 @@ class ProjectResourcePolicyRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _get_project_resource_policy_by_name(self, session: SASession, name: str) -> ProjectResourcePolicyRow:
+    async def _get_project_resource_policy_by_name(
+        self, session: SASession, name: str
+    ) -> ProjectResourcePolicyRow:
         """Private method to get a project resource policy by name using an existing session.
         Raises ProjectResourcePolicyNotFound if not found."""
         query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
@@ -45,7 +47,9 @@ class ProjectResourcePolicyRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def update(self, name: str, modifier: ProjectResourcePolicyModifier) -> ProjectResourcePolicyData:
+    async def update(
+        self, name: str, modifier: ProjectResourcePolicyModifier
+    ) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             row = await self._get_project_resource_policy_by_name(db_sess, name)
             fields = modifier.fields_to_update()

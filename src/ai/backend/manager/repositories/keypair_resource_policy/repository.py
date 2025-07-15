@@ -19,7 +19,9 @@ class KeypairResourcePolicyRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _get_keypair_resource_policy_by_name(self, session: SASession, name: str) -> KeyPairResourcePolicyRow:
+    async def _get_keypair_resource_policy_by_name(
+        self, session: SASession, name: str
+    ) -> KeyPairResourcePolicyRow:
         """Private method to get a keypair resource policy by name using an existing session.
         Raises KeyPairResourcePolicyNotFound if not found."""
         query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
@@ -45,7 +47,9 @@ class KeypairResourcePolicyRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def update(self, name: str, modifier: KeyPairResourcePolicyModifier) -> KeyPairResourcePolicyData:
+    async def update(
+        self, name: str, modifier: KeyPairResourcePolicyModifier
+    ) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             row = await self._get_keypair_resource_policy_by_name(db_sess, name)
             fields = modifier.fields_to_update()

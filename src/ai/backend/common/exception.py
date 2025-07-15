@@ -145,6 +145,9 @@ class ErrorDomain(enum.StrEnum):
     SCALING_GROUP = "scaling-group"
     INSTANCE = "instance"
     ENDPOINT = "endpoint"
+    KEYPAIR = "keypair"
+    MODEL_SERVING = "model-serving"
+    RESOURCE_POLICY = "resource-policy"
     ENDPOINT_AUTO_SCALING = "endpoint-auto-scaling"
     ROUTE = "route"
     DOTFILE = "dotfile"
@@ -181,6 +184,7 @@ class ErrorOperation(enum.StrEnum):
     EXECUTE = "execute"
     SETUP = "setup"
     GRANT = "grant"
+    DELETE = "delete"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -234,6 +238,8 @@ class ErrorDetail(enum.StrEnum):
     # MISMATCH means the current state of the server does not match the expected state.
     # MISMATCH is used when the server is in a state that is not expected.
     MISMATCH = "mismatch"
+    # UNSPECIFIED means the error detail is not specified.
+    UNSPECIFIED = "unspecified"
 
 
 @dataclass

@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
-from uuid import uuid4
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.manager.data.utils import Creator
+from ai.backend.manager.types import Creator
 
 
 @dataclass

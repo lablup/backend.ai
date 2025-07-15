@@ -19,7 +19,9 @@ class UserResourcePolicyRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _get_user_resource_policy_by_name(self, session: SASession, name: str) -> UserResourcePolicyRow:
+    async def _get_user_resource_policy_by_name(
+        self, session: SASession, name: str
+    ) -> UserResourcePolicyRow:
         """Private method to get a user resource policy by name using an existing session.
         Raises UserResourcePolicyNotFound if not found."""
         query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
@@ -45,7 +47,9 @@ class UserResourcePolicyRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def update(self, name: str, modifier: UserResourcePolicyModifier) -> UserResourcePolicyData:
+    async def update(
+        self, name: str, modifier: UserResourcePolicyModifier
+    ) -> UserResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             row = await self._get_user_resource_policy_by_name(db_sess, name)
             fields = modifier.fields_to_update()

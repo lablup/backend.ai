@@ -15,7 +15,7 @@ class ResourcePresetCreator(Creator):
 
     @override
     def fields_to_store(self) -> dict[str, Any]:
-        to_store = {
+        to_store: dict[str, Any] = {
             "name": self.name,
             "resource_slots": self.resource_slots,
         }
