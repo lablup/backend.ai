@@ -33,6 +33,11 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
+from ai.backend.common.request import (
+    FolderMountRequest,
+    VolumeFsUsageRequest,
+    VolumePerformanceMetricRequest,
+)
 from ai.backend.common.types import (
     HardwareMetadata,
     VFolderHostPermission,
@@ -40,6 +45,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy import StorageProxyClient
 from ai.backend.manager.config.unified import VolumesConfig
 
 from ..errors.api import InvalidAPIParameters
@@ -80,6 +86,7 @@ class StorageProxyInfo:
     client_api_url: yarl.URL
     manager_api_url: yarl.URL
     sftp_scaling_groups: list[str]
+    client: StorageProxyClient
 
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
@@ -106,12 +113,19 @@ class StorageSessionManager:
         for proxy_name, proxy_config in self.config.proxies.items():
             connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
             session = aiohttp.ClientSession(connector=connector)
+            manager_api_url = yarl.URL(proxy_config.manager_api)
+            client = StorageProxyClient(
+                session=session,
+                secret=proxy_config.secret,
+                manager_api_url=manager_api_url,
+            )
             self._proxies[proxy_name] = StorageProxyInfo(
                 session=session,
                 secret=proxy_config.secret,
                 client_api_url=yarl.URL(proxy_config.client_api),
-                manager_api_url=yarl.URL(proxy_config.manager_api),
+                manager_api_url=manager_api_url,
                 sftp_scaling_groups=proxy_config.sftp_scaling_groups or [],
+                client=client,
             )
 
     async def aclose(self) -> None:
@@ -158,14 +172,11 @@ class StorageSessionManager:
             proxy_name: str,
             proxy_info: StorageProxyInfo,
         ) -> Iterable[Tuple[str, VolumeInfo]]:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "volumes",
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return ((proxy_name, volume_data) for volume_data in reply["volumes"])
+            response = await proxy_info.client.get_volumes()
+            return (
+                (proxy_name, cast(VolumeInfo, volume_data.model_dump()))
+                for volume_data in response.volumes
+            )
 
         for proxy_name, proxy_info in self._proxies.items():
             fetch_aws.append(_fetch(proxy_name, proxy_info))
@@ -184,18 +195,19 @@ class StorageSessionManager:
         vfolder_id: VFolderID,
         subpath: PurePosixPath = PurePosixPath("."),
     ) -> str:
-        async with self.request(
-            vfolder_host,
-            "GET",
-            "folder/mount",
-            json={
-                "volume": self.get_proxy_and_volume(vfolder_host)[1],
-                "vfid": str(vfolder_id),
-                "subpath": str(subpath),
-            },
-        ) as (_, resp):
-            reply = await resp.json()
-            return reply["path"]
+        proxy_name, volume_name = self.get_proxy_and_volume(vfolder_host)
+        try:
+            proxy_info = self._proxies[proxy_name]
+        except KeyError:
+            raise InvalidArgument("There is no such storage proxy", proxy_name)
+
+        request = FolderMountRequest(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            subpath=str(subpath),
+        )
+        response = await proxy_info.client.get_folder_mount(request)
+        return response.path
 
     @actxmgr
     async def request(
@@ -279,15 +291,9 @@ class StorageVolume(graphene.ObjectType):
         except KeyError:
             raise ValueError(f"no such storage proxy: {proxy_name!r}")
         try:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "volume/performance-metric",
-                json={"volume": volume_name},
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return reply["metric"]
+            request = VolumePerformanceMetricRequest(volume=volume_name)
+            response = await proxy_info.client.get_volume_performance_metric(request)
+            return response.metric
         except aiohttp.ClientResponseError:
             return {}
 
@@ -299,29 +305,23 @@ class StorageVolume(graphene.ObjectType):
         except KeyError:
             raise ValueError(f"no such storage proxy: {proxy_name!r}")
         try:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "folder/fs-usage",
-                json={"volume": volume_name},
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return reply
+            request = VolumeFsUsageRequest(volume=volume_name)
+            response = await proxy_info.client.get_folder_fs_usage(request)
+            return response.model_dump()
         except aiohttp.ClientResponseError:
             return {}
 
     @classmethod
     def from_info(cls, proxy_name: str, volume_info: VolumeInfo) -> StorageVolume:
-        return cls(
-            id=f"{proxy_name}:{volume_info['name']}",
-            backend=volume_info["backend"],
-            path=volume_info["path"],
-            fsprefix=volume_info["fsprefix"],
-            capabilities=volume_info["capabilities"],
-            name=volume_info["name"],
-            proxy=proxy_name,
-        )
+        obj = cls()
+        obj.id = f"{proxy_name}:{volume_info['name']}"
+        obj.backend = volume_info["backend"]
+        obj.path = volume_info["path"]
+        obj.fsprefix = volume_info["fsprefix"]
+        obj.capabilities = volume_info["capabilities"]
+        obj.name = volume_info["name"]
+        obj.proxy = proxy_name
+        return obj
 
     @classmethod
     async def load_count(
@@ -329,6 +329,7 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         filter: Optional[str] = None,
     ) -> int:
+        _ = filter  # Unused parameter
         volumes = [*await ctx.storage_manager.get_all_volumes()]
         return len(volumes)
 
@@ -363,20 +364,13 @@ class StorageVolume(graphene.ObjectType):
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
             raise ValueError(f"no such storage proxy: {proxy_name!r}")
-        async with proxy_info.session.request(
-            "GET",
-            proxy_info.manager_api_url / "volumes",
-            raise_for_status=True,
-            headers={AUTH_TOKEN_HDR: proxy_info.secret},
-        ) as resp:
-            reply = await resp.json()
-            for volume_data in reply["volumes"]:
-                if volume_data["name"] == volume_name:
-                    return cls.from_info(proxy_name, volume_data)
-            else:
-                raise ValueError(
-                    f"no such volume in the storage proxy {proxy_name!r}: {volume_name!r}",
-                )
+        response = await proxy_info.client.get_volumes()
+        for volume_data in response.volumes:
+            if volume_data.name == volume_name:
+                return cls.from_info(proxy_name, cast(VolumeInfo, volume_data.model_dump()))
+        raise ValueError(
+            f"no such volume in the storage proxy {proxy_name!r}: {volume_name!r}",
+        )
 
 
 class StorageVolumeList(graphene.ObjectType):

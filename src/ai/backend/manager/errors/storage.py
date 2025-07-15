@@ -5,7 +5,7 @@ Storage and virtual folder-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from aiohttp import web
 
@@ -267,3 +267,87 @@ class StorageProxyError(BackendAIError, web.HTTPError):
     def status(self) -> int:
         # override the status property again to refer the subclass' attribute.
         return self.status_code
+
+
+class StorageOperationError(BackendAIError, web.HTTPInternalServerError):
+    """Base exception for storage operation related errors."""
+
+    error_type = "https://api.backend.ai/probs/storage-operation-error"
+    error_title = "Storage operation failed."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageConnectionError(BackendAIError, web.HTTPBadGateway):
+    """Exception raised when connection to storage service fails."""
+
+    error_type = "https://api.backend.ai/probs/storage-connection-error"
+    error_title = "Failed to connect to storage service."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageRequestError(BackendAIError, web.HTTPBadRequest):
+    """Exception raised when storage request fails."""
+
+    error_type = "https://api.backend.ai/probs/storage-request-error"
+    error_title = "Storage request failed."
+
+    def __init__(
+        self,
+        extra_msg: Optional[str] = None,
+        status_code: Optional[int] = None,
+        extra_data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.status_code = status_code
+        super().__init__(extra_msg, extra_data)
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class StorageResourceNotFoundError(BackendAIError, web.HTTPNotFound):
+    """Exception raised when storage resource is not found."""
+
+    error_type = "https://api.backend.ai/probs/storage-resource-not-found"
+    error_title = "Storage resource not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class StorageResourceGoneError(BackendAIError, web.HTTPGone):
+    """Exception raised when storage resource is gone or deleted."""
+
+    error_type = "https://api.backend.ai/probs/storage-resource-gone"
+    error_title = "Storage resource is gone or deleted."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.GONE,
+        )

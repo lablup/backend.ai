@@ -338,18 +338,20 @@ class AgentRegistry:
             return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
+        from ai.backend.common.request import VolumeHwinfoRequest
+
         proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
-        async with self.storage_manager.request(
-            proxy_name,
-            "GET",
-            "volume/hwinfo",
-            json={"volume": volume_name},
-            raise_for_status=True,
-        ) as (_, storage_resp):
-            return check_type(
-                await storage_resp.json(),
-                HardwareMetadata,
-            )
+        try:
+            proxy_info = self.storage_manager._proxies[proxy_name]
+        except KeyError:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+
+        request = VolumeHwinfoRequest(volume=volume_name)
+        response = await proxy_info.client.get_volume_hwinfo(request)
+        return check_type(
+            response.model_dump(),
+            HardwareMetadata,
+        )
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
         agent = await self.get_instance(instance_id, agents.c.addr)
