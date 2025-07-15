@@ -40,7 +40,7 @@ class UserCreator(Creator):
             "domain_name": self.domain_name,
             "status_info": "admin-requested",  # user mutation is only for admin
         }
-        
+
         # Optional fields
         if self.full_name is not None:
             fields["full_name"] = self.full_name
@@ -64,11 +64,11 @@ class UserCreator(Creator):
             fields["container_main_gid"] = self.container_main_gid
         if self.container_gids is not None:
             fields["container_gids"] = self.container_gids
-        
+
         # Note: is_active and group_ids are handled separately
         # is_active is converted to status in the service layer
         # group_ids are handled through separate association table
-        
+
         return fields
 
 

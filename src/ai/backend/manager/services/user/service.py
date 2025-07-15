@@ -70,17 +70,19 @@ class UserService:
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         # Prepare UserCreator with proper defaults
         user_creator = action.input
-        
+
         # Set username to email if not provided
         if not user_creator.username:
             user_creator.username = user_creator.email
-        
+
         # Set status based on is_active if status is not provided
         if user_creator.status is None and user_creator.is_active is not None:
-            user_creator.status = UserStatus.ACTIVE if user_creator.is_active else UserStatus.INACTIVE
+            user_creator.status = (
+                UserStatus.ACTIVE if user_creator.is_active else UserStatus.INACTIVE
+            )
         elif user_creator.status is None:
             user_creator.status = UserStatus.ACTIVE
-        
+
         group_ids = user_creator.group_ids if user_creator.group_ids is not None else []
 
         try:

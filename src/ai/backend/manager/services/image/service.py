@@ -117,11 +117,8 @@ class ImageService:
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         from ai.backend.manager.data.image.creator import ImageAliasCreator
-        
-        alias_creator = ImageAliasCreator(
-            alias=action.alias,
-            target=action.image_canonical
-        )
+
+        alias_creator = ImageAliasCreator(alias=action.alias, target=action.image_canonical)
         try:
             image_id, image_alias = await self._image_repository.add_image_alias(
                 alias_creator, action.image_canonical, action.architecture
