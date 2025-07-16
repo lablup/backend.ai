@@ -15,7 +15,7 @@ from glide import (
 )
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import (
     DomainType,
     LayerMetricObserver,
@@ -388,6 +388,24 @@ def create_layer_aware_valkey_decorator(
                             duration=time.perf_counter() - start,
                         )
                         return res
+                    except BackendAIError as e:
+                        log.exception(
+                            "Error in valkey request method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
+                        # If it's a BackendAIError, this error is intended to be handled by the caller.
+                        raise e
                     except Exception as e:
                         if attempt < retry_count - 1:
                             await asyncio.sleep(retry_delay)

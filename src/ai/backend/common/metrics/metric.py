@@ -395,7 +395,7 @@ class ActionMetricObserver:
 class DomainType(enum.StrEnum):
     VALKEY = "valkey"
     REPOSITORY = "repository"
-    RPC = "rpc"
+    CLIENT = "client"
 
 
 class LayerType(enum.StrEnum):
