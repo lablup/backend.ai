@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.auth.field import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
@@ -662,7 +663,12 @@ async def server_main(
 ) -> AsyncIterator[Any]:
     config = cast(WebServerUnifiedConfig, args[0])
     app = web.Application(
-        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+        middlewares=[
+            decrypt_payload,
+            track_active_handlers,
+            security_policy_middleware,
+            general_exception_middleware,
+        ],
     )
     app["config"] = config
     request_policy_config: list[str] = config.security.request_policies

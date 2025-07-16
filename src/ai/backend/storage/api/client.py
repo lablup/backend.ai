@@ -32,6 +32,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -432,7 +433,11 @@ async def prepare_tus_session_headers(
 
 
 async def init_client_app(ctx: RootContext) -> web.Application:
-    app = web.Application()
+    app = web.Application(
+        middlewares=[
+            general_exception_middleware,
+        ]
+    )
     app["ctx"] = ctx
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(
