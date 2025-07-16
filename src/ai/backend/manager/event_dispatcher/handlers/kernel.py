@@ -1,8 +1,10 @@
 import logging
+import zlib
 from io import BytesIO
 
 import sqlalchemy as sa
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
@@ -32,13 +34,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class KernelEventHandler:
     _valkey_stream: ValkeyStreamClient
+    _valkey_stat: ValkeyStatClient
     _registry: AgentRegistry
     _db: ExtendedAsyncSAEngine
 
     def __init__(
-        self, valkey_stream: ValkeyStreamClient, registry: AgentRegistry, db: ExtendedAsyncSAEngine
+        self,
+        valkey_stream: ValkeyStreamClient,
+        valkey_stat: ValkeyStatClient,
+        registry: AgentRegistry,
+        db: ExtendedAsyncSAEngine,
     ) -> None:
         self._valkey_stream = valkey_stream
+        self._valkey_stat = valkey_stat
         self._registry = registry
         self._db = db
 
@@ -51,7 +59,7 @@ class KernelEventHandler:
         # The log data is at most 10 MiB.
         log_buffer = BytesIO()
         try:
-            list_size = await self._valkey_stream.container_log_len(container_id=event.container_id)
+            list_size = await self._valkey_stat.container_log_len(container_id=event.container_id)
             if list_size is None:
                 # The log data is expired due to a very slow event delivery.
                 # (should never happen!)
@@ -62,14 +70,13 @@ class KernelEventHandler:
                 return
             for _ in range(list_size):
                 # Read chunk-by-chunk to allow interleaving with other Redis operations.
-                chunks = await self._valkey_stream.pop_container_logs(
-                    container_id=event.container_id
-                )
+                chunks = await self._valkey_stat.pop_container_logs(container_id=event.container_id)
                 if chunks is None:  # maybe missing
                     log_buffer.write(b"(container log unavailable)\n")
                     break
                 for chunk in chunks:
-                    log_buffer.write(chunk)
+                    decomporessed_chunk = zlib.decompress(chunk)
+                    log_buffer.write(decomporessed_chunk)
             try:
                 log_data = log_buffer.getvalue()
 
@@ -85,7 +92,7 @@ class KernelEventHandler:
                 await execute_with_retry(_update_log)
             finally:
                 # Clear the log data from Redis when done.
-                await self._valkey_stream.clear_container_logs(container_id=event.container_id)
+                await self._valkey_stat.clear_container_logs(container_id=event.container_id)
         finally:
             log_buffer.close()
 
