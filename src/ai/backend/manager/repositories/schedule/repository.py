@@ -1,7 +1,8 @@
 import itertools
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Optional, cast
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
@@ -386,10 +387,6 @@ class ScheduleRepository:
         sgroup_name: str,
         kernel_agent_bindings: list,
     ) -> None:
-        from datetime import datetime
-
-        from dateutil.tz import tzutc
-
         from ai.backend.manager.models import KernelStatus, SessionStatus
         from ai.backend.manager.models.utils import sql_json_merge
 
@@ -483,7 +480,7 @@ class ScheduleRepository:
             )
             await session.execute(query)
 
-    async def _finalize_single_node_session(
+    async def finalize_single_node_session(
         self,
         session_id: SessionId,
         sgroup_name: str,
@@ -514,6 +511,7 @@ class ScheduleRepository:
             )
             if agent_alloc_ctx.agent_id is not None:
                 agent_ids.append(agent_alloc_ctx.agent_id)
+            session_row.scaling_group_name = sgroup_name
             session_row.agent_ids = agent_ids
 
     async def _update_kernel_scheduling_failure(
