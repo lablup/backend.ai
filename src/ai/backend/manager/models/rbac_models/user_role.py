@@ -11,7 +11,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.internal_types.permission_controller.role import (
+from ai.backend.manager.data.permission_controller.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
