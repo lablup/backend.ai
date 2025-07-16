@@ -35,7 +35,11 @@ from ai.backend.manager.models.utils import (
     sql_json_increment,
     sql_json_merge,
 )
-from ai.backend.manager.scheduler.types import AgentAllocationContext, SchedulingContext
+from ai.backend.manager.scheduler.types import (
+    AgentAllocationContext,
+    KernelAgentBinding,
+    SchedulingContext,
+)
 
 # Layer-specific decorator for schedule repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
@@ -387,57 +391,42 @@ class ScheduleRepository:
         self,
         session_id: SessionId,
         sgroup_name: str,
-        kernel_agent_bindings: list,
+        kernel_agent_bindings: list[KernelAgentBinding],
     ) -> None:
-        from ai.backend.manager.models import KernelStatus, SessionStatus
-        from ai.backend.manager.models.utils import sql_json_merge
-
-        async with self._db.begin_session() as session:
-            agent_ids = []
-            now = datetime.now(tzutc())
-
-            for binding in kernel_agent_bindings:
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .values(
-                        agent=binding.agent_alloc_ctx.agent_id,
-                        agent_addr=binding.agent_alloc_ctx.agent_addr,
-                        scaling_group=sgroup_name,
-                        status=KernelStatus.SCHEDULED,
-                        status_info="scheduled",
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                KernelStatus.SCHEDULED.name: now.isoformat(),
-                            },
-                        ),
-                    )
-                    .where(KernelRow.id == binding.kernel.id)
-                )
-                await session.execute(kernel_query)
-                if binding.agent_alloc_ctx.agent_id is not None:
-                    agent_ids.append(binding.agent_alloc_ctx.agent_id)
-
-            session_query = (
-                sa.update(SessionRow)
-                .values(
-                    scaling_group_name=sgroup_name,
-                    agent_ids=agent_ids,
-                    status=SessionStatus.SCHEDULED,
-                    status_info="scheduled",
-                    status_data={},
-                    status_history=sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            SessionStatus.SCHEDULED.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(SessionRow.id == session_id)
+        kernel_agent_id_addr = {
+            binding.kernel.id: (
+                binding.agent_alloc_ctx.agent_id,
+                binding.agent_alloc_ctx.agent_addr,
             )
-            await session.execute(session_query)
+            for binding in kernel_agent_bindings
+        }
+        agent_ids: list[AgentId] = []
+        now = datetime.now(tzutc())
+        async with self._db.begin_session() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(selectinload(SessionRow.kernels))
+            )
+
+            session_row = await db_session.scalar(stmt)
+            session_row = cast(SessionRow, session_row)
+            for kernel_row in session_row.kernels:
+                kernel_row = cast(KernelRow, kernel_row)
+                kernel_row.set_status(
+                    KernelStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+                )
+                kernel_row.scaling_group = sgroup_name
+                bind_agent_id, bind_agent_addr = kernel_agent_id_addr[kernel_row.id]
+                if bind_agent_id is not None:
+                    agent_ids.append(bind_agent_id)
+                    kernel_row.agent = bind_agent_id
+                    kernel_row.agent_addr = bind_agent_addr
+            session_row.set_status(
+                SessionStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+            )
+            session_row.scaling_group_name = sgroup_name
+            session_row.agent_ids = agent_ids
 
     async def _update_session_scheduling_failure(
         self,
@@ -489,9 +478,9 @@ class ScheduleRepository:
         sgroup_name: str,
         agent_alloc_ctx: AgentAllocationContext,
     ) -> None:
+        agent_ids: list[AgentId] = []
+        now = datetime.now(tzutc())
         async with self._db.begin_session() as db_session:
-            agent_ids: list[AgentId] = []
-            now = datetime.now(tzutc())
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == session_id)
@@ -518,7 +507,8 @@ class ScheduleRepository:
             session_row.scaling_group_name = sgroup_name
             session_row.agent_ids = agent_ids
 
-    async def _update_kernel_scheduling_failure(
+    @repository_decorator()
+    async def update_kernel_scheduling_failure(
         self,
         sched_ctx: SchedulingContext,
         sess_ctx: SessionRow,
@@ -544,7 +534,8 @@ class ScheduleRepository:
             )
             await session.execute(query)
 
-    async def _update_multinode_kernel_generic_failure(
+    @repository_decorator()
+    async def update_multinode_kernel_generic_failure(
         self,
         sched_ctx: SchedulingContext,
         sess_ctx: SessionRow,
