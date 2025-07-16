@@ -41,6 +41,9 @@ class PermissionControllerService:
         self._repository = repository
 
     async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
+        """
+        Creates a new role in the repository.
+        """
         result = await self._repository.create_role(action.input)
         return CreateRoleActionResult(
             data=result,
@@ -48,6 +51,10 @@ class PermissionControllerService:
         )
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
+        """
+        Updates an existing role in the repository.
+        If the role does not exist, it returns a result indicating failure.
+        """
         try:
             result = await self._repository.update_role(action.input)
         except ObjectNotFound:
@@ -58,6 +65,10 @@ class PermissionControllerService:
         )
 
     async def delete_role(self, action: DeleteRoleAction) -> DeleteRoleActionResult:
+        """
+        Deletes a role from the repository. It marks the role as deleted.
+        If the role does not exist, it returns a result indicating failure.
+        """
         try:
             _ = await self._repository.delete_role(action.input)
         except ObjectNotFound:
@@ -65,11 +76,18 @@ class PermissionControllerService:
         return DeleteRoleActionResult(success=True)
 
     async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
+        """
+        Assigns a role to a user.
+        """
         data = await self._repository.assign_role(action.input)
 
         return AssignRoleActionResult(success=True, data=data)
 
     async def list_access(self, action: ListAccessAction) -> ListAccessActionResult:
+        """
+        Lists the access permissions for a user based on their roles.
+        It returns the allowed operations for both scope and object permissions.
+        """
         roles = await self._repository.get_active_roles(action.user_id)
 
         scope_allowed_operations: defaultdict[ScopeId, set[str]] = defaultdict(set)
