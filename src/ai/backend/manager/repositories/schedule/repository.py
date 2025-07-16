@@ -1,7 +1,8 @@
 import itertools
 import uuid
-from datetime import UTC, datetime, timedelta
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
@@ -259,12 +260,8 @@ class ScheduleRepository:
     async def _get_schedulable_session_with_kernels_and_agents(
         self, session: SASession, session_id: SessionId
     ) -> Optional[SessionRow]:
-        from sqlalchemy.orm import noload, selectinload
-
         eager_loading_op = (
-            noload("*"),
             selectinload(SessionRow.kernels).options(
-                noload("*"),
                 selectinload(KernelRow.agent_row).noload("*"),
             ),
         )
@@ -390,10 +387,6 @@ class ScheduleRepository:
         sgroup_name: str,
         kernel_agent_bindings: list,
     ) -> None:
-        from datetime import datetime
-
-        from dateutil.tz import tzutc
-
         from ai.backend.manager.models import KernelStatus, SessionStatus
         from ai.backend.manager.models.utils import sql_json_merge
 
@@ -487,64 +480,41 @@ class ScheduleRepository:
             )
             await session.execute(query)
 
-    async def _finalize_single_node_session(
+    @repository_decorator()
+    async def finalize_single_node_session(
         self,
         session_id: SessionId,
         sgroup_name: str,
         agent_alloc_ctx: AgentAllocationContext,
     ) -> None:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_session() as db_session:
             agent_ids: list[AgentId] = []
             now = datetime.now(tzutc())
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(selectinload(SessionRow.kernels))
+            )
 
-            session_row = await session.get(SessionRow, session_id)
+            session_row = await db_session.scalar(stmt)
+            session_row = cast(SessionRow, session_row)
             if session_row is None:
                 raise RuntimeError(f"Session {session_id} not found")
 
             for kernel in session_row.kernels:
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=sgroup_name,
-                        status=KernelStatus.SCHEDULED,
-                        status_info="scheduled",
-                        status_data={},
-                        status_changed=now,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                KernelStatus.SCHEDULED.name: now.isoformat(),
-                            },
-                        ),
-                    )
-                    .where(KernelRow.id == kernel.id)
+                kernel.set_status(
+                    KernelStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
                 )
-                await session.execute(kernel_query)
+                kernel.agent = agent_alloc_ctx.agent_id
+                kernel.agent_addr = agent_alloc_ctx.agent_addr
+                kernel.scaling_group = sgroup_name
+            session_row.set_status(
+                SessionStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+            )
             if agent_alloc_ctx.agent_id is not None:
                 agent_ids.append(agent_alloc_ctx.agent_id)
-
-            session_query = (
-                sa.update(SessionRow)
-                .values(
-                    scaling_group_name=sgroup_name,
-                    agent_ids=agent_ids,
-                    status=SessionStatus.SCHEDULED,
-                    status_info="scheduled",
-                    status_data={},
-                    status_history=sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            SessionStatus.SCHEDULED.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(SessionRow.id == session_id)
-            )
-            await session.execute(session_query)
+            session_row.scaling_group_name = sgroup_name
+            session_row.agent_ids = agent_ids
 
     async def _update_kernel_scheduling_failure(
         self,
@@ -638,10 +608,6 @@ class ScheduleRepository:
             return await self._transit_scheduled_to_preparing(session)
 
     async def _transit_scheduled_to_preparing(self, session: SASession) -> list[SessionRow]:
-        from datetime import timezone
-
-        from sqlalchemy import cast
-
         now = datetime.now(timezone.utc)
         scheduled_sessions = await SessionRow.get_sessions_by_status(
             session, SessionStatus.SCHEDULED, load_kernel_image=True
@@ -659,10 +625,6 @@ class ScheduleRepository:
             return await self._mark_sessions_and_kernels_creating(session)
 
     async def _mark_sessions_and_kernels_creating(self, session: SASession) -> list[SessionRow]:
-        from datetime import timezone
-
-        from sqlalchemy import cast
-
         now = datetime.now(timezone.utc)
         session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
         for row in session_rows:
@@ -772,7 +734,7 @@ class ScheduleRepository:
             await self._autoscale_endpoints(session)
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
-        current_datetime = datetime.now(tz=UTC)
+        current_datetime = datetime.now(timezone.utc)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
         # TODO: Check this implementation
