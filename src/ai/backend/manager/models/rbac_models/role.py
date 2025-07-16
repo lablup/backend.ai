@@ -20,31 +20,32 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from .resource_permission import ResourcePermissionRow
-    from .role_permission import RolePermissionRow
+    from .object_permission import ObjectPermissionRow
+    from .scope_permission import ScopePermissionRow
     from .user_role import UserRoleRow
 
 
-class RoleState(enum.StrEnum):
+class RoleStatus(enum.StrEnum):
     ACTIVE = "active"
-    # 'inactive' state is used when the role is temporarily disabled
+    # 'inactive' status is used when the role is temporarily disabled
     INACTIVE = "inactive"
-    # 'deleted' state is used when the role is permanently removed
+    # 'deleted' status is used when the role is permanently removed
     DELETED = "deleted"
 
 
 class RoleRow(Base):
     __tablename__ = "roles"
+    __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
     id: uuid.UUID = IDColumn()
     name: str = sa.Column("name", sa.String(64), nullable=False)
     description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-    state: str = sa.Column(
-        "state",
-        StrEnumType(RoleState),
+    status: str = sa.Column(
+        "status",
+        StrEnumType(RoleStatus),
         nullable=False,
-        default=RoleState.ACTIVE,
-        server_default=RoleState.ACTIVE,
+        default=RoleStatus.ACTIVE,
+        server_default=RoleStatus.ACTIVE,
     )
     created_at: datetime = sa.Column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
@@ -61,13 +62,13 @@ class RoleRow(Base):
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
     )
-    role_permission_rows: list[RolePermissionRow] = relationship(
-        "RolePermissionRow",
+    scope_permission_rows: list[ScopePermissionRow] = relationship(
+        "ScopePermissionRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(RolePermissionRow.role_id)",
+        primaryjoin="RoleRow.id == foreign(ScopePermissionRow.role_id)",
     )
-    resource_permission_rows: list[ResourcePermissionRow] = relationship(
-        "ResourcePermissionRow",
+    object_permission_rows: list[ObjectPermissionRow] = relationship(
+        "ObjectPermissionRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(ResourcePermissionRow.role_id)",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
     )

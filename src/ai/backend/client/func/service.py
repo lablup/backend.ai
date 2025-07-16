@@ -97,9 +97,9 @@ class Service(BaseFunction):
         domain_name: str,
         group_name: str,
         scaling_group: str,
-        extra_mounts: Sequence[str] = [],
-        extra_mount_map: Mapping[str, str] = {},
-        extra_mount_options: Mapping[str, Mapping[str, str]] = {},
+        extra_mounts: Optional[Sequence[str]] = None,
+        extra_mount_map: Optional[Mapping[str, str]] = None,
+        extra_mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         service_name: Optional[str] = None,
         model_version: Optional[str] = None,
         dependencies: Optional[Sequence[str]] = None,
@@ -148,6 +148,10 @@ class Service(BaseFunction):
 
         :returns: The :class:`ComputeSession` instance.
         """
+        extra_mounts = extra_mounts or []
+        extra_mount_map = extra_mount_map or {}
+        extra_mount_options = extra_mount_options or {}
+
         if service_name is None:
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
@@ -171,7 +175,7 @@ class Service(BaseFunction):
                         raise BackendClientError(f"VFolder (id: {vfolder_id}) not found")
                 except ValueError:
                     if mount not in vfolder_name_to_id:
-                        raise BackendClientError(f"VFolder (name: {vfolder_id}) not found")
+                        raise BackendClientError(f"VFolder (name: {mount}) not found")
                     vfolder_id = vfolder_name_to_id[mount]
                 extra_mount_body[str(vfolder_id)] = {
                     "mount_destination": extra_mount_map.get(mount),

@@ -27,12 +27,12 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.scheduler.agent_selector import (
     DispersedAgentSelector,
 )
 from ai.backend.manager.scheduler.dispatcher import (
     SchedulerDispatcher,
-    _list_managed_sessions,
     load_scheduler,
 )
 from ai.backend.manager.scheduler.drf import DRFScheduler
@@ -549,7 +549,10 @@ async def test_pending_timeout() -> None:
         ScalingGroupOpts(pending_timeout=timedelta(seconds=86400 * 2)),
         {},
     )
-    _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
+    from unittest.mock import Mock
+
+    repository = ScheduleRepository(db=Mock())
+    _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",
         pending_timeout=scheduler.sgroup_opts.pending_timeout,
@@ -562,7 +565,7 @@ async def test_pending_timeout() -> None:
         ScalingGroupOpts(pending_timeout=timedelta(seconds=0)),
         {},
     )
-    _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
+    _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",
         pending_timeout=scheduler.sgroup_opts.pending_timeout,
@@ -601,9 +604,12 @@ async def test_manually_assign_agent_available(
     ) = registry_ctx
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
-    mock_redis_wrapper = MagicMock()
-    mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
-    mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
+    # Mock the recalc_concurrency_used function since it uses ValkeyStatClient
+    mock_recalc_concurrency_used = AsyncMock()
+    mocker.patch(
+        "ai.backend.manager.repositories.schedule.repository.recalc_concurrency_used",
+        mock_recalc_concurrency_used,
+    )
     sgroup_opts = ScalingGroupOpts()
     agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
@@ -617,6 +623,10 @@ async def test_manually_assign_agent_available(
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
     mock_etcd = DummyEtcd()
+    test_valkey_live = MagicMock()
+    test_valkey_stat = MagicMock()
+
+    mock_schedule_repository = MagicMock(spec=ScheduleRepository)
 
     dispatcher = SchedulerDispatcher(
         config_provider=mock_config_provider,
@@ -624,6 +634,9 @@ async def test_manually_assign_agent_available(
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
         registry=registry,
+        valkey_live=test_valkey_live,
+        valkey_stat=test_valkey_stat,
+        schedule_repository=mock_schedule_repository,
     )
 
     # manually assigned agent has None capacity

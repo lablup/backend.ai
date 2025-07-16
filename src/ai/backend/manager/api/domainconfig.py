@@ -9,13 +9,13 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import (
-    DomainNotFound,
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import GenericForbidden
+from ..errors.resource import DomainNotFound
+from ..errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
-    GenericForbidden,
-    InvalidAPIParameters,
 )
 from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required

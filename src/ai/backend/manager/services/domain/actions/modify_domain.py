@@ -3,12 +3,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
-from ai.backend.manager.services.domain.types import DomainData, DomainModifier
+from ai.backend.manager.services.domain.types import DomainData, DomainModifier, UserInfo
 
 
 @dataclass
 class ModifyDomainAction(DomainAction):
     domain_name: str
+    user_info: UserInfo
     modifier: DomainModifier = field(default_factory=DomainModifier)
 
     @override

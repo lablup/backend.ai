@@ -40,12 +40,13 @@ from pydantic import (
     GetCoreSchemaHandler,
 )
 from pydantic_core import core_schema
-from redis.asyncio import Redis
 from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
@@ -64,7 +65,6 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
-    RedisConnectionInfo,
     RedisProfileTarget,
     ResourceSlot,
     SessionExecutionStatus,
@@ -120,11 +120,6 @@ def calculate_remaining_time(
         baseline = max(idle_baseline, grace_period_end)
     remaining = baseline - now + timeout_period
     return remaining.total_seconds()
-
-
-async def get_redis_now(redis_obj: RedisConnectionInfo) -> float:
-    t = await redis_helper.execute(redis_obj, lambda r: r.time())
-    return t[0] + (t[1] / (10**6))
 
 
 async def get_db_now(dbconn: SAConnection) -> datetime:
@@ -199,6 +194,8 @@ class IdleCheckerHost:
         config_provider: ManagerConfigProvider,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
+        valkey_live: ValkeyLiveClient,
+        valkey_stat: ValkeyStatClient,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._event_dispatch_checkers: list[AbstractEventDispatcherIdleChecker] = []
@@ -207,22 +204,10 @@ class IdleCheckerHost:
         self._config_provider = config_provider
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._config_provider.config.redis.model_dump()
-        )
-        self._redis_live = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            name="idle.live",
-            db=REDIS_LIVE_DB,
-        )
-        self._redis_stat = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="idle.stat",
-            db=REDIS_STATISTICS_DB,
-        )
-        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
-            self._redis_live
-        )
+        self._valkey_live = valkey_live
+        self._valkey_stat = valkey_stat
+        # NewUserGracePeriodChecker will be initialized in start() method
+        self._grace_period_checker = NewUserGracePeriodChecker(self._valkey_live)
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -263,8 +248,8 @@ class IdleCheckerHost:
         for checker in self._checkers:
             await checker.aclose()
         await self.timer.leave()
-        await self._redis_stat.close()
-        await self._redis_live.close()
+        await self._valkey_stat.close()
+        await self._valkey_live.close()
 
     async def update_app_streaming_status(
         self,
@@ -372,9 +357,9 @@ class IdleCheckerHost:
     ) -> dict[str, Any]:
         return {
             checker.name: {
-                "remaining": await checker.get_checker_result(self._redis_live, session_id),
+                "remaining": await checker.get_checker_result(self._valkey_live, session_id),
                 "remaining_time_type": checker.remaining_time_type.value,
-                "extra": await checker.get_extra_info(self._redis_live, session_id),
+                "extra": await checker.get_extra_info(self._valkey_live, session_id),
             }
             for checker in self._checkers
         }
@@ -397,16 +382,11 @@ class IdleCheckerHost:
 
         key_list = list(key_session_report_map.keys())
 
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
-            for key in key_list:
-                await pipe.get(key)
-            return pipe
+        # Get all reports using ValkeyLiveClient batch operation
+        reports = await self._valkey_live.get_multiple_live_data(key_list)
 
         ret: dict[SessionId, dict[str, ReportInfo]] = {}
-        for key, report in zip(
-            key_list, await redis_helper.execute(self._redis_live, _pipe_builder)
-        ):
+        for key, report in zip(key_list, reports):
             session_id, checker, report_type = key_session_report_map[key]
             if session_id not in ret:
                 ret[session_id] = {}
@@ -430,7 +410,7 @@ class AbstractIdleCheckReporter(ABC):
     report_key: ClassVar[str] = "base"
     extra_info_key: ClassVar[str] = "base_extra"
 
-    def __init__(self, redis_live: RedisConnectionInfo) -> None:
+    def __init__(self, redis_live: ValkeyLiveClient) -> None:
         self._redis_live = redis_live
 
     async def aclose(self) -> None:
@@ -457,14 +437,14 @@ class AbstractIdleCheckReporter(ABC):
 
     @abstractmethod
     async def get_extra_info(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
     @abstractmethod
     async def get_checker_result(
         self,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyLiveClient,
         session_id: SessionId,
     ) -> Optional[float]:
         """
@@ -473,13 +453,10 @@ class AbstractIdleCheckReporter(ABC):
         pass
 
     async def set_remaining_time_report(self, session_id: SessionId, remaining: float) -> None:
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                self.get_report_key(session_id),
-                msgpack.packb(remaining),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-            ),
+        await self._redis_live.store_live_data(
+            self.get_report_key(session_id),
+            msgpack.packb(remaining),
+            ex=int(DEFAULT_CHECK_INTERVAL) * 10,
         )
 
 
@@ -534,19 +511,14 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         )
 
     async def get_extra_info(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
     async def del_remaining_time_report(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> None:
-        await redis_helper.execute(
-            redis_obj,
-            lambda r: r.delete(
-                self.get_report_key(session_id),
-            ),
-        )
+        await redis_obj.delete_live_data(self.get_report_key(session_id))
 
     async def get_grace_period_end(
         self,
@@ -572,19 +544,19 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 
     async def get_checker_result(
         self,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyLiveClient,
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
 @dataclass
 class IdleCheckerArgs:
     event_producer: EventProducer
-    redis_live: RedisConnectionInfo
-    redis_stat: RedisConnectionInfo
+    redis_live: ValkeyLiveClient
+    valkey_stat_client: ValkeyStatClient
 
 
 class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
@@ -595,7 +567,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
         args: IdleCheckerArgs,
     ) -> None:
         self._redis_live = args.redis_live
-        self._redis_stat = args.redis_stat
+        self._valkey_stat_client = args.valkey_stat_client
         self._event_producer = args.event_producer
 
     @override
@@ -647,7 +619,7 @@ UTILIZATION_CHECKER_NAME = "utilization"
 
 @dataclass
 class EventDispatcherIdleCheckerInitArgs:
-    redis_live: RedisConnectionInfo
+    redis_live: ValkeyLiveClient
     idle_timeout: Optional[timedelta] = None
 
 
@@ -655,7 +627,7 @@ DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT: Final[timedelta] = timedelta(minutes=10)
 
 
 class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecker):
-    _redis_live: RedisConnectionInfo
+    _redis_live: ValkeyLiveClient
     _idle_timeout: timedelta
 
     _config_iv = t.Dict(
@@ -719,26 +691,19 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                f"session.{session_id}.last_access",
-                "0",
-                xx=True,
-            ),
+        await self._redis_live.store_live_data(
+            f"session.{session_id}.last_access",
+            "0",
+            xx=True,
         )
 
     async def _update_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
-        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        t = t[0] + (t[1] / (10**6))
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                f"session.{session_id}.last_access",
-                f"{t:.06f}",
-                ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
-            ),
+        timestamp = await self._redis_live.get_server_time()
+        await self._redis_live.store_live_data(
+            f"session.{session_id}.last_access",
+            f"{timestamp:.06f}",
+            ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
         )
 
 
@@ -776,7 +741,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         )
 
     async def get_extra_info(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
@@ -798,21 +763,11 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         if SessionTypes(kernel["session_type"]) == SessionTypes.BATCH:
             return True
 
-        active_streams = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.zcount(
-                f"session.{session_id}.active_app_connections",
-                float("-inf"),
-                float("+inf"),
-            ),
-        )
+        active_streams = await self._redis_live.count_active_connections(session_id)
         if active_streams is not None and active_streams > 0:
             return True
-        now: float = await get_redis_now(self._redis_live)
-        raw_last_access = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(f"session.{session_id}.last_access"),
-        )
+        now = await self._redis_live.get_server_time()
+        raw_last_access = await self._redis_live.get_live_data(f"session.{session_id}.last_access")
         if raw_last_access is None or raw_last_access == "0":
             return True
         last_access = float(raw_last_access)
@@ -839,11 +794,11 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     async def get_checker_result(
         self,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyLiveClient,
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -857,7 +812,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         pass
 
     async def get_extra_info(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
@@ -897,11 +852,11 @@ class SessionLifetimeChecker(BaseIdleChecker):
 
     async def get_checker_result(
         self,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyLiveClient,
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -1038,14 +993,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
         return f"session.{session_id}.{cls.extra_info_key}"
 
     async def get_extra_info(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+        self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         key = self.get_extra_info_key(session_id)
         assert key is not None
-        data = await redis_helper.execute(
-            redis_obj,
-            lambda r: r.get(key),
-        )
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
     def get_time_window(self, policy: Row) -> timedelta:
@@ -1092,15 +1044,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Wait until the time "interval" is passed after the last udpated time.
-        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        util_now: float = t[0] + (t[1] / (10**6))
-        raw_util_last_collected = cast(
-            bytes | None,
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.get(util_last_collected_key),
-            ),
-        )
+        util_now = await self._redis_live.get_server_time()
+        raw_util_last_collected = await self._redis_live.get_live_data(util_last_collected_key)
+
         util_last_collected: float = (
             float(raw_util_last_collected) if raw_util_last_collected else 0.0
         )
@@ -1109,20 +1055,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         raw_util_first_collected = cast(
             bytes | None,
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.get(util_first_collected_key),
-            ),
+            await self._redis_live.get_live_data(util_first_collected_key),
         )
         if raw_util_first_collected is None:
             util_first_collected = util_now
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    util_first_collected_key,
-                    f"{util_now:.06f}",
-                    ex=max(86400, int(self.time_window.total_seconds() * 2)),
-                ),
+            await self._redis_live.store_live_data(
+                util_first_collected_key,
+                f"{util_now:.06f}",
+                ex=max(86400, int(self.time_window.total_seconds() * 2)),
             )
         else:
             util_first_collected = float(raw_util_first_collected)
@@ -1179,7 +1119,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Update utilization time-series data.
         raw_util_series = cast(
             Optional[bytes],
-            await redis_helper.execute(self._redis_live, lambda r: r.get(util_series_key)),
+            await self._redis_live.get_live_data(util_series_key),
         )
 
         def default_util_series() -> dict[str, list[float]]:
@@ -1211,21 +1151,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if util_now - util_first_collected >= time_window.total_seconds():
             do_idle_check = True
 
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                util_series_key,
-                msgpack.packb(util_series),
-                ex=max(86400, int(self.time_window.total_seconds() * 2)),
-            ),
+        await self._redis_live.store_live_data(
+            util_series_key,
+            msgpack.packb(util_series),
+            ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                util_last_collected_key,
-                f"{util_now:.06f}",
-                ex=max(86400, int(self.time_window.total_seconds() * 2)),
-            ),
+        await self._redis_live.store_live_data(
+            util_last_collected_key,
+            f"{util_now:.06f}",
+            ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
 
         def _avg(util_list: list[float]) -> float:
@@ -1245,13 +1179,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
         }
         _key = self.get_extra_info_key(session_id)
         assert _key is not None
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
-                _key,
-                msgpack.packb(report),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-            ),
+        await self._redis_live.store_live_data(
+            _key,
+            msgpack.packb(report),
+            ex=int(DEFAULT_CHECK_INTERVAL) * 10,
         )
 
         if not do_idle_check:
@@ -1290,19 +1221,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
             live_stat = {}
             kernel_counter = 0
             for kernel_id in kernel_ids:
-                raw_live_stat = cast(
-                    bytes | None,
-                    await redis_helper.execute(
-                        self._redis_stat,
-                        lambda r: r.get(str(kernel_id)),
-                    ),
-                )
+                raw_live_stat = await self._valkey_stat_client.get_kernel_statistics(str(kernel_id))
                 if raw_live_stat is None:
                     log.warning(
                         f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
                     )
                     continue
-                live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
+                live_stat = raw_live_stat
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_names_to_check
@@ -1334,11 +1259,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     async def get_checker_result(
         self,
-        redis_obj: RedisConnectionInfo,
+        redis_obj: ValkeyLiveClient,
         session_id: SessionId,
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
-        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
 
@@ -1360,16 +1285,32 @@ async def init_idle_checkers(
     Create an instance of session idleness checker
     from the given configuration.
     """
+    # Create ValkeyLiveClient for dependency injection
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+        config_provider.config.redis.model_dump()
+    )
+    valkey_live = await ValkeyLiveClient.create(
+        redis_profile_target.profile_target(RedisRole.LIVE),
+        human_readable_name="idle.live",
+        db_id=REDIS_LIVE_DB,
+    )
+    valkey_stat = await ValkeyStatClient.create(
+        redis_profile_target.profile_target(RedisRole.STATISTICS),
+        human_readable_name="idle.stat",
+        db_id=REDIS_STATISTICS_DB,
+    )
     checker_host = IdleCheckerHost(
         db,
         config_provider,
         event_producer,
         lock_factory,
+        valkey_live,
+        valkey_stat,
     )
     checker_init_args = IdleCheckerArgs(
         event_producer,
-        checker_host._redis_live,
-        checker_host._redis_stat,
+        checker_host._valkey_live,
+        checker_host._valkey_stat,
     )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
@@ -1384,7 +1325,7 @@ async def init_idle_checkers(
         checker_instance = checker_cls(checker_init_args)
         checker_host.add_checker(checker_instance)
     event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
-        checker_host._redis_live,
+        checker_host._valkey_live,
     )
     for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
         if event_dispatcher_checker_cls.name() in enabled_checker_names:

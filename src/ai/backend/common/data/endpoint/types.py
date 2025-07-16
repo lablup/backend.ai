@@ -1,0 +1,11 @@
+from enum import StrEnum
+
+
+class EndpointStatus(StrEnum):
+    READY = "READY"
+    PROVISIONING = "PROVISIONING"
+    HEALTHY = "HEALTHY"
+    UNHEALTHY = "UNHEALTHY"
+    DESTROYING = "DESTROYING"
+    DESTROYED = "DESTROYED"
+    DEGRADED = "DEGRADED"

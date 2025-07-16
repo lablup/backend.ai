@@ -30,7 +30,7 @@ from ai.backend.common.types import (
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
 )
-from ...errors.exceptions import (
+from ...errors.storage import (
     VFolderOperationFailed,
 )
 from ..base import (

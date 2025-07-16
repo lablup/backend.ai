@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common import msgpack, redis_helper
+from ai.backend.common import msgpack
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
@@ -181,9 +181,8 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+        await checker_host._valkey_live.store_live_data(
+            f"session.{session_id}.last_access", str(last_access)
         )
 
         should_alive = await network_idle_checker.check_idleness(
@@ -192,7 +191,7 @@ async def network_timeout_idle_checker(
             policy,
         )
         remaining = await network_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -235,9 +234,8 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+        await checker_host._valkey_live.store_live_data(
+            f"session.{session_id}.last_access", str(last_access)
         )
 
         should_alive = await network_idle_checker.check_idleness(
@@ -246,7 +244,7 @@ async def network_timeout_idle_checker(
             policy,
         )
         remaining = await network_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -293,9 +291,8 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+        await checker_host._valkey_live.store_live_data(
+            f"session.{session_id}.last_access", str(last_access)
         )
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
@@ -306,7 +303,7 @@ async def network_timeout_idle_checker(
             grace_period_end=grace_period_end,
         )
         remaining = await network_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -353,9 +350,8 @@ async def network_timeout_idle_checker(
         await checker_host.start()
         network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
 
-        await redis_helper.execute(
-            checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+        await checker_host._valkey_live.store_live_data(
+            f"session.{session_id}.last_access", str(last_access)
         )
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
@@ -366,7 +362,7 @@ async def network_timeout_idle_checker(
             grace_period_end=grace_period_end,
         )
         remaining = await network_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -432,7 +428,7 @@ async def session_lifetime_checker(
             policy,
         )
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -477,7 +473,7 @@ async def session_lifetime_checker(
             policy,
         )
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -529,7 +525,7 @@ async def session_lifetime_checker(
             grace_period_end=grace_period_end,
         )
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -581,7 +577,7 @@ async def session_lifetime_checker(
             grace_period_end=grace_period_end,
         )
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -655,10 +651,7 @@ async def utilization_idle_checker__utilization(
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
-    await redis_helper.execute(
-        checker_host._redis_stat,
-        lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
-    )
+    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
     try:
         await checker_host.start()
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
@@ -753,10 +746,7 @@ async def utilization_idle_checker(
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
-    await redis_helper.execute(
-        checker_host._redis_stat,
-        lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
-    )
+    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
     try:
         await checker_host.start()
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
@@ -767,10 +757,10 @@ async def utilization_idle_checker(
             policy,
         )
         remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
         util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -838,10 +828,7 @@ async def utilization_idle_checker(
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
-    await redis_helper.execute(
-        checker_host._redis_stat,
-        lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
-    )
+    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
     try:
         await checker_host.start()
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
@@ -850,10 +837,10 @@ async def utilization_idle_checker(
             kernel, checker_host._db, policy
         )
         remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
         util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()
@@ -921,10 +908,7 @@ async def utilization_idle_checker(
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
-    await redis_helper.execute(
-        checker_host._redis_stat,
-        lambda r: r.set(str(kernel_id), msgpack.packb(live_stat)),
-    )
+    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
     try:
         await checker_host.start()
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
@@ -935,10 +919,10 @@ async def utilization_idle_checker(
             policy,
         )
         remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
         util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._redis_live, session_id
+            checker_host._valkey_live, session_id
         )
     finally:
         await checker_host.shutdown()

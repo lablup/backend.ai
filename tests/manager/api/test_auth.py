@@ -8,7 +8,7 @@ from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
-from ai.backend.manager.errors.exceptions import InvalidAuthParameters
+from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.server import (
     agent_registry_ctx,
     database_ctx,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Callable, Optional, Self
+from typing import Any, Callable, Optional, Self
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.types import (
     ResourcePresetCreator,
 )
@@ -19,9 +20,6 @@ from .base import (
     IDColumn,
     ResourceSlotColumn,
 )
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
@@ -122,6 +120,15 @@ class ResourcePresetRow(Base):
         delete_stmt = sa.delete(ResourcePresetRow)
         delete_stmt = query_option(delete_stmt)
         return await db_session.execute(delete_stmt)
+
+    def to_dataclass(self) -> ResourcePresetData:
+        return ResourcePresetData(
+            id=self.id,
+            name=self.name,
+            resource_slots=self.resource_slots,
+            shared_memory=self.shared_memory,
+            scaling_group_name=self.scaling_group_name,
+        )
 
 
 # For compatibility

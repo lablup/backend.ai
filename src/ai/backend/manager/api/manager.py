@@ -19,7 +19,6 @@ import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
@@ -32,13 +31,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
-from ..errors.exceptions import (
-    GenericBadRequest,
-    InstanceNotFound,
-    InvalidAPIParameters,
-    ServerFrozen,
-    ServiceUnavailable,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
+from ..errors.resource import InstanceNotFound
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from ..models.health import (
     SQLAlchemyConnectionInfo,
@@ -303,10 +298,8 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
 
     scheduler_status = {}
     for event in SchedulerEvent:
-        scheduler_status[event.value] = await redis_helper.execute(
-            root_ctx.redis_live,
-            lambda r: r.hgetall(f"manager.{manager_id}.{event.value}"),
-            encoding="utf-8",
+        scheduler_status[event.value] = await root_ctx.valkey_live.get_scheduler_metadata(
+            f"manager.{manager_id}.{event.value}"
         )
 
     return web.json_response(scheduler_status)

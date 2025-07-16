@@ -3,11 +3,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.services.domain.types import UserInfo
 
 
 @dataclass
 class DeleteDomainAction(DomainAction):
     name: str
+    user_info: UserInfo
 
     @override
     def entity_id(self) -> Optional[str]:

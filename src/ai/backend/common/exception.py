@@ -193,6 +193,7 @@ class ErrorDetail(enum.StrEnum):
     # Client Error
     BAD_REQUEST = "bad-request"
     NOT_FOUND = "not-found"
+    GONE = "gone"  # The resource is gone.
     # Conflict means the request conflicts with the current state of the server.
     CONFLICT = "conflict"
     # Already Exists means the resource already exists.

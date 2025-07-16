@@ -3,12 +3,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
-from ai.backend.manager.services.domain.types import DomainCreator, DomainData
+from ai.backend.manager.services.domain.types import DomainCreator, DomainData, UserInfo
 
 
 @dataclass
 class CreateDomainAction(DomainAction):
     creator: DomainCreator
+    user_info: UserInfo
 
     @override
     def entity_id(self) -> Optional[str]:

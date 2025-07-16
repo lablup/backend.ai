@@ -20,7 +20,7 @@ from ai.backend.common.types import (
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import InstanceNotFound
+from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
 
 from ...models.agent import AgentStatus, agents

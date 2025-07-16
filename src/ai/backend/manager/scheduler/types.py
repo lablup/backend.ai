@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from typing import (
+    TYPE_CHECKING,
     Any,
     Final,
     Generic,
@@ -35,7 +36,9 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from ..registry import AgentRegistry
+
+if TYPE_CHECKING:
+    from ..registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -70,7 +73,7 @@ class SchedulingContext:
     Context for each scheduling decision.
     """
 
-    registry: AgentRegistry
+    registry: "AgentRegistry"
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 

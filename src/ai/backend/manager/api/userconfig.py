@@ -9,11 +9,11 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import (
+from ..errors.api import InvalidAPIParameters
+from ..errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
-    InvalidAPIParameters,
 )
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,

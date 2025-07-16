@@ -20,7 +20,7 @@ from ai.backend.common.container_registry import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
 )
 from ai.backend.manager.models.container_registry import (
@@ -28,12 +28,12 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
 
-from ..errors.exceptions import (
+from ..errors.common import (
     GenericBadRequest,
-    HarborWebhookContainerRegistryRowNotFound,
     InternalServerError,
     ObjectNotFound,
 )
+from ..errors.image import HarborWebhookContainerRegistryRowNotFound
 
 if TYPE_CHECKING:
     from .context import RootContext

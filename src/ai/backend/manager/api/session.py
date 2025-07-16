@@ -37,7 +37,6 @@ import trafaret as t
 from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, Field
-from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -92,11 +91,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
@@ -111,11 +110,8 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.exceptions import (
-    BackendError,
-    InsufficientPrivilege,
-    InvalidAPIParameters,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InsufficientPrivilege
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
@@ -822,7 +818,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
                 agent_id=agent_id,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
     return web.json_response({}, status=HTTPStatus.OK)
@@ -951,16 +947,14 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
-        async def _check_impl(r: Redis):
-            async for agent_id, prev in r.hscan_iter("agent.last_seen"):
-                prev = datetime.fromtimestamp(float(prev), tzutc())
-                if now - prev > timeout:
-                    await root_ctx.event_producer.anycast_event(
-                        AgentTerminatedEvent("agent-lost"),
-                        source_override=agent_id.decode(),
-                    )
-
-        await redis_helper.execute(root_ctx.redis_live, _check_impl)
+        agent_last_seen = await root_ctx.valkey_live.scan_agent_last_seen()
+        for agent_id, prev_timestamp in agent_last_seen:
+            prev = datetime.fromtimestamp(prev_timestamp, tzutc())
+            if now - prev > timeout:
+                await root_ctx.event_producer.anycast_event(
+                    AgentTerminatedEvent("agent-lost"),
+                    source_override=AgentId(agent_id),
+                )
     except asyncio.CancelledError:
         pass
 
@@ -1155,7 +1149,7 @@ async def get_info(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("GET_INFO: exception")
         raise
     return web.json_response(result.result, status=HTTPStatus.OK)
@@ -1181,7 +1175,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("RESTART: exception")
         raise
     except Exception:
@@ -1235,7 +1229,7 @@ async def interrupt(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("INTERRUPT: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1293,7 +1287,7 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
                 service_name=service_name,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1442,7 +1436,7 @@ async def upload_files(request: web.Request) -> web.Response:
                 reader=reader,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception("UPLOAD_FILES: exception")
         raise
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1584,7 +1578,7 @@ async def get_container_logs(
                 kernel_id=kernel_id,
             )
         )
-    except BackendError:
+    except BackendAIError:
         log.exception(
             "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
             requester_access_key,

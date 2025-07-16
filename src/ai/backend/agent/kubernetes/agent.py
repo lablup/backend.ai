@@ -65,6 +65,7 @@ from ..agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
+from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import (
@@ -117,7 +118,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
@@ -135,7 +136,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             restarting=restarting,
         )
         kernel_id = ownership_data.kernel_id
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         rel_scratch_dir = Path(str(kernel_id))  # need relative path for nfs mount
 
         self.scratch_dir = scratch_dir
@@ -260,8 +261,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
+                    uid = self.local_config.container.kernel_uid
+                    gid = self.local_config.container.kernel_gid
                     if os.geteuid() == 0:  # only possible when I am root.
                         os.chown(self.work_dir, uid, gid)
                         os.chown(self.work_dir / ".jupyter", uid, gid)
@@ -544,8 +545,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
+                        uid = self.local_config.container.kernel_uid
+                        gid = self.local_config.container.kernel_gid
                         if os.geteuid() == 0:
                             os.chown(self.work_dir / "bootstrap.sh", uid, gid)
 
@@ -555,8 +556,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 file_path = self.config_dir / file_name
                 file_path.write_text(content)
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
+                    uid = self.local_config.container.kernel_uid
+                    gid = self.local_config.container.kernel_gid
                     if os.geteuid() == 0:
                         os.chown(str(file_path), uid, gid)
 
@@ -645,8 +646,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             while tmp != self.work_dir:
                 tmp.chmod(int(dotfile["perm"], 8))
                 if KernelFeatures.UID_MATCH in self.kernel_features and os.geteuid() == 0:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
+                    uid = self.local_config.container.kernel_uid
+                    gid = self.local_config.container.kernel_gid
                     os.chown(tmp, uid, gid)
                 tmp = tmp.parent
 
@@ -657,7 +658,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
-            agent_config=self.local_config,
+            agent_config=self.local_config.model_dump(by_alias=True),
             service_ports=service_ports,
             resource_spec=resource_spec,
             environ=environ,
@@ -702,7 +703,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         )
 
-        if self.local_config["debug"]["log-kernel-config"]:
+        if self.local_config.debug.log_kernel_config:
             log.debug("Initial container config: {0}", deployment)
 
         expose_service = Service(
@@ -821,7 +822,7 @@ class KubernetesAgent(
     def __init__(
         self,
         etcd: AsyncEtcd,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
@@ -839,7 +840,7 @@ class KubernetesAgent(
 
     async def __ainit__(self) -> None:
         await super().__ainit__()
-        ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+        ipc_base_path = self.local_config.agent.ipc_base_path
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
 
         await self.check_krunner_pv_status()
@@ -850,7 +851,7 @@ class KubernetesAgent(
         # K8s event monitor task initialization
 
     async def check_krunner_pv_status(self):
-        capacity = format(self.local_config["container"]["scratch-size"], "g")[:-1]
+        capacity = format(self.local_config.container.scratch_size, "g")[:-1]
 
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
@@ -871,31 +872,29 @@ class KubernetesAgent(
 
         if len(pv.items) == 0:
             # PV does not exists; create one
-            if self.local_config["container"]["scratch-type"] == "k8s-nfs":
+            if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
                 new_pv = NFSPersistentVolume(
-                    self.local_config["container"]["scratch-nfs-address"],
+                    self.local_config.container.scratch_nfs_address,
                     "backend-ai-static-pv",
                     capacity,
                 )
                 new_pv.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config["container"]["scratch-nfs-address"],
+                    self.local_config.container.scratch_nfs_address,
                 )
                 new_pv.options = [
-                    x.strip()
-                    for x in self.local_config["container"]["scratch-nfs-options"].split(",")
+                    x.strip() for x in self.local_config.container.scratch_nfs_options.split(",")
                 ]
-            elif self.local_config["container"]["scratch-type"] == "hostdir":
+            elif self.local_config.container.scratch_type == ScratchType.HOSTDIR:
                 new_pv = HostPathPersistentVolume(
-                    self.local_config["container"]["scratch-root"].as_posix(),
+                    self.local_config.container.scratch_root.as_posix(),
                     "backend-ai-static-pv",
                     capacity,
                 )
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f"Scratch type {self.local_config['container']['scratch-type']} is not"
-                    " supported",
+                    f"Scratch type {self.local_config.container.scratch_type} is not supported",
                 )
 
             try:
@@ -914,10 +913,10 @@ class KubernetesAgent(
                 "backend-ai-static-pv",
                 capacity,
             )
-            if self.local_config["container"]["scratch-type"] == "k8s-nfs":
+            if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
                 new_pvc.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config["container"]["scratch-nfs-address"],
+                    self.local_config.container.scratch_nfs_address,
                 )
             else:
                 new_pvc.label("backend.ai/backend-ai-scratch-volume", "hostPath")
@@ -966,11 +965,12 @@ class KubernetesAgent(
         return ""
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config)
+        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
 
     async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(
-            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+            self.local_config.model_dump(by_alias=True),
+            {name: cctx.instance for name, cctx in self.computers.items()},
         )
 
     async def extract_command(self, image_ref: str) -> str | None:
@@ -1108,7 +1108,7 @@ class KubernetesAgent(
     ) -> None:
         loop = current_loop()
         if not restarting:
-            scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
+            scratch_dir = self.local_config.container.scratch_root / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
     async def create_local_network(self, network_name: str) -> None:
@@ -1123,7 +1123,7 @@ class KubernetesAgent(
         name: str,
     ) -> bytes:
         loop = current_loop()
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
         return await loop.run_in_executor(
             None,
@@ -1137,11 +1137,15 @@ class KubernetesAgent(
         data: bytes,
     ) -> None:
         loop = current_loop()
-        scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
+
+        def _write_bytes(data: bytes) -> None:
+            (config_dir / name).write_bytes(data)
+
         return await loop.run_in_executor(
             None,
-            (config_dir / name).write_bytes,
+            _write_bytes,
             data,
         )
 

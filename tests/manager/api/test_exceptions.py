@@ -1,13 +1,13 @@
 import json
 import pickle
 
-from ai.backend.common.exception import ErrorCode
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.utils import odict
-from ai.backend.manager.errors.exceptions import BackendAgentError, BackendError
+from ai.backend.manager.errors.kernel import BackendAgentError
 
 
-class TestError(BackendError):
+class TestError(BackendAIError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode.default()

@@ -8,7 +8,7 @@ import aiohttp
 import yarl
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.common import (
     GenericBadRequest,
     InternalServerError,
     ObjectNotFound,

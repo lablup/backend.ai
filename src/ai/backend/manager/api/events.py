@@ -53,7 +53,8 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import GenericForbidden, GroupNotFound
+from ..errors.common import GenericForbidden
+from ..errors.resource import GroupNotFound
 from ..models import UserRole, groups, kernels
 from ..models.session import SessionRow
 from ..models.utils import execute_with_retry

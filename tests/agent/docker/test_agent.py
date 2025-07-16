@@ -218,8 +218,7 @@ async def test_save_last_registry_exception(agent, mocker):
     agent.latest_registry_written_time = MagicMock(return_value=0)
     mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)
     registry_state_path = (
-        agent.local_config["agent"]["var-base-path"]
-        / f"last_registry.{agent.local_instance_id}.dat"
+        agent.local_config.agent.var_base_path / f"last_registry.{agent.local_instance_id}.dat"
     )
     await agent.save_last_registry()
     assert not registry_state_path.exists()

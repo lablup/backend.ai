@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import secrets
+from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
@@ -15,11 +16,9 @@ import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.contexts.user_id import with_user_id
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -29,6 +28,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.utils import with_log_context_fields
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
@@ -42,11 +42,8 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.exceptions import (
-    AuthorizationFailed,
-    InvalidAuthParameters,
-    RejectedByHook,
-)
+from ..errors.auth import AuthorizationFailed, InvalidAuthParameters
+from ..errors.common import RejectedByHook
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
@@ -484,20 +481,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
 
-            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                last_call_time_key = f"kp:{access_key}:last_call_time"
-                await pipe.set(last_call_time_key, now)
-                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -517,21 +501,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             )
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
-
-            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                last_call_time_key = f"kp:{access_key}:last_call_time"
-                await pipe.set(last_call_time_key, now)
-                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -566,9 +536,18 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         # Populate the result to the per-request state dict.
         request.update(auth_result)
 
-    # No matter if authenticated or not, pass-through to the handler.
-    # (if it's required, auth_required decorator will handle the situation.)
-    return await handler(request)
+    with ExitStack() as stack:
+        user_id = request.get("user", {}).get("uuid")
+        if user_id is not None:
+            stack.enter_context(with_user_id(str(user_id)))
+            stack.enter_context(
+                with_log_context_fields({
+                    "user_id": str(user_id),
+                })
+            )
+        # No matter if authenticated or not, pass-through to the handler.
+        # (if it's required, `auth_required` decorator will handle the situation.)
+        return await handler(request)
 
 
 def auth_required(handler):

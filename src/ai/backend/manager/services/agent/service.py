@@ -1,7 +1,6 @@
 import logging
 
 import aiohttp
-import sqlalchemy as sa
 import yarl
 from async_timeout import timeout as _timeout
 
@@ -11,9 +10,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -43,22 +41,22 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentService:
-    _db: ExtendedAsyncSAEngine
     _etcd: AsyncEtcd
     _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
+    _agent_repository: AgentRepository
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
         etcd: AsyncEtcd,
         agent_registry: AgentRegistry,
         config_provider: ManagerConfigProvider,
+        agent_repository: AgentRepository,
     ) -> None:
-        self._db = db
         self._etcd = etcd
         self._agent_registry = agent_registry
         self._config_provider = config_provider
+        self._agent_repository = agent_repository
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -86,10 +84,9 @@ class AgentService:
     ) -> SyncAgentRegistryActionResult:
         agent_id = action.agent_id
         await self._agent_registry.sync_agent_kernel_registry(agent_id)
-        async with self._db.begin_readonly_session() as db_session:
-            agent_row = db_session.scalar(sa.select(AgentRow).where(AgentRow.id == agent_id))
+        agent_data = await self._agent_repository.get_by_id(agent_id)
 
-        return SyncAgentRegistryActionResult(result=None, agent_row=agent_row)
+        return SyncAgentRegistryActionResult(result=None, agent_data=agent_data)
 
     async def get_watcher_status(
         self, action: GetWatcherStatusAction

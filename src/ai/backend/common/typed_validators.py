@@ -289,6 +289,12 @@ class HostPortPair(BaseModel):
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
 
+    def __str__(self) -> str:
+        return self.address
+
+    def __repr__(self) -> str:
+        return self.address
+
     @property
     def address(self) -> str:
         return f"{self.host}:{self.port}"
