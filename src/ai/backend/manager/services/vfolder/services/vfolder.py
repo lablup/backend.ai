@@ -1,6 +1,5 @@
 import uuid
 from typing import (
-    Any,
     Optional,
 )
 
@@ -230,22 +229,23 @@ class VFolderService:
                     options = {}
                     if max_quota_scope_size and max_quota_scope_size > 0:
                         options["initial_max_size_for_quota_scope"] = max_quota_scope_size
-                    body_data: dict[str, Any] = {
-                        "volume": self._storage_manager.get_proxy_and_volume(
-                            folder_host, is_unmanaged(unmanaged_path)
-                        )[1],
-                        "vfid": str(vfid),
-                        "options": options,
-                    }
-                    if vfolder_permission_mode is not None:
-                        body_data["mode"] = vfolder_permission_mode
-                    async with self._storage_manager.request(
-                        folder_host,
-                        "POST",
-                        "folder/create",
-                        json=body_data,
-                    ):
-                        pass
+                    from ai.backend.common.request import FolderCreateRequest
+
+                    proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+                        folder_host, is_unmanaged(unmanaged_path)
+                    )
+                    try:
+                        proxy_info = self._storage_manager._proxies[proxy_name]
+                    except KeyError:
+                        raise ValueError(f"no such storage proxy: {proxy_name!r}")
+
+                    request = FolderCreateRequest(
+                        volume=volume_name,
+                        vfid=str(vfid),
+                        options=options,
+                        mode=vfolder_permission_mode,
+                    )
+                    await proxy_info.client.create_folder(request)
             except aiohttp.ClientResponseError as e:
                 raise VFolderCreationFailure from e
 
