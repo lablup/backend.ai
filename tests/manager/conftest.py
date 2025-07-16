@@ -948,6 +948,15 @@ async def registry_ctx(mocker):
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
+    # Create mock repositories
+    mock_repositories = MagicMock()
+    mock_agent_registry_repository = MagicMock()
+    mock_agent_registry_repository.recalc_agent_resource_usage = AsyncMock()
+    mock_agent_registry_repository.handle_agent_heartbeat = AsyncMock(
+        return_value=(False, None, True)
+    )
+    mock_repositories.agent_registry.repository = mock_agent_registry_repository
+
     registry = AgentRegistry(
         config_provider=mock_config_provider,
         db=mock_db,
@@ -961,6 +970,7 @@ async def registry_ctx(mocker):
         agent_cache=mock_agent_cache,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+        repositories=mock_repositories,
     )
     await registry.init()
     try:
