@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -27,6 +28,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
+    ensure_host_permission_allowed,
     query_accessible_vfolders,
 )
 
@@ -825,3 +827,31 @@ class VfolderRepository:
             cloneable=vfolder_dict["cloneable"],
             status=vfolder_dict["status"],
         )
+
+    @repository_decorator()
+    async def ensure_host_permission_allowed(
+        self,
+        folder_host: str,
+        *,
+        permission: "VFolderHostPermission",
+        allowed_vfolder_types: list[str],
+        user_uuid: uuid.UUID,
+        resource_policy: dict[str, Any],
+        domain_name: str,
+        group_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        """
+        Check if host permission is allowed for the user/group.
+        """
+
+        async with self._db.begin() as conn:
+            await ensure_host_permission_allowed(
+                conn,
+                folder_host,
+                permission=permission,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                group_id=group_id,
+            )
