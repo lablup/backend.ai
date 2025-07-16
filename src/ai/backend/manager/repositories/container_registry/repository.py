@@ -2,12 +2,17 @@ from typing import Optional
 
 import sqlalchemy as sa
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.exceptions import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+
+# Layer-specific decorator for container_registry repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.CONTAINER_REGISTRY)
 
 
 class ContainerRegistryRepository:
@@ -16,6 +21,7 @@ class ContainerRegistryRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def get_by_registry_and_project(
         self,
         registry_name: str,
@@ -27,14 +33,17 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound()
             return result
 
+    @repository_decorator()
     async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
             return await self._get_by_registry_name(session, registry_name)
 
+    @repository_decorator()
     async def get_all(self) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
             return await self._get_all(session)
 
+    @repository_decorator()
     async def clear_images(
         self,
         registry_name: str,
@@ -59,6 +68,7 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound()
             return result
 
+    @repository_decorator()
     async def get_known_registries(self) -> dict[str, str]:
         async with self._db.begin_readonly_session() as session:
             from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -78,6 +88,7 @@ class ContainerRegistryRepository:
 
             return known_registries
 
+    @repository_decorator()
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,

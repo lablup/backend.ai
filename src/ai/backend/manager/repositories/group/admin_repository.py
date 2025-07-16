@@ -4,13 +4,13 @@ import aiotools
 import sqlalchemy as sa
 
 from ai.backend.common.types import VFolderID
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.resource import (
     GroupHasActiveEndpointsError,
     GroupHasActiveKernelsError,
     GroupHasVFoldersMountedError,
     GroupNotFound,
-    VFolderOperationFailed,
 )
+from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.routing import RoutingRow

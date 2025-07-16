@@ -2,10 +2,15 @@ from typing import Any, Mapping
 
 import sqlalchemy as sa
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.errors.exceptions import ObjectNotFound
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+# Layer-specific decorator for keypair_resource_policy repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.KEYPAIR_RESOURCE_POLICY)
 
 
 class KeypairResourcePolicyRepository:
@@ -14,6 +19,7 @@ class KeypairResourcePolicyRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def create(self, fields: Mapping[str, Any]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             db_row = KeyPairResourcePolicyRow(**fields)
@@ -21,6 +27,7 @@ class KeypairResourcePolicyRepository:
             await db_sess.flush()
             return db_row.to_dataclass()
 
+    @repository_decorator()
     async def get_by_name(self, name: str) -> KeyPairResourcePolicyData:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
@@ -30,6 +37,7 @@ class KeypairResourcePolicyRepository:
                 raise ObjectNotFound(f"Keypair resource policy with name {name} not found.")
             return row.to_dataclass()
 
+    @repository_decorator()
     async def update(self, name: str, fields: Mapping[str, Any]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
@@ -42,6 +50,7 @@ class KeypairResourcePolicyRepository:
             await db_sess.flush()
             return row.to_dataclass()
 
+    @repository_decorator()
     async def delete(self, name: str) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)

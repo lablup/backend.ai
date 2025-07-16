@@ -5,8 +5,10 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     UserCreationError,
 )
@@ -15,6 +17,9 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import UserRow, check_credential, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
+# Layer-specific decorator for auth repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.AUTH)
+
 
 class AuthRepository:
     _db: ExtendedAsyncSAEngine
@@ -22,6 +27,7 @@ class AuthRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def get_user_by_email_validated(self, email: str, domain_name: str) -> Optional[UserData]:
         async with self._db.begin() as conn:
             row = await self._get_user_by_email(conn, email, domain_name)
@@ -40,6 +46,7 @@ class AuthRepository:
         result = await session.execute(query)
         return result.first()
 
+    @repository_decorator()
     async def get_group_membership_validated(
         self, group_id: UUID, user_id: UUID
     ) -> GroupMembershipData:
@@ -68,6 +75,7 @@ class AuthRepository:
             return None
         return GroupMembershipData(group_id=row.group_id, user_id=row.user_id)
 
+    @repository_decorator()
     async def check_email_exists(self, email: str) -> bool:
         async with self._db.begin() as conn:
             query = sa.select([users.c.email]).select_from(users).where(users.c.email == email)
@@ -75,6 +83,7 @@ class AuthRepository:
             row = result.first()
             return row is not None
 
+    @repository_decorator()
     async def create_user_with_keypair(
         self,
         user_data: dict,
@@ -114,6 +123,7 @@ class AuthRepository:
 
             return self._user_row_to_data(user_row)
 
+    @repository_decorator()
     async def update_user_full_name_validated(
         self, email: str, domain_name: str, full_name: str
     ) -> bool:
@@ -127,6 +137,7 @@ class AuthRepository:
             await conn.execute(update_query)
             return True
 
+    @repository_decorator()
     async def update_user_password_validated(self, email: str, password: str) -> None:
         async with self._db.begin() as conn:
             data = {
@@ -137,6 +148,7 @@ class AuthRepository:
             query = users.update().values(data).where(users.c.email == email)
             await conn.execute(query)
 
+    @repository_decorator()
     async def update_user_password_by_uuid_validated(
         self, user_uuid: UUID, password: str
     ) -> datetime:
@@ -155,6 +167,7 @@ class AuthRepository:
             result = await conn.execute(query)
             return result.scalar()
 
+    @repository_decorator()
     async def deactivate_user_and_keypairs_validated(self, email: str) -> None:
         async with self._db.begin() as conn:
             # Deactivate user
@@ -167,6 +180,7 @@ class AuthRepository:
             )
             await conn.execute(keypair_query)
 
+    @repository_decorator()
     async def get_ssh_public_key_validated(self, access_key: str) -> Optional[str]:
         async with self._db.begin() as conn:
             query = sa.select([keypairs.c.ssh_public_key]).where(
@@ -174,6 +188,7 @@ class AuthRepository:
             )
             return await conn.scalar(query)
 
+    @repository_decorator()
     async def update_ssh_keypair_validated(
         self, access_key: str, public_key: str, private_key: str
     ) -> None:
@@ -207,6 +222,7 @@ class AuthRepository:
             sudo_session_enabled=row.sudo_session_enabled,
         )
 
+    @repository_decorator()
     async def check_credential_validated(
         self, domain_name: str, email: str, password: str
     ) -> Optional[dict]:
@@ -217,10 +233,12 @@ class AuthRepository:
             password=password,
         )
 
+    @repository_decorator()
     async def get_user_row_by_uuid_validated(self, user_uuid) -> Optional[UserRow]:
         async with self._db.begin_session() as db_session:
             return await UserRow.query_user_by_uuid(user_uuid, db_session)
 
+    @repository_decorator()
     async def get_current_time_validated(self) -> datetime:
         async with self._db.begin_readonly() as db_conn:
             return await db_conn.scalar(sa.select(sa.func.now()))

@@ -4,7 +4,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.errors.exceptions import DomainDataProcessingError
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.errors.resource import DomainDataProcessingError
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -24,6 +26,9 @@ from ai.backend.manager.services.domain.types import (
     UserInfo,
 )
 
+# Layer-specific decorator for domain repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.DOMAIN)
+
 
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
@@ -31,6 +36,7 @@ class DomainRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def create_domain_validated(self, creator: DomainCreator) -> DomainData:
         """
         Creates a new domain with model-store group.
@@ -55,6 +61,7 @@ class DomainRepository:
             raise DomainDataProcessingError("Failed to convert domain row to DomainData")
         return result
 
+    @repository_decorator()
     async def modify_domain_validated(
         self, domain_name: str, modifier: DomainModifier
     ) -> Optional[DomainData]:
@@ -78,6 +85,7 @@ class DomainRepository:
 
         return DomainData.from_row(row)
 
+    @repository_decorator()
     async def soft_delete_domain_validated(self, domain_name: str) -> bool:
         """
         Soft deletes a domain by setting is_active to False.
@@ -90,6 +98,7 @@ class DomainRepository:
             result = await conn.execute(update_query)
             return result.rowcount > 0
 
+    @repository_decorator()
     async def purge_domain_validated(self, domain_name: str) -> bool:
         """
         Permanently deletes a domain after validation checks.
@@ -116,6 +125,7 @@ class DomainRepository:
             result = await conn.execute(delete_query)
             return result.rowcount > 0
 
+    @repository_decorator()
     async def create_domain_node_validated(
         self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
@@ -151,6 +161,7 @@ class DomainRepository:
                 )
             return result
 
+    @repository_decorator()
     async def modify_domain_node_validated(
         self,
         domain_name: str,
@@ -249,6 +260,7 @@ class DomainRepository:
         query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
         return await conn.scalar(query)
 
+    @repository_decorator()
     async def create_domain_node_with_permissions(
         self,
         creator: DomainCreator,
@@ -270,6 +282,7 @@ class DomainRepository:
         async with self._db.connect() as db_conn:
             return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
 
+    @repository_decorator()
     async def modify_domain_node_with_permissions(
         self,
         domain_name: str,

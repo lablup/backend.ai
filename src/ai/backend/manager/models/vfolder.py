@@ -65,9 +65,9 @@ from ..defs import (
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ..errors.exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import ObjectNotFound
+from ..errors.storage import (
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,

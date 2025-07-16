@@ -9,16 +9,21 @@ import msgpack
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import GroupNotFound
+from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
+
+# Layer-specific decorator for group repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -43,6 +48,7 @@ class GroupRepository:
         result = await session.execute(sa.select(GroupRow).where(groups.c.id == group_id))
         return result.scalar_one_or_none()
 
+    @repository_decorator()
     async def create(self, creator: GroupCreator) -> GroupData:
         """Create a new group."""
         data = creator.fields_to_store()
@@ -55,6 +61,7 @@ class GroupRepository:
                 raise GroupNotFound()
             return group_data
 
+    @repository_decorator()
     async def modify_validated(
         self,
         group_id: uuid.UUID,
@@ -101,6 +108,7 @@ class GroupRepository:
             # If only user updates were performed, return None
             return None
 
+    @repository_decorator()
     async def mark_inactive(self, group_id: uuid.UUID) -> bool:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
@@ -116,6 +124,7 @@ class GroupRepository:
                 return True
             raise GroupNotFound()
 
+    @repository_decorator()
     async def get_container_stats_for_period(
         self,
         start_date: datetime,
@@ -297,6 +306,7 @@ class GroupRepository:
                 objs_per_group[group_id]["c_infos"].append(c_info)
         return list(objs_per_group.values())
 
+    @repository_decorator()
     async def fetch_project_resource_usage(
         self,
         start_date: datetime,

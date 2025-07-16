@@ -17,10 +17,9 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.exceptions import (
-    Forbidden,
-    ObjectNotFound,
-    ProjectNotFound,
+from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderCreationFailure,
     VFolderFilterStatusFailed,

@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.errors.exceptions import VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,

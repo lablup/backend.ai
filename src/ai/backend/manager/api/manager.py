@@ -31,13 +31,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
-from ..errors.exceptions import (
-    GenericBadRequest,
-    InstanceNotFound,
-    InvalidAPIParameters,
-    ServerFrozen,
-    ServiceUnavailable,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
+from ..errors.resource import InstanceNotFound
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from ..models.health import (
     SQLAlchemyConnectionInfo,

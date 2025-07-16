@@ -62,7 +62,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.exception import ErrorCode
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -142,11 +142,10 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .errors.exceptions import (
-    BackendError,
+from .errors.api import InvalidAPIParameters
+from .errors.common import (
     GenericBadRequest,
     InternalServerError,
-    InvalidAPIParameters,
     MethodNotAllowed,
     URLNotFound,
 )
@@ -327,7 +326,7 @@ def _debug_error_response(
     error_message = "Internal server error"
     status_code = 500
     error_code = ErrorCode.default()
-    if isinstance(e, BackendError):
+    if isinstance(e, BackendAIError):
         error_type = e.error_type
         error_title = e.error_title
         if e.extra_msg:
@@ -368,7 +367,7 @@ async def exception_middleware(
             raise InvalidAPIParameters(ex.args[0])
         else:
             raise InvalidAPIParameters()
-    except BackendError as ex:
+    except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
                 "client error raised inside handlers: ({} {}): {}", method, endpoint, repr(ex)

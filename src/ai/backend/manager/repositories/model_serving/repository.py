@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
@@ -24,7 +26,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingGroupData,
     UserData,
 )
-from ai.backend.manager.errors.exceptions import EndpointNotFound
+from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -50,6 +52,9 @@ from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParam
 from ai.backend.manager.services.model_serving.types import MutationResult
 from ai.backend.manager.types import MountOptionModel, UserScope
 
+# Layer-specific decorator for model_serving repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.MODEL_SERVING)
+
 if TYPE_CHECKING:
     from ai.backend.manager.registry import AgentRegistry
 
@@ -60,6 +65,7 @@ class ModelServingRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def get_endpoint_by_id_validated(
         self, endpoint_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> Optional[EndpointData]:
@@ -80,6 +86,7 @@ class ModelServingRepository:
             data = EndpointData.from_row(endpoint)
         return data
 
+    @repository_decorator()
     async def get_endpoint_by_name_validated(
         self, name: str, user_id: uuid.UUID
     ) -> Optional[EndpointData]:
@@ -94,6 +101,7 @@ class ModelServingRepository:
             data = EndpointData.from_row(endpoint)
         return data
 
+    @repository_decorator()
     async def list_endpoints_by_owner_validated(
         self, session_owner_id: uuid.UUID, name: Optional[str] = None
     ) -> list[EndpointData]:
@@ -117,6 +125,7 @@ class ModelServingRepository:
             data_list = [EndpointData.from_row(row) for row in rows]
         return data_list
 
+    @repository_decorator()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
         """
         Check if endpoint name is unique (not already taken by non-destroyed endpoints).
@@ -131,6 +140,7 @@ class ModelServingRepository:
             existing_endpoint = result.scalar()
             return existing_endpoint is None
 
+    @repository_decorator()
     async def create_endpoint_validated(self, endpoint_row: EndpointRow) -> EndpointData:
         """
         Create a new endpoint after validation.
@@ -142,6 +152,7 @@ class ModelServingRepository:
             data = EndpointData.from_row(endpoint_row)
         return data
 
+    @repository_decorator()
     async def update_endpoint_lifecycle_validated(
         self,
         endpoint_id: uuid.UUID,
@@ -175,6 +186,7 @@ class ModelServingRepository:
             await session.execute(query)
         return True
 
+    @repository_decorator()
     async def clear_endpoint_errors_validated(
         self, endpoint_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> bool:
@@ -204,6 +216,7 @@ class ModelServingRepository:
             await session.execute(query)
         return True
 
+    @repository_decorator()
     async def get_route_by_id_validated(
         self,
         route_id: uuid.UUID,
@@ -229,6 +242,7 @@ class ModelServingRepository:
             data = RoutingData.from_row(route)
         return data
 
+    @repository_decorator()
     async def update_route_traffic_validated(
         self,
         route_id: uuid.UUID,
@@ -265,6 +279,7 @@ class ModelServingRepository:
             data = EndpointData.from_row(endpoint)
         return data
 
+    @repository_decorator()
     async def decrease_endpoint_replicas_validated(
         self, service_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> bool:
@@ -288,6 +303,7 @@ class ModelServingRepository:
             await session.execute(query)
         return True
 
+    @repository_decorator()
     async def create_endpoint_token_validated(
         self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> Optional[EndpointTokenData]:
@@ -309,6 +325,7 @@ class ModelServingRepository:
             data = EndpointTokenData.from_row(token_row)
         return data
 
+    @repository_decorator()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
         """
         Get scaling group information (wsproxy details).
@@ -328,6 +345,7 @@ class ModelServingRepository:
                 wsproxy_addr=row["wsproxy_addr"], wsproxy_api_token=row["wsproxy_api_token"]
             )
 
+    @repository_decorator()
     async def get_user_by_id(self, user_id: uuid.UUID) -> Optional[UserData]:
         """
         Get user information by ID.
@@ -406,6 +424,7 @@ class ModelServingRepository:
             case _:
                 return endpoint.session_owner == user_id
 
+    @repository_decorator()
     async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderRow]:
         """
         Get VFolder by ID.
@@ -413,6 +432,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await VFolderRow.get(session, vfolder_id)
 
+    @repository_decorator()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Optional[Any]:
         """
         Get user with their main access key.
@@ -424,6 +444,7 @@ class ModelServingRepository:
             result = await session.execute(query)
             return result.fetchone()
 
+    @repository_decorator()
     async def get_keypair_resource_policy(self, policy_name: str) -> Optional[Any]:
         """
         Get keypair resource policy by name.
@@ -437,6 +458,7 @@ class ModelServingRepository:
             result = await session.execute(query)
             return result.first()
 
+    @repository_decorator()
     async def get_endpoint_for_appproxy_update(
         self, service_id: uuid.UUID
     ) -> Optional[EndpointRow]:
@@ -446,6 +468,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
 
+    @repository_decorator()
     async def get_route_with_session(self, route_id: uuid.UUID) -> Optional[RoutingRow]:
         """
         Get route with endpoint and session data loaded.
@@ -455,6 +478,7 @@ class ModelServingRepository:
                 session, route_id, load_endpoint=True, load_session=True
             )
 
+    @repository_decorator()
     async def update_endpoint_replicas_validated(
         self,
         endpoint_id: uuid.UUID,
@@ -483,6 +507,7 @@ class ModelServingRepository:
             await session.execute(query)
         return True
 
+    @repository_decorator()
     async def get_auto_scaling_rule_by_id_validated(
         self,
         rule_id: uuid.UUID,
@@ -509,6 +534,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return None
 
+    @repository_decorator()
     async def create_auto_scaling_rule_validated(
         self,
         endpoint_id: uuid.UUID,
@@ -552,6 +578,7 @@ class ModelServingRepository:
             )
             return rule
 
+    @repository_decorator()
     async def update_auto_scaling_rule_validated(
         self,
         rule_id: uuid.UUID,
@@ -585,6 +612,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return None
 
+    @repository_decorator()
     async def delete_auto_scaling_rule_validated(
         self,
         rule_id: uuid.UUID,
@@ -612,6 +640,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return False
 
+    @repository_decorator()
     async def resolve_group_id(
         self, domain_name: str, group_name_or_id: str | uuid.UUID
     ) -> Optional[uuid.UUID]:
@@ -623,6 +652,7 @@ class ModelServingRepository:
             assert conn is not None
             return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
 
+    @repository_decorator()
     async def get_session_by_id(
         self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
     ) -> Optional[SessionRow]:
@@ -637,6 +667,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return None
 
+    @repository_decorator()
     async def update_appproxy_endpoint_routes(
         self, agent_registry: "AgentRegistry", endpoint_row: EndpointRow
     ) -> None:
@@ -653,6 +684,7 @@ class ModelServingRepository:
                 db_sess, endpoint_row, healthy_routes
             )
 
+    @repository_decorator()
     async def resolve_image_for_endpoint_creation(
         self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
     ) -> ImageRow:
@@ -664,6 +696,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await ImageRow.resolve(session, identifiers)
 
+    @repository_decorator()
     async def modify_endpoint(
         self,
         action: ModifyEndpointAction,

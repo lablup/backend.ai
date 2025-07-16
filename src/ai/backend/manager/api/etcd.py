@@ -22,7 +22,7 @@ from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_container_registries
 
-from ..errors.exceptions import InvalidAPIParameters
+from ..errors.api import InvalidAPIParameters
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
 from .types import CORSOptions, WebMiddleware

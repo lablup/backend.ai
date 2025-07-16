@@ -42,11 +42,8 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.exceptions import (
-    AuthorizationFailed,
-    InvalidAuthParameters,
-    RejectedByHook,
-)
+from ..errors.auth import AuthorizationFailed, InvalidAuthParameters
+from ..errors.common import RejectedByHook
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware

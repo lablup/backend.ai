@@ -13,7 +13,8 @@ from ai.backend.common import validators as tx
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import InvalidAPIParameters, TaskTemplateNotFound
+from ..errors.api import InvalidAPIParameters
+from ..errors.resource import TaskTemplateNotFound
 from ..models import (
     TemplateType,
     UserRole,

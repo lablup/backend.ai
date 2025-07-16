@@ -10,10 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.decorators import create_layer_aware_repository_decorator
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.exceptions import UserNotFound
+from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
@@ -22,6 +24,9 @@ from ai.backend.manager.models.user import UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.type import UserData
 
+# Layer-specific decorator for user repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
+
 
 class UserRepository:
     _db: ExtendedAsyncSAEngine
@@ -29,6 +34,7 @@ class UserRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def get_by_email_validated(
         self, email: str, requester_uuid: Optional[UUID]
     ) -> Optional[UserData]:
@@ -44,6 +50,7 @@ class UserRepository:
                 return None
             return UserData.from_row(user_row)
 
+    @repository_decorator()
     async def get_by_uuid_validated(
         self, user_uuid: UUID, requester_uuid: Optional[UUID]
     ) -> Optional[UserData]:
@@ -59,6 +66,7 @@ class UserRepository:
                 return None
             return UserData.from_row(user_row)
 
+    @repository_decorator()
     async def create_user_validated(self, user_data: dict, group_ids: list[str]) -> UserData:
         """
         Create a new user with default keypair and group associations.
@@ -107,6 +115,7 @@ class UserRepository:
             raise RuntimeError("Failed to convert created user row to UserData")
         return res
 
+    @repository_decorator()
     async def update_user_validated(
         self,
         email: str,
@@ -165,6 +174,7 @@ class UserRepository:
             raise RuntimeError("Failed to convert updated user row to UserData")
         return res
 
+    @repository_decorator()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
@@ -341,6 +351,7 @@ class UserRepository:
             values = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
             await conn.execute(sa.insert(association_groups_users).values(values))
 
+    @repository_decorator()
     async def get_user_time_binned_monthly_stats(
         self,
         user_uuid: UUID,

@@ -42,7 +42,8 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import VolumesConfig
 
-from ..errors.exceptions import InvalidAPIParameters, VFolderGone, VFolderOperationFailed
+from ..errors.api import InvalidAPIParameters
+from ..errors.storage import VFolderGone, VFolderOperationFailed
 from ..exceptions import InvalidArgument
 from .base import Item, PaginatedList
 from .rbac import (

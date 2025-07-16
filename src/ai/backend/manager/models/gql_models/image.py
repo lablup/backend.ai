@@ -77,7 +77,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from ...data.image.types import ImageStatus, ImageType
 from ...defs import DEFAULT_IMAGE_ARCH
-from ...errors.exceptions import ImageNotFound
+from ...errors.image import ImageNotFound
 from ..base import (
     FilterExprArg,
     OrderExprArg,

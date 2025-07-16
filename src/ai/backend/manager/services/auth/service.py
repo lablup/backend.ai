@@ -11,18 +11,20 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
-from ai.backend.manager.errors.exceptions import (
+from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
-    GenericBadRequest,
-    GenericForbidden,
     GroupMembershipNotFoundError,
-    InternalServerError,
-    ObjectNotFound,
     PasswordExpired,
-    RejectedByHook,
     UserCreationError,
     UserNotFound,
+)
+from ai.backend.manager.errors.common import (
+    GenericBadRequest,
+    GenericForbidden,
+    InternalServerError,
+    ObjectNotFound,
+    RejectedByHook,
 )
 from ai.backend.manager.models.keypair import (
     generate_keypair,
