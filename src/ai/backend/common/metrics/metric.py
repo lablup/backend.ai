@@ -425,6 +425,11 @@ class LayerType(enum.StrEnum):
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
 
+    # Client layers
+    AGENT_CLIENT = "agent_client"
+    STORAGE_PROXY_CLIENT = "storage_proxy_client"
+    WSPROXY_CLIENT = "wsproxy_client"
+
 
 # Backward compatibility
 ClientType = DomainType
