@@ -7,13 +7,24 @@ password = ""				    # env: BACKEND_ETCD_PASSWORD
 
 [storage-proxy]
 # An identifier of this storage proxy, which must be unique in a cluster.
-node-id = "i-storage-proxy-local"
-num-proc = 1
+node-id = "i-storage-proxy-01"
+num-proc = 4
+# The PID file for systemd or other daemon managers to keep track of.
 # pid-file = "./storage-proxy.pid"
 event-loop = "uvloop"
 
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
 # ipc-base-path = "/tmp/backend.ai/ipc"
+
+# The maximum number of directory entries to return upon
+# a scandir operation to prevent excessive loads/delays on filesystems.
+# Settings it zero means no limit.
 scandir-limit = 1000
+
+# The maximum allowed size of a single upload session.
 max-upload-size = "100g"
 
 # Used to generate JWT tokens for download/upload sessions
@@ -55,13 +66,16 @@ ssl-enabled = false
 
 [api.manager]
 # Manager-facing API
+# Recommended to have SSL and bind on a private IP only accessible by managers
 service-addr = { host = "0.0.0.0", port = 6022 }
+# Set the internal hostname/port to accept internal API requests.
 internal-addr = { host = "0.0.0.0", port = 16023 }
-ssl-enabled = false
-# ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
-# ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
-secret = "some-secret-shared-with-manager"
+ssl-enabled = true
+ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
+ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
 
+# Used to authenticate managers
+secret = "some-secret-shared-with-manager"
 
 [pyroscope]
 enabled = true
@@ -69,16 +83,28 @@ app-name = "backendai-half-storage-proxy"
 server-addr = "http://localhost:4040"
 sample-rate = 100
 
-
 [debug]
+# Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
 enabled = false
+
+# Enable or disable the asyncio debug mode.
 asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
 enhanced-aiomonitor-task-info = false
+
+# Enable logging events from EventProducer and EventDispatcher
 log-events = true
 
 
 [logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
 level = "INFO"
+
+# Multi-choice of: "console", "logstash", "file"
+# For each choice, there must be a "logging.<driver>" section
+# in this config file as exemplified below.
 drivers = ["console"]
 
 [logging.pkg-ns]
@@ -93,14 +119,104 @@ drivers = ["console"]
 colored = true
 
 # One of: "simple", "verbose"
-format = "verbose"
+format = "simple"
 
 
 [volume]
+# volume section may define one or more named subsections with
+# backend-specific configurations.
+# It is your job to prepare the "/vfroot" directory and its inner mount
+# points from actual storage devices or using local partitions.
 
-[volume.volume1]
+
+[volume.local]
+# The default, generic filesystem.
+# It uses the standard syscalls to perform filesystem operations
+# such as scanning the file/directory metadata.
+# This does *NOT* support per-directory quota.
 backend = "vfs"
-path = "vfolder/local/volume1"
+path = "/vfroot/vfs"
+
+
+[volume.fastlocal]
+# An extended version for XFS, which supports per-directory quota
+# based on xfs projects.
+backend = "xfs"
+path = "/vfroot/xfs"
+
+
+[volume.mypure]
+# An extended version for PureStorage FlashBlade nodes, which uses
+# RapidFile Tools to perform filesystem metadata queries and the
+# FB REST APIs to configure per-directory quota.
+backend = "purestorage"
+path = "/vfroot/fb1"
+
+[volume.mypure.options]
+purity_endpoint = "https://pure01.example.com"
+purity_ssl_verify = false
+purity_api_token = "T-11111111-2222-3333-4444-000000000000"
+purity_api_version = "1.8"
+purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
+
+
+[volume.myceph]
+# An extended version for CephFS, which supports extended inode attributes
+# for per-directory quota and fast metadata queries.
+backend = "cephfs"
+path = "/mnt/vfroot/ceph-fuse"
+
+[volume.netapp]
+backend = "netapp"
+path = "/vfroot/netapp"
+
+[volume.netapp.options]
+# Must set storage-proxy.user and storage-proxy.group to a valid Netapp user and group id
+netapp_ontap_endpoint = "https://netapp.example.com"
+netapp_ontap_user = "admin-username"
+netapp_ontap_password = "admin-passwd"
+netapp_svm = "svm-name"
+netapp_volume_name = "netapp-volume-name"
+netapp_xcp_cmd = ["/home/user/xcp/linux/xcp"]
+# For containerized xcp: netapp_xcp_cmd = ["docker", "exec", "netapp-xcp", "xcp"]
+netapp_nfs_host = "xcp-hostname"
+
+[volume.weka]
+backend = "weka"
+path = "/vfroot/weka"
+
+[volume.weka.options]
+weka_endpoint = "https://wekaio.example.com"  # Endpoint to Weka.IO API
+weka_username = ""  # Weka.IO Username
+weka_password = ""  # Weka.IO Password
+weka_organization = ""  # Weka.IO Organization
+weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`
+weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context
+
+[volume.gpfs]
+backend = "spectrumscale"
+path = "/gpfs/example_fs"
+
+[volume.gpfs.options]
+gpfs_endpoint = "https://gpfs.example.com"  # Endpoint to Spectrum Scale API
+gpfs_username = "admin"  # Spectrum Scale GUI Username
+gpfs_password = "admin"  # Spectrum Scale GUI Password
+gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
+gpfs_verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
+gpfs_owner = "1000:1000"  # Default ownership to created fileset
+
+[volume.vast]
+backend = "vast"
+path = "/vfroot/vast"
+
+[volume.vast.options]
+vast_endpoint = "https://vast.example.com"  # Endpoint to Vast mgmt system API
+vast_username = ""  # Vast mgmt system Username
+vast_password = ""  # Vast mgmt system Password
+vast_verify_ssl = false # If set to true, allow to communicate to server with insecure ssl context. Defaults to false.
+vast_api_version = "v2" # Vast mgmt system API version. Defaults to `v2`
+vast_cluster_id = 1 # Vast mgmt system Cluster ID
+vast_storage_base_dir = "/" # Vast storage base directory that is mounted to our volume base path
 
 [otel]
 enabled = true

@@ -5,7 +5,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
@@ -14,6 +13,9 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationData,
     VFolderListResult,
     VFolderPermissionData,
+)
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound

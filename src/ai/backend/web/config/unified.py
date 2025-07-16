@@ -11,6 +11,7 @@ from pydantic import (
     Field,
     FilePath,
     HttpUrl,
+    field_validator,
 )
 
 from ai.backend.common.typed_validators import (
@@ -364,6 +365,11 @@ class ServiceConfig(BaseModel):
         validation_alias=AliasChoices("default_file_browser_image", "default-file-browser-image"),
         serialization_alias="default-file-browser-image",
     )
+
+    @field_validator("static_path")
+    @classmethod
+    def resolve_static_path(cls, v: Path) -> Path:
+        return v.resolve()
 
 
 class CSPConfig(BaseModel):
@@ -808,7 +814,7 @@ class RedisHelperConfig(BaseModel):
         """,
         examples=[5.0, 10.0],
         validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
-        serialization_alias="socket-timeout",
+        serialization_alias="socket_timeout",
     )
     socket_connect_timeout: float = Field(
         default=2.0,
@@ -817,7 +823,7 @@ class RedisHelperConfig(BaseModel):
         """,
         examples=[2.0, 5.0],
         validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
-        serialization_alias="socket-connect-timeout",
+        serialization_alias="socket_connect_timeout",
     )
     reconnect_poll_timeout: float = Field(
         default=0.3,
@@ -826,7 +832,7 @@ class RedisHelperConfig(BaseModel):
         """,
         examples=[0.3, 1.0],
         validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
-        serialization_alias="reconnect-poll-timeout",
+        serialization_alias="reconnect_poll_timeout",
     )
 
 
@@ -874,7 +880,7 @@ class RedisConfig(BaseModel):
         Redis helper configuration.
         """,
         validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis-helper-config",
+        serialization_alias="redis_helper_config",
     )
 
 

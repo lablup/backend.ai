@@ -5,12 +5,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 
-from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions, find_dependent_sessions
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups

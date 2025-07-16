@@ -806,7 +806,7 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
-            await self.schedule_repository._finalize_single_node_session(
+            await self.schedule_repository.finalize_single_node_session(
                 sess_ctx.id, sgroup_name, agent_alloc_ctx
             )
 
