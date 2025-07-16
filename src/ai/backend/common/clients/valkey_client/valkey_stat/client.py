@@ -1130,6 +1130,3 @@ class ValkeyStatClient:
 
     def _container_log_key(self, container_id: str) -> str:
         return f"containerlog.{container_id}"
-
-    def _create_batch(self, is_atomic: bool = False) -> Batch:
-        return Batch(is_atomic=is_atomic)
