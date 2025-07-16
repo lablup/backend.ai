@@ -55,7 +55,7 @@ class DomainCreator(Creator):
     description: Optional[str] = None
     is_active: Optional[bool] = None
     total_resource_slots: Optional[ResourceSlot] = None
-    allowed_vfolder_hosts: Optional[dict[str, str]] = None
+    allowed_vfolder_hosts: Optional[dict[str, list[str]]] = None
     allowed_docker_registries: Optional[list[str]] = None
     integration_id: Optional[str] = None
     dotfiles: Optional[bytes] = None
@@ -86,7 +86,9 @@ class DomainModifier(PartialModifier):
     description: TriState[str] = field(default_factory=TriState.nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState.nop)
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(default_factory=OptionalState.nop)
+    allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = field(
+        default_factory=OptionalState.nop
+    )
     allowed_docker_registries: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
     integration_id: TriState[str] = field(default_factory=TriState.nop)
 
@@ -108,8 +110,8 @@ class DomainNodeModifier(PartialModifier):
     description: TriState[str] = field(default_factory=TriState[str].nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=OptionalState[dict[str, str]].nop
+    allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = field(
+        default_factory=OptionalState[dict[str, list[str]]].nop
     )
     allowed_docker_registries: OptionalState[list[str]] = field(
         default_factory=OptionalState[list[str]].nop
