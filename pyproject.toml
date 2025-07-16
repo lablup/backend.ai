@@ -61,6 +61,11 @@ underlines = ["", "", ""]
     name = "Miscellaneous"
     showcontent = true
 
+[[tool.towncrier.type]]
+    directory = "test"
+    name = "Test Updates"
+    showcontent = true
+
 [tool.pytest.ini_options]
 testpaths = "tests"
 markers = [
