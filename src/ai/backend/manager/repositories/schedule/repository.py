@@ -480,6 +480,7 @@ class ScheduleRepository:
             )
             await session.execute(query)
 
+    @repository_decorator()
     async def finalize_single_node_session(
         self,
         session_id: SessionId,
