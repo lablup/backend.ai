@@ -28,11 +28,11 @@ from ai.backend.manager.models.session import (
     QueryOption,
     RelatedFields,
     SessionRow,
-    and_status,
-    and_user_id,
-    join_related_field,
+    by_status,
+    by_user_id,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
@@ -108,12 +108,12 @@ class AdminUserRepository:
         Admin-only operation that bypasses ownership validation.
         """
         query_conditions: list[QueryCondition] = [
-            and_user_id(user_uuid),
-            and_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+            by_user_id(user_uuid),
+            by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
         ]
 
         query_options: list[QueryOption] = [
-            join_related_field(RelatedFields.USER),
+            join_by_related_field(RelatedFields.USER),
         ]
 
         return await SessionRow.list_session_by_condition(
