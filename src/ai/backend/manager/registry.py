@@ -152,6 +152,7 @@ from ai.backend.common.exception import BackendAIError
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
+from .clients.wsproxy.client import WSProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
@@ -323,6 +324,10 @@ class AgentRegistry:
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
+
+    def _create_wsproxy_client(self, address: str, token: str) -> WSProxyClient:
+        """Create a WSProxy client instance."""
+        return WSProxyClient(address, token)
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -3633,39 +3638,34 @@ class AgentRegistry:
                     "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
                 })
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
-                json={
-                    "service_name": endpoint.name,
-                    "tags": {
-                        "session": {
-                            "user_uuid": str(endpoint.session_owner),
-                            "group_id": str(endpoint.project),
-                            "domain_name": endpoint.domain,
-                        },
-                        "endpoint": {
-                            "id": str(endpoint.id),
-                            "runtime_variant": endpoint.runtime_variant.value,
-                            "existing_url": str(endpoint.url) if endpoint.url else None,
-                        },
+        wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        endpoint_json = await wsproxy_client.create_endpoint(
+            str(endpoint.id),
+            {
+                "service_name": endpoint.name,
+                "tags": {
+                    "session": {
+                        "user_uuid": str(endpoint.session_owner),
+                        "group_id": str(endpoint.project),
+                        "domain_name": endpoint.domain,
                     },
-                    "apps": inference_apps,
-                    "open_to_public": endpoint.open_to_public,
-                },  # TODO: support for multiple inference apps
-                headers={
-                    "X-BackendAI-Token": wsproxy_api_token,
+                    "endpoint": {
+                        "id": str(endpoint.id),
+                        "runtime_variant": endpoint.runtime_variant.value,
+                        "existing_url": str(endpoint.url) if endpoint.url else None,
+                    },
                 },
-            ) as resp:
-                resp.raise_for_status()
-                endpoint_json = await resp.json()
-                async with self.db.begin_session() as db_sess:
-                    query = (
-                        sa.update(EndpointRow)
-                        .values({"url": endpoint_json["endpoint"]})
-                        .where(EndpointRow.id == endpoint.id)
-                    )
-                    await db_sess.execute(query)
+                "apps": inference_apps,
+                "open_to_public": endpoint.open_to_public,
+            },  # TODO: support for multiple inference apps
+        )
+        async with self.db.begin_session() as db_sess:
+            query = (
+                sa.update(EndpointRow)
+                .values({"url": endpoint_json["endpoint"]})
+                .where(EndpointRow.id == endpoint.id)
+            )
+            await db_sess.execute(query)
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
@@ -3679,14 +3679,8 @@ class AgentRegistry:
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
 
-        async with aiohttp.ClientSession() as session:
-            async with session.delete(
-                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
-                headers={
-                    "X-BackendAI-Token": wsproxy_api_token,
-                },
-            ):
-                pass
+        wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        await wsproxy_client.delete_endpoint(str(endpoint.id))
 
     async def purge_containers(
         self,

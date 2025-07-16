@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import (
@@ -25,6 +24,9 @@ from ai.backend.manager.data.model_serving.types import (
     RoutingData,
     ScalingGroupData,
     UserData,
+)
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.endpoint import (

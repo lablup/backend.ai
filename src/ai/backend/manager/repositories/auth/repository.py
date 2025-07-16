@@ -5,9 +5,11 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
 from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     UserCreationError,

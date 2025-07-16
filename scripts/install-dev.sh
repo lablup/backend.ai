@@ -952,7 +952,7 @@ configure_backendai() {
   cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
-  cp configs/storage-proxy/sample.toml ./storage-proxy.toml
+  cp configs/storage-proxy/halfstack.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml

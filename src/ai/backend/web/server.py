@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.auth.field import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
@@ -49,7 +50,7 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.web.config.unified import WebServerUnifiedConfig
+from ai.backend.web.config.unified import ServiceMode, WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
@@ -131,7 +132,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
     tpl = j2env.get_template("config_ini.toml.j2")
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config.model_dump(),
+        "config": config.model_dump(by_alias=True),
     })
     return web.Response(text=config_content, content_type="text/plain")
 
@@ -149,7 +150,7 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     tpl = j2env.get_template("config.toml.j2")
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config.model_dump(),
+        "config": config.model_dump(by_alias=True),
     })
     return web.Response(text=config_content, content_type="text/plain")
 
@@ -165,7 +166,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     try:
         file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
+        raise web.HTTPNotFound(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-not-found",
                 "title": "Not Found",
@@ -662,13 +663,18 @@ async def server_main(
 ) -> AsyncIterator[Any]:
     config = cast(WebServerUnifiedConfig, args[0])
     app = web.Application(
-        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+        middlewares=[
+            decrypt_payload,
+            track_active_handlers,
+            security_policy_middleware,
+            general_exception_middleware,
+        ],
     )
     app["config"] = config
     request_policy_config: list[str] = config.security.request_policies
     response_policy_config: list[str] = config.security.response_policies
     csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = (
-        config.security.csp.model_dump() if config.security.csp else None
+        config.security.csp.model_dump(by_alias=True) if config.security.csp else None
     )
     app["security_policy"] = SecurityPolicy.from_config(
         request_policy_config, response_policy_config, csp_policy_config
@@ -691,10 +697,10 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
-    etcd_resdis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config.session.redis.model_dump()
+    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
+        config.session.redis.model_dump(by_alias=True)
     )
-    redis_target = etcd_resdis_config.profile_target(RedisRole.STATISTICS)
+    redis_target = etcd_redis_config.profile_target(RedisRole.STATISTICS)
 
     # Create ValkeySessionClient for session management
     valkey_session_client = await ValkeySessionClient.create(
@@ -788,11 +794,11 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
-    if config.service.mode == "webui":
+    if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         fallback_handler = console_handler
-    elif config.service.mode == "static":
+    elif config.service.mode == ServiceMode.STATIC:
         fallback_handler = static_handler
     else:
         raise ValueError("Unrecognized service.mode", config.service.mode)

@@ -100,7 +100,6 @@ class ValkeyStreamClient:
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator()
     async def make_consumer_group(
         self,
         stream_key: str,

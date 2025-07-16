@@ -9,11 +9,13 @@ import msgpack
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.decorators import create_layer_aware_repository_decorator
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
 from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
