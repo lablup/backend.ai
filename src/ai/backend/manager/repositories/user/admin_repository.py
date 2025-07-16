@@ -26,7 +26,6 @@ from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     QueryCondition,
     QueryOption,
-    RelatedFields,
     SessionRow,
     by_status,
     by_user_id,
@@ -113,7 +112,7 @@ class AdminUserRepository:
         ]
 
         query_options: list[QueryOption] = [
-            join_by_related_field(RelatedFields.USER),
+            join_by_related_field(SessionRow.user),
         ]
 
         return await SessionRow.list_session_by_condition(

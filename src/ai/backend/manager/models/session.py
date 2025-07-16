@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Callable,
     Final,
     List,
     Optional,
@@ -1467,16 +1466,6 @@ class SessionRow(Base):
         return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
 
 
-@dataclass
-class SessionQueryConditions:
-    statuses: Optional[Iterable[SessionStatus]] = None
-    user_id: Optional[UUID] = None
-    project_id: Optional[UUID] = None
-    domain_name: Optional[str] = None
-    resource_group_name: Optional[str] = None
-    raw_filter: Optional[str] = None
-
-
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     def _by_status(
         query_stmt: sa.sql.Select,
@@ -1531,35 +1520,6 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
         return query_stmt.where(new_cond)
 
     return _by_raw_filter
-
-
-class RelatedFields(enum.StrEnum):
-    KERNEL = enum.auto()
-    USER = enum.auto()
-    PROJECT = enum.auto()
-
-    def loading_option(self, already_joined: bool = False) -> Callable:
-        match self:
-            case RelatedFields.KERNEL:
-                return selectinload(SessionRow.kernels)
-            case RelatedFields.USER:
-                if already_joined:
-                    return contains_eager(SessionRow.user)
-                return joinedload(SessionRow.user)
-            case RelatedFields.PROJECT:
-                if already_joined:
-                    return contains_eager(SessionRow.group)
-                return joinedload(SessionRow.group)
-
-    @property
-    def orm_field(self) -> sa.orm.attributes.InstrumentedAttribute:
-        match self:
-            case RelatedFields.KERNEL:
-                return SessionRow.kernels
-            case RelatedFields.USER:
-                return SessionRow.user
-            case RelatedFields.PROJECT:
-                return SessionRow.group
 
 
 class SessionLifecycleManager:
