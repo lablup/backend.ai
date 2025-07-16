@@ -49,43 +49,29 @@ from ai.backend.manager.types import OptionalState
 async def created_user(
     database_engine: ExtendedAsyncSAEngine,
     processors: UserProcessors,
-    request: pytest.FixtureRequest,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """
     Fixture that creates a user and yields the user ID.
-    Usage: Pass parameters via request.param dictionary.
     """
-    # Get parameters from request.param or use defaults
-    params = getattr(request, "param", {})
-    # Generate unique email if not provided
+    # Generate unique identifiers
     unique_suffix = str(uuid.uuid4())[:8]
-    email = params.get("email", f"testuser-{unique_suffix}@example.com")
-    name = params.get("name", f"testuser-{unique_suffix}")
-    domain_name = params.get("domain_name", "default")
-    need_password_change = params.get("need_password_change", False)
-    role = params.get("role", UserRole.USER)
-    full_name = params.get("full_name", "Sample User")
-    password = params.get("password", "sample_password")
-    resource_policy_name = params.get("resource_policy_name", "default")
-    description = params.get("description", "")
-    totp_activated = params.get("totp_activated", False)
-    sudo_session_enabled = params.get("sudo_session_enabled", False)
-    is_active = params.get("is_active", True)
+    email = f"testuser-{unique_suffix}@example.com"
+    name = f"testuser-{unique_suffix}"
 
     user_data = {
         "username": name,
-        "password": password,
+        "password": "sample_password",
         "email": email,
-        "need_password_change": need_password_change,
-        "full_name": full_name,
-        "domain_name": domain_name,
-        "role": role,
+        "need_password_change": False,
+        "full_name": "Sample User",
+        "domain_name": "default",
+        "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
         "allowed_client_ip": None,
-        "resource_policy": resource_policy_name,
-        "description": description,
-        "totp_activated": totp_activated,
-        "sudo_session_enabled": sudo_session_enabled,
+        "resource_policy": "default",
+        "description": "",
+        "totp_activated": False,
+        "sudo_session_enabled": False,
         "container_uid": None,
         "container_main_gid": None,
         "container_gids": None,
@@ -101,8 +87,8 @@ async def created_user(
             "user_id": email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": is_active,
-            "is_admin": role == UserRole.SUPERADMIN or role == UserRole.ADMIN,
+            "is_active": True,
+            "is_admin": False,
             "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
             "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
             "num_queries": 0,
@@ -127,7 +113,7 @@ async def created_user(
         if len(gids_to_join) > 0:
             query = (
                 sa.select(GroupRow.id)
-                .where(GroupRow.domain_name == domain_name)
+                .where(GroupRow.domain_name == "default")
                 .where(GroupRow.id.in_(gids_to_join))
             )
             grps = (await session.execute(query)).all()
@@ -165,8 +151,9 @@ class TestCreateUserIntegration:
                 role=UserRole.USER,
                 domain_name="default",
                 need_password_change=False,
-                resource_policy="default-user-policy",
+                resource_policy="default",
                 status=UserStatus.ACTIVE,
+                sudo_session_enabled=False,
             ),
         )
 
@@ -221,6 +208,7 @@ class TestCreateUserIntegration:
                 username="containeruser",
                 need_password_change=False,
                 domain_name="default",
+                sudo_session_enabled=False,
                 container_uid=2000,
                 container_main_gid=2000,
                 container_gids=[2000, 2001],
@@ -248,8 +236,9 @@ class TestCreateUserIntegration:
                 username="limiteduser",
                 need_password_change=False,
                 domain_name="default",
-                resource_policy="limited-user-policy",
+                resource_policy="default",
                 allowed_client_ip=["192.168.1.0/24"],
+                sudo_session_enabled=False,
             ),
         )
 
@@ -264,26 +253,21 @@ class TestCreateUserIntegration:
 class TestModifyUserIntegration:
     """Integration tests for Modify User functionality"""
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "modify_basic@example.com",
-                "name": "modifybasic",
-                "domain_name": "default",
-                "full_name": "Test User",
-            }
-        ],
-        indirect=True,
-    )
     async def test_modify_user_basic_info(
         self,
         processors: UserProcessors,
         created_user: uuid.UUID,
+        database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test 2.1: Basic information modification"""
+        # Get the created user's email
+        async with database_engine.begin_session() as session:
+            user_email = await session.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == created_user)
+            )
+
         action = ModifyUserAction(
-            email="modify_basic@example.com",
+            email=user_email,
             modifier=UserModifier(
                 full_name=OptionalState.update("Updated Name"),
                 description=OptionalState.update("Senior Developer"),
@@ -297,26 +281,21 @@ class TestModifyUserIntegration:
         assert result.data.full_name == "Updated Name"
         assert result.data.description == "Senior Developer"
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "modify_role@example.com",
-                "name": "modifyrole",
-                "domain_name": "default",
-                "full_name": "Test User",
-            }
-        ],
-        indirect=True,
-    )
     async def test_modify_user_role_elevation(
         self,
         processors: UserProcessors,
         created_user: uuid.UUID,
+        database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test 2.2: Permission elevation to admin"""
+        # Get the created user's email
+        async with database_engine.begin_session() as session:
+            user_email = await session.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == created_user)
+            )
+
         action = ModifyUserAction(
-            email="modify_role@example.com",
+            email=user_email,
             modifier=UserModifier(
                 role=OptionalState.update(UserRole.ADMIN),
             ),
@@ -328,17 +307,6 @@ class TestModifyUserIntegration:
         assert result.data is not None
         assert result.data.role == UserRole.ADMIN
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "grouptest@example.com",
-                "name": "groupuser",
-                "domain_name": "default",
-            }
-        ],
-        indirect=True,
-    )
     async def test_modify_user_group_changes(
         self,
         processors: UserProcessors,
@@ -346,8 +314,13 @@ class TestModifyUserIntegration:
         database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test 2.3: Group membership changes"""
-        user_email = "grouptest@example.com"
         user_id = created_user
+
+        # Get the created user's email
+        async with database_engine.begin_session() as session:
+            user_email = await session.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == user_id)
+            )
 
         # Create test groups
         async with database_engine.begin_session() as session:
@@ -395,17 +368,6 @@ class TestModifyUserIntegration:
 class TestDeleteUserIntegration:
     """Integration tests for Delete User functionality"""
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "leaving@example.com",
-                "name": "leaving",
-                "domain_name": "default",
-            }
-        ],
-        indirect=True,
-    )
     async def test_delete_user_normal(
         self,
         processors: UserProcessors,
@@ -413,8 +375,13 @@ class TestDeleteUserIntegration:
         database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test 3.1: Normal user deletion"""
-        user_email = "leaving@example.com"
         user_id = created_user
+
+        # Get the created user's email
+        async with database_engine.begin_session() as session:
+            user_email = await session.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == user_id)
+            )
 
         action = DeleteUserAction(email=user_email)
         result = await processors.delete_user.wait_for_complete(action)
@@ -431,17 +398,6 @@ class TestDeleteUserIntegration:
 class TestPurgeUserIntegration:
     """Integration tests for Purge User functionality"""
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "purge@example.com",
-                "name": "purgeuser",
-                "domain_name": "default",
-            }
-        ],
-        indirect=True,
-    )
     async def test_purge_user_complete(
         self,
         processors: UserProcessors,
@@ -449,8 +405,13 @@ class TestPurgeUserIntegration:
         database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test 4.1: Complete user purge"""
-        user_email = "purge@example.com"
         user_id = created_user
+
+        # Get the created user's email
+        async with database_engine.begin_session() as session:
+            user_email = await session.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == user_id)
+            )
 
         # First soft delete the user
         delete_action = DeleteUserAction(email=user_email)
@@ -485,17 +446,6 @@ class TestPurgeUserIntegration:
 class TestUserStatsIntegration:
     """Integration tests for User Statistics functionality"""
 
-    @pytest.mark.parametrize(
-        "created_user",
-        [
-            {
-                "email": "active@example.com",
-                "name": "activeuser",
-                "domain_name": "default",
-            }
-        ],
-        indirect=True,
-    )
     async def test_user_month_stats_current_month(
         self,
         processors: UserProcessors,
