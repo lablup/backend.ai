@@ -183,6 +183,7 @@ class VFolderService:
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
 
+        folder_id = uuid.uuid4()
         if group_type == ProjectType.MODEL_STORE:
             if action.mount_permission != VFolderPermission.READ_WRITE:
                 raise VFolderInvalidParameter(
@@ -223,7 +224,6 @@ class VFolderService:
                     f"VFolder with the given name already exists. ({action.name})"
                 )
 
-            folder_id = uuid.uuid4()
             try:
                 vfid = VFolderID(quota_scope_id, folder_id)
                 if not unmanaged_path:
