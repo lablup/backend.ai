@@ -1129,8 +1129,8 @@ class AbstractAgent(
                     log_length += fragment_length
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
-                        stored_chunk = bytes(cb[:chunk_size])
-                        await self.redis_stream_client.enqueue_container_logs(
+                        stored_chunk = zlib.compress(bytes(cb[:chunk_size]))
+                        await self.valkey_stat_client.enqueue_container_logs(
                             container_id,
                             stored_chunk,
                         )
@@ -1143,9 +1143,10 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await self.redis_stream_client.enqueue_container_logs(
+                stored_chunk = zlib.compress(chunk_buffer.getvalue())
+                await self.valkey_stat_client.enqueue_container_logs(
                     container_id,
-                    chunk_buffer.getvalue(),
+                    stored_chunk,
                 )
         finally:
             chunk_buffer.close()

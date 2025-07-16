@@ -744,6 +744,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.valkey_stat,
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.event_hub,
