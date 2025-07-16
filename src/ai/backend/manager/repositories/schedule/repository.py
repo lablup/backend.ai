@@ -506,6 +506,7 @@ class ScheduleRepository:
                 )
                 kernel.agent = agent_alloc_ctx.agent_id
                 kernel.agent_addr = agent_alloc_ctx.agent_addr
+                kernel.scaling_group = sgroup_name
             session_row.set_status(
                 SessionStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
             )
