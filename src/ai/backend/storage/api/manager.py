@@ -49,6 +49,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
@@ -1166,7 +1167,11 @@ async def _shutdown(app: web.Application) -> None:
 
 
 def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
-    app = web.Application()
+    app = web.Application(
+        middlewares=[
+            general_exception_middleware,
+        ]
+    )
     handler = VFolderHandler(service_ctx.volume_service)
     app.router.add_route("GET", "/volumes", handler.get_volumes)
     app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
