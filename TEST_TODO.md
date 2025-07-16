@@ -104,6 +104,8 @@ src/ai/backend/manager/services/{domain}/README.md
 
 ## 작업 방식
 
+* 작업이 중단되었다면, step.md 파일을 확인하여 중단된 작업부터 이어서 진행할 것
+
 1. 이번에 작업할 범위에 대해서만 작업을 수행함
 2. 작업을 수행하기 전 단계별로 step.md 파일에 수행해야할 작업을 작성
 3. 작업을 완료하면 step.md 파일에 완료한 작업을 작성
