@@ -101,3 +101,14 @@ src/ai/backend/manager/services/{domain}/README.md
 # 이번에 작업할 범위
 
 * src/ai/backend/manager/services/agent 패키지에 대해서만 위의 작업 프로세스를 진행할 것
+
+## 작업 방식
+
+1. 이번에 작업할 범위에 대해서만 작업을 수행함
+2. 작업을 수행하기 전 단계별로 step.md 파일에 수행해야할 작업을 작성
+3. 작업을 완료하면 step.md 파일에 완료한 작업을 작성
+4. 모든 작업이 완료되면 다음 동작 확인
+    * pants lint :: 를 실행하여 lint 오류가 없는지 확인
+    * pants fmt :: 를 실행하여 코드 포맷이 일관된지 확인
+    * pants check :: 를 실행하여 코드 품질이 유지되는지 확인
+    * pants test :: 를 실행하여 테스트가 모두 통과하는지 확인
