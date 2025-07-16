@@ -144,8 +144,14 @@ from ai.backend.manager.utils import query_userinfo
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
+from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import BackendAIError
 
+from .agent_cache import AgentRPCCache
+from .clients.agent.client import AgentClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
@@ -206,6 +212,7 @@ from .models.session import (
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
+from .models.storage import StorageSessionManager
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -214,17 +221,8 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
+from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 from .types import UserScope
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-
-    from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events.dispatcher import EventProducer
-
-    from .agent_cache import AgentRPCCache
-    from .models.storage import StorageSessionManager
-    from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
@@ -291,6 +289,29 @@ class AgentRegistry:
             self,
         )
 
+    def _get_agent_client(
+        self,
+        agent_id: AgentId,
+        *,
+        invoke_timeout: Optional[float] = None,
+        order_key: Optional[str] = None,
+    ) -> AgentClient:
+        """Get an AgentClient for the given agent ID.
+
+        Args:
+            agent_id: The agent ID to get the client for
+
+        Returns:
+            AgentClient instance for the agent
+        """
+        # TODO: Apply AgentClient Pool
+        return AgentClient(
+            self.agent_cache,
+            agent_id,
+            invoke_timeout=invoke_timeout,
+            order_key=order_key,
+        )
+
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
         self.session_creation_tracker = {}
@@ -333,9 +354,9 @@ class AgentRegistry:
 
     async def gather_agent_hwinfo(self, instance_id: AgentId) -> Mapping[str, HardwareMetadata]:
         agent = await self.get_instance(instance_id, agents.c.addr)
-        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
-            result = await rpc.call.gather_hwinfo()
-            return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
+        agent_client = self._get_agent_client(agent["id"])
+        result = await agent_client.gather_hwinfo()
+        return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
         proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
@@ -353,8 +374,8 @@ class AgentRegistry:
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
         agent = await self.get_instance(instance_id, agents.c.addr)
-        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
-            return await rpc.call.scan_gpu_alloc_map()
+        agent_client = self._get_agent_client(agent["id"])
+        return await agent_client.scan_gpu_alloc_map()
 
     async def create_session(
         self,
@@ -1385,11 +1406,9 @@ class AgentRegistry:
         """
         assert agent_alloc_ctx.agent_id is not None
 
-        async with self.agent_cache.rpc_context(
-            agent_alloc_ctx.agent_id,
-        ) as rpc:
-            resp = await rpc.call.check_and_pull(image_configs)
-            resp = cast(dict[str, str], resp)
+        agent_client = self._get_agent_client(agent_alloc_ctx.agent_id)
+        resp = await agent_client.check_and_pull(image_configs)
+        resp = cast(dict[str, str], resp)
         return {img: uuid.UUID(hex=bgtask_id) for img, bgtask_id in resp.items()}
 
     async def check_and_pull_images(
@@ -1541,11 +1560,11 @@ class AgentRegistry:
                     assert agent_alloc_ctx.agent_id is not None
                     assert scheduled_session.id is not None
                     try:
-                        async with self.agent_cache.rpc_context(
+                        agent_client = self._get_agent_client(
                             agent_alloc_ctx.agent_id,
                             order_key=str(scheduled_session.main_kernel.id),
-                        ) as rpc:
-                            await rpc.call.create_local_network(network_name)
+                        )
+                        await agent_client.create_local_network(network_name)
                     except Exception:
                         log.exception(f"Failed to create an agent-local network {network_name}")
                         raise
@@ -1583,19 +1602,19 @@ class AgentRegistry:
                     ):
                         for index, item in enumerate(group_iterator):
                             assert item.agent_alloc_ctx.agent_id is not None
-                            async with self.agent_cache.rpc_context(
+                            agent_client = self._get_agent_client(
                                 item.agent_alloc_ctx.agent_id,
                                 order_key=str(scheduled_session.id),
-                            ) as rpc:
-                                port = await rpc.call.assign_port()
-                                agent_addr = item.agent_alloc_ctx.agent_addr.replace(
-                                    "tcp://", ""
-                                ).split(":", maxsplit=1)[0]
-                                cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
-                                    agent_addr,
-                                    port,
-                                )
-                                item.allocated_host_ports.add(port)
+                            )
+                            port = await agent_client.assign_port()
+                            agent_addr = item.agent_alloc_ctx.agent_addr.replace(
+                                "tcp://", ""
+                            ).split(":", maxsplit=1)[0]
+                            cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
+                                agent_addr,
+                                port,
+                            )
+                            item.allocated_host_ports.add(port)
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
         if scheduled_session.network_type == NetworkType.VOLATILE:
@@ -1730,7 +1749,7 @@ class AgentRegistry:
         scheduled_session: SessionRow,
         items: Sequence[KernelAgentBinding],
         image_configs: Mapping[str, ImageConfig],
-        cluster_info,
+        cluster_info: ClusterInfo,
         idle_timeout: float | int,
     ) -> None:
         assert agent_alloc_ctx.agent_id is not None
@@ -1752,109 +1771,103 @@ class AgentRegistry:
         await execute_with_retry(_update_kernel)
 
         try:
-            async with self.agent_cache.rpc_context(
-                agent_alloc_ctx.agent_id,
-                order_key=str(scheduled_session.id),
-            ) as rpc:
 
-                def get_image_conf(kernel: KernelRow) -> ImageConfig:
-                    return image_configs[kernel.image]
+            def get_image_conf(kernel: KernelRow) -> ImageConfig:
+                return image_configs[kernel.image]
 
-                kernel_image_refs: dict[KernelId, ImageRef] = {}
+            kernel_image_refs: dict[KernelId, ImageRef] = {}
 
-                raw_configs: list[KernelCreationConfig] = []
-                async with self.db.begin_readonly_session() as db_sess:
-                    for binding in items:
-                        kernel_image_refs[binding.kernel.id] = (
-                            await ImageRow.resolve(
-                                db_sess,
-                                [
-                                    ImageIdentifier(
-                                        binding.kernel.image, binding.kernel.architecture
-                                    )
-                                ],
-                            )
-                        ).image_ref
+            raw_configs: list[KernelCreationConfig] = []
+            async with self.db.begin_readonly_session() as db_sess:
+                for binding in items:
+                    kernel_image_refs[binding.kernel.id] = (
+                        await ImageRow.resolve(
+                            db_sess,
+                            [ImageIdentifier(binding.kernel.image, binding.kernel.architecture)],
+                        )
+                    ).image_ref
 
-                        raw_configs.append({
-                            "image": {
-                                # TODO: refactor registry and is_local to be specified per kernel.
-                                "registry": get_image_conf(binding.kernel)["registry"],
-                                "project": get_image_conf(binding.kernel)["project"],
-                                "digest": get_image_conf(binding.kernel)["digest"],
-                                "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
-                                "canonical": get_image_conf(binding.kernel)["canonical"],
-                                "architecture": get_image_conf(binding.kernel)["architecture"],
-                                "labels": get_image_conf(binding.kernel)["labels"],
-                                "is_local": get_image_conf(binding.kernel)["is_local"],
-                                "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
-                            },
-                            "network_id": str(scheduled_session.id),
-                            "session_type": scheduled_session.session_type.value,
-                            "kernel_id": str(binding.kernel.id),
-                            "session_id": str(scheduled_session.id),
-                            "owner_user_id": str(scheduled_session.user_uuid),
-                            "owner_project_id": None,  # TODO: Implement project-owned sessions
-                            "cluster_role": binding.kernel.cluster_role,
-                            "cluster_idx": binding.kernel.cluster_idx,
-                            "cluster_mode": binding.kernel.cluster_mode,
-                            "package_directory": tuple(),
-                            "local_rank": binding.kernel.local_rank,
-                            "cluster_hostname": binding.kernel.cluster_hostname,
-                            "uid": binding.kernel.uid,
-                            "main_gid": binding.kernel.main_gid,
-                            "supplementary_gids": binding.kernel.gids or [],
-                            "idle_timeout": int(idle_timeout),
-                            "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
-                            "environ": {
-                                # inherit per-session environment variables
-                                **scheduled_session.environ,
-                                # set per-kernel environment variables
-                                "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
-                                "BACKENDAI_KERNEL_IMAGE": get_image_conf(binding.kernel)[
-                                    "canonical"
-                                ],
-                                "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
-                                "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
-                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
-                                "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
-                                "BACKENDAI_SERVICE_PORTS": str(
-                                    get_image_conf(binding.kernel)["labels"].get(
-                                        "ai.backend.service-ports"
-                                    )
-                                ),
-                            },
-                            "resource_slots": binding.kernel.requested_slots.to_json(),
-                            "resource_opts": binding.kernel.resource_opts,
-                            "bootstrap_script": binding.kernel.bootstrap_script,
-                            "startup_command": binding.kernel.startup_command,
-                            "internal_data": scheduled_session.main_kernel.internal_data,
+                    raw_configs.append({
+                        "image": {
+                            # TODO: refactor registry and is_local to be specified per kernel.
+                            "registry": get_image_conf(binding.kernel)["registry"],
+                            "project": get_image_conf(binding.kernel)["project"],
+                            "digest": get_image_conf(binding.kernel)["digest"],
+                            "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
+                            "canonical": get_image_conf(binding.kernel)["canonical"],
+                            "architecture": get_image_conf(binding.kernel)["architecture"],
+                            "labels": get_image_conf(binding.kernel)["labels"],
+                            "is_local": get_image_conf(binding.kernel)["is_local"],
                             "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
-                            "preopen_ports": scheduled_session.main_kernel.preopen_ports,
-                            "allocated_host_ports": list(binding.allocated_host_ports),
-                            "agent_addr": binding.agent_alloc_ctx.agent_addr,
-                            "scaling_group": binding.agent_alloc_ctx.scaling_group,
-                            "endpoint_id": None,
-                        })
+                        },
+                        "network_id": str(scheduled_session.id),
+                        "session_type": scheduled_session.session_type.value,
+                        "kernel_id": str(binding.kernel.id),
+                        "session_id": str(scheduled_session.id),
+                        "owner_user_id": str(scheduled_session.user_uuid),
+                        "owner_project_id": None,  # TODO: Implement project-owned sessions
+                        "cluster_role": binding.kernel.cluster_role,
+                        "cluster_idx": binding.kernel.cluster_idx,
+                        "cluster_mode": binding.kernel.cluster_mode,
+                        "package_directory": tuple(),
+                        "local_rank": binding.kernel.local_rank,
+                        "cluster_hostname": binding.kernel.cluster_hostname,
+                        "uid": binding.kernel.uid,
+                        "main_gid": binding.kernel.main_gid,
+                        "supplementary_gids": binding.kernel.gids or [],
+                        "idle_timeout": int(idle_timeout),
+                        "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
+                        "environ": {
+                            # inherit per-session environment variables
+                            **scheduled_session.environ,
+                            # set per-kernel environment variables
+                            "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
+                            "BACKENDAI_KERNEL_IMAGE": get_image_conf(binding.kernel)["canonical"],
+                            "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
+                            "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
+                            "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
+                            "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
+                            "BACKENDAI_SERVICE_PORTS": str(
+                                get_image_conf(binding.kernel)["labels"].get(
+                                    "ai.backend.service-ports"
+                                )
+                            ),
+                        },
+                        "resource_slots": binding.kernel.requested_slots.to_json(),
+                        "resource_opts": binding.kernel.resource_opts,
+                        "bootstrap_script": binding.kernel.bootstrap_script,
+                        "startup_command": binding.kernel.startup_command,
+                        "internal_data": scheduled_session.main_kernel.internal_data,
+                        "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
+                        "preopen_ports": scheduled_session.main_kernel.preopen_ports,
+                        "allocated_host_ports": list(binding.allocated_host_ports),
+                        "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                        "scaling_group": binding.agent_alloc_ctx.scaling_group,
+                        "endpoint_id": None,
+                    })
 
                 raw_kernel_ids = [str(binding.kernel.id) for binding in items]
 
-                # Issue a batched RPC call to create kernels on this agent
-                # created_infos = await rpc.call.create_kernels(
-                await rpc.call.create_kernels(
-                    str(scheduled_session.id),
-                    raw_kernel_ids,
-                    raw_configs,
-                    cluster_info,
-                    kernel_image_refs,
-                )
-                log.debug(
-                    "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
-                    scheduled_session.name,
-                    scheduled_session.access_key,
-                    [binding.kernel.id for binding in items],
-                    agent_alloc_ctx.agent_id,
-                )
+            # Issue a batched RPC call to create kernels on this agent
+            # created_infos = await agent_client.create_kernels(
+            agent_client = self._get_agent_client(
+                agent_alloc_ctx.agent_id,
+                order_key=str(scheduled_session.id),
+            )
+            await agent_client.create_kernels(
+                str(scheduled_session.id),
+                raw_kernel_ids,
+                raw_configs,
+                cluster_info,
+                kernel_image_refs,
+            )
+            log.debug(
+                "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
+                scheduled_session.name,
+                scheduled_session.access_key,
+                [binding.kernel.id for binding in items],
+                agent_alloc_ctx.agent_id,
+            )
         except (asyncio.TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
             raise
@@ -1986,8 +1999,8 @@ class AgentRegistry:
 
     async def update_scaling_group(self, id, scaling_group) -> None:
         agent = await self.get_instance(id, agents.c.addr)
-        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
-            await rpc.call.update_scaling_group(scaling_group)
+        agent_client = self._get_agent_client(agent["id"])
+        await agent_client.update_scaling_group(scaling_group)
 
     async def settle_agent_alloc(
         self,
@@ -2194,20 +2207,22 @@ class AgentRegistry:
                     destroyed_kernels.append(kernel)
             if not destroyed_kernels:
                 return
-            async with self.agent_cache.rpc_context(
-                destroyed_kernels[0]["agent"], order_key=str(session_id)
-            ) as rpc:
-                for kernel in destroyed_kernels:
-                    # internally it enqueues a "destroy" lifecycle event.
-                    rpc_coros.append(
-                        rpc.call.destroy_kernel(
-                            str(kernel["id"]),
-                            str(session_id),
-                            reason,
-                            suppress_events=True,
-                        ),
+            for kernel in destroyed_kernels:
+
+                async def destory_kernel() -> None:
+                    agent_client = self._get_agent_client(
+                        destroyed_kernels[0]["agent"], order_key=str(session_id)
                     )
-                await asyncio.gather(*rpc_coros)
+                    await agent_client.destroy_kernel(
+                        str(kernel["id"]),
+                        str(session_id),
+                        reason,
+                        suppress_events=True,
+                    )
+
+                # internally it enqueues a "destroy" lifecycle event.
+                rpc_coros.append(destory_kernel())
+            await asyncio.gather(*rpc_coros)
 
     async def destroy_session(
         self,
@@ -2534,42 +2549,48 @@ class AgentRegistry:
                     session: SessionRow, destroyed_kernels: List[KernelRow]
                 ) -> None:
                     nonlocal main_stat
-                    async with self.agent_cache.rpc_context(
-                        destroyed_kernels[0].agent, order_key=session.id
-                    ) as rpc:
-                        rpc_coros = []
-                        for kernel in destroyed_kernels:
-                            # internally it enqueues a "destroy" lifecycle event.
-                            if kernel.status != KernelStatus.SCHEDULED:
-                                rpc_coros.append(
-                                    rpc.call.destroy_kernel(
-                                        str(kernel.id), str(session.id), reason
-                                    ),
+                    rpc_coros = []
+                    for kernel in destroyed_kernels:
+                        # internally it enqueues a "destroy" lifecycle event.
+                        if kernel.status != KernelStatus.SCHEDULED:
+
+                            async def destroy_kernel() -> None:
+                                agent_client = self._get_agent_client(
+                                    destroyed_kernels[0].agent,
+                                    order_key=str(session.id),
                                 )
-                        try:
-                            await asyncio.gather(*rpc_coros)
-                        except Exception:
-                            log.exception(
-                                "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
-                                destroyed_kernels[0].agent,
-                                session.id,
-                            )
-                        for kernel in destroyed_kernels:
-                            last_stat: Optional[Dict[str, Any]]
-                            last_stat = None
-                            try:
-                                last_stat = await self.valkey_stat.get_kernel_statistics(
+                                await agent_client.destroy_kernel(
                                     str(kernel.id),
+                                    str(session.id),
+                                    reason,
+                                    suppress_events=True,
                                 )
-                                if last_stat is not None:
-                                    last_stat["version"] = 2
-                            except asyncio.TimeoutError:
-                                pass
-                            if kernel.cluster_role == DEFAULT_ROLE:
-                                main_stat = {
-                                    **(last_stat if last_stat is not None else {}),
-                                    "status": "terminated",
-                                }
+
+                            rpc_coros.append(destroy_kernel())
+                    try:
+                        await asyncio.gather(*rpc_coros)
+                    except Exception:
+                        log.exception(
+                            "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
+                            destroyed_kernels[0].agent,
+                            session.id,
+                        )
+                    for kernel in destroyed_kernels:
+                        last_stat: Optional[dict[str, Any]]
+                        last_stat = None
+                        try:
+                            last_stat = await self.valkey_stat.get_kernel_statistics(
+                                str(kernel.id),
+                            )
+                            if last_stat is not None:
+                                last_stat["version"] = 2
+                        except asyncio.TimeoutError:
+                            pass
+                        if kernel.cluster_role == DEFAULT_ROLE:
+                            main_stat = {
+                                **(last_stat if last_stat is not None else {}),
+                                "status": "terminated",
+                            }
 
                 if destroyed_kernels:
                     per_agent_tasks.append(_destroy_kernels_in_agent(session, destroyed_kernels))
@@ -2620,11 +2641,11 @@ class AgentRegistry:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
                     try:
-                        async with self.agent_cache.rpc_context(
+                        agent_client = self._get_agent_client(
                             session.main_kernel.agent,
                             order_key=str(session.main_kernel.session_id),
-                        ) as rpc:
-                            await rpc.call.destroy_local_network(network_ref_name)
+                        )
+                        await agent_client.destroy_local_network(network_ref_name)
                     except Exception:
                         log.exception(
                             f"Failed to destroy the agent-local network {network_ref_name}"
@@ -2675,24 +2696,21 @@ class AgentRegistry:
 
         async def _restart_kernel(kernel: KernelRow) -> None:
             try:
-                async with self.agent_cache.rpc_context(
-                    kernel.agent,  # the main-container's agent
-                    order_key=None,
-                ) as rpc:
-                    updated_config: Dict[str, Any] = {
-                        # TODO: support rescaling of sub-containers
-                    }
-                    async with self.db.begin_session() as db_sess:
-                        image_row = await ImageRow.resolve(
-                            db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]
-                        )
-
-                    kernel_info = await rpc.call.restart_kernel(
-                        str(kernel.session_id),
-                        str(kernel.id),
-                        image_row.image_ref,
-                        updated_config,
+                updated_config: Dict[str, Any] = {
+                    # TODO: support rescaling of sub-containers
+                }
+                async with self.db.begin_session() as db_sess:
+                    image_row = await ImageRow.resolve(
+                        db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]
                     )
+
+                agent_client = self._get_agent_client(kernel.agent)
+                kernel_info = await agent_client.restart_kernel(
+                    str(kernel.session_id),
+                    str(kernel.id),
+                    image_row.image_ref,
+                    updated_config,
+                )
 
                 now = datetime.now(tzutc())
                 update_data = {
@@ -2756,50 +2774,50 @@ class AgentRegistry:
             major_api_version = api_version[0]
             if major_api_version == 4:  # manager-agent protocol is same.
                 major_api_version = 3
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 invoke_timeout=30,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.execute(
-                    str(session.id),
-                    str(session.main_kernel.id),
-                    major_api_version,
-                    run_id,
-                    mode,
-                    code,
-                    opts,
-                    flush_timeout,
-                )
+            )
+            return await agent_client.execute(
+                str(session.id),
+                str(session.main_kernel.id),
+                major_api_version,
+                run_id,
+                mode,
+                code,
+                opts,
+                flush_timeout,
+            )
 
     async def trigger_batch_execution(
         self,
         session: SessionRow,
     ) -> None:
         async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 invoke_timeout=30,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.trigger_batch_execution(
-                    str(session.id),
-                    str(session.main_kernel.id),
-                    session.main_kernel.startup_command or "",
-                    session.batch_timeout,
-                )
+            )
+            return await agent_client.trigger_batch_execution(
+                str(session.id),
+                str(session.main_kernel.id),
+                session.main_kernel.startup_command or "",
+                session.batch_timeout,
+            )
 
     async def interrupt_session(
         self,
         session: SessionRow,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 invoke_timeout=30,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.interrupt_kernel(str(session.main_kernel.id))
+            )
+            return await agent_client.interrupt_kernel(str(session.main_kernel.id))
 
     async def get_completions(
         self,
@@ -2808,14 +2826,14 @@ class AgentRegistry:
         opts: Mapping[str, Any],
     ) -> CodeCompletionResp:
         async with handle_session_exception(self.db, "execute", session.id):
-            async with self.agent_cache.rpc_context(
+            # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 invoke_timeout=10,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
-                result = await rpc.call.get_completions(str(session.main_kernel.id), text, opts)
-                return CodeCompletionResp.from_dict(result)
+            )
+            result = await agent_client.get_completions(str(session.main_kernel.id), text, opts)
+            return CodeCompletionResp.from_dict(result)
 
     async def start_service(
         self,
@@ -2824,11 +2842,11 @@ class AgentRegistry:
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.start_service(str(session.main_kernel.id), service, opts)
+            )
+            return await agent_client.start_service(str(session.main_kernel.id), service, opts)
 
     async def shutdown_service(
         self,
@@ -2836,11 +2854,11 @@ class AgentRegistry:
         service: str,
     ) -> None:
         async with handle_session_exception(self.db, "shutdown_service", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.shutdown_service(str(session.main_kernel.id), service)
+            )
+            return await agent_client.shutdown_service(str(session.main_kernel.id), service)
 
     async def upload_file(
         self,
@@ -2849,11 +2867,11 @@ class AgentRegistry:
         payload: bytes,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "upload_file", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.upload_file(str(session.main_kernel.id), filename, payload)
+            )
+            return await agent_client.upload_file(str(session.main_kernel.id), filename, payload)
 
     async def download_file(
         self,
@@ -2862,8 +2880,11 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception(self.db, "download_file", kernel.session_id):
-            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                return await rpc.call.download_file(str(kernel.id), filepath)
+            agent_client = self._get_agent_client(
+                session.main_kernel.agent,
+                order_key=kernel.id,
+            )
+            return await agent_client.download_file(str(kernel.id), filepath)
 
     async def download_single(
         self,
@@ -2873,8 +2894,8 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception(self.db, "download_single", kernel.session_id):
-            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                return await rpc.call.download_single(str(kernel.id), filepath)
+            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
+            return await agent_client.download_single(str(kernel.id), filepath)
 
     async def list_files(
         self,
@@ -2882,12 +2903,12 @@ class AgentRegistry:
         path: str,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "list_files", session.id):
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 session.main_kernel.agent,
                 invoke_timeout=30,
                 order_key=session.main_kernel.id,
-            ) as rpc:
-                return await rpc.call.list_files(str(session.main_kernel.id), path)
+            )
+            return await agent_client.list_files(str(session.main_kernel.id), path)
 
     async def get_logs_from_agent(
         self,
@@ -2904,13 +2925,13 @@ class AgentRegistry:
                 raise InstanceNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
-            async with self.agent_cache.rpc_context(
+            agent_client = self._get_agent_client(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
                 order_key=kernel.id,
-            ) as rpc:
-                reply = await rpc.call.get_logs(str(kernel.id))
-                return reply["logs"]
+            )
+            reply = await agent_client.get_logs(str(kernel.id))
+            return reply["logs"]
 
     async def increment_session_usage(
         self,
@@ -3184,12 +3205,10 @@ class AgentRegistry:
             key=keyfunc,
         ):
             grouped_kernels = [*group_iterator]
-            async with self.agent_cache.rpc_context(
-                agent_id,
-            ) as rpc:
-                return await rpc.call.sync_kernel_registry([
-                    (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
-                ])
+            agent_client = self._get_agent_client(agent_id)
+            return await agent_client.sync_kernel_registry([
+                (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
+            ])
 
     async def mark_image_pull_started(
         self,
@@ -3483,13 +3502,13 @@ class AgentRegistry:
             )
         email = await self._get_user_email(kernel)
         async with handle_session_exception(self.db, "commit_session", session.id):
-            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(
-                    str(kernel.id),
-                    email,
-                    canonical=new_image_ref.canonical,
-                    extra_labels=extra_labels,
-                )
+            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
+            resp = await agent_client.commit(
+                str(kernel.id),
+                email,
+                canonical=new_image_ref.canonical,
+                extra_labels=extra_labels,
+            )
         return resp
 
     async def push_image(
@@ -3501,12 +3520,11 @@ class AgentRegistry:
         """
         Commit a main kernel's container of the given session.
         """
-        async with self.agent_cache.rpc_context(agent) as rpc:
-            resp: Mapping[str, Any] = await rpc.call.push_image(
-                image_ref,
-                {**registry, "url": str(registry["url"])},
-            )
-        return resp
+        agent_client = self._get_agent_client(agent)
+        return await agent_client.push_image(
+            str(image_ref),
+            {**registry, "url": str(registry["url"])},
+        )
 
     async def commit_session_to_file(
         self,
@@ -3532,14 +3550,14 @@ class AgentRegistry:
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
-            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(
-                    str(kernel.id),
-                    email,
-                    filename=filename,
-                    extra_labels=extra_labels,
-                    canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
-                )
+            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
+            resp = await agent_client.commit(
+                str(kernel.id),
+                email,
+                filename=filename,
+                extra_labels=extra_labels,
+                canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
+            )
         return resp
 
     async def get_agent_local_config(
@@ -3547,22 +3565,22 @@ class AgentRegistry:
         agent_id: AgentId,
         agent_addr: str,
     ) -> Mapping[str, str]:
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            return await rpc.call.get_local_config()
+        agent_client = self._get_agent_client(agent_id)
+        return await agent_client.get_local_config()
 
     async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImagesResp:
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            result = await rpc.call.purge_images(request.images, request.force, request.noprune)
+        agent_client = self._get_agent_client(agent_id)
+        result = await agent_client.purge_images(request.images, request.force, request.noprune)
 
-            return PurgeImagesResp(
-                responses=[
-                    PurgeImageResp(
-                        image=resp["image"],
-                        error=resp.get("error"),
-                    )
-                    for resp in result["responses"]
-                ],
-            )
+        return PurgeImagesResp(
+            responses=[
+                PurgeImageResp(
+                    image=resp["image"],
+                    error=resp.get("error"),
+                )
+                for resp in result["responses"]
+            ],
+        )
 
     async def get_abusing_report(
         self,
@@ -3678,8 +3696,8 @@ class AgentRegistry:
         serialized = [entry.serialize() for entry in container_kernel_ids]
         if not serialized:
             return
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.purge_containers(serialized)
+        agent_client = self._get_agent_client(agent_id)
+        await agent_client.purge_containers(serialized)
 
     async def drop_kernel_registry(
         self,
@@ -3689,8 +3707,8 @@ class AgentRegistry:
         kernel_id_list = list(kernel_ids)  # Parse the iterable to a list for serialization
         if not kernel_id_list:
             return
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.drop_kernel_registry(kernel_id_list)
+        agent_client = self._get_agent_client(agent_id)
+        await agent_client.drop_kernel_registry(kernel_id_list)
 
 
 async def handle_image_pull_started(
