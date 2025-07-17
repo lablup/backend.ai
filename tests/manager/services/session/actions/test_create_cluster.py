@@ -12,7 +12,6 @@ from ai.backend.manager.services.session.actions.create_cluster import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -21,12 +20,11 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_create_cluster_rpc(mocker, mock_agent_response_result):
+def mock_create_cluster_rpc(mocker):
     mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService._create_cluster",
+        "ai.backend.manager.registry.AgentRegistry.create_cluster",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
     return mock
 
 
@@ -34,38 +32,6 @@ CREATE_CLUSTER_MOCK = {"cluster_id": "test_cluster_123"}
 TEST_TEMPLATE_ID = uuid4()
 
 
-@pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
-    [
-        (
-            TestScenario.success(
-                "Create cluster session",
-                CreateClusterAction(
-                    session_name=cast(str, SESSION_FIXTURE_DATA.name),
-                    user_id=SESSION_FIXTURE_DATA.user_uuid,
-                    user_role=UserRole.USER,
-                    sudo_session_enabled=False,
-                    template_id=TEST_TEMPLATE_ID,
-                    session_type=SessionTypes.INTERACTIVE,
-                    group_name=str(SESSION_FIXTURE_DATA.group_id),
-                    domain_name=SESSION_FIXTURE_DATA.domain_name,
-                    scaling_group_name="default",
-                    requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    tag="latest",
-                    enqueue_only=False,
-                    keypair_resource_policy=None,
-                    max_wait_seconds=0,
-                ),
-                CreateClusterActionResult(
-                    session_id=SESSION_FIXTURE_DATA.id,
-                    result=CREATE_CLUSTER_MOCK,
-                ),
-            ),
-            CREATE_CLUSTER_MOCK,
-        ),
-    ],
-)
 @pytest.mark.parametrize(
     "extra_fixtures",
     [
@@ -78,6 +44,37 @@ TEST_TEMPLATE_ID = uuid4()
 async def test_create_cluster(
     mock_create_cluster_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CreateClusterAction, CreateClusterActionResult],
 ):
-    await test_scenario.test(processors.create_cluster.wait_for_complete)
+    # Setup mock to return expected cluster result
+    mock_create_cluster_rpc.return_value = CREATE_CLUSTER_MOCK
+
+    # Create the action
+    action = CreateClusterAction(
+        session_name=cast(str, SESSION_FIXTURE_DATA.name),
+        user_id=SESSION_FIXTURE_DATA.user_uuid,
+        user_role=UserRole.USER,
+        sudo_session_enabled=False,
+        template_id=TEST_TEMPLATE_ID,
+        session_type=SessionTypes.INTERACTIVE,
+        group_name=str(SESSION_FIXTURE_DATA.group_id),
+        domain_name=SESSION_FIXTURE_DATA.domain_name,
+        scaling_group_name="default",
+        requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+        owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+        tag="latest",
+        enqueue_only=False,
+        keypair_resource_policy=None,
+        max_wait_seconds=0,
+    )
+
+    # Execute the action
+    result = await processors.create_cluster.wait_for_complete(action)
+
+    # Assert the result is correct
+    assert result is not None
+    assert isinstance(result, CreateClusterActionResult)
+    assert result.session_id == SESSION_FIXTURE_DATA.id
+    assert result.result == CREATE_CLUSTER_MOCK
+
+    # Verify the mock was called correctly
+    mock_create_cluster_rpc.assert_called_once()
