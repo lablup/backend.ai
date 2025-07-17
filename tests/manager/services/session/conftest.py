@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AGENTID_MANAGER, EtcdRedisConfig
+from ai.backend.common.types import AGENTID_MANAGER, RedisProfileTarget
 from ai.backend.manager.idle import init_idle_checkers
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -42,7 +42,7 @@ async def processors(
 
     raw_redis_config = await etcd.get_prefix("config/redis")
     local_config["redis"] = redis_config_iv.check(raw_redis_config)
-    etcd_redis_config = EtcdRedisConfig.from_dict(local_config["redis"])
+    etcd_redis_config = RedisProfileTarget.from_dict(local_config["redis"])
 
     redis_stream = redis_helper.get_redis_object(
         etcd_redis_config.get_override_config(RedisRole.STREAM),
