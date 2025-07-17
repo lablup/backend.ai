@@ -4,26 +4,18 @@ These tests focus on the repository layer implementation of the scenarios.
 """
 
 import uuid
-from datetime import datetime
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
-    VFolderInvitationData,
 )
-from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
-    VFolderInvitationRow,
-    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -54,7 +46,7 @@ class TestVFolderScenariosRepository:
 
     @pytest.mark.asyncio
     async def test_scenario_1_1_personal_vfolder_creation(self, vfolder_repo, mock_db_engine):
-        """Test Scenario 1.1: 개인 VFolder 생성 - Repository Layer"""
+        """Test Scenario 1.1: Personal VFolder Creation - Repository Layer"""
         # Given
         user_id = uuid.uuid4()
         vfolder_id = uuid.uuid4()
@@ -107,7 +99,7 @@ class TestVFolderScenariosRepository:
                 unmanaged_path=None,
                 cloneable=False,
                 status=VFolderOperationStatus.READY,
-                cur_size=0,  # 초기 사용량: 0
+                cur_size=0,  # Initial usage: 0
             )
 
             with patch.object(vfolder_repo, "_vfolder_row_to_data", return_value=expected_data):
@@ -123,7 +115,7 @@ class TestVFolderScenariosRepository:
 
     @pytest.mark.asyncio
     async def test_scenario_1_2_project_vfolder_creation(self, vfolder_repo, mock_db_engine):
-        """Test Scenario 1.2: 프로젝트 VFolder 생성 - Repository Layer"""
+        """Test Scenario 1.2: Project VFolder Creation - Repository Layer"""
         # Given
         project_id = uuid.uuid4()
         vfolder_id = uuid.uuid4()
@@ -190,7 +182,7 @@ class TestVFolderScenariosRepository:
 
     @pytest.mark.asyncio
     async def test_scenario_1_3_model_storage_creation(self, vfolder_repo, mock_db_engine):
-        """Test Scenario 1.3: 모델 저장소 생성 - Repository Layer"""
+        """Test Scenario 1.3: Model Storage Creation - Repository Layer"""
         # Given
         user_id = uuid.uuid4()
         vfolder_id = uuid.uuid4()

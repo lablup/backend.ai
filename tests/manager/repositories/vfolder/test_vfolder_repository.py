@@ -1,19 +1,14 @@
 import uuid
-from datetime import datetime
-from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
-    VFolderAccessInfo,
     VFolderCreateParams,
     VFolderData,
     VFolderListResult,
-    VFolderPermissionData,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.user import UserRole, UserRow
