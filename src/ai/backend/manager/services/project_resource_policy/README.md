@@ -107,14 +107,19 @@ The service integrates with `ProjectResourcePolicyRepository` which provides:
 - Database persistence with proper transaction handling
 - Layer-aware decorators for monitoring and metrics
 - Error handling for not-found scenarios
+- Additional operations:
+  - `get_by_name`: Retrieve a specific policy by name
+  - Atomic operations with transaction support
 
 ### Database Models
 
 Uses `ProjectResourcePolicyRow` from the models layer which maps to the database schema:
-- `name`: Unique policy identifier
-- `max_vfolder_count`: Maximum number of vfolders allowed
-- `max_quota_scope_size`: Total storage quota in bytes
-- `max_network_count`: Maximum number of networks allowed
+- `name`: Unique policy identifier (primary key with unique constraint)
+- `max_vfolder_count`: Maximum number of vfolders allowed (non-nullable)
+- `max_quota_scope_size`: Total storage quota in bytes (non-nullable)
+- `max_network_count`: Maximum number of networks allowed (non-nullable)
+
+Note: All numeric fields are required and cannot be NULL. Zero values are allowed for edge cases.
 
 ### Action System
 
@@ -125,41 +130,79 @@ The service follows the action-based pattern with:
 
 ## Testing Guidelines
 
-### Unit Testing
+### Test Coverage
 
-The service includes comprehensive unit tests covering:
-- Successful creation, modification, and deletion scenarios
-- Error handling for non-existent policies
-- Partial update functionality
-- Integration with fixtures for database setup/teardown
+The project includes comprehensive test coverage at multiple layers:
+
+#### Service Layer Tests
+- Integration tests through service actions
+- End-to-end workflow validation
+- Error handling verification
+
+#### Repository Layer Tests
+- Direct repository method testing
+- Database constraint validation (e.g., unique constraints, non-null fields)
+- Concurrent operation handling
+- Edge cases (zero values, empty updates)
+- Transaction rollback scenarios
 
 ### Test Fixtures
 
-Key fixtures provided:
+Key fixtures provided for reliable test data management:
 - `project_resource_policy_repository`: Repository instance
-- `project_resource_policy_service`: Service instance
-- `create_project_resource_policy`: Context manager for test data creation
+- `project_resource_policy_service`: Service instance  
+- `create_project_resource_policy`: Async context manager for test data creation with guaranteed cleanup
+- `cleanup_policies`: Fixture that tracks and cleans up policies even if tests fail
+
+### Test Data Cleanup
+
+Tests use fixture-based cleanup to ensure:
+- No orphaned test data remains after test failures
+- Proper isolation between tests
+- Consistent database state
 
 ### Running Tests
 
 ```bash
-# Run all project resource policy tests
-pytest tests/services/project_resource_policy/
+# Run repository tests
+pytest tests/manager/repositories/resource_policy/test_project_resource_policy.py
 
-# Run specific test
-pytest tests/services/project_resource_policy/test_project_resource_policy.py::test_create_project_resource_policy
+# Run service tests (if available)
+pytest tests/manager/services/project_resource_policy/
+
+# Run with coverage
+pytest --cov=ai.backend.manager.services.project_resource_policy \
+       --cov=ai.backend.manager.repositories.project_resource_policy
 ```
 
 ## Error Handling
 
-The service handles the following error scenarios:
+The service and repository handle the following error scenarios:
+
+### Service Layer
 - `ObjectNotFound`: When attempting to modify or delete non-existent policies
-- Database constraint violations: Handled at the repository layer
 - Invalid input validation: Handled by action classes and type definitions
+
+### Repository Layer  
+- `ObjectNotFound`: Raised when policy lookup fails
+- `IntegrityError`: Raised when creating duplicate policies (unique constraint violation)
+- Database constraint violations: Non-null constraints on numeric fields
+- Transaction failures: Proper rollback on errors
 
 ## Best Practices
 
 1. **Use Partial Updates**: When modifying policies, only specify fields that need to change
-2. **Handle Errors Gracefully**: Always catch `ObjectNotFound` exceptions in client code
-3. **Resource Limits**: Set reasonable defaults for resource limits based on your infrastructure
-4. **Policy Naming**: Use descriptive names that indicate the policy's purpose or target group
+2. **Handle Errors Gracefully**: 
+   - Always catch `ObjectNotFound` exceptions in client code
+   - Handle `IntegrityError` when creating policies with duplicate names
+3. **Resource Limits**: 
+   - Set reasonable defaults for resource limits based on your infrastructure
+   - All numeric fields are required (cannot be NULL)
+   - Zero values are valid for testing or special cases
+4. **Policy Naming**: 
+   - Use descriptive names that indicate the policy's purpose or target group
+   - Policy names must be unique across the system
+5. **Testing**: 
+   - Use provided fixtures for consistent test data management
+   - Ensure proper cleanup with context managers
+   - Test both success and failure scenarios
