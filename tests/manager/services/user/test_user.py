@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
@@ -21,7 +22,6 @@ from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.manager.services.user.type import UserCreator, UserInfoContext
 from ai.backend.manager.types import OptionalState
 
 
@@ -82,7 +82,7 @@ class TestUserServiceCompatibility:
 
         # Test 1.1: Normal user creation
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="test@example.com",
                 password="SecurePass123!",
                 username="testuser",
@@ -110,7 +110,7 @@ class TestUserServiceCompatibility:
         )
 
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="container@example.com",
                 password="ContainerPass123!",
                 username="containeruser",
@@ -129,9 +129,9 @@ class TestUserServiceCompatibility:
         # Verify container settings were passed to repository
         call_args = mock_dependencies["user_repository"].create_user_validated.call_args
         user_data = call_args[0][0]
-        assert user_data["container_uid"] == 2000
-        assert user_data["container_main_gid"] == 2000
-        assert user_data["container_gids"] == [2000, 2001]
+        assert user_data.container_uid == 2000
+        assert user_data.container_main_gid == 2000
+        assert user_data.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
     async def test_modify_user_action_structure(self, user_service, mock_dependencies):
@@ -262,7 +262,7 @@ class TestUserServiceCompatibility:
             totp_activated=False,
             resource_policy="default-policy",
             sudo_session_enabled=False,
-            group_ids=["group1", "group2"],
+            # group_ids is not part of UserCreator
             container_uid=2000,
             container_main_gid=2000,
             container_gids=[2000, 2001],

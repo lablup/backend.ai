@@ -316,7 +316,7 @@ class TestModifyUserIntegration:
         created_user: uuid.UUID,
         database_engine: ExtendedAsyncSAEngine,
     ) -> None:
-        """Test 2.3: Group membership changes"""
+        """Test 2.3: Group membership changes when domain changes"""
         user_id = created_user
 
         # Get the created user's email
@@ -325,7 +325,21 @@ class TestModifyUserIntegration:
                 sa.select(UserRow.email).where(UserRow.uuid == user_id)
             )
 
-        # Create test groups
+        # Create a new domain
+        async with database_engine.begin_session() as session:
+            from ai.backend.manager.models.domain import DomainRow
+
+            await session.execute(
+                sa.insert(DomainRow).values({
+                    "name": "test-domain",
+                    "description": "Test domain for group changes",
+                    "is_active": True,
+                    "total_resource_slots": {},
+                    "allowed_vfolder_hosts": {},
+                })
+            )
+
+        # Create test groups in the new domain
         async with database_engine.begin_session() as session:
             new_team_id = uuid.uuid4()
             research_team_id = uuid.uuid4()
@@ -335,29 +349,34 @@ class TestModifyUserIntegration:
                     {
                         "id": new_team_id,
                         "name": "new-team",
-                        "domain_name": "default",
+                        "domain_name": "test-domain",
                         "type": ProjectType.GENERAL,
                         "resource_policy": "default",
                     },
                     {
                         "id": research_team_id,
                         "name": "research-team",
-                        "domain_name": "default",
+                        "domain_name": "test-domain",
                         "type": ProjectType.GENERAL,
                         "resource_policy": "default",
                     },
                 ])
             )
 
+        # Modify user to change domain and set groups
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(),
+            modifier=UserModifier(
+                domain_name=OptionalState.update("test-domain"),
+            ),
             group_ids=[str(new_team_id), str(research_team_id)],
         )
 
         result = await processors.modify_user.wait_for_complete(action)
 
         assert result.success is True
+        assert result.data is not None
+        assert result.data.domain_name == "test-domain"
 
         # Verify group membership
         async with database_engine.begin_session() as session:
