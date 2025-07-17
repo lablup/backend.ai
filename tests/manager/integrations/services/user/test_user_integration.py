@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.keypair import (
@@ -41,7 +42,6 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.processors import UserProcessors
-from ai.backend.manager.services.user.type import UserCreator, UserInfoContext
 from ai.backend.manager.types import OptionalState
 
 
@@ -143,7 +143,7 @@ class TestCreateUserIntegration:
     ) -> None:
         """Test 1.1: Normal user creation with all required fields"""
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="testnewuser@example.com",
                 password="SecurePass123!",
                 username="testnewuser",
@@ -175,7 +175,7 @@ class TestCreateUserIntegration:
     ) -> None:
         """Test 1.2: Admin user creation with sudo session enabled"""
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="testadmin@example.com",
                 password="AdminPass123!",
                 username="testadmin",
@@ -203,7 +203,7 @@ class TestCreateUserIntegration:
     ) -> None:
         """Test 1.5: Container UID/GID configuration"""
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="testcontainer@example.com",
                 password="ContainerPass123!",
                 username="testcontaineruser",
@@ -232,7 +232,7 @@ class TestCreateUserIntegration:
     ) -> None:
         """Test 1.6: Resource policy and IP restriction"""
         action = CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 email="testlimited@example.com",
                 password="LimitedPass123!",
                 username="testlimiteduser",
@@ -352,7 +352,7 @@ class TestModifyUserIntegration:
         action = ModifyUserAction(
             email=user_email,
             modifier=UserModifier(),
-            group_ids=OptionalState.update([str(new_team_id), str(research_team_id)]),
+            group_ids=[str(new_team_id), str(research_team_id)],
         )
 
         result = await processors.modify_user.wait_for_complete(action)

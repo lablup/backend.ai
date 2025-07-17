@@ -7,7 +7,6 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserStatus
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -35,6 +34,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.types import NoUserUpdateError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,40 +68,9 @@ class UserService:
         self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        username = action.input.username if action.input.username else action.input.email
-        _status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if action.input.status is None and action.input.is_active is not None:
-            _status = UserStatus.ACTIVE if action.input.is_active else UserStatus.INACTIVE
-        if action.input.status is not None:
-            _status = action.input.status
-        group_ids = [] if action.input.group_ids is None else action.input.group_ids
-
-        user_data = {
-            "username": username,
-            "email": action.input.email,
-            "password": action.input.password,
-            "need_password_change": action.input.need_password_change,
-            "full_name": action.input.full_name,
-            "description": action.input.description,
-            "status": _status,
-            "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": action.input.domain_name,
-            "role": action.input.role,
-            "allowed_client_ip": action.input.allowed_client_ip,
-            "totp_activated": action.input.totp_activated,
-            "resource_policy": action.input.resource_policy,
-            "sudo_session_enabled": action.input.sudo_session_enabled,
-        }
-        if action.input.container_uid is not None:
-            user_data["container_uid"] = action.input.container_uid
-        if action.input.container_main_gid is not None:
-            user_data["container_main_gid"] = action.input.container_main_gid
-        if action.input.container_gids is not None:
-            user_data["container_gids"] = action.input.container_gids
-
         try:
             user_data_result = await self._user_repository.create_user_validated(
-                user_data, group_ids
+                action.creator, action.group_ids
             )
             return CreateUserActionResult(
                 data=user_data_result,
@@ -116,25 +85,13 @@ class UserService:
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         email = action.email
         data = action.modifier.fields_to_update()
-        if data.get("password") is None:
-            data.pop("password", None)
-
-        group_ids = action.group_ids.optional_value()
-
+        group_ids = action.group_ids
         if not data and group_ids is None:
-            return ModifyUserActionResult(data=None, success=False)
-        if data.get("status") is None and data.get("is_active") is not None:
-            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
-
-        if data.get("password") is not None:
-            from datetime import datetime
-
-            data["password_changed_at"] = datetime.now()
-
+            raise NoUserUpdateError("No fields to update for user {email}.")
         try:
             user_data_result = await self._user_repository.update_user_validated(
                 email=email,
-                updates=data,
+                modifier=action.modifier,
                 group_ids=group_ids,
                 requester_uuid=None,  # No user context available in ModifyUserAction
             )
@@ -163,10 +120,9 @@ class UserService:
         log.info("Purging all records of the user {0}...", email)
 
         # Check if user exists
-        user_data = await self._admin_user_repository.get_by_email_force(email)
-        if not user_data:
-            raise RuntimeError(f"User not found (email: {email})")
-
+        user_data = await self._user_repository.get_by_email_validated(
+            email=email,
+        )
         user_uuid = user_data.uuid
 
         # Check for active vfolder mounts

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -36,7 +37,6 @@ from ai.backend.manager.services.user.actions.modify_user import ModifyUserActio
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.manager.services.user.type import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.types import OptionalState
 
 from .test_utils import TestScenario
@@ -187,7 +187,7 @@ def create_user(
         TestScenario.success(
             "With valid data, create user action will be successful",
             CreateUserAction(
-                input=UserCreator(
+                creator=UserCreator(
                     username="testuser",
                     password="password123",
                     email="test_user@test.com",
@@ -202,11 +202,11 @@ def create_user(
                     totp_activated=False,
                     resource_policy="default",
                     sudo_session_enabled=False,
-                    group_ids=None,
                     container_uid=None,
                     container_main_gid=None,
                     container_gids=None,
                 ),
+                group_ids=None,
             ),
             CreateUserActionResult(
                 data=UserData(
@@ -240,7 +240,7 @@ def create_user(
         TestScenario.success(
             "With non-existing domain name, create user action will return result with None data",
             CreateUserAction(
-                input=UserCreator(
+                creator=UserCreator(
                     username="test_user_not_existing_domain",
                     password="password123",
                     email="test@test.com",
@@ -255,11 +255,11 @@ def create_user(
                     totp_activated=False,
                     resource_policy="default",
                     sudo_session_enabled=False,
-                    group_ids=None,
                     container_uid=None,
                     container_main_gid=None,
                     container_gids=None,
                 ),
+                group_ids=None,
             ),
             CreateUserActionResult(
                 data=None,

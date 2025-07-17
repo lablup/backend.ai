@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models import (
@@ -36,7 +37,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
-from ai.backend.manager.services.user.type import UserData
 
 
 class AdminUserRepository:

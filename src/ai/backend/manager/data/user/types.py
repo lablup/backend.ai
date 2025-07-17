@@ -26,13 +26,17 @@ class UserCreator(Creator):
     totp_activated: Optional[bool] = None
     resource_policy: Optional[str] = None
     sudo_session_enabled: Optional[bool] = None
-    group_ids: Optional[list[str]] = None
     container_uid: Optional[int] = None
     container_main_gid: Optional[int] = None
     container_gids: Optional[list[int]] = None
 
     def fields_to_store(self) -> dict[str, Any]:
-        return {
+        status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
+        if self.status is None and self.is_active is not None:
+            status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
+        if self.status is not None:
+            status = self.status
+        user_data = {
             "email": self.email,
             "username": self.username,
             "password": self.password,
@@ -40,18 +44,23 @@ class UserCreator(Creator):
             "domain_name": self.domain_name,
             "full_name": self.full_name,
             "description": self.description,
-            "is_active": self.is_active,
-            "status": self.status,
+            "status": status,
             "role": self.role,
             "allowed_client_ip": self.allowed_client_ip,
             "totp_activated": self.totp_activated,
             "resource_policy": self.resource_policy,
             "sudo_session_enabled": self.sudo_session_enabled,
-            "group_ids": self.group_ids,
             "container_uid": self.container_uid,
             "container_main_gid": self.container_main_gid,
             "container_gids": self.container_gids,
         }
+        if self.container_uid is not None:
+            user_data["container_uid"] = self.container_uid
+        if self.container_main_gid is not None:
+            user_data["container_main_gid"] = self.container_main_gid
+        if self.container_gids is not None:
+            user_data["container_gids"] = self.container_gids
+        return user_data
 
 
 @dataclass
@@ -88,9 +97,7 @@ class UserData:
     container_gids: Optional[list[int]] = field(compare=False)
 
     @classmethod
-    def from_row(cls, row: Row) -> Optional[Self]:
-        if row is None:
-            return None
+    def from_row(cls, row: Row) -> Self:
         return cls(
             id=row.uuid,
             uuid=row.uuid,
