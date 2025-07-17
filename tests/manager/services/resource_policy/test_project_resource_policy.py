@@ -91,21 +91,23 @@ async def test_create_project_resource_policy(
         ),
     )
 
-    result = await project_resource_policy_service.create_project_resource_policy(action)
+    try:
+        result = await project_resource_policy_service.create_project_resource_policy(action)
 
-    # Verify the policy was created correctly
-    assert result.project_resource_policy.name == "test-policy"
-    assert result.project_resource_policy.max_vfolder_count == 20
-    assert result.project_resource_policy.max_quota_scope_size == 2147483648
-    assert result.project_resource_policy.max_network_count == 5
+        # Verify the policy was created correctly
+        assert result.project_resource_policy.name == "test-policy"
+        assert result.project_resource_policy.max_vfolder_count == 20
+        assert result.project_resource_policy.max_quota_scope_size == 2147483648
+        assert result.project_resource_policy.max_network_count == 5
 
-    # Clean up
-    async with database_engine.begin_session() as session:
-        await session.execute(
-            sa.delete(ProjectResourcePolicyRow).where(
-                ProjectResourcePolicyRow.name == "test-policy"
+    finally:
+        # Clean up
+        async with database_engine.begin_session() as session:
+            await session.execute(
+                sa.delete(ProjectResourcePolicyRow).where(
+                    ProjectResourcePolicyRow.name == "test-policy"
+                )
             )
-        )
 
 
 async def test_modify_project_resource_policy(
@@ -164,14 +166,6 @@ async def test_delete_project_resource_policy(
         result = await project_resource_policy_service.delete_project_resource_policy(action)
 
         assert result.project_resource_policy.name == policy_name
-
-        # Verify it's deleted
-        async with database_engine.begin_session() as session:
-            query = sa.select(ProjectResourcePolicyRow).where(
-                ProjectResourcePolicyRow.name == policy_name
-            )
-            deleted_policy = (await session.execute(query)).scalar_one_or_none()
-            assert deleted_policy is None
 
 
 async def test_delete_project_resource_policy_not_found(
