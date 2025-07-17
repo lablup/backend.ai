@@ -42,7 +42,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -55,9 +54,7 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -185,7 +182,7 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
-def ipc_base_path() -> Path:
+def ipc_base_path(test_id) -> Path:
     ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     return ipc_base_path
@@ -379,17 +376,21 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def unified_config(
-    app, bootstrap_config: BootstrapConfig, etcd_fixture
-) -> AsyncIterator[ManagerUnifiedConfig]:
-    root_ctx: RootContext = app["_root.context"]
-    etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
-    root_ctx.etcd = etcd
-    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    raw_config = await etcd_loader.load()
-    merged_config = {**bootstrap_config.model_dump(), **raw_config}
-    unified_config = ManagerUnifiedConfig(**merged_config)
-    yield unified_config
+def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
+    """
+    Provide a local_config fixture that returns the bootstrap config as a dictionary.
+    This is used by session processors and other components that expect config in dict format.
+    """
+    config_dict = bootstrap_config.model_dump()
+
+    # Convert back to proper types for compatibility with AsyncEtcd
+    from ai.backend.common.typed_validators import HostPortPair
+
+    config_dict["etcd"]["addr"] = HostPortPair(
+        host=config_dict["etcd"]["addr"]["host"], port=config_dict["etcd"]["addr"]["port"]
+    )
+
+    return config_dict
 
 
 @pytest.fixture(scope="session")

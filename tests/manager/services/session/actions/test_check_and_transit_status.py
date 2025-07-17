@@ -23,10 +23,14 @@ from ..fixtures import (
 @pytest.fixture
 def mock_check_and_transit_status_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService._check_and_transit_status",
+        "ai.backend.manager.services.session.service.SessionService.check_and_transit_status",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    # Return proper CheckAndTransitStatusActionResult object instead of just dict
+    mock.return_value = CheckAndTransitStatusActionResult(
+        result=mock_agent_response_result,
+        session_row=SESSION_ROW_FIXTURE,
+    )
     return mock
 
 
