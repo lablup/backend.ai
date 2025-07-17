@@ -1,1 +1,0 @@
-# BUILD file for services tests
