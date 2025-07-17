@@ -1,13 +1,13 @@
 import itertools
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.metrics.metric import LayerType
@@ -15,6 +15,8 @@ from ai.backend.common.types import AgentId, ResourceSlot, SessionId
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.model_serving import EndpointNotFound
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
     AgentRow,
     AgentStatus,
@@ -209,7 +211,7 @@ class ScheduleRepository:
             )
             row = result.first()
             if row is None:
-                raise ValueError(f'Scaling group "{sgroup_name}" not found!')
+                raise ScalingGroupNotFound(f'Scaling group "{sgroup_name}" not found!')
             return row.scheduler, row.scheduler_opts
 
     @repository_decorator()
@@ -222,11 +224,14 @@ class ScheduleRepository:
             return await self._list_managed_sessions(session, sgroup_name, pending_timeout)
 
     @repository_decorator()
-    async def get_endpoint_for_session(self, session_id: SessionId) -> Optional[uuid.UUID]:
+    async def get_endpoint_for_session(self, session_id: SessionId) -> uuid.UUID:
         async with self._db.begin_readonly_session() as session:
-            return await session.scalar(
+            res = await session.scalar(
                 sa.select(RoutingRow.endpoint).where(RoutingRow.session == session_id)
             )
+            if res is None:
+                raise EndpointNotFound("No endpoint found for session.")
+            return res
 
     @repository_decorator()
     async def get_kernel_count_per_agent_at_endpoint(
@@ -240,12 +245,12 @@ class ScheduleRepository:
             )
 
     @repository_decorator()
-    async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> list[AgentRow]:
+    async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> Sequence[AgentRow]:
         async with self._db.begin_readonly_session() as session:
             from ai.backend.manager.models import list_schedulable_agents_by_sgroup
 
             result = await list_schedulable_agents_by_sgroup(session, sgroup_name)
-            return list(result)
+            return result
 
     @repository_decorator()
     async def get_session_by_id(self, session_id: SessionId) -> Optional[SessionRow]:
@@ -264,6 +269,7 @@ class ScheduleRepository:
     ) -> Optional[SessionRow]:
         eager_loading_op = (
             selectinload(SessionRow.kernels).options(
+                noload("*"),
                 selectinload(KernelRow.agent_row).noload("*"),
             ),
         )
