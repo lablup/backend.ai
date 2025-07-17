@@ -482,7 +482,7 @@ class TestUserStatsIntegration:
         user_id = created_user
 
         action = UserMonthStatsAction(
-            user_id=str(user_id),
+            user_id=user_id,
         )
 
         result = await processors.user_month_stats.wait_for_complete(action)
