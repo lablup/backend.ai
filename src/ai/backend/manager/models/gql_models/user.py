@@ -19,6 +19,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
@@ -36,7 +37,6 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
-from ai.backend.manager.services.user.type import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
@@ -733,7 +733,7 @@ class UserInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateUserAction(
-            input=UserCreator(
+            creator=UserCreator(
                 username=self.username,
                 password=self.password,
                 email=email,
@@ -748,11 +748,11 @@ class UserInput(graphene.InputObjectType):
                 totp_activated=value_or_none(self.totp_activated),
                 resource_policy=value_or_none(self.resource_policy),
                 sudo_session_enabled=value_or_none(self.sudo_session_enabled),
-                group_ids=value_or_none(self.group_ids),
                 container_uid=value_or_none(self.container_uid),
                 container_main_gid=value_or_none(self.container_main_gid),
                 container_gids=value_or_none(self.container_gids),
             ),
+            group_ids=value_or_none(self.group_ids),
         )
 
 
@@ -846,9 +846,7 @@ class ModifyUserInput(graphene.InputObjectType):
                     self.container_gids,
                 ),
             ),
-            group_ids=OptionalState[list[str]].from_graphql(
-                self.group_ids,
-            ),
+            group_ids=self.group_ids,
         )
 
 

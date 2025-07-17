@@ -33,10 +33,9 @@ from ai.backend.manager.models.session import (
     join_related_field,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow, UserStatus, users
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
-from ai.backend.manager.services.user.type import UserData
 
 
 class AdminUserRepository:
@@ -49,89 +48,6 @@ class AdminUserRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    async def get_by_email_force(self, email: str) -> Optional[UserData]:
-        """
-        Get user by email without ownership validation.
-        Admin-only operation that bypasses access controls.
-        """
-        async with self._db.begin_session() as session:
-            user_row = await self._get_user_by_email(session, email)
-            if not user_row:
-                return None
-            return UserData.from_row(user_row)
-
-    async def get_by_uuid_force(self, user_uuid: UUID) -> Optional[UserData]:
-        """
-        Get user by UUID without ownership validation.
-        Admin-only operation that bypasses access controls.
-        """
-        async with self._db.begin_session() as session:
-            user_row = await self._get_user_by_uuid(session, user_uuid)
-            if not user_row:
-                return None
-            return UserData.from_row(user_row)
-
-    async def create_user_force(self, user_data: dict, group_ids: list[str]) -> UserData:
-        """
-        Create user with admin privileges, bypassing normal validation.
-        """
-        async with self._db.begin() as conn:
-            # Direct user creation without additional validations
-            user_insert_query = sa.insert(users).values(user_data)
-            query = user_insert_query.returning(user_insert_query.table)
-            result = await conn.execute(query)
-            created_user = result.first()
-
-            if not created_user:
-                raise RuntimeError("Failed to create user")
-
-        result = UserData.from_row(created_user)
-        if not result:
-            raise RuntimeError("Failed to convert created user row to UserData")
-        return result
-
-    async def update_user_force(
-        self,
-        email: str,
-        updates: dict,
-        group_ids: Optional[list[str]] = None,
-    ) -> UserData:
-        """
-        Update user with admin privileges, bypassing ownership validation.
-        """
-        async with self._db.begin() as conn:
-            # Direct update without ownership validation
-            update_query = (
-                sa.update(users).where(users.c.email == email).values(updates).returning(users)
-            )
-            result = await conn.execute(update_query)
-            updated_user = result.first()
-
-            if not updated_user:
-                raise UserNotFound()
-
-        result = UserData.from_row(updated_user)
-        if not result:
-            raise RuntimeError("Failed to convert updated user row to UserData")
-        return result
-
-    async def delete_user_force(self, email: str) -> None:
-        """
-        Force delete user without ownership validation.
-        """
-        async with self._db.begin() as conn:
-            # Deactivate all user keypairs
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email)
-            )
-
-            # Soft delete user
-            await conn.execute(
-                sa.update(users)
-                .values(status=UserStatus.DELETED, status_info="admin-requested")
-                .where(users.c.email == email)
-            )
 
     async def purge_user_force(self, email: str) -> None:
         """

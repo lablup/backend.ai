@@ -13,18 +13,19 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.auth import UserNotFound
+from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
-from ai.backend.manager.models.user import UserRow, UserStatus, users
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.user.type import UserData
+from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
@@ -38,41 +39,25 @@ class UserRepository:
 
     @repository_decorator()
     async def get_by_email_validated(
-        self, email: str, requester_uuid: Optional[UUID]
-    ) -> Optional[UserData]:
+        self,
+        email: str,
+    ) -> UserData:
         """
         Get user by email with ownership validation.
         Returns None if user not found or access denied.
         """
         async with self._db.begin_session() as session:
             user_row = await self._get_user_by_email(session, email)
-            if not user_row:
-                return None
-            if not self._validate_user_access(user_row, requester_uuid):
-                return None
             return UserData.from_row(user_row)
 
     @repository_decorator()
-    async def get_by_uuid_validated(
-        self, user_uuid: UUID, requester_uuid: Optional[UUID]
-    ) -> Optional[UserData]:
-        """
-        Get user by UUID with ownership validation.
-        Returns None if user not found or access denied.
-        """
-        async with self._db.begin_session() as session:
-            user_row = await self._get_user_by_uuid(session, user_uuid)
-            if not user_row:
-                return None
-            if not self._validate_user_access(user_row, requester_uuid):
-                return None
-            return UserData.from_row(user_row)
-
-    @repository_decorator()
-    async def create_user_validated(self, user_data: dict, group_ids: list[str]) -> UserData:
+    async def create_user_validated(
+        self, user_creator: UserCreator, group_ids: Optional[list[str]]
+    ) -> UserData:
         """
         Create a new user with default keypair and group associations.
         """
+        user_data = user_creator.fields_to_store()
         async with self._db.begin() as conn:
             # Insert user
             user_insert_query = sa.insert(users).values(user_data)
@@ -109,7 +94,7 @@ class UserRepository:
 
             # Add user to groups including model store project
             await self._add_user_to_groups(
-                conn, created_user.uuid, user_data["domain_name"], group_ids
+                conn, created_user.uuid, user_data["domain_name"], group_ids or []
             )
 
             res = UserData.from_row(created_user)
@@ -121,59 +106,53 @@ class UserRepository:
     async def update_user_validated(
         self,
         email: str,
-        updates: dict,
+        modifier: UserModifier,
         group_ids: Optional[list[str]],
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
         Update user with ownership validation and handle role/group changes.
         """
+        to_update = modifier.fields_to_update()
         async with self._db.begin() as conn:
             # Get current user data for validation
             current_user = await self._get_user_by_email_with_conn(conn, email)
-            if not current_user:
-                raise UserNotFound()
-
-            if not self._validate_user_access(current_user, requester_uuid):
-                raise UserNotFound()
-
-            prev_role = current_user.role
 
             # Handle main_access_key validation
-            if "main_access_key" in updates:
-                await self._validate_and_update_main_access_key(
-                    conn, email, updates["main_access_key"]
-                )
+            main_access_key = modifier.main_access_key.optional_value()
+            if main_access_key:
+                await self._validate_and_update_main_access_key(conn, email, main_access_key)
 
             # Update user
-            if "status" in updates and current_user.status != updates["status"]:
-                updates["status_info"] = "admin-requested"
-
-            if "password" in updates:
-                updates["password_changed_at"] = sa.func.now()
-
+            if modifier.password.optional_value():
+                to_update["password_changed_at"] = sa.func.now()
+            status = modifier.status.optional_value()
+            if status is not None and status != current_user.status:
+                to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users).where(users.c.email == email).values(updates).returning(users)
+                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
             )
             result = await conn.execute(update_query)
             updated_user = result.first()
+            if not updated_user:
+                raise RuntimeError("Failed to update user")
 
             # Handle role changes
-            if "role" in updates and updates["role"] != prev_role:
-                await self._sync_keypair_roles(conn, updated_user.uuid, updates["role"])
+            prev_role = current_user.role
+            prev_domain_name = current_user.domain_name
+            role = modifier.role.optional_value()
+            if role is not None and role != prev_role:
+                await self._sync_keypair_roles(conn, updated_user.uuid, role)
 
             # Handle group updates
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 
-            if group_ids is not None:
+            if prev_domain_name != updated_user.domain_name and group_ids is not None:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
-
             res = UserData.from_row(updated_user)
-        if not res:
-            raise RuntimeError("Failed to convert updated user row to UserData")
         return res
 
     @repository_decorator()
@@ -182,19 +161,10 @@ class UserRepository:
         Soft delete user by setting status to DELETED and deactivating keypairs.
         """
         async with self._db.begin() as conn:
-            # Validate user exists and access
-            user_row = await self._get_user_by_email_with_conn(conn, email)
-            if not user_row:
-                raise UserNotFound()
-
-            if not self._validate_user_access(user_row, requester_uuid):
-                raise UserNotFound()
-
             # Deactivate all user keypairs
             await conn.execute(
                 sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email)
             )
-
             # Soft delete user
             await conn.execute(
                 sa.update(users)
@@ -202,18 +172,27 @@ class UserRepository:
                 .where(users.c.email == email)
             )
 
-    async def _get_user_by_email(self, session: SASession, email: str) -> Optional[UserRow]:
+    async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
-        return await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+        res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+        if res is None:
+            raise UserNotFound(f"User with email {email} not found.")
+        return res
 
-    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> Optional[UserRow]:
+    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID."""
-        return await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        if res is None:
+            raise UserNotFound(f"User with UUID {user_uuid} not found.")
+        return res
 
-    async def _get_user_by_email_with_conn(self, conn, email: str) -> Optional[UserRow]:
+    async def _get_user_by_email_with_conn(self, conn, email: str) -> UserRow:
         """Private method to get user by email using connection."""
         result = await conn.execute(sa.select(users).where(users.c.email == email))
-        return result.first()
+        res = result.first()
+        if res is None:
+            raise UserNotFound(f"User with email {email} not found.")
+        return res
 
     def _validate_user_access(self, user_row: UserRow, requester_uuid: Optional[UUID]) -> bool:
         """Private method to validate user access - can be extended for ownership logic."""
@@ -260,15 +239,15 @@ class UserRepository:
         )
         keypair_row = (await session.scalars(keypair_query)).first()
         if not keypair_row:
-            raise RuntimeError("Cannot set non-existing access key as the main access key.")
+            raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
         if keypair_row.user_row.email != email:
-            raise RuntimeError("Cannot set another user's access key as the main access key.")
+            raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
 
         await conn.execute(
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
 
-    async def _sync_keypair_roles(self, conn, user_uuid: UUID, new_role: str) -> None:
+    async def _sync_keypair_roles(self, conn, user_uuid: UUID, new_role: UserRole) -> None:
         """Private method to sync keypair roles with user role."""
         from sqlalchemy.sql.expression import bindparam
 
@@ -285,7 +264,7 @@ class UserRepository:
             .order_by(sa.desc(keypairs.c.is_active))
         )
 
-        if new_role in ["superadmin", "admin"]:
+        if new_role in [UserRole.SUPERADMIN, UserRole.ADMIN]:
             # User becomes admin - set first keypair as active admin
             kp = result.first()
             kp_data = {}
