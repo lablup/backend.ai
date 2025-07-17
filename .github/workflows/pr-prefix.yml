@@ -12,7 +12,7 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore|release|deps)(\([^)]+\))?$';
+          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore|release|test|deps)(\([^)]+\))?$';
           then
             echo "PR title is valid."
           else
@@ -26,6 +26,7 @@ jobs:
             echo "  ci:         (for changes related to CI/CD workflows)"
             echo "  chore:      (for changes related to repo/build configs, tool dependencies, etc.)"
             echo "  release:    (for changes related to versioning and release management)"
+            echo "  test:       (for changes related to tests and test cases)"
             echo "  deps:       (for changes related to upstream dependencies, etc.)"
             echo "following the conventional commit style."
             echo ""
