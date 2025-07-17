@@ -27,6 +27,8 @@ class KeypairResourcePolicyRepository:
             db_row = KeyPairResourcePolicyRow(**fields)
             db_sess.add(db_row)
             await db_sess.flush()
+            # Refresh the object to ensure all attributes are loaded
+            await db_sess.refresh(db_row)
             return db_row.to_dataclass()
 
     @repository_decorator()
