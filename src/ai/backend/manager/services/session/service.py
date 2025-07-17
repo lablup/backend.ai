@@ -1107,7 +1107,9 @@ class SessionService:
         )
         kernel = session.main_kernel
         report = await self._agent_registry.get_abusing_report(kernel.id)
-        return GetAbusingReportActionResult(result=report, session_row=session)
+        return GetAbusingReportActionResult(
+            abuse_report=report, session_data=session.to_dataclass()
+        )
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
@@ -1120,8 +1122,12 @@ class SessionService:
         )
         statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
 
-        resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
-        return GetCommitStatusActionResult(result=resp, session_row=session)
+        commit_info = CommitStatusInfo(
+            status=statuses[session.main_kernel.id], kernel=str(session.main_kernel.id)
+        )
+        return GetCommitStatusActionResult(
+            commit_info=commit_info, session_data=session.to_dataclass()
+        )
 
     async def get_container_logs(
         self, action: GetContainerLogsAction
@@ -1155,7 +1161,9 @@ class SessionService:
                 # Get logs from database record
                 log.debug("returning log from database record")
                 resp["result"]["logs"] = kernel_log.decode("utf-8")
-                return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+                return GetContainerLogsActionResult(
+                    result=resp, session_data=compute_session.to_dataclass()
+                )
 
         registry = self._agent_registry
         await registry.increment_session_usage(compute_session)
@@ -1231,7 +1239,6 @@ class SessionService:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        resp = {}
         sess = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
