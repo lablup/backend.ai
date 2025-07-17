@@ -339,7 +339,7 @@ async def test_modify_domain_node(
                     name="test-complex-resources",
                     description="Test domain with complex resource slots",
                     total_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "10", "memory": "64G", "cuda.device": "2"}, None
+                        {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
                     ),
                     allowed_vfolder_hosts={
                         "host1": ["upload-file", "download-file", "mount-in-session"],
@@ -361,7 +361,7 @@ async def test_modify_domain_node(
                     created_at=datetime.now(),
                     modified_at=datetime.now(),
                     total_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "10", "memory": "64G", "cuda.device": "2"}, None
+                        {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
                     ),
                     allowed_vfolder_hosts=VFolderHostPermissionMap({
                         "host1": {"upload-file", "download-file", "mount-in-session"},
@@ -913,7 +913,7 @@ async def test_modify_domain_resource_slots_update(
             user_info=admin_user,
             modifier=DomainModifier(
                 total_resource_slots=TriState.update(
-                    ResourceSlot.from_user_input({"cpu": "20", "memory": "128G"}, None)
+                    ResourceSlot.from_user_input({"cpu": "20", "mem": "128G"}, None)
                 ),
             ),
         )
@@ -1126,7 +1126,7 @@ async def test_create_domain_with_comprehensive_settings(
             description="Comprehensive test domain with all settings",
             is_active=True,
             total_resource_slots=ResourceSlot.from_user_input(
-                {"cpu": "100", "memory": "512G", "cuda.device": "8", "rocm.device": "4"}, None
+                {"cpu": "100", "mem": "512G", "cuda.device": "8", "rocm.device": "4"}, None
             ),
             allowed_vfolder_hosts={
                 "local": ["upload-file", "download-file", "mount-in-session"],
@@ -1177,7 +1177,7 @@ async def test_domain_lifecycle_complete_workflow(
         creator=DomainCreator(
             name=domain_name,
             description="Lifecycle test domain",
-            total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "memory": "16G"}, None),
+            total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "16G"}, None),
         ),
         user_info=admin_user,
     )
@@ -1193,7 +1193,7 @@ async def test_domain_lifecycle_complete_workflow(
             modifier=DomainModifier(
                 description=TriState.update("Modified lifecycle test domain"),
                 total_resource_slots=TriState.update(
-                    ResourceSlot.from_user_input({"cpu": "8", "memory": "32G"}, None)
+                    ResourceSlot.from_user_input({"cpu": "8", "mem": "32G"}, None)
                 ),
             ),
         )
