@@ -24,6 +24,7 @@ from ai.backend.manager.services.metric.types import (
     ContainerMetricResult,
     MetricResultValue,
     UtilizationMetricType,
+    ValueType,
 )
 
 
@@ -117,9 +118,9 @@ class TestQueryMetric:
                     metric_name="container_cpu_percent",
                     start="2024-01-01T00:00:00",
                     end="2024-01-01T01:00:00",
-                    step=60,
+                    step="60s",
                     labels=ContainerMetricOptionalLabel(
-                        value_type="usage",
+                        value_type="current",
                         kernel_id="kernel-123",
                     ),
                 ),
@@ -127,9 +128,15 @@ class TestQueryMetric:
                     result=[
                         ContainerMetricResult(
                             metric=ContainerMetricResponseInfo(
-                                value_type="usage",
+                                value_type="current",
+                                container_metric_name="cpu_util",
+                                agent_id=None,
+                                instance=None,
+                                job=None,
                                 kernel_id="kernel-123",
-                                container_metric_name="container_cpu_percent",
+                                owner_project_id= None,
+                                owner_user_id= None,
+                                session_id= None,
                             ),
                             values=[
                                 MetricResultValue(1704067200.0, "10.5"),
@@ -146,16 +153,16 @@ class TestQueryMetric:
                     metric_name="container_memory_used_bytes",
                     start="2024-01-01T00:00:00",
                     end="2024-01-01T00:05:00",
-                    step=60,
+                    step="60s",
                     labels=ContainerMetricOptionalLabel(
-                        value_type="usage",
+                        value_type="current",
                     ),
                 ),
                 expected=ContainerMetricActionResult(
                     result=[
                         ContainerMetricResult(
                             metric=ContainerMetricResponseInfo(
-                                value_type="usage",
+                                value_type="current",
                                 container_metric_name="container_memory_used_bytes",
                             ),
                             values=[
@@ -275,7 +282,7 @@ class TestQueryMetric:
                     metric_name="container_memory_capacity_bytes",
                     start="2024-01-01T00:00:00",
                     end="2024-01-01T01:00:00",
-                    step=60,
+                    step="60s",
                     labels=ContainerMetricOptionalLabel(
                         value_type="capacity",
                     ),
@@ -285,7 +292,7 @@ class TestQueryMetric:
                         ContainerMetricResult(
                             metric=ContainerMetricResponseInfo(
                                 value_type="capacity",
-                                container_metric_name="container_memory_capacity_bytes",
+                                container_metric_name="mem",
                             ),
                             values=[
                                 MetricResultValue(1704067200.0, "8589934592"),
