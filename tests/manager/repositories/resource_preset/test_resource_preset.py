@@ -27,23 +27,23 @@ class TestResourcePresetRepository:
     """Test cases for ResourcePresetRepository"""
 
     @pytest.fixture
-    def mock_db_engine(self):
+    def mock_db_engine(self) -> MagicMock:
         """Create mocked database engine"""
         return MagicMock(spec=ExtendedAsyncSAEngine)
 
     @pytest.fixture
-    def resource_preset_repository(self, mock_db_engine):
+    def resource_preset_repository(self, mock_db_engine) -> ResourcePresetRepository:
         """Create ResourcePresetRepository instance with mocked database"""
         return ResourcePresetRepository(db=mock_db_engine)
 
     @pytest.fixture
-    def sample_preset_row(self):
+    def sample_preset_row(self) -> MagicMock:
         """Create sample resource preset row for testing"""
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
-            shared_memory=BinarySize.from_str("2G"),
+            shared_memory=BinarySize(BinarySize.from_str("2G")),
             scaling_group_name=None,
         )
 
@@ -58,19 +58,19 @@ class TestResourcePresetRepository:
         return mock_row
 
     @pytest.fixture
-    def sample_preset_creator(self):
+    def sample_preset_creator(self) -> ResourcePresetCreator:
         """Create sample resource preset creator for creation"""
         return ResourcePresetCreator(
             name="new-preset",
             resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-            shared_memory=BinarySize.from_str("1G"),
+            shared_memory=str(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
 
     @pytest.mark.asyncio
     async def test_create_preset_validated_success(
         self, resource_preset_repository, mock_db_engine, sample_preset_creator, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset creation"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -94,7 +94,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_create_preset_validated_duplicate(
         self, resource_preset_repository, mock_db_engine, sample_preset_creator
-    ):
+    ) -> None:
         """Test preset creation with duplicate name"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -112,7 +112,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_get_preset_by_id_success(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset retrieval by ID"""
         preset_id = sample_preset_row.id
 
@@ -135,7 +135,9 @@ class TestResourcePresetRepository:
             assert result.name == sample_preset_row.name
 
     @pytest.mark.asyncio
-    async def test_get_preset_by_id_not_found(self, resource_preset_repository, mock_db_engine):
+    async def test_get_preset_by_id_not_found(
+        self, resource_preset_repository, mock_db_engine
+    ) -> None:
         """Test preset retrieval by ID when not found"""
         preset_id = uuid.uuid4()
 
@@ -156,7 +158,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_get_preset_by_name_success(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset retrieval by name"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -177,7 +179,9 @@ class TestResourcePresetRepository:
             assert result.id == sample_preset_row.id
 
     @pytest.mark.asyncio
-    async def test_get_preset_by_name_not_found(self, resource_preset_repository, mock_db_engine):
+    async def test_get_preset_by_name_not_found(
+        self, resource_preset_repository, mock_db_engine
+    ) -> None:
         """Test preset retrieval by name when not found"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -196,7 +200,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_get_preset_by_id_or_name_with_id(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test preset retrieval by ID when both ID and name provided"""
         preset_id = sample_preset_row.id
 
@@ -222,7 +226,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_get_preset_by_id_or_name_with_name_only(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test preset retrieval by name only"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -244,7 +248,7 @@ class TestResourcePresetRepository:
             assert result.name == "test-preset"
 
     @pytest.mark.asyncio
-    async def test_get_preset_by_id_or_name_no_params(self, resource_preset_repository):
+    async def test_get_preset_by_id_or_name_no_params(self, resource_preset_repository) -> None:
         """Test preset retrieval with neither ID nor name"""
         with pytest.raises(ValueError, match="Either preset_id or name must be provided"):
             await resource_preset_repository.get_preset_by_id_or_name(preset_id=None, name=None)
@@ -252,7 +256,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_modify_preset_validated_success(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset modification"""
         preset_id = sample_preset_row.id
 
@@ -261,7 +265,7 @@ class TestResourcePresetRepository:
             id=preset_id,
             name="modified-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("17179869184")}),
-            shared_memory=BinarySize.from_str("4G"),
+            shared_memory=BinarySize(BinarySize.from_str("4G")),
             scaling_group_name=None,
         )
 
@@ -280,7 +284,7 @@ class TestResourcePresetRepository:
         modifier = ResourcePresetModifier(
             name=OptionalState.update("modified-preset"),
             resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
-            shared_memory=TriState.update(BinarySize.from_str("4G")),
+            shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
         )
 
         # Mock the _get_preset_by_id method
@@ -300,7 +304,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_modify_preset_validated_not_found(
         self, resource_preset_repository, mock_db_engine
-    ):
+    ) -> None:
         """Test preset modification when preset not found"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -321,7 +325,7 @@ class TestResourcePresetRepository:
                 )
 
     @pytest.mark.asyncio
-    async def test_modify_preset_validated_no_params(self, resource_preset_repository):
+    async def test_modify_preset_validated_no_params(self, resource_preset_repository) -> None:
         """Test preset modification with neither ID nor name"""
         modifier = ResourcePresetModifier()
 
@@ -333,7 +337,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_delete_preset_validated_success(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset deletion"""
         preset_id = sample_preset_row.id
 
@@ -362,7 +366,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_delete_preset_validated_by_name(
         self, resource_preset_repository, mock_db_engine, sample_preset_row
-    ):
+    ) -> None:
         """Test successful preset deletion by name"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -388,7 +392,7 @@ class TestResourcePresetRepository:
     @pytest.mark.asyncio
     async def test_delete_preset_validated_not_found(
         self, resource_preset_repository, mock_db_engine
-    ):
+    ) -> None:
         """Test preset deletion when preset not found"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -407,20 +411,20 @@ class TestResourcePresetRepository:
                 )
 
     @pytest.mark.asyncio
-    async def test_delete_preset_validated_no_params(self, resource_preset_repository):
+    async def test_delete_preset_validated_no_params(self, resource_preset_repository) -> None:
         """Test preset deletion with neither ID nor name"""
         with pytest.raises(ValueError, match="Either preset_id or name must be provided"):
             await resource_preset_repository.delete_preset_validated(preset_id=None, name=None)
 
     @pytest.mark.asyncio
-    async def test_list_presets_all(self, resource_preset_repository, mock_db_engine):
+    async def test_list_presets_all(self, resource_preset_repository, mock_db_engine) -> None:
         """Test listing all presets"""
         # Create multiple preset data
         preset1_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="preset-1",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
-            shared_memory=BinarySize.from_str("1G"),
+            shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
         preset2_data = ResourcePresetData(
@@ -459,7 +463,9 @@ class TestResourcePresetRepository:
         assert result[1].name == "preset-2"
 
     @pytest.mark.asyncio
-    async def test_list_presets_by_scaling_group(self, resource_preset_repository, mock_db_engine):
+    async def test_list_presets_by_scaling_group(
+        self, resource_preset_repository, mock_db_engine
+    ) -> None:
         """Test listing presets filtered by scaling group"""
         # Create presets with different scaling groups
         global_preset = ResourcePresetData(
@@ -506,7 +512,7 @@ class TestResourcePresetRepository:
         assert any(p.name == "group-preset" for p in result)  # Group-specific presets included
 
     @pytest.mark.asyncio
-    async def test_list_presets_empty(self, resource_preset_repository, mock_db_engine):
+    async def test_list_presets_empty(self, resource_preset_repository, mock_db_engine) -> None:
         """Test listing presets when none exist"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
@@ -528,7 +534,7 @@ class TestResourcePresetRepository:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_repository_decorator_applied(self, resource_preset_repository):
+    async def test_repository_decorator_applied(self, resource_preset_repository) -> None:
         """Test that repository decorator is properly applied"""
         # This test verifies that the repository methods have the decorator applied
         # The decorator should be present on the main repository methods
@@ -541,11 +547,11 @@ class TestResourcePresetRepository:
         assert hasattr(resource_preset_repository, "list_presets")
 
 
-class TestResourcePresetRepositoryIntegration:
-    """Integration tests that test ResourcePresetRepository with real database operations"""
+class TestResourcePresetDataModels:
+    """Tests for ResourcePreset data models and type validation"""
 
     @pytest.mark.asyncio
-    async def test_resource_preset_data_conversion(self):
+    async def test_resource_preset_data_conversion(self) -> None:
         """Test ResourcePresetData conversion from ResourcePresetRow"""
         # Create a sample preset row
         preset_row = ResourcePresetRow(
@@ -566,7 +572,7 @@ class TestResourcePresetRepositoryIntegration:
         assert preset_data.shared_memory == preset_row.shared_memory
         assert preset_data.scaling_group_name == preset_row.scaling_group_name
 
-    def test_resource_slot_validation(self):
+    def test_resource_slot_validation(self) -> None:
         """Test resource slot validation"""
         # Test valid resource slots
         valid_slots = ResourceSlot({"cpu": "4", "mem": "8G", "gpu": "1", "gpu_memory": "16G"})
@@ -577,7 +583,7 @@ class TestResourcePresetRepositoryIntegration:
         assert valid_slots["gpu"] == "1"
         assert valid_slots["gpu_memory"] == "16G"
 
-    def test_binary_size_validation(self):
+    def test_binary_size_validation(self) -> None:
         """Test binary size validation"""
         # Test valid binary sizes
         sizes = [
@@ -590,7 +596,7 @@ class TestResourcePresetRepositoryIntegration:
             assert isinstance(size, BinarySize)
             assert size > 0  # BinarySize objects support comparison
 
-    def test_scaling_group_name_validation(self):
+    def test_scaling_group_name_validation(self) -> None:
         """Test scaling group name validation"""
         # Test valid scaling group names
         valid_names = [None, "default", "gpu-cluster", "cpu-only"]
