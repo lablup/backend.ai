@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -326,7 +328,6 @@ async def test_concurrent_operations(
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
     """Test that repository handles concurrent operations correctly"""
-    import asyncio
 
     policy_name = "test-concurrent-policy"
 
