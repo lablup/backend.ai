@@ -192,10 +192,8 @@ class UserService:
         return PurgeUserActionResult(success=True)
 
     async def user_month_stats(self, action: UserMonthStatsAction) -> UserMonthStatsActionResult:
-        from uuid import UUID
-
         stats = await self._user_repository.get_user_time_binned_monthly_stats(
-            user_uuid=UUID(action.user_id),
+            user_uuid=action.user_id,
             valkey_stat_client=self._valkey_stat_client,
         )
         return UserMonthStatsActionResult(stats=stats)
