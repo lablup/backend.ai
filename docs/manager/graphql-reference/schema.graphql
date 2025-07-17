@@ -604,6 +604,8 @@ type ImageNode implements Node {
 
   """Added in 25.11.0. Indicates if the image is installed on any Agent."""
   installed: Boolean
+
+  """Added in 25.12.0."""
   type: ImageType
 }
 
