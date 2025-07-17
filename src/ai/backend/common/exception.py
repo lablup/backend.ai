@@ -135,6 +135,7 @@ class ErrorDomain(enum.StrEnum):
     BGTASK = "bgtask"
     KERNEL = "kernel"
     USER = "user"
+    KEYPAIR = "keypair"
     SESSION = "session"
     GROUP = "group"
     DOMAIN = "domain"
@@ -283,10 +284,7 @@ class BackendAIError(web.HTTPError, ABC):
 
     error_type: str = "https://api.backend.ai/probs/general-error"
     error_title: str = "General Backend API Error."
-
-    content_type: str
     extra_msg: Optional[str]
-
     body_dict: dict[str, Any]
 
     def __init__(self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs):
