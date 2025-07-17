@@ -2,15 +2,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AGENTID_MANAGER, RedisProfileTarget
-from ai.backend.manager.idle import init_idle_checkers
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
@@ -23,9 +22,8 @@ async def processors(
     database_fixture,
     database_engine,
     registry_ctx,
-    shared_config,
     local_config,
-):
+) -> SessionProcessors:
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],
         local_config["etcd"]["namespace"],
@@ -44,53 +42,51 @@ async def processors(
     local_config["redis"] = redis_config_iv.check(raw_redis_config)
     etcd_redis_config = RedisProfileTarget.from_dict(local_config["redis"])
 
-    redis_stream = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
-        name="stream",
-        db=REDIS_STREAM_DB,
+    redis_target = etcd_redis_config.profile_target(RedisRole.STREAM)
+    redis_stream = await ValkeyStreamClient.create(
+        redis_target,
+        human_readable_name="stream",
+        db_id=REDIS_STREAM_DB,
     )
 
     mq = RedisQueue(
         redis_stream,
+        redis_target,
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key="events",
+            broadcast_channel="manager_broadcast",
+            consume_stream_keys={"events"},
+            subscribe_channels=None,
             group_name="manager",
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
-
-    distributed_lock_factory = AsyncMock()
 
     event_producer = EventProducer(
         mq,
         source=AGENTID_MANAGER,
         log_events=False,
     )
-    event_dispatcher = EventDispatcher(
-        mq,
-        log_events=False,
-    )
 
     background_task_manager = BackgroundTaskManager(
-        redis_stream,
         event_producer,
     )
 
-    idle_checker_host = await init_idle_checkers(
-        database_engine,
-        shared_config,
-        event_dispatcher,
-        event_producer,
-        distributed_lock_factory,
-    )
+    # Mock idle_checker_host for testing
+    idle_checker_host = AsyncMock()
 
+    # Mock the complex dependencies for testing
     session_service = SessionService(
         SessionServiceArgs(
-            db=database_engine,
             agent_registry=agent_registry,
+            event_fetcher=AsyncMock(),
             background_task_manager=background_task_manager,
+            event_hub=AsyncMock(),
             error_monitor=ectx,
             idle_checker_host=idle_checker_host,
+            session_repository=AsyncMock(),
+            admin_session_repository=AsyncMock(),
         )
     )
     return SessionProcessors(session_service, [])
