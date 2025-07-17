@@ -1,12 +1,15 @@
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+"""
+Simple tests for Project Resource Policy Service functionality.
+Tests the core project resource policy service actions to verify functionality.
+"""
+
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.project_resource_policy.repository import (
     ProjectResourcePolicyRepository,
 )
@@ -29,101 +32,95 @@ from ai.backend.manager.services.project_resource_policy.types import (
 from ai.backend.manager.types import OptionalState
 
 
-@pytest.fixture
-def project_resource_policy_repository(
-    database_engine: ExtendedAsyncSAEngine,
-) -> ProjectResourcePolicyRepository:
-    return ProjectResourcePolicyRepository(db=database_engine)
+class TestProjectResourcePolicyService:
+    """Test project resource policy service functionality."""
 
+    @pytest.fixture
+    def mock_dependencies(self) -> dict[str, Any]:
+        """Create mocked dependencies for testing."""
+        project_resource_policy_repository = MagicMock(spec=ProjectResourcePolicyRepository)
 
-@pytest.fixture
-def project_resource_policy_service(
-    project_resource_policy_repository: ProjectResourcePolicyRepository,
-) -> ProjectResourcePolicyService:
-    return ProjectResourcePolicyService(
-        project_resource_policy_repository=project_resource_policy_repository
-    )
+        # Setup async methods
+        project_resource_policy_repository.create = AsyncMock()
+        project_resource_policy_repository.update = AsyncMock()
+        project_resource_policy_repository.delete = AsyncMock()
+        project_resource_policy_repository.get_by_name = AsyncMock()
 
-
-@pytest.fixture
-def create_project_resource_policy(
-    database_engine: ExtendedAsyncSAEngine,
-):
-    @asynccontextmanager
-    async def _create_project_resource_policy(
-        name: str,
-        *,
-        max_vfolder_count: Optional[int] = 10,
-        max_quota_scope_size: Optional[int] = 1073741824,  # 1GB
-        max_network_count: Optional[int] = 1,
-    ) -> AsyncGenerator[str, None]:
-        policy_data = {
-            "name": name,
-            "max_vfolder_count": max_vfolder_count,
-            "max_quota_scope_size": max_quota_scope_size,
-            "max_network_count": max_network_count,
+        return {
+            "project_resource_policy_repository": project_resource_policy_repository,
         }
-        async with database_engine.begin_session() as session:
-            await session.execute(sa.insert(ProjectResourcePolicyRow).values(**policy_data))
 
-        try:
-            yield name
-        finally:
-            async with database_engine.begin_session() as session:
-                await session.execute(
-                    sa.delete(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
-                )
+    @pytest.fixture
+    def project_resource_policy_service(self, mock_dependencies):
+        """Create ProjectResourcePolicyService instance with mocked dependencies."""
+        return ProjectResourcePolicyService(
+            project_resource_policy_repository=mock_dependencies[
+                "project_resource_policy_repository"
+            ]
+        )
 
-    return _create_project_resource_policy
-
-
-async def test_create_project_resource_policy(
-    project_resource_policy_service: ProjectResourcePolicyService,
-    database_engine: ExtendedAsyncSAEngine,
-) -> None:
-    action = CreateProjectResourcePolicyAction(
-        creator=ProjectResourcePolicyCreator(
+    @pytest.mark.asyncio
+    async def test_create_project_resource_policy(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test that CreateProjectResourcePolicyAction creates a policy correctly."""
+        # Mock successful policy creation
+        mock_policy_data = ProjectResourcePolicyRow(
             name="test-policy",
             max_vfolder_count=20,
             max_quota_scope_size=2147483648,  # 2GB
-            max_vfolder_size=None,  # deprecated field
             max_network_count=5,
-        ),
-    )
+        )
 
-    try:
+        mock_dependencies["project_resource_policy_repository"].create = AsyncMock(
+            return_value=mock_policy_data
+        )
+
+        action = CreateProjectResourcePolicyAction(
+            creator=ProjectResourcePolicyCreator(
+                name="test-policy",
+                max_vfolder_count=20,
+                max_quota_scope_size=2147483648,  # 2GB
+                max_vfolder_size=None,  # deprecated field
+                max_network_count=5,
+            ),
+        )
+
         result = await project_resource_policy_service.create_project_resource_policy(action)
 
-        # Verify the policy was created correctly
+        # Verify the repository was called correctly
+        mock_dependencies["project_resource_policy_repository"].create.assert_called_once()
+        call_args = mock_dependencies["project_resource_policy_repository"].create.call_args[0][0]
+        assert call_args["name"] == "test-policy"
+        assert call_args["max_vfolder_count"] == 20
+        assert call_args["max_quota_scope_size"] == 2147483648
+        assert call_args["max_network_count"] == 5
+
+        # Verify the result
         assert result.project_resource_policy.name == "test-policy"
         assert result.project_resource_policy.max_vfolder_count == 20
         assert result.project_resource_policy.max_quota_scope_size == 2147483648
         assert result.project_resource_policy.max_network_count == 5
 
-    finally:
-        # Clean up
-        async with database_engine.begin_session() as session:
-            await session.execute(
-                sa.delete(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == "test-policy"
-                )
-            )
+    @pytest.mark.asyncio
+    async def test_modify_project_resource_policy(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test that ModifyProjectResourcePolicyAction modifies a policy correctly."""
+        # Mock successful policy modification
+        mock_modified_policy = ProjectResourcePolicyRow(
+            name="modify-test-policy",
+            max_vfolder_count=30,
+            max_quota_scope_size=3221225472,  # 3GB
+            max_network_count=10,
+        )
 
+        mock_dependencies["project_resource_policy_repository"].update = AsyncMock(
+            return_value=mock_modified_policy
+        )
 
-async def test_modify_project_resource_policy(
-    project_resource_policy_service: ProjectResourcePolicyService,
-    database_engine: ExtendedAsyncSAEngine,
-    create_project_resource_policy,
-) -> None:
-    policy_name = "modify-test-policy"
-    async with create_project_resource_policy(
-        name=policy_name,
-        max_vfolder_count=10,
-        max_quota_scope_size=1073741824,
-        max_network_count=1,
-    ):
         action = ModifyProjectResourcePolicyAction(
-            name=policy_name,
+            name="modify-test-policy",
             modifier=ProjectResourcePolicyModifier(
                 max_vfolder_count=OptionalState.update(30),
                 max_quota_scope_size=OptionalState.update(3221225472),  # 3GB
@@ -133,67 +130,116 @@ async def test_modify_project_resource_policy(
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)
 
-        assert result.project_resource_policy.name == policy_name
+        # Verify the repository was called correctly
+        mock_dependencies["project_resource_policy_repository"].update.assert_called_once()
+        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0]
+        assert call_args[0] == "modify-test-policy"
+        assert call_args[1]["max_vfolder_count"] == 30
+        assert call_args[1]["max_quota_scope_size"] == 3221225472
+        assert call_args[1]["max_network_count"] == 10
+
+        # Verify the result
+        assert result.project_resource_policy.name == "modify-test-policy"
         assert result.project_resource_policy.max_vfolder_count == 30
         assert result.project_resource_policy.max_quota_scope_size == 3221225472
         assert result.project_resource_policy.max_network_count == 10
 
+    @pytest.mark.asyncio
+    async def test_modify_project_resource_policy_not_found(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test that ModifyProjectResourcePolicyAction handles non-existent policy."""
+        # Mock repository to raise ObjectNotFound
+        mock_dependencies["project_resource_policy_repository"].update = AsyncMock(
+            side_effect=ObjectNotFound(
+                "Project resource policy with name non-existent-policy not found."
+            )
+        )
 
-async def test_modify_project_resource_policy_not_found(
-    project_resource_policy_service: ProjectResourcePolicyService,
-) -> None:
-    action = ModifyProjectResourcePolicyAction(
-        name="non-existent-policy",
-        modifier=ProjectResourcePolicyModifier(
-            max_vfolder_count=OptionalState.update(30),
-        ),
-    )
+        action = ModifyProjectResourcePolicyAction(
+            name="non-existent-policy",
+            modifier=ProjectResourcePolicyModifier(
+                max_vfolder_count=OptionalState.update(30),
+            ),
+        )
 
-    with pytest.raises(ObjectNotFound) as exc_info:
-        await project_resource_policy_service.modify_project_resource_policy(action)
+        with pytest.raises(ObjectNotFound) as exc_info:
+            await project_resource_policy_service.modify_project_resource_policy(action)
 
-    assert "Project resource policy with name non-existent-policy not found" in str(exc_info.value)
+        assert "Project resource policy with name non-existent-policy not found" in str(
+            exc_info.value
+        )
 
+    @pytest.mark.asyncio
+    async def test_delete_project_resource_policy(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test that DeleteProjectResourcePolicyAction deletes a policy correctly."""
+        # Mock successful policy deletion
+        mock_deleted_policy = ProjectResourcePolicyRow(
+            name="delete-test-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1073741824,  # 1GB
+            max_network_count=1,
+        )
 
-async def test_delete_project_resource_policy(
-    project_resource_policy_service: ProjectResourcePolicyService,
-    database_engine: ExtendedAsyncSAEngine,
-    create_project_resource_policy,
-) -> None:
-    policy_name = "delete-test-policy"
-    async with create_project_resource_policy(name=policy_name) as _:
-        action = DeleteProjectResourcePolicyAction(name=policy_name)
+        mock_dependencies["project_resource_policy_repository"].delete = AsyncMock(
+            return_value=mock_deleted_policy
+        )
+
+        action = DeleteProjectResourcePolicyAction(name="delete-test-policy")
+
         result = await project_resource_policy_service.delete_project_resource_policy(action)
 
-        assert result.project_resource_policy.name == policy_name
+        # Verify the repository was called correctly
+        mock_dependencies["project_resource_policy_repository"].delete.assert_called_once_with(
+            "delete-test-policy"
+        )
 
+        # Verify the result
+        assert result.project_resource_policy.name == "delete-test-policy"
 
-async def test_delete_project_resource_policy_not_found(
-    project_resource_policy_service: ProjectResourcePolicyService,
-) -> None:
-    action = DeleteProjectResourcePolicyAction(name="non-existent-policy")
+    @pytest.mark.asyncio
+    async def test_delete_project_resource_policy_not_found(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test that DeleteProjectResourcePolicyAction handles non-existent policy."""
+        # Mock repository to raise ObjectNotFound
+        mock_dependencies["project_resource_policy_repository"].delete = AsyncMock(
+            side_effect=ObjectNotFound(
+                "Project resource policy with name non-existent-policy not found."
+            )
+        )
 
-    with pytest.raises(ObjectNotFound) as exc_info:
-        await project_resource_policy_service.delete_project_resource_policy(action)
+        action = DeleteProjectResourcePolicyAction(name="non-existent-policy")
 
-    assert "Project resource policy with name non-existent-policy not found" in str(exc_info.value)
+        with pytest.raises(ObjectNotFound) as exc_info:
+            await project_resource_policy_service.delete_project_resource_policy(action)
 
+        assert "Project resource policy with name non-existent-policy not found" in str(
+            exc_info.value
+        )
 
-async def test_partial_update_project_resource_policy(
-    project_resource_policy_service: ProjectResourcePolicyService,
-    database_engine: ExtendedAsyncSAEngine,
-    create_project_resource_policy,
-) -> None:
-    policy_name = "partial-update-policy"
-    async with create_project_resource_policy(
-        name=policy_name,
-        max_vfolder_count=10,
-        max_quota_scope_size=1073741824,
-        max_network_count=1,
-    ):
+    @pytest.mark.asyncio
+    async def test_partial_update_project_resource_policy(
+        self, project_resource_policy_service, mock_dependencies
+    ) -> None:
+        """Test partial update of project resource policy."""
+        # Mock successful partial update
+        mock_modified_policy = ProjectResourcePolicyRow(
+            name="partial-update-policy",
+            max_vfolder_count=25,
+            max_quota_scope_size=1073741824,  # 1GB (unchanged)
+            max_network_count=1,  # Unchanged
+        )
+
+        mock_dependencies["project_resource_policy_repository"].update = AsyncMock(
+            return_value=mock_modified_policy
+        )
+
         # Update only max_vfolder_count, leave others unchanged
         action = ModifyProjectResourcePolicyAction(
-            name=policy_name,
+            name="partial-update-policy",
             modifier=ProjectResourcePolicyModifier(
                 max_vfolder_count=OptionalState.update(25),
                 # Other fields remain OptionalState.nop() by default
@@ -202,7 +248,19 @@ async def test_partial_update_project_resource_policy(
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)
 
-        assert result.project_resource_policy.name == policy_name
+        # Verify the repository was called correctly
+        mock_dependencies["project_resource_policy_repository"].update.assert_called_once()
+        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0]
+        assert call_args[0] == "partial-update-policy"
+        # Check that only max_vfolder_count was in the update fields
+        assert call_args[1]["max_vfolder_count"] == 25
+        assert (
+            "max_quota_scope_size" not in call_args[1]
+        )  # Should not be included in partial update
+        assert "max_network_count" not in call_args[1]  # Should not be included in partial update
+
+        # Verify the result
+        assert result.project_resource_policy.name == "partial-update-policy"
         assert result.project_resource_policy.max_vfolder_count == 25
         assert result.project_resource_policy.max_quota_scope_size == 1073741824  # Unchanged
         assert result.project_resource_policy.max_network_count == 1  # Unchanged
