@@ -512,7 +512,7 @@ async def test_modify_group_description_null_handling(
         action = ModifyGroupAction(
             group_id=group_id,
             modifier=GroupModifier(
-                description=TriState.update(None),
+                description=TriState.nullify(),
             ),
         )
         result = await processors.modify_group.wait_for_complete(action)
@@ -768,6 +768,7 @@ async def test_complete_group_lifecycle(
         )
         modify_result = await processors.modify_group.wait_for_complete(modify_action)
         assert modify_result.success is True
+        assert modify_result.data is not None
         assert modify_result.data.name == "lifecycle_modified"
 
         # 2. Delete the group (soft delete)
