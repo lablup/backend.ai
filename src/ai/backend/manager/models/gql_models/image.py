@@ -458,7 +458,7 @@ class ImageNode(graphene.ObjectType):
     installed = graphene.Boolean(
         description="Added in 25.11.0. Indicates if the image is installed on any Agent."
     )
-    type = ImageTypeEnum()
+    type = ImageTypeEnum(description="Added in 25.12.0.")
 
     @property
     def _canonical(self) -> str:
