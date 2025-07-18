@@ -130,7 +130,6 @@ EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
 )
 async def test_execute_session(
     mock_agent_execute_rpc,
-    mock_session_repository_methods,
     mock_increment_session_usage,
     processors: SessionProcessors,
     test_scenario: TestScenario[ExecuteSessionAction, ExecuteSessionActionResult],
