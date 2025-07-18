@@ -17,6 +17,7 @@ class AuthorizeAction(AuthAction):
     domain_name: str
     email: str
     password: str
+    stoken: Optional[str]
     auth_config: Optional[AuthConfig]
 
     @override
@@ -35,6 +36,8 @@ class AuthorizeAction(AuthAction):
             "domain": self.domain_name,
             "username": self.email,
             "password": self.password,
+            "stoken": self.stoken or "",
+            "sToken": self.stoken or "",
         }
 
 
