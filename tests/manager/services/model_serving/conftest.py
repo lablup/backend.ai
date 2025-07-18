@@ -104,7 +104,8 @@ def model_serving_service(
         event_dispatcher=mock_event_dispatcher,
         storage_manager=mock_storage_manager,
         config_provider=mock_config_provider,
-        repositories=mock_repositories,
+        repository=mock_repositories.repository,
+        admin_repository=mock_repositories.admin_repository,
     )
 
 
@@ -126,7 +127,8 @@ def auto_scaling_service(
     mock_repositories,
 ):
     return AutoScalingService(
-        repositories=mock_repositories,
+        repository=mock_repositories.repository,
+        admin_repository=mock_repositories.admin_repository,
     )
 
 

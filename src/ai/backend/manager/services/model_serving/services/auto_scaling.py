@@ -4,7 +4,10 @@ from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.admin_repository import (
+    AdminModelServingRepository,
+)
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -37,13 +40,16 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class AutoScalingService:
-    _repositories: ModelServingRepositories
+    _repository: ModelServingRepository
+    _admin_repository: AdminModelServingRepository
 
     def __init__(
         self,
-        repositories: ModelServingRepositories,
+        repository: ModelServingRepository,
+        admin_repository: AdminModelServingRepository,
     ) -> None:
-        self._repositories = repositories
+        self._repository = repository
+        self._admin_repository = admin_repository
 
     async def check_requester_access(self, requester_ctx: RequesterCtx) -> None:
         if requester_ctx.is_authorized is False:
@@ -55,17 +61,15 @@ class AutoScalingService:
         # Get endpoint with access validation
         await self.check_requester_access(action.requester_ctx)
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._repositories.admin_repository.get_endpoint_by_id_force(
-                action.service_id
-            )
+            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(action.service_id)
             if not endpoint_data:
                 raise ModelServiceNotFound
 
-            success = await self._repositories.admin_repository.update_endpoint_replicas_force(
+            success = await self._admin_repository.update_endpoint_replicas_force(
                 action.service_id, action.to
             )
         else:
-            endpoint_data = await self._repositories.repository.get_endpoint_by_id_validated(
+            endpoint_data = await self._repository.get_endpoint_by_id_validated(
                 action.service_id,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
@@ -74,7 +78,7 @@ class AutoScalingService:
             if not endpoint_data:
                 raise ModelServiceNotFound
 
-            success = await self._repositories.repository.update_endpoint_replicas_validated(
+            success = await self._repository.update_endpoint_replicas_validated(
                 action.service_id,
                 action.to,
                 action.requester_ctx.user_id,
@@ -100,7 +104,7 @@ class AutoScalingService:
 
         # Create auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            created_rule = await self._repositories.admin_repository.create_auto_scaling_rule_force(
+            created_rule = await self._admin_repository.create_auto_scaling_rule_force(
                 endpoint_id=action.endpoint_id,
                 metric_source=action.creator.metric_source,
                 metric_name=action.creator.metric_name,
@@ -112,7 +116,7 @@ class AutoScalingService:
                 max_replicas=action.creator.max_replicas,
             )
         else:
-            created_rule = await self._repositories.repository.create_auto_scaling_rule_validated(
+            created_rule = await self._repository.create_auto_scaling_rule_validated(
                 user_id=action.requester_ctx.user_id,
                 user_role=action.requester_ctx.user_role,
                 domain_name=action.requester_ctx.domain_name,
@@ -142,11 +146,11 @@ class AutoScalingService:
 
         # Update auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            updated_rule = await self._repositories.admin_repository.update_auto_scaling_rule_force(
+            updated_rule = await self._admin_repository.update_auto_scaling_rule_force(
                 action.id, fields_to_update
             )
         else:
-            updated_rule = await self._repositories.repository.update_auto_scaling_rule_validated(
+            updated_rule = await self._repository.update_auto_scaling_rule_validated(
                 action.id,
                 fields_to_update,
                 action.requester_ctx.user_id,
@@ -167,11 +171,9 @@ class AutoScalingService:
     ) -> DeleteEndpointAutoScalingRuleActionResult:
         # Delete auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            success = await self._repositories.admin_repository.delete_auto_scaling_rule_force(
-                action.id
-            )
+            success = await self._admin_repository.delete_auto_scaling_rule_force(action.id)
         else:
-            success = await self._repositories.repository.delete_auto_scaling_rule_validated(
+            success = await self._repository.delete_auto_scaling_rule_validated(
                 action.id,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
