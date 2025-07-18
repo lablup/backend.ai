@@ -16,7 +16,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -29,7 +28,7 @@ def mock_check_and_transit_status_rpc(mocker, mock_agent_response_result):
     # Return proper CheckAndTransitStatusActionResult object instead of just dict
     mock.return_value = CheckAndTransitStatusActionResult(
         result=mock_agent_response_result,
-        session_row=SESSION_ROW_FIXTURE,
+        session_data=SESSION_FIXTURE_DATA,
     )
     return mock
 

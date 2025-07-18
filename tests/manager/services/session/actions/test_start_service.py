@@ -21,10 +21,15 @@ from ..fixtures import (
 @pytest.fixture
 def mock_start_service_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.start_service",
+        "ai.backend.manager.services.session.service.SessionService.start_service",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = StartServiceActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
+        token="test_token",
+        wsproxy_addr="localhost:8080",
+    )
     return mock
 
 
