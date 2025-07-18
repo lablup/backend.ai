@@ -35,7 +35,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import SessionNotFound
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 

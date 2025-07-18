@@ -45,12 +45,12 @@ from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import (
+from ..errors.api import (
     DeprecatedAPI,
-    GenericForbidden,
     InvalidAPIParameters,
     NotImplementedAPI,
 )
+from ..errors.common import GenericForbidden
 from ..models import UserRole, users
 from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,

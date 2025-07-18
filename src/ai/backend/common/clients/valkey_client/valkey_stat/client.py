@@ -21,13 +21,17 @@ from msgpack.exceptions import ExtraData, UnpackException
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
+    create_layer_aware_valkey_decorator,
     create_valkey_client,
-    valkey_decorator,
 )
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Layer-specific decorator for valkey_stat client
+valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STAT)
 
 _DEFAULT_EXPIRATION = 86400  # 24 hours default expiration
 _KEYPAIR_CONCURRENCY_PREFIX: Final[str] = "keypair.concurrency_used"
@@ -87,6 +91,7 @@ class ValkeyStatClient:
             client=client,
         )
 
+    @valkey_decorator()
     async def close(self) -> None:
         """
         Close the ValkeyStatClient connection.

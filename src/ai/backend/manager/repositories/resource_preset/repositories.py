@@ -11,8 +11,6 @@ class ResourcePresetRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ResourcePresetRepository(args.db)
-
         return cls(
-            repository=repository,
+            repository=ResourcePresetRepository(args.db),
         )

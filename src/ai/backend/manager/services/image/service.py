@@ -4,9 +4,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.exceptions import (
-    ImageNotFound,
-)
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
 )

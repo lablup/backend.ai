@@ -65,9 +65,10 @@ from ..defs import (
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ..errors.exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import ObjectNotFound
+from ..errors.storage import (
+    VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -625,6 +626,7 @@ async def query_accessible_vfolders(
         vfolders.c.id,
         vfolders.c.host,
         vfolders.c.quota_scope_id,
+        vfolders.c.domain_name,
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
@@ -660,6 +662,7 @@ async def query_accessible_vfolders(
                 "id": row.vfolders_id,
                 "host": row.vfolders_host,
                 "quota_scope_id": row.vfolders_quota_scope_id,
+                "domain_name": row.vfolders_domain_name,
                 "usage_mode": row.vfolders_usage_mode,
                 "created_at": row.vfolders_created_at,
                 "last_used": row.vfolders_last_used,
@@ -1456,6 +1459,8 @@ async def initiate_vfolder_deletion(
         except (VFolderOperationFailed, InvalidAPIParameters) as e:
             if e.status == 410:
                 already_deleted.append(vfolder_info)
+        except VFolderGone:
+            already_deleted.append(vfolder_info)
     if already_deleted:
         vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..errors.exceptions import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
+from ..errors.common import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
 from .base import (
     GUID,
     Base,

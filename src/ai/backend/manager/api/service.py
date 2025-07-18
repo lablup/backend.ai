@@ -72,7 +72,8 @@ from ai.backend.manager.services.model_serving.types import (
 )
 
 from ..defs import DEFAULT_IMAGE_ARCH
-from ..errors.exceptions import InvalidAPIParameters, VFolderNotFound
+from ..errors.api import InvalidAPIParameters
+from ..errors.storage import VFolderNotFound
 from ..models import (
     ModelServiceHelper,
     UserRole,

@@ -18,7 +18,7 @@ from graphql.execution import ExecutionResult  # pants: no-infer-dep
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import GraphQLError as BackendGQLError
+from ..errors.api import GraphQLError as BackendGQLError
 from ..models.base import DataLoaderManager
 from ..models.gql import (
     GQLExceptionMiddleware,

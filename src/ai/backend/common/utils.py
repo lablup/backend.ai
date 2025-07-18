@@ -329,7 +329,10 @@ async def mount(
     mountpoint = Path(mount_prefix) / mount_path
     if mountpoint.is_mount():
         return False
-    mountpoint.mkdir(exist_ok=True)
+    try:
+        mountpoint.mkdir(exist_ok=True)
+    except OSError as e:
+        raise VolumeMountFailed(f"Failed to create mountpoint {mountpoint}. (e: {e})") from e
     if cmd_options is not None:
         cmd = [
             "mount",
@@ -411,6 +414,17 @@ async def umount(
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True
+
+
+async def chown(path: Path | str, uid_gid: str, mount_prefix: Optional[str | Path] = None) -> None:
+    mounted = Path(mount_prefix or "/", path)
+    await asyncio.create_subprocess_exec(
+        "chown",
+        uid_gid,
+        str(mounted),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
 
 
 def is_ip_address_format(str: str) -> bool:

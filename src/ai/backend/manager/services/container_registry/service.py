@@ -1,9 +1,9 @@
-import sqlalchemy as sa
-
 from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.admin_repository import (
+    AdminContainerRegistryRepository,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -28,105 +28,77 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesActionResult,
 )
 
-from ...data.image.types import ImageStatus
-
 
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
     _container_registry_repository: ContainerRegistryRepository
+    _admin_container_registry_repository: AdminContainerRegistryRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         container_registry_repository: ContainerRegistryRepository,
+        admin_container_registry_repository: AdminContainerRegistryRepository,
     ) -> None:
         self._db = db
         self._container_registry_repository = container_registry_repository
+        self._admin_container_registry_repository = admin_container_registry_repository
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         registry_name = action.registry
         project = action.project
 
-        async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == registry_name,
-            )
-            if project:
-                stmt = stmt.where(ContainerRegistryRow.project == project)
-            # TODO: Raise exception if registry not found or two or more registries found
-            registry_row: ContainerRegistryRow = await db_session.scalar(stmt)
+        registry_data = await self._container_registry_repository.get_by_registry_and_project(
+            registry_name, project
+        )
 
-            scanner_cls = get_container_registry_cls(registry_row)
-            scanner = scanner_cls(self._db, registry_name, registry_row)
-            result = await scanner.rescan_single_registry(action.progress_reporter)
+        registry_row = await self._container_registry_repository.get_registry_row_for_scanner(
+            registry_name, project
+        )
+
+        scanner_cls = get_container_registry_cls(registry_row)
+        scanner = scanner_cls(self._db, registry_name, registry_row)
+        result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
+            images=result.images, errors=result.errors, registry=registry_data
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
-        async with self._db.begin_session() as session:
-            update_stmt = (
-                sa.update(ImageRow)
-                .where(ImageRow.registry == action.registry)
-                .where(ImageRow.status != ImageStatus.DELETED)
-                .values(status=ImageStatus.DELETED)
-            )
-            if action.project:
-                update_stmt = update_stmt.where(ImageRow.project == action.project)
+        registry_data = await self._admin_container_registry_repository.clear_images_force(
+            action.registry, action.project
+        )
 
-            await session.execute(update_stmt)
-
-            get_registry_row_stmt = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == action.registry,
-            )
-            if action.project:
-                get_registry_row_stmt = get_registry_row_stmt.where(
-                    ContainerRegistryRow.project == action.project
-                )
-
-            registry_row: ContainerRegistryRow = await session.scalar(get_registry_row_stmt)
-
-        return ClearImagesActionResult(registry=registry_row.to_dataclass())
+        return ClearImagesActionResult(registry=registry_data)
 
     async def load_container_registries(
         self, action: LoadContainerRegistriesAction
     ) -> LoadContainerRegistriesActionResult:
-        project = action.project
-
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == action.registry
+        if action.project is not None:
+            try:
+                registry_data = (
+                    await self._container_registry_repository.get_by_registry_and_project(
+                        action.registry, action.project
+                    )
+                )
+                registries = [registry_data]
+            except ContainerRegistryNotFound:
+                registries = []
+        else:
+            registries = await self._container_registry_repository.get_by_registry_name(
+                action.registry
             )
-            if project is not None:
-                query = query.where(ContainerRegistryRow.project == project)
-            result = await db_session.execute(query)
-            registries = result.scalars().all()
 
-        return LoadContainerRegistriesActionResult(
-            registries=[registry.to_dataclass() for registry in registries]
-        )
+        return LoadContainerRegistriesActionResult(registries=registries)
 
     async def load_all_container_registries(
-        self, action: LoadAllContainerRegistriesAction
+        self, _action: LoadAllContainerRegistriesAction
     ) -> LoadAllContainerRegistriesActionResult:
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(ContainerRegistryRow)
-            result = await db_session.execute(query)
-            registries: list[ContainerRegistryRow] = result.scalars().all()
-        return LoadAllContainerRegistriesActionResult(
-            registries=[registry.to_dataclass() for registry in registries]
-        )
+        registries = await self._container_registry_repository.get_all()
+        return LoadAllContainerRegistriesActionResult(registries=registries)
 
     async def get_container_registries(
-        self, action: GetContainerRegistriesAction
+        self, _action: GetContainerRegistriesAction
     ) -> GetContainerRegistriesActionResult:
-        async with self._db.begin_session() as session:
-            _registries = await ContainerRegistryRow.get_known_container_registries(session)
-
-        known_registries = {}
-        for project, registries in _registries.items():
-            for registry_name, url in registries.items():
-                if project not in known_registries:
-                    known_registries[f"{project}/{registry_name}"] = url.human_repr()
-        return GetContainerRegistriesActionResult(registries=known_registries)
+        registries = await self._container_registry_repository.get_known_registries()
+        return GetContainerRegistriesActionResult(registries=registries)

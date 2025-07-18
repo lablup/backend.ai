@@ -19,13 +19,17 @@ from glide import (
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
+    create_layer_aware_valkey_decorator,
     create_valkey_client,
-    valkey_decorator,
 )
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Layer-specific decorator for valkey_live client
+valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_LIVE)
 
 _DEFAULT_EXPIRATION = 3600  # 1 hour default expiration
 _SESSION_REQUESTS_SUFFIX: Final[str] = "requests"
@@ -71,6 +75,7 @@ class ValkeyLiveClient:
         await client.connect()
         return cls(client=client)
 
+    @valkey_decorator()
     async def close(self) -> None:
         """
         Close the ValkeyLiveClient connection.

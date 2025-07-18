@@ -58,13 +58,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.models.storage import StorageSessionManager
 
-from ..errors.exceptions import (
-    BackendAgentError,
-    InsufficientPrivilege,
-    InternalServerError,
-    InvalidAPIParameters,
-    ModelServiceDependencyNotCleared,
-    ObjectNotFound,
+from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InsufficientPrivilege
+from ..errors.common import InternalServerError, ObjectNotFound
+from ..errors.kernel import BackendAgentError
+from ..errors.service import ModelServiceDependencyNotCleared
+from ..errors.storage import (
     TooManyVFoldersFound,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,

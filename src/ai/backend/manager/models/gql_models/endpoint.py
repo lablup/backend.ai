@@ -15,6 +15,7 @@ from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -57,11 +58,13 @@ from ai.backend.manager.services.model_serving.types import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...errors.exceptions import (
-    EndpointNotFound,
-    EndpointTokenNotFound,
+from ...errors.common import (
     GenericForbidden,
     ObjectNotFound,
+)
+from ...errors.service import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
 )
 from ..base import (
     FilterExprArg,
@@ -891,26 +894,26 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
             case EndpointLifecycle.DESTROYED.name:
-                return "DESTROYED"
+                return EndpointStatus.DESTROYED
             case EndpointLifecycle.DESTROYING.name:
-                return "DESTROYING"
+                return EndpointStatus.DESTROYING
             case _:
                 if len(self.routings) == 0:
-                    return "READY"
+                    return EndpointStatus.READY
                 elif self.retries > SERVICE_MAX_RETRIES:
-                    return "UNHEALTHY"
+                    return EndpointStatus.UNHEALTHY
                 elif (spawned_service_count := len([r for r in self.routings])) > 0:
                     healthy_service_count = len([
                         r for r in self.routings if r.status == RouteStatus.HEALTHY.name
                     ])
                     if healthy_service_count == spawned_service_count:
-                        return "HEALTHY"
+                        return EndpointStatus.HEALTHY
                     unhealthy_service_count = len([
                         r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
                     ])
                     if unhealthy_service_count > 0:
-                        return "DEGRADED"
-                return "PROVISIONING"
+                        return EndpointStatus.DEGRADED
+                return EndpointStatus.PROVISIONING
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:

@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from ai.backend.manager.errors.exceptions import ForgetImageForbiddenError, ImageNotFound
+from ai.backend.manager.errors.image import ForgetImageForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

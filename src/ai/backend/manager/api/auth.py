@@ -42,11 +42,8 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.exceptions import (
-    AuthorizationFailed,
-    InvalidAuthParameters,
-    RejectedByHook,
-)
+from ..errors.auth import AuthorizationFailed, InvalidAuthParameters
+from ..errors.common import RejectedByHook
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
@@ -643,12 +640,14 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
 async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
     log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
     root_ctx: RootContext = request.app["_root.context"]
+    stoken = params.get("stoken") or params.get("sToken")
     action = AuthorizeAction(
         request=request,
         type=AuthTokenType(params["type"]),
         domain_name=params["domain"],
         email=params["username"],
         password=params["password"],
+        stoken=stoken,
         auth_config=root_ctx.config_provider.config.auth,
     )
     result = await root_ctx.processors.auth.authorize.wait_for_complete(action)

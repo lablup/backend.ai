@@ -392,32 +392,71 @@ class ActionMetricObserver:
         ).observe(duration)
 
 
-class ClientType(enum.StrEnum):
+class DomainType(enum.StrEnum):
     VALKEY = "valkey"
+    REPOSITORY = "repository"
+    CLIENT = "client"
 
 
-class ClientMetricObserver:
+class LayerType(enum.StrEnum):
+    # Repository layers
+    AGENT = "agent"
+    AUTH = "auth"
+    CONTAINER_REGISTRY = "container_registry"
+    DOMAIN = "domain"
+    GROUP = "group"
+    IMAGE = "image"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    METRIC = "metric"
+    MODEL_SERVING = "model_serving"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    RESOURCE_PRESET = "resource_preset"
+    SCHEDULE = "schedule"
+    SESSION = "session"
+    USER = "user"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    VFOLDER = "vfolder"
+
+    # Valkey client layers
+    VALKEY_IMAGE = "valkey_image"
+    VALKEY_LIVE = "valkey_live"
+    VALKEY_RATE_LIMIT = "valkey_rate_limit"
+    VALKEY_SESSION = "valkey_session"
+    VALKEY_STAT = "valkey_stat"
+    VALKEY_STREAM = "valkey_stream"
+
+    # Client layers
+    AGENT_CLIENT = "agent_client"
+    STORAGE_PROXY_CLIENT = "storage_proxy_client"
+    WSPROXY_CLIENT = "wsproxy_client"
+
+
+# Backward compatibility
+ClientType = DomainType
+
+
+class LayerMetricObserver:
     _instance: Optional[Self] = None
 
-    _client_operation_triggered_count: Gauge
-    _client_operation_count: Counter
-    _client_operation_duration_sec: Histogram
+    _layer_operation_triggered_count: Gauge
+    _layer_operation_count: Counter
+    _layer_operation_duration_sec: Histogram
 
     def __init__(self) -> None:
-        self._client_operation_triggered_count = Gauge(
-            name="backendai_client_operation_triggered_count",
-            documentation="Number of client operations triggered",
-            labelnames=["client_type", "operation"],
+        self._layer_operation_triggered_count = Gauge(
+            name="backendai_layer_operation_triggered_count",
+            documentation="Number of layer operations triggered",
+            labelnames=["domain", "layer", "operation"],
         )
-        self._client_operation_count = Counter(
-            name="backendai_client_operation_count",
-            documentation="Total number of client operations",
-            labelnames=["client_type", "operation", "success"],
+        self._layer_operation_count = Counter(
+            name="backendai_layer_operation_count",
+            documentation="Total number of layer operations",
+            labelnames=["domain", "layer", "operation", "success"],
         )
-        self._client_operation_duration_sec = Histogram(
-            name="backendai_client_operation_duration_sec",
-            documentation="Duration of client operations in seconds",
-            labelnames=["client_type", "operation", "success"],
+        self._layer_operation_duration_sec = Histogram(
+            name="backendai_layer_operation_duration_sec",
+            documentation="Duration of layer operations in seconds",
+            labelnames=["domain", "layer", "operation", "success"],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -427,36 +466,42 @@ class ClientMetricObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_client_operation_triggered(
+    def observe_layer_operation_triggered(
         self,
         *,
-        client_type: ClientType,
+        domain: DomainType,
+        layer: LayerType,
         operation: str,
     ) -> None:
-        self._client_operation_triggered_count.labels(
-            client_type=client_type,
+        self._layer_operation_triggered_count.labels(
+            domain=domain,
+            layer=layer,
             operation=operation,
         ).inc()
 
-    def observe_client_operation(
+    def observe_layer_operation(
         self,
         *,
-        client_type: ClientType,
+        domain: DomainType,
+        layer: LayerType,
         operation: str,
         success: bool,
         duration: float,
     ) -> None:
-        self._client_operation_triggered_count.labels(
-            client_type=client_type,
+        self._layer_operation_triggered_count.labels(
+            domain=domain,
+            layer=layer,
             operation=operation,
         ).dec()  # Decrement the triggered count since the operation is now complete
-        self._client_operation_count.labels(
-            client_type=client_type,
+        self._layer_operation_count.labels(
+            domain=domain,
+            layer=layer,
             operation=operation,
             success=str(success),
         ).inc()
-        self._client_operation_duration_sec.labels(
-            client_type=client_type,
+        self._layer_operation_duration_sec.labels(
+            domain=domain,
+            layer=layer,
             operation=operation,
             success=str(success),
         ).observe(duration)

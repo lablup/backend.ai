@@ -19,12 +19,24 @@ from ai.backend.common.types import (
 
 
 @dataclass
+class NetworkConfig:
+    mode: Optional[str]
+    network_name: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "network_name": self.network_name,
+        }
+
+
+@dataclass
 class NetworkSpec:
     kernel_config: KernelCreationConfig
 
     cluster_size: int
     replicas: Mapping[str, int]  # per-role kernel counts
-    network_config: Mapping[str, Any]
+    network_config: NetworkConfig
     ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
@@ -69,7 +81,7 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
         ]
 
     async def _prepare_base_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
-        match spec.network_config.get("mode"):
+        match spec.network_config.mode:
             case "bridge":
                 return await self._prepare_bridge_network(spec)
             case mode if mode:
@@ -82,11 +94,11 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
         result: list[dict[str, Any]] = []
         result.append({
             "HostConfig": {
-                "NetworkMode": spec.network_config["network_name"],
+                "NetworkMode": spec.network_config.network_name,
             },
             "NetworkingConfig": {
                 "EndpointsConfig": {
-                    spec.network_config["network_name"]: {
+                    spec.network_config.network_name: {
                         "Aliases": [spec.kernel_config["cluster_hostname"]],
                     },
                 },
@@ -104,12 +116,12 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
             mode=spec.kernel_config["cluster_mode"],
             size=spec.cluster_size,
             replicas=spec.replicas,
-            network_config=spec.network_config,
+            network_config=spec.network_config.to_dict(),
             ssh_keypair=spec.ssh_keypair,
             cluster_ssh_port_mapping=spec.cluster_ssh_port_mapping,
         )
         container_config = await plugin.join_network(
-            spec.kernel_config, cluster_info, **cluster_info["network_config"]
+            spec.kernel_config, cluster_info, **spec.network_config.to_dict()
         )
         result: list[dict[str, Any]] = []
         result.append(container_config)

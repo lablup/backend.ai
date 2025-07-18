@@ -43,20 +43,17 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingBroadcastEvent
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..errors.exceptions import (
-    AppNotFound,
-    BackendError,
-    InternalServerError,
-    InvalidAPIParameters,
-    SessionNotFound,
-    TooManySessionsMatched,
-)
+from ..errors.api import InvalidAPIParameters
+from ..errors.common import InternalServerError
+from ..errors.kernel import SessionNotFound, TooManySessionsMatched
+from ..errors.resource import AppNotFound
 from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -380,7 +377,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
                 "status": "error",
                 "msg": f"Invalid API parameters: {e!r}",
             })
-    except BackendError as e:
+    except BackendAIError as e:
         log.exception("STREAM_EXECUTE: exception")
         if not ws.closed:
             await ws.send_json({

@@ -41,9 +41,10 @@ from ai.backend.logging import BraceStyleAdapter
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
+from ai.backend.common.exception import BackendAIError
+
 from ..defs import DEFAULT_ROLE
-from ..errors.exceptions import (
-    BackendError,
+from ..errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -343,7 +344,7 @@ async def handle_kernel_exception(
         if error_callback:
             await error_callback()
         raise exc_class("FAILURE", e) from None
-    except BackendError:
+    except BackendAIError:
         # silently re-raise to make them handled by gateway http handlers
         raise
     except Exception as e:

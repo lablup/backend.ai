@@ -182,11 +182,13 @@ def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000
     Convert a Decimal value to a string without scientific notation.
     """
     try:
-        return str(remove_exponent(value.quantize(exponent)))
+        quantized = value.quantize(exponent)
     except DecimalException:
-        # If the value is too large or too small to be represented as a Decimal,
-        # we raise a ValueError to indicate that the value cannot be serialized.
-        raise ValueError(f"Cannot serialize Decimal value: {value}")
+        return str(value)
+    try:
+        return str(remove_exponent(quantized))
+    except DecimalException:
+        return str(quantized)
 
 
 class MovingStatistics:
