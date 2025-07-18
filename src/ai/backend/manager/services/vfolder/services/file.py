@@ -8,7 +8,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,
 )
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.file import (
@@ -32,19 +31,16 @@ class VFolderFileService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
 
     async def upload_file(
         self, action: CreateUploadSessionAction

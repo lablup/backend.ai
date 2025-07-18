@@ -16,7 +16,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.invite import (
@@ -44,17 +43,14 @@ from ..types import VFolderInvitationInfo
 class VFolderInviteService:
     _config_provider: ManagerConfigProvider
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
     ) -> None:
         self._config_provider = config_provider
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
