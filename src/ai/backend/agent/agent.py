@@ -196,6 +196,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import (
     cancel_tasks,
+    chown,
     current_loop,
     mount,
     umount,
@@ -3415,6 +3416,12 @@ async def handle_volume_mount(
             event.fstab_path,
             mount_prefix,
         )
+        if context.local_config.agent.mount_path_uid_gid is not None:
+            await chown(
+                real_path,
+                context.local_config.agent.mount_path_uid_gid,
+                mount_prefix=mount_prefix,
+            )
     except VolumeMountFailed as e:
         err_msg = str(e)
     await context.event_producer.broadcast_event(

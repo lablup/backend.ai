@@ -562,6 +562,13 @@ class AgentConfig(BaseModel):
         validation_alias=AliasChoices("docker-mode", "docker_mode"),
         serialization_alias="docker-mode",
     )
+    mount_path_uid_gid: Optional[str] = Field(
+        default=None,
+        description="Owner uid:gid of the mount directory",
+        examples=["root:root", "bai:bai"],
+        validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
+        serialization_alias="mount-path-uid-gid",
+    )
 
     def real_mount_path(self, directory_path: str) -> Path:
         if self.mount_path is None:
