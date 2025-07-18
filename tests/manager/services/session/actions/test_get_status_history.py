@@ -21,10 +21,13 @@ from ..fixtures import (
 @pytest.fixture
 def mock_get_status_history_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService._get_status_history",
+        "ai.backend.manager.services.session.service.SessionService.get_status_history",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = GetStatusHistoryActionResult(
+        status_history=mock_agent_response_result,
+        session_id=SESSION_FIXTURE_DATA.id,
+    )
     return mock
 
 

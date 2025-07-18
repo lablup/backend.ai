@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.services.session.actions.interrupt import (
+from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
     InterruptSessionActionResult,
 )
@@ -21,10 +21,13 @@ from ..fixtures import (
 @pytest.fixture
 def mock_interrupt_session_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.interrupt_session",
+        "ai.backend.manager.services.session.service.SessionService.interrupt",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = InterruptSessionActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
+    )
     return mock
 
 

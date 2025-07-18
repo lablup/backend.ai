@@ -21,10 +21,12 @@ from ..fixtures import (
 @pytest.fixture
 def mock_match_sessions_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService._match_sessions",
+        "ai.backend.manager.services.session.service.SessionService.match_sessions",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = MatchSessionsActionResult(
+        result=mock_agent_response_result,
+    )
     return mock
 
 

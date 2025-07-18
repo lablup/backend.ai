@@ -21,10 +21,13 @@ from ..fixtures import (
 @pytest.fixture
 def mock_restart_session_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.restart_session",
+        "ai.backend.manager.services.session.service.SessionService.restart_session",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = RestartSessionActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
+    )
     return mock
 
 

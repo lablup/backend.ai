@@ -21,10 +21,13 @@ from ..fixtures import (
 @pytest.fixture
 def mock_upload_files_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.upload_files",
+        "ai.backend.manager.services.session.service.SessionService.upload_files",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
+    mock.return_value = UploadFilesActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
+    )
     return mock
 
 

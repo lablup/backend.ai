@@ -15,7 +15,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -39,7 +38,7 @@ def mock_session_service_download_files(mocker, mock_agent_response_result):
     )
     multipart_writer = MultipartWriter()
     mock.return_value = DownloadFilesActionResult(
-        session_row=SESSION_ROW_FIXTURE,
+        session_data=SESSION_FIXTURE_DATA,
         result=multipart_writer,
     )
     return mock

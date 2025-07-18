@@ -818,7 +818,9 @@ class CheckAndTransitStatus(graphene.Mutation):
                     )
                 )
             )
-            session_nodes.append(ComputeSessionNode.from_row(graph_ctx, action_result.session_row))
+            session_nodes.append(
+                ComputeSessionNode.from_dataclass(graph_ctx, action_result.session_data)
+            )
 
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
 
