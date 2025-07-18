@@ -5,10 +5,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.permission_controller.id import (
+from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
-from ai.backend.manager.data.permission_controller.role import (
+from ai.backend.manager.data.permission.role import (
     PermissionCheckInput,
     RoleCreateInput,
     RoleData,
@@ -17,10 +17,10 @@ from ai.backend.manager.data.permission_controller.role import (
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
-from ai.backend.manager.data.permission_controller.status import (
+from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ai.backend.manager.errors.exceptions import ObjectNotFound
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...models.rbac_models.object_permission import ObjectPermissionRow
@@ -72,12 +72,14 @@ class PermissionControllerRepository:
         return cast(Optional[RoleRow], role_row)
 
     async def update_role(self, data: RoleUpdateInput) -> RoleData:
+        to_update = data.fields_to_update()
         async with self._db.begin_session() as db_session:
+            stmt = sa.update(RoleRow).where(RoleRow.id == data.id).values(**to_update)
+            await db_session.execute(stmt)
             role_row = await self._get_role(data.id, db_session)
             if role_row is None:
                 raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
-            role_row.update(data)
-        return role_row.to_data()
+            return role_row.to_data()
 
     async def delete_role(self, data: RoleDeleteInput) -> RoleData:
         async with self._db.begin_session() as db_session:

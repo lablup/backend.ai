@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Optional,
@@ -14,13 +13,12 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.data.permission_controller.role import (
+from ai.backend.manager.data.permission.role import (
     RoleCreateInput,
     RoleData,
     RoleDataWithPermissions,
-    RoleUpdateInput,
 )
-from ai.backend.manager.data.permission_controller.status import (
+from ai.backend.manager.data.permission.status import (
     PermissionStatus,
     RoleStatus,
 )
@@ -116,36 +114,6 @@ class RoleRow(Base):
             deleted_at=self.deleted_at,
             description=self.description,
         )
-
-    @classmethod
-    def _get_value[T](cls, getter: Callable[..., T]) -> tuple[Optional[T], bool]:
-        try:
-            return getter(), True
-        except ValueError:
-            return None, False
-
-    def update(self, data: RoleUpdateInput) -> None:
-        is_updated = False
-
-        name, do_update = self._get_value(data.name.value)
-        if do_update:
-            assert name is not None
-            self.name = name
-            is_updated = True
-
-        description, do_update = self._get_value(data.description.value)
-        if do_update:
-            self.description = description
-            is_updated = True
-
-        status, do_update = self._get_value(data.status.value)
-        if do_update:
-            assert status is not None
-            self.status = status
-            is_updated = True
-
-        if is_updated:
-            self.updated_at = datetime.now(timezone.utc)
 
     @classmethod
     def from_input(cls, data: RoleCreateInput) -> Self:

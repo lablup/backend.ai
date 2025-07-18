@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.permission_controller.role import RoleCreateInput, RoleData
+from ai.backend.manager.data.permission.role import RoleCreateInput, RoleData
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 

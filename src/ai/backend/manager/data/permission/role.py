@@ -1,9 +1,9 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional, override
 
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 from .object_permission import ObjectPermissionData
 from .scope_permission import ScopePermissionData, ScopePermissionDataWithEntity
@@ -21,11 +21,19 @@ class RoleCreateInput:
 
 
 @dataclass
-class RoleUpdateInput:
+class RoleUpdateInput(PartialModifier):
     id: uuid.UUID
     name: OptionalState[str]
     status: OptionalState[RoleStatus]
     description: TriState[str]
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.status.update_dict(to_update, "status")
+        self.description.update_dict(to_update, "description")
+        return to_update
 
 
 @dataclass

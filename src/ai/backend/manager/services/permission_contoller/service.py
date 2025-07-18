@@ -2,11 +2,11 @@ import logging
 from collections import defaultdict
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission_controller.id import (
+from ai.backend.manager.data.permission.id import (
     ObjectId,
     ScopeId,
 )
-from ai.backend.manager.errors.exceptions import ObjectNotFound
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
