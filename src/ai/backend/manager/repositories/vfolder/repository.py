@@ -305,15 +305,17 @@ class VfolderRepository:
                     vfolder_row = await self._get_vfolder_by_id(db_session, vfolder_id)
                     if vfolder_row:
                         vfolder_rows.append(vfolder_row)
+                delete_stmt = (
+                    sa.update(VFolderRow)
+                    .where(VFolderRow.id.in_(vfolder_ids))
+                    .values(status=VFolderOperationStatus.DELETE_ONGOING)
+                )
+                await db_session.execute(delete_stmt)
 
-                # Delete relation rows
-                await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
+            # Delete relation rows
+            await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
 
-                # Delete vfolder rows
-                for vfolder_row in vfolder_rows:
-                    await db_session.delete(vfolder_row)
-
-                return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+            return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
     @repository_decorator()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:

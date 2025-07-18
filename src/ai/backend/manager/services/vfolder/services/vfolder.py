@@ -17,7 +17,12 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.clients.storage_proxy.client import StorageProxyClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import (
+    DeleteStatus,
+    VFolderDeleteParams,
+)
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -40,6 +45,7 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     vfolder_status_map,
 )
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.base import (
@@ -85,19 +91,25 @@ async def _check_vfolder_status(
 class VFolderService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
+    _storage_client: StorageProxyClient
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
+    _user_repository: UserRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
+        storage_client: StorageProxyClient,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
+        user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
+        self._storage_client = storage_client
         self._vfolder_repository = vfolder_repository
+        self._user_repository = user_repository
         self._background_task_manager = background_task_manager
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
@@ -488,7 +500,23 @@ class VFolderService:
     ) -> DeleteForeverVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, action.user_uuid, user.domain_name
+        )
+        result = await self._storage_client.delete_vfolder(
+            VFolderDeleteParams(
+                vfolder_id=VFolderID(vfolder.quota_scope_id, vfolder.id),
+                host=vfolder.host,
+                unmanaged_path=vfolder.unmanaged_path,
+            )
+        )
+        match result.status:
+            case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
+                await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+            case DeleteStatus.ERROR:
+                # TODO: Handle error case properly
+                pass
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
@@ -496,7 +524,23 @@ class VFolderService:
     ) -> ForceDeleteVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, action.user_uuid, user.domain_name
+        )
+        result = await self._storage_client.delete_vfolder(
+            VFolderDeleteParams(
+                vfolder_id=VFolderID(vfolder.quota_scope_id, vfolder.id),
+                host=vfolder.host,
+                unmanaged_path=vfolder.unmanaged_path,
+            )
+        )
+        match result.status:
+            case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
+                await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+            case DeleteStatus.ERROR:
+                # TODO: Handle error case properly
+                pass
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:

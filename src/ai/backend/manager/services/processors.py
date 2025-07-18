@@ -11,6 +11,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.clients.storage_proxy.client import StorageProxyClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -76,6 +77,7 @@ class ServiceArgs:
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
+    storage_client: StorageProxyClient
     valkey_stat_client: ValkeyStatClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
@@ -144,8 +146,10 @@ class Services:
         vfolder_service = VFolderService(
             args.config_provider,
             args.storage_manager,
+            args.storage_client,
             args.background_task_manager,
             repositories.vfolder.repository,
+            repositories.user.repository,
         )
         vfolder_file_service = VFolderFileService(
             args.config_provider,
