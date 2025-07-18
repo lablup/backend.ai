@@ -29,6 +29,26 @@ def mock_start_service_rpc(mocker, mock_agent_response_result):
         return_value={"advertise_address": "localhost:8080"},
     )
 
+    # Mock the start_service method directly
+    from ai.backend.manager.services.session.service import SessionService
+
+    mock_start_service = mocker.patch.object(
+        SessionService,
+        "start_service",
+        new_callable=AsyncMock,
+    )
+
+    from ai.backend.manager.services.session.actions.start_service import (
+        StartServiceActionResult,
+    )
+
+    mock_start_service.return_value = StartServiceActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
+        token="test_token",
+        wsproxy_addr="localhost:8080",
+    )
+
     return mock_agent_response_result
 
 

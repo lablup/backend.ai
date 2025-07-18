@@ -27,22 +27,42 @@ GET_STATUS_HISTORY_MOCK = {
 }
 
 
+@pytest.fixture
+def mock_get_status_history_rpc(mocker):
+    """Mock the get_status_history service method"""
+    from ai.backend.manager.services.session.service import SessionService
+
+    mock_method = mocker.patch.object(
+        SessionService,
+        "get_status_history",
+        new_callable=mocker.AsyncMock,
+    )
+
+    from ai.backend.manager.services.session.actions.get_status_history import (
+        GetStatusHistoryActionResult,
+    )
+
+    mock_method.return_value = GetStatusHistoryActionResult(
+        status_history=GET_STATUS_HISTORY_MOCK,
+        session_id=SESSION_FIXTURE_DATA.id,
+    )
+
+    return mock_method
+
+
 @pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
+    "test_scenario",
     [
-        (
-            TestScenario.success(
-                "Get status history",
-                GetStatusHistoryAction(
-                    session_name=cast(str, SESSION_FIXTURE_DATA.name),
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                ),
-                GetStatusHistoryActionResult(
-                    status_history=GET_STATUS_HISTORY_MOCK,
-                    session_id=SESSION_FIXTURE_DATA.id,
-                ),
+        TestScenario.success(
+            "Get status history",
+            GetStatusHistoryAction(
+                session_name=cast(str, SESSION_FIXTURE_DATA.name),
+                owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
             ),
-            GET_STATUS_HISTORY_MOCK,
+            GetStatusHistoryActionResult(
+                status_history=GET_STATUS_HISTORY_MOCK,
+                session_id=SESSION_FIXTURE_DATA.id,
+            ),
         ),
     ],
 )

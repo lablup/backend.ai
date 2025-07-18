@@ -33,21 +33,18 @@ GET_DEPENDENCY_GRAPH_MOCK = {
 
 
 @pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
+    "test_scenario",
     [
-        (
-            TestScenario.success(
-                "Get dependency graph",
-                GetDependencyGraphAction(
-                    root_session_name=cast(str, SESSION_FIXTURE_DATA.name),
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                ),
-                GetDependencyGraphActionResult(
-                    result=GET_DEPENDENCY_GRAPH_MOCK,
-                    session_data=SESSION_FIXTURE_DATA,
-                ),
+        TestScenario.success(
+            "Get dependency graph",
+            GetDependencyGraphAction(
+                root_session_name=cast(str, SESSION_FIXTURE_DATA.name),
+                owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
             ),
-            GET_DEPENDENCY_GRAPH_BASE,
+            GetDependencyGraphActionResult(
+                result=GET_DEPENDENCY_GRAPH_MOCK,
+                session_data=SESSION_FIXTURE_DATA,
+            ),
         ),
     ],
 )

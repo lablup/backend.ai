@@ -28,6 +28,29 @@ GET_DIRECT_ACCESS_INFO_MOCK = {
 }
 
 
+@pytest.fixture
+def mock_get_direct_access_info_service(mocker):
+    """Mock the get_direct_access_info service method"""
+    from ai.backend.manager.services.session.service import SessionService
+
+    mock_method = mocker.patch.object(
+        SessionService,
+        "get_direct_access_info",
+        new_callable=mocker.AsyncMock,
+    )
+
+    from ai.backend.manager.services.session.actions.get_direct_access_info import (
+        GetDirectAccessInfoActionResult,
+    )
+
+    mock_method.return_value = GetDirectAccessInfoActionResult(
+        result=GET_DIRECT_ACCESS_INFO_MOCK,
+        session_data=SESSION_FIXTURE_DATA,
+    )
+
+    return mock_method
+
+
 @pytest.mark.parametrize(
     "test_scenario",
     [
@@ -58,6 +81,7 @@ GET_DIRECT_ACCESS_INFO_MOCK = {
 )
 async def test_get_direct_access_info(
     mock_session_repository_methods,
+    mock_get_direct_access_info_service,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDirectAccessInfoAction, GetDirectAccessInfoActionResult],
     session_repository,
