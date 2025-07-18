@@ -460,7 +460,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
                     if self.total_resource_slots is graphql.Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
                     self.allowed_vfolder_hosts,
                 ),
                 allowed_docker_registries=OptionalState[list[str]].from_graphql(
@@ -679,7 +679,7 @@ class ModifyDomainInput(graphene.InputObjectType):
                     if self.total_resource_slots is Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
                     self.allowed_vfolder_hosts,
                 ),
                 allowed_docker_registries=OptionalState[list[str]].from_graphql(

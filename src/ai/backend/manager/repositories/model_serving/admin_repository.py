@@ -251,9 +251,9 @@ class AdminModelServingRepository:
         threshold: Any,
         comparator: AutoScalingMetricComparator,
         step_size: int,
-        cooldown_seconds: int,
-        min_replicas: int,
-        max_replicas: int,
+        cooldown_seconds: int = 300,
+        min_replicas: Optional[int] = None,
+        max_replicas: Optional[int] = None,
     ) -> Optional[EndpointAutoScalingRuleRow]:
         """
         Create auto scaling rule without access validation.
