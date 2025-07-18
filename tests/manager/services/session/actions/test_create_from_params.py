@@ -1,5 +1,5 @@
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -12,11 +12,17 @@ from ai.backend.manager.services.session.actions.create_from_params import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
+from ...fixtures import (
+    IMAGE_FIXTURE_DICT,
+)
 from ...test_utils import TestScenario
 from ..fixtures import (
+    GROUP_FIXTURE_DATA,
+    GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
+    USER_FIXTURE_DATA,
 )
 
 
@@ -31,30 +37,8 @@ def mock_create_from_params_rpc(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_resolve_image(mocker):
-    mock_image_row = MagicMock()
-    mock_image_row.id = "test_image_id"
-    mock_image_row.canonical = "python:3.9"
-    mock_image_row.architecture = "x86_64"
-
-    mock = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.resolve_image",
-        new_callable=AsyncMock,
-        return_value=mock_image_row,
-    )
-    return mock
-
-
-@pytest.fixture
 def mock_session_service_create_from_params(mocker, mock_agent_response_result):
-    # Mock additional repository methods needed for session creation
-    mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.query_userinfo",
-        new_callable=AsyncMock,
-        return_value=("user_info", SESSION_FIXTURE_DATA.group_id, "resource_policy"),
-    )
-
-    # Mock AgentRegistry.create_session to return the expected result
+    # Mock only the external AgentRegistry call
     mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.create_session",
         new_callable=AsyncMock,
@@ -62,6 +46,19 @@ def mock_session_service_create_from_params(mocker, mock_agent_response_result):
     )
 
     return None
+
+
+@pytest.fixture
+def mock_resolve_image(mocker):
+    """Mock the resolve_image method to return our test image."""
+    from ai.backend.manager.repositories.session.repository import SessionRepository
+
+    from ...fixtures import IMAGE_ROW_FIXTURE
+
+    # Mock the resolve_image method to return our test image
+    mock_resolve = mocker.patch.object(SessionRepository, "resolve_image", new_callable=AsyncMock)
+    mock_resolve.return_value = IMAGE_ROW_FIXTURE
+    return mock_resolve
 
 
 CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
@@ -244,6 +241,10 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
         {
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
+            "users": [USER_FIXTURE_DATA],
+            "groups": [GROUP_FIXTURE_DATA],
+            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
+            "images": [IMAGE_FIXTURE_DICT],
         }
     ],
 )
@@ -252,6 +253,7 @@ async def test_create_from_params(
     mock_resolve_image,
     processors: SessionProcessors,
     test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
+    session_repository,
 ):
     # Execute the actual service
     result = await processors.create_from_params.wait_for_complete(test_scenario.input)

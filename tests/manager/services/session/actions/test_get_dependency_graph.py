@@ -1,5 +1,4 @@
 from typing import cast
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -12,36 +11,14 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...test_utils import TestScenario
 from ..fixtures import (
+    GROUP_FIXTURE_DATA,
+    GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
     SESSION_ROW_FIXTURE,
+    USER_FIXTURE_DATA,
 )
-
-
-@pytest.fixture
-def mock_session_repository_methods(mocker, mock_agent_response_result):
-    """Mock SessionRepository methods to return test data"""
-    # Mock find_dependency_sessions to return the dependency graph with session_id
-    mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.find_dependency_sessions",
-        new_callable=AsyncMock,
-        return_value={"session_id": [SESSION_ROW_FIXTURE.id], **mock_agent_response_result},
-    )
-
-    # Mock get_session_by_id to return the session with proper to_dataclass
-    from unittest.mock import MagicMock
-
-    mock_session = MagicMock()
-    mock_session.to_dataclass.return_value = SESSION_FIXTURE_DATA
-    mock_session.id = SESSION_FIXTURE_DATA.id
-
-    mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_session,
-    )
-
 
 GET_DEPENDENCY_GRAPH_BASE = {
     "nodes": [{"id": "node1", "type": "function"}],
@@ -80,6 +57,9 @@ GET_DEPENDENCY_GRAPH_MOCK = {
         {
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
+            "users": [USER_FIXTURE_DATA],
+            "groups": [GROUP_FIXTURE_DATA],
+            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
         }
     ],
 )
@@ -87,5 +67,6 @@ async def test_get_dependency_graph(
     mock_session_repository_methods,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDependencyGraphAction, GetDependencyGraphActionResult],
+    session_repository,
 ):
     await test_scenario.test(processors.get_dependency_graph.wait_for_complete)

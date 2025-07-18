@@ -1,5 +1,4 @@
 from typing import cast
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -12,30 +11,13 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...test_utils import TestScenario
 from ..fixtures import (
+    GROUP_FIXTURE_DATA,
+    GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
+    USER_FIXTURE_DATA,
 )
-
-
-@pytest.fixture
-def mock_get_status_history_rpc(mocker, mock_agent_response_result):
-    # Mock the repository method
-    mock_get_session = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_validated",
-        new_callable=AsyncMock,
-    )
-    from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.session import SessionRow
-
-    mock_session = SessionRow(**SESSION_FIXTURE_DICT)
-    mock_kernel = KernelRow(**KERNEL_FIXTURE_DICT)
-    mock_session.kernels = [mock_kernel]
-    mock_session.status_history = mock_agent_response_result
-    mock_get_session.return_value = mock_session
-
-    return mock_get_session
-
 
 GET_STATUS_HISTORY_MOCK = {
     "history": [
@@ -70,6 +52,9 @@ GET_STATUS_HISTORY_MOCK = {
         {
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
+            "users": [USER_FIXTURE_DATA],
+            "groups": [GROUP_FIXTURE_DATA],
+            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
         }
     ],
 )
@@ -77,5 +62,6 @@ async def test_get_status_history(
     mock_get_status_history_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetStatusHistoryAction, GetStatusHistoryActionResult],
+    session_repository,
 ):
     await test_scenario.test(processors.get_status_history.wait_for_complete)

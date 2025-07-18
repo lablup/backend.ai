@@ -84,6 +84,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -603,8 +604,9 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
             async with engine.begin() as conn:
                 await conn.execute((vfolders.delete()))
                 await conn.execute((kernels.delete()))
-                await conn.execute((agents.delete()))
                 await conn.execute((SessionRow.__table__.delete()))
+                await conn.execute((agents.delete()))
+                await conn.execute((session_templates.delete()))
                 await conn.execute((keypairs.delete()))
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))

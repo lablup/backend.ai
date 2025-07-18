@@ -13,10 +13,12 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...test_utils import TestScenario
 from ..fixtures import (
+    GROUP_FIXTURE_DATA,
+    GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
+    USER_FIXTURE_DATA,
 )
 
 
@@ -32,12 +34,8 @@ def mock_agent_execute_rpc(mocker, mock_agent_response_result):
 
 @pytest.fixture
 def mock_session_repository_methods(mocker):
-    """Mock SessionRepository methods to return test data"""
-    mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_validated",
-        new_callable=AsyncMock,
-        return_value=SESSION_ROW_FIXTURE,
-    )
+    """No need to mock repository methods - using real database fixtures"""
+    pass
 
 
 @pytest.fixture
@@ -130,6 +128,9 @@ EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
         {
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
+            "users": [USER_FIXTURE_DATA],
+            "groups": [GROUP_FIXTURE_DATA],
+            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
         }
     ],
 )
@@ -139,5 +140,6 @@ async def test_execute_session(
     mock_increment_session_usage,
     processors: SessionProcessors,
     test_scenario: TestScenario[ExecuteSessionAction, ExecuteSessionActionResult],
+    session_repository,
 ):
     await test_scenario.test(processors.execute_session.wait_for_complete)

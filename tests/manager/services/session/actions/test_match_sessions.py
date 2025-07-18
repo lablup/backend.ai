@@ -1,5 +1,4 @@
 from typing import cast
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -12,41 +11,25 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...test_utils import TestScenario
 from ..fixtures import (
+    GROUP_FIXTURE_DATA,
+    GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
+    USER_FIXTURE_DATA,
 )
-
-
-@pytest.fixture
-def mock_match_sessions_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.match_sessions",
-        new_callable=AsyncMock,
-    )
-    # Mock the repository to return SessionRow objects that match the expected structure
-    from ai.backend.manager.models.session import SessionRow
-
-    mock_session = SessionRow(
-        id="session_123",
-        name="test_session",
-        status=type("Status", (), {"name": "RUNNING"})(),
-    )
-    mock.return_value = [mock_session]
-    return mock
-
 
 MATCH_SESSIONS_MOCK = [
     {
-        "id": "session_123",
-        "name": "test_session",
+        "id": str(SESSION_FIXTURE_DATA.id),
+        "name": str(SESSION_FIXTURE_DATA.name),
         "status": "RUNNING",
     }
 ]
 
 
 @pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
+    ("test_scenario",),
     [
         (
             TestScenario.success(
@@ -59,7 +42,6 @@ MATCH_SESSIONS_MOCK = [
                     result=MATCH_SESSIONS_MOCK,
                 ),
             ),
-            MATCH_SESSIONS_MOCK,
         ),
     ],
 )
@@ -69,12 +51,15 @@ MATCH_SESSIONS_MOCK = [
         {
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
+            "users": [USER_FIXTURE_DATA],
+            "groups": [GROUP_FIXTURE_DATA],
+            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
         }
     ],
 )
 async def test_match_sessions(
-    mock_match_sessions_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[MatchSessionsAction, MatchSessionsActionResult],
+    session_repository,
 ):
     await test_scenario.test(processors.match_sessions.wait_for_complete)

@@ -20,20 +20,32 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_check_and_transit_status_rpc(mocker, mock_agent_response_result):
-    # Mock the repository method for non-admin users
-    mock_get_session = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_to_determine_status",
-        new_callable=AsyncMock,
-    )
+def mock_check_and_transit_status_rpc(
+    mocker, mock_agent_response_result, session_repository, monkeypatch
+):
+    # This action involves complex session lifecycle management
+    # We'll mock the SessionService methods directly for simplicity
     from ai.backend.manager.models.kernel import KernelRow
     from ai.backend.manager.models.session import SessionRow
 
-    # Create a mock session
     mock_session = SessionRow(**SESSION_FIXTURE_DICT)
     mock_kernel = KernelRow(**KERNEL_FIXTURE_DICT)
     mock_session.kernels = [mock_kernel]
-    mock_get_session.return_value = mock_session
+
+    # Note: get_session_to_determine_status now uses real database fixture
+    # No need to mock this method as it will find the session from the database fixtures
+
+    # Mock the agent registry with a simpler approach
+    mock_agent_registry = mocker.patch(
+        "ai.backend.manager.services.session.service.SessionService._agent_registry",
+        new=mocker.MagicMock(),
+    )
+
+    # Mock the session lifecycle manager
+    mock_lifecycle_mgr = mocker.MagicMock()
+    mock_lifecycle_mgr.transit_session_status = AsyncMock(return_value=[(mock_session, True)])
+    mock_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
+    mock_agent_registry.session_lifecycle_mgr = mock_lifecycle_mgr
 
     return mock_session
 
@@ -74,6 +86,7 @@ async def test_check_and_transit_status(
     mock_check_and_transit_status_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CheckAndTransitStatusAction, CheckAndTransitStatusActionResult],
+    session_repository,
 ):
     # Execute the actual service
     result = await processors.check_and_transit_status.wait_for_complete(test_scenario.input)
