@@ -1,5 +1,5 @@
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -24,60 +24,14 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_group_with_container_registry(mocker):
-    """Mock the group's container_registry to be populated"""
+def mock_convert_session_to_image_service(mocker):
     mock = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_with_group",
+        "ai.backend.manager.services.session.service.SessionService.convert_session_to_image",
         new_callable=AsyncMock,
     )
-
-    # Create a mock session with a group that has container registry
-    mock_session = MagicMock()
-    mock_session.name = SESSION_FIXTURE_DATA.name
-    mock_session.id = SESSION_FIXTURE_DATA.id
-    mock_session.access_key = SESSION_FIXTURE_DATA.access_key
-    mock_session.main_kernel.image = "registry.example.com/test_project/python:3.9"
-    mock_session.main_kernel.architecture = "x86_64"
-    mock_session.group = MagicMock()
-    mock_session.group.container_registry = {
-        "registry": "registry.example.com",
-        "project": "test_project",
-    }
-
-    mock.return_value = mock_session
-    return mock
-
-
-@pytest.fixture
-def mock_resolve_image(mocker):
-    mock_image_row = MagicMock()
-    mock_image_row.id = "test_image_id"
-    mock_image_row.canonical = "registry.example.com/test_project/python:3.9"
-    mock_image_row.architecture = "x86_64"
-
-    mock = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.resolve_image",
-        new_callable=AsyncMock,
-        return_value=mock_image_row,
-    )
-    return mock
-
-
-@pytest.fixture
-def mock_agent_convert_session_to_image_rpc(mocker):
-    mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.commit_session",
-        new_callable=AsyncMock,
-    )
-    return mock
-
-
-@pytest.fixture
-def mock_background_task_manager(mocker):
-    mock = mocker.patch(
-        "ai.backend.common.bgtask.bgtask.BackgroundTaskManager.start",
-        new_callable=AsyncMock,
-        return_value=CONVERT_SESSION_TO_IMAGE_MOCK,
+    mock.return_value = ConvertSessionToImageActionResult(
+        task_id=CONVERT_SESSION_TO_IMAGE_MOCK,
+        session_data=SESSION_FIXTURE_DATA,
     )
     return mock
 
@@ -97,15 +51,9 @@ CONVERT_SESSION_TO_IMAGE_MOCK = uuid4()
     ],
 )
 async def test_convert_session_to_image(
-    mock_agent_convert_session_to_image_rpc,
-    mock_group_with_container_registry,
-    mock_resolve_image,
-    mock_background_task_manager,
+    mock_convert_session_to_image_service,
     processors: SessionProcessors,
 ):
-    # Setup mock to return expected task ID
-    mock_agent_convert_session_to_image_rpc.return_value = CONVERT_SESSION_TO_IMAGE_MOCK
-
     # Create the action
     action = ConvertSessionToImageAction(
         session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -132,4 +80,4 @@ async def test_convert_session_to_image(
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
 
     # Verify the mock was called correctly
-    mock_agent_convert_session_to_image_rpc.assert_called_once()
+    mock_convert_session_to_image_service.assert_called_once()

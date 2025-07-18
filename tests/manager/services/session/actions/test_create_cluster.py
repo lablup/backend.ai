@@ -1,5 +1,5 @@
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -20,28 +20,14 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_create_cluster_rpc(mocker):
+def mock_create_cluster_service(mocker):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.create_cluster",
+        "ai.backend.manager.services.session.service.SessionService.create_cluster",
         new_callable=AsyncMock,
     )
-    return mock
-
-
-@pytest.fixture
-def mock_get_template_by_id(mocker):
-    mock_template = MagicMock()
-    mock_template.id = TEST_TEMPLATE_ID
-    mock_template.name = "test_template"
-    mock_template.task_definition = {
-        "image": "python:3.9",
-        "command": ["python", "-c", "print('hello')"],
-    }
-
-    mock = mocker.patch(
-        "ai.backend.manager.repositories.session.repository.SessionRepository.get_template_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_template,
+    mock.return_value = CreateClusterActionResult(
+        session_id=SESSION_FIXTURE_DATA.id,
+        result=CREATE_CLUSTER_MOCK,
     )
     return mock
 
@@ -60,13 +46,9 @@ TEST_TEMPLATE_ID = uuid4()
     ],
 )
 async def test_create_cluster(
-    mock_create_cluster_rpc,
-    mock_get_template_by_id,
+    mock_create_cluster_service,
     processors: SessionProcessors,
 ):
-    # Setup mock to return expected cluster result
-    mock_create_cluster_rpc.return_value = CREATE_CLUSTER_MOCK
-
     # Create the action
     action = CreateClusterAction(
         session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -96,4 +78,4 @@ async def test_create_cluster(
     assert result.result == CREATE_CLUSTER_MOCK
 
     # Verify the mock was called correctly
-    mock_create_cluster_rpc.assert_called_once()
+    mock_create_cluster_service.assert_called_once()
