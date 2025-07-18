@@ -40,7 +40,6 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     vfolder_status_map,
 )
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.base import (
@@ -88,7 +87,6 @@ class VFolderService:
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
 
     def __init__(
         self,
@@ -96,12 +94,10 @@ class VFolderService:
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
         self._background_task_manager = background_task_manager
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
@@ -476,7 +472,7 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.move_vfolders_to_trash_force([action.vfolder_uuid])
+        await self._vfolder_repository.move_vfolders_to_trash([action.vfolder_uuid])
         return MoveToTrashVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def restore(
@@ -484,9 +480,7 @@ class VFolderService:
     ) -> RestoreVFolderFromTrashActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.restore_vfolders_from_trash_force([
-            action.vfolder_uuid
-        ])
+        await self._vfolder_repository.restore_vfolders_from_trash([action.vfolder_uuid])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_forever(
@@ -494,7 +488,7 @@ class VFolderService:
     ) -> DeleteForeverVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.delete_vfolders_forever_force([action.vfolder_uuid])
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
@@ -502,7 +496,7 @@ class VFolderService:
     ) -> ForceDeleteVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.delete_vfolders_forever_force([action.vfolder_uuid])
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:

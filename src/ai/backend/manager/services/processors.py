@@ -146,7 +146,6 @@ class Services:
             args.storage_manager,
             args.background_task_manager,
             repositories.vfolder.repository,
-            repositories.vfolder.admin_repository,
         )
         vfolder_file_service = VFolderFileService(
             args.config_provider,
