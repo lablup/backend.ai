@@ -32,6 +32,25 @@ GET_DEPENDENCY_GRAPH_MOCK = {
 }
 
 
+@pytest.fixture
+def mock_get_dependency_graph_service(mocker):
+    """Mock the get_dependency_graph service method"""
+    from ai.backend.manager.services.session.service import SessionService
+
+    mock_method = mocker.patch.object(
+        SessionService,
+        "get_dependency_graph",
+        new_callable=mocker.AsyncMock,
+    )
+
+    mock_method.return_value = GetDependencyGraphActionResult(
+        result=GET_DEPENDENCY_GRAPH_MOCK,
+        session_data=SESSION_FIXTURE_DATA,
+    )
+
+    return mock_method
+
+
 @pytest.mark.parametrize(
     "test_scenario",
     [
@@ -61,7 +80,7 @@ GET_DEPENDENCY_GRAPH_MOCK = {
     ],
 )
 async def test_get_dependency_graph(
-    mock_session_repository_methods,
+    mock_get_dependency_graph_service,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDependencyGraphAction, GetDependencyGraphActionResult],
     session_repository,

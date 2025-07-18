@@ -80,7 +80,6 @@ def mock_get_direct_access_info_service(mocker):
     ],
 )
 async def test_get_direct_access_info(
-    mock_session_repository_methods,
     mock_get_direct_access_info_service,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDirectAccessInfoAction, GetDirectAccessInfoActionResult],

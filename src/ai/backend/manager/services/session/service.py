@@ -114,7 +114,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateAction,
     CreateFromTemplateActionResult,
 )
-from ai.backend.manager.services.session.actions.destory_session import (
+from ai.backend.manager.services.session.actions.destroy_session import (
     DestroySessionAction,
     DestroySessionActionResult,
 )

@@ -5,7 +5,7 @@ import pytest
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.actions.destory_session import (
+from ai.backend.manager.services.session.actions.destroy_session import (
     DestroySessionAction,
     DestroySessionActionResult,
 )
@@ -72,7 +72,6 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 )
 async def test_destroy_session(
     mock_agent_destroy_session_rpc,
-    mock_session_repository_methods,
     processors: SessionProcessors,
     test_scenario: TestScenario[DestroySessionAction, DestroySessionActionResult],
     session_repository,

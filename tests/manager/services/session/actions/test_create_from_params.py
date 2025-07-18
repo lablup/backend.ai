@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
+from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
@@ -49,15 +50,26 @@ def mock_session_service_create_from_params(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_resolve_image(mocker):
+def mock_resolve_image(mocker, request):
     """Mock the resolve_image method to return our test image."""
+    from ai.backend.manager.errors.image import UnknownImageReferenceError
     from ai.backend.manager.repositories.session.repository import SessionRepository
 
     from ...fixtures import IMAGE_ROW_FIXTURE
 
     # Mock the resolve_image method to return our test image
     mock_resolve = mocker.patch.object(SessionRepository, "resolve_image", new_callable=AsyncMock)
-    mock_resolve.return_value = IMAGE_ROW_FIXTURE
+
+    # Check if this is a failure scenario by looking at the test parameter
+    test_scenario = request.getfixturevalue("test_scenario")
+    if hasattr(test_scenario.input, "params") and hasattr(test_scenario.input.params, "image"):
+        if test_scenario.input.params.image == "non-existent:latest":
+            mock_resolve.side_effect = UnknownImageReferenceError("non-existent:latest")
+        else:
+            mock_resolve.return_value = IMAGE_ROW_FIXTURE
+    else:
+        mock_resolve.return_value = IMAGE_ROW_FIXTURE
+
     return mock_resolve
 
 
@@ -143,7 +155,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
                     requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
                     keypair_resource_policy=None,
                 ),
-                Exception,  # Will be mocked to raise an exception
+                UnknownImageReferenceError,  # Will be mocked to raise an exception
             ),
             None,
         ),
@@ -255,15 +267,9 @@ async def test_create_from_params(
     test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
     session_repository,
 ):
-    # Execute the actual service
-    result = await processors.create_from_params.wait_for_complete(test_scenario.input)
+    # Use the test scenario's built-in test method that handles both success and failure cases
+    await test_scenario.test(processors.create_from_params.wait_for_complete)
 
-    # Verify the result
-    assert result is not None
-    assert isinstance(result, CreateFromParamsActionResult)
-    assert result.session_id is not None
-    assert result.result is not None
-    assert "sessionId" in result.result
-
-    # Verify the mocks were called
-    mock_resolve_image.assert_called_once()
+    # Verify the mocks were called (only for successful cases)
+    if test_scenario.expected_exception is None:
+        mock_resolve_image.assert_called_once()

@@ -59,7 +59,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateAction,
     CreateFromTemplateActionParams,
 )
-from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
+from ai.backend.manager.services.session.actions.destroy_session import DestroySessionAction
 from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
 from ai.backend.manager.services.session.actions.download_files import DownloadFilesAction
 from ai.backend.manager.services.session.actions.execute_session import (
