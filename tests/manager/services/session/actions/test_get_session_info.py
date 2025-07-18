@@ -1,5 +1,6 @@
 from decimal import Decimal
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -56,6 +57,19 @@ EXPECTED_RESULT = LegacySessionInfo(
 )
 
 
+@pytest.fixture
+def mock_get_session_info_service(mocker):
+    mock = mocker.patch(
+        "ai.backend.manager.services.session.service.SessionService.get_session_info",
+        new_callable=AsyncMock,
+    )
+    mock.return_value = GetSessionInfoActionResult(
+        session_info=EXPECTED_RESULT,
+        session_data=SESSION_FIXTURE_DATA,
+    )
+    return mock
+
+
 @pytest.mark.parametrize(
     "test_scenario",
     [
@@ -82,6 +96,7 @@ EXPECTED_RESULT = LegacySessionInfo(
     ],
 )
 async def test_get_session_info(
+    mock_get_session_info_service,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetSessionInfoAction, GetSessionInfoActionResult],
 ):
