@@ -151,12 +151,10 @@ class Services:
             args.config_provider,
             args.storage_manager,
             repositories.vfolder.repository,
-            repositories.vfolder.admin_repository,
         )
         vfolder_invite_service = VFolderInviteService(
             args.config_provider,
             repositories.vfolder.repository,
-            repositories.vfolder.admin_repository,
         )
         session_service = SessionService(
             SessionServiceArgs(
