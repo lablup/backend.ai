@@ -21,18 +21,19 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_create_cluster_service(mocker):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.create_cluster",
+    # Only mock agent registry - use real SessionRepository
+    mock_create_cluster = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.create_cluster",
         new_callable=AsyncMock,
     )
-    mock.return_value = CreateClusterActionResult(
-        session_id=SESSION_FIXTURE_DATA.id,
-        result=CREATE_CLUSTER_MOCK,
-    )
-    return mock
+    mock_create_cluster.return_value = CREATE_CLUSTER_MOCK
+
+    return {
+        "create_cluster": mock_create_cluster,
+    }
 
 
-CREATE_CLUSTER_MOCK = {"cluster_id": "test_cluster_123"}
+CREATE_CLUSTER_MOCK = {"cluster_id": "test_cluster_123", "kernelId": SESSION_FIXTURE_DATA.id}
 TEST_TEMPLATE_ID = uuid4()
 
 
@@ -77,5 +78,5 @@ async def test_create_cluster(
     assert result.session_id == SESSION_FIXTURE_DATA.id
     assert result.result == CREATE_CLUSTER_MOCK
 
-    # Verify the mock was called correctly
-    mock_create_cluster_service.assert_called_once()
+    # Verify the mocks were called correctly
+    mock_create_cluster_service["create_cluster"].assert_called_once()

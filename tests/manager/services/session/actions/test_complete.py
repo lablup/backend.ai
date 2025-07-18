@@ -31,15 +31,12 @@ def mock_agent_complete_session_rpc(mocker, mock_agent_response_result):
 
 @pytest.fixture
 def mock_session_service_complete(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.complete",
+    # Only mock the AgentRegistry increment_session_usage method
+    mock_increment_usage = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
-    mock.return_value = CompleteActionResult(
-        session_data=SESSION_FIXTURE_DATA,
-        result=mock_agent_response_result,
-    )
-    return mock
+    return mock_increment_usage
 
 
 COMPLETE_SESSION_MOCK = CodeCompletionResp(
@@ -86,7 +83,20 @@ COMPLETE_ACTION = CompleteAction(
 )
 async def test_complete_session(
     mock_session_service_complete,
+    mock_agent_complete_session_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CompleteAction, CompleteActionResult],
 ):
-    await test_scenario.test(processors.complete.wait_for_complete)
+    # Execute the actual service
+    result = await processors.complete.wait_for_complete(test_scenario.input)
+
+    # Verify the result
+    assert result is not None
+    assert isinstance(result, CompleteActionResult)
+    assert result.session_data is not None
+    assert result.result is not None
+    assert result.result == COMPLETE_SESSION_MOCK
+
+    # Verify the mocks were called
+    mock_session_service_complete.assert_called_once()
+    mock_agent_complete_session_rpc.assert_called_once()

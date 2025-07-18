@@ -20,15 +20,18 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_upload_files_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.upload_files",
+    # Only mock agent registry methods - use real SessionRepository
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
-    mock.return_value = UploadFilesActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.upload_file",
+        new_callable=AsyncMock,
+        return_value=mock_agent_response_result,
     )
-    return mock
+
+    return mock_agent_response_result
 
 
 UPLOAD_FILES_MOCK = {"uploaded": True, "files": ["test_file1.txt", "test_file2.txt"]}
@@ -68,4 +71,7 @@ async def test_upload_files(
     processors: SessionProcessors,
     test_scenario: TestScenario[UploadFilesAction, UploadFilesActionResult],
 ):
+    # Expected result will use the session data from the database fixture
+    assert test_scenario.expected is not None
+    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
     await test_scenario.test(processors.upload_files.wait_for_complete)

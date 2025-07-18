@@ -21,21 +21,28 @@ from ..fixtures import (
 @pytest.fixture
 def mock_match_sessions_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.match_sessions",
+        "ai.backend.manager.repositories.session.repository.SessionRepository.match_sessions",
         new_callable=AsyncMock,
     )
-    mock.return_value = MatchSessionsActionResult(
-        result=mock_agent_response_result,
+    # Mock the repository to return SessionRow objects that match the expected structure
+    from ai.backend.manager.models.session import SessionRow
+
+    mock_session = SessionRow(
+        id="session_123",
+        name="test_session",
+        status=type("Status", (), {"name": "RUNNING"})(),
     )
+    mock.return_value = [mock_session]
     return mock
 
 
-MATCH_SESSIONS_MOCK = {
-    "matches": [
-        {"session_id": "session_123", "score": 0.95},
-        {"session_id": "session_456", "score": 0.87},
-    ]
-}
+MATCH_SESSIONS_MOCK = [
+    {
+        "id": "session_123",
+        "name": "test_session",
+        "status": "RUNNING",
+    }
+]
 
 
 @pytest.mark.parametrize(

@@ -28,19 +28,6 @@ def mock_agent_commit_session_rpc(mocker, mock_agent_response_result):
     return mock
 
 
-@pytest.fixture
-def mock_session_service_commit_session(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.commit_session",
-        new_callable=AsyncMock,
-    )
-    mock.return_value = CommitSessionActionResult(
-        session_data=SESSION_FIXTURE_DATA,
-        commit_result=mock_agent_response_result,
-    )
-    return mock
-
-
 COMMIT_SESSION_MOCK = {"committed": True}
 
 
@@ -77,7 +64,7 @@ COMMIT_SESSION_ACTION = CommitSessionAction(
     ],
 )
 async def test_commit_session(
-    mock_session_service_commit_session,
+    mock_agent_commit_session_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CommitSessionAction, CommitSessionActionResult],
 ):
