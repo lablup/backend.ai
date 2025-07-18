@@ -20,17 +20,16 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_start_service_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.start_service",
+    # Only mock external dependencies - use real SessionRepository
+
+    # Mock query_wsproxy_status
+    mocker.patch(
+        "ai.backend.manager.api.scaling_group.query_wsproxy_status",
         new_callable=AsyncMock,
+        return_value={"advertise_address": "localhost:8080"},
     )
-    mock.return_value = StartServiceActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
-        token="test_token",
-        wsproxy_addr="localhost:8080",
-    )
-    return mock
+
+    return mock_agent_response_result
 
 
 START_SERVICE_MOCK = {"started": True, "port": 8080}
@@ -76,4 +75,8 @@ async def test_start_service(
     processors: SessionProcessors,
     test_scenario: TestScenario[StartServiceAction, StartServiceActionResult],
 ):
+    # Expected result will use the session data from the database fixture
+    assert test_scenario.expected is not None
+    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
+    test_scenario.expected.wsproxy_addr = "localhost:8080"
     await test_scenario.test(processors.start_service.wait_for_complete)

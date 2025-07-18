@@ -20,18 +20,20 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_interrupt_session_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.interrupt",
+    # Only mock agent registry methods - use real SessionRepository
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
-    mock.return_value = InterruptSessionActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.interrupt_session",
+        new_callable=AsyncMock,
     )
-    return mock
+
+    return mock_agent_response_result
 
 
-INTERRUPT_SESSION_MOCK = {"interrupted": True}
+INTERRUPT_SESSION_MOCK = None
 
 
 @pytest.mark.parametrize(
@@ -67,4 +69,7 @@ async def test_interrupt_session(
     processors: SessionProcessors,
     test_scenario: TestScenario[InterruptSessionAction, InterruptSessionActionResult],
 ):
+    # Expected result will use the session data from the database fixture
+    assert test_scenario.expected is not None
+    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
     await test_scenario.test(processors.interrupt.wait_for_complete)

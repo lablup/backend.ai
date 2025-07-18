@@ -47,18 +47,24 @@ def mock_resolve_image(mocker):
 
 @pytest.fixture
 def mock_session_service_create_from_params(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.create_from_params",
+    # Mock additional repository methods needed for session creation
+    mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.query_userinfo",
         new_callable=AsyncMock,
+        return_value=("user_info", SESSION_FIXTURE_DATA.group_id, "resource_policy"),
     )
-    mock.return_value = CreateFromParamsActionResult(
-        session_id=SESSION_FIXTURE_DATA.id,
-        result=mock_agent_response_result,
+
+    # Mock AgentRegistry.create_session to return the expected result
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.create_session",
+        new_callable=AsyncMock,
+        return_value=mock_agent_response_result,
     )
-    return mock
+
+    return None
 
 
-CREATE_FROM_PARAMS_MOCK = {"sessionId": "test_session_123"}
+CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
 
 
 CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
@@ -124,4 +130,15 @@ async def test_create_from_params(
     processors: SessionProcessors,
     test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
 ):
-    await test_scenario.test(processors.create_from_params.wait_for_complete)
+    # Execute the actual service
+    result = await processors.create_from_params.wait_for_complete(test_scenario.input)
+
+    # Verify the result
+    assert result is not None
+    assert isinstance(result, CreateFromParamsActionResult)
+    assert result.session_id is not None
+    assert result.result is not None
+    assert "sessionId" in result.result
+
+    # Verify the mocks were called
+    mock_resolve_image.assert_called_once()

@@ -59,15 +59,12 @@ EXPECTED_RESULT = LegacySessionInfo(
 
 @pytest.fixture
 def mock_get_session_info_service(mocker):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.get_session_info",
+    # Only mock the AgentRegistry dependency, not the service method itself
+    mock_increment_usage = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
-    mock.return_value = GetSessionInfoActionResult(
-        session_info=EXPECTED_RESULT,
-        session_data=SESSION_FIXTURE_DATA,
-    )
-    return mock
+    return mock_increment_usage
 
 
 @pytest.mark.parametrize(
@@ -100,4 +97,21 @@ async def test_get_session_info(
     processors: SessionProcessors,
     test_scenario: TestScenario[GetSessionInfoAction, GetSessionInfoActionResult],
 ):
-    await test_scenario.test(processors.get_session_info.wait_for_complete)
+    # Execute the actual service
+    result = await processors.get_session_info.wait_for_complete(test_scenario.input)
+
+    # Verify the result
+    assert result is not None
+    assert isinstance(result, GetSessionInfoActionResult)
+    assert result.session_info is not None
+    assert result.session_data is not None
+
+    # Check key fields (ignoring age_ms which is calculated dynamically)
+    assert result.session_info.domain_name == EXPECTED_RESULT.domain_name
+    assert result.session_info.group_id == EXPECTED_RESULT.group_id
+    assert result.session_info.user_id == EXPECTED_RESULT.user_id
+    assert result.session_info.image == EXPECTED_RESULT.image
+    assert result.session_info.status == EXPECTED_RESULT.status
+
+    # Verify the mock was called
+    mock_get_session_info_service.assert_called_once()

@@ -20,18 +20,16 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_shutdown_service_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.shutdown_service",
+    # Only mock agent registry methods - use real SessionRepository
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.shutdown_service",
         new_callable=AsyncMock,
     )
-    mock.return_value = ShutdownServiceActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
-    )
-    return mock
+
+    return mock_agent_response_result
 
 
-SHUTDOWN_SERVICE_MOCK = {"shutdown": True}
+SHUTDOWN_SERVICE_MOCK = None
 
 
 @pytest.mark.parametrize(
@@ -68,4 +66,7 @@ async def test_shutdown_service(
     processors: SessionProcessors,
     test_scenario: TestScenario[ShutdownServiceAction, ShutdownServiceActionResult],
 ):
+    # Expected result will use the session data from the database fixture
+    assert test_scenario.expected is not None
+    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
     await test_scenario.test(processors.shutdown_service.wait_for_complete)

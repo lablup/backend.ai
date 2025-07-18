@@ -20,18 +20,20 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_restart_session_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.restart_session",
+    # Only mock agent registry methods - use real SessionRepository
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
-    mock.return_value = RestartSessionActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.restart_session",
+        new_callable=AsyncMock,
     )
-    return mock
+
+    return mock_agent_response_result
 
 
-RESTART_SESSION_MOCK = {"restarted": True}
+RESTART_SESSION_MOCK = None
 
 
 @pytest.mark.parametrize(
@@ -67,4 +69,7 @@ async def test_restart_session(
     processors: SessionProcessors,
     test_scenario: TestScenario[RestartSessionAction, RestartSessionActionResult],
 ):
+    # Expected result will use the session data from the database fixture
+    assert test_scenario.expected is not None
+    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
     await test_scenario.test(processors.restart_session.wait_for_complete)
