@@ -198,8 +198,7 @@ class Services:
             repositories=repositories.model_serving,
         )
         model_serving_auto_scaling = AutoScalingService(
-            repositories.model_serving.repository,
-            repositories.model_serving.admin_repository,
+            repositories=repositories.model_serving,
         )
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,

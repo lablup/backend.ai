@@ -82,11 +82,12 @@ class ModelServingRepository:
             if not endpoint:
                 return None
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return None
 
-            data = EndpointData.from_row(endpoint)
-        return data
+            return EndpointData.from_row(endpoint)
 
     @repository_decorator()
     async def get_endpoint_by_name_validated(
@@ -100,8 +101,7 @@ class ModelServingRepository:
             endpoint = await self._get_endpoint_by_name(session, name, user_id)
             if not endpoint:
                 return None
-            data = EndpointData.from_row(endpoint)
-        return data
+            return EndpointData.from_row(endpoint)
 
     @repository_decorator()
     async def list_endpoints_by_owner_validated(
@@ -125,7 +125,8 @@ class ModelServingRepository:
             result = await session.execute(query)
             rows = result.scalars().all()
             data_list = [EndpointData.from_row(row) for row in rows]
-        return data_list
+
+            return data_list
 
     @repository_decorator()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
@@ -140,6 +141,7 @@ class ModelServingRepository:
             )
             result = await session.execute(query)
             existing_endpoint = result.scalar()
+
             return existing_endpoint is None
 
     @repository_decorator()
@@ -152,7 +154,8 @@ class ModelServingRepository:
             await db_sess.flush()
             await db_sess.refresh(endpoint_row)
             data = EndpointData.from_row(endpoint_row)
-        return data
+
+            return data
 
     @repository_decorator()
     async def update_endpoint_lifecycle_validated(
@@ -173,7 +176,9 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return False
 
             update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
@@ -186,6 +191,7 @@ class ModelServingRepository:
                 sa.update(EndpointRow).where(EndpointRow.id == endpoint_id).values(update_values)
             )
             await session.execute(query)
+
         return True
 
     @repository_decorator()
@@ -201,7 +207,9 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return False
 
             # Delete failed routes
@@ -216,6 +224,7 @@ class ModelServingRepository:
                 sa.update(EndpointRow).values({"retries": 0}).where(EndpointRow.id == endpoint_id)
             )
             await session.execute(query)
+
         return True
 
     @repository_decorator()
@@ -236,13 +245,12 @@ class ModelServingRepository:
             if not route or route.endpoint != service_id:
                 return None
 
-            if not self._validate_endpoint_access(
-                route.endpoint_row, user_id, user_role, domain_name
+            if not await self._validate_endpoint_access(
+                session, route.endpoint_row, user_id, user_role, domain_name
             ):
                 return None
 
-            data = RoutingData.from_row(route)
-        return data
+            return RoutingData.from_row(route)
 
     @repository_decorator()
     async def update_route_traffic_validated(
@@ -263,8 +271,8 @@ class ModelServingRepository:
             if not route or route.endpoint != service_id:
                 return None
 
-            if not self._validate_endpoint_access(
-                route.endpoint_row, user_id, user_role, domain_name
+            if not await self._validate_endpoint_access(
+                session, route.endpoint_row, user_id, user_role, domain_name
             ):
                 return None
 
@@ -278,8 +286,8 @@ class ModelServingRepository:
             endpoint = await self._get_endpoint_by_id(session, service_id, load_routes=True)
             if endpoint is None:
                 raise NoResultFound
-            data = EndpointData.from_row(endpoint)
-        return data
+
+            return EndpointData.from_row(endpoint)
 
     @repository_decorator()
     async def decrease_endpoint_replicas_validated(
@@ -290,11 +298,13 @@ class ModelServingRepository:
         Returns True if decreased, False if not found or no access.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, service_id)
+            endpoint = await self._get_endpoint_by_id(session, service_id, load_session_owner=True)
             if not endpoint:
                 return False
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return False
 
             query = (
@@ -303,6 +313,7 @@ class ModelServingRepository:
                 .values({"replicas": endpoint.replicas - 1})
             )
             await session.execute(query)
+
         return True
 
     @repository_decorator()
@@ -318,14 +329,16 @@ class ModelServingRepository:
             if not endpoint:
                 return None
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return None
 
             session.add(token_row)
             await session.commit()
             await session.refresh(token_row)
-            data = EndpointTokenData.from_row(token_row)
-        return data
+
+            return EndpointTokenData.from_row(token_row)
 
     @repository_decorator()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
@@ -358,8 +371,8 @@ class ModelServingRepository:
             user_row = result.scalar()
             if not user_row:
                 return None
-            data = UserData.from_row(user_row)
-        return data
+
+            return UserData.from_row(user_row)
 
     async def _get_endpoint_by_id(
         self,
@@ -393,6 +406,7 @@ class ModelServingRepository:
             (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
         )
         result = await session.execute(query)
+
         return result.scalar()
 
     async def _get_route_by_id(
@@ -412,19 +426,33 @@ class ModelServingRepository:
         except NoResultFound:
             return None
 
-    def _validate_endpoint_access(
-        self, endpoint: EndpointRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
+    async def _validate_endpoint_access(
+        self,
+        session: SASession,
+        endpoint: EndpointRow,
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
     ) -> bool:
         """
         Private method to validate user access to endpoint.
         """
+        if endpoint.session_owner is None:
+            return True
+
+        query = sa.select(UserRow).where(UserRow.uuid == endpoint.session_owner)
+        result = await session.execute(query)
+        owner = result.scalar()
+
         match user_role:
             case UserRole.SUPERADMIN:
                 return True
             case UserRole.ADMIN:
+                if owner.role == UserRole.SUPERADMIN:
+                    return False
                 return endpoint.domain == domain_name
             case _:
-                return endpoint.session_owner == user_id
+                return owner.uuid == user_id
 
     @repository_decorator()
     async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderRow]:
@@ -498,7 +526,9 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return False
 
             query = (
@@ -527,8 +557,8 @@ class ModelServingRepository:
                 if not rule:
                     return None
 
-                if not self._validate_endpoint_access(
-                    rule.endpoint_row, user_id, user_role, domain_name
+                if not await self._validate_endpoint_access(
+                    session, rule.endpoint_row, user_id, user_role, domain_name
                 ):
                     return None
 
@@ -539,6 +569,9 @@ class ModelServingRepository:
     @repository_decorator()
     async def create_auto_scaling_rule_validated(
         self,
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
         endpoint_id: uuid.UUID,
         metric_source: AutoScalingMetricSource,
         metric_name: str,
@@ -546,11 +579,8 @@ class ModelServingRepository:
         comparator: AutoScalingMetricComparator,
         step_size: int,
         cooldown_seconds: int,
-        min_replicas: int,
-        max_replicas: int,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
+        min_replicas: Optional[int] = None,
+        max_replicas: Optional[int] = None,
     ) -> Optional[EndpointAutoScalingRuleRow]:
         """
         Create auto scaling rule with access validation.
@@ -561,7 +591,9 @@ class ModelServingRepository:
             if not endpoint:
                 return None
 
-            if not self._validate_endpoint_access(endpoint, user_id, user_role, domain_name):
+            if not await self._validate_endpoint_access(
+                session, endpoint, user_id, user_role, domain_name
+            ):
                 return None
 
             if endpoint.lifecycle_stage in EndpointLifecycle.inactive_states():
@@ -599,8 +631,8 @@ class ModelServingRepository:
                 if not rule:
                     return None
 
-                if not self._validate_endpoint_access(
-                    rule.endpoint_row, user_id, user_role, domain_name
+                if not await self._validate_endpoint_access(
+                    session, rule.endpoint_row, user_id, user_role, domain_name
                 ):
                     return None
 
@@ -632,8 +664,8 @@ class ModelServingRepository:
                 if not rule:
                     return False
 
-                if not self._validate_endpoint_access(
-                    rule.endpoint_row, user_id, user_role, domain_name
+                if not await self._validate_endpoint_access(
+                    session, rule.endpoint_row, user_id, user_role, domain_name
                 ):
                     return False
 
