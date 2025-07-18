@@ -68,7 +68,7 @@ class TestDryRunModelService:
         "scenario",
         [
             TestScenario.success(
-                "설정 검증 성공",
+                "Configuration validation success",
                 DryRunModelServiceAction(
                     service_name="test-model-v1.0",
                     replicas=2,

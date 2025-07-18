@@ -109,7 +109,7 @@ class TestCreateModelService:
         "scenario",
         [
             TestScenario.success(
-                "정상적인 모델 배포",
+                "Successful model deployment",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                     creator=ModelServiceCreator(
@@ -166,7 +166,7 @@ class TestCreateModelService:
                 ),
             ),
             TestScenario.failure(
-                "리소스 부족",
+                "insufficient resources",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                     creator=ModelServiceCreator(
@@ -209,7 +209,7 @@ class TestCreateModelService:
                 Exception,  # insufficient resources
             ),
             TestScenario.failure(
-                "중복 모델 이름",
+                "duplicate model name",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                     creator=ModelServiceCreator(
@@ -252,7 +252,7 @@ class TestCreateModelService:
                 InvalidAPIParameters,
             ),
             TestScenario.success(
-                "퍼블릭 엔드포인트 생성",
+                "public endpoint creation",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                     creator=ModelServiceCreator(
@@ -325,17 +325,17 @@ class TestCreateModelService:
     ):
         expected = cast(CreateModelServiceActionResult, scenario.expected)
 
-        if scenario.description == "정상적인 모델 배포":
+        if scenario.description == "Successful model deployment":
             mock_endpoint_data = MagicMock(id=expected.data.endpoint_id)
             mock_create_endpoint_validated.return_value = mock_endpoint_data
 
-        elif scenario.description == "리소스 부족":
+        elif scenario.description == "insufficient resources":
             mock_create_session.side_effect = Exception("Insufficient resources")
 
-        elif scenario.description == "중복 모델 이름":
+        elif scenario.description == "duplicate model name":
             mock_check_endpoint_name_uniqueness.return_value = False
 
-        elif scenario.description == "퍼블릭 엔드포인트 생성":
+        elif scenario.description == "public endpoint creation":
             mock_endpoint_data = MagicMock(id=expected.data.endpoint_id)
             mock_create_endpoint_validated.return_value = mock_endpoint_data
 

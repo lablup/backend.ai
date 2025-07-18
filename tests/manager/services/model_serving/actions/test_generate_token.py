@@ -217,7 +217,7 @@ class TestGenerateToken:
 
         # TODO: Change using aioresponses to mocking client layer after refactoring service layer
         with aioresponses() as mock_http:
-            # HTTP 응답 Mock 설정
+            # HTTP response mock setup
             expected_url = (
                 f"{mock_scaling_group.wsproxy_addr}/v2/endpoints/{action.service_id}/token"
             )
