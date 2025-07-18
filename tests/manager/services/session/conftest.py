@@ -2,6 +2,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 
@@ -43,3 +45,13 @@ async def processors(
 
     # Create real SessionProcessors with real service
     return SessionProcessors(session_service, [])
+
+
+@pytest.fixture
+def session_repository(database_engine) -> SessionRepository:
+    return SessionRepository(database_engine)
+
+
+@pytest.fixture
+def admin_session_repository(database_engine) -> AdminSessionRepository:
+    return AdminSessionRepository(database_engine)

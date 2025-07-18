@@ -134,6 +134,14 @@ SESSION_FIXTURE_DICT = dataclasses.asdict(
 
 del SESSION_FIXTURE_DICT["service_ports"]
 
+# Add status_history for testing
+SESSION_FIXTURE_DICT["status_history"] = {
+    "history": [
+        {"status": "PENDING", "timestamp": "2023-01-01T00:00:00Z"},
+        {"status": "RUNNING", "timestamp": "2023-01-01T00:01:00Z"},
+    ]
+}
+
 KERNEL_FIXTURE_DATA = KERNEL_ROW_FIXTURE.to_dataclass()
 KERNEL_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
@@ -158,3 +166,61 @@ PENDING_SESSION_FIXTURE_DICT = dataclasses.asdict(
         status=PENDING_SESSION_FIXTURE_DATA.status.value,  # type: ignore
     )
 )
+
+# Additional fixtures for complex database operations
+IMAGE_FIXTURE_DATA = {
+    "id": "test_image_id",
+    "name": "python",
+    "project": "test_project",
+    "tag": "3.9",
+    "registry": "registry.example.com",
+    "architecture": "x86_64",
+    "config_digest": "sha256:test_config_digest",
+    "size_bytes": 1024,
+    "type": "compute",
+    "accelerators": "",
+    "labels": {},
+    "resource_limits": [],
+    "supported_accelerators": "",
+    "installed_global_pkgs": [],
+    "digest": "sha256:test_digest",
+    "installed": True,
+    "resource_slots": {"cpu": "1", "mem": "1g"},
+    "environments": [],
+    "min_kernel_version": "1.0.0",
+    "is_local": False,
+}
+
+GROUP_FIXTURE_DATA = {
+    "id": SESSION_FIXTURE_DATA.group_id,
+    "name": "test_group",
+    "description": "Test group for fixtures",
+    "is_active": True,
+    "domain_name": SESSION_FIXTURE_DATA.domain_name,
+    "total_resource_slots": {},
+    "allowed_vfolder_hosts": {},
+    "resource_policy": "default",
+    "type": "general",
+}
+
+USER_FIXTURE_DATA = {
+    "uuid": SESSION_FIXTURE_DATA.user_uuid,
+    "username": "test_user",
+    "email": "test@example.com",
+    "password": "test_password",
+    "need_password_change": False,
+    "full_name": "Test User",
+    "description": "Test user for fixtures",
+    "status": "active",
+    "status_info": "admin-requested",
+    "domain_name": SESSION_FIXTURE_DATA.domain_name,
+    "role": "user",
+    "main_access_key": SESSION_FIXTURE_DATA.access_key,
+    "resource_policy": "default",
+}
+
+# Association table for groups and users
+GROUP_USER_ASSOCIATION_DATA = {
+    "group_id": SESSION_FIXTURE_DATA.group_id,
+    "user_id": SESSION_FIXTURE_DATA.user_uuid,
+}

@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -30,7 +30,7 @@ class SessionData:
     occupying_slots: Any  # TODO: ResourceSlot?
     requested_slots: Any
     use_host_network: bool
-    created_at: datetime
+    created_at: datetime = field(compare=False)
     status: "SessionStatus"
     result: SessionResult
     num_queries: int
@@ -46,15 +46,15 @@ class SessionData:
     target_sgroup_names: Optional[list[str]]
     timeout: Optional[int]
     batch_timeout: Optional[int]
-    terminated_at: Optional[datetime]
+    terminated_at: Optional[datetime] = field(compare=False)
     scaling_group_name: Optional[str]
-    starts_at: Optional[datetime]
-    status_info: Optional[str]
-    status_data: Optional[dict[str, Any]]
-    status_history: Optional[dict[str, Any]]
+    starts_at: Optional[datetime] = field(compare=False)
+    status_info: Optional[str] = field(compare=False)
+    status_data: Optional[dict[str, Any]] = field(compare=False)
+    status_history: Optional[dict[str, Any]] = field(compare=False)
     callback_url: Optional[str]
     startup_command: Optional[str]
-    last_stat: Optional[dict[str, Any]]
+    last_stat: Optional[dict[str, Any]] = field(compare=False)
     network_type: Optional[NetworkType]
     network_id: Optional[str]
 
