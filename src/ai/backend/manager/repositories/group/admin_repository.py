@@ -184,6 +184,56 @@ class AdminGroupRepository:
         await session.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
         await session.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
 
+    async def _check_group_has_active_endpoints(
+        self, session: SASession, group_id: uuid.UUID
+    ) -> bool:
+        """Check if group has active endpoints."""
+        query = (
+            sa.select([sa.func.count(EndpointRow.id)])
+            .select_from(EndpointRow)
+            .where(
+                (EndpointRow.group == group_id)
+                & (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
+            )
+        )
+        result = await session.execute(query)
+        count = result.scalar()
+        return count > 0
+
+    async def purge_group(self, group_id: uuid.UUID) -> bool:
+        """Completely remove a group and all its associated data with proper checks."""
+        async with self._db.begin_session() as session:
+            # Pre-flight checks
+            if await self._check_group_vfolders_mounted_to_active_kernels(session, group_id):
+                raise GroupHasVFoldersMountedError()
+
+            if await self._check_group_has_active_kernels(session, group_id):
+                raise GroupHasActiveKernelsError()
+
+            if await self._check_group_has_active_endpoints(session, group_id):
+                raise GroupHasActiveEndpointsError()
+
+            # Delete associated resources
+            await self._delete_group_endpoints(session, group_id)
+
+            # Commit session before vfolder deletion (which uses separate transactions)
+            await session.commit()
+
+        # Delete vfolders (uses separate transaction)
+        await self._delete_group_vfolders(group_id)
+
+        async with self._db.begin_session() as session:
+            # Delete remaining data
+            await self._delete_group_kernels(session, group_id)
+            await self._delete_group_sessions(session, group_id)
+
+            # Finally delete the group itself
+            result = await session.execute(sa.delete(groups).where(groups.c.id == group_id))
+
+            if result.rowcount > 0:
+                return True
+            raise GroupNotFound()
+
     async def purge_group_force(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         async with self._db.begin_session() as session:

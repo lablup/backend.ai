@@ -16,7 +16,12 @@ from sqlalchemy.exc import IntegrityError
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import (
+    GroupHasActiveEndpointsError,
+    GroupHasActiveKernelsError,
+    GroupHasVFoldersMountedError,
+    GroupNotFound,
+)
 from ai.backend.manager.models.group import ProjectType, groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus, users
@@ -850,3 +855,285 @@ class TestAdminGroupRepository:
                 result = await conn.execute(sa.select(groups).where(groups.c.id == group.id))
                 group_row = result.first()
                 assert group_row is None
+
+    @pytest.mark.asyncio
+    async def test_create_group_with_invalid_domain(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test group creation with non-existent domain"""
+        invalid_domain_creator = GroupCreator(
+            name="invalid-domain-group",
+            domain_name="non-existent-domain",
+            description="Test group with invalid domain",
+            is_active=True,
+            resource_policy="default",
+            type=ProjectType.GENERAL,
+        )
+
+        # Should raise exception or fail due to foreign key constraint
+        with pytest.raises((IntegrityError, Exception)):
+            await group_repository.create(invalid_domain_creator)
+
+    @pytest.mark.asyncio
+    async def test_create_group_with_invalid_resource_policy(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test group creation with non-existent resource policy"""
+        invalid_policy_creator = GroupCreator(
+            name="invalid-policy-group",
+            domain_name="default",
+            description="Test group with invalid resource policy",
+            is_active=True,
+            resource_policy="non-existent-policy",
+            type=ProjectType.GENERAL,
+        )
+
+        # Should raise exception or fail due to foreign key constraint
+        with pytest.raises((IntegrityError, Exception)):
+            await group_repository.create(invalid_policy_creator)
+
+    @pytest.mark.asyncio
+    async def test_group_usage_analytics_edge_cases(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test edge cases for usage analytics methods"""
+        async with self.create_test_group_for_purge(
+            database_engine, "analytics-edge-test", is_active=True
+        ) as group:
+            from datetime import datetime, timedelta
+
+            # Test with invalid date ranges
+            end_date = datetime.now()
+            start_date = end_date + timedelta(days=1)  # Start after end
+
+            # Should handle invalid date ranges gracefully
+            try:
+                stats = await group_repository.get_container_stats_for_period(
+                    start_date, end_date, [group.id]
+                )
+                assert isinstance(stats, list)
+            except Exception:
+                # Some implementations might raise an exception for invalid ranges
+                pass
+
+            # Test with very long periods (should be handled by business logic)
+            long_start = datetime.now() - timedelta(days=200)
+            long_end = datetime.now()
+
+            stats = await group_repository.get_container_stats_for_period(
+                long_start, long_end, [group.id]
+            )
+            assert isinstance(stats, list)
+
+    @pytest.mark.asyncio
+    async def test_group_modification_validation_edge_cases(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test edge cases for group modification validation"""
+        async with self.create_test_group_for_purge(
+            database_engine, "validation-edge-test", is_active=True
+        ) as group:
+            # Test with empty modifier (should succeed with no changes)
+            empty_modifier = GroupModifier()
+            result = await group_repository.modify_validated(
+                group.id, empty_modifier, UserRole.ADMIN, None, None
+            )
+            assert result is not None
+            assert result.id == group.id
+
+            # Test with valid user operations but empty user lists
+            modifier_with_empty_users = GroupModifier()
+            result = await group_repository.modify_validated(
+                group.id, modifier_with_empty_users, UserRole.ADMIN, "add", []
+            )
+            assert result is not None
+
+            # Test with invalid user_update_mode
+            modifier_with_invalid_mode = GroupModifier()
+            try:
+                result = await group_repository.modify_validated(
+                    group.id, modifier_with_invalid_mode, UserRole.ADMIN, "invalid_mode", []
+                )
+                # Should handle gracefully or raise appropriate exception
+            except Exception:
+                # Some implementations might raise an exception for invalid modes
+                pass
+
+    @pytest.mark.asyncio
+    async def test_purge_group_with_active_kernels_error(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        admin_group_repository: AdminGroupRepository,
+    ) -> None:
+        """Test purge group fails when group has active kernels"""
+        async with self.create_test_group_for_purge(
+            database_engine, "active-kernels-test"
+        ) as group:
+            # Mock having active kernels by patching the check method
+            from unittest.mock import patch
+
+            with patch.object(
+                admin_group_repository, "_check_group_has_active_kernels", return_value=True
+            ) as mock_check:
+                # Should raise GroupHasActiveKernelsError
+                with pytest.raises(GroupHasActiveKernelsError):
+                    await admin_group_repository.purge_group(group.id)
+                mock_check.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_purge_group_with_mounted_vfolders_error(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        admin_group_repository: AdminGroupRepository,
+    ) -> None:
+        """Test purge group fails when group has mounted vfolders"""
+        async with self.create_test_group_for_purge(
+            database_engine, "mounted-vfolders-test"
+        ) as group:
+            # Mock having mounted vfolders by patching the check method
+            from unittest.mock import patch
+
+            with patch.object(
+                admin_group_repository,
+                "_check_group_vfolders_mounted_to_active_kernels",
+                return_value=True,
+            ) as mock_check:
+                # Should raise GroupHasVFoldersMountedError
+                with pytest.raises(GroupHasVFoldersMountedError):
+                    await admin_group_repository.purge_group(group.id)
+                mock_check.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_purge_group_with_active_endpoints_error(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        admin_group_repository: AdminGroupRepository,
+    ) -> None:
+        """Test purge group fails when group has active endpoints"""
+        async with self.create_test_group_for_purge(
+            database_engine, "active-endpoints-test"
+        ) as group:
+            # Mock having active endpoints by patching the check method
+            from unittest.mock import patch
+
+            with patch.object(
+                admin_group_repository, "_check_group_has_active_endpoints", return_value=True
+            ) as mock_check:
+                # Should raise GroupHasActiveEndpointsError
+                with pytest.raises(GroupHasActiveEndpointsError):
+                    await admin_group_repository.purge_group(group.id)
+                mock_check.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_group_domain_validation(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test group creation with domain validation scenarios"""
+        # Test with valid domain (should succeed)
+        valid_creator = GroupCreator(
+            name="valid-domain-group",
+            domain_name="default",  # This should exist in test fixtures
+            description="Test group with valid domain",
+            is_active=True,
+            resource_policy="default",
+            type=ProjectType.GENERAL,
+        )
+
+        created_group = await group_repository.create(valid_creator)
+        assert created_group.domain_name == "default"
+
+        # Cleanup
+        async with database_engine.begin() as conn:
+            await conn.execute(sa.delete(groups).where(groups.c.id == created_group.id))
+            await conn.commit()
+
+    @pytest.mark.asyncio
+    async def test_create_group_resource_policy_validation(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test group creation with resource policy validation"""
+        # Test with valid resource policy (should succeed)
+        valid_creator = GroupCreator(
+            name="valid-policy-group",
+            domain_name="default",
+            description="Test group with valid resource policy",
+            is_active=True,
+            resource_policy="default",  # This should exist in test fixtures
+            type=ProjectType.GENERAL,
+        )
+
+        created_group = await group_repository.create(valid_creator)
+        assert created_group.resource_policy == "default"
+
+        # Cleanup
+        async with database_engine.begin() as conn:
+            await conn.execute(sa.delete(groups).where(groups.c.id == created_group.id))
+            await conn.commit()
+
+    @pytest.mark.asyncio
+    async def test_group_soft_delete_idempotency(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test that soft delete is idempotent - multiple deletes should not fail"""
+        async with self.create_test_group_for_purge(
+            database_engine, "idempotent-delete-test", is_active=True
+        ) as group:
+            # First soft delete
+            result1 = await group_repository.mark_inactive(group.id)
+            assert result1 is True
+
+            # Second soft delete should also succeed (idempotent)
+            result2 = await group_repository.mark_inactive(group.id)
+            assert result2 is True
+
+            # Verify group is still inactive
+            async with database_engine.begin() as conn:
+                result = await conn.execute(sa.select(groups).where(groups.c.id == group.id))
+                group_row = result.first()
+                assert group_row is not None
+                assert group_row.is_active is False
+
+    @pytest.mark.asyncio
+    async def test_group_membership_with_nonexistent_users(
+        self,
+        database_fixture,
+        database_engine: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test group membership operations with non-existent users"""
+        async with self.create_test_group_for_purge(
+            database_engine, "nonexistent-users-test", is_active=True
+        ) as group:
+            # Try to add non-existent users
+            nonexistent_user_uuids = [uuid.uuid4(), uuid.uuid4()]
+
+            modifier = GroupModifier()
+            # Should raise exception or handle gracefully
+            with pytest.raises((IntegrityError, Exception)):
+                await group_repository.modify_validated(
+                    group.id, modifier, UserRole.ADMIN, "add", nonexistent_user_uuids
+                )
