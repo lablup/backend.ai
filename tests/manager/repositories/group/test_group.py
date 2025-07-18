@@ -80,10 +80,12 @@ class TestGroupRepository:
         is_active: bool = True,
     ) -> AsyncGenerator[GroupData, None]:
         """Create a test group and ensure cleanup"""
+        group_id = uuid.uuid4()
+
+        # Create group
         async with database_engine.begin() as conn:
-            # Create group
             group_data = {
-                "id": uuid.uuid4(),
+                "id": group_id,
                 "name": name,
                 "description": description,
                 "is_active": is_active,
@@ -104,11 +106,12 @@ class TestGroupRepository:
             group_data_obj = GroupData.from_row(group_row)
             assert group_data_obj is not None
 
-            try:
-                yield group_data_obj
-            finally:
-                # Cleanup
-                await conn.execute(sa.delete(groups).where(groups.c.id == group_data_obj.id))
+        try:
+            yield group_data_obj
+        finally:
+            # Cleanup with a separate connection
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(groups).where(groups.c.id == group_id))
                 await conn.commit()
 
     @pytest.mark.asyncio
@@ -664,10 +667,12 @@ class TestAdminGroupRepository:
         is_active: bool = False,  # Inactive for purging
     ) -> AsyncGenerator[GroupData, None]:
         """Create a test group for purge testing"""
+        group_id = uuid.uuid4()
+
+        # Create group
         async with database_engine.begin() as conn:
-            # Create group
             group_data = {
-                "id": uuid.uuid4(),
+                "id": group_id,
                 "name": name,
                 "description": "Test group for purging",
                 "is_active": is_active,
@@ -688,11 +693,12 @@ class TestAdminGroupRepository:
             group_data_obj = GroupData.from_row(group_row)
             assert group_data_obj is not None
 
-            try:
-                yield group_data_obj
-            finally:
-                # Cleanup (if not already purged)
-                await conn.execute(sa.delete(groups).where(groups.c.id == group_data_obj.id))
+        try:
+            yield group_data_obj
+        finally:
+            # Cleanup (if not already purged) with a separate connection
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(groups).where(groups.c.id == group_id))
                 await conn.commit()
 
     @pytest.mark.asyncio
