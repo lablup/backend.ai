@@ -315,6 +315,8 @@ MetricKey = NewType("MetricKey", str)
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
+ClusterRole = NewType("ClusterRole", str)
+
 
 class ContainerStatus(enum.StrEnum):
     RUNNING = "running"
@@ -1268,6 +1270,16 @@ class ClusterInfo(TypedDict):
 class ClusterSSHKeyPair(TypedDict):
     public_key: str  # OpenSSH authorized-keys compatible format
     private_key: str  # PEM-encoded string
+
+
+@dataclass
+class ContainerSSHKeyPair:
+    """
+    Represents a container SSH key pair.
+    """
+
+    public_key: str
+    private_key: str
 
 
 class ComputedDeviceCapacity(TypedDict):

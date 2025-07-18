@@ -134,3 +134,15 @@ class InvalidSocket(Exception):
 
 class NetworkPluginNotFound(RuntimeError):
     pass
+
+
+class ServicePortAlreadyUsedError(RuntimeError):
+    """
+    Raised when a port is already used by another service.
+    """
+
+
+class InvalidModelConfigurationError(RuntimeError):
+    """
+    Raised when a model configuration is invalid.
+    """
