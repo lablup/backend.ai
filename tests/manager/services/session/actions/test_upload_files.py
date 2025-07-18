@@ -34,6 +34,39 @@ def mock_upload_files_rpc(mocker, mock_agent_response_result):
     return mock_agent_response_result
 
 
+@pytest.fixture
+def mock_large_file_reader():
+    """Mock a MultipartReader with a large file"""
+    mock_reader = MagicMock()
+    mock_file = MagicMock()
+    mock_file.filename = "large_file.txt"
+    mock_file.read_chunk = AsyncMock(return_value=b"x" * 1048577)  # > 1MB
+    mock_file.decode = MagicMock(return_value="large content")
+
+    async def mock_next():
+        yield mock_file
+
+    mock_reader.next = mock_next
+    return mock_reader
+
+
+@pytest.fixture
+def mock_too_many_files_reader():
+    """Mock a MultipartReader with too many files"""
+    mock_reader = MagicMock()
+
+    async def mock_next():
+        for i in range(21):  # More than 20 files
+            mock_file = MagicMock()
+            mock_file.filename = f"file_{i}.txt"
+            mock_file.read_chunk = AsyncMock(return_value=b"small content")
+            mock_file.decode = MagicMock(return_value="content")
+            yield mock_file
+
+    mock_reader.next = mock_next
+    return mock_reader
+
+
 UPLOAD_FILES_MOCK = {"uploaded": True, "files": ["test_file1.txt", "test_file2.txt"]}
 
 
