@@ -1,6 +1,5 @@
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import AsyncGenerator
 from unittest.mock import MagicMock
 
@@ -10,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -27,19 +27,13 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.services.user.actions.create_user import (
-    CreateUserAction,
-    CreateUserActionResult,
-)
+from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction, UserModifier
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.manager.services.user.type import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.types import OptionalState
-
-from .test_utils import TestScenario
 
 
 @pytest.fixture
@@ -181,98 +175,88 @@ def create_user(
     return _create_user
 
 
-@pytest.mark.parametrize(
-    "test_scenario",
-    [
-        TestScenario.success(
-            "With valid data, create user action will be successful",
-            CreateUserAction(
-                input=UserCreator(
-                    username="testuser",
-                    password="password123",
-                    email="test_user@test.com",
-                    need_password_change=False,
-                    domain_name="default",
-                    full_name="Test User",
-                    description="Test user description",
-                    is_active=True,
-                    status=UserStatus.ACTIVE,
-                    role=UserRole.USER,
-                    allowed_client_ip=None,
-                    totp_activated=False,
-                    resource_policy="default",
-                    sudo_session_enabled=False,
-                    group_ids=None,
-                    container_uid=None,
-                    container_main_gid=None,
-                    container_gids=None,
-                ),
-            ),
-            CreateUserActionResult(
-                data=UserData(
-                    id=uuid.uuid4(),
-                    uuid=uuid.uuid4(),
-                    username="testuser",
-                    email="test_user@test.com",
-                    need_password_change=False,
-                    full_name="Test User",
-                    description="Test user description",
-                    is_active=True,
-                    status=UserStatus.ACTIVE,
-                    status_info="admin-requested",
-                    created_at=datetime.now(),
-                    modified_at=datetime.now(),
-                    domain_name="default",
-                    role=UserRole.USER,
-                    resource_policy="default",
-                    allowed_client_ip=None,
-                    totp_activated=False,
-                    totp_activated_at=datetime.now(),
-                    sudo_session_enabled=False,
-                    main_access_key=None,
-                    container_uid=None,
-                    container_main_gid=None,
-                    container_gids=None,
-                ),
-                success=True,
-            ),
-        ),
-        TestScenario.success(
-            "With non-existing domain name, create user action will return result with None data",
-            CreateUserAction(
-                input=UserCreator(
-                    username="test_user_not_existing_domain",
-                    password="password123",
-                    email="test@test.com",
-                    need_password_change=False,
-                    domain_name="non_existing_domain",
-                    full_name="Test User",
-                    description="Test user description",
-                    is_active=True,
-                    status=UserStatus.ACTIVE,
-                    role=UserRole.USER,
-                    allowed_client_ip=None,
-                    totp_activated=False,
-                    resource_policy="default",
-                    sudo_session_enabled=False,
-                    group_ids=None,
-                    container_uid=None,
-                    container_main_gid=None,
-                    container_gids=None,
-                ),
-            ),
-            CreateUserActionResult(
-                data=None,
-                success=False,
-            ),
-        ),
-    ],
-)
 async def test_create_user(
-    test_scenario: TestScenario,
+    processors: UserProcessors,
+    database_fixture,
+) -> None:
+    """Test successful user creation with valid data"""
+    action = CreateUserAction(
+        creator=UserCreator(
+            username="testuser",
+            password="password123",
+            email="test_user@test.com",
+            need_password_change=False,
+            domain_name="default",
+            full_name="Test User",
+            description="Test user description",
+            is_active=True,
+            status=UserStatus.ACTIVE,
+            role=UserRole.USER,
+            allowed_client_ip=None,
+            totp_activated=False,
+            resource_policy="default",
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        ),
+        group_ids=None,
+    )
+
+    result = await processors.create_user.wait_for_complete(action)
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data.username == "testuser"
+    assert result.data.email == "test_user@test.com"
+    assert result.data.need_password_change is False
+    assert result.data.full_name == "Test User"
+    assert result.data.description == "Test user description"
+    assert result.data.is_active is True
+    assert result.data.status == UserStatus.ACTIVE
+    # status_info is None for newly created users
+    assert result.data.domain_name == "default"
+    assert result.data.role == UserRole.USER
+    assert result.data.resource_policy == "default"
+    assert result.data.allowed_client_ip is None
+    assert result.data.totp_activated is False
+    assert result.data.sudo_session_enabled is False
+    assert result.data.container_uid is None
+    assert result.data.container_main_gid is None
+    assert result.data.container_gids is None
+
+
+async def test_create_user_non_existing_domain(
     processors: UserProcessors,
 ) -> None:
-    await test_scenario.test(processors.create_user.wait_for_complete)
+    """Test user creation with non-existing domain returns failure"""
+    action = CreateUserAction(
+        creator=UserCreator(
+            username="test_user_not_existing_domain",
+            password="password123",
+            email="test@test.com",
+            need_password_change=False,
+            domain_name="non_existing_domain",
+            full_name="Test User",
+            description="Test user description",
+            is_active=True,
+            status=UserStatus.ACTIVE,
+            role=UserRole.USER,
+            allowed_client_ip=None,
+            totp_activated=False,
+            resource_policy="default",
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        ),
+        group_ids=None,
+    )
+
+    result = await processors.create_user.wait_for_complete(action)
+
+    assert result.success is False
+    assert result.data is None
 
 
 async def test_create_default_keypair_after_create_user(
@@ -503,25 +487,20 @@ async def test_purge_user(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "test_scenario",
-    [
-        TestScenario.failure(
-            "With non-existing email, purge user action will raise error",
-            PurgeUserAction(
-                email="non-exisiting-user@email.com",
-                user_info_ctx=UserInfoContext(
-                    uuid=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
-                    email="non-exisiting-user@email.com",
-                    main_access_key=AccessKey("sample_access_key"),
-                ),
-            ),
-            RuntimeError,
-        ),
-    ],
-)
 async def test_purge_user_fail(
     processors: UserProcessors,
-    test_scenario,
 ) -> None:
-    await test_scenario.test(processors.purge_user.wait_for_complete)
+    """Test that purging a non-existing user raises UserNotFound error"""
+    from ai.backend.manager.errors.user import UserNotFound
+
+    action = PurgeUserAction(
+        email="non-exisiting-user@email.com",
+        user_info_ctx=UserInfoContext(
+            uuid=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            email="non-exisiting-user@email.com",
+            main_access_key=AccessKey("sample_access_key"),
+        ),
+    )
+
+    with pytest.raises(UserNotFound):
+        await processors.purge_user.wait_for_complete(action)

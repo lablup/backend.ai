@@ -103,16 +103,8 @@ class VFolderInviteService:
             if result:
                 invited_ids.append(result)
 
-        # Convert email strings to UUIDs by looking up invitee user IDs
-        invited_user_ids = []
-        for email in invited_ids:
-            user_info = await self._vfolder_repository.get_user_by_email(email)
-            if user_info:
-                user_id, _ = user_info
-                invited_user_ids.append(user_id)
-
         return InviteVFolderActionResult(
-            vfolder_uuid=action.vfolder_uuid, invitation_ids=invited_user_ids
+            vfolder_uuid=action.vfolder_uuid, invitation_ids=invited_ids
         )
 
     async def accept_invitation(

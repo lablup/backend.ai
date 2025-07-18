@@ -131,6 +131,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "status": (EnumFieldItem("status", ImageStatus), None),
     "project": ("project", None),
     "image": ("image", None),
+    "base_image_name": ("image", None),
     "created_at": ("created_at", dtparse),
     "registry": ("registry", None),
     "registry_id": ("registry_id", None),
@@ -148,6 +149,7 @@ _queryorder_colmap: ColumnMapType = {
     "status": ("status", None),
     "project": ("project", None),
     "image": ("image", None),
+    "base_image_name": ("image", None),
     "created_at": ("created_at", None),
     "registry": ("registry", None),
     "registry_id": ("registry_id", None),
@@ -158,6 +160,7 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.4.0.")
+ImageTypeEnum = graphene.Enum.from_enum(ImageType, description="Added in 25.12.0.")
 
 
 class Image(graphene.ObjectType):
@@ -455,6 +458,7 @@ class ImageNode(graphene.ObjectType):
     installed = graphene.Boolean(
         description="Added in 25.11.0. Indicates if the image is installed on any Agent."
     )
+    type = ImageTypeEnum(description="Added in 25.12.0.")
 
     @property
     def _canonical(self) -> str:
@@ -549,6 +553,7 @@ class ImageNode(graphene.ObjectType):
             return None
         image_ref = row.image_ref
         version, ptag_set = image_ref.tag_set
+        image_type = row.labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
 
         result = cls(
             id=row.id,
@@ -579,6 +584,7 @@ class ImageNode(graphene.ObjectType):
             aliases=[alias_row.alias for alias_row in row.aliases],
             permissions=[] if permissions is None else permissions,
             status=row.status,
+            type=image_type,
         )
 
         return result
@@ -587,6 +593,7 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(
         cls, row: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> ImageNode:
+        image_type = row.labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         result = cls(
             id=row.id,
             row_id=row.id,
@@ -609,6 +616,7 @@ class ImageNode(graphene.ObjectType):
             aliases=row.aliases,
             permissions=[] if permissions is None else permissions,
             status=row.status,
+            type=image_type,
         )
         return result
 

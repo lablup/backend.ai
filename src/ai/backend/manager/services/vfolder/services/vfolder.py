@@ -13,6 +13,7 @@ from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
+    VFolderHostPermission,
     VFolderID,
     VFolderUsageMode,
 )
@@ -106,6 +107,7 @@ class VFolderService:
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
         user_uuid = action.user_uuid
+        keypair_resource_policy = action.keypair_resource_policy
         domain_name = action.domain_name
         group_id_or_name = action.group_id_or_name
         folder_host = action.folder_host
@@ -193,94 +195,99 @@ class VFolderService:
                     "Only Model VFolder can be created under the model store project"
                 )
 
-            # Note: Host permission check would need to be moved to a separate permission service
-            # For now, this validation is skipped as it requires direct database access
-            # TODO: Implement host permission check in permission service
+        # Check host permissions
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            folder_host,
+            permission=VFolderHostPermission.CREATE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=keypair_resource_policy,
+            domain_name=domain_name,
+            group_id=group_uuid,
+        )
 
-            # Check resource policy's max_vfolder_count using repository
-            if max_vfolder_count > 0:
-                if ownership_type == "user":
-                    current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
-                else:
-                    assert group_uuid is not None
-                    current_count = await self._vfolder_repository.count_vfolders_by_group(
-                        group_uuid
-                    )
+        # Check resource policy's max_vfolder_count using repository
+        if max_vfolder_count > 0:
+            if ownership_type == "user":
+                current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
+            else:
+                assert group_uuid is not None
+                current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
 
-                if current_count >= max_vfolder_count:
-                    raise VFolderInvalidParameter("You cannot create more vfolders.")
+            if current_count >= max_vfolder_count:
+                raise VFolderInvalidParameter("You cannot create more vfolders.")
 
-            # Check for duplicate vfolder names using repository
-            name_exists = await self._vfolder_repository.check_vfolder_name_exists(
-                action.name,
-                user_uuid,
-                user_role,
-                domain_name,
-                list(allowed_vfolder_types),
-            )
-            if name_exists:
-                raise VFolderAlreadyExists(
-                    f"VFolder with the given name already exists. ({action.name})"
-                )
-
-            folder_id = uuid.uuid4()
-            try:
-                vfid = VFolderID(quota_scope_id, folder_id)
-                if not unmanaged_path:
-                    options = {}
-                    if max_quota_scope_size and max_quota_scope_size > 0:
-                        options["initial_max_size_for_quota_scope"] = max_quota_scope_size
-                    body_data: dict[str, Any] = {
-                        "volume": self._storage_manager.get_proxy_and_volume(
-                            folder_host, is_unmanaged(unmanaged_path)
-                        )[1],
-                        "vfid": str(vfid),
-                        "options": options,
-                    }
-                    if vfolder_permission_mode is not None:
-                        body_data["mode"] = vfolder_permission_mode
-                    async with self._storage_manager.request(
-                        folder_host,
-                        "POST",
-                        "folder/create",
-                        json=body_data,
-                    ):
-                        pass
-            except aiohttp.ClientResponseError as e:
-                raise VFolderCreationFailure from e
-
-            # By default model store VFolder should be considered as read only for every users but without the creator
-            if group_type == ProjectType.MODEL_STORE:
-                action.mount_permission = VFolderPermission.READ_ONLY
-
-            # Use repository to create VFolder
-            from ai.backend.manager.data.vfolder.types import VFolderCreateParams
-
-            params = VFolderCreateParams(
-                id=folder_id,
-                name=action.name,
-                domain_name=domain_name,
-                quota_scope_id=str(quota_scope_id),
-                usage_mode=action.usage_mode,
-                permission=action.mount_permission,
-                host=folder_host,
-                creator=action.creator_email,
-                ownership_type=VFolderOwnershipType(ownership_type),
-                user=user_uuid if ownership_type == "user" else None,
-                group=group_uuid if ownership_type == "group" else None,
-                unmanaged_path=unmanaged_path,
-                cloneable=action.cloneable,
-                status=VFolderOperationStatus.READY,
+        # Check for duplicate vfolder names using repository
+        name_exists = await self._vfolder_repository.check_vfolder_name_exists(
+            action.name,
+            user_uuid,
+            user_role,
+            domain_name,
+            list(allowed_vfolder_types),
+        )
+        if name_exists:
+            raise VFolderAlreadyExists(
+                f"VFolder with the given name already exists. ({action.name})"
             )
 
-            try:
-                # Create with permission if it's a model store
-                create_owner_permission = group_type == ProjectType.MODEL_STORE
-                await self._vfolder_repository.create_vfolder_with_permission(
-                    params, create_owner_permission=create_owner_permission
-                )
-            except sa_exc.DataError:
-                raise VFolderInvalidParameter
+        folder_id = uuid.uuid4()
+        try:
+            vfid = VFolderID(quota_scope_id, folder_id)
+            if not unmanaged_path:
+                options = {}
+                if max_quota_scope_size and max_quota_scope_size > 0:
+                    options["initial_max_size_for_quota_scope"] = max_quota_scope_size
+                body_data: dict[str, Any] = {
+                    "volume": self._storage_manager.get_proxy_and_volume(
+                        folder_host, is_unmanaged(unmanaged_path)
+                    )[1],
+                    "vfid": str(vfid),
+                    "options": options,
+                }
+                if vfolder_permission_mode is not None:
+                    body_data["mode"] = vfolder_permission_mode
+                async with self._storage_manager.request(
+                    folder_host,
+                    "POST",
+                    "folder/create",
+                    json=body_data,
+                ):
+                    pass
+        except aiohttp.ClientResponseError as e:
+            raise VFolderCreationFailure from e
+
+        # By default model store VFolder should be considered as read only for every users but without the creator
+        if group_type == ProjectType.MODEL_STORE:
+            action.mount_permission = VFolderPermission.READ_ONLY
+
+        # Use repository to create VFolder
+        from ai.backend.manager.data.vfolder.types import VFolderCreateParams
+
+        params = VFolderCreateParams(
+            id=folder_id,
+            name=action.name,
+            domain_name=domain_name,
+            quota_scope_id=str(quota_scope_id),
+            usage_mode=action.usage_mode,
+            permission=action.mount_permission,
+            host=folder_host,
+            creator=action.creator_email,
+            ownership_type=VFolderOwnershipType(ownership_type),
+            user=user_uuid if ownership_type == "user" else None,
+            group=group_uuid if ownership_type == "group" else None,
+            unmanaged_path=unmanaged_path,
+            cloneable=action.cloneable,
+            status=VFolderOperationStatus.READY,
+        )
+
+        try:
+            # Create with permission if it's a model store
+            create_owner_permission = group_type == ProjectType.MODEL_STORE
+            await self._vfolder_repository.create_vfolder_with_permission(
+                params, create_owner_permission=create_owner_permission
+            )
+        except sa_exc.DataError:
+            raise VFolderInvalidParameter
 
         return CreateVFolderActionResult(
             id=folder_id,
