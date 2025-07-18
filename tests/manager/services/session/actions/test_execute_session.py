@@ -63,6 +63,19 @@ EXECUTE_SESSION_RAW_RESULT = {
 }
 EXECUTE_SESSION_MOCK = {"result": EXECUTE_SESSION_RAW_RESULT}
 
+EXECUTE_SESSION_ERROR_RESULT = {
+    "status": "finished",
+    "runId": "test_run_error",
+    "exitCode": 1,
+    "options": {},
+    "files": [],
+    "stdout": None,
+    "stderr": "ZeroDivisionError: division by zero",
+    "media": None,
+    "html": None,
+}
+EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
+
 
 @pytest.mark.parametrize(
     ("test_scenario", "mock_agent_response_result"),
@@ -87,6 +100,27 @@ EXECUTE_SESSION_MOCK = {"result": EXECUTE_SESSION_RAW_RESULT}
                 ),
             ),
             EXECUTE_SESSION_RAW_RESULT,
+        ),
+        (
+            TestScenario.success(
+                "Execute session with error",
+                ExecuteSessionAction(
+                    session_name=cast(str, SESSION_FIXTURE_DATA.name),
+                    api_version=(1, 0),
+                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                    params=ExecuteSessionActionParams(
+                        mode="query",
+                        options=None,
+                        code="1 / 0",  # Division by zero
+                        run_id="test_run_error",
+                    ),
+                ),
+                ExecuteSessionActionResult(
+                    result=EXECUTE_SESSION_ERROR_MOCK,
+                    session_data=SESSION_FIXTURE_DATA,
+                ),
+            ),
+            EXECUTE_SESSION_ERROR_RESULT,
         ),
     ],
 )
