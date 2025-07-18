@@ -15,7 +15,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -45,7 +44,7 @@ UPLOAD_FILES_MOCK = {"uploaded": True, "files": ["test_file1.txt", "test_file2.t
                 ),
                 UploadFilesActionResult(
                     result=UPLOAD_FILES_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
             UPLOAD_FILES_MOCK,

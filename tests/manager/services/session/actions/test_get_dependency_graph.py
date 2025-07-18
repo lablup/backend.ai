@@ -20,18 +20,38 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_get_dependency_graph_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.get_dependency_graph",
+def mock_session_repository_methods(mocker, mock_agent_response_result):
+    """Mock SessionRepository methods to return test data"""
+    # Mock find_dependency_sessions to return the dependency graph with session_id
+    mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.find_dependency_sessions",
         new_callable=AsyncMock,
+        return_value={"session_id": [SESSION_ROW_FIXTURE.id], **mock_agent_response_result},
     )
-    mock.return_value = mock_agent_response_result
-    return mock
+
+    # Mock get_session_by_id to return the session with proper to_dataclass
+    from unittest.mock import MagicMock
+
+    mock_session = MagicMock()
+    mock_session.to_dataclass.return_value = SESSION_FIXTURE_DATA
+    mock_session.id = SESSION_FIXTURE_DATA.id
+
+    mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_by_id",
+        new_callable=AsyncMock,
+        return_value=mock_session,
+    )
 
 
-GET_DEPENDENCY_GRAPH_MOCK = {
+GET_DEPENDENCY_GRAPH_BASE = {
     "nodes": [{"id": "node1", "type": "function"}],
     "edges": [{"from": "node1", "to": "node2"}],
+}
+
+# The actual result will include session_id from the mocked repository
+GET_DEPENDENCY_GRAPH_MOCK = {
+    "session_id": [SESSION_ROW_FIXTURE.id],
+    **GET_DEPENDENCY_GRAPH_BASE,
 }
 
 
@@ -47,10 +67,10 @@ GET_DEPENDENCY_GRAPH_MOCK = {
                 ),
                 GetDependencyGraphActionResult(
                     result=GET_DEPENDENCY_GRAPH_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
-            GET_DEPENDENCY_GRAPH_MOCK,
+            GET_DEPENDENCY_GRAPH_BASE,
         ),
     ],
 )
@@ -64,7 +84,7 @@ GET_DEPENDENCY_GRAPH_MOCK = {
     ],
 )
 async def test_get_dependency_graph(
-    mock_get_dependency_graph_rpc,
+    mock_session_repository_methods,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDependencyGraphAction, GetDependencyGraphActionResult],
 ):

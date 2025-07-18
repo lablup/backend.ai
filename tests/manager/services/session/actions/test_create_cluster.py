@@ -1,5 +1,5 @@
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -28,6 +28,24 @@ def mock_create_cluster_rpc(mocker):
     return mock
 
 
+@pytest.fixture
+def mock_get_template_by_id(mocker):
+    mock_template = MagicMock()
+    mock_template.id = TEST_TEMPLATE_ID
+    mock_template.name = "test_template"
+    mock_template.task_definition = {
+        "image": "python:3.9",
+        "command": ["python", "-c", "print('hello')"],
+    }
+
+    mock = mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.get_template_by_id",
+        new_callable=AsyncMock,
+        return_value=mock_template,
+    )
+    return mock
+
+
 CREATE_CLUSTER_MOCK = {"cluster_id": "test_cluster_123"}
 TEST_TEMPLATE_ID = uuid4()
 
@@ -43,6 +61,7 @@ TEST_TEMPLATE_ID = uuid4()
 )
 async def test_create_cluster(
     mock_create_cluster_rpc,
+    mock_get_template_by_id,
     processors: SessionProcessors,
 ):
     # Setup mock to return expected cluster result

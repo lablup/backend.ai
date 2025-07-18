@@ -15,7 +15,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -44,7 +43,7 @@ RESTART_SESSION_MOCK = {"restarted": True}
                 ),
                 RestartSessionActionResult(
                     result=RESTART_SESSION_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
             RESTART_SESSION_MOCK,

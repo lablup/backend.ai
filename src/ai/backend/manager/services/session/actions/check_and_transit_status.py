@@ -4,7 +4,7 @@ from typing import Optional, override
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action import BaseActionResult, BaseBatchActionResult
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction, SessionBatchAction
 
@@ -29,11 +29,11 @@ class CheckAndTransitStatusAction(SessionAction):
 class CheckAndTransitStatusActionResult(BaseActionResult):
     # TODO: Add proper type
     result: dict[SessionId, str]
-    session_row: SessionRow
+    session_data: SessionData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.session_row.id)
+        return str(self.session_data.id)
 
 
 # TODO: Change this to BatchAction

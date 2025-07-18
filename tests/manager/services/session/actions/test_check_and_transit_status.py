@@ -50,7 +50,7 @@ CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNN
                 ),
                 CheckAndTransitStatusActionResult(
                     result=CHECK_AND_TRANSIT_STATUS_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
             CHECK_AND_TRANSIT_STATUS_MOCK,

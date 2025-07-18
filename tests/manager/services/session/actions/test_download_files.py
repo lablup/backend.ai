@@ -10,18 +10,37 @@ from ai.backend.manager.services.session.actions.download_files import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
+from ...test_utils import TestScenario
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
+    SESSION_ROW_FIXTURE,
 )
 
 
 @pytest.fixture
-def mock_agent_download_files_rpc(mocker):
+def mock_agent_download_files_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.download_file",
         new_callable=AsyncMock,
+    )
+    mock.return_value = mock_agent_response_result
+    return mock
+
+
+@pytest.fixture
+def mock_session_service_download_files(mocker, mock_agent_response_result):
+    from aiohttp import MultipartWriter
+
+    mock = mocker.patch(
+        "ai.backend.manager.services.session.service.SessionService.download_files",
+        new_callable=AsyncMock,
+    )
+    multipart_writer = MultipartWriter()
+    mock.return_value = DownloadFilesActionResult(
+        session_row=SESSION_ROW_FIXTURE,
+        result=multipart_writer,
     )
     return mock
 
@@ -29,6 +48,30 @@ def mock_agent_download_files_rpc(mocker):
 DOWNLOAD_FILES_MOCK = b"test file content"
 
 
+DOWNLOAD_FILES_ACTION = DownloadFilesAction(
+    user_id=SESSION_FIXTURE_DATA.user_uuid,
+    session_name=cast(str, SESSION_FIXTURE_DATA.name),
+    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+    files=["test_file1.txt", "test_file2.txt"],
+)
+
+
+@pytest.mark.parametrize(
+    ("test_scenario", "mock_agent_response_result"),
+    [
+        (
+            TestScenario.success(
+                "Download files",
+                DOWNLOAD_FILES_ACTION,
+                DownloadFilesActionResult(
+                    session_data=SESSION_FIXTURE_DATA,
+                    result=None,  # Will be validated separately
+                ),
+            ),
+            DOWNLOAD_FILES_MOCK,
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "extra_fixtures",
     [
@@ -39,33 +82,18 @@ DOWNLOAD_FILES_MOCK = b"test file content"
     ],
 )
 async def test_download_files(
-    mock_agent_download_files_rpc,
+    mock_session_service_download_files,
     processors: SessionProcessors,
+    test_scenario: TestScenario[DownloadFilesAction, DownloadFilesActionResult],
 ):
-    # Setup mock to return expected download result
-    mock_agent_download_files_rpc.return_value = DOWNLOAD_FILES_MOCK
+    # Custom test to handle MultipartWriter comparison
+    result = await processors.download_files.wait_for_complete(test_scenario.input)
 
-    # Create the action
-    action = DownloadFilesAction(
-        user_id=SESSION_FIXTURE_DATA.user_uuid,
-        session_name=cast(str, SESSION_FIXTURE_DATA.name),
-        owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-        files=["test_file1.txt", "test_file2.txt"],
-    )
-
-    # Execute the action
-    result = await processors.download_files.wait_for_complete(action)
-
-    # Assert the result is correct
+    # Verify the result
     assert result is not None
     assert isinstance(result, DownloadFilesActionResult)
-    assert result.result is not None  # Should be a MultipartWriter
-
-    # Verify the session_row contains the expected session data
-    assert result.session_row is not None
-    assert str(result.session_row.id) == str(SESSION_FIXTURE_DATA.id)
-    assert result.session_row.name == SESSION_FIXTURE_DATA.name
-    assert result.session_row.access_key == SESSION_FIXTURE_DATA.access_key
+    assert result.session_data == test_scenario.expected.session_data  # type: ignore[union-attr]
+    assert result.result is not None  # MultipartWriter should be present
 
     # Verify the mock was called correctly
-    mock_agent_download_files_rpc.assert_called()
+    mock_session_service_download_files.assert_called_once()

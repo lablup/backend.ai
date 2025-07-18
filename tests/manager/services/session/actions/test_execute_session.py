@@ -21,16 +21,47 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_agent_execute_session_rpc(mocker, mock_agent_response_result):
+def mock_agent_execute_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.execute_session",
+        "ai.backend.manager.registry.AgentRegistry.execute",
         new_callable=AsyncMock,
     )
     mock.return_value = mock_agent_response_result
     return mock
 
 
-EXECUTE_SESSION_MOCK = {"status": "finished", "result": {"output": "Hello World"}}
+@pytest.fixture
+def mock_session_repository_methods(mocker):
+    """Mock SessionRepository methods to return test data"""
+    mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_validated",
+        new_callable=AsyncMock,
+        return_value=SESSION_ROW_FIXTURE,
+    )
+
+
+@pytest.fixture
+def mock_increment_session_usage(mocker):
+    """Mock AgentRegistry increment_session_usage method"""
+    mock = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
+        new_callable=AsyncMock,
+    )
+    return mock
+
+
+EXECUTE_SESSION_RAW_RESULT = {
+    "status": "finished",
+    "runId": "test_run_123",
+    "exitCode": 0,
+    "options": {},
+    "files": [],
+    "stdout": None,
+    "stderr": None,
+    "media": None,
+    "html": None,
+}
+EXECUTE_SESSION_MOCK = {"result": EXECUTE_SESSION_RAW_RESULT}
 
 
 @pytest.mark.parametrize(
@@ -52,10 +83,10 @@ EXECUTE_SESSION_MOCK = {"status": "finished", "result": {"output": "Hello World"
                 ),
                 ExecuteSessionActionResult(
                     result=EXECUTE_SESSION_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
-            EXECUTE_SESSION_MOCK,
+            EXECUTE_SESSION_RAW_RESULT,
         ),
     ],
 )
@@ -69,7 +100,9 @@ EXECUTE_SESSION_MOCK = {"status": "finished", "result": {"output": "Hello World"
     ],
 )
 async def test_execute_session(
-    mock_agent_execute_session_rpc,
+    mock_agent_execute_rpc,
+    mock_session_repository_methods,
+    mock_increment_session_usage,
     processors: SessionProcessors,
     test_scenario: TestScenario[ExecuteSessionAction, ExecuteSessionActionResult],
 ):

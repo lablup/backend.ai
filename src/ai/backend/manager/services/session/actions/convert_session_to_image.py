@@ -5,7 +5,7 @@ from typing import Optional, override
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
 
 
@@ -33,9 +33,8 @@ class ConvertSessionToImageAction(SessionAction):
 class ConvertSessionToImageActionResult(BaseActionResult):
     task_id: uuid.UUID
 
-    # TODO: Add SessionData type
-    session_row: SessionRow
+    session_data: SessionData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.session_row.id)
+        return str(self.session_data.id)
