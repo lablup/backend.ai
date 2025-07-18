@@ -3,38 +3,26 @@ import uuid
 import pytest
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.manager.data.model_serving.types import EndpointData
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.data.model_serving.types import EndpointData, RoutingData
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 
-from .conftest import setup_db_session_mock, setup_mock_query_result
+from .conftest import assert_update_query_executed
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_success(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
+async def test_get_endpoint_by_id_force_success(
+    admin_model_serving_repository,
+    setup_readonly_session,
     sample_endpoint,
-    sample_user,
     patch_endpoint_get,
 ):
-    """Test successful retrieval of endpoint by ID with valid access."""
+    """Test admin force retrieval of endpoint by ID without access checks."""
     # Arrange
     endpoint_id = sample_endpoint.id
-    user_id = sample_user.uuid
-    user_role = UserRole.USER
-    domain_name = "default"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
     patch_endpoint_get.return_value = sample_endpoint
 
-    # Mock user query for access validation
-    setup_mock_query_result(mock_session, scalar_result=sample_user)
-
     # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, user_id, user_role, domain_name
-    )
+    result = await admin_model_serving_repository.get_endpoint_by_id_force(endpoint_id)
 
     # Assert
     assert result is not None
@@ -42,190 +30,177 @@ async def test_get_endpoint_by_id_validated_success(
     assert result.id == endpoint_id
     assert result.name == sample_endpoint.name
     patch_endpoint_get.assert_called_once_with(
-        mock_session, endpoint_id, load_routes=True, load_session_owner=True, load_model=True
+        setup_readonly_session,
+        endpoint_id,
+        load_routes=True,
+        load_session_owner=True,
+        load_model=True,
     )
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_not_found(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
+async def test_get_endpoint_by_id_force_not_found(
+    admin_model_serving_repository,
+    setup_readonly_session,
     patch_endpoint_get,
 ):
-    """Test retrieval of non-existent endpoint returns None."""
+    """Test admin force retrieval returns None for non-existent endpoint."""
     # Arrange
     endpoint_id = uuid.uuid4()
-    user_id = uuid.uuid4()
-    user_role = UserRole.USER
-    domain_name = "default"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
     patch_endpoint_get.side_effect = NoResultFound()
 
     # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, user_id, user_role, domain_name
-    )
+    result = await admin_model_serving_repository.get_endpoint_by_id_force(endpoint_id)
 
     # Assert
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_access_denied_wrong_owner(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
+@pytest.mark.parametrize(
+    "new_lifecycle,new_replicas",
+    [
+        (EndpointLifecycle.DESTROYING, None),
+        (EndpointLifecycle.CREATED, 10),
+    ],
+)
+async def test_update_endpoint_lifecycle_force(
+    admin_model_serving_repository,
+    setup_writable_session,
     sample_endpoint,
-    sample_user,
     patch_endpoint_get,
+    new_lifecycle,
+    new_replicas,
 ):
-    """Test access denied when user is not the owner."""
+    """Test admin force update of endpoint lifecycle with optional replicas."""
     # Arrange
     endpoint_id = sample_endpoint.id
-    wrong_user_id = uuid.uuid4()  # Different user
-    user_role = UserRole.USER
-    domain_name = "default"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
     patch_endpoint_get.return_value = sample_endpoint
 
-    # Mock user query - returns original owner
-    setup_mock_query_result(mock_session, scalar_result=sample_user)
-
     # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, wrong_user_id, user_role, domain_name
+    result = await admin_model_serving_repository.update_endpoint_lifecycle_force(
+        endpoint_id, new_lifecycle, replicas=new_replicas
     )
 
     # Assert
-    assert result is None
+    assert result is True
+    assert_update_query_executed(setup_writable_session)
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_admin_access_same_domain(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
+async def test_clear_endpoint_errors_force_success(
+    admin_model_serving_repository,
+    setup_writable_session,
     sample_endpoint,
-    sample_admin_user,
-    sample_user,
     patch_endpoint_get,
 ):
-    """Test admin can access endpoints in their domain."""
+    """Test admin force clear of endpoint errors."""
     # Arrange
     endpoint_id = sample_endpoint.id
-    admin_id = sample_admin_user.uuid
-    user_role = UserRole.ADMIN
-    domain_name = "default"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
     patch_endpoint_get.return_value = sample_endpoint
 
-    # Mock user query for owner check
-    setup_mock_query_result(mock_session, scalar_result=sample_user)
+    # Act
+    result = await admin_model_serving_repository.clear_endpoint_errors_force(endpoint_id)
+
+    # Assert
+    assert result is True
+    # Verify two queries were executed (delete failed routes, reset retries)
+    assert setup_writable_session.execute.call_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "route_belongs_to_service,expected_result",
+    [
+        (True, "should_return_route"),
+        (False, None),
+    ],
+)
+async def test_get_route_by_id_force(
+    admin_model_serving_repository,
+    setup_readonly_session,
+    sample_route,
+    patch_routing_get,
+    route_belongs_to_service,
+    expected_result,
+):
+    """Test admin force retrieval of route by ID with service validation."""
+    # Arrange
+    route_id = sample_route.id
+    service_id = sample_route.endpoint if route_belongs_to_service else uuid.uuid4()
+    patch_routing_get.return_value = sample_route
 
     # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, admin_id, user_role, domain_name
+    result = await admin_model_serving_repository.get_route_by_id_force(route_id, service_id)
+
+    # Assert
+    if expected_result == "should_return_route":
+        assert result is not None
+        assert isinstance(result, RoutingData)
+        assert result.id == route_id
+    else:
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_update_route_traffic_force_success(
+    admin_model_serving_repository,
+    setup_writable_session,
+    sample_route,
+    sample_endpoint,
+    patch_routing_get,
+    patch_endpoint_get,
+):
+    """Test admin force update of route traffic ratio."""
+    # Arrange
+    route_id = sample_route.id
+    service_id = sample_route.endpoint
+    new_traffic_ratio = 0.5
+    patch_routing_get.return_value = sample_route
+    patch_endpoint_get.return_value = sample_endpoint
+
+    # Act
+    result = await admin_model_serving_repository.update_route_traffic_force(
+        route_id, service_id, new_traffic_ratio
     )
 
     # Assert
     assert result is not None
     assert isinstance(result, EndpointData)
-    assert result.id == endpoint_id
+    assert_update_query_executed(setup_writable_session)
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_admin_access_different_domain(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
+@pytest.mark.parametrize(
+    "operation,new_value",
+    [
+        ("decrease", None),
+        ("update", 8),
+    ],
+)
+async def test_endpoint_replicas_force_operations(
+    admin_model_serving_repository,
+    setup_writable_session,
     sample_endpoint,
-    sample_admin_user,
-    sample_user,
     patch_endpoint_get,
+    operation,
+    new_value,
 ):
-    """Test admin cannot access endpoints in different domain."""
+    """Test admin force operations on endpoint replicas."""
     # Arrange
     endpoint_id = sample_endpoint.id
-    admin_id = sample_admin_user.uuid
-    user_role = UserRole.ADMIN
-    different_domain = "other-domain"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
-    patch_endpoint_get.return_value = sample_endpoint
-
-    # Mock user query
-    setup_mock_query_result(mock_session, scalar_result=sample_user)
-
-    # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, admin_id, user_role, different_domain
-    )
-
-    # Assert
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_superadmin_access(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    sample_superadmin_user,
-    patch_endpoint_get,
-):
-    """Test superadmin can access any endpoint."""
-    # Arrange
-    endpoint_id = sample_endpoint.id
-    superadmin_id = sample_superadmin_user.uuid
-    user_role = UserRole.SUPERADMIN
-    domain_name = "any-domain"
-
-    setup_db_session_mock(mock_db_engine, mock_session)
+    if operation == "decrease":
+        sample_endpoint.replicas = 5
     patch_endpoint_get.return_value = sample_endpoint
 
     # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, superadmin_id, user_role, domain_name
-    )
+    if operation == "decrease":
+        result = await admin_model_serving_repository.decrease_endpoint_replicas_force(endpoint_id)
+    else:  # update
+        result = await admin_model_serving_repository.update_endpoint_replicas_force(
+            endpoint_id, new_value
+        )
 
     # Assert
-    assert result is not None
-    assert isinstance(result, EndpointData)
-    assert result.id == endpoint_id
-
-
-@pytest.mark.asyncio
-async def test_get_endpoint_by_id_validated_no_session_owner(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    patch_endpoint_get,
-):
-    """Test endpoint with no session owner is accessible by anyone."""
-    # Arrange
-    endpoint_id = sample_endpoint.id
-    user_id = uuid.uuid4()
-    user_role = UserRole.USER
-    domain_name = "default"
-
-    # Set endpoint session_owner to None
-    sample_endpoint.session_owner = None
-
-    setup_db_session_mock(mock_db_engine, mock_session)
-    patch_endpoint_get.return_value = sample_endpoint
-
-    # Act
-    result = await model_serving_repository.get_endpoint_by_id_validated(
-        endpoint_id, user_id, user_role, domain_name
-    )
-
-    # Assert
-    assert result is not None
-    assert isinstance(result, EndpointData)
-    assert result.id == endpoint_id
+    assert result is True
+    assert_update_query_executed(setup_writable_session, "replicas")

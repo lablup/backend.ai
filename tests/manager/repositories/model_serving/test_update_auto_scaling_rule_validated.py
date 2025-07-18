@@ -11,12 +11,13 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.user import UserRole
 
+from .conftest import setup_mock_query_result
+
 
 @pytest.mark.asyncio
 async def test_update_auto_scaling_rule_validated_success(
     model_serving_repository,
-    mock_db_engine,
-    mock_session,
+    setup_writable_session,
     sample_endpoint,
     sample_user,
     sample_auto_scaling_rule,
@@ -26,23 +27,14 @@ async def test_update_auto_scaling_rule_validated_success(
     # Arrange
     rule_id = sample_auto_scaling_rule.id
     user_id = sample_user.uuid
-    user_role = UserRole.USER
-    domain_name = "default"
-    fields_to_update = {
-        "threshold": 90.0,
-        "step_size": 2,
-        "cooldown_seconds": 600,
-    }
+    fields_to_update = {"threshold": 90.0, "step_size": 2, "cooldown_seconds": 600}
 
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
-
-    # Mock user query for access validation
-    mock_session.execute.return_value.scalar.return_value = sample_user
+    setup_mock_query_result(setup_writable_session, scalar_result=sample_user)
 
     # Act
     result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, user_id, user_role, domain_name
+        rule_id, fields_to_update, user_id, UserRole.USER, "default"
     )
 
     # Assert
@@ -56,26 +48,38 @@ async def test_update_auto_scaling_rule_validated_success(
 
 
 @pytest.mark.asyncio
-async def test_update_auto_scaling_rule_validated_not_found(
+@pytest.mark.parametrize("scenario", ["rule_not_found", "access_denied", "inactive_endpoint"])
+async def test_update_auto_scaling_rule_validated_failure_cases(
     model_serving_repository,
-    mock_db_engine,
-    mock_session,
+    setup_writable_session,
+    sample_endpoint,
+    sample_user,
+    sample_auto_scaling_rule,
     patch_auto_scaling_rule_get,
+    scenario,
 ):
-    """Test update returns None when rule not found."""
+    """Test various failure scenarios for auto scaling rule update."""
     # Arrange
-    rule_id = uuid.uuid4()
-    user_id = uuid.uuid4()
-    user_role = UserRole.USER
-    domain_name = "default"
+    rule_id = sample_auto_scaling_rule.id
     fields_to_update = {"threshold": 90.0}
 
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-    patch_auto_scaling_rule_get.side_effect = NoResultFound()
+    if scenario == "rule_not_found":
+        patch_auto_scaling_rule_get.side_effect = NoResultFound()
+        user_id = sample_user.uuid
+    elif scenario == "access_denied":
+        patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
+        setup_mock_query_result(setup_writable_session, scalar_result=sample_user)
+        user_id = uuid.uuid4()  # Different user
+    else:  # inactive_endpoint
+        sample_endpoint.lifecycle_stage = EndpointLifecycle.DESTROYED
+        sample_auto_scaling_rule.endpoint_row = sample_endpoint
+        patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
+        setup_mock_query_result(setup_writable_session, scalar_result=sample_user)
+        user_id = sample_user.uuid
 
     # Act
     result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, user_id, user_role, domain_name
+        rule_id, fields_to_update, user_id, UserRole.USER, "default"
     )
 
     # Assert
@@ -83,151 +87,52 @@ async def test_update_auto_scaling_rule_validated_not_found(
 
 
 @pytest.mark.asyncio
-async def test_update_auto_scaling_rule_validated_access_denied(
+@pytest.mark.parametrize(
+    "update_fields,user_role",
+    [
+        (
+            {
+                "metric_source": AutoScalingMetricSource.KERNEL,
+                "metric_name": "memory_util",
+                "threshold": 85.0,
+                "comparator": AutoScalingMetricComparator.LESS_THAN,
+                "step_size": 3,
+                "cooldown_seconds": 900,
+                "min_replicas": 2,
+                "max_replicas": 15,
+            },
+            UserRole.USER,
+        ),
+        ({"threshold": 95.0}, UserRole.ADMIN),
+    ],
+)
+async def test_update_auto_scaling_rule_validated_field_variations(
     model_serving_repository,
-    mock_db_engine,
-    mock_session,
+    setup_writable_session,
     sample_endpoint,
     sample_user,
+    sample_admin_user,
     sample_auto_scaling_rule,
     patch_auto_scaling_rule_get,
+    update_fields,
+    user_role,
 ):
-    """Test update returns None when user doesn't have access."""
+    """Test update with various field combinations and user roles."""
     # Arrange
     rule_id = sample_auto_scaling_rule.id
-    wrong_user_id = uuid.uuid4()  # Different user
-    user_role = UserRole.USER
-    domain_name = "default"
-    fields_to_update = {"threshold": 90.0}
+    user_id = sample_user.uuid if user_role == UserRole.USER else sample_admin_user.uuid
 
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
-
-    # Mock user query - returns original owner
-    mock_session.execute.return_value.scalar.return_value = sample_user
+    setup_mock_query_result(setup_writable_session, scalar_result=sample_user)
 
     # Act
     result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, wrong_user_id, user_role, domain_name
-    )
-
-    # Assert
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_update_auto_scaling_rule_validated_inactive_endpoint(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    sample_user,
-    sample_auto_scaling_rule,
-    patch_auto_scaling_rule_get,
-):
-    """Test update returns None when endpoint is inactive."""
-    # Arrange
-    rule_id = sample_auto_scaling_rule.id
-    user_id = sample_user.uuid
-    user_role = UserRole.USER
-    domain_name = "default"
-    fields_to_update = {"threshold": 90.0}
-
-    # Set endpoint to inactive state
-    sample_endpoint.lifecycle_stage = EndpointLifecycle.DESTROYED
-    sample_auto_scaling_rule.endpoint_row = sample_endpoint
-
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-    patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
-
-    # Mock user query for access validation
-    mock_session.execute.return_value.scalar.return_value = sample_user
-
-    # Act
-    result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, user_id, user_role, domain_name
-    )
-
-    # Assert
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_update_auto_scaling_rule_validated_multiple_fields(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    sample_user,
-    sample_auto_scaling_rule,
-    patch_auto_scaling_rule_get,
-):
-    """Test update of multiple fields at once."""
-    # Arrange
-    rule_id = sample_auto_scaling_rule.id
-    user_id = sample_user.uuid
-    user_role = UserRole.USER
-    domain_name = "default"
-    fields_to_update = {
-        "metric_source": AutoScalingMetricSource.KERNEL,
-        "metric_name": "memory_util",
-        "threshold": 85.0,
-        "comparator": AutoScalingMetricComparator.LESS_THAN,
-        "step_size": 3,
-        "cooldown_seconds": 900,
-        "min_replicas": 2,
-        "max_replicas": 15,
-    }
-
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-    patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
-
-    # Mock user query for access validation
-    mock_session.execute.return_value.scalar.return_value = sample_user
-
-    # Act
-    result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, user_id, user_role, domain_name
+        rule_id, update_fields, user_id, user_role, "default"
     )
 
     # Assert
     assert result is not None
 
     # Verify all fields were updated
-    for key, value in fields_to_update.items():
+    for key, value in update_fields.items():
         assert getattr(result, key) == value
-
-
-@pytest.mark.asyncio
-async def test_update_auto_scaling_rule_validated_admin_access(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    sample_admin_user,
-    sample_user,
-    sample_auto_scaling_rule,
-    patch_auto_scaling_rule_get,
-):
-    """Test admin can update rules for endpoints in their domain."""
-    # Arrange
-    rule_id = sample_auto_scaling_rule.id
-    admin_id = sample_admin_user.uuid
-    user_role = UserRole.ADMIN
-    domain_name = "default"
-    fields_to_update = {"threshold": 95.0}
-
-    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-    patch_auto_scaling_rule_get.return_value = sample_auto_scaling_rule
-
-    # Mock user query for owner check
-    mock_session.execute.return_value.scalar.return_value = sample_user
-
-    # Act
-    result = await model_serving_repository.update_auto_scaling_rule_validated(
-        rule_id, fields_to_update, admin_id, user_role, domain_name
-    )
-
-    # Assert
-    assert result is not None
-    assert result.threshold == 95.0

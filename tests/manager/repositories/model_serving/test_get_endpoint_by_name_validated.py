@@ -4,14 +4,13 @@ import pytest
 
 from ai.backend.manager.data.model_serving.types import EndpointData
 
-from .conftest import setup_db_session_mock, setup_mock_query_result
+from .conftest import setup_mock_query_result
 
 
 @pytest.mark.asyncio
 async def test_get_endpoint_by_name_validated_success(
     model_serving_repository,
-    mock_db_engine,
-    mock_session,
+    setup_readonly_session,
     sample_endpoint,
     sample_user,
 ):
@@ -19,11 +18,7 @@ async def test_get_endpoint_by_name_validated_success(
     # Arrange
     endpoint_name = sample_endpoint.name
     user_id = sample_user.uuid
-
-    setup_db_session_mock(mock_db_engine, mock_session)
-
-    # Mock the query execution
-    setup_mock_query_result(mock_session, scalar_result=sample_endpoint)
+    setup_mock_query_result(setup_readonly_session, scalar_result=sample_endpoint)
 
     # Act
     result = await model_serving_repository.get_endpoint_by_name_validated(endpoint_name, user_id)
@@ -34,88 +29,36 @@ async def test_get_endpoint_by_name_validated_success(
     assert result.id == sample_endpoint.id
     assert result.name == endpoint_name
 
-    # Verify the query
-    mock_session.execute.assert_called_once()
-    executed_query = mock_session.execute.call_args[0][0]
-    # Check that the query includes both name and owner conditions
-    assert "name" in str(executed_query)
-    assert "session_owner" in str(executed_query)
+    # Verify query conditions
+    setup_readonly_session.execute.assert_called_once()
+    executed_query = setup_readonly_session.execute.call_args[0][0]
+    query_str = str(executed_query)
+    assert "name" in query_str
+    assert "session_owner" in query_str
 
 
 @pytest.mark.asyncio
-async def test_get_endpoint_by_name_validated_not_found(
+@pytest.mark.parametrize("scenario", ["endpoint_not_found", "wrong_owner"])
+async def test_get_endpoint_by_name_validated_failure_cases(
     model_serving_repository,
-    mock_db_engine,
-    mock_session,
+    setup_readonly_session,
+    sample_endpoint,
     sample_user,
+    scenario,
 ):
-    """Test retrieval returns None when endpoint doesn't exist."""
+    """Test failure cases for endpoint retrieval by name."""
     # Arrange
-    endpoint_name = "non-existent-endpoint"
-    user_id = sample_user.uuid
+    if scenario == "endpoint_not_found":
+        endpoint_name = "non-existent-endpoint"
+        user_id = sample_user.uuid
+    else:  # wrong_owner
+        endpoint_name = sample_endpoint.name
+        user_id = uuid.uuid4()
 
-    setup_db_session_mock(mock_db_engine, mock_session)
-
-    # Mock the query execution - no result found
-    setup_mock_query_result(mock_session, scalar_result=None)
+    setup_mock_query_result(setup_readonly_session, scalar_result=None)
 
     # Act
     result = await model_serving_repository.get_endpoint_by_name_validated(endpoint_name, user_id)
 
     # Assert
     assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_endpoint_by_name_validated_wrong_owner(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-):
-    """Test retrieval returns None when user doesn't own the endpoint."""
-    # Arrange
-    endpoint_name = sample_endpoint.name
-    wrong_user_id = uuid.uuid4()  # Different user
-
-    setup_db_session_mock(mock_db_engine, mock_session)
-
-    # Mock the query execution - no match due to different owner
-    setup_mock_query_result(mock_session, scalar_result=None)
-
-    # Act
-    result = await model_serving_repository.get_endpoint_by_name_validated(
-        endpoint_name, wrong_user_id
-    )
-
-    # Assert
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_endpoint_by_name_validated_multiple_same_name(
-    model_serving_repository,
-    mock_db_engine,
-    mock_session,
-    sample_endpoint,
-    sample_user,
-):
-    """Test retrieval returns only the endpoint owned by the user."""
-    # Arrange
-    endpoint_name = "shared-endpoint-name"
-    user_id = sample_user.uuid
-    sample_endpoint.name = endpoint_name
-
-    setup_db_session_mock(mock_db_engine, mock_session)
-
-    # Mock the query execution
-    setup_mock_query_result(mock_session, scalar_result=sample_endpoint)
-
-    # Act
-    result = await model_serving_repository.get_endpoint_by_name_validated(endpoint_name, user_id)
-
-    # Assert
-    assert result is not None
-    assert isinstance(result, EndpointData)
-    assert result.id == sample_endpoint.id
-    assert result.name == endpoint_name

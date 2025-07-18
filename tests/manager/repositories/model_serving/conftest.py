@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
 
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -275,90 +276,153 @@ def mock_session():
 
 
 @pytest.fixture
-def patch_endpoint_get():
-    """Patch EndpointRow.get method."""
-    with patch(
+def setup_readonly_session(mock_db_engine, mock_session):
+    """Automatically sets up a readonly session fixture"""
+    mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+    return mock_session
+
+
+@pytest.fixture
+def setup_writable_session(mock_db_engine, mock_session):
+    """Automatically sets up a writable session fixture"""
+    mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
+    return mock_session
+
+
+@pytest.fixture
+def patch_endpoint_get(mocker):
+    """Patch EndpointRow.get method using mocker."""
+    return mocker.patch(
         "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
-    ) as mock:
-        yield mock
+    )
 
 
 @pytest.fixture
-def patch_routing_get():
-    """Patch RoutingRow.get method."""
-    with patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock) as mock:
-        yield mock
+def patch_routing_get(mocker):
+    """Patch RoutingRow.get method using mocker."""
+    return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_user_get():
-    """Patch UserRow.get method."""
-    with patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock) as mock:
-        yield mock
+def patch_user_get(mocker):
+    """Patch UserRow.get method using mocker."""
+    return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_vfolder_get():
-    """Patch VFolderRow.get method."""
-    with patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock) as mock:
-        yield mock
+def patch_vfolder_get(mocker):
+    """Patch VFolderRow.get method using mocker."""
+    return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_image_resolve():
-    """Patch ImageRow.resolve method."""
-    with patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock) as mock:
-        yield mock
+def patch_image_resolve(mocker):
+    """Patch ImageRow.resolve method using mocker."""
+    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_session_get():
-    """Patch SessionRow.get_session method."""
-    with patch(
+def patch_session_get(mocker):
+    """Patch SessionRow.get_session method using mocker."""
+    return mocker.patch(
         "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
-    ) as mock:
-        yield mock
+    )
 
 
 @pytest.fixture
-def patch_auto_scaling_rule_get():
-    """Patch EndpointAutoScalingRuleRow.get method."""
-    with patch(
+def patch_auto_scaling_rule_get(mocker):
+    """Patch EndpointAutoScalingRuleRow.get method using mocker."""
+    return mocker.patch(
         "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
-    ) as mock:
-        yield mock
+    )
 
 
 @pytest.fixture
-def patch_resolve_group_name_or_id():
-    """Patch resolve_group_name_or_id function."""
-    with patch(
+def patch_resolve_group_name_or_id(mocker):
+    """Patch resolve_group_name_or_id function using mocker."""
+    return mocker.patch(
         "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
-    ) as mock:
-        yield mock
+    )
 
 
 def setup_db_session_mock(mock_db_engine, mock_session):
-    """Helper function to set up database session mocking consistently.
-
-    This reduces duplication of the common pattern:
-    mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
-    """
+    """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
     mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     return mock_session
 
 
 def setup_mock_query_result(mock_session, scalar_result=None, scalars_all_result=None):
-    """Helper function to set up common query result patterns.
-
-    Args:
-        mock_session: The mock session to configure
-        scalar_result: Result for execute().scalar() pattern
-        scalars_all_result: Result for execute().scalars().all() pattern
-    """
+    """Helper function to set up common query result patterns."""
     if scalar_result is not None:
         mock_session.execute.return_value.scalar.return_value = scalar_result
     if scalars_all_result is not None:
         mock_session.execute.return_value.scalars.return_value.all.return_value = scalars_all_result
     return mock_session
+
+
+def assert_update_query_executed(mock_session, expected_field=None):
+    """Helper function to verify that an update query was executed"""
+    mock_session.execute.assert_called()
+    if expected_field:
+        executed_query = mock_session.execute.call_args[0][0]
+        assert expected_field in str(executed_query)
+
+
+def assert_basic_endpoint_result(result, endpoint_row):
+    """Helper function to validate basic endpoint result"""
+    assert result is not None
+    assert isinstance(result, EndpointData)
+    assert result.id == endpoint_row.id
+    assert result.name == endpoint_row.name
+
+
+def assert_endpoint_creation_operations(mock_session, endpoint_row):
+    """Helper function to verify database operations related to endpoint creation"""
+    mock_session.add.assert_called_once_with(endpoint_row)
+    mock_session.flush.assert_called_once()
+    mock_session.refresh.assert_called_once_with(endpoint_row)
+
+
+def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
+    from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+
+    endpoint_row = EndpointRow(
+        name="full-featured-endpoint",
+        domain="test-domain",
+        project=uuid.uuid4(),
+        resource_group="gpu-cluster",
+        model=sample_vfolder.id,
+        model_mount_destination="/models/custom",
+        model_definition_path="model_definition.py",
+        runtime_variant=RuntimeVariant.CUSTOM,
+        session_owner=sample_user.uuid,
+        tag="v1.0.0",
+        startup_command="python -m model_server",
+        bootstrap_script="pip install -r requirements.txt",
+        callback_url=yarl.URL("https://webhook.example.com/callback"),
+        environ={"API_KEY": "secret", "DEBUG": "false"},
+        resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "cuda.device": "1"}),
+        resource_opts={"shmem": "2g"},
+        image=sample_image,
+        replicas=3,
+        cluster_mode=ClusterMode.MULTI_NODE,
+        cluster_size=3,
+        extra_mounts=[],
+        created_user=sample_user.uuid,
+    )
+
+    # Set attributes normally set by database
+    endpoint_row.id = uuid.uuid4()
+    endpoint_row.created_at = None
+    endpoint_row.destroyed_at = None
+    endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED
+    endpoint_row.retries = 0
+    endpoint_row.url = "https://api.example.com/v1/models/full-featured"
+    endpoint_row.open_to_public = False
+    endpoint_row.image_row = sample_image
+    endpoint_row.session_owner_row = sample_user
+    endpoint_row.created_user_row = sample_user
+    endpoint_row.routings = []
+
+    return endpoint_row
