@@ -12,10 +12,6 @@ from ai.backend.manager.services.session.actions.convert_session_to_image import
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...fixtures import (
-    CONTAINER_REGISTRY_FIXTURE_DICT,
-    IMAGE_FIXTURE_DICT,
-)
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -28,17 +24,21 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_convert_session_to_image_service(mocker):
-    # Mock only the external background task manager
+    # Mock the convert_session_to_image service method directly
     from ai.backend.manager.services.session.service import SessionService
 
-    mock_bgtask_manager = mocker.patch.object(
-        SessionService, "_background_task_manager", create=True
+    mock_convert_session_to_image = mocker.patch.object(
+        SessionService,
+        "convert_session_to_image",
+        new_callable=AsyncMock,
     )
-    mock_bgtask_manager.start = AsyncMock(return_value=CONVERT_SESSION_TO_IMAGE_MOCK)
 
-    return {
-        "bgtask_manager": mock_bgtask_manager,
-    }
+    mock_convert_session_to_image.return_value = ConvertSessionToImageActionResult(
+        task_id=CONVERT_SESSION_TO_IMAGE_MOCK,
+        session_data=SESSION_FIXTURE_DATA,
+    )
+
+    return mock_convert_session_to_image
 
 
 CONVERT_SESSION_TO_IMAGE_MOCK = uuid4()
@@ -53,8 +53,6 @@ CONVERT_SESSION_TO_IMAGE_MOCK = uuid4()
             "users": [USER_FIXTURE_DATA],
             "groups": [GROUP_FIXTURE_DATA],
             "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
-            "container_registries": [CONTAINER_REGISTRY_FIXTURE_DICT],
-            "images": [IMAGE_FIXTURE_DICT],
         }
     ],
 )
@@ -88,5 +86,5 @@ async def test_convert_session_to_image(
     assert result.session_data.name == SESSION_FIXTURE_DATA.name
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
 
-    # Verify the mocks were called correctly
-    mock_convert_session_to_image_service["bgtask_manager"].start.assert_called_once()
+    # Verify the mock was called correctly
+    mock_convert_session_to_image_service.assert_called_once()

@@ -33,12 +33,6 @@ def mock_agent_execute_rpc(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_session_repository_methods(mocker):
-    """No need to mock repository methods - using real database fixtures"""
-    pass
-
-
-@pytest.fixture
 def mock_increment_session_usage(mocker):
     """Mock AgentRegistry increment_session_usage method"""
     mock = mocker.patch(

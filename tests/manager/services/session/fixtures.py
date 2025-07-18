@@ -201,6 +201,7 @@ GROUP_FIXTURE_DATA = {
     "allowed_vfolder_hosts": {},
     "resource_policy": "default",
     "type": "general",
+    "container_registry": None,  # Will be set dynamically in tests
 }
 
 USER_FIXTURE_DATA = {

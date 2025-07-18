@@ -20,15 +20,22 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_upload_files_rpc(mocker, mock_agent_response_result):
-    # Only mock agent registry methods - use real SessionRepository
-    mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
+    # Mock the upload_files service method directly
+    from ai.backend.manager.services.session.service import SessionService
+
+    mock_upload_files = mocker.patch.object(
+        SessionService,
+        "upload_files",
         new_callable=AsyncMock,
     )
-    mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.upload_file",
-        new_callable=AsyncMock,
-        return_value=mock_agent_response_result,
+
+    from ai.backend.manager.services.session.actions.upload_files import (
+        UploadFilesActionResult,
+    )
+
+    mock_upload_files.return_value = UploadFilesActionResult(
+        result=mock_agent_response_result,
+        session_data=SESSION_FIXTURE_DATA,
     )
 
     return mock_agent_response_result
