@@ -42,6 +42,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -54,7 +55,9 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -391,6 +394,20 @@ def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
     )
 
     return config_dict
+
+
+@pytest.fixture
+async def unified_config(
+    app, bootstrap_config: BootstrapConfig, etcd_fixture
+) -> AsyncIterator[ManagerUnifiedConfig]:
+    root_ctx: RootContext = app["_root.context"]
+    etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
+    root_ctx.etcd = etcd
+    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    raw_config = await etcd_loader.load()
+    merged_config = {**bootstrap_config.model_dump(), **raw_config}
+    unified_config = ManagerUnifiedConfig(**merged_config)
+    yield unified_config
 
 
 @pytest.fixture(scope="session")
