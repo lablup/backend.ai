@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import pytest
 import sqlalchemy as sa
@@ -26,6 +26,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
 )
+from ai.backend.manager.services.keypair_resource_policy.processors import (
+    KeypairResourcePolicyProcessors,
+)
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 from ai.backend.manager.types import OptionalState, TriState
@@ -48,6 +51,11 @@ def keypair_resource_policy_service(
 
 
 @pytest.fixture
+def processors(keypair_resource_policy_service) -> KeypairResourcePolicyProcessors:
+    return KeypairResourcePolicyProcessors(keypair_resource_policy_service, [])
+
+
+@pytest.fixture
 def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
     @asynccontextmanager
     async def _create_keypair_resource_policy(
@@ -62,7 +70,7 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
         max_concurrent_sftp_sessions: int = 10,
         max_containers_per_session: int = 1,
         idle_timeout: int = 1800,
-        allowed_vfolder_hosts: Optional[Dict[str, Any]] = None,
+        allowed_vfolder_hosts: Optional[dict[str, Any]] = None,
     ) -> AsyncGenerator[KeyPairResourcePolicyData, None]:
         if total_resource_slots is None:
             total_resource_slots = ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None)
@@ -194,29 +202,9 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
 )
 async def test_create_keypair_resource_policy(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
-    database_engine: ExtendedAsyncSAEngine,
+    processors: KeypairResourcePolicyProcessors,
 ) -> None:
-    async def test_function(action: CreateKeyPairResourcePolicyAction):
-        result = await keypair_resource_policy_service.create_keypair_resource_policy(action)
-
-        # Cleanup after test
-        async with database_engine.begin_session() as session:
-            await session.execute(
-                sa.delete(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == action.creator.name
-                )
-            )
-
-        # Normalize datetime for comparison after cleanup
-        if test_scenario.expected is not None:
-            result.keypair_resource_policy.created_at = (
-                test_scenario.expected.keypair_resource_policy.created_at
-            )
-
-        return result
-
-    await test_scenario.test(test_function)
+    await test_scenario.test(processors.create_keypair_resource_policy.wait_for_complete)
 
 
 @pytest.mark.parametrize(
@@ -248,18 +236,9 @@ async def test_create_keypair_resource_policy(
 )
 async def test_create_keypair_resource_policy_failure(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
-    create_keypair_resource_policy,
+    processors: KeypairResourcePolicyProcessors,
 ) -> None:
-    async def test_function(action: CreateKeyPairResourcePolicyAction):
-        if "duplicate" in test_scenario.description.lower():
-            # Create existing policy first
-            async with create_keypair_resource_policy(name="existing-policy"):
-                return await keypair_resource_policy_service.create_keypair_resource_policy(action)
-        else:
-            return await keypair_resource_policy_service.create_keypair_resource_policy(action)
-
-    await test_scenario.test(test_function)
+    await test_scenario.test(processors.create_keypair_resource_policy.wait_for_complete)
 
 
 @pytest.mark.parametrize(
@@ -359,20 +338,12 @@ async def test_create_keypair_resource_policy_failure(
 )
 async def test_modify_keypair_resource_policy(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
+    processors: KeypairResourcePolicyProcessors,
     create_keypair_resource_policy,
 ) -> None:
     async def test_function(action: ModifyKeyPairResourcePolicyAction):
         async with create_keypair_resource_policy(name=action.name) as _:
-            result = await keypair_resource_policy_service.modify_keypair_resource_policy(action)
-
-            # Normalize datetime for comparison
-            if test_scenario.expected is not None:
-                result.keypair_resource_policy.created_at = (
-                    test_scenario.expected.keypair_resource_policy.created_at
-                )
-
-            return result
+            return await processors.modify_keypair_resource_policy.wait_for_complete(action)
 
     await test_scenario.test(test_function)
 
@@ -394,9 +365,9 @@ async def test_modify_keypair_resource_policy(
 )
 async def test_modify_keypair_resource_policy_failure(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
+    processors: KeypairResourcePolicyProcessors,
 ) -> None:
-    await test_scenario.test(keypair_resource_policy_service.modify_keypair_resource_policy)
+    await test_scenario.test(processors.modify_keypair_resource_policy.wait_for_complete)
 
 
 @pytest.mark.parametrize(
@@ -428,13 +399,13 @@ async def test_modify_keypair_resource_policy_failure(
 )
 async def test_delete_keypair_resource_policy(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
+    processors: KeypairResourcePolicyProcessors,
     create_keypair_resource_policy,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
     async def test_function(action: DeleteKeyPairResourcePolicyAction):
         async with create_keypair_resource_policy(name=action.name) as _:
-            result = await keypair_resource_policy_service.delete_keypair_resource_policy(action)
+            result = await processors.delete_keypair_resource_policy.wait_for_complete(action)
 
             # Verify the policy was deleted from the database
             async with database_engine.begin_session() as session:
@@ -444,12 +415,6 @@ async def test_delete_keypair_resource_policy(
                     )
                 )
                 assert db_row is None
-
-            # Normalize datetime for comparison
-            if test_scenario.expected is not None:
-                result.keypair_resource_policy.created_at = (
-                    test_scenario.expected.keypair_resource_policy.created_at
-                )
 
             return result
 
@@ -468,6 +433,6 @@ async def test_delete_keypair_resource_policy(
 )
 async def test_delete_keypair_resource_policy_failure(
     test_scenario: TestScenario,
-    keypair_resource_policy_service: KeypairResourcePolicyService,
+    processors: KeypairResourcePolicyProcessors,
 ) -> None:
-    await test_scenario.test(keypair_resource_policy_service.delete_keypair_resource_policy)
+    await test_scenario.test(processors.delete_keypair_resource_policy.wait_for_complete)
