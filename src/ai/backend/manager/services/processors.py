@@ -195,11 +195,12 @@ class Services:
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
-            repositories=repositories.model_serving,
+            repository=repositories.model_serving.repository,
+            admin_repository=repositories.model_serving.admin_repository,
         )
         model_serving_auto_scaling = AutoScalingService(
-            repositories.model_serving.repository,
-            repositories.model_serving.admin_repository,
+            repository=repositories.model_serving.repository,
+            admin_repository=repositories.model_serving.admin_repository,
         )
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,

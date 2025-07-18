@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.user.actions.base import UserAction
-from ai.backend.manager.services.user.type import UserData
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -31,12 +31,14 @@ class UserModifier(PartialModifier):
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.username.update_dict(to_update, "username")
-        self.password.update_dict(to_update, "password")
+        # Can't remove password
+        password = self.password.optional_value()
+        if password is not None:
+            to_update["password"] = password
         self.need_password_change.update_dict(to_update, "need_password_change")
         self.full_name.update_dict(to_update, "full_name")
         self.description.update_dict(to_update, "description")
         self.is_active.update_dict(to_update, "is_active")
-        self.status.update_dict(to_update, "status")
         self.domain_name.update_dict(to_update, "domain_name")
         self.role.update_dict(to_update, "role")
         self.allowed_client_ip.update_dict(to_update, "allowed_client_ip")
@@ -47,6 +49,13 @@ class UserModifier(PartialModifier):
         self.container_uid.update_dict(to_update, "container_uid")
         self.container_main_gid.update_dict(to_update, "container_main_gid")
         self.container_gids.update_dict(to_update, "container_gids")
+        # Set status based on is_active if not explicitly set
+        status = self.status.optional_value()
+        if status is None:
+            is_active = self.is_active.optional_value()
+            to_update["status"] = UserStatus.ACTIVE if is_active else UserStatus.INACTIVE
+        else:
+            to_update["status"] = status
         return to_update
 
 
@@ -54,7 +63,7 @@ class UserModifier(PartialModifier):
 class ModifyUserAction(UserAction):
     email: str
     modifier: UserModifier
-    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
+    group_ids: Optional[list[str]] = None
 
     @override
     def entity_id(self) -> Optional[str]:

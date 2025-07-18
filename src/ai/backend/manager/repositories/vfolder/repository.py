@@ -1,11 +1,12 @@
 import uuid
-from typing import Any, Optional, Union
+from typing import Any, Mapping, Optional, Sequence, Union
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -29,6 +30,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
+    ensure_host_permission_allowed,
     query_accessible_vfolders,
 )
 
@@ -800,6 +802,33 @@ class VfolderRepository:
                 results.append((invitation_data, vfolder_data))
 
             return results
+
+    @repository_decorator()
+    async def ensure_host_permission_allowed(
+        self,
+        folder_host: str,
+        *,
+        permission: VFolderHostPermission,
+        allowed_vfolder_types: Sequence[str],
+        user_uuid: uuid.UUID,
+        resource_policy: Mapping[str, Any],
+        domain_name: str,
+        group_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        """
+        Ensure that the user has the required permission on the specified vfolder host.
+        """
+        async with self._db.begin_session() as session:
+            await ensure_host_permission_allowed(
+                session.bind,
+                folder_host,
+                permission=permission,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                group_id=group_id,
+            )
 
     def _vfolder_dict_to_data(self, vfolder_dict: dict[str, Any]) -> VFolderData:
         """

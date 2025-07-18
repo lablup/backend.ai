@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
@@ -25,7 +25,7 @@ class ProjectResourcePolicyData:
 @dataclass
 class KeyPairResourcePolicyData:
     name: str
-    created_at: datetime
+    created_at: datetime = field(compare=False)
     default_for_unspecified: DefaultForUnspecified
     total_resource_slots: ResourceSlot
     max_session_lifetime: int

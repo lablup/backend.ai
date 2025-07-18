@@ -20,6 +20,8 @@ from ai.backend.common.stage.types import (
 )
 from ai.backend.common.types import BinarySize, KernelId
 
+from .utils import ScratchUtil
+
 
 @dataclass
 class ContainerOwnershipConfig:
@@ -70,44 +72,24 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
     def name(self) -> str:
         return "docker-scratch"
 
-    @classmethod
-    def _scratch_dir(cls, scratch_root: Path, kernel_id: KernelId) -> Path:
-        return scratch_root / str(kernel_id)
-
-    @classmethod
-    def _scratch_file(cls, scratch_root: Path, kernel_id: KernelId) -> Path:
-        return cls._scratch_dir(scratch_root, kernel_id) / f"{kernel_id}.img"
-
-    @classmethod
-    def _tmp_dir(cls, scratch_root: Path, kernel_id: KernelId) -> Path:
-        return scratch_root / f"{kernel_id}_tmp"
-
-    @classmethod
-    def _work_dir(cls, scratch_root: Path, kernel_id: KernelId) -> Path:
-        return cls._scratch_dir(scratch_root, kernel_id) / "work"
-
-    @classmethod
-    def _config_dir(cls, scratch_root: Path, kernel_id: KernelId) -> Path:
-        return cls._scratch_dir(scratch_root, kernel_id) / "config"
-
     @override
     async def setup(self, spec: ScratchSpec) -> ScratchResult:
         await self._create_filesystem(spec)
         await self._create_scratch_dirs(spec)
         await self._clone_dotfiles(spec)
         return ScratchResult(
-            scratch_dir=self._scratch_dir(spec.scratch_root, spec.kernel_id).resolve(),
-            scratch_file=self._scratch_file(spec.scratch_root, spec.kernel_id).resolve(),
-            tmp_dir=self._tmp_dir(spec.scratch_root, spec.kernel_id).resolve(),
-            work_dir=self._work_dir(spec.scratch_root, spec.kernel_id).resolve(),
-            config_dir=self._config_dir(spec.scratch_root, spec.kernel_id).resolve(),
+            scratch_dir=ScratchUtil.scratch_dir(spec.scratch_root, spec.kernel_id),
+            scratch_file=ScratchUtil.scratch_file(spec.scratch_root, spec.kernel_id),
+            tmp_dir=ScratchUtil.tmp_dir(spec.scratch_root, spec.kernel_id),
+            work_dir=ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id),
+            config_dir=ScratchUtil.config_dir(spec.scratch_root, spec.kernel_id),
             scratch_type=spec.scratch_type,
         )
 
     async def _create_filesystem(self, spec: ScratchSpec) -> None:
         loop = asyncio.get_running_loop()
-        tmp_dir = self._tmp_dir(spec.scratch_root, spec.kernel_id).resolve()
-        scratch_dir = self._scratch_dir(spec.scratch_root, spec.kernel_id).resolve()
+        tmp_dir = ScratchUtil.tmp_dir(spec.scratch_root, spec.kernel_id)
+        scratch_dir = ScratchUtil.scratch_dir(spec.scratch_root, spec.kernel_id)
         if sys.platform.startswith("linux") and spec.scratch_type == "memory":
             await loop.run_in_executor(None, functools.partial(tmp_dir.mkdir, exist_ok=True))
             await self._create_scratch_filesystem(scratch_dir, 64)
@@ -159,8 +141,8 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         self, scratch_root: Path, scratch_size: int, kernel_id: KernelId
     ) -> None:
         loop = asyncio.get_running_loop()
-        scratch_dir = self._scratch_dir(scratch_root, kernel_id).resolve()
-        scratch_file = self._scratch_file(scratch_root, kernel_id).resolve()
+        scratch_dir = ScratchUtil.scratch_dir(scratch_root, kernel_id)
+        scratch_file = ScratchUtil.scratch_file(scratch_root, kernel_id)
         await loop.run_in_executor(
             None, functools.partial(os.makedirs, str(scratch_dir), exist_ok=True)
         )
@@ -180,8 +162,8 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             raise RuntimeError("mount failed")
 
     async def _create_scratch_dirs(self, spec: ScratchSpec) -> None:
-        work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
-        config_dir = self._config_dir(spec.scratch_root, spec.kernel_id).resolve()
+        work_dir = ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id)
+        config_dir = ScratchUtil.config_dir(spec.scratch_root, spec.kernel_id)
 
         def create() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
@@ -202,7 +184,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         await loop.run_in_executor(None, self._clone_func, spec)
 
     def _clone_func(self, spec: ScratchSpec) -> None:
-        work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
+        work_dir = ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id)
         jupyter_custom_css_path = Path(
             pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
         )
