@@ -30,7 +30,18 @@ def mock_agent_destroy_session_rpc(mocker, mock_agent_response_result):
     return mock
 
 
+@pytest.fixture
+def mock_session_repository_methods(mocker):
+    """Mock SessionRepository methods to return test data"""
+    mocker.patch(
+        "ai.backend.manager.repositories.session.repository.SessionRepository.get_session_validated",
+        new_callable=AsyncMock,
+        return_value=SESSION_ROW_FIXTURE,
+    )
+
+
 DESTROY_SESSION_MOCK = {"destroyed": True}
+DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 
 
 @pytest.mark.parametrize(
@@ -47,8 +58,8 @@ DESTROY_SESSION_MOCK = {"destroyed": True}
                     owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
                 ),
                 DestroySessionActionResult(
-                    destroyed_sessions=[SESSION_ROW_FIXTURE],
-                    result=DESTROY_SESSION_MOCK,
+                    destroyed_sessions=[SESSION_FIXTURE_DATA],
+                    result=DESTROY_SESSION_RESPONSE_MOCK,
                 ),
             ),
             DESTROY_SESSION_MOCK,
@@ -64,9 +75,9 @@ DESTROY_SESSION_MOCK = {"destroyed": True}
         }
     ],
 )
-@pytest.mark.skip(reason="Test infrastructure needs fixing for session fixture dependencies")
 async def test_destroy_session(
     mock_agent_destroy_session_rpc,
+    mock_session_repository_methods,
     processors: SessionProcessors,
     test_scenario: TestScenario[DestroySessionAction, DestroySessionActionResult],
 ):

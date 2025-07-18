@@ -261,7 +261,7 @@ class SessionService:
         )
 
         return CommitSessionActionResult(
-            session_row=session,
+            session_data=session.to_dataclass(),
             commit_result=resp,
         )
 
@@ -282,7 +282,7 @@ class SessionService:
         except AssertionError:
             raise InvalidAPIParameters
         return CompleteActionResult(
-            session_row=session,
+            session_data=session.to_dataclass(),
             result=resp,
         )
 
@@ -505,7 +505,9 @@ class SessionService:
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
 
-        return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
+        return ConvertSessionToImageActionResult(
+            task_id=task_id, session_data=session.to_dataclass()
+        )
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:
         template_id = action.template_id
@@ -910,7 +912,13 @@ class SessionService:
                 *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
             ]
 
-            return DestroySessionActionResult(result=last_stats, destroyed_sessions=sessions)
+            # Convert SessionRows to SessionData
+            destroyed_sessions = [
+                sess.to_dataclass() if isinstance(sess, SessionRow) else sess for sess in sessions
+            ]
+            return DestroySessionActionResult(
+                result=last_stats, destroyed_sessions=destroyed_sessions
+            )
         else:
             session = await self._session_repository.get_session_validated(
                 session_name,
@@ -926,7 +934,9 @@ class SessionService:
                 "stats": last_stat,
             }
 
-            return DestroySessionActionResult(result=resp, destroyed_sessions=[session])
+            return DestroySessionActionResult(
+                result=resp, destroyed_sessions=[session.to_dataclass()]
+            )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
@@ -992,7 +1002,7 @@ class SessionService:
                 mpwriter.append(tarbytes, headers)
 
             return DownloadFilesActionResult(
-                session_row=session,
+                session_data=session.to_dataclass(),
                 result=mpwriter,  # type: ignore
             )
 
@@ -1070,7 +1080,9 @@ class SessionService:
                         "files": [],
                         "console": [],
                     }
-                    return ExecuteSessionActionResult(result=resp, session_row=session)
+                    return ExecuteSessionActionResult(
+                        result=resp, session_data=session.to_dataclass()
+                    )
                 # Keep internal/public API compatilibty
                 result = {
                     "status": raw_result["status"],
@@ -1093,7 +1105,7 @@ class SessionService:
         except BackendAIError:
             raise
 
-        return ExecuteSessionActionResult(result=resp, session_row=session)
+        return ExecuteSessionActionResult(result=resp, session_data=session.to_dataclass())
 
     async def get_abusing_report(
         self, action: GetAbusingReportAction
@@ -1198,7 +1210,9 @@ class SessionService:
 
         if session is None:
             raise SessionNotFound
-        return GetDependencyGraphActionResult(result=dependency_graph, session_row=session)
+        return GetDependencyGraphActionResult(
+            result=dependency_graph, session_data=session.to_dataclass()
+        )
 
     async def get_direct_access_info(
         self, action: GetDirectAccessInfoAction
@@ -1233,7 +1247,7 @@ class SessionService:
                 "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
             }
 
-        return GetDirectAccessInfoActionResult(result=resp, session_row=sess)
+        return GetDirectAccessInfoActionResult(result=resp, session_data=sess.to_dataclass())
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
         session_name = action.session_name
@@ -1307,7 +1321,7 @@ class SessionService:
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.interrupt_session(session)
 
-        return InterruptSessionActionResult(result=None, session_row=session)
+        return InterruptSessionActionResult(result=None, session_data=session.to_dataclass())
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         session_name = action.session_name
@@ -1387,7 +1401,7 @@ class SessionService:
         )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)
-        return RestartSessionActionResult(result=None, session_row=session)
+        return RestartSessionActionResult(result=None, session_data=session.to_dataclass())
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
@@ -1400,7 +1414,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.shutdown_service(session, service_name)
-        return ShutdownServiceActionResult(result=None, session_row=session)
+        return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_name = action.session_name
@@ -1506,7 +1520,7 @@ class SessionService:
 
                 return StartServiceActionResult(
                     result=None,
-                    session_row=session,
+                    session_data=session.to_dataclass(),
                     token=token_json["token"],
                     wsproxy_addr=wsproxy_advertise_addr,
                 )
@@ -1549,7 +1563,7 @@ class SessionService:
             upload_tasks.append(t)
         await asyncio.gather(*upload_tasks)
 
-        return UploadFilesActionResult(result=None, session_row=session)
+        return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
@@ -1583,7 +1597,9 @@ class SessionService:
                 log.warning(
                     f"You are not allowed to transit others's sessions status, skip (s:{session_id})"
                 )
-                return CheckAndTransitStatusActionResult(result={}, session_row=session_row)
+                return CheckAndTransitStatusActionResult(
+                    result={}, session_data=session_row.to_dataclass()
+                )
 
         now = datetime.now(tzutc())
         session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
@@ -1594,7 +1610,9 @@ class SessionService:
         ])
 
         result = {row.id: row.status.name for row, _ in session_rows}
-        return CheckAndTransitStatusActionResult(result=result, session_row=session_row)
+        return CheckAndTransitStatusActionResult(
+            result=result, session_data=session_row.to_dataclass()
+        )
 
     async def check_and_transit_status_multi(
         self, action: CheckAndTransitStatusBatchAction

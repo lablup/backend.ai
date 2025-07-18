@@ -15,7 +15,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -49,7 +48,7 @@ START_SERVICE_MOCK = {"started": True, "port": 8080}
                 ),
                 StartServiceActionResult(
                     result=START_SERVICE_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                     token="test_token",
                     wsproxy_addr="localhost:8080",
                 ),

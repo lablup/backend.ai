@@ -15,7 +15,6 @@ from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
-    SESSION_ROW_FIXTURE,
 )
 
 
@@ -45,7 +44,7 @@ SHUTDOWN_SERVICE_MOCK = {"shutdown": True}
                 ),
                 ShutdownServiceActionResult(
                     result=SHUTDOWN_SERVICE_MOCK,
-                    session_row=SESSION_ROW_FIXTURE,
+                    session_data=SESSION_FIXTURE_DATA,
                 ),
             ),
             SHUTDOWN_SERVICE_MOCK,
