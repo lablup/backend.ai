@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
@@ -20,6 +21,9 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -28,6 +32,9 @@ from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
 
+# Layer-specific decorator for user repository
+repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
+
 
 class PermissionControllerRepository:
     _db: ExtendedAsyncSAEngine
@@ -35,6 +42,7 @@ class PermissionControllerRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @repository_decorator()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
         """
         Create a new role in the database.
@@ -71,6 +79,7 @@ class PermissionControllerRepository:
         role_row = await db_session.scalar(stmt)
         return cast(Optional[RoleRow], role_row)
 
+    @repository_decorator()
     async def update_role(self, data: RoleUpdateInput) -> RoleData:
         to_update = data.fields_to_update()
         async with self._db.begin_session() as db_session:
@@ -81,6 +90,7 @@ class PermissionControllerRepository:
                 raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
             return role_row.to_data()
 
+    @repository_decorator()
     async def delete_role(self, data: RoleDeleteInput) -> RoleData:
         async with self._db.begin_session() as db_session:
             role_row = await self._get_role(data.id, db_session)
@@ -90,12 +100,14 @@ class PermissionControllerRepository:
             role_data = role_row.to_data()
         return role_data
 
+    @repository_decorator()
     async def assign_role(self, data: UserRoleAssignmentInput):
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
             db_session.add(user_role_row)
         return user_role_row.to_data()
 
+    @repository_decorator()
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
         async with self._db.begin_readonly_session() as db_session:
             result = await self._get_role(role_id, db_session)
@@ -103,6 +115,7 @@ class PermissionControllerRepository:
                 return None
             return result.to_data()
 
+    @repository_decorator()
     async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleDataWithPermissions]:
         async with self._db.begin_readonly_session() as db_session:
             query = (
@@ -125,6 +138,7 @@ class PermissionControllerRepository:
             result = cast(list[RoleRow], result)
             return [role.to_data_with_permissions() for role in result]
 
+    @repository_decorator()
     async def check_permission(self, data: PermissionCheckInput) -> bool:
         roles = await self.get_active_roles(data.user_id)
         target_object_id = ObjectId(
