@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Sequence
 from uuid import UUID
@@ -9,12 +10,19 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.errors.resource import (
+    GroupHasActiveEndpointsError,
+    GroupHasActiveKernelsError,
+    GroupHasVFoldersMountedError,
+    GroupNotFound,
+)
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -78,10 +86,6 @@ class GroupService:
             return CreateGroupActionResult(data=None, success=False)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        import uuid
-
-        from ai.backend.manager.models.user import UserRole
-
         try:
             # Convert user_uuids from list[str] to list[UUID] if provided
             user_uuids_converted = None
@@ -100,6 +104,9 @@ class GroupService:
                 # Only user updates were performed, no group data to return
                 return ModifyGroupActionResult(data=None, success=True)
             return ModifyGroupActionResult(data=group_data, success=True)
+        except GroupNotFound:
+            log.warning("modify_group(): group not found ({})", action.group_id)
+            return ModifyGroupActionResult(data=None, success=False)
         except Exception as e:
             log.warning("modify_group(): error ({})", repr(e))
             return ModifyGroupActionResult(data=None, success=False)
@@ -108,17 +115,14 @@ class GroupService:
         try:
             result = await self._group_repository.mark_inactive(action.group_id)
             return DeleteGroupActionResult(data=None, success=result)
+        except GroupNotFound:
+            log.warning("delete_group(): group not found ({})", action.group_id)
+            return DeleteGroupActionResult(data=None, success=False)
         except Exception as e:
             log.warning("delete_group(): error ({})", repr(e))
             return DeleteGroupActionResult(data=None, success=False)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        from ai.backend.manager.errors.resource import (
-            GroupHasActiveEndpointsError,
-            GroupHasActiveKernelsError,
-            GroupHasVFoldersMountedError,
-        )
-
         try:
             result = await self._admin_group_repository.purge_group_force(action.group_id)
             return PurgeGroupActionResult(data=None, success=result)
