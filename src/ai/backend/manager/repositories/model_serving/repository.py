@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError, StatementError
@@ -50,6 +50,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.services.model_serving.types import MutationResult
@@ -57,9 +58,6 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 # Layer-specific decorator for model_serving repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.MODEL_SERVING)
-
-if TYPE_CHECKING:
-    from ai.backend.manager.registry import AgentRegistry
 
 
 class ModelServingRepository:
@@ -727,7 +725,7 @@ class ModelServingRepository:
     async def modify_endpoint(
         self,
         action: ModifyEndpointAction,
-        agent_registry: "AgentRegistry",
+        agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
     ) -> MutationResult:
