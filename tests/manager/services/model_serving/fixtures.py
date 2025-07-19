@@ -81,6 +81,15 @@ def mock_background_task_manager():
 
 
 @pytest.fixture
+def mock_valkey_live():
+    mock = MagicMock()
+    mock.store_live_data = AsyncMock()
+    mock.get_live_data = AsyncMock()
+    mock.delete_live_data = AsyncMock()
+    return mock
+
+
+@pytest.fixture
 def mock_service(
     database_fixture,  # noqa: ARG001
     database_engine,  # noqa: ARG001
@@ -89,6 +98,7 @@ def mock_service(
     mock_agent_registry,
     mock_background_task_manager,
     mock_config_provider,
+    mock_valkey_live,
     mock_repositories,
 ) -> ModelServingService:
     return ModelServingService(
@@ -97,6 +107,7 @@ def mock_service(
         event_dispatcher=mock_event_dispatcher,
         storage_manager=mock_storage_manager,
         config_provider=mock_config_provider,
+        valkey_live=mock_valkey_live,
         repository=mock_repositories.repository,
         admin_repository=mock_repositories.admin_repository,
     )
