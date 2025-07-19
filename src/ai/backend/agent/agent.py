@@ -2934,15 +2934,11 @@ class AbstractAgent(
             # if everything went well then krunner itself will report the status via zmq
             await self.anycast_and_broadcast_event(
                 ModelServiceStatusAnycastEvent(
-                    kernel_obj.kernel_id,
                     kernel_obj.session_id,
-                    model["name"],
                     ModelServiceStatus.UNHEALTHY,
                 ),
                 ModelServiceStatusBroadcastEvent(
-                    kernel_obj.kernel_id,
                     kernel_obj.session_id,
-                    model["name"],
                     ModelServiceStatus.UNHEALTHY,
                 ),
             )

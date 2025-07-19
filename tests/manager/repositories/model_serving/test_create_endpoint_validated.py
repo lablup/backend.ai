@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from .conftest import (
@@ -8,15 +10,26 @@ from .conftest import (
 )
 
 
+@pytest.fixture
+def mock_agent_registry():
+    """Mock agent registry for testing."""
+    mock = MagicMock()
+    mock.create_appproxy_endpoint = AsyncMock(return_value="https://test-endpoint.example.com")
+    return mock
+
+
 @pytest.mark.asyncio
 async def test_create_endpoint_validated_success(
     model_serving_repository,
     setup_writable_session,
     sample_endpoint,
+    mock_agent_registry,
 ):
     """Test successful creation of an endpoint."""
     # Act
-    result = await model_serving_repository.create_endpoint_validated(sample_endpoint)
+    result = await model_serving_repository.create_endpoint_validated(
+        sample_endpoint, mock_agent_registry
+    )
 
     # Assert
     assert_basic_endpoint_result(result, sample_endpoint)
@@ -48,6 +61,7 @@ async def test_create_endpoint_validated_with_configurations(
     sample_vfolder,
     endpoint_config,
     expected_attrs,
+    mock_agent_registry,
 ):
     """Test creation of endpoints with different configurations."""
     # Arrange
@@ -57,7 +71,9 @@ async def test_create_endpoint_validated_with_configurations(
         endpoint_row = create_full_featured_endpoint(sample_user, sample_image, sample_vfolder)
 
     # Act
-    result = await model_serving_repository.create_endpoint_validated(endpoint_row)
+    result = await model_serving_repository.create_endpoint_validated(
+        endpoint_row, mock_agent_registry
+    )
 
     # Assert
     assert_basic_endpoint_result(result, endpoint_row)
@@ -75,13 +91,16 @@ async def test_create_endpoint_validated_transaction_handling(
     mock_db_engine,
     mock_session,
     sample_endpoint,
+    mock_agent_registry,
 ):
     """Test that creation properly handles database transactions."""
     # Arrange
     setup_db_session_mock(mock_db_engine, mock_session)
 
     # Act
-    result = await model_serving_repository.create_endpoint_validated(sample_endpoint)
+    result = await model_serving_repository.create_endpoint_validated(
+        sample_endpoint, mock_agent_registry
+    )
 
     # Assert
     assert_basic_endpoint_result(result, sample_endpoint)

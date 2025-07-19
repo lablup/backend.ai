@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.orm.exc import NoResultFound
@@ -7,6 +8,13 @@ from ai.backend.manager.data.model_serving.types import EndpointData, RoutingDat
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 
 from .conftest import assert_update_query_executed
+
+
+@pytest.fixture
+def mock_valkey_live():
+    mock = AsyncMock()
+    mock.store_live_data = AsyncMock()
+    return mock
 
 
 @pytest.mark.asyncio
@@ -150,6 +158,7 @@ async def test_update_route_traffic_force_success(
     sample_endpoint,
     patch_routing_get,
     patch_endpoint_get,
+    mock_valkey_live,
 ):
     """Test admin force update of route traffic ratio."""
     # Arrange
@@ -161,7 +170,7 @@ async def test_update_route_traffic_force_success(
 
     # Act
     result = await admin_model_serving_repository.update_route_traffic_force(
-        route_id, service_id, new_traffic_ratio
+        mock_valkey_live, route_id, service_id, new_traffic_ratio
     )
 
     # Assert

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
@@ -77,6 +78,7 @@ class ServiceArgs:
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     valkey_stat_client: ValkeyStatClient
+    valkey_live: ValkeyLiveClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
@@ -195,6 +197,7 @@ class Services:
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
+            valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
             admin_repository=repositories.model_serving.admin_repository,
         )

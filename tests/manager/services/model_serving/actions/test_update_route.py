@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.manager.errors.service import RouteNotFound
+from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -60,10 +60,10 @@ def mock_get_endpoint_for_appproxy_update(mocker, mock_repositories):
 
 
 @pytest.fixture
-def mock_update_appproxy_endpoint_routes(mocker, mock_repositories):
+def mock_notify_endpoint_route_update_to_appproxy(mocker, mock_agent_registry):
     mock = mocker.patch.object(
-        mock_repositories.repository,
-        "update_appproxy_endpoint_routes",
+        mock_agent_registry,
+        "notify_endpoint_route_update_to_appproxy",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -130,7 +130,7 @@ class TestUpdateRoute:
         mock_update_route_traffic_force,
         mock_update_route_traffic_validated,
         mock_get_endpoint_for_appproxy_update,
-        mock_update_appproxy_endpoint_routes,
+        mock_notify_endpoint_route_update_to_appproxy,
     ):
         # Mock endpoint data for route update
         mock_endpoint_data = MagicMock(
@@ -182,7 +182,7 @@ class TestUpdateRoute:
                     route_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
                     traffic_ratio=0.5,
                 ),
-                RouteNotFound,
+                ModelServiceNotFound,
             ),
         ],
     )
@@ -209,7 +209,7 @@ class TestUpdateRoute:
         mock_check_requester_access_update_route,
         mock_update_route_traffic_validated,
         mock_get_endpoint_for_appproxy_update,
-        mock_update_appproxy_endpoint_routes,
+        mock_notify_endpoint_route_update_to_appproxy,
     ):
         action = UpdateRouteAction(
             requester_ctx=RequesterCtx(
@@ -228,9 +228,10 @@ class TestUpdateRoute:
         mock_get_endpoint_for_appproxy_update.return_value = MagicMock(id=action.service_id)
 
         # Mock AppProxy communication failure
-        mock_update_appproxy_endpoint_routes.side_effect = aiohttp.ClientError("Connection failed")
+        mock_notify_endpoint_route_update_to_appproxy.side_effect = aiohttp.ClientError(
+            "Connection failed"
+        )
 
-        result = await model_serving_processors.update_route.wait_for_complete(action)
-
-        # Should still return success despite AppProxy failure
-        assert result.success is True
+        # AppProxy failure should propagate as exception
+        with pytest.raises(aiohttp.ClientError, match="Connection failed"):
+            await model_serving_processors.update_route.wait_for_complete(action)
