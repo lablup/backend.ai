@@ -38,6 +38,16 @@ class UserRepository:
         self._db = db
 
     @repository_decorator()
+    async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
+        """
+        Get user by UUID without ownership validation.
+        Admin-only operation.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            user_row = await self._get_user_by_uuid(db_session, user_uuid)
+            return user_row.to_data()
+
+    @repository_decorator()
     async def get_by_email_validated(
         self,
         email: str,

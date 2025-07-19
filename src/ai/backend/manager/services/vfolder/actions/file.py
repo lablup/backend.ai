@@ -163,6 +163,7 @@ class DeleteFilesActionResult(BaseActionResult):
 
 @dataclass
 class MkdirAction(VFolderAction):
+    user_id: uuid.UUID
     vfolder_uuid: uuid.UUID
 
     path: str | list[str]

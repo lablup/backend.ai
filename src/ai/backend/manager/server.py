@@ -618,6 +618,8 @@ def _make_action_reporters(
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .clients.storage_proxy.client import StorageProxyClient
+
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
     reporter_hub = ReporterHub(
@@ -628,6 +630,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    storage_client = StorageProxyClient(root_ctx.storage_manager)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -636,6 +639,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 etcd=root_ctx.etcd,
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
+                storage_client=storage_client,
                 valkey_stat_client=root_ctx.valkey_stat,
                 valkey_live=root_ctx.valkey_live,
                 event_fetcher=root_ctx.event_fetcher,
