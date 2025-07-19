@@ -59,7 +59,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateAction,
     CreateFromTemplateActionParams,
 )
-from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
+from ai.backend.manager.services.session.actions.destroy_session import DestroySessionAction
 from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
 from ai.backend.manager.services.session.actions.download_files import DownloadFilesAction
 from ai.backend.manager.services.session.actions.execute_session import (
@@ -769,7 +769,8 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    resp = result.commit_info.asdict()
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -794,7 +795,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result or {}, status=HTTPStatus.OK)
+    return web.json_response(result.abuse_report or {}, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1152,7 +1153,7 @@ async def get_info(request: web.Request) -> web.Response:
     except BackendAIError:
         log.exception("GET_INFO: exception")
         raise
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    return web.json_response(result.session_info.asdict(), status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1503,7 +1504,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
             file=file,
         )
     )
-    return web.Response(body=result.result, status=HTTPStatus.OK)
+    return web.Response(body=result.bytes, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
