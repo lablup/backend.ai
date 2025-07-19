@@ -1,4 +1,5 @@
 from typing import Any, Mapping
+from uuid import UUID
 
 import aiohttp
 
@@ -10,7 +11,7 @@ class WSProxyClient:
 
     async def create_endpoint(
         self,
-        endpoint_id: str,
+        endpoint_id: UUID,
         body: Mapping[str, Any],
     ) -> dict[str, Any]:
         async with aiohttp.ClientSession() as session:
@@ -26,7 +27,7 @@ class WSProxyClient:
 
     async def delete_endpoint(
         self,
-        endpoint_id: str,
+        endpoint_id: UUID,
     ) -> None:
         async with aiohttp.ClientSession() as session:
             async with session.delete(

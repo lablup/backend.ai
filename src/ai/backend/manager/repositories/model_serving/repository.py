@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError, StatementError
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import (
@@ -36,7 +37,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServicePredicateChecker,
+    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
@@ -49,6 +50,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.services.model_serving.types import MutationResult
@@ -56,9 +58,6 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 # Layer-specific decorator for model_serving repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.MODEL_SERVING)
-
-if TYPE_CHECKING:
-    from ai.backend.manager.registry import AgentRegistry
 
 
 class ModelServingRepository:
@@ -145,15 +144,19 @@ class ModelServingRepository:
             return existing_endpoint is None
 
     @repository_decorator()
-    async def create_endpoint_validated(self, endpoint_row: EndpointRow) -> EndpointData:
+    async def create_endpoint_validated(
+        self, endpoint_row: EndpointRow, registry: AgentRegistry
+    ) -> EndpointData:
         """
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
+            data = EndpointData.from_row(endpoint_row)
+            endpoint_row.url = await registry.create_appproxy_endpoint(db_sess, endpoint_row)
             db_sess.add(endpoint_row)
+
             await db_sess.flush()
             await db_sess.refresh(endpoint_row)
-            data = EndpointData.from_row(endpoint_row)
 
             return data
 
@@ -255,6 +258,7 @@ class ModelServingRepository:
     @repository_decorator()
     async def update_route_traffic_validated(
         self,
+        valkey_live: ValkeyLiveClient,
         route_id: uuid.UUID,
         service_id: uuid.UUID,
         traffic_ratio: float,
@@ -287,6 +291,10 @@ class ModelServingRepository:
             if endpoint is None:
                 raise NoResultFound
 
+            await valkey_live.store_live_data(
+                f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
+                str(traffic_ratio),
+            )
             return EndpointData.from_row(endpoint)
 
     @repository_decorator()
@@ -702,23 +710,6 @@ class ModelServingRepository:
                 return None
 
     @repository_decorator()
-    async def update_appproxy_endpoint_routes(
-        self, agent_registry: "AgentRegistry", endpoint_row: EndpointRow
-    ) -> None:
-        """
-        Update AppProxy endpoint routes using agent registry.
-        """
-        async with self._db.begin_session() as db_sess:
-            healthy_routes = (
-                [r for r in endpoint_row.routings if r.status == RouteStatus.HEALTHY]
-                if endpoint_row.routings
-                else []
-            )
-            await agent_registry.update_appproxy_endpoint_routes(
-                db_sess, endpoint_row, healthy_routes
-            )
-
-    @repository_decorator()
     async def resolve_image_for_endpoint_creation(
         self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
     ) -> ImageRow:
@@ -734,7 +725,7 @@ class ModelServingRepository:
     async def modify_endpoint(
         self,
         action: ModifyEndpointAction,
-        agent_registry: "AgentRegistry",
+        agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
     ) -> MutationResult:
@@ -798,7 +789,7 @@ class ModelServingRepository:
                 conn = await db_session.connection()
                 assert conn
 
-                await ModelServicePredicateChecker.check_scaling_group(
+                await ModelServiceHelper.check_scaling_group(
                     conn,
                     endpoint_row.resource_group,
                     session_owner.main_access_key,
@@ -838,7 +829,7 @@ class ModelServingRepository:
                         )
                         for mount in extra_mounts_input
                     }
-                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                    vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
                         conn,
                         legacy_etcd_config_loader,
                         storage_manager,
@@ -851,10 +842,18 @@ class ModelServingRepository:
                     endpoint_row.extra_mounts = vfolder_mounts
 
                 if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
-                    await ModelServicePredicateChecker.validate_model_definition(
+                    vfid = endpoint_row.model_row.vfid
+                    yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                         storage_manager,
-                        endpoint_row.model_row,
-                        endpoint_row.model_definition_path,
+                        endpoint_row.model_row.host,
+                        vfid,
+                        endpoint_row.config.model_definition_path,
+                    )
+                    await ModelServiceHelper.validate_model_definition(
+                        storage_manager,
+                        endpoint_row.model_row.host,
+                        vfid,
+                        yaml_path,
                     )
                 elif (
                     endpoint_row.runtime_variant != RuntimeVariant.CMD

@@ -61,6 +61,13 @@ class RouteInfo:
 
 
 @dataclass
+class RouteConnectionInfo:
+    app: str
+    kernel_host: str
+    kernel_port: int
+
+
+@dataclass
 class ServiceConfig:
     model: str
     model_definition_path: Optional[str]

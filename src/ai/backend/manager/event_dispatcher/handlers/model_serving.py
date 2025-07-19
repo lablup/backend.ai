@@ -28,7 +28,6 @@ from ...models.user import UserRow
 from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    is_db_retry_error,
 )
 from ...types import UserScope
 from ...utils import query_userinfo
@@ -72,25 +71,6 @@ class ModelServingEventHandler:
                         data["status"] = RouteStatus.UNHEALTHY
                 query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
                 await db_sess.execute(query)
-
-                query = sa.select(RoutingRow).where(
-                    (RoutingRow.endpoint == route.endpoint)
-                    & (RoutingRow.status == RouteStatus.HEALTHY)
-                )
-                result = await db_sess.execute(query)
-                latest_routes = result.fetchall()
-                latest_routes = await RoutingRow.list(
-                    db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
-                )
-
-                try:
-                    await self._registry.update_appproxy_endpoint_routes(
-                        db_sess, route.endpoint_row, latest_routes
-                    )
-                except Exception as e:
-                    if is_db_retry_error(e):
-                        raise
-                    log.exception("failed to communicate with AppProxy endpoint:")
 
         await execute_with_retry(_update)
 

@@ -10,6 +10,7 @@ from pydantic import HttpUrl
 from yarl import URL
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
@@ -134,6 +135,8 @@ class ModelServingService:
     _repository: ModelServingRepository
     _admin_repository: AdminModelServingRepository
 
+    _valkey_live: ValkeyLiveClient
+
     def __init__(
         self,
         agent_registry: AgentRegistry,
@@ -141,6 +144,7 @@ class ModelServingService:
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
+        valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
         admin_repository: AdminModelServingRepository,
     ) -> None:
@@ -149,6 +153,7 @@ class ModelServingService:
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
         self._config_provider = config_provider
+        self._valkey_live = valkey_live
         self._repository = repository
         self._admin_repository = admin_repository
 
@@ -647,10 +652,11 @@ class ModelServingService:
         await self.check_requester_access(action.requester_ctx)
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
             endpoint_data = await self._admin_repository.update_route_traffic_force(
-                action.route_id, action.service_id, action.traffic_ratio
+                self._valkey_live, action.route_id, action.service_id, action.traffic_ratio
             )
         else:
             endpoint_data = await self._repository.update_route_traffic_validated(
+                self._valkey_live,
                 action.route_id,
                 action.service_id,
                 action.traffic_ratio,
@@ -658,19 +664,10 @@ class ModelServingService:
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,
             )
-
         if not endpoint_data:
-            raise RouteNotFound
+            raise ModelServiceNotFound
 
-        # Update AppProxy routes
-        endpoint_row = await self._repository.get_endpoint_for_appproxy_update(action.service_id)
-        if endpoint_row:
-            try:
-                await self._repository.update_appproxy_endpoint_routes(
-                    self._agent_registry, endpoint_row
-                )
-            except aiohttp.ClientError as e:
-                log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
 
         return UpdateRouteActionResult(success=True)
 
@@ -811,16 +808,10 @@ class ModelServingService:
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,
             )
-
         if not endpoint_data:
             raise ModelServiceNotFound
 
-        # Sync with AppProxy
-        endpoint_row = await self._repository.get_endpoint_for_appproxy_update(action.service_id)
-        if endpoint_row:
-            await self._repository.update_appproxy_endpoint_routes(
-                self._agent_registry, endpoint_row
-            )
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
 
         return ForceSyncActionResult(success=True)
 
