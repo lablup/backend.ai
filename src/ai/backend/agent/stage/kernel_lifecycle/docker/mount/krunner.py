@@ -46,8 +46,6 @@ class KernelRunnerInfo:
 
 @dataclass
 class KernelRunnerMountSpec:
-    config_dir: Path
-
     distro: str
     krunner_volumes: Mapping[str, str]
     sandbox_type: str  # docker, jail
@@ -89,7 +87,6 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             *self._prepare_jail_mounts(info, spec.sandbox_type),
         ]
 
-        mounts.extend(await self._prepare_accelerator_mounts(spec))
         mounts.extend(await self._prepare_hook_mounts(spec, info))
         return KernelRunnerMountResult(
             mounts=mounts,
@@ -229,31 +226,6 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             ),
         ]
 
-    async def _prepare_accelerator_mounts(
-        self,
-        spec: KernelRunnerMountSpec,
-    ) -> list[Mount]:
-        """
-        Prepare mounts for accelerator libraries.
-        """
-        mounts: list[Mount] = []
-        for dev_type, device_alloc in spec.resource_spec.allocations.items():
-            computer_ctx = spec.existing_computers[dev_type]
-            computer = computer_ctx.instance
-            src_path = spec.config_dir / str(computer.key)
-            src_path.mkdir()
-            accelerator_mounts = await computer.generate_mounts(src_path, device_alloc)
-            mounts.extend([
-                Mount(
-                    m.mode,
-                    m.src_path,
-                    Path(m.dst_path.as_posix()),
-                    MountPermission.READ_ONLY,
-                )
-                for m in accelerator_mounts
-            ])
-        return mounts
-
     async def _prepare_hook_mounts(
         self, spec: KernelRunnerMountSpec, runner_info: KernelRunnerInfo
     ) -> list[Mount]:
@@ -269,19 +241,19 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
                 hook_paths = await computer_ctx.instance.get_hooks(
                     runner_info.distro, runner_info.architecture
                 )
-            for hook_path in hook_paths:
-                if hook_path in already_injected_hooks:
-                    continue
-                container_hook_path = f"/opt/kernel/{hook_path.name}"
-                already_injected_hooks.add(hook_path)
-                mounts.append(
-                    Mount(
-                        MountTypes.BIND,
-                        hook_path,
-                        Path(container_hook_path),
-                        MountPermission.READ_ONLY,
+                for hook_path in hook_paths:
+                    if hook_path in already_injected_hooks:
+                        continue
+                    container_hook_path = f"/opt/kernel/{hook_path.name}"
+                    already_injected_hooks.add(hook_path)
+                    mounts.append(
+                        Mount(
+                            MountTypes.BIND,
+                            hook_path,
+                            Path(container_hook_path),
+                            MountPermission.READ_ONLY,
+                        )
                     )
-                )
         return mounts
 
     @cached(

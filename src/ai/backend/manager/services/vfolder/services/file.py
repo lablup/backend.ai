@@ -1,4 +1,5 @@
 from ai.backend.common.types import (
+    VFolderHostPermission,
     VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -53,8 +54,18 @@ class VFolderFileService:
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
-        # Note: Host permission check would need to be moved to a separate permission service
-        # For now, this validation is skipped as it requires direct database access
+        # Check host permissions
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.UPLOAD_FILE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -92,8 +103,18 @@ class VFolderFileService:
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
-        # Note: Host permission check would need to be moved to a separate permission service
-        # For now, this validation is skipped as it requires direct database access
+        # Check host permissions
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -198,8 +219,18 @@ class VFolderFileService:
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
-        # Note: Host permission check would need to be moved to a separate permission service
-        # For now, this validation is skipped as it requires direct database access
+        # Check host permissions
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.MODIFY,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)

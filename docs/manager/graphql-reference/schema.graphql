@@ -604,6 +604,9 @@ type ImageNode implements Node {
 
   """Added in 25.11.0. Indicates if the image is installed on any Agent."""
   installed: Boolean
+
+  """Added in 25.12.0."""
+  type: ImageType
 }
 
 type KVPair {
@@ -627,6 +630,13 @@ type ResourceLimit {
 Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
 """
 scalar ImagePermissionValueField
+
+"""Added in 25.12.0."""
+enum ImageType {
+  COMPUTE
+  SYSTEM
+  SERVICE
+}
 
 type AgentList implements PaginatedList {
   items: [Agent]!

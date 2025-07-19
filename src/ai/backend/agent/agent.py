@@ -196,6 +196,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import (
     cancel_tasks,
+    chown,
     current_loop,
     mount,
     umount,
@@ -2933,15 +2934,11 @@ class AbstractAgent(
             # if everything went well then krunner itself will report the status via zmq
             await self.anycast_and_broadcast_event(
                 ModelServiceStatusAnycastEvent(
-                    kernel_obj.kernel_id,
                     kernel_obj.session_id,
-                    model["name"],
                     ModelServiceStatus.UNHEALTHY,
                 ),
                 ModelServiceStatusBroadcastEvent(
-                    kernel_obj.kernel_id,
                     kernel_obj.session_id,
-                    model["name"],
                     ModelServiceStatus.UNHEALTHY,
                 ),
             )
@@ -3415,6 +3412,12 @@ async def handle_volume_mount(
             event.fstab_path,
             mount_prefix,
         )
+        if context.local_config.agent.mount_path_uid_gid is not None:
+            await chown(
+                real_path,
+                context.local_config.agent.mount_path_uid_gid,
+                mount_prefix=mount_prefix,
+            )
     except VolumeMountFailed as e:
         err_msg = str(e)
     await context.event_producer.broadcast_event(

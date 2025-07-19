@@ -121,11 +121,8 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint: bool = False,
-        status_filter: list[RouteStatus] = [
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
-            RouteStatus.PROVISIONING,
-        ],
+        load_session: bool = False,
+        status_filter: list[RouteStatus] = list(RouteStatus.active_route_statuses()),
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -141,6 +138,8 @@ class RoutingRow(Base):
         )
         if load_endpoint:
             query = query.options(selectinload(RoutingRow.endpoint_row))
+        if load_session:
+            query = query.options(selectinload(RoutingRow.session_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:

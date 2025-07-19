@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     EndpointTokenData,
@@ -113,7 +114,11 @@ class AdminModelServingRepository:
         return data
 
     async def update_route_traffic_force(
-        self, route_id: uuid.UUID, service_id: uuid.UUID, traffic_ratio: float
+        self,
+        valkey_live: ValkeyLiveClient,
+        route_id: uuid.UUID,
+        service_id: uuid.UUID,
+        traffic_ratio: float,
     ) -> Optional[EndpointData]:
         """
         Update route traffic ratio without access validation.
@@ -135,6 +140,11 @@ class AdminModelServingRepository:
             if endpoint is None:
                 raise NoResultFound
             data = EndpointData.from_row(endpoint)
+
+            await valkey_live.store_live_data(
+                f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
+                str(traffic_ratio),
+            )
         return data
 
     async def decrease_endpoint_replicas_force(self, service_id: uuid.UUID) -> bool:
@@ -251,9 +261,9 @@ class AdminModelServingRepository:
         threshold: Any,
         comparator: AutoScalingMetricComparator,
         step_size: int,
-        cooldown_seconds: int,
-        min_replicas: int,
-        max_replicas: int,
+        cooldown_seconds: int = 300,
+        min_replicas: Optional[int] = None,
+        max_replicas: Optional[int] = None,
     ) -> Optional[EndpointAutoScalingRuleRow]:
         """
         Create auto scaling rule without access validation.

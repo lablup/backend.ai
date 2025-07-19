@@ -494,13 +494,19 @@ class ScheduleRepository:
 
             for kernel in session_row.kernels:
                 kernel.set_status(
-                    KernelStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+                    KernelStatus.SCHEDULED,
+                    status_info="scheduled",
+                    status_data={},
+                    status_changed_at=now,
                 )
                 kernel.agent = agent_alloc_ctx.agent_id
                 kernel.agent_addr = agent_alloc_ctx.agent_addr
                 kernel.scaling_group = sgroup_name
             session_row.set_status(
-                SessionStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+                SessionStatus.SCHEDULED,
+                status_info="scheduled",
+                status_data={},
+                status_changed_at=now,
             )
             if agent_alloc_ctx.agent_id is not None:
                 agent_ids.append(agent_alloc_ctx.agent_id)
