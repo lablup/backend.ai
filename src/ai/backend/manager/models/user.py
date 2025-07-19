@@ -20,9 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common.types import CIStrEnum
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 
 from .base import (
     Base,
@@ -49,7 +48,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__: Sequence[str] = (
     "users",
     "UserRow",
-    "UserRole",
+    "UserRole",  # For compatibility with existing code
     "UserStatus",  # For compatibility with existing code
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
@@ -61,17 +60,6 @@ class PasswordColumn(TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         return _hash_password(value)
-
-
-class UserRole(CIStrEnum):
-    """
-    User's role.
-    """
-
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    USER = "user"
-    MONITOR = "monitor"
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)

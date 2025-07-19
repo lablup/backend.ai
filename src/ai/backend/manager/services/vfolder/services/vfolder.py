@@ -484,7 +484,11 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._vfolder_repository.move_vfolders_to_trash([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
         return MoveToTrashVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def restore(
@@ -492,7 +496,11 @@ class VFolderService:
     ) -> RestoreVFolderFromTrashActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._vfolder_repository.restore_vfolders_from_trash([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_forever(
@@ -501,14 +509,14 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        vfolder = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, action.user_uuid, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
         result = await self._storage_client.delete_vfolder(
             VFolderDeleteParams(
-                vfolder_id=VFolderID(vfolder.quota_scope_id, vfolder.id),
-                host=vfolder.host,
-                unmanaged_path=vfolder.unmanaged_path,
+                vfolder_id=VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                host=vfolder_data.host,
+                unmanaged_path=vfolder_data.unmanaged_path,
             )
         )
         match result.status:
@@ -525,14 +533,14 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        vfolder = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, action.user_uuid, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
         result = await self._storage_client.delete_vfolder(
             VFolderDeleteParams(
-                vfolder_id=VFolderID(vfolder.quota_scope_id, vfolder.id),
-                host=vfolder.host,
-                unmanaged_path=vfolder.unmanaged_path,
+                vfolder_id=VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                host=vfolder_data.host,
+                unmanaged_path=vfolder_data.unmanaged_path,
             )
         )
         match result.status:
@@ -546,10 +554,12 @@ class VFolderService:
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
         # TODO: Implement proper cloning logic with storage operations
         # For now, return a placeholder result
-
+        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
         # Get source vfolder
-        source_vfolder = await self._vfolder_repository.get_by_id(action.source_vfolder_uuid)
-        if not source_vfolder:
+        source_vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.source_vfolder_uuid, user.id, user.domain_name
+        )
+        if not source_vfolder_data:
             raise VFolderNotFound()
 
         # Get requester user email
@@ -566,13 +576,13 @@ class VFolderService:
             vfolder_uuid=action.source_vfolder_uuid,
             target_vfolder_id=target_id,
             target_vfolder_name=action.target_name,
-            target_vfolder_host=action.target_host or source_vfolder.host,
+            target_vfolder_host=action.target_host or source_vfolder_data.host,
             usage_mode=action.usage_mode,
             mount_permission=action.mount_permission,
             creator_email=requester_email,
-            ownership_type=source_vfolder.ownership_type,
-            owner_user_uuid=source_vfolder.user,
-            owner_group_uuid=source_vfolder.group,
+            ownership_type=source_vfolder_data.ownership_type,
+            owner_user_uuid=source_vfolder_data.user,
+            owner_group_uuid=source_vfolder_data.group,
             cloneable=action.cloneable,
             bgtask_id=uuid.uuid4(),  # placeholder
         )

@@ -70,6 +70,7 @@ class VfolderRepository:
             vfolder_dicts = await query_accessible_vfolders(
                 session.bind,
                 user_id,
+                allow_privileged_access=True,
                 user_role=user_row.role,
                 domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,

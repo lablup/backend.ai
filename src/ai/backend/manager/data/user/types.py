@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy.engine import Row
 
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, CIStrEnum
 from ai.backend.manager.types import Creator
 
 
@@ -36,6 +36,17 @@ class UserStatus(enum.StrEnum):
             case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
                 return cls.BEFORE_VERIFICATION
         return None
+
+
+class UserRole(CIStrEnum):
+    """
+    User's role.
+    """
+
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+    MONITOR = "monitor"
 
 
 @dataclass
@@ -113,7 +124,7 @@ class UserData:
     created_at: datetime = field(compare=False)
     modified_at: datetime = field(compare=False)
     domain_name: str
-    role: str
+    role: UserRole
     resource_policy: str
     allowed_client_ip: Optional[list[str]]
     totp_activated: bool

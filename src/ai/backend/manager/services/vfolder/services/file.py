@@ -8,6 +8,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,
 )
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.file import (
@@ -31,22 +32,28 @@ class VFolderFileService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _vfolder_repository: VfolderRepository
+    _user_repository: UserRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         vfolder_repository: VfolderRepository,
+        user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
+        self._user_repository = user_repository
 
     async def upload_file(
         self, action: CreateUploadSessionAction
     ) -> CreateUploadSessionActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -95,7 +102,10 @@ class VFolderFileService:
         self, action: CreateDownloadSessionAction
     ) -> CreateDownloadSessionActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -145,33 +155,10 @@ class VFolderFileService:
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         # Get user info and check VFolder access using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise VFolderInvalidParameter("User not found")
-        user_role, user_domain_name = user_info
-
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
-
-        # Check if user has access to the VFolder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=None,  # We'll filter by vfolder_uuid below
-        )
-
-        # Find the requested vfolder
-        vfolder_data = None
-        for access_info in vfolder_list_result.vfolders:
-            if access_info.vfolder_data.id == action.vfolder_uuid:
-                vfolder_data = access_info.vfolder_data
-                break
-
-        if not vfolder_data:
-            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -211,7 +198,10 @@ class VFolderFileService:
 
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -254,30 +244,10 @@ class VFolderFileService:
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
         # Get user info and check VFolder access using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise VFolderInvalidParameter("User not found")
-        user_role, user_domain_name = user_info
-
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
-
-        # Check if user has access to the VFolder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=None,  # We'll filter by vfolder_uuid below
-        )
-
-        # Find the requested vfolder
-        vfolder_data = None
-        for access_info in vfolder_list_result.vfolders:
-            if access_info.vfolder_data.id == action.vfolder_uuid:
-                vfolder_data = access_info.vfolder_data
-                break
 
         if not vfolder_data:
             raise VFolderInvalidParameter("The specified vfolder is not accessible.")
@@ -311,7 +281,10 @@ class VFolderFileService:
             raise VFolderInvalidParameter("Too many directories specified.")
 
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
