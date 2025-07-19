@@ -2,13 +2,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from sqlalchemy.orm import (
+    relationship,
+)
+
+from ai.backend.manager.data.permission.id import ObjectId
 
 from ..base import (
     Base,
     IDColumn,
 )
+
+if TYPE_CHECKING:
+    from .scope_permission import ScopePermissionRow
 
 
 class AssociationScopesEntitiesRow(Base):
@@ -44,3 +53,15 @@ class AssociationScopesEntitiesRow(Base):
         nullable=False,
         server_default=sa.func.now(),
     )
+
+    scope_permission_row: ScopePermissionRow = relationship(
+        "ScopePermissionRow",
+        back_populates="mapped_entity_rows",
+        primaryjoin="ScopePermissionRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
+    )
+
+    def object_id(self) -> ObjectId:
+        """
+        Convert the association to a tuple of ScopeId and ObjectId.
+        """
+        return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
