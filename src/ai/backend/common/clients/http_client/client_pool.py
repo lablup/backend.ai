@@ -1,10 +1,15 @@
 import asyncio
+import logging
 import time
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Optional
 
 import aiohttp
+
+from ai.backend.logging.utils import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -45,12 +50,17 @@ class ClientPool:
 
     async def _cleanup_loop(self, cleanup_interval_seconds: int) -> None:
         while True:
-            await asyncio.sleep(cleanup_interval_seconds)
-            now = time.perf_counter()
-            for key, client in list(self._clients.items()):
-                if now - client.last_used > cleanup_interval_seconds:
-                    await client.session.close()
-                    del self._clients[key]
+            try:
+                await asyncio.sleep(cleanup_interval_seconds)
+                now = time.perf_counter()
+                for key, client in list(self._clients.items()):
+                    if now - client.last_used > cleanup_interval_seconds:
+                        await client.session.close()
+                        del self._clients[key]
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                log.exception("Error during client pool cleanup: {}", e)
 
     def _make_client_session(self) -> aiohttp.ClientSession:
         connector = aiohttp.TCPConnector(
