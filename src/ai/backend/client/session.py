@@ -484,6 +484,18 @@ class Session(BaseSession):
         return False  # raise up the inner exception
 
 
+def _default_http_client_session(skip_sslcert_validation: bool) -> aiohttp.ClientSession:
+    """
+    Returns a default aiohttp client session with the default configuration.
+    This is used for the API client session when no explicit session is provided.
+    """
+    ssl: SSLContextType = True
+    if skip_sslcert_validation:
+        ssl = False
+    connector = aiohttp.TCPConnector(ssl=ssl)
+    return aiohttp.ClientSession(connector=connector)
+
+
 class AsyncSession(BaseSession):
     """
     A context manager for API client sessions that makes API requests asynchronously.
@@ -496,13 +508,17 @@ class AsyncSession(BaseSession):
         *,
         config: Optional[APIConfig] = None,
         proxy_mode: bool = False,
+        aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        ssl: SSLContextType = True
-        if self._config.skip_sslcert_validation:
-            ssl = False
-        connector = aiohttp.TCPConnector(ssl=ssl)
-        self.aiohttp_session = aiohttp.ClientSession(connector=connector)
+        if aiohttp_session is not None:
+            self.aiohttp_session = aiohttp_session
+            self._aiohttp_session_injected = True
+        else:
+            self.aiohttp_session = _default_http_client_session(
+                self._config.skip_sslcert_validation
+            )
+            self._aiohttp_session_injected = False
 
     async def _aopen(self) -> None:
         self._context_token = api_session.set(self)
@@ -516,7 +532,8 @@ class AsyncSession(BaseSession):
         if self._closed:
             return
         self._closed = True
-        await _close_aiohttp_session(self.aiohttp_session)
+        if not self._aiohttp_session_injected:
+            await _close_aiohttp_session(self.aiohttp_session)
         api_session.reset(self._context_token)
 
     def close(self) -> Awaitable[None]:
