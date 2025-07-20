@@ -17,12 +17,12 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.clients.storage_proxy.client import StorageProxyClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
     DeleteStatus,
-    VFolderDeleteParams,
+    VFolderDeleteResult,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -30,8 +30,10 @@ from ai.backend.manager.errors.storage import (
     VFolderCreationFailure,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
+    VFolderGone,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -91,7 +93,6 @@ async def _check_vfolder_status(
 class VFolderService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
-    _storage_client: StorageProxyClient
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
@@ -100,14 +101,12 @@ class VFolderService:
         self,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
-        storage_client: StorageProxyClient,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
-        self._storage_client = storage_client
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
@@ -511,13 +510,33 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        result = await self._storage_client.delete_vfolder(
-            VFolderDeleteParams(
-                vfolder_id=VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                host=vfolder_data.host,
-                unmanaged_path=vfolder_data.unmanaged_path,
-            )
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
+        try:
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.delete_folder(
+                volume_name,
+                str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
+            )
+            result = VFolderDeleteResult(
+                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.DELETE_ONGOING
+            )
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if getattr(e, "status", None) == 410:
+                result = VFolderDeleteResult(
+                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                    DeleteStatus.ALREADY_DELETED,
+                )
+            else:
+                result = VFolderDeleteResult(
+                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.ERROR
+                )
+        except VFolderGone:
+            result = VFolderDeleteResult(
+                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                DeleteStatus.ALREADY_DELETED,
+            )
         match result.status:
             case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
                 await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
@@ -535,13 +554,33 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        result = await self._storage_client.delete_vfolder(
-            VFolderDeleteParams(
-                vfolder_id=VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                host=vfolder_data.host,
-                unmanaged_path=vfolder_data.unmanaged_path,
-            )
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
+        try:
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.delete_folder(
+                volume_name,
+                str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
+            )
+            result = VFolderDeleteResult(
+                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.DELETE_ONGOING
+            )
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if getattr(e, "status", None) == 410:
+                result = VFolderDeleteResult(
+                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                    DeleteStatus.ALREADY_DELETED,
+                )
+            else:
+                result = VFolderDeleteResult(
+                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.ERROR
+                )
+        except VFolderGone:
+            result = VFolderDeleteResult(
+                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
+                DeleteStatus.ALREADY_DELETED,
+            )
         match result.status:
             case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
                 await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])

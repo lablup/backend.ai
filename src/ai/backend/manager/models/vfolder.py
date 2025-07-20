@@ -1089,13 +1089,14 @@ async def prepare_vfolder_mounts(
             # if they do not belong to the execution kernel.
             continue
         try:
-            mount_base_path = PurePosixPath(
-                await storage_manager.get_mount_path(
-                    vfolder["host"],
-                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    PurePosixPath(requested_vfolder_subpaths[requested_key]),
-                ),
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            mount_path_result = await manager_client.get_mount_path(
+                volume_name,
+                str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                str(PurePosixPath(requested_vfolder_subpaths[requested_key])),
             )
+            mount_base_path = PurePosixPath(mount_path_result["path"])
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
@@ -2244,11 +2245,6 @@ class SetQuotaScope(graphene.Mutation):
             )
         max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
-        request_body = {
-            "volume": volume_name,
-            "qsid": str(qsid),
-            "options": {"limit_bytes": max_vfolder_size},
-        }
         manager_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
         await manager_client.update_quota_scope(
             volume_name,

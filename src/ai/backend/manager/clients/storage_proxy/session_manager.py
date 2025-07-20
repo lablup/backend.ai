@@ -4,11 +4,8 @@ import asyncio
 import itertools
 import logging
 from collections.abc import Iterable, Mapping
-from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from pathlib import PurePosixPath
 from typing import (
-    AsyncIterator,
     Final,
     TypedDict,
 )
@@ -18,9 +15,6 @@ import attrs
 import yarl
 
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
-from ai.backend.common.types import (
-    VFolderID,
-)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
@@ -33,13 +27,9 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import VolumesConfig
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
     StorageProxyNotFound,
-    VFolderGone,
-    VFolderOperationFailed,
 )
-from ai.backend.manager.exceptions import InvalidArgument
 
 _ctx_volumes_cache: ContextVar[list[tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
 
@@ -205,74 +195,3 @@ class StorageSessionManager:
         if proxy_name not in self._proxies:
             raise IndexError(f"proxy {proxy_name} does not exist")
         return self._proxies[proxy_name].sftp_scaling_groups or []
-
-    async def get_mount_path(
-        self,
-        vfolder_host: str,
-        vfolder_id: VFolderID,
-        subpath: PurePosixPath = PurePosixPath("."),
-    ) -> str:
-        async with self.request(
-            vfolder_host,
-            "GET",
-            "folder/mount",
-            json={
-                "volume": self.get_proxy_and_volume(vfolder_host)[1],
-                "vfid": str(vfolder_id),
-                "subpath": str(subpath),
-            },
-        ) as (_, resp):
-            reply = await resp.json()
-            return reply["path"]
-
-    @actxmgr
-    async def request(
-        self,
-        vfolder_host_or_proxy_name: str,
-        method: str,
-        request_relpath: str,
-        *args,
-        **kwargs,
-    ) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientResponse]]:
-        proxy_name, _ = self.get_proxy_and_volume(vfolder_host_or_proxy_name)
-        try:
-            proxy_info = self._proxies[proxy_name]
-        except KeyError:
-            raise InvalidArgument("There is no such storage proxy", proxy_name)
-        headers = kwargs.pop("headers", {})
-        headers[AUTH_TOKEN_HDR] = proxy_info.secret
-        async with proxy_info.session.request(
-            method,
-            proxy_info.manager_api_url / request_relpath,
-            *args,
-            headers=headers,
-            **kwargs,
-        ) as client_resp:
-            if client_resp.status // 100 != 2:
-                try:
-                    error_data = await client_resp.json()
-                    raise VFolderOperationFailed(
-                        extra_msg=error_data.pop("msg", None),
-                        extra_data=error_data,
-                    )
-                except aiohttp.ClientResponseError:
-                    # when the response body is not JSON, just raise with status info.
-                    if client_resp.status == 410:
-                        raise VFolderGone(
-                            extra_msg=(
-                                "The requested resource is gone. It may have been deleted or moved."
-                            ),
-                        )
-                    raise VFolderOperationFailed(
-                        extra_msg=(
-                            "Storage proxy responded with "
-                            f"{client_resp.status} {client_resp.reason}"
-                        ),
-                        extra_data=None,
-                    )
-                except VFolderOperationFailed as e:
-                    if client_resp.status // 100 == 5:
-                        raise InvalidAPIParameters(e.extra_msg, e.extra_data)
-                    # Raise as-is for semantic failures, not server errors.
-                    raise
-            yield proxy_info.client_api_url, client_resp
