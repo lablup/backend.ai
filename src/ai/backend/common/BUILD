@@ -27,6 +27,7 @@ python_distribution(
         ":src",
         "src/ai/backend/common/auth:src",
         "src/ai/backend/common/bgtask:src",
+        "src/ai/backend/common/clients/http_client:src",
         "src/ai/backend/common/clients/valkey_client:src",
         "src/ai/backend/common/clients/valkey_client/valkey_image:src",
         "src/ai/backend/common/clients/valkey_client/valkey_live:src",
