@@ -27,9 +27,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ...defs import (
-    DEFAULT_CHUNK_SIZE,
-)
 from ...errors.storage import (
     VFolderOperationFailed,
 )
@@ -582,21 +579,19 @@ class ModelCard(graphene.ObjectType):
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
             chunks = bytes()
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/file/fetch",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(vfolder_id),
-                    "relpath": f"./{filename}",
-                },
-            ) as (_, storage_resp):
-                while True:
-                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    chunks += chunk
+            manager_facing_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+            result = await manager_facing_client.fetch_file(
+                volume_name,
+                str(vfolder_id),
+                f"./{filename}",
+            )
+            # Convert base64 data back to bytes
+            import base64
+
+            if "data" in result:
+                chunks = base64.b64decode(result["data"])
+            else:
+                chunks = bytes()
             return chunks
 
         vfolder_row_id = vfolder_row.id
@@ -607,17 +602,13 @@ class ModelCard(graphene.ObjectType):
             host, is_unmanaged(vfolder_row.unmanaged_path)
         )
         try:
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/file/list",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(vfolder_id),
-                    "relpath": ".",
-                },
-            ) as (_, storage_resp):
-                vfolder_files = (await storage_resp.json())["items"]
+            manager_facing_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+            result = await manager_facing_client.list_files(
+                volume_name,
+                str(vfolder_id),
+                ".",
+            )
+            vfolder_files = result["items"]
         except VFolderOperationFailed as e:
             raise ModelCardProcessError(
                 f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"

@@ -254,13 +254,17 @@ class VFolderService:
                 }
                 if vfolder_permission_mode is not None:
                     body_data["mode"] = vfolder_permission_mode
-                async with self._storage_manager.request(
-                    folder_host,
-                    "POST",
-                    "folder/create",
-                    json=body_data,
-                ):
-                    pass
+                proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+                    folder_host, is_unmanaged(unmanaged_path)
+                )
+                manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+                await manager_client.create_folder(
+                    volume_name,
+                    body_data["vfid"],
+                    body_data["host_access_key"],
+                    body_data.get("owner_access_key"),
+                    body_data.get("mode"),
+                )
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailure from e
 
@@ -392,20 +396,15 @@ class VFolderService:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
-        async with self._storage_manager.request(
-            proxy_name,
-            "GET",
-            "folder/usage",
-            json={
-                "volume": volume_name,
-                "vfid": str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
-            },
-        ) as (_, storage_resp):
-            usage = await storage_resp.json()
-            usage_info = VFolderUsageInfo(
-                used_bytes=usage["used_bytes"],
-                num_files=usage["file_count"],
-            )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await manager_client.get_folder_usage(
+            volume_name,
+            str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
+        )
+        usage_info = VFolderUsageInfo(
+            used_bytes=usage["used_bytes"],
+            num_files=usage["file_count"],
+        )
         return GetVFolderActionResult(
             user_uuid=action.user_uuid,
             base_info=VFolderBaseInfo(

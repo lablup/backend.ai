@@ -123,16 +123,8 @@ class StorageSessionManager:
             if proxy_name in client_facing_clients:
                 log.error("Storage proxy {} is already registered.", proxy_name)
                 continue
-            connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
-            session = aiohttp.ClientSession(connector=connector)
             client_facing_clients[proxy_name] = StorageProxyClientFacingClient(
-                StorageProxyHTTPClient(
-                    session,
-                    StorageProxyClientArgs(
-                        endpoint=yarl.URL(proxy_config.client_api),
-                        secret=proxy_config.secret,
-                    ),
-                )
+                base_url=str(proxy_config.client_api),
             )
         return client_facing_clients
 
@@ -143,12 +135,12 @@ class StorageSessionManager:
             )
         return self._manager_facing_clients[proxy_name]
 
-    def get_client_facing_client(self, proxy_name: str) -> StorageProxyClientFacingClient:
+    def get_client_api_url(self, proxy_name: str) -> yarl.URL:
         if proxy_name not in self._client_facing_clients:
             raise StorageProxyNotFound(
                 f"Storage proxy {proxy_name} not found.",
             )
-        return self._client_facing_clients[proxy_name]
+        return yarl.URL(self._client_facing_clients[proxy_name].base_url)
 
     async def aclose(self) -> None:
         close_aws = []

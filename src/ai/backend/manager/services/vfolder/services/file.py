@@ -80,18 +80,15 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/upload",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "size": action.size,
-            },
-        ) as (client_api_url, storage_resp):
-            storage_reply = await storage_resp.json()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.upload_file(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+            action.size,
+            "",  # Empty base64 data for now - actual upload will use the token
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateUploadSessionActionResult(
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
@@ -132,21 +129,22 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        # For download, we need to handle the request differently as it includes extra params
+        body = {
+            "volume": volume_name,
+            "vfid": str(vfolder_id),
+            "relpath": action.path,
+            "archive": action.archive,
+        }
+        if vfolder_data.unmanaged_path:
+            body["unmanaged_path"] = vfolder_data.unmanaged_path
+        storage_reply = await manager_client._client.request(
             "POST",
             "folder/file/download",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "archive": action.archive,
-                "unmanaged_path": vfolder_data.unmanaged_path
-                if vfolder_data.unmanaged_path
-                else None,
-            },
-        ) as (client_api_url, storage_resp):
-            storage_reply = await storage_resp.json()
+            body=body,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateDownloadSessionActionResult(
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
@@ -170,17 +168,12 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-            },
-        ) as (_, storage_resp):
-            result = await storage_resp.json()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_client.list_files(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+        )
         return ListFilesActionResult(
             vfolder_uuid=action.vfolder_uuid,
             files=[
@@ -228,18 +221,13 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/rename",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.target_path,
-                "new_name": action.new_name,
-            },
-        ):
-            pass
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.rename_file(
+            volume_name,
+            str(vfolder_id),
+            action.target_path,
+            action.new_name,
+        )
         return RenameFileActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
@@ -262,18 +250,13 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/delete",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpaths": action.files,
-                "recursive": action.recursive,
-            },
-        ):
-            pass
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.delete_files(
+            volume_name,
+            str(vfolder_id),
+            action.files,
+            action.recursive,
+        )
         return DeleteFilesActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
@@ -298,22 +281,18 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/mkdir",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "parents": action.parents,
-                "exist_ok": action.exist_ok,
-            },
-        ) as (_, storage_resp):
-            storage_reply = await storage_resp.json()
-            results = storage_reply["results"]
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.mkdir(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+            action.parents,
+            action.exist_ok,
+        )
+        results = storage_reply.get("results", [])
+        status = storage_reply.get("status", 200)  # Default to 200 if not provided
         return MkdirActionResult(
             vfolder_uuid=action.vfolder_uuid,
             results=results,
-            storage_resp_status=storage_resp.status,
+            storage_resp_status=status,
         )

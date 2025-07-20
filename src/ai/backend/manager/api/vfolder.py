@@ -542,31 +542,22 @@ async def fetch_exposed_volume_fields(
         if volume_usage_cache:
             volume_usage = msgpack.unpackb(volume_usage_cache)
         else:
-            async with storage_manager.request(
-                proxy_name,
-                "GET",
-                "folder/fs-usage",
-                json={
-                    "volume": volume_name,
-                },
-            ) as (_, storage_resp):
-                storage_reply = await storage_resp.json()
-                storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
-                storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            storage_reply = await manager_client.get_fs_usage(volume_name)
+            storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
+            storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
-                if show_used:
-                    volume_usage["used"] = storage_used_bytes
+            if show_used:
+                volume_usage["used"] = storage_used_bytes
 
-                if show_total:
-                    volume_usage["total"] = storage_capacity_bytes
+            if show_total:
+                volume_usage["total"] = storage_capacity_bytes
 
-                if show_percentage:
-                    try:
-                        volume_usage["percentage"] = (
-                            storage_used_bytes / storage_capacity_bytes
-                        ) * 100
-                    except ZeroDivisionError:
-                        volume_usage["percentage"] = 0
+            if show_percentage:
+                try:
+                    volume_usage["percentage"] = (storage_used_bytes / storage_capacity_bytes) * 100
+                except ZeroDivisionError:
+                    volume_usage["percentage"] = 0
 
             await valkey_stat_client.set_volume_usage(
                 proxy_name, volume_name, msgpack.packb(volume_usage), 60
@@ -698,15 +689,8 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
         request["keypair"]["access_key"],
     )
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(params["folder_host"])
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "GET",
-        "volume/performance-metric",
-        json={
-            "volume": volume_name,
-        },
-    ) as (_, storage_resp):
-        storage_reply = await storage_resp.json()
+    manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    storage_reply = await manager_client.get_volume_performance_metric(volume_name, "io")
     return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
@@ -814,16 +798,10 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=params["id"])
 
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "GET",
-        "volume/quota",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID.from_row(vfolder_row)),
-        },
-    ) as (_, storage_resp):
-        storage_reply = await storage_resp.json()
+    manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    vfid = str(VFolderID.from_row(vfolder_row))
+    # Get quota for the specific vfolder
+    storage_reply = await manager_client.get_quota_scope(volume_name, vfid)
     return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
@@ -894,17 +872,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
         quota = max_quota_scope_size
 
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "PATCH",
-        "volume/quota",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID.from_row(vfolder_row)),
-            "size_bytes": quota,
-        },
-    ):
-        pass
+    manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    vfid = str(VFolderID.from_row(vfolder_row))
+    # Update quota scope with new quota value
+    await manager_client.update_quota_scope(volume_name, vfid, quota)
 
     # Update the quota for the vfolder in DB.
     async with root_ctx.db.begin() as conn:
@@ -942,16 +913,9 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         volume_name,
         params["id"],
     )
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "GET",
-        "folder/usage",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID(vfolder_row["quota_scope_id"], params["id"])),
-        },
-    ) as (_, storage_resp):
-        usage = await storage_resp.json()
+    client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    vfid = str(VFolderID(vfolder_row["quota_scope_id"], params["id"]))
+    usage = await client.get_folder_usage(volume_name, vfid)
     return web.json_response(usage, status=HTTPStatus.OK)
 
 
@@ -973,16 +937,9 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
     )
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "GET",
-        "folder/used-bytes",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID(vfolder_row["quota_scope_id"], params["id"])),
-        },
-    ) as (_, storage_resp):
-        usage = await storage_resp.json()
+    client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    vfid = str(VFolderID(vfolder_row["quota_scope_id"], params["id"]))
+    usage = await client.get_used_bytes(volume_name, vfid)
     return web.json_response(usage, status=HTTPStatus.OK)
 
 
@@ -1232,18 +1189,9 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
         row["host"], is_unmanaged(row["unmanaged_path"])
     )
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "POST",
-        "folder/file/move",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
-            "src_relpath": params["src"],
-            "dst_relpath": params["dst"],
-        },
-    ):
-        pass
+    manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
+    vfid = str(VFolderID(row["quota_scope_id"], row["id"]))
+    await manager_client.move_file(volume_name, vfid, params["src"], params["dst"])
     return web.json_response({}, status=HTTPStatus.OK)
 
 
