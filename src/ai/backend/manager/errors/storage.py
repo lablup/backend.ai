@@ -88,6 +88,19 @@ class VFolderGone(BackendAIError, web.HTTPGone):
         )
 
 
+class VFolderBadRequest(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
+    error_title = "Virtual folder operation has failed due to bad request."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class VFolderOperationFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
