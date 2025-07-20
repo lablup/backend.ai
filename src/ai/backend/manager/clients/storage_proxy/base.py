@@ -36,13 +36,15 @@ class StorageProxyHTTPClient:
         self,
         method: str,
         url: str,
+        *,
+        body: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request using the session client.
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
-        :param kwargs: Additional keyword arguments for the request
+        :param body: JSON body data to send with the request
         :return: Response object from the request
         """
         headers = {
@@ -52,6 +54,7 @@ class StorageProxyHTTPClient:
             method,
             self._endpoint / url,
             headers=headers,
+            json=body,
         ) as client_resp:
             if client_resp.status // 100 == 2:
                 return await client_resp.json()
