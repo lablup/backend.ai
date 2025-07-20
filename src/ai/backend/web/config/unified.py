@@ -763,6 +763,61 @@ class UIConfig(BaseModel):
     )
 
 
+class SessionPoolConfig(BaseModel):
+    enabled: bool = Field(
+        default=True,
+        description="""
+        Enable/disable connection pooling for API sessions.
+        """,
+        examples=[True, False],
+    )
+    max_connections_per_host: int = Field(
+        default=100,
+        description="""
+        Maximum number of connections per host.
+        """,
+        examples=[100, 200],
+        validation_alias=AliasChoices("max_connections_per_host", "max-connections-per-host"),
+        serialization_alias="max-connections-per-host",
+    )
+    max_pool_size: int = Field(
+        default=1000,
+        description="""
+        Total connection pool limit.
+        """,
+        examples=[1000, 2000],
+        validation_alias=AliasChoices("max_pool_size", "max-pool-size"),
+        serialization_alias="max-pool-size",
+    )
+    idle_timeout: float = Field(
+        default=300.0,
+        description="""
+        Idle timeout for connections in seconds.
+        """,
+        examples=[300.0, 600.0],
+        validation_alias=AliasChoices("idle_timeout", "idle-timeout"),
+        serialization_alias="idle-timeout",
+    )
+    connection_timeout: float = Field(
+        default=30.0,
+        description="""
+        Connection timeout in seconds.
+        """,
+        examples=[30.0, 60.0],
+        validation_alias=AliasChoices("connection_timeout", "connection-timeout"),
+        serialization_alias="connection-timeout",
+    )
+    max_age: float = Field(
+        default=3600.0,
+        description="""
+        Maximum age for sessions in seconds regardless of usage.
+        """,
+        examples=[3600.0, 7200.0],
+        validation_alias=AliasChoices("max_age", "max-age"),
+        serialization_alias="max-age",
+    )
+
+
 class APIConfig(BaseModel):
     domain: str = Field(
         default="default",
@@ -1111,6 +1166,14 @@ class WebServerUnifiedConfig(BaseModel):
         description="""
         API configuration.
         """,
+    )
+    session_pool: SessionPoolConfig = Field(
+        default_factory=SessionPoolConfig,
+        description="""
+        Session pool configuration.
+        """,
+        validation_alias=AliasChoices("session_pool", "session-pool"),
+        serialization_alias="session-pool",
     )
     session: SessionConfig = Field(
         default_factory=SessionConfig,

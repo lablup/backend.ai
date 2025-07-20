@@ -55,7 +55,18 @@ async def get_api_session(
         user_agent=user_agent,
         skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+
+    # Use session pool manager if available
+    pool_manager = request.app.get("session_pool_manager")
+    if pool_manager and pool_manager.enabled:
+        pool_key = (api_endpoint, config.api.domain, ak)
+        http_session = await pool_manager.get_session(pool_key, ssl_verify=config.api.ssl_verify)
+        return APISession(
+            config=api_config, proxy_mode=True, http_session=http_session, close_http_session=False
+        )
+    else:
+        # Fallback to original behavior
+        return APISession(config=api_config, proxy_mode=True)
 
 
 async def get_anonymous_session(
@@ -75,7 +86,19 @@ async def get_anonymous_session(
         user_agent=user_agent,
         skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+
+    # Use session pool manager if available
+    pool_manager = request.app.get("session_pool_manager")
+    if pool_manager and pool_manager.enabled:
+        # For anonymous sessions, use a simpler pool key
+        pool_key = (api_endpoint, config.api.domain, "anonymous")
+        http_session = await pool_manager.get_session(pool_key, ssl_verify=config.api.ssl_verify)
+        return APISession(
+            config=api_config, proxy_mode=True, http_session=http_session, close_http_session=False
+        )
+    else:
+        # Fallback to original behavior
+        return APISession(config=api_config, proxy_mode=True)
 
 
 def get_client_ip(request: web.Request) -> Optional[str]:

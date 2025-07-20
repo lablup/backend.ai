@@ -52,6 +52,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.web.config.unified import ServiceMode, WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
+from ai.backend.web.session_pool import APISessionPoolManager
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -627,6 +628,8 @@ async def server_shutdown(app) -> None:
 
 async def server_cleanup(app) -> None:
     await app["redis"].close()
+    if "session_pool_manager" in app:
+        await app["session_pool_manager"].close()
 
 
 @aiotools.server_context
@@ -731,6 +734,9 @@ async def server_main(
     cors = aiohttp_cors.setup(app, defaults=cors_options)
 
     app["stats"] = WebStats()
+
+    # Initialize session pool manager
+    app["session_pool_manager"] = APISessionPoolManager(config)
 
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)

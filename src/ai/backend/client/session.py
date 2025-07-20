@@ -246,6 +246,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "_closed",
         "_context_token",
         "_proxy_mode",
+        "_close_http_session",
         "aiohttp_session",
         "api_version",
         "System",
@@ -496,13 +497,22 @@ class AsyncSession(BaseSession):
         *,
         config: Optional[APIConfig] = None,
         proxy_mode: bool = False,
+        http_session: Optional[aiohttp.ClientSession] = None,
+        close_http_session: bool = True,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        ssl: SSLContextType = True
-        if self._config.skip_sslcert_validation:
-            ssl = False
-        connector = aiohttp.TCPConnector(ssl=ssl)
-        self.aiohttp_session = aiohttp.ClientSession(connector=connector)
+        self._close_http_session = close_http_session
+
+        if http_session is not None:
+            # Use provided session
+            self.aiohttp_session = http_session
+        else:
+            # Create new session (existing behavior)
+            ssl: SSLContextType = True
+            if self._config.skip_sslcert_validation:
+                ssl = False
+            connector = aiohttp.TCPConnector(ssl=ssl)
+            self.aiohttp_session = aiohttp.ClientSession(connector=connector)
 
     async def _aopen(self) -> None:
         self._context_token = api_session.set(self)
@@ -516,7 +526,8 @@ class AsyncSession(BaseSession):
         if self._closed:
             return
         self._closed = True
-        await _close_aiohttp_session(self.aiohttp_session)
+        if self._close_http_session:
+            await _close_aiohttp_session(self.aiohttp_session)
         api_session.reset(self._context_token)
 
     def close(self) -> Awaitable[None]:
