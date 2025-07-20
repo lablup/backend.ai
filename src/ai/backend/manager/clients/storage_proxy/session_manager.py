@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import logging
 from collections.abc import Iterable, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
@@ -20,9 +21,21 @@ from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.types import (
     VFolderID,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.base import (
+    StorageProxyClientArgs,
+    StorageProxyHTTPClient,
+)
+from ai.backend.manager.clients.storage_proxy.client_facing_client import (
+    StorageProxyClientFacingClient,
+)
+from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
+    StorageProxyManagerFacingClient,
+)
 from ai.backend.manager.config.unified import VolumesConfig
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
+    StorageProxyNotFound,
     VFolderGone,
     VFolderOperationFailed,
 )
@@ -32,6 +45,9 @@ _ctx_volumes_cache: ContextVar[list[tuple[str, VolumeInfo]]] = ContextVar("_ctx_
 
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VolumeInfo(TypedDict):
@@ -54,6 +70,8 @@ class StorageProxyInfo:
 class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
     _exposed_volume_info: list[str]
+    _manager_facing_clients: Mapping[str, StorageProxyManagerFacingClient]
+    _client_facing_clients: Mapping[str, StorageProxyClientFacingClient]
 
     def __init__(self, storage_config: VolumesConfig) -> None:
         self.config = storage_config
@@ -69,6 +87,68 @@ class StorageSessionManager:
                 manager_api_url=yarl.URL(proxy_config.manager_api),
                 sftp_scaling_groups=proxy_config.sftp_scaling_groups or [],
             )
+        self._manager_facing_clients = self._setup_manager_facing_clients(storage_config)
+        self._client_facing_clients = self._setup_client_facing_clients(storage_config)
+
+    @classmethod
+    def _setup_manager_facing_clients(
+        cls,
+        storage_config: VolumesConfig,
+    ) -> Mapping[str, StorageProxyManagerFacingClient]:
+        manager_facing_clients = {}
+        for proxy_name, proxy_config in storage_config.proxies.items():
+            if proxy_name in manager_facing_clients:
+                log.error("Storage proxy {} is already registered.", proxy_name)
+                continue
+            connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
+            session = aiohttp.ClientSession(connector=connector)
+            manager_facing_clients[proxy_name] = StorageProxyManagerFacingClient(
+                StorageProxyHTTPClient(
+                    session,
+                    StorageProxyClientArgs(
+                        endpoint=yarl.URL(proxy_config.manager_api),
+                        secret=proxy_config.secret,
+                    ),
+                )
+            )
+        return manager_facing_clients
+
+    @classmethod
+    def _setup_client_facing_clients(
+        cls,
+        storage_config: VolumesConfig,
+    ) -> Mapping[str, StorageProxyClientFacingClient]:
+        client_facing_clients = {}
+        for proxy_name, proxy_config in storage_config.proxies.items():
+            if proxy_name in client_facing_clients:
+                log.error("Storage proxy {} is already registered.", proxy_name)
+                continue
+            connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
+            session = aiohttp.ClientSession(connector=connector)
+            client_facing_clients[proxy_name] = StorageProxyClientFacingClient(
+                StorageProxyHTTPClient(
+                    session,
+                    StorageProxyClientArgs(
+                        endpoint=yarl.URL(proxy_config.client_api),
+                        secret=proxy_config.secret,
+                    ),
+                )
+            )
+        return client_facing_clients
+
+    def get_manager_facing_client(self, proxy_name: str) -> StorageProxyManagerFacingClient:
+        if proxy_name not in self._manager_facing_clients:
+            raise StorageProxyNotFound(
+                f"Storage proxy {proxy_name} not found.",
+            )
+        return self._manager_facing_clients[proxy_name]
+
+    def get_client_facing_client(self, proxy_name: str) -> StorageProxyClientFacingClient:
+        if proxy_name not in self._client_facing_clients:
+            raise StorageProxyNotFound(
+                f"Storage proxy {proxy_name} not found.",
+            )
+        return self._client_facing_clients[proxy_name]
 
     async def aclose(self) -> None:
         close_aws = []

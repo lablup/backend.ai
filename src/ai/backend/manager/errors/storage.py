@@ -256,27 +256,14 @@ class DotfileVFolderPathConflict(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class StorageProxyError(BackendAIError, web.HTTPError):
-    error_type = "https://api.backend.ai/probs/storage-proxy-error"
-    error_title = "The storage proxy returned an error."
+class StorageProxyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/storage-proxy-not-found"
+    error_title = "Storage proxy not found."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.STORAGE,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
-
-    def __init__(self, status: int, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        # Currently there is no good public way to override the status code
-        # after initialization of aiohttp.web.StreamResponse objects. :(
-        self.status_code = status  # HTTPException uses self.status_code
-        self._status = status  # StreamResponse uses self._status
-        self.args = (status, self.args[1], self.args[2])
-
-    @property
-    def status(self) -> int:
-        # override the status property again to refer the subclass' attribute.
-        return self.status_code

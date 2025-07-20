@@ -157,6 +157,7 @@ class ErrorDomain(enum.StrEnum):
     AGENT = "agent"
     PERMISSION = "permission"
     METRIC = "metric"
+    STORAGE_PROXY = "storage-proxy"
 
 
 class ErrorOperation(enum.StrEnum):
