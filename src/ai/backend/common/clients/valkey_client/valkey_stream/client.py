@@ -12,6 +12,7 @@ from glide import (
     StreamReadGroupOptions,
     TrimByMaxLen,
 )
+from glide.exceptions import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -137,12 +138,15 @@ class ValkeyStreamClient:
         :return: A list of messages, each represented as a mapping of bytes to bytes.
         :raises: GlideClientError if the group does not exist or other errors occur.
         """
-        result = await self._client.client.xreadgroup(
-            {stream_key: ">"},
-            group_name,
-            consumer_name,
-            StreamReadGroupOptions(block_ms=block_ms, count=count),
-        )
+        try:
+            result = await self._client.client.xreadgroup(
+                {stream_key: ">"},
+                group_name,
+                consumer_name,
+                StreamReadGroupOptions(block_ms=block_ms, count=count),
+            )
+        except GlideTimeoutError:
+            return None
         if not result:
             return None
         messages: list[StreamMessage] = []
