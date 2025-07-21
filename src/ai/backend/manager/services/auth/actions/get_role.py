@@ -9,7 +9,7 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 @dataclass
 class GetRoleAction(AuthAction):
     user_id: uuid.UUID
-    group_id: uuid.UUID
+    group_id: Optional[uuid.UUID]
     is_superadmin: bool
     is_admin: bool
 
