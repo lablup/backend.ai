@@ -50,7 +50,6 @@ from ai.backend.logging import BraceStyleAdapter
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.types import MountOptionModel, UserScope
 
@@ -870,17 +869,13 @@ class ModelServiceHelper:
         vfid: VFolderID,
         relpath: str,
     ) -> dict[str, Any]:
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": relpath,
-            },
-        ) as (client_api_url, storage_resp):
-            return await storage_resp.json()
+        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_facing_client.list_files(
+            volume_name,
+            str(vfid),
+            relpath,
+        )
+        return cast(dict[str, Any], result)
 
     @staticmethod
     async def validate_model_definition_file_exists(
@@ -932,22 +927,12 @@ class ModelServiceHelper:
         Reads specified model definition file from target VFolder and returns
         """
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        chunks = bytes()
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/fetch",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": f"./{model_definition_filename}",
-            },
-        ) as (client_api_url, storage_resp):
-            while True:
-                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                if not chunk:
-                    break
-                chunks += chunk
+        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
+        chunks = await manager_facing_client.fetch_file_content(
+            volume_name,
+            str(vfid),
+            f"./{model_definition_filename}",
+        )
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
         return yaml.load(model_definition_yaml)

@@ -370,17 +370,9 @@ class AgentRegistry:
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
         proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
-        async with self.storage_manager.request(
-            proxy_name,
-            "GET",
-            "volume/hwinfo",
-            json={"volume": volume_name},
-            raise_for_status=True,
-        ) as (_, storage_resp):
-            return check_type(
-                await storage_resp.json(),
-                HardwareMetadata,
-            )
+        manager_client = self.storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_client.get_volume_hwinfo(volume_name)
+        return check_type(result, HardwareMetadata)
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
         agent = await self.get_instance(instance_id, agents.c.addr)

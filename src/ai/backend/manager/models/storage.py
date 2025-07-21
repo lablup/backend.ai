@@ -84,21 +84,11 @@ class StorageVolume(graphene.ObjectType):
 
     async def resolve_performance_metric(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
-            proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
-        try:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "volume/performance-metric",
-                json={"volume": volume_name},
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return reply["metric"]
+            proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
+            manager_client = ctx.storage_manager.get_manager_facing_client(proxy_name)
+            storage_reply = await manager_client.get_volume_performance_metric(volume_name)
+            return storage_reply["metric"]
         except aiohttp.ClientResponseError:
             return {}
 
@@ -106,19 +96,8 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
-            proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
-        try:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "folder/fs-usage",
-                json={"volume": volume_name},
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return reply
+            manager_client = ctx.storage_manager.get_manager_facing_client(proxy_name)
+            return await manager_client.get_fs_usage(volume_name)
         except aiohttp.ClientResponseError:
             return {}
 

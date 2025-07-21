@@ -27,9 +27,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ...defs import (
-    DEFAULT_CHUNK_SIZE,
-)
 from ...errors.storage import (
     VFolderOperationFailed,
 )
@@ -578,27 +575,6 @@ class ModelCard(graphene.ObjectType):
 
     @classmethod
     async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
-        async def _fetch_file(
-            filename: str,
-        ) -> bytes:  # FIXME: We should avoid fetching files from disk
-            chunks = bytes()
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/file/fetch",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(vfolder_id),
-                    "relpath": f"./{filename}",
-                },
-            ) as (_, storage_resp):
-                while True:
-                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    chunks += chunk
-            return chunks
-
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
@@ -607,17 +583,13 @@ class ModelCard(graphene.ObjectType):
             host, is_unmanaged(vfolder_row.unmanaged_path)
         )
         try:
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/file/list",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(vfolder_id),
-                    "relpath": ".",
-                },
-            ) as (_, storage_resp):
-                vfolder_files = (await storage_resp.json())["items"]
+            manager_facing_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+            result = await manager_facing_client.list_files(
+                volume_name,
+                str(vfolder_id),
+                ".",
+            )
+            vfolder_files = result["items"]
         except VFolderOperationFailed as e:
             raise ModelCardProcessError(
                 f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
@@ -636,7 +608,11 @@ class ModelCard(graphene.ObjectType):
 
         if model_definition_filename:
             try:
-                chunks = await _fetch_file(model_definition_filename)
+                chunks = await manager_facing_client.fetch_file_content(
+                    volume_name,
+                    str(vfolder_id),
+                    f"./{model_definition_filename}",
+                )
             except VFolderOperationFailed as e:
                 raise ModelCardProcessError(
                     f"Failed to fetch model definition file (detail:{e.extra_msg})"
@@ -663,7 +639,11 @@ class ModelCard(graphene.ObjectType):
         if readme_idx is not None:
             readme_filename: str = vfolder_files[readme_idx]["name"]
             try:
-                chunks = await _fetch_file(readme_filename)
+                chunks = await manager_facing_client.fetch_file_content(
+                    volume_name,
+                    str(vfolder_id),
+                    f"./{readme_filename}",
+                )
             except VFolderOperationFailed:
                 readme = "Failed to fetch README file."
                 readme_filetype = None

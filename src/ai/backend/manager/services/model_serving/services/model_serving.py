@@ -35,7 +35,6 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.constant import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import (
     EndpointNotFound,
@@ -167,23 +166,12 @@ class ModelServingService:
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
 
-        chunks = bytes()
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/fetch",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": f"./{filename}",
-            },
-        ) as (_, storage_resp):
-            while True:
-                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                if not chunk:
-                    break
-                chunks += chunk
-        return chunks
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        return await manager_client.fetch_file_content(
+            volume_name,
+            str(vfid),
+            f"./{filename}",
+        )
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
