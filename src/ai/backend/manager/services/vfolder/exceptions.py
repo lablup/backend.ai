@@ -1,3 +1,8 @@
+from aiohttp import web
+
+from ai.backend.common.exception import BackendError
+
+
 class VFolderServiceException(Exception):
     pass
 
@@ -10,7 +15,7 @@ class VFolderCreationFailure(VFolderServiceException):
     pass
 
 
-class VFolderAlreadyExists(VFolderServiceException):
+class VFolderAlreadyExists(BackendError, web.HTTPConflict):
     pass
 
 

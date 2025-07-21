@@ -116,7 +116,7 @@ class VFolderInviteService:
             count = await db_session.scalar(count_query)
             if count > 0:
                 raise VFolderAlreadyExists(
-                    "Invitation to this VFolder already sent out to target user"
+                    extra_msg="Invitation to this VFolder already sent out to target user"
                 )
 
             # Create invitation.
