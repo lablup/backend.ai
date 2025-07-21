@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
-from ai.backend.manager.errors.image import UnknownImageReferenceError
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
@@ -14,6 +14,7 @@ from ai.backend.manager.services.session.actions.create_from_params import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...fixtures import (
+    IMAGE_ALIAS_DICT,
     IMAGE_FIXTURE_DICT,
 )
 from ...test_utils import TestScenario
@@ -28,49 +29,19 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_create_from_params_rpc(mocker, mock_agent_response_result):
-    mock = mocker.patch(
+def mock_create_from_params_rpc(mocker):
+    mock_create_session = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.create_session",
         new_callable=AsyncMock,
     )
-    mock.return_value = mock_agent_response_result
-    return mock
+
+    return {
+        "create_session": mock_create_session,
+    }
 
 
-@pytest.fixture
-def mock_session_service_create_from_params(mocker, mock_agent_response_result):
-    # Mock only the external AgentRegistry call
-    mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.create_session",
-        new_callable=AsyncMock,
-        return_value=mock_agent_response_result,
-    )
-
-    return None
-
-
-@pytest.fixture
-def mock_resolve_image(mocker, request):
-    """Mock the resolve_image method to return our test image."""
-    from ai.backend.manager.errors.image import UnknownImageReferenceError
-    from ai.backend.manager.repositories.session.repository import SessionRepository
-
-    from ...fixtures import IMAGE_ROW_FIXTURE
-
-    # Mock the resolve_image method to return our test image
-    mock_resolve = mocker.patch.object(SessionRepository, "resolve_image", new_callable=AsyncMock)
-
-    # Check if this is a failure scenario by looking at the test parameter
-    test_scenario = request.getfixturevalue("test_scenario")
-    if hasattr(test_scenario.input, "params") and hasattr(test_scenario.input.params, "image"):
-        if test_scenario.input.params.image == "non-existent:latest":
-            mock_resolve.side_effect = UnknownImageReferenceError("non-existent:latest")
-        else:
-            mock_resolve.return_value = IMAGE_ROW_FIXTURE
-    else:
-        mock_resolve.return_value = IMAGE_ROW_FIXTURE
-
-    return mock_resolve
+# We no longer need to mock resolve_image as we'll use the session_repository fixture
+# with actual database fixtures
 
 
 CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
@@ -79,7 +50,7 @@ CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
 CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
     params=CreateFromParamsActionParams(
         session_name=cast(str, SESSION_FIXTURE_DATA.name),
-        image="python:3.9",
+        image="python",  # Use the actual fixture image alias
         architecture="x86_64",
         session_type=SessionTypes.INTERACTIVE,
         group_name="default",
@@ -109,141 +80,129 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
 
 
 @pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
+    "test_scenario",
     [
-        (
-            TestScenario.success(
-                "Create session from params",
-                CREATE_FROM_PARAMS_ACTION,
-                CreateFromParamsActionResult(
-                    session_id=SESSION_FIXTURE_DATA.id,
-                    result=CREATE_FROM_PARAMS_MOCK,
-                ),
+        TestScenario.success(
+            "Create session from params",
+            CREATE_FROM_PARAMS_ACTION,
+            CreateFromParamsActionResult(
+                session_id=SESSION_FIXTURE_DATA.id,
+                result=CREATE_FROM_PARAMS_MOCK,
             ),
-            CREATE_FROM_PARAMS_MOCK,
         ),
-        (
-            TestScenario.failure(
-                "Create session with unknown image",
-                CreateFromParamsAction(
-                    params=CreateFromParamsActionParams(
-                        session_name="test-session",
-                        image="non-existent:latest",
-                        architecture="x86_64",
-                        session_type=SessionTypes.INTERACTIVE,
-                        group_name="default",
-                        domain_name="default",
-                        cluster_size=1,
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        config={},
-                        tag="latest",
-                        priority=0,
-                        owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                        enqueue_only=False,
-                        max_wait_seconds=0,
-                        starts_at=None,
-                        reuse_if_exists=False,
-                        startup_command=None,
-                        batch_timeout=None,
-                        bootstrap_script=None,
-                        dependencies=None,
-                        callback_url=None,
-                    ),
-                    user_id=SESSION_FIXTURE_DATA.user_uuid,
-                    user_role=UserRole.USER,
-                    sudo_session_enabled=False,
-                    requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    keypair_resource_policy=None,
+        TestScenario.failure(
+            "Create session with unknown image",
+            CreateFromParamsAction(
+                params=CreateFromParamsActionParams(
+                    session_name="test-session",
+                    image="non-existent:latest",
+                    architecture="x86_64",
+                    session_type=SessionTypes.INTERACTIVE,
+                    group_name="default",
+                    domain_name="default",
+                    cluster_size=1,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    config={},
+                    tag="latest",
+                    priority=0,
+                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                    enqueue_only=False,
+                    max_wait_seconds=0,
+                    starts_at=None,
+                    reuse_if_exists=False,
+                    startup_command=None,
+                    batch_timeout=None,
+                    bootstrap_script=None,
+                    dependencies=None,
+                    callback_url=None,
                 ),
-                UnknownImageReferenceError,  # Will be mocked to raise an exception
+                user_id=SESSION_FIXTURE_DATA.user_uuid,
+                user_role=UserRole.USER,
+                sudo_session_enabled=False,
+                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                keypair_resource_policy=None,
             ),
-            None,
+            ImageNotFound,  # Actual error when image is not found in database
         ),
-        (
-            TestScenario.success(
-                "Create session with environment variables",
-                CreateFromParamsAction(
-                    params=CreateFromParamsActionParams(
-                        session_name="env-test-session",
-                        image="python:3.9",
-                        architecture="x86_64",
-                        session_type=SessionTypes.INTERACTIVE,
-                        group_name="default",
-                        domain_name="default",
-                        cluster_size=1,
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        config={
-                            "environ": {
-                                "CUDA_VISIBLE_DEVICES": "0",
-                                "PYTHONPATH": "/app",
-                                "CUSTOM_VAR": "test_value",
-                            }
-                        },
-                        tag="latest",
-                        priority=0,
-                        owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                        enqueue_only=False,
-                        max_wait_seconds=0,
-                        starts_at=None,
-                        reuse_if_exists=False,
-                        startup_command=None,
-                        batch_timeout=None,
-                        bootstrap_script=None,
-                        dependencies=None,
-                        callback_url=None,
-                    ),
-                    user_id=SESSION_FIXTURE_DATA.user_uuid,
-                    user_role=UserRole.USER,
-                    sudo_session_enabled=False,
-                    requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    keypair_resource_policy=None,
+        TestScenario.success(
+            "Create session with environment variables",
+            CreateFromParamsAction(
+                params=CreateFromParamsActionParams(
+                    session_name="env-test-session",
+                    image="python",  # Use the actual fixture image alias
+                    architecture="x86_64",
+                    session_type=SessionTypes.INTERACTIVE,
+                    group_name="default",
+                    domain_name="default",
+                    cluster_size=1,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    config={
+                        "environ": {
+                            "CUDA_VISIBLE_DEVICES": "0",
+                            "PYTHONPATH": "/app",
+                            "CUSTOM_VAR": "test_value",
+                        }
+                    },
+                    tag="latest",
+                    priority=0,
+                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                    enqueue_only=False,
+                    max_wait_seconds=0,
+                    starts_at=None,
+                    reuse_if_exists=False,
+                    startup_command=None,
+                    batch_timeout=None,
+                    bootstrap_script=None,
+                    dependencies=None,
+                    callback_url=None,
                 ),
-                CreateFromParamsActionResult(
-                    session_id=SESSION_FIXTURE_DATA.id,
-                    result=CREATE_FROM_PARAMS_MOCK,
-                ),
+                user_id=SESSION_FIXTURE_DATA.user_uuid,
+                user_role=UserRole.USER,
+                sudo_session_enabled=False,
+                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                keypair_resource_policy=None,
             ),
-            CREATE_FROM_PARAMS_MOCK,
+            CreateFromParamsActionResult(
+                session_id=SESSION_FIXTURE_DATA.id,
+                result=CREATE_FROM_PARAMS_MOCK,
+            ),
         ),
-        (
-            TestScenario.success(
-                "Create session with bootstrap script",
-                CreateFromParamsAction(
-                    params=CreateFromParamsActionParams(
-                        session_name="bootstrap-test-session",
-                        image="python:3.9",
-                        architecture="x86_64",
-                        session_type=SessionTypes.INTERACTIVE,
-                        group_name="default",
-                        domain_name="default",
-                        cluster_size=1,
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        config={},
-                        tag="latest",
-                        priority=0,
-                        owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                        enqueue_only=False,
-                        max_wait_seconds=0,
-                        starts_at=None,
-                        reuse_if_exists=False,
-                        startup_command=None,
-                        batch_timeout=None,
-                        bootstrap_script="cGlwIGluc3RhbGwgLXIgcmVxdWlyZW1lbnRzLnR4dApweXRob24gc2V0dXAucHk=",  # base64 encoded
-                        dependencies=None,
-                        callback_url=None,
-                    ),
-                    user_id=SESSION_FIXTURE_DATA.user_uuid,
-                    user_role=UserRole.USER,
-                    sudo_session_enabled=False,
-                    requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    keypair_resource_policy=None,
+        TestScenario.success(
+            "Create session with bootstrap script",
+            CreateFromParamsAction(
+                params=CreateFromParamsActionParams(
+                    session_name="bootstrap-test-session",
+                    image="python",  # Use the actual fixture image alias
+                    architecture="x86_64",
+                    session_type=SessionTypes.INTERACTIVE,
+                    group_name="default",
+                    domain_name="default",
+                    cluster_size=1,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    config={},
+                    tag="latest",
+                    priority=0,
+                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                    enqueue_only=False,
+                    max_wait_seconds=0,
+                    starts_at=None,
+                    reuse_if_exists=False,
+                    startup_command=None,
+                    batch_timeout=None,
+                    bootstrap_script="cGlwIGluc3RhbGwgLXIgcmVxdWlyZW1lbnRzLnR4dApweXRob24gc2V0dXAucHk=",  # base64 encoded
+                    dependencies=None,
+                    callback_url=None,
                 ),
-                CreateFromParamsActionResult(
-                    session_id=SESSION_FIXTURE_DATA.id,
-                    result=CREATE_FROM_PARAMS_MOCK,
-                ),
+                user_id=SESSION_FIXTURE_DATA.user_uuid,
+                user_role=UserRole.USER,
+                sudo_session_enabled=False,
+                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                keypair_resource_policy=None,
             ),
-            CREATE_FROM_PARAMS_MOCK,
+            CreateFromParamsActionResult(
+                session_id=SESSION_FIXTURE_DATA.id,
+                result=CREATE_FROM_PARAMS_MOCK,
+            ),
         ),
     ],
 )
@@ -257,19 +216,23 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
             "groups": [GROUP_FIXTURE_DATA],
             "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
             "images": [IMAGE_FIXTURE_DICT],
+            "image_aliases": [IMAGE_ALIAS_DICT],
         }
     ],
 )
 async def test_create_from_params(
-    mock_session_service_create_from_params,
-    mock_resolve_image,
+    mock_create_from_params_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
     session_repository,
 ):
+    # Set up the mock return value for create_session
+    if test_scenario.expected_exception is None:
+        mock_create_from_params_rpc["create_session"].return_value = CREATE_FROM_PARAMS_MOCK
+
     # Use the test scenario's built-in test method that handles both success and failure cases
     await test_scenario.test(processors.create_from_params.wait_for_complete)
 
     # Verify the mocks were called (only for successful cases)
     if test_scenario.expected_exception is None:
-        mock_resolve_image.assert_called_once()
+        mock_create_from_params_rpc["create_session"].assert_called_once()

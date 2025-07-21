@@ -23,31 +23,15 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_create_cluster_dependencies(mocker):
-    # Mock only the AgentRegistry create_cluster method (external service)
+def mock_create_cluster_rpc(mocker):
     mock_create_cluster = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.create_cluster",
         new_callable=AsyncMock,
     )
     mock_create_cluster.return_value = CREATE_CLUSTER_MOCK
 
-    # Mock query_userinfo to return consistent results
-    from ai.backend.manager.repositories.session.repository import SessionRepository
-
-    mock_query_userinfo = mocker.patch.object(
-        SessionRepository,
-        "query_userinfo",
-        new_callable=AsyncMock,
-    )
-    mock_query_userinfo.return_value = (
-        SESSION_FIXTURE_DATA.user_uuid,
-        SESSION_FIXTURE_DATA.group_id,
-        {"cpu": 4, "memory": "8g"},  # Mock resource policy
-    )
-
     return {
         "create_cluster": mock_create_cluster,
-        "query_userinfo": mock_query_userinfo,
     }
 
 
@@ -65,6 +49,20 @@ TEST_TEMPLATE_ID = uuid4()
             "users": [USER_FIXTURE_DATA],
             "groups": [GROUP_FIXTURE_DATA],
             "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
+            "keypair_resource_policies": [
+                {
+                    "name": "default",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "total_resource_slots": {"cpu": "8", "mem": "16g"},
+                    "default_for_unspecified": "UNLIMITED",
+                    "max_containers_per_session": 1,
+                    "max_concurrent_sessions": 30,
+                    "max_concurrent_sftp_sessions": 10,
+                    "max_session_lifetime": 0,
+                    "allowed_vfolder_hosts": {},
+                    "idle_timeout": 1800,
+                }
+            ],
             "session_templates": [
                 {
                     "id": TEST_TEMPLATE_ID,
@@ -81,7 +79,7 @@ TEST_TEMPLATE_ID = uuid4()
     ],
 )
 async def test_create_cluster_with_template(
-    mock_create_cluster_dependencies,
+    mock_create_cluster_rpc,
     processors: SessionProcessors,
     session_repository,
 ):
@@ -93,7 +91,7 @@ async def test_create_cluster_with_template(
         sudo_session_enabled=False,
         template_id=TEST_TEMPLATE_ID,
         session_type=SessionTypes.INTERACTIVE,
-        group_name="test_group",
+        group_name="default",
         domain_name=SESSION_FIXTURE_DATA.domain_name,
         scaling_group_name="default",
         requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
@@ -114,7 +112,7 @@ async def test_create_cluster_with_template(
     assert result.result == CREATE_CLUSTER_MOCK
 
     # Verify the mocks were called
-    mock_create_cluster_dependencies["create_cluster"].assert_called_once()
+    mock_create_cluster_rpc["create_cluster"].assert_called_once()
 
 
 # Test different template scenarios
@@ -127,6 +125,20 @@ async def test_create_cluster_with_template(
             "users": [USER_FIXTURE_DATA],
             "groups": [GROUP_FIXTURE_DATA],
             "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
+            "keypair_resource_policies": [
+                {
+                    "name": "default",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "total_resource_slots": {"cpu": "8", "mem": "16g"},
+                    "default_for_unspecified": "UNLIMITED",
+                    "max_containers_per_session": 1,
+                    "max_concurrent_sessions": 30,
+                    "max_concurrent_sftp_sessions": 10,
+                    "max_session_lifetime": 0,
+                    "allowed_vfolder_hosts": {},
+                    "idle_timeout": 1800,
+                }
+            ],
             "session_templates": [
                 {
                     "id": TEST_TEMPLATE_ID,
@@ -150,7 +162,7 @@ async def test_create_cluster_with_template(
     ],
 )
 async def test_create_cluster_with_gpu_template(
-    mock_create_cluster_dependencies,
+    mock_create_cluster_rpc,
     processors: SessionProcessors,
     session_repository,
 ):
@@ -162,7 +174,7 @@ async def test_create_cluster_with_gpu_template(
         sudo_session_enabled=False,
         template_id=TEST_TEMPLATE_ID,  # GPU template
         session_type=SessionTypes.INTERACTIVE,
-        group_name="test_group",
+        group_name="default",
         domain_name=SESSION_FIXTURE_DATA.domain_name,
         scaling_group_name="default",
         requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
@@ -183,4 +195,4 @@ async def test_create_cluster_with_gpu_template(
     assert result.result == CREATE_CLUSTER_MOCK
 
     # Verify the mocks were called
-    mock_create_cluster_dependencies["create_cluster"].assert_called_once()
+    mock_create_cluster_rpc["create_cluster"].assert_called_once()
