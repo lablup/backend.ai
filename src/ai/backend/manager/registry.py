@@ -21,7 +21,6 @@ from collections.abc import (
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import (
-    TYPE_CHECKING,
     Any,
     Dict,
     List,
@@ -45,6 +44,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
@@ -53,12 +53,15 @@ from yarl import URL
 
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
@@ -105,7 +108,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -145,15 +148,6 @@ from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-
-from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.exception import BackendAIError
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
