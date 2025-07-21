@@ -1,9 +1,11 @@
+from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
@@ -20,24 +22,36 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_check_and_transit_status_rpc(mocker):
-    # Mock the check_and_transit_status method directly
-    mock_check_and_transit_status = mocker.patch(
-        "ai.backend.manager.services.session.service.SessionService.check_and_transit_status",
+def mock_session_lifecycle_dependencies(mocker):
+    # Create a mock session row object for the transit_session_status return value
+    mock_session_row = SimpleNamespace()
+    mock_session_row.id = cast(SessionId, SESSION_FIXTURE_DATA.id)
+    mock_session_row.status = SessionStatus.RUNNING
+
+    # Mock the SessionLifecycleManager.transit_session_status method (main external dependency)
+    mock_transit_status = mocker.patch(
+        "ai.backend.manager.registry.SessionLifecycleManager.transit_session_status",
+        new_callable=AsyncMock,
+    )
+    # Return list of tuples: [(session_row, is_transited)]
+    mock_transit_status.return_value = [(mock_session_row, True)]
+
+    # Mock deregister_status_updatable_session to avoid errors
+    mocker.patch(
+        "ai.backend.manager.registry.SessionLifecycleManager.deregister_status_updatable_session",
         new_callable=AsyncMock,
     )
 
-    from ai.backend.manager.services.session.actions.check_and_transit_status import (
-        CheckAndTransitStatusActionResult,
-    )
+    return mock_transit_status
 
-    # Mock the return value
-    mock_check_and_transit_status.return_value = CheckAndTransitStatusActionResult(
-        result=CHECK_AND_TRANSIT_STATUS_MOCK,
-        session_data=SESSION_FIXTURE_DATA,
-    )
 
-    return mock_check_and_transit_status
+@pytest.fixture
+def mock_trgger_batch_execution_rpc(mocker):
+    # Mock potential agent RPC calls that could be triggered during status transitions
+    mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.trigger_batch_execution",
+        new_callable=AsyncMock,
+    )
 
 
 CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNNING"}
@@ -70,7 +84,8 @@ CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNN
     ],
 )
 async def test_check_and_transit_status(
-    mock_check_and_transit_status_rpc,
+    mock_session_lifecycle_dependencies,
+    mock_trgger_batch_execution_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CheckAndTransitStatusAction, CheckAndTransitStatusActionResult],
 ):
