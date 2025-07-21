@@ -585,8 +585,7 @@ class VFolderRow(Base):
             except ValueError:
                 raise ObjectNotFound(object_name="VFolder")
 
-        vfolder = await session.get(VFolderRow, vfolder_id)
-
+        vfolder = await session.get(VFolderRow, vfolder_id, options=[load_only(VFolderRow.name)])
         if vfolder is None:
             raise ObjectNotFound(object_name="VFolder")
 
