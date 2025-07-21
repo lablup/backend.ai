@@ -992,9 +992,11 @@ class AgentRegistry:
             await self._resolve_vfolder_ids(session_enqueue_configs)
 
             # Translate mounts/mount_map/mount_options into vfolder mounts
-            requested_mounts = session_creation_config.get("mounts") or []
-            requested_mount_map = session_creation_config.get("mount_map") or {}
-            requested_mount_options = session_creation_config.get("mount_options") or {}
+            requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
+            requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_options = (
+                session_enqueue_configs["creation_config"].get("mount_options") or {}
+            )
             allowed_vfolder_types = (
                 await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
