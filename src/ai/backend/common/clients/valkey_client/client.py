@@ -455,3 +455,102 @@ def create_layer_aware_valkey_decorator(
         return decorator
 
     return valkey_decorator
+
+
+def create_layer_aware_valkey_decorator_with_default(
+    layer: LayerType,
+):
+    """
+    Factory function to create layer-aware valkey decorators.
+
+    Args:
+        layer: The layer type for metric observation
+
+    Returns:
+        A valkey_decorator function configured for the specified layer
+    """
+
+    def valkey_decorator_with_default(
+        *,
+        retry_count: int = 3,
+        retry_delay: float = 0.1,
+        default_return: Optional[R] = None,  # 새로 추가되지만 backward compatible
+    ) -> Callable[
+        [Callable[P, Awaitable[R]]],
+        Callable[P, Awaitable[R]],
+    ]:
+        """
+        Decorator for Valkey client operations that adds retry logic and metrics.
+        If default_return is set, it will be returned instead of raising the final exception.
+        """
+
+        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+            observer = LayerMetricObserver.instance()
+
+            async def wrapper(*args, **kwargs) -> R:
+                log.trace("Calling {}", func.__name__)
+                start = time.perf_counter()
+
+                for attempt in range(retry_count):
+                    try:
+                        observer.observe_layer_operation_triggered(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                        )
+                        res = await func(*args, **kwargs)
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=True,
+                            duration=time.perf_counter() - start,
+                        )
+                        return res
+                    except BackendAIError as e:
+                        log.exception(
+                            "Handled BackendAIError in {}, args: {}, kwargs: {}, retry: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
+                        break  # 실패 후 default로
+                    except Exception as e:
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        log.exception(
+                            "Unhandled error in {}, args: {}, kwargs: {}, retry: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
+                        break
+
+                if default_return is not None:
+                    log.warning("Returning default value from {} after failure", func.__name__)
+                    return default_return
+                else:
+                    raise RuntimeError(f"{func.__name__} failed after {retry_count} attempts")
+
+            return wrapper
+
+        return decorator

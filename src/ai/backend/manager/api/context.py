@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -55,6 +58,7 @@ class RootContext(BaseContext):
     event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
+    valkey_container_log: ValkeyContainerLogClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     valkey_image: ValkeyImageClient
