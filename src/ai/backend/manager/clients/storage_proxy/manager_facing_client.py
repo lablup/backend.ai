@@ -6,9 +6,13 @@ from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
+from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
+
+client_decorator = create_layer_aware_client_decorator(LayerType.STORAGE_PROXY_CLIENT)
 
 
 class StorageProxyManagerFacingClient:
@@ -23,6 +27,7 @@ class StorageProxyManagerFacingClient:
     def __init__(self, client: StorageProxyHTTPClient):
         self._client = client
 
+    @client_decorator()
     async def get_volumes(self) -> Mapping[str, Any]:
         """
         Get all volumes from the storage proxy.
@@ -31,6 +36,7 @@ class StorageProxyManagerFacingClient:
         """
         return await self._client.request_with_response("GET", "volumes")
 
+    @client_decorator()
     async def create_folder(
         self,
         volume: str,
@@ -58,6 +64,7 @@ class StorageProxyManagerFacingClient:
             body["mode"] = mode
         await self._client.request("POST", "folder/create", body=body)
 
+    @client_decorator()
     async def delete_folder(
         self,
         volume: str,
@@ -78,6 +85,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def clone_folder(
         self,
         src_volume: str,
@@ -101,6 +109,7 @@ class StorageProxyManagerFacingClient:
         }
         await self._client.request("POST", "folder/clone", body=body)
 
+    @client_decorator()
     async def get_mount_path(
         self,
         volume: str,
@@ -125,6 +134,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def get_volume_hwinfo(
         self,
         volume: str,
@@ -143,6 +153,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def get_volume_performance_metric(
         self,
         volume: str,
@@ -161,6 +172,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def get_fs_usage(
         self,
         volume: str,
@@ -179,6 +191,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def get_volume_quota(
         self,
         volume: str,
@@ -200,6 +213,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def update_volume_quota(
         self,
         volume: str,
@@ -221,6 +235,7 @@ class StorageProxyManagerFacingClient:
         }
         await self._client.request("PATCH", "volume/quota", body=body)
 
+    @client_decorator()
     async def get_quota_scope(
         self,
         volume: str,
@@ -242,6 +257,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def update_quota_scope(
         self,
         volume: str,
@@ -264,6 +280,7 @@ class StorageProxyManagerFacingClient:
         }
         await self._client.request("PATCH", "quota-scope", body=body)
 
+    @client_decorator()
     async def delete_quota_scope_quota(
         self,
         volume: str,
@@ -284,6 +301,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def mkdir(
         self,
         *,
@@ -317,6 +335,7 @@ class StorageProxyManagerFacingClient:
             body=body,
         )
 
+    @client_decorator()
     async def rename_file(
         self,
         volume: str,
@@ -343,6 +362,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def delete_files(
         self,
         volume: str,
@@ -370,6 +390,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def move_file(
         self,
         volume: str,
@@ -396,6 +417,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def upload_file(
         self,
         volume: str,
@@ -423,6 +445,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def download_file(
         self,
         *,
@@ -454,6 +477,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def list_files(
         self,
         volume: str,
@@ -504,6 +528,7 @@ class StorageProxyManagerFacingClient:
         ) as response_stream:
             yield response_stream
 
+    @client_decorator()
     async def fetch_file_content(
         self,
         volume: str,
@@ -535,6 +560,7 @@ class StorageProxyManagerFacingClient:
                 )
             return chunks
 
+    @client_decorator()
     async def get_folder_usage(
         self,
         volume: str,
@@ -556,6 +582,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
+    @client_decorator()
     async def get_used_bytes(
         self,
         volume: str,

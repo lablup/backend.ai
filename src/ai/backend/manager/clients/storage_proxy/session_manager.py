@@ -175,19 +175,13 @@ class StorageSessionManager:
 
         async def _fetch(
             proxy_name: str,
-            proxy_info: StorageProxyInfo,
+            client: StorageProxyManagerFacingClient,
         ) -> Iterable[tuple[str, VolumeInfo]]:
-            async with proxy_info.session.request(
-                "GET",
-                proxy_info.manager_api_url / "volumes",
-                raise_for_status=True,
-                headers={AUTH_TOKEN_HDR: proxy_info.secret},
-            ) as resp:
-                reply = await resp.json()
-                return ((proxy_name, volume_data) for volume_data in reply["volumes"])
+            reply = await client.get_volumes()
+            return ((proxy_name, volume_data) for volume_data in reply["volumes"])
 
-        for proxy_name, proxy_info in self._proxies.items():
-            fetch_aws.append(_fetch(proxy_name, proxy_info))
+        for proxy_name, client in self._manager_facing_clients.items():
+            fetch_aws.append(_fetch(proxy_name, client))
         results = [*itertools.chain(*await asyncio.gather(*fetch_aws))]
         _ctx_volumes_cache.set(results)
         return results
