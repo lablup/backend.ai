@@ -16,7 +16,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.invite import (
@@ -44,21 +44,24 @@ from ..types import VFolderInvitationInfo
 class VFolderInviteService:
     _config_provider: ManagerConfigProvider
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
+    _user_repository: UserRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
+        user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
+        self._user_repository = user_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, action.user_uuid, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderNotFound()
 
@@ -238,7 +241,10 @@ class VFolderInviteService:
         self, action: LeaveInvitedVFolderAction
     ) -> LeaveInvitedVFolderActionResult:
         # Get vfolder info
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderNotFound()
 

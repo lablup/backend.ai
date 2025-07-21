@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -10,7 +9,6 @@ from typing import (
     Self,
     Sequence,
     cast,
-    override,
 )
 from uuid import UUID
 
@@ -22,8 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common.types import CIStrEnum
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 
 from .base import (
     Base,
@@ -50,8 +48,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__: Sequence[str] = (
     "users",
     "UserRow",
-    "UserRole",
-    "UserStatus",
+    "UserRole",  # For compatibility with existing code
+    "UserStatus",  # For compatibility with existing code
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
 )
@@ -62,43 +60,6 @@ class PasswordColumn(TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         return _hash_password(value)
-
-
-class UserRole(CIStrEnum):
-    """
-    User's role.
-    """
-
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    USER = "user"
-    MONITOR = "monitor"
-
-
-class UserStatus(enum.StrEnum):
-    """
-    User account status.
-    """
-
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    DELETED = "deleted"
-    BEFORE_VERIFICATION = "before-verification"
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[UserStatus]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "ACTIVE":
-                return cls.ACTIVE
-            case "INACTIVE":
-                return cls.INACTIVE
-            case "DELETED":
-                return cls.DELETED
-            case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
-                return cls.BEFORE_VERIFICATION
-        return None
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)
@@ -340,6 +301,33 @@ class UserRow(Base):
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate
+
+    def to_data(self) -> UserData:
+        return UserData(
+            id=self.uuid,
+            uuid=self.uuid,
+            username=self.username,
+            email=self.email,
+            need_password_change=self.need_password_change,
+            full_name=self.full_name,
+            description=self.description,
+            is_active=self.status == UserStatus.ACTIVE,
+            status=self.status.value,
+            status_info=self.status_info,
+            created_at=self.created_at,
+            modified_at=self.modified_at,
+            domain_name=self.domain_name,
+            role=self.role.value,
+            resource_policy=self.resource_policy,
+            allowed_client_ip=self.allowed_client_ip or [],
+            totp_activated=self.totp_activated,
+            totp_activated_at=self.totp_activated_at,
+            sudo_session_enabled=self.sudo_session_enabled,
+            main_access_key=self.main_access_key,
+            container_uid=self.container_uid,
+            container_main_gid=self.container_main_gid,
+            container_gids=self.container_gids,
+        )
 
 
 def by_user_uuid(

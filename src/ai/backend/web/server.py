@@ -31,6 +31,7 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
+from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.manager.auth.field import (
@@ -627,6 +628,8 @@ async def server_shutdown(app) -> None:
 
 async def server_cleanup(app) -> None:
     await app["redis"].close()
+    client_pool: ClientPool = app["client_pool"]
+    await client_pool.close()
 
 
 @aiotools.server_context
@@ -671,6 +674,12 @@ async def server_main(
         ],
     )
     app["config"] = config
+    app["client_pool"] = ClientPool(
+        ClientConfig(
+            ssl=config.api.ssl_verify,
+            limit=config.api.connection_limit,
+        )
+    )
     request_policy_config: list[str] = config.security.request_policies
     response_policy_config: list[str] = config.security.response_policies
     csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = (

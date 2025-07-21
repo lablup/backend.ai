@@ -1089,13 +1089,14 @@ async def prepare_vfolder_mounts(
             # if they do not belong to the execution kernel.
             continue
         try:
-            mount_base_path = PurePosixPath(
-                await storage_manager.get_mount_path(
-                    vfolder["host"],
-                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    PurePosixPath(requested_vfolder_subpaths[requested_key]),
-                ),
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            mount_path_result = await manager_client.get_mount_path(
+                volume_name,
+                str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                str(PurePosixPath(requested_vfolder_subpaths[requested_key])),
             )
+            mount_base_path = PurePosixPath(mount_path_result["path"])
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
@@ -1106,18 +1107,14 @@ async def prepare_vfolder_mounts(
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
-            async with storage_manager.request(
-                vfolder["host"],
-                "POST",
-                "folder/file/mkdir",
-                params={
-                    "volume": storage_manager.get_proxy_and_volume(vfolder["host"])[1],
-                    "vfid": str(vfid),
-                    "relpaths": [vfsubpath.as_posix()],
-                    "exist_ok": True,
-                },
-            ):
-                pass
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.mkdir(
+                volume=volume_name,
+                vfid=str(vfid),
+                relpath=[vfsubpath.as_posix()],
+                exist_ok=True,
+            )
             # Mount the per-user subdirectory as the ".local" vfolder.
             matched_vfolder_mounts.append(
                 VFolderMount(
@@ -1353,18 +1350,13 @@ async def initiate_vfolder_clone(
         await execute_with_retry(_insert_vfolder)
 
         try:
-            async with storage_manager.request(
-                source_proxy,
-                "POST",
-                "folder/clone",
-                json={
-                    "src_volume": source_volume,
-                    "src_vfid": str(vfolder_info.source_vfolder_id),
-                    "dst_volume": target_volume,
-                    "dst_vfid": str(target_folder_id),
-                },
-            ):
-                pass
+            manager_client = storage_manager.get_manager_facing_client(source_proxy)
+            await manager_client.clone_folder(
+                source_volume,
+                str(vfolder_info.source_vfolder_id),
+                target_volume,
+                str(target_folder_id),
+            )
         except aiohttp.ClientResponseError:
             raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
 
@@ -1446,16 +1438,8 @@ async def initiate_vfolder_deletion(
             host_name, is_unmanaged(unmanaged_path)
         )
         try:
-            async with storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/delete",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(folder_id),
-                },
-            ) as (_, resp):
-                pass
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.delete_folder(volume_name, str(folder_id))
         except (VFolderOperationFailed, InvalidAPIParameters) as e:
             if e.status == 410:
                 already_deleted.append(vfolder_info)
@@ -2179,23 +2163,17 @@ class QuotaScope(graphene.ObjectType):
             self.storage_host_name
         )
         try:
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "GET",
-                "quota-scope",
-                json={"volume": volume_name, "qsid": self.quota_scope_id},
-                raise_for_status=True,
-            ) as (_, storage_resp):
-                quota_config = await storage_resp.json()
-                usage_bytes = quota_config["used_bytes"]
-                if usage_bytes is not None and usage_bytes < 0:
-                    usage_bytes = None
-                return QuotaDetails(
-                    # FIXME: limit scaning this only for fast scan capable volumes
-                    usage_bytes=usage_bytes,
-                    hard_limit_bytes=quota_config["limit_bytes"] or None,
-                    usage_count=None,  # TODO: Implement
-                )
+            manager_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+            quota_config = await manager_client.get_quota_scope(volume_name, self.quota_scope_id)
+            usage_bytes = quota_config["used_bytes"]
+            if usage_bytes is not None and usage_bytes < 0:
+                usage_bytes = None
+            return QuotaDetails(
+                # FIXME: limit scaning this only for fast scan capable volumes
+                usage_bytes=usage_bytes,
+                hard_limit_bytes=quota_config["limit_bytes"] or None,
+                usage_count=None,  # TODO: Implement
+            )
         except aiohttp.ClientResponseError:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
@@ -2264,19 +2242,12 @@ class SetQuotaScope(graphene.Mutation):
             )
         max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
-        request_body = {
-            "volume": volume_name,
-            "qsid": str(qsid),
-            "options": {"limit_bytes": max_vfolder_size},
-        }
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "PATCH",
-            "quota-scope",
-            json=request_body,
-            raise_for_status=True,
-        ):
-            pass
+        manager_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.update_quota_scope(
+            volume_name,
+            str(qsid),
+            max_vfolder_size,
+        )
         return cls(
             QuotaScope(
                 quota_scope_id=quota_scope_id,
@@ -2308,20 +2279,10 @@ class UnsetQuotaScope(graphene.Mutation):
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
-        request_body: dict[str, Any] = {
-            "volume": volume_name,
-            "qsid": str(qsid),
-        }
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "DELETE",
-            "quota-scope/quota",
-            json=request_body,
-            raise_for_status=True,
-        ):
-            pass
+        manager_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.delete_quota_scope_quota(volume_name, str(qsid))
 
         return cls(
             QuotaScope(

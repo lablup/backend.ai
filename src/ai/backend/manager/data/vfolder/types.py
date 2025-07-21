@@ -1,9 +1,10 @@
+import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -108,3 +109,26 @@ class VFolderListResult:
 
     vfolders: list[VFolderAccessInfo]
     total_count: Optional[int] = None
+
+
+@dataclass
+class VFolderDeleteParams:
+    vfolder_id: VFolderID
+    host: str
+    unmanaged_path: Optional[str] = None
+
+
+class DeleteStatus(enum.StrEnum):
+    DELETE_ONGOING = "delete_ongoing"
+    ALREADY_DELETED = "already_deleted"
+    ERROR = "error"
+
+
+@dataclass
+class VFolderDeleteResult:
+    """
+    Result of a VFolder delete operation.
+    """
+
+    vfolder_id: VFolderID
+    status: DeleteStatus

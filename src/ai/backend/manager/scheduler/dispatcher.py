@@ -18,6 +18,7 @@ from typing import (
     Any,
     Optional,
     Union,
+    cast,
 )
 
 import aiotools
@@ -830,130 +831,118 @@ class SchedulerDispatcher(aobject):
         """
         log_fmt = _log_fmt.get()
         log_args = _log_args.get()
-        agent_query_extra_conds = None
 
         kernel_agent_bindings: list[KernelAgentBinding] = []
-        async with self.registry.db.begin_session() as agent_db_sess:
-            # This outer transaction is rolled back when any exception occurs inside,
-            # including scheduling failures of a kernel.
-            # It ensures that occupied_slots are recovered when there are partial
-            # scheduling failures.
-            kernel: KernelRow
-            for kernel in sess_ctx.kernels:
-                agent_alloc_ctx: AgentAllocationContext | None = None
-                try:
-                    agent_id: Optional[AgentId] = None
-                    agent: Optional[AgentRow] = kernel.agent_row
-                    if agent is not None:
-                        # Check the resource availability of the manually designated agent
-                        (
-                            available_slots,
-                            occupied_slots,
-                        ) = await self.schedule_repository.get_agent_available_slots(agent.id)
+        # This outer transaction is rolled back when any exception occurs inside,
+        # including scheduling failures of a kernel.
+        # It ensures that occupied_slots are recovered when there are partial
+        # scheduling failures.
+        for kernel in sess_ctx.kernels:
+            kernel = cast(KernelRow, kernel)
+            agent_alloc_ctx: AgentAllocationContext | None = None
+            agent_id: Optional[AgentId] = None
+            agent: Optional[AgentRow] = kernel.agent_row
+            try:
+                if agent is not None:
+                    # Check the resource availability of the manually designated agent
+                    (
+                        available_slots,
+                        occupied_slots,
+                    ) = await self.schedule_repository.get_agent_available_slots(agent.id)
 
-                        for key in available_slots.keys():
-                            if (
-                                available_slots[key] - occupied_slots[key]
-                                >= kernel.requested_slots[key]
-                            ):
-                                continue
-                            else:
-                                raise InstanceNotAvailable(
-                                    extra_msg=(
-                                        f"The designated agent ({agent.id}) does not have "
-                                        f"the enough remaining capacity ({key}, "
-                                        f"requested: {sess_ctx.requested_slots[key]}, "
-                                        f"remaining: {available_slots[key] - occupied_slots[key]})."
-                                    ),
-                                )
-                        agent_id = agent.id
-                    else:
-                        # Each kernel may have different images and different architectures
-                        compatible_candidate_agents = [
-                            ag for ag in candidate_agents if ag.architecture == kernel.architecture
-                        ]
-                        if not candidate_agents:
-                            raise InstanceNotAvailable(
-                                extra_msg="No agents are available for scheduling"
-                            )
-                        if not compatible_candidate_agents:
+                    for key in available_slots.keys():
+                        if (
+                            available_slots[key] - occupied_slots[key]
+                            >= kernel.requested_slots[key]
+                        ):
+                            continue
+                        else:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "No agents found to be compatible with the image architecture "
-                                    f"(image: {kernel.image}, "
-                                    f"arch: {kernel.architecture})"
+                                    f"The designated agent ({agent.id}) does not have "
+                                    f"the enough remaining capacity ({key}, "
+                                    f"requested: {sess_ctx.requested_slots[key]}, "
+                                    f"remaining: {available_slots[key] - occupied_slots[key]})."
                                 ),
                             )
-                        available_candidate_agents = await self._filter_agent_by_container_limit(
-                            compatible_candidate_agents
-                        )
-                        if not available_candidate_agents:
-                            raise InstanceNotAvailable(
-                                extra_msg=(
-                                    "No agents found to be available because all agents have"
-                                    " reached the hard limit of the number of containers."
-                                ),
-                            )
-                        # Let the agent selector decide the target agent
-                        agent_id = await agent_selector.assign_agent_for_kernel(
-                            available_candidate_agents,
-                            kernel,
-                        )
-                        if agent_id is None:
-                            raise InstanceNotAvailable(
-                                extra_msg=(
-                                    "Could not find a contiguous resource region in any agent big"
-                                    f" enough to host a kernel in the session (id: {sess_ctx.id},"
-                                    f" resource group: {sess_ctx.scaling_group_name})"
-                                ),
-                            )
-                    assert agent_id is not None
-
-                    async def _reserve() -> None:
-                        nonlocal agent_alloc_ctx, candidate_agents
-                        async with agent_db_sess.begin_nested():
-                            agent_alloc_ctx = await self.schedule_repository._reserve_agent(
-                                agent_db_sess,
-                                sgroup_name,
-                                agent_id,
-                                kernel.requested_slots,
-                                extra_conds=agent_query_extra_conds,
-                            )
-                            # Update the agent data to schedule the next kernel in the session
-                            candidate_agents = (
-                                await self.schedule_repository.get_schedulable_agents_by_sgroup(
-                                    sgroup_name
-                                )
-                            )
-
-                    await execute_with_retry(_reserve)
-                except InstanceNotAvailable as sched_failure:
-                    log.debug(log_fmt + "no-available-instances", *log_args)
-
-                    async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
-                        await self.schedule_repository._update_kernel_scheduling_failure(
-                            sched_ctx, sess_ctx, kernel.id, exc.extra_msg
-                        )
-
-                    await execute_with_retry(partial(_update_sched_failure, sched_failure))
-                    raise
-                except Exception as e:
-                    log.exception(
-                        log_fmt + "unexpected-error, during agent allocation",
-                        *log_args,
-                    )
-                    exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
-
-                    async def _update_generic_failure() -> None:
-                        await self.schedule_repository._update_multinode_kernel_generic_failure(
-                            sched_ctx, sess_ctx, kernel.id, exc_data
-                        )
-
-                    await execute_with_retry(_update_generic_failure)
-                    raise
+                    agent_id = agent.id
                 else:
-                    assert agent_alloc_ctx is not None
-                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
+                    # Each kernel may have different images and different architectures
+                    compatible_candidate_agents = [
+                        ag for ag in candidate_agents if ag.architecture == kernel.architecture
+                    ]
+                    if not candidate_agents:
+                        raise InstanceNotAvailable(
+                            extra_msg="No agents are available for scheduling"
+                        )
+                    if not compatible_candidate_agents:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "No agents found to be compatible with the image architecture "
+                                f"(image: {kernel.image}, "
+                                f"arch: {kernel.architecture})"
+                            ),
+                        )
+                    available_candidate_agents = await self._filter_agent_by_container_limit(
+                        compatible_candidate_agents
+                    )
+                    if not available_candidate_agents:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "No agents found to be available because all agents have"
+                                " reached the hard limit of the number of containers."
+                            ),
+                        )
+                    # Let the agent selector decide the target agent
+                    agent_id = await agent_selector.assign_agent_for_kernel(
+                        available_candidate_agents,
+                        kernel,
+                    )
+                    if agent_id is None:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "Could not find a contiguous resource region in any agent big"
+                                f" enough to host a kernel in the session (id: {sess_ctx.id},"
+                                f" resource group: {sess_ctx.scaling_group_name})"
+                            ),
+                        )
+                assert agent_id is not None
+
+                agent_alloc_ctx = await self.schedule_repository.reserve_agent(
+                    sgroup_name,
+                    agent_id,
+                    sess_ctx.requested_slots,
+                )
+                candidate_agents = await self.schedule_repository.get_schedulable_agents_by_sgroup(
+                    sgroup_name
+                )
+            except InstanceNotAvailable as sched_failure:
+                log.debug(log_fmt + "no-available-instances", *log_args)
+
+                async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
+                    await self.schedule_repository.update_kernel_scheduling_failure(
+                        sched_ctx, sess_ctx, kernel.id, exc.extra_msg
+                    )
+
+                await execute_with_retry(partial(_update_sched_failure, sched_failure))
+                raise
+            except Exception as e:
+                log.exception(
+                    log_fmt + "unexpected-error, during agent allocation",
+                    *log_args,
+                )
+                exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
+
+                async def _update_generic_failure() -> None:
+                    await self.schedule_repository.update_multinode_kernel_generic_failure(
+                        sched_ctx, sess_ctx, kernel.id, exc_data
+                    )
+
+                await execute_with_retry(_update_generic_failure)
+                raise
+            else:
+                assert agent_alloc_ctx is not None
+                kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
         # Proceed to PREPARING only when all kernels are successfully scheduled.

@@ -1,6 +1,6 @@
+import logging
 import uuid
 from typing import (
-    Any,
     Optional,
 )
 
@@ -17,7 +17,11 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+)
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -25,6 +29,7 @@ from ai.backend.manager.errors.storage import (
     VFolderCreationFailure,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
+    VFolderGone,
     VFolderInvalidParameter,
     VFolderNotFound,
 )
@@ -40,7 +45,7 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     vfolder_status_map,
 )
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.base import (
@@ -67,6 +72,8 @@ from ..actions.base import (
 )
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+
 
 async def _check_vfolder_status(
     vfolder_status: VFolderOperationStatus,
@@ -88,7 +95,7 @@ class VFolderService:
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
+    _user_repository: UserRepository
 
     def __init__(
         self,
@@ -96,12 +103,12 @@ class VFolderService:
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
+        user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
+        self._user_repository = user_repository
         self._background_task_manager = background_task_manager
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
@@ -234,25 +241,16 @@ class VFolderService:
         try:
             vfid = VFolderID(quota_scope_id, folder_id)
             if not unmanaged_path:
-                options = {}
-                if max_quota_scope_size and max_quota_scope_size > 0:
-                    options["initial_max_size_for_quota_scope"] = max_quota_scope_size
-                body_data: dict[str, Any] = {
-                    "volume": self._storage_manager.get_proxy_and_volume(
-                        folder_host, is_unmanaged(unmanaged_path)
-                    )[1],
-                    "vfid": str(vfid),
-                    "options": options,
-                }
-                if vfolder_permission_mode is not None:
-                    body_data["mode"] = vfolder_permission_mode
-                async with self._storage_manager.request(
-                    folder_host,
-                    "POST",
-                    "folder/create",
-                    json=body_data,
-                ):
-                    pass
+                proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+                    folder_host, is_unmanaged(unmanaged_path)
+                )
+                manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+                await manager_client.create_folder(
+                    volume_name,
+                    str(vfid),
+                    max_quota_scope_size,
+                    vfolder_permission_mode,
+                )
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailure from e
 
@@ -384,20 +382,15 @@ class VFolderService:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
-        async with self._storage_manager.request(
-            proxy_name,
-            "GET",
-            "folder/usage",
-            json={
-                "volume": volume_name,
-                "vfid": str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
-            },
-        ) as (_, storage_resp):
-            usage = await storage_resp.json()
-            usage_info = VFolderUsageInfo(
-                used_bytes=usage["used_bytes"],
-                num_files=usage["file_count"],
-            )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await manager_client.get_folder_usage(
+            volume_name,
+            str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
+        )
+        usage_info = VFolderUsageInfo(
+            used_bytes=usage["used_bytes"],
+            num_files=usage["file_count"],
+        )
         return GetVFolderActionResult(
             user_uuid=action.user_uuid,
             base_info=VFolderBaseInfo(
@@ -476,7 +469,11 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.move_vfolders_to_trash_force([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
         return MoveToTrashVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def restore(
@@ -484,17 +481,41 @@ class VFolderService:
     ) -> RestoreVFolderFromTrashActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.restore_vfolders_from_trash_force([
-            action.vfolder_uuid
-        ])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        try:
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.delete_folder(
+                volume_name,
+                str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
+            )
+        except VFolderGone as e:
+            # If the vfolder is already gone, just delete it from the repository
+            log.warning("VFolder {} is already gone: {}", vfolder_data.id, e)
+        except VFolderNotFound as e:
+            # If the vfolder is not found, just delete it from the repository
+            log.warning("VFolder {} not found: {}", vfolder_data.id, e)
 
     async def delete_forever(
         self, action: DeleteForeverVFolderAction
     ) -> DeleteForeverVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.delete_vfolders_forever_force([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
@@ -502,16 +523,23 @@ class VFolderService:
     ) -> ForceDeleteVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        await self._admin_vfolder_repository.delete_vfolders_forever_force([action.vfolder_uuid])
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
         # TODO: Implement proper cloning logic with storage operations
         # For now, return a placeholder result
-
+        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
         # Get source vfolder
-        source_vfolder = await self._vfolder_repository.get_by_id(action.source_vfolder_uuid)
-        if not source_vfolder:
+        source_vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.source_vfolder_uuid, user.id, user.domain_name
+        )
+        if not source_vfolder_data:
             raise VFolderNotFound()
 
         # Get requester user email
@@ -528,13 +556,13 @@ class VFolderService:
             vfolder_uuid=action.source_vfolder_uuid,
             target_vfolder_id=target_id,
             target_vfolder_name=action.target_name,
-            target_vfolder_host=action.target_host or source_vfolder.host,
+            target_vfolder_host=action.target_host or source_vfolder_data.host,
             usage_mode=action.usage_mode,
             mount_permission=action.mount_permission,
             creator_email=requester_email,
-            ownership_type=source_vfolder.ownership_type,
-            owner_user_uuid=source_vfolder.user,
-            owner_group_uuid=source_vfolder.group,
+            ownership_type=source_vfolder_data.ownership_type,
+            owner_user_uuid=source_vfolder_data.user,
+            owner_group_uuid=source_vfolder_data.group,
             cloneable=action.cloneable,
             bgtask_id=uuid.uuid4(),  # placeholder
         )

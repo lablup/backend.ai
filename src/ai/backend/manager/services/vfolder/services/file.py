@@ -8,7 +8,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,
 )
-from ai.backend.manager.repositories.vfolder.admin_repository import AdminVfolderRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
 from ..actions.file import (
@@ -32,25 +32,28 @@ class VFolderFileService:
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _vfolder_repository: VfolderRepository
-    _admin_vfolder_repository: AdminVfolderRepository
+    _user_repository: UserRepository
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         vfolder_repository: VfolderRepository,
-        admin_vfolder_repository: AdminVfolderRepository,
+        user_repository: UserRepository,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
-        self._admin_vfolder_repository = admin_vfolder_repository
+        self._user_repository = user_repository
 
     async def upload_file(
         self, action: CreateUploadSessionAction
     ) -> CreateUploadSessionActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -77,18 +80,14 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/upload",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "size": action.size,
-            },
-        ) as (client_api_url, storage_resp):
-            storage_reply = await storage_resp.json()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.upload_file(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+            action.size,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateUploadSessionActionResult(
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
@@ -99,7 +98,10 @@ class VFolderFileService:
         self, action: CreateDownloadSessionAction
     ) -> CreateDownloadSessionActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -126,21 +128,16 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/download",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "archive": action.archive,
-                "unmanaged_path": vfolder_data.unmanaged_path
-                if vfolder_data.unmanaged_path
-                else None,
-            },
-        ) as (client_api_url, storage_resp):
-            storage_reply = await storage_resp.json()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        # For download, we need to handle the request differently as it includes extra params
+        storage_reply = await manager_client.download_file(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            archive=action.archive,
+            unmanaged_path=vfolder_data.unmanaged_path,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateDownloadSessionActionResult(
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
@@ -149,33 +146,10 @@ class VFolderFileService:
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         # Get user info and check VFolder access using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise VFolderInvalidParameter("User not found")
-        user_role, user_domain_name = user_info
-
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
-
-        # Check if user has access to the VFolder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=None,  # We'll filter by vfolder_uuid below
-        )
-
-        # Find the requested vfolder
-        vfolder_data = None
-        for access_info in vfolder_list_result.vfolders:
-            if access_info.vfolder_data.id == action.vfolder_uuid:
-                vfolder_data = access_info.vfolder_data
-                break
-
-        if not vfolder_data:
-            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -187,17 +161,12 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-            },
-        ) as (_, storage_resp):
-            result = await storage_resp.json()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_client.list_files(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+        )
         return ListFilesActionResult(
             vfolder_uuid=action.vfolder_uuid,
             files=[
@@ -215,7 +184,10 @@ class VFolderFileService:
 
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -242,46 +214,21 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/rename",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.target_path,
-                "new_name": action.new_name,
-            },
-        ):
-            pass
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.rename_file(
+            volume_name,
+            str(vfolder_id),
+            action.target_path,
+            action.new_name,
+        )
         return RenameFileActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
         # Get user info and check VFolder access using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise VFolderInvalidParameter("User not found")
-        user_role, user_domain_name = user_info
-
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
         )
-
-        # Check if user has access to the VFolder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=None,  # We'll filter by vfolder_uuid below
-        )
-
-        # Find the requested vfolder
-        vfolder_data = None
-        for access_info in vfolder_list_result.vfolders:
-            if access_info.vfolder_data.id == action.vfolder_uuid:
-                vfolder_data = access_info.vfolder_data
-                break
 
         if not vfolder_data:
             raise VFolderInvalidParameter("The specified vfolder is not accessible.")
@@ -296,18 +243,13 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/delete",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpaths": action.files,
-                "recursive": action.recursive,
-            },
-        ):
-            pass
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.delete_files(
+            volume_name,
+            str(vfolder_id),
+            action.files,
+            action.recursive,
+        )
         return DeleteFilesActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
@@ -315,7 +257,10 @@ class VFolderFileService:
             raise VFolderInvalidParameter("Too many directories specified.")
 
         # Get VFolder data using repository
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
 
@@ -329,22 +274,17 @@ class VFolderFileService:
             folder_id=vfolder_data.id,
         )
 
-        async with self._storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/mkdir",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": action.path,
-                "parents": action.parents,
-                "exist_ok": action.exist_ok,
-            },
-        ) as (_, storage_resp):
-            storage_reply = await storage_resp.json()
-            results = storage_reply["results"]
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.mkdir(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            exist_ok=action.exist_ok,
+            parents=action.parents,
+        )
+        results = storage_reply["results"]
         return MkdirActionResult(
             vfolder_uuid=action.vfolder_uuid,
             results=results,
-            storage_resp_status=storage_resp.status,
+            storage_resp_status=200,
         )

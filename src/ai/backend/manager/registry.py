@@ -4,6 +4,7 @@ import asyncio
 import base64
 import copy
 import itertools
+import json
 import logging
 import re
 import secrets
@@ -20,7 +21,6 @@ from collections.abc import (
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import (
-    TYPE_CHECKING,
     Any,
     Dict,
     List,
@@ -31,7 +31,6 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import urlparse
 
 import aiodocker
 import aiohttp
@@ -45,6 +44,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
@@ -53,11 +53,15 @@ from yarl import URL
 
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
@@ -82,6 +86,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.model_serving.anycast import (
+    EndpointRouteListUpdatedEvent,
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
 )
@@ -103,10 +108,11 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReport,
     AccessKey,
     AgentId,
@@ -128,6 +134,7 @@ from ai.backend.common.types import (
     KernelId,
     ModelServiceStatus,
     ResourceSlot,
+    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -137,18 +144,10 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-
-from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.exception import BackendAIError
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
@@ -174,7 +173,6 @@ from .models import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
-    EndpointLifecycle,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -192,6 +190,7 @@ from .models import (
     SessionStatus,
     UserRole,
     UserRow,
+    VFolderRow,
     agents,
     domains,
     handle_session_exception,
@@ -218,7 +217,6 @@ from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
-    is_db_retry_error,
     reenter_txn_session,
     sql_json_merge,
 )
@@ -285,6 +283,7 @@ class AgentRegistry:
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
             valkey_stat,
+            valkey_live,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -365,17 +364,9 @@ class AgentRegistry:
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
         proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
-        async with self.storage_manager.request(
-            proxy_name,
-            "GET",
-            "volume/hwinfo",
-            json={"volume": volume_name},
-            raise_for_status=True,
-        ) as (_, storage_resp):
-            return check_type(
-                await storage_resp.json(),
-                HardwareMetadata,
-            )
+        manager_client = self.storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_client.get_volume_hwinfo(volume_name)
+        return check_type(result, HardwareMetadata)
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
         agent = await self.get_instance(instance_id, agents.c.addr)
@@ -3600,14 +3591,44 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
-    async def update_appproxy_endpoint_routes(
-        self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
-    ) -> None:
-        target_sessions = await SessionRow.list_sessions(
-            db_sess,
-            [r.session for r in active_routes],
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
+    async def get_health_check_info(
+        self, endpoint: EndpointRow, model: VFolderRow
+    ) -> HealthCheckConfig | None:
+        _info: HealthCheckConfig | None = None
+
+        if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
+            _info = HealthCheckConfig(path=_path)
+        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
+                self.storage_manager,
+                model.host,
+                model.vfid,
+                endpoint.model_definition_path,
+            )
+            model_definition = await ModelServiceHelper.validate_model_definition(
+                self.storage_manager,
+                model.host,
+                model.vfid,
+                model_definition_path,
+            )
+
+            for model_info in model_definition["models"]:
+                if health_check_info := model_info.get("service", {}).get("health_check"):
+                    _info = HealthCheckConfig(
+                        path=health_check_info["path"],
+                        interval=health_check_info["interval"],
+                        max_retries=health_check_info["max_retries"],
+                        max_wait_time=health_check_info["max_wait_time"],
+                        expected_status_code=health_check_info["expected_status_code"],
+                    )
+                    break
+        return _info
+
+    async def create_appproxy_endpoint(
+        self,
+        db_sess: AsyncSession,
+        endpoint: EndpointRow,
+    ) -> str:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
@@ -3618,54 +3639,34 @@ class AgentRegistry:
         sgroup = result.first()
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
-
-        session_id_to_route_map = {r.session: r for r in active_routes}
-        inference_apps: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
-        for target_session in target_sessions:
-            if target_session.main_kernel.kernel_host is None:
-                kernel_host = urlparse(target_session.main_kernel.agent_addr).hostname
-            else:
-                kernel_host = target_session.main_kernel.kernel_host
-            assert kernel_host is not None
-            for port_info in target_session.main_kernel.service_ports:
-                if not port_info["is_inference"]:
-                    continue
-                inference_apps[port_info["name"]].append({
-                    "session_id": str(target_session.id),
-                    "route_id": str(session_id_to_route_map[target_session.id].id),
-                    "kernel_host": kernel_host,
-                    "kernel_port": port_info["host_ports"][0],
-                    "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
-                })
-
         wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
-        endpoint_json = await wsproxy_client.create_endpoint(
-            str(endpoint.id),
-            {
-                "service_name": endpoint.name,
-                "tags": {
-                    "session": {
-                        "user_uuid": str(endpoint.session_owner),
-                        "group_id": str(endpoint.project),
-                        "domain_name": endpoint.domain,
-                    },
-                    "endpoint": {
-                        "id": str(endpoint.id),
-                        "runtime_variant": endpoint.runtime_variant.value,
-                        "existing_url": str(endpoint.url) if endpoint.url else None,
-                    },
+
+        model = await VFolderRow.get(db_sess, endpoint.model)
+
+        health_check_config = await self.get_health_check_info(endpoint, model)
+
+        request_body = {
+            "version": "v2",
+            "service_name": endpoint.name,
+            "tags": {
+                "session": {
+                    "user_uuid": str(endpoint.session_owner),
+                    "group_id": str(endpoint.project),
+                    "domain_name": endpoint.domain,
                 },
-                "apps": inference_apps,
-                "open_to_public": endpoint.open_to_public,
-            },  # TODO: support for multiple inference apps
-        )
-        async with self.db.begin_session() as db_sess:
-            query = (
-                sa.update(EndpointRow)
-                .values({"url": endpoint_json["endpoint"]})
-                .where(EndpointRow.id == endpoint.id)
-            )
-            await db_sess.execute(query)
+                "endpoint": {
+                    "id": str(endpoint.id),
+                    "runtime_variant": endpoint.runtime_variant.value,
+                    "existing_url": str(endpoint.url) if endpoint.url else None,
+                },
+            },
+            "open_to_public": endpoint.open_to_public,
+            "health_check": health_check_config.model_dump(mode="json")
+            if health_check_config
+            else None,
+        }
+        endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
+        return endpoint_json["endpoint"]
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
@@ -3680,7 +3681,22 @@ class AgentRegistry:
         wsproxy_api_token = sgroup["wsproxy_api_token"]
 
         wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
-        await wsproxy_client.delete_endpoint(str(endpoint.id))
+        await wsproxy_client.delete_endpoint(endpoint.id)
+
+    async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
+        async with self.db.begin_readonly_session() as db_sess:
+            endpoint = await EndpointRow.get(db_sess, endpoint_id)
+            connection_info = await endpoint.generate_redis_route_info(db_sess)
+            model = await VFolderRow.get(db_sess, endpoint.model)
+
+        health_check_config = await self.get_health_check_info(endpoint, model)
+        await self.valkey_live.update_appproxy_redis_info(
+            endpoint.id,
+            connection_info,
+            health_check_config,
+        )
+
+        await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
 
     async def purge_containers(
         self,
@@ -3894,24 +3910,6 @@ async def handle_model_service_status_update(
             query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
             await db_sess.execute(query)
 
-            query = sa.select(RoutingRow).where(
-                (RoutingRow.endpoint == route.endpoint) & (RoutingRow.status == RouteStatus.HEALTHY)
-            )
-            result = await db_sess.execute(query)
-            latest_routes = result.fetchall()
-            latest_routes = await RoutingRow.list(
-                db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
-            )
-
-            try:
-                await context.update_appproxy_endpoint_routes(
-                    db_sess, route.endpoint_row, latest_routes
-                )
-            except Exception as e:
-                if is_db_retry_error(e):
-                    raise
-                log.exception("failed to communicate with AppProxy endpoint:")
-
     await execute_with_retry(_update)
 
 
@@ -3951,85 +3949,65 @@ async def invoke_session_callback(
         if session.session_type == SessionTypes.INFERENCE:
 
             async def _update() -> None:
-                new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                    if isinstance(event, SessionCancelledAnycastEvent):
-                        update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
-                        if "error" in session.status_data:
-                            if session.status_data["error"]["name"] == "MultiAgentError":
-                                errors = session.status_data["error"]["collection"]
-                            else:
-                                errors = [session.status_data["error"]]
-                            update_data["error_data"] = {
-                                "type": "session_cancelled",
-                                "errors": errors,
-                                "session_id": session.id,
-                            }
-                        query = (
-                            sa.update(RoutingRow)
-                            .values(update_data)
-                            .where(RoutingRow.id == route.id)
-                        )
-                        await db_sess.execute(query)
-                        query = (
-                            sa.update(EndpointRow)
-                            .values({"retries": endpoint.retries + 1})
-                            .where(EndpointRow.id == endpoint.id)
-                        )
-                        await db_sess.execute(query)
-                    elif isinstance(event, SessionTerminatedAnycastEvent):
-                        query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
-                        await db_sess.execute(query)
-                        if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
-                            new_routes = [
-                                r
-                                for r in endpoint.routings
-                                if r.id != route.id and r.status == RouteStatus.HEALTHY
-                            ]
-                            try:
-                                await context.update_appproxy_endpoint_routes(
-                                    db_sess, endpoint, new_routes
-                                )
-                            except Exception as e:
-                                if is_db_retry_error(e):
-                                    raise
-                                log.warning(
-                                    "failed to communicate with AppProxy endpoint: {}", str(e)
-                                )
-                        await db_sess.commit()
-                    else:
-                        new_route_status: Optional[RouteStatus] = None
-                        if isinstance(event, SessionTerminatingAnycastEvent):
-                            new_route_status = RouteStatus.TERMINATING
-
-                        if new_route_status:
+                    match event:
+                        case SessionCancelledAnycastEvent():
+                            update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
+                            if "error" in session.status_data:
+                                if session.status_data["error"]["name"] == "MultiAgentError":
+                                    errors = session.status_data["error"]["collection"]
+                                else:
+                                    errors = [session.status_data["error"]]
+                                update_data["error_data"] = {
+                                    "type": "session_cancelled",
+                                    "errors": errors,
+                                    "session_id": session.id,
+                                }
                             query = (
                                 sa.update(RoutingRow)
+                                .values(update_data)
                                 .where(RoutingRow.id == route.id)
-                                .values({"status": new_route_status})
                             )
                             await db_sess.execute(query)
-
-                            new_routes = [
-                                r
-                                for r in endpoint.routings
-                                if r.id != route.id and r.status == RouteStatus.HEALTHY
-                            ]
-                            if new_route_status == RouteStatus.HEALTHY:
-                                new_routes.append(route)
-                            try:
-                                await context.update_appproxy_endpoint_routes(
-                                    db_sess, endpoint, new_routes
-                                )
-                            except Exception as e:
-                                if is_db_retry_error(e):
-                                    raise
-                                log.warning(
-                                    "failed to communicate with AppProxy endpoint: {}", str(e)
-                                )
-                        await db_sess.commit()
+                            query = (
+                                sa.update(EndpointRow)
+                                .values({"retries": endpoint.retries + 1})
+                                .where(EndpointRow.id == endpoint.id)
+                            )
+                            await db_sess.execute(query)
+                        case SessionTerminatedAnycastEvent():
+                            query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
+                            await db_sess.execute(query)
+                        case SessionStartedAnycastEvent() | SessionTerminatingAnycastEvent():
+                            target_kernels = await KernelRow.batch_load_by_session_id(
+                                db_sess,
+                                [
+                                    r.session_id
+                                    for r in endpoint.routings
+                                    if r.status in RouteStatus.active_route_statuses()
+                                ],
+                            )
+                            connection_info: defaultdict[str, dict[str, tuple[str, int]]] = (
+                                defaultdict()
+                            )
+                            for kernel in target_kernels:
+                                for port_info in kernel.service_ports:
+                                    if port_info["is_inference"]:
+                                        connection_info[port_info["name"]][str(kernel.id)] = (
+                                            kernel.kernel_host,
+                                            port_info["host_ports"][0],
+                                        )
+                            await context.valkey_live.delete_key(
+                                f"endpoint.{endpoint.id}.route_connection_info"
+                            )
+                            await context.valkey_live.store_live_data(
+                                f"endpoint.{endpoint.id}.route_connection_info",
+                                json.dumps(connection_info),
+                                ex=3600,
+                            )
+                    await db_sess.commit()
 
             await execute_with_retry(_update)
 

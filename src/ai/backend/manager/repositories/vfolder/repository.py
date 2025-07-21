@@ -26,10 +26,12 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationRow,
     VFolderInvitationState,
+    VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
+    delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     query_accessible_vfolders,
 )
@@ -68,6 +70,7 @@ class VfolderRepository:
             vfolder_dicts = await query_accessible_vfolders(
                 session.bind,
                 user_id,
+                allow_privileged_access=True,
                 user_role=user_row.role,
                 domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -231,6 +234,89 @@ class VfolderRepository:
 
             await session.flush()
             return self._vfolder_row_to_data(vfolder_row)
+
+    @repository_decorator()
+    async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
+        """
+        Move VFolders to trash.
+        """
+        from ai.backend.manager.models.vfolder import (
+            VFolderDeletionInfo,
+        )
+
+        async with self._db.begin_session() as session:
+            vfolder_rows = []
+            for vfolder_id in vfolder_ids:
+                vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
+                if vfolder_row:
+                    vfolder_rows.append(vfolder_row)
+
+            # Create deletion info for each vfolder
+            deletion_infos = []
+            for vfolder_row in vfolder_rows:
+                from ai.backend.common.types import VFolderID
+
+                vfolder_id_obj = VFolderID(
+                    quota_scope_id=vfolder_row.quota_scope_id,
+                    folder_id=vfolder_row.id,
+                )
+                deletion_info = VFolderDeletionInfo(
+                    vfolder_id=vfolder_id_obj,
+                    host=vfolder_row.host,
+                    unmanaged_path=vfolder_row.unmanaged_path,
+                )
+                deletion_infos.append(deletion_info)
+
+            # Note: initiate_vfolder_deletion requires storage_manager parameter
+            # This would need to be passed to the repository method or handled differently
+            # For now, we'll update the status directly instead of using the full deletion process
+            for vfolder_row in vfolder_rows:
+                vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
+
+            await session.flush()
+
+            return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+    @repository_decorator()
+    async def restore_vfolders_from_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
+        """
+        Restore VFolders from trash.
+        """
+        async with self._db.begin_session() as session:
+            vfolder_rows = []
+            for vfolder_id in vfolder_ids:
+                vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
+                if vfolder_row:
+                    vfolder_row.status = VFolderOperationStatus.READY
+                    vfolder_rows.append(vfolder_row)
+
+            await session.flush()
+            return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+    @repository_decorator()
+    async def delete_vfolders_forever(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
+        """
+        Delete VFolders forever
+        """
+
+        async with self._db.connect() as db_conn:
+            async with self._db.begin_session(db_conn) as db_session:
+                vfolder_rows = []
+                for vfolder_id in vfolder_ids:
+                    vfolder_row = await self._get_vfolder_by_id(db_session, vfolder_id)
+                    if vfolder_row:
+                        vfolder_rows.append(vfolder_row)
+                delete_stmt = (
+                    sa.update(VFolderRow)
+                    .where(VFolderRow.id.in_(vfolder_ids))
+                    .values(status=VFolderOperationStatus.DELETE_ONGOING)
+                )
+                await db_session.execute(delete_stmt)
+
+            # Delete relation rows
+            await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
+
+            return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
     @repository_decorator()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:

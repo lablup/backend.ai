@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Mapping
 from typing import (
@@ -7,6 +8,7 @@ from typing import (
     Self,
     cast,
 )
+from uuid import UUID
 
 from glide import (
     Batch,
@@ -22,6 +24,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -472,6 +475,32 @@ class ValkeyLiveClient:
             str_result[str_key] = str_value
 
         return str_result
+
+    @valkey_decorator()
+    async def update_appproxy_redis_info(
+        self,
+        endpoint_id: UUID,
+        connection_info: dict[str, Any],
+        health_check_config: HealthCheckConfig | None,
+    ) -> None:
+        pipe = self._create_batch()
+        pipe.set(
+            f"endpoint.{endpoint_id}.route_connection_info",
+            json.dumps(connection_info),
+            expiry=ExpirySet(ExpiryType.SEC, 3600),
+        )
+        pipe.set(
+            f"endpoint.{endpoint_id}.health_check_enabled",
+            "true" if health_check_config is not None else "false",
+            expiry=ExpirySet(ExpiryType.SEC, 3600),
+        )
+        if health_check_config:
+            pipe.set(
+                f"endpoint.{endpoint_id}.health_check_config",
+                health_check_config.model_dump_json(),
+                expiry=ExpirySet(ExpiryType.SEC, 3600),
+            )
+        await self._client.client.exec(pipe, True)
 
     @valkey_decorator()
     async def delete_key(self, key: str) -> int:

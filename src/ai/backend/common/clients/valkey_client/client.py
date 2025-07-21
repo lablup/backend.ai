@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar
 
+import glide
 from glide import (
     GlideClient,
     GlideClientConfiguration,
@@ -406,6 +407,25 @@ def create_layer_aware_valkey_decorator(
                         )
                         # If it's a BackendAIError, this error is intended to be handled by the caller.
                         raise e
+                    except glide.TimeoutError as e:
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        log.warning(
+                            "Timeout in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
                     except Exception as e:
                         if attempt < retry_count - 1:
                             await asyncio.sleep(retry_delay)

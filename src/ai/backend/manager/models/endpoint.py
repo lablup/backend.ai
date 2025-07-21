@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import (
     Container,
     Mapping,
@@ -15,6 +16,7 @@ from typing import (
     List,
     Optional,
     Self,
+    TypeAlias,
     cast,
 )
 from uuid import UUID, uuid4
@@ -48,7 +50,6 @@ from ai.backend.logging import BraceStyleAdapter
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.types import MountOptionModel, UserScope
 
@@ -69,8 +70,9 @@ from .base import (
 from .image import ImageRow
 from .routing import RouteStatus
 from .scaling_group import scaling_groups
+from .session import SessionStatus
 from .user import UserRow
-from .vfolder import VFolderRow, prepare_vfolder_mounts
+from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.model_serving.types import EndpointTokenData
@@ -80,12 +82,14 @@ if TYPE_CHECKING:
 __all__ = (
     "EndpointRow",
     "EndpointLifecycle",
-    "ModelServicePredicateChecker",
+    "ModelServiceHelper",
     "EndpointStatistics",
     "EndpointTokenRow",
     "EndpointAutoScalingRuleRow",
 )
 
+
+ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -528,6 +532,36 @@ class EndpointRow(Base):
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
+    async def generate_redis_route_info(
+        self, db_sess: AsyncSession
+    ) -> ModelServiceSerializableConnectionInfo:
+        from .kernel import KernelRow
+        from .routing import RoutingRow
+
+        active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        target_kernels = await KernelRow.batch_load_by_session_id(
+            db_sess,
+            [
+                r.session
+                for r in active_routes
+                if r.status in RouteStatus.active_route_statuses()
+                and r.session
+                and r.session_row.status == SessionStatus.RUNNING
+            ],
+        )
+        session_id_to_route_map = {r.session: r for r in active_routes}
+        connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+        for kernel in target_kernels:
+            for port_info in kernel.service_ports:
+                if port_info["is_inference"]:
+                    connection_info[port_info["name"]].append({
+                        "session_id": str(kernel.session_id),
+                        "route_id": str(session_id_to_route_map[kernel.session_id].id),
+                        "kernel_host": kernel.kernel_host,
+                        "kernel_port": port_info["host_ports"][0],
+                    })
+        return connection_info
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
@@ -724,7 +758,7 @@ class EndpointAutoScalingRuleRow(Base):
         await session.delete(self)
 
 
-class ModelServicePredicateChecker:
+class ModelServiceHelper:
     @staticmethod
     async def check_scaling_group(
         conn: AsyncConnection,
@@ -838,98 +872,102 @@ class ModelServicePredicateChecker:
         vfid: VFolderID,
         relpath: str,
     ) -> dict[str, Any]:
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": relpath,
-            },
-        ) as (client_api_url, storage_resp):
-            return await storage_resp.json()
+        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_facing_client.list_files(
+            volume_name,
+            str(vfid),
+            relpath,
+        )
+        return cast(dict[str, Any], result)
 
     @staticmethod
-    async def validate_model_definition(
+    async def validate_model_definition_file_exists(
         storage_manager: StorageSessionManager,
-        model_vfolder_row: VFolderRow | Mapping[str, Any],
-        model_definition_path: str | None,
-    ) -> str | None:
+        folder_host: str,
+        vfid: VFolderID,
+        suggested_path: str | None,
+    ) -> str:
         """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns relative path to customized model-definition.yaml (if any) or None.
+        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
+        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
+        at least one model definition file exists under the target VFolder and returns the matched filename.
         """
-        match model_vfolder_row:
-            case VFolderRow():
-                folder_name = model_vfolder_row.name
-                vfid = model_vfolder_row.vfid
-                folder_host = model_vfolder_row.host
-            case _:
-                folder_name = model_vfolder_row["name"]
-                vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
-                folder_host = model_vfolder_row["host"]
-
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
-        if model_definition_path:
-            path = Path(model_definition_path)
-            storage_reply = await ModelServicePredicateChecker._listdir(
+        if suggested_path:
+            path = Path(suggested_path)
+            storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
             )
             for item in storage_reply["items"]:
                 if item["name"] == path.name:
-                    yaml_name = model_definition_path
-                    break
+                    return suggested_path
             else:
                 raise InvalidAPIParameters(
-                    f"Model definition YAML file {model_definition_path} not found inside the model storage"
+                    f"Model definition YAML file {suggested_path} not found inside the model storage"
                 )
         else:
-            storage_reply = await ModelServicePredicateChecker._listdir(
+            storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, "."
             )
             model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
-                    yaml_name = item["name"]
-                    break
+                    return item["name"]
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
                 )
 
-        chunks = bytes()
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/fetch",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": f"./{yaml_name}",
-            },
-        ) as (client_api_url, storage_resp):
-            while True:
-                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                if not chunk:
-                    break
-                chunks += chunk
+    @staticmethod
+    async def _read_model_definition(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        model_definition_filename: str,
+    ) -> dict[str, Any]:
+        """
+        Reads specified model definition file from target VFolder and returns
+        """
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
+        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
+        chunks = await manager_facing_client.fetch_file_content(
+            volume_name,
+            str(vfid),
+            f"./{model_definition_filename}",
+        )
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
-        model_definition_dict = yaml.load(model_definition_yaml)
+        return yaml.load(model_definition_yaml)
+
+    @staticmethod
+    async def validate_model_definition(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        model_definition_path: str,
+    ) -> dict[str, Any]:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        Returns validated model definition configuration.
+        """
+        raw_model_definition = await ModelServiceHelper._read_model_definition(
+            storage_manager,
+            folder_host,
+            vfid,
+            model_definition_path,
+        )
+
         try:
-            model_definition = model_definition_iv.check(model_definition_dict)
+            model_definition = model_definition_iv.check(raw_model_definition)
             assert model_definition is not None
+            return model_definition
         except t.DataError as e:
             raise InvalidAPIParameters(
-                f"Failed to validate model definition from vFolder {folder_name} (ID"
-                f" {vfid.folder_id}): {e}",
+                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
             ) from e
         except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
-
-        return yaml_name
 
 
 class EndpointStatistics:

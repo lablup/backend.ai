@@ -9,8 +9,10 @@ import humps
 import tomli
 import trafaret as t
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
+    Field,
 )
 
 from . import validators as tx
@@ -171,6 +173,145 @@ model_definition_iv = t.Dict({
         })
     )
 })
+
+
+class PreStartAction(BaseConfigModel):
+    action: str = Field(
+        description="The name of the pre-start action to execute.",
+        examples=["action_name"],
+    )
+    args: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arguments for the pre-start action.",
+        examples=[{"arg1": "value1", "arg2": "value2"}],
+    )
+
+
+class ModelHealthCheck(BaseConfigModel):
+    interval: Optional[float] = Field(
+        default=10.0,
+        description="Interval in seconds between health checks.",
+        examples=[10.0],
+    )
+    path: str = Field(
+        description="Path to check for health status.",
+        examples=["/health"],
+    )
+    max_retries: Optional[int] = Field(
+        default=10,
+        description="Maximum number of retries for health check.",
+        examples=[10],
+    )
+    max_wait_time: Optional[float] = Field(
+        default=15.0,
+        description="Maximum time in seconds to wait for a health check response.",
+        examples=[15.0],
+    )
+    expected_status_code: Optional[int] = Field(
+        default=200,
+        description="Expected HTTP status code for a healthy response.",
+        examples=[200],
+        gt=100,
+    )
+
+
+class ModelServiceConfig(BaseConfigModel):
+    pre_start_actions: list[PreStartAction] = Field(
+        default_factory=list,
+        description="List of pre-start actions to execute before starting the model service.",
+    )
+    start_command: str | list[str] = Field(
+        description="Command to start the model service.",
+        examples=["python service.py", ["python", "service.py"]],
+    )
+    shell: str = Field(
+        default="/bin/bash",
+        description="Shell to use if start_command is a string.",
+        examples=["/bin/bash"],
+    )
+    port: int = Field(
+        description="Port number for the model service. Must be greater than 1.",
+        examples=[8080],
+        gt=1,
+    )
+    health_check: Optional[ModelHealthCheck] = Field(
+        default=None,
+        description="Health check configuration for the model service.",
+    )
+
+
+class ModelMetadata(BaseConfigModel):
+    author: Optional[str] = Field(
+        default=None,
+        examples=["John Doe"],
+    )
+    title: Optional[str] = Field(
+        default=None,
+    )
+    version: Optional[int | str] = Field(
+        default=None,
+    )
+    created: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("created", "created_at"),
+        serialization_alias="created",
+    )
+    last_modified: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("last_modified", "modified_at"),
+        serialization_alias="last_modified",
+    )
+    description: Optional[str] = Field(
+        default=None,
+    )
+    task: Optional[str] = Field(
+        default=None,
+    )
+    category: Optional[str] = Field(
+        default=None,
+    )
+    architecture: Optional[str] = Field(
+        default=None,
+    )
+    framework: Optional[list[str]] = Field(
+        default=None,
+    )
+    label: Optional[list[str]] = Field(
+        default=None,
+    )
+    license: Optional[str] = Field(
+        default=None,
+    )
+    min_resource: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Minimum resource requirements for the model.",
+    )
+
+
+class ModelConfig(BaseConfigModel):
+    name: str = Field(
+        description="Name of the model.",
+        examples=["my_model"],
+    )
+    model_path: str = Field(
+        description="Path to the model file.",
+        examples=["/models/my_model"],
+    )
+    service: Optional[ModelServiceConfig] = Field(
+        default=None,
+        description="Configuration for the model service.",
+    )
+    metadata: Optional[ModelMetadata] = Field(
+        default=None,
+        description="Metadata about the model.",
+    )
+
+
+class ModelDefinition(BaseConfigModel):
+    models: list[ModelConfig] = Field(
+        default_factory=list,
+        description="List of models in the model definition.",
+    )
 
 
 def find_config_file(daemon_name: str) -> Path:

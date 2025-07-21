@@ -11,13 +11,18 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.object_permission import (
+    ObjectPermissionData,
+)
+from ai.backend.manager.data.permission.status import PermissionStatus
+
 from ..base import (
     GUID,
     Base,
     IDColumn,
     StrEnumType,
 )
-from .types import PermissionStatus
 
 if TYPE_CHECKING:
     from .role import RoleRow
@@ -59,3 +64,17 @@ class ObjectPermissionRow(Base):
         back_populates="object_permission_rows",
         primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
     )
+
+    @property
+    def parsed_object_id(self) -> ObjectId:
+        return ObjectId(self.entity_type, self.entity_id)
+
+    def to_data(self) -> ObjectPermissionData:
+        return ObjectPermissionData(
+            id=self.id,
+            status=self.status,
+            role_id=self.role_id,
+            object_id=self.parsed_object_id,
+            operation=self.operation,
+            created_at=self.created_at,
+        )

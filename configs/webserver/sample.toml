@@ -162,6 +162,9 @@
   ssl_verify = true
   # Authentication token name.
   auth_token_name = "sToken"
+  # Maximum number of simultaneous API connections.
+  # This limits the number of concurrent API requests that can be processed.
+  connection_limit = 100
 
 [session]
   # Session maximum age in seconds.
