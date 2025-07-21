@@ -149,6 +149,10 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.lock import FileLock
+from ai.backend.common.log.types import (
+    ContainerLogData,
+    ContainerLogType,
+)
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -1130,10 +1134,12 @@ class AbstractAgent(
                     log_length += fragment_length
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
-                        stored_chunk = zlib.compress(bytes(cb[:chunk_size]))
+                        chunk_log_item = ContainerLogData.from_log(
+                            ContainerLogType.ZLIB, bytes(cb[:chunk_size])
+                        )
                         await self.valkey_stat_client.enqueue_container_logs(
                             container_id,
-                            stored_chunk,
+                            chunk_log_item.serialize(),
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1144,14 +1150,17 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                stored_chunk = zlib.compress(chunk_buffer.getvalue())
+                chunk_log_item = ContainerLogData.from_log(
+                    ContainerLogType.ZLIB, chunk_buffer.getvalue()
+                )
                 await self.valkey_stat_client.enqueue_container_logs(
                     container_id,
-                    stored_chunk,
+                    chunk_log_item.serialize(),
                 )
+
+            await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
         finally:
             chunk_buffer.close()
-        await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):

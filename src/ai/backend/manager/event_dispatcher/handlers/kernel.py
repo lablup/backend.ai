@@ -1,5 +1,4 @@
 import logging
-import zlib
 from io import BytesIO
 
 import sqlalchemy as sa
@@ -16,6 +15,9 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
+)
+from ai.backend.common.log.types import (
+    ContainerLogData,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -75,8 +77,8 @@ class KernelEventHandler:
                     log_buffer.write(b"(container log unavailable)\n")
                     break
                 for chunk in chunks:
-                    decomporessed_chunk = zlib.decompress(chunk)
-                    log_buffer.write(decomporessed_chunk)
+                    log_item = ContainerLogData.deserialize(chunk)
+                    log_buffer.write(log_item.get_content())
             try:
                 log_data = log_buffer.getvalue()
 
