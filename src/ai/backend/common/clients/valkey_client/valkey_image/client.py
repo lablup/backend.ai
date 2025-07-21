@@ -133,7 +133,7 @@ class ValkeyImageClient:
                 break
         if keys_to_remove:
             tx = self._create_batch()
-            for key in keys:
+            for key in keys_to_remove:
                 tx.srem(key, [agent_id])
             await self._client.client.exec(tx, raise_on_error=True)
 
