@@ -20,8 +20,8 @@ from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
-from ai.backend.manager.clients.storage_proxy.client_facing_client import (
-    StorageProxyClientFacingClient,
+from ai.backend.manager.clients.storage_proxy.client_facing_info import (
+    StorageProxyClientFacingInfo,
 )
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
@@ -61,7 +61,7 @@ class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
     _exposed_volume_info: list[str]
     _manager_facing_clients: Mapping[str, StorageProxyManagerFacingClient]
-    _client_facing_clients: Mapping[str, StorageProxyClientFacingClient]
+    _client_facing_clients: Mapping[str, StorageProxyClientFacingInfo]
 
     def __init__(self, storage_config: VolumesConfig) -> None:
         self.config = storage_config
@@ -107,13 +107,13 @@ class StorageSessionManager:
     def _setup_client_facing_clients(
         cls,
         storage_config: VolumesConfig,
-    ) -> Mapping[str, StorageProxyClientFacingClient]:
+    ) -> Mapping[str, StorageProxyClientFacingInfo]:
         client_facing_clients = {}
         for proxy_name, proxy_config in storage_config.proxies.items():
             if proxy_name in client_facing_clients:
                 log.error("Storage proxy {} is already registered.", proxy_name)
                 continue
-            client_facing_clients[proxy_name] = StorageProxyClientFacingClient(
+            client_facing_clients[proxy_name] = StorageProxyClientFacingInfo(
                 base_url=yarl.URL(proxy_config.client_api),
             )
         return client_facing_clients

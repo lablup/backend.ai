@@ -6,7 +6,7 @@ import yarl
 
 
 @dataclass(frozen=True)
-class StorageProxyClientFacingClient:
+class StorageProxyClientFacingInfo:
     """
     Dataclass containing endpoint information for client-facing storage proxy operations.
     This class provides endpoint URLs and configuration that can be sent to users.
