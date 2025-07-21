@@ -46,7 +46,7 @@ def mock_session_lifecycle_dependencies(mocker):
 
 
 @pytest.fixture
-def mock_trgger_batch_execution_rpc(mocker):
+def mock_trigger_batch_execution_rpc(mocker):
     # Mock potential agent RPC calls that could be triggered during status transitions
     mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.trigger_batch_execution",
@@ -85,7 +85,7 @@ CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNN
 )
 async def test_check_and_transit_status(
     mock_session_lifecycle_dependencies,
-    mock_trgger_batch_execution_rpc,
+    mock_trigger_batch_execution_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CheckAndTransitStatusAction, CheckAndTransitStatusActionResult],
 ):
