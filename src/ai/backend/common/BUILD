@@ -37,6 +37,8 @@ python_distribution(
         "src/ai/backend/common/clients/valkey_client/valkey_stream:src",
         "src/ai/backend/common/configs:src",
         "src/ai/backend/common/contexts:src",
+        "src/ai/backend/common/data/config:src",
+        "src/ai/backend/common/data/endpoint:src",
         "src/ai/backend/common/data/session:src",
         "src/ai/backend/common/data/vfolder:src",
         "src/ai/backend/common/dto/agent:src",
