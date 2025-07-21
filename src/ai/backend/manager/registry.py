@@ -1107,6 +1107,15 @@ class AgentRegistry:
             resource_opts = creation_config.get("resource_opts") or {}
 
             creation_config["mounts"] = [vfmount.to_json() for vfmount in vfolder_mounts]
+
+            # self.db를 통해 vfolders 테이블 접근해서 name으로 resolve 해 주면 끝.
+            # VFolderRow.get 사용할 것.
+
+            # 여기를 고쳐주면 됨.
+            # -> 에이전트에 보내주기 전에 id면 name으로 바꾼 다음 보내주면 끝.
+            # 어차피 마운트, 마운트 맵 쓰는 다른 코드들 모두 여길 거쳐가게 되어 있으므로.
+            #
+
             # TODO: merge into a single call
             async with self.db.begin_readonly_session() as session:
                 log.debug(

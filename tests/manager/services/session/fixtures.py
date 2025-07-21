@@ -339,8 +339,8 @@ SESSION_FIXTURE_DATA2 = SESSION_ROW_FIXTURE2.to_dataclass()
 SESSION_FIXTURE_DICT2 = dataclasses.asdict(
     dataclasses.replace(
         SESSION_FIXTURE_DATA2,
-        result=SESSION_FIXTURE_DATA2.result.name,
-        status=SESSION_FIXTURE_DATA2.status.value,
+        result=SESSION_FIXTURE_DATA2.result.name,  # type: ignore
+        status=SESSION_FIXTURE_DATA2.status.value,  # type: ignore
     )
 )
 
@@ -348,10 +348,10 @@ KERNEL_FIXTURE_DATA2 = KERNEL_ROW_FIXTURE2.to_dataclass()
 KERNEL_FIXTURE_DICT2 = dataclasses.asdict(
     dataclasses.replace(
         KERNEL_FIXTURE_DATA2,
-        session_type=KERNEL_FIXTURE_DATA2.session_type.value,
-        cluster_mode=KERNEL_FIXTURE_DATA2.cluster_mode.name,
-        result=KERNEL_FIXTURE_DATA2.result.name,
-        status=KERNEL_FIXTURE_DATA2.status.value,
+        session_type=KERNEL_FIXTURE_DATA2.session_type.value,  # type: ignore
+        cluster_mode=KERNEL_FIXTURE_DATA2.cluster_mode.name,  # type: ignore
+        result=KERNEL_FIXTURE_DATA2.result.name,  # type: ignore
+        status=KERNEL_FIXTURE_DATA2.status.value,  # type: ignore
     )
 )
 
