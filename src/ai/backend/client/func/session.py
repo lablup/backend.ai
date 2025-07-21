@@ -212,8 +212,8 @@ class ComputeSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
+        mounts: Optional[list[str | UUID]] = None,
+        mount_map: Optional[Mapping[str, str | UUID]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
@@ -403,8 +403,8 @@ class ComputeSession(BaseFunction):
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: list[str] | Undefined = undefined,
-        mount_map: Mapping[str, str] | Undefined = undefined,
+        mounts: list[str | UUID] | Undefined = undefined,
+        mount_map: Mapping[str, str | UUID] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         batch_timeout: str | int | Undefined = undefined,
@@ -461,10 +461,10 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder names that belongs to the current API
+        :param mounts: The list of vfolder ids or names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
-            Key and value of this map should be vfolder name and custom path.
+            Key and value of this map should be vfolder id or name and custom path.
             Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
@@ -1368,8 +1368,8 @@ class InferenceSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
+        mounts: Optional[list[str | UUID]] = None,
+        mount_map: Optional[Mapping[str, str | UUID]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
@@ -1406,8 +1406,8 @@ class InferenceSession(BaseFunction):
         dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: list[str] | Undefined = undefined,
-        mount_map: Mapping[str, str] | Undefined = undefined,
+        mounts: list[str | UUID] | Undefined = undefined,
+        mount_map: Mapping[str, str | UUID] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         resources: Mapping[str, int] | Undefined = undefined,

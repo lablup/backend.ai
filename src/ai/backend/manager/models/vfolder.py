@@ -573,6 +573,25 @@ class VFolderRow(Base):
             raise ObjectNotFound(object_name="VFolder")
         return result
 
+    @classmethod
+    async def id_to_name(
+        cls,
+        session: SASession,
+        vfolder_id: uuid.UUID | str,
+    ) -> str:
+        if isinstance(vfolder_id, str):
+            try:
+                vfolder_id = uuid.UUID(vfolder_id)
+            except ValueError:
+                raise ObjectNotFound(object_name="VFolder")
+
+        vfolder = await session.get(VFolderRow, vfolder_id)
+
+        if vfolder is None:
+            raise ObjectNotFound(object_name="VFolder")
+
+        return vfolder.name
+
     def __contains__(self, key):
         return key in self.__dir__()
 
