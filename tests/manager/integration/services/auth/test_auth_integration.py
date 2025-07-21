@@ -120,7 +120,7 @@ async def test_duplicate_signup_fails(auth_service, database_fixture):
         await auth_service.signup(signup_action)
 
 
-async def test_update_password_flow(auth_service, database_fixture):
+async def test_update_password_flow(auth_service, database_fixture, database_engine):
     """Test password update flow"""
     # Create a user first
     email = f"password_test_{datetime.now().timestamp()}@example.com"
@@ -140,7 +140,11 @@ async def test_update_password_flow(auth_service, database_fixture):
     await auth_service.signup(signup_action)
 
     # Update password
-    user_id = sa.select(UserRow.uuid).where(UserRow.email == email)
+    query = sa.select(UserRow.uuid).where(UserRow.email == email)
+    user_id = None
+    async with database_engine.connect() as session:
+        result = await session.execute(query)
+        user_id = result.scalar()
     update_action = UpdatePasswordAction(
         user_id=user_id,
         domain_name="default",
@@ -183,7 +187,7 @@ async def test_update_password_flow(auth_service, database_fixture):
     assert auth_result.authorization_result is not None
 
 
-async def test_signout_flow(auth_service, database_fixture):
+async def test_signout_flow(auth_service, database_fixture, database_engine):
     """Test signout flow"""
     # Create a user first
     email = f"signout_test_{datetime.now().timestamp()}@example.com"
@@ -216,7 +220,11 @@ async def test_signout_flow(auth_service, database_fixture):
     assert auth_result.authorization_result is not None
 
     # Signout
-    user_id = sa.select(UserRow.uuid).where(UserRow.email == email)
+    user_id = None
+    query = sa.select(UserRow.uuid).where(UserRow.email == email)
+    async with database_engine.connect() as session:
+        result = await session.execute(query)
+        user_id = result.scalar()
     signout_action = SignoutAction(
         user_id=user_id,
         domain_name="default",
