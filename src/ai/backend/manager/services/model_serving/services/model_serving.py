@@ -167,19 +167,11 @@ class ModelServingService:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
 
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        result = await manager_client.fetch_file(
+        return await manager_client.fetch_file_content(
             volume_name,
             str(vfid),
             f"./{filename}",
         )
-        # Convert base64 data back to bytes
-        import base64
-
-        if "data" in result:
-            chunks = base64.b64decode(result["data"])
-        else:
-            chunks = bytes()
-        return chunks
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx

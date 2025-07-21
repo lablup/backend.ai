@@ -86,7 +86,6 @@ class VFolderFileService:
             str(vfolder_id),
             action.path,
             action.size,
-            "",  # Empty base64 data for now - actual upload will use the token
         )
         client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateUploadSessionActionResult(
@@ -131,18 +130,12 @@ class VFolderFileService:
 
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
         # For download, we need to handle the request differently as it includes extra params
-        body = {
-            "volume": volume_name,
-            "vfid": str(vfolder_id),
-            "relpath": action.path,
-            "archive": action.archive,
-        }
-        if vfolder_data.unmanaged_path:
-            body["unmanaged_path"] = vfolder_data.unmanaged_path
-        storage_reply = await manager_client._client.request(
-            "POST",
-            "folder/file/download",
-            body=body,
+        storage_reply = await manager_client.download_file(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            archive=action.archive,
+            unmanaged_path=vfolder_data.unmanaged_path,
         )
         client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateDownloadSessionActionResult(
@@ -283,16 +276,15 @@ class VFolderFileService:
 
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
         storage_reply = await manager_client.mkdir(
-            volume_name,
-            str(vfolder_id),
-            action.path,
-            action.parents,
-            action.exist_ok,
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            exist_ok=action.exist_ok,
+            parents=action.parents,
         )
-        results = storage_reply.get("results", [])
-        status = storage_reply.get("status", 200)  # Default to 200 if not provided
+        results = storage_reply["results"]
         return MkdirActionResult(
             vfolder_uuid=action.vfolder_uuid,
             results=results,
-            storage_resp_status=status,
+            storage_resp_status=200,
         )

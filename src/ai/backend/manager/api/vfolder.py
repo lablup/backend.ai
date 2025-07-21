@@ -690,7 +690,7 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
     )
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(params["folder_host"])
     manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-    storage_reply = await manager_client.get_volume_performance_metric(volume_name, "io")
+    storage_reply = await manager_client.get_volume_performance_metric(volume_name)
     return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
@@ -801,7 +801,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
     vfid = str(VFolderID.from_row(vfolder_row))
     # Get quota for the specific vfolder
-    storage_reply = await manager_client.get_quota_scope(volume_name, vfid)
+    storage_reply = await manager_client.get_volume_quota(volume_name, vfid)
     return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
@@ -875,7 +875,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
     vfid = str(VFolderID.from_row(vfolder_row))
     # Update quota scope with new quota value
-    await manager_client.update_quota_scope(volume_name, vfid, quota)
+    await manager_client.update_volume_quota(volume_name, vfid, quota)
 
     # Update the quota for the vfolder in DB.
     async with root_ctx.db.begin() as conn:

@@ -1110,10 +1110,9 @@ async def prepare_vfolder_mounts(
             proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
             await manager_client.mkdir(
-                volume_name,
-                str(vfid),
-                vfsubpath.as_posix(),
-                parents=True,
+                volume=volume_name,
+                vfid=str(vfid),
+                relpath=[vfsubpath.as_posix()],
                 exist_ok=True,
             )
             # Mount the per-user subdirectory as the ".local" vfolder.
@@ -1357,8 +1356,6 @@ async def initiate_vfolder_clone(
                 str(vfolder_info.source_vfolder_id),
                 target_volume,
                 str(target_folder_id),
-                vfolder_info.email,  # Using creator email as host_access_key
-                vfolder_info.user_id.hex if vfolder_info.user_id else None,
             )
         except aiohttp.ClientResponseError:
             raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))

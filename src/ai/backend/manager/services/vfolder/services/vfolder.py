@@ -1,6 +1,6 @@
+import logging
 import uuid
 from typing import (
-    Any,
     Optional,
 )
 
@@ -17,12 +17,11 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
-    DeleteStatus,
-    VFolderDeleteResult,
+    VFolderData,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -33,7 +32,6 @@ from ai.backend.manager.errors.storage import (
     VFolderGone,
     VFolderInvalidParameter,
     VFolderNotFound,
-    VFolderOperationFailed,
 )
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -73,6 +71,8 @@ from ..actions.base import (
     UpdateVFolderAttributeActionResult,
 )
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 async def _check_vfolder_status(
@@ -241,28 +241,15 @@ class VFolderService:
         try:
             vfid = VFolderID(quota_scope_id, folder_id)
             if not unmanaged_path:
-                options = {}
-                if max_quota_scope_size and max_quota_scope_size > 0:
-                    options["initial_max_size_for_quota_scope"] = max_quota_scope_size
-                body_data: dict[str, Any] = {
-                    "volume": self._storage_manager.get_proxy_and_volume(
-                        folder_host, is_unmanaged(unmanaged_path)
-                    )[1],
-                    "vfid": str(vfid),
-                    "options": options,
-                }
-                if vfolder_permission_mode is not None:
-                    body_data["mode"] = vfolder_permission_mode
                 proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
                     folder_host, is_unmanaged(unmanaged_path)
                 )
                 manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
                 await manager_client.create_folder(
                     volume_name,
-                    body_data["vfid"],
-                    body_data["host_access_key"],
-                    body_data.get("owner_access_key"),
-                    body_data.get("mode"),
+                    str(vfid),
+                    max_quota_scope_size,
+                    vfolder_permission_mode,
                 )
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailure from e
@@ -501,15 +488,7 @@ class VFolderService:
         await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
-    async def delete_forever(
-        self, action: DeleteForeverVFolderAction
-    ) -> DeleteForeverVFolderActionResult:
-        # TODO: Implement proper permission checking and business logic
-        # For now, use admin repository for the operation
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+    async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
@@ -519,30 +498,24 @@ class VFolderService:
                 volume_name,
                 str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
             )
-            result = VFolderDeleteResult(
-                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.DELETE_ONGOING
-            )
-        except (VFolderOperationFailed, InvalidAPIParameters) as e:
-            if getattr(e, "status", None) == 410:
-                result = VFolderDeleteResult(
-                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                    DeleteStatus.ALREADY_DELETED,
-                )
-            else:
-                result = VFolderDeleteResult(
-                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.ERROR
-                )
-        except VFolderGone:
-            result = VFolderDeleteResult(
-                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                DeleteStatus.ALREADY_DELETED,
-            )
-        match result.status:
-            case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
-                await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
-            case DeleteStatus.ERROR:
-                # TODO: Handle error case properly
-                pass
+        except VFolderGone as e:
+            # If the vfolder is already gone, just delete it from the repository
+            log.warning("VFolder {} is already gone: {}", vfolder_data.id, e)
+        except VFolderNotFound as e:
+            # If the vfolder is not found, just delete it from the repository
+            log.warning("VFolder {} not found: {}", vfolder_data.id, e)
+
+    async def delete_forever(
+        self, action: DeleteForeverVFolderAction
+    ) -> DeleteForeverVFolderActionResult:
+        # TODO: Implement proper permission checking and business logic
+        # For now, use admin repository for the operation
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
@@ -554,39 +527,8 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
-        )
-        try:
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-            await manager_client.delete_folder(
-                volume_name,
-                str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)),
-            )
-            result = VFolderDeleteResult(
-                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.DELETE_ONGOING
-            )
-        except (VFolderOperationFailed, InvalidAPIParameters) as e:
-            if getattr(e, "status", None) == 410:
-                result = VFolderDeleteResult(
-                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                    DeleteStatus.ALREADY_DELETED,
-                )
-            else:
-                result = VFolderDeleteResult(
-                    VFolderID(vfolder_data.quota_scope_id, vfolder_data.id), DeleteStatus.ERROR
-                )
-        except VFolderGone:
-            result = VFolderDeleteResult(
-                VFolderID(vfolder_data.quota_scope_id, vfolder_data.id),
-                DeleteStatus.ALREADY_DELETED,
-            )
-        match result.status:
-            case DeleteStatus.DELETE_ONGOING | DeleteStatus.ALREADY_DELETED:
-                await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
-            case DeleteStatus.ERROR:
-                # TODO: Handle error case properly
-                pass
+        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:

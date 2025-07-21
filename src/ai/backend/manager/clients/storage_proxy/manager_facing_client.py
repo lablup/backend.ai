@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from contextlib import asynccontextmanager as actxmgr
+from typing import Any, AsyncIterator, Optional
+
+import aiohttp
 
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
+from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
+from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 
 
 class StorageProxyManagerFacingClient:
@@ -24,50 +29,47 @@ class StorageProxyManagerFacingClient:
 
         :return: Response containing volume information
         """
-        return await self._client.request("GET", "volumes")
+        return await self._client.request_with_response("GET", "volumes")
 
     async def create_folder(
         self,
         volume: str,
         vfid: str,
-        host_access_key: str,
-        owner_access_key: str | None = None,
+        max_quota_scope_size: int | None = None,
         mode: int | None = None,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Create a new folder in the storage proxy.
 
         :param volume: Volume name
         :param vfid: Virtual folder ID
-        :param host_access_key: Host access key
-        :param owner_access_key: Owner access key (optional)
+        :param max_quota_scope_size: Maximum size for the quota scope (optional)
         :param mode: File mode permissions (optional)
-        :return: Response from the storage proxy
         """
-        body = {
+        options = {}
+        if max_quota_scope_size and max_quota_scope_size > 0:
+            options["initial_max_size_for_quota_scope"] = max_quota_scope_size
+        body: dict[str, Any] = {
             "volume": volume,
             "vfid": vfid,
-            "host_access_key": host_access_key,
+            "options": options,
         }
-        if owner_access_key is not None:
-            body["owner_access_key"] = owner_access_key
         if mode is not None:
-            body["mode"] = str(mode)
-        return await self._client.request("POST", "folder/create", body=body)
+            body["mode"] = mode
+        await self._client.request("POST", "folder/create", body=body)
 
     async def delete_folder(
         self,
         volume: str,
         vfid: str,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Delete a folder from the storage proxy.
 
         :param volume: Volume name
         :param vfid: Virtual folder ID
-        :return: Response from the storage proxy
         """
-        return await self._client.request(
+        await self._client.request(
             "POST",
             "folder/delete",
             body={
@@ -82,9 +84,7 @@ class StorageProxyManagerFacingClient:
         src_vfid: str,
         dst_volume: str,
         dst_vfid: str,
-        host_access_key: str,
-        owner_access_key: str | None = None,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Clone a folder to another location.
 
@@ -92,20 +92,14 @@ class StorageProxyManagerFacingClient:
         :param src_vfid: Source virtual folder ID
         :param dst_volume: Destination volume name
         :param dst_vfid: Destination virtual folder ID
-        :param host_access_key: Host access key
-        :param owner_access_key: Owner access key (optional)
-        :return: Response from the storage proxy
         """
         body = {
             "src_volume": src_volume,
             "src_vfid": src_vfid,
             "dst_volume": dst_volume,
             "dst_vfid": dst_vfid,
-            "host_access_key": host_access_key,
         }
-        if owner_access_key is not None:
-            body["owner_access_key"] = owner_access_key
-        return await self._client.request("POST", "folder/clone", body=body)
+        await self._client.request("POST", "folder/clone", body=body)
 
     async def get_mount_path(
         self,
@@ -121,7 +115,7 @@ class StorageProxyManagerFacingClient:
         :param subpath: Subpath within the folder (default: ".")
         :return: Response containing the mount path
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "folder/mount",
             body={
@@ -141,7 +135,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :return: Response containing hardware information
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "volume/hwinfo",
             body={
@@ -152,21 +146,18 @@ class StorageProxyManagerFacingClient:
     async def get_volume_performance_metric(
         self,
         volume: str,
-        metric: str,
     ) -> Mapping[str, Any]:
         """
         Get performance metrics for a volume.
 
         :param volume: Volume name
-        :param metric: Metric name to retrieve
         :return: Response containing performance metrics
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "volume/performance-metric",
             body={
                 "volume": volume,
-                "metric": metric,
             },
         )
 
@@ -180,13 +171,55 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :return: Response containing filesystem usage
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "folder/fs-usage",
             body={
                 "volume": volume,
             },
         )
+
+    async def get_volume_quota(
+        self,
+        volume: str,
+        vfid: str,
+    ) -> Mapping[str, Any]:
+        """
+        Get quota information for a specific volume and virtual folder.
+
+        :param volume: Volume name
+        :param vfid: Virtual folder ID
+        :return: Response containing quota information
+        """
+        return await self._client.request_with_response(
+            "GET",
+            "volume/quota",
+            body={
+                "volume": volume,
+                "vfid": vfid,
+            },
+        )
+
+    async def update_volume_quota(
+        self,
+        volume: str,
+        vfid: str,
+        quota_scope_size: int,
+    ) -> None:
+        """
+        Update the quota for a specific volume and virtual folder.
+
+        :param volume: Volume name
+        :param vfid: Virtual folder ID
+        :param quota_scope_size: New quota size to set
+        """
+        # DEPRECATED: This method is deprecated and will be removed in the future.
+        body = {
+            "volume": volume,
+            "vfid": vfid,
+            "size_bytes": quota_scope_size,
+        }
+        await self._client.request("PATCH", "volume/quota", body=body)
 
     async def get_quota_scope(
         self,
@@ -200,7 +233,7 @@ class StorageProxyManagerFacingClient:
         :param qsid: Quota scope ID
         :return: Response containing quota scope information
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "quota-scope",
             body={
@@ -213,37 +246,36 @@ class StorageProxyManagerFacingClient:
         self,
         volume: str,
         qsid: str,
-        quota: int | None = None,
-    ) -> Mapping[str, Any]:
+        max_vfolder_size: int,
+    ) -> None:
         """
         Update quota scope settings.
 
         :param volume: Volume name
         :param qsid: Quota scope ID
-        :param quota: New quota value (optional)
-        :return: Response from the storage proxy
+        :param max_vfolder_size: Maximum size for the quota scope
         """
         body = {
             "volume": volume,
             "qsid": qsid,
+            "options": {
+                "limit_bytes": max_vfolder_size,
+            },
         }
-        if quota is not None:
-            body["quota"] = str(quota)
-        return await self._client.request("PATCH", "quota-scope", body=body)
+        await self._client.request("PATCH", "quota-scope", body=body)
 
     async def delete_quota_scope_quota(
         self,
         volume: str,
         qsid: str,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Delete quota scope quota.
 
         :param volume: Volume name
         :param qsid: Quota scope ID
-        :return: Response from the storage proxy
         """
-        return await self._client.request(
+        await self._client.request(
             "DELETE",
             "quota-scope/quota",
             body={
@@ -254,11 +286,12 @@ class StorageProxyManagerFacingClient:
 
     async def mkdir(
         self,
+        *,
         volume: str,
         vfid: str,
         relpath: str | list[str],
-        parents: bool = True,
-        exist_ok: bool = False,
+        exist_ok: bool,
+        parents: Optional[bool] = None,
     ) -> Mapping[str, Any]:
         """
         Create a directory in a folder.
@@ -266,20 +299,22 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :param vfid: Virtual folder ID
         :param relpath: Relative path of the directory to create
-        :param parents: Create parent directories if they don't exist
-        :param exist_ok: Don't raise error if directory already exists
+        :param exist_ok: If True, do not raise an error if the directory already exists
+        :param parents: If True, create parent directories as needed
         :return: Response from the storage proxy
         """
-        return await self._client.request(
+        body = {
+            "volume": volume,
+            "vfid": vfid,
+            "relpath": relpath,
+            "exist_ok": exist_ok,
+        }
+        if parents is not None:
+            body["parents"] = parents
+        return await self._client.request_with_response(
             "POST",
             "folder/file/mkdir",
-            body={
-                "volume": volume,
-                "vfid": vfid,
-                "relpath": relpath,
-                "parents": parents,
-                "exist_ok": exist_ok,
-            },
+            body=body,
         )
 
     async def rename_file(
@@ -288,8 +323,7 @@ class StorageProxyManagerFacingClient:
         vfid: str,
         relpath: str,
         new_name: str,
-        is_dir: bool = False,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Rename a file or directory.
 
@@ -297,10 +331,8 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :param relpath: Current relative path of the file/directory
         :param new_name: New name for the file/directory
-        :param is_dir: Whether the target is a directory
-        :return: Response from the storage proxy
         """
-        return await self._client.request(
+        await self._client.request(
             "POST",
             "folder/file/rename",
             body={
@@ -308,7 +340,6 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "relpath": relpath,
                 "new_name": new_name,
-                "is_dir": is_dir,
             },
         )
 
@@ -328,7 +359,7 @@ class StorageProxyManagerFacingClient:
         :param recursive: Whether to delete directories recursively
         :return: Response from the storage proxy
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "POST",
             "folder/file/delete",
             body={
@@ -345,7 +376,7 @@ class StorageProxyManagerFacingClient:
         vfid: str,
         src: str,
         dst: str,
-    ) -> Mapping[str, Any]:
+    ) -> None:
         """
         Move a file or directory.
 
@@ -353,16 +384,15 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :param src: Source relative path
         :param dst: Destination relative path
-        :return: Response from the storage proxy
         """
-        return await self._client.request(
+        await self._client.request(
             "POST",
             "folder/file/move",
             body={
                 "volume": volume,
                 "vfid": vfid,
-                "src": src,
-                "dst": dst,
+                "src_relpath": src,
+                "dst_relpath": dst,
             },
         )
 
@@ -372,7 +402,6 @@ class StorageProxyManagerFacingClient:
         vfid: str,
         relpath: str,
         size: str,
-        base64_encoded_data: str,
     ) -> Mapping[str, Any]:
         """
         Upload a file to the storage proxy.
@@ -381,10 +410,9 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :param relpath: Relative path of the file
         :param size: Size of the file
-        :param base64_encoded_data: Base64 encoded file data
         :return: Response from the storage proxy
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "POST",
             "folder/file/upload",
             body={
@@ -392,15 +420,17 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "relpath": relpath,
                 "size": size,
-                "data": base64_encoded_data,
             },
         )
 
     async def download_file(
         self,
+        *,
         volume: str,
         vfid: str,
         relpath: str,
+        archive: bool = False,
+        unmanaged_path: Optional[str] = None,
     ) -> Mapping[str, Any]:
         """
         Download a file from the storage proxy.
@@ -408,15 +438,19 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :param vfid: Virtual folder ID
         :param relpath: Relative path of the file
+        :param archive: If True, download as an archive
+        :param unmanaged_path: Optional unmanaged path for the file
         :return: Response from the storage proxy containing file data
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "POST",
             "folder/file/download",
             body={
                 "volume": volume,
                 "vfid": vfid,
                 "relpath": relpath,
+                "archive": archive,
+                "unmanaged_path": unmanaged_path,
             },
         )
 
@@ -434,7 +468,7 @@ class StorageProxyManagerFacingClient:
         :param relpath: Relative path of the directory
         :return: Response from the storage proxy containing file list
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "POST",
             "folder/file/list",
             body={
@@ -444,12 +478,13 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    async def fetch_file(
+    @actxmgr
+    async def _fetch_file(
         self,
         volume: str,
         vfid: str,
         relpath: str,
-    ) -> Mapping[str, Any]:
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Fetch file content from the storage proxy.
 
@@ -458,7 +493,7 @@ class StorageProxyManagerFacingClient:
         :param relpath: Relative path of the file
         :return: Response from the storage proxy containing file content
         """
-        return await self._client.request(
+        async with self._client.request_stream_response(
             "POST",
             "folder/file/fetch",
             body={
@@ -466,7 +501,39 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "relpath": relpath,
             },
-        )
+        ) as response_stream:
+            yield response_stream
+
+    async def fetch_file_content(
+        self,
+        volume: str,
+        vfid: str,
+        relpath: str,
+    ) -> bytes:
+        """
+        Fetch file content from the storage proxy.
+
+        :param volume: Volume name
+        :param vfid: Virtual folder ID
+        :param relpath: Relative path of the file
+        :return: Response from the storage proxy containing file content
+        """
+        async with self._fetch_file(
+            volume=volume,
+            vfid=vfid,
+            relpath=relpath,
+        ) as response_stream:
+            chunks = bytes()
+            while True:
+                chunk = await response_stream.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+            if not chunks:
+                raise UnexpectedStorageProxyResponseError(
+                    f"No content received for {volume}/{vfid}/{relpath}"
+                )
+            return chunks
 
     async def get_folder_usage(
         self,
@@ -480,7 +547,7 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :return: Response from the storage proxy containing usage information
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "folder/usage",
             body={
@@ -501,7 +568,7 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :return: Response from the storage proxy containing used bytes
         """
-        return await self._client.request(
+        return await self._client.request_with_response(
             "GET",
             "folder/used-bytes",
             body={

@@ -114,7 +114,7 @@ class StorageSessionManager:
                 log.error("Storage proxy {} is already registered.", proxy_name)
                 continue
             client_facing_clients[proxy_name] = StorageProxyClientFacingClient(
-                base_url=str(proxy_config.client_api),
+                base_url=yarl.URL(proxy_config.client_api),
             )
         return client_facing_clients
 
@@ -126,11 +126,12 @@ class StorageSessionManager:
         return self._manager_facing_clients[proxy_name]
 
     def get_client_api_url(self, proxy_name: str) -> yarl.URL:
-        if proxy_name not in self._client_facing_clients:
+        client = self._client_facing_clients.get(proxy_name, None)
+        if client is None:
             raise StorageProxyNotFound(
                 f"Storage proxy {proxy_name} not found.",
             )
-        return yarl.URL(self._client_facing_clients[proxy_name].base_url)
+        return client.base_url
 
     async def aclose(self) -> None:
         close_aws = []

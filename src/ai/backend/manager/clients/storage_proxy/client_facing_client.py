@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import yarl
+
 
 @dataclass(frozen=True)
 class StorageProxyClientFacingClient:
@@ -10,4 +12,4 @@ class StorageProxyClientFacingClient:
     This class provides endpoint URLs and configuration that can be sent to users.
     """
 
-    base_url: str
+    base_url: yarl.URL

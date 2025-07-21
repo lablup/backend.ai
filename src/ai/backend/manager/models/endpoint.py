@@ -927,21 +927,12 @@ class ModelServiceHelper:
         Reads specified model definition file from target VFolder and returns
         """
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        chunks = bytes()
         manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        result = await manager_facing_client.fetch_file(
+        chunks = await manager_facing_client.fetch_file_content(
             volume_name,
             str(vfid),
             f"./{model_definition_filename}",
         )
-        # Convert base64 data back to bytes
-        import base64
-
-        if "data" in result:
-            chunks = base64.b64decode(result["data"])
-        else:
-            # If no data field, assume empty file
-            chunks = bytes()
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
         return yaml.load(model_definition_yaml)
