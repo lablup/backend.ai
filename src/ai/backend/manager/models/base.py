@@ -1360,8 +1360,11 @@ async def populate_fixture(
                 if isinstance(col.type, sa.sql.sqltypes.DateTime):
                     for row in rows:
                         if col.name in row:
-                            row[col.name] = isoparse(row[col.name])
-                elif isinstance(col.type, EnumType):
+                            if row[col.name] is not None:
+                                row[col.name] = isoparse(row[col.name])
+                            else:
+                                row[col.name] = None
+                if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
@@ -1369,12 +1372,19 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])
-                elif isinstance(
-                    col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
-                ):
+                elif isinstance(col.type, (StructuredJSONObjectColumn)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._schema.from_json(row[col.name])
+                elif isinstance(col.type, (StructuredJSONObjectListColumn)):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            row[col.name] = [
+                                item
+                                if isinstance(item, col.type._schema)
+                                else col.type._schema.from_json(item)
+                                for item in row[col.name]
+                            ]
 
             match op_mode:
                 case FixtureOpModes.INSERT:

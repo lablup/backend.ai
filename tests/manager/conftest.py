@@ -34,6 +34,7 @@ import aiohttp
 import asyncpg
 import pytest
 import sqlalchemy as sa
+import yarl
 from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import BaseModel
@@ -83,6 +84,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -184,7 +186,7 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
-def ipc_base_path() -> Path:
+def ipc_base_path(test_id) -> Path:
     ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     return ipc_base_path
@@ -378,6 +380,24 @@ def etcd_fixture(
 
 
 @pytest.fixture
+def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
+    """
+    Provide a local_config fixture that returns the bootstrap config as a dictionary.
+    This is used by session processors and other components that expect config in dict format.
+    """
+    config_dict = bootstrap_config.model_dump()
+
+    # Convert back to proper types for compatibility with AsyncEtcd
+    from ai.backend.common.typed_validators import HostPortPair
+
+    config_dict["etcd"]["addr"] = HostPortPair(
+        host=config_dict["etcd"]["addr"]["host"], port=config_dict["etcd"]["addr"]["port"]
+    )
+
+    return config_dict
+
+
+@pytest.fixture
 async def unified_config(
     app, bootstrap_config: BootstrapConfig, etcd_fixture
 ) -> AsyncIterator[ManagerUnifiedConfig]:
@@ -526,12 +546,16 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
     def fixture_json_encoder(obj: Any):
+        if isinstance(obj, Mapping):
+            return dict(obj)
         if isinstance(obj, uuid.UUID):
             return str(obj)
         if isinstance(obj, datetime):
             return str(obj)
         if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
             return obj.value
+        if isinstance(obj, yarl.URL):
+            return str(obj)
 
         raise TypeError(f'Fixture type "{type(obj)}" not serializable')
 
@@ -580,7 +604,9 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
             async with engine.begin() as conn:
                 await conn.execute((vfolders.delete()))
                 await conn.execute((kernels.delete()))
+                await conn.execute((SessionRow.__table__.delete()))
                 await conn.execute((agents.delete()))
+                await conn.execute((session_templates.delete()))
                 await conn.execute((keypairs.delete()))
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))

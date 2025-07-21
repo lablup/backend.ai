@@ -3,7 +3,7 @@ from typing import Any, Mapping, Optional, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
 
 
@@ -25,12 +25,11 @@ class CommitSessionAction(SessionAction):
 
 @dataclass
 class CommitSessionActionResult(BaseActionResult):
-    # TODO: Add SessionData type
-    session_row: SessionRow
+    session_data: SessionData
 
     # TODO: Add proper type
     commit_result: Mapping[str, Any]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.session_row.id)
+        return str(self.session_data.id)

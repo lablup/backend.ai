@@ -1101,6 +1101,7 @@ class AgentRegistry:
             resource_opts = creation_config.get("resource_opts") or {}
 
             creation_config["mounts"] = [vfmount.to_json() for vfmount in vfolder_mounts]
+
             # TODO: merge into a single call
             async with self.db.begin_readonly_session() as session:
                 log.debug(
