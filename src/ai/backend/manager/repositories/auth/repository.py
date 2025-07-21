@@ -16,7 +16,7 @@ from ai.backend.manager.errors.auth import (
 )
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import UserRow, check_credential, users
+from ai.backend.manager.models.user import UserRow, UserStatus, check_credential, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for auth repository
@@ -173,7 +173,9 @@ class AuthRepository:
     async def deactivate_user_and_keypairs_validated(self, email: str) -> None:
         async with self._db.begin() as conn:
             # Deactivate user
-            user_query = users.update().values(status="inactive").where(users.c.email == email)
+            user_query = (
+                users.update().values(status=UserStatus.INACTIVE).where(users.c.email == email)
+            )
             await conn.execute(user_query)
 
             # Deactivate keypairs
@@ -202,7 +204,7 @@ class AuthRepository:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
-    def _user_row_to_data(self, row) -> UserData:
+    def _user_row_to_data(self, row: UserRow) -> UserData:
         return UserData(
             uuid=row.uuid,
             username=row.username,
@@ -211,7 +213,7 @@ class AuthRepository:
             need_password_change=row.need_password_change,
             full_name=row.full_name,
             description=row.description,
-            is_active=row.is_active,
+            is_active=row.status == UserStatus.ACTIVE,
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
