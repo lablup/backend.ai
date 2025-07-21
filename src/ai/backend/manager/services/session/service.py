@@ -655,7 +655,9 @@ class SessionService:
                 callback_url=callback_url,
                 sudo_session_enabled=sudo_session_enabled,
             )
-            return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
+            return CreateFromParamsActionResult(
+                session_id=uuid.UUID(resp["sessionId"]), result=resp
+            )
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendAIError:

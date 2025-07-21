@@ -20,7 +20,6 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_shutdown_service_rpc(mocker, mock_agent_response_result):
-    # Only mock agent registry methods - use real SessionRepository
     mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.shutdown_service",
         new_callable=AsyncMock,

@@ -1066,7 +1066,6 @@ class SessionRow(Base):
         Else, do nothing.
         Return True if a transition happened, else return False.
         """
-
         determined_status = determine_session_status_by_kernels(self.kernels)
         if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
             return False

@@ -15,7 +15,7 @@ from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTUR
 
 
 @pytest.fixture
-def mock_agent_list_files_rpc(mocker, mock_agent_response_result):
+def mock_list_files_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.list_files",
         new_callable=AsyncMock,
@@ -69,7 +69,7 @@ AGENT_LIST_FILES_RPC_RESP = {
     ],
 )
 async def test_list_files(
-    mock_agent_list_files_rpc,
+    mock_list_files_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[ListFilesAction, ListFilesActionResult],
 ):

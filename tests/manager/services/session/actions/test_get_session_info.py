@@ -58,8 +58,7 @@ EXPECTED_RESULT = LegacySessionInfo(
 
 
 @pytest.fixture
-def mock_get_session_info_service(mocker):
-    # Only mock the AgentRegistry dependency, not the service method itself
+def mock_increment_session_usage_rpc(mocker):
     mock_increment_usage = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
@@ -93,7 +92,7 @@ def mock_get_session_info_service(mocker):
     ],
 )
 async def test_get_session_info(
-    mock_get_session_info_service,
+    mock_increment_session_usage_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetSessionInfoAction, GetSessionInfoActionResult],
 ):
@@ -114,4 +113,4 @@ async def test_get_session_info(
     assert result.session_info.status == EXPECTED_RESULT.status
 
     # Verify the mock was called
-    mock_get_session_info_service.assert_called_once()
+    mock_increment_session_usage_rpc.assert_called_once()

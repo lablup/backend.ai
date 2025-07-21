@@ -15,9 +15,6 @@ async def processors(
     database_engine,
     registry_ctx,
 ) -> SessionProcessors:
-    from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
-    from ai.backend.manager.repositories.session.repository import SessionRepository
-
     agent_registry, _, _, _, _, _, _ = registry_ctx
 
     # Create REAL SessionRepository and AdminSessionRepository with database fixture

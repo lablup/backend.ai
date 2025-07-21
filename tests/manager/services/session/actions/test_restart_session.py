@@ -20,7 +20,6 @@ from ..fixtures import (
 
 @pytest.fixture
 def mock_restart_session_rpc(mocker, mock_agent_response_result):
-    # Only mock agent registry methods - use real SessionRepository
     mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,

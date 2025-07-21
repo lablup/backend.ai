@@ -14,8 +14,11 @@ from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
+    KERNEL_FIXTURE_DICT2,
     SESSION_FIXTURE_DATA,
+    SESSION_FIXTURE_DATA2,
     SESSION_FIXTURE_DICT,
+    SESSION_FIXTURE_DICT2,
     SESSION_ROW_FIXTURE,
     USER_FIXTURE_DATA,
 )
@@ -23,6 +26,7 @@ from ..fixtures import (
 GET_DEPENDENCY_GRAPH_BASE = {
     "nodes": [{"id": "node1", "type": "function"}],
     "edges": [{"from": "node1", "to": "node2"}],
+    "session_id": [SESSION_ROW_FIXTURE.id],
 }
 
 # The actual result will include session_id from the mocked repository
@@ -31,24 +35,12 @@ GET_DEPENDENCY_GRAPH_MOCK = {
     **GET_DEPENDENCY_GRAPH_BASE,
 }
 
-
-@pytest.fixture
-def mock_get_dependency_graph_service(mocker):
-    """Mock the get_dependency_graph service method"""
-    from ai.backend.manager.services.session.service import SessionService
-
-    mock_method = mocker.patch.object(
-        SessionService,
-        "get_dependency_graph",
-        new_callable=mocker.AsyncMock,
-    )
-
-    mock_method.return_value = GetDependencyGraphActionResult(
-        result=GET_DEPENDENCY_GRAPH_MOCK,
-        session_data=SESSION_FIXTURE_DATA,
-    )
-
-    return mock_method
+# Mock result with child sessions for dependency graph testing
+GET_DEPENDENCY_GRAPH_WITH_CHILD_MOCK = {
+    "nodes": [{"id": "node1", "type": "function"}, {"id": "node2", "type": "function"}],
+    "edges": [{"from": "node1", "to": "node2"}],
+    "session_id": [SESSION_ROW_FIXTURE.id, SESSION_FIXTURE_DATA2.id],
+}
 
 
 @pytest.mark.parametrize(
@@ -61,7 +53,7 @@ def mock_get_dependency_graph_service(mocker):
                 owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
             ),
             GetDependencyGraphActionResult(
-                result=GET_DEPENDENCY_GRAPH_MOCK,
+                result=GET_DEPENDENCY_GRAPH_WITH_CHILD_MOCK,
                 session_data=SESSION_FIXTURE_DATA,
             ),
         ),
@@ -71,16 +63,21 @@ def mock_get_dependency_graph_service(mocker):
     "extra_fixtures",
     [
         {
-            "sessions": [SESSION_FIXTURE_DICT],
-            "kernels": [KERNEL_FIXTURE_DICT],
+            "sessions": [SESSION_FIXTURE_DICT, SESSION_FIXTURE_DICT2],
+            "kernels": [KERNEL_FIXTURE_DICT, KERNEL_FIXTURE_DICT2],
             "users": [USER_FIXTURE_DATA],
             "groups": [GROUP_FIXTURE_DATA],
             "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
+            "session_dependencies": [
+                {
+                    "session_id": SESSION_FIXTURE_DATA.id,
+                    "depends_on": SESSION_FIXTURE_DATA2.id,
+                }
+            ],
         }
     ],
 )
 async def test_get_dependency_graph(
-    mock_get_dependency_graph_service,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDependencyGraphAction, GetDependencyGraphActionResult],
     session_repository,

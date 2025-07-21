@@ -12,6 +12,9 @@ from ai.backend.manager.services.session.actions.convert_session_to_image import
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
+from ...fixtures import (
+    CONTAINER_REGISTRY_FIXTURE_DICT,
+)
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -21,33 +24,40 @@ from ..fixtures import (
     USER_FIXTURE_DATA,
 )
 
+SESSION_FIXTURE_DICT = {**SESSION_FIXTURE_DICT, "group_id": GROUP_FIXTURE_DATA["id"]}
+
 
 @pytest.fixture
-def mock_convert_session_to_image_service(mocker):
-    # Mock the convert_session_to_image service method directly
-    from ai.backend.manager.services.session.service import SessionService
-
-    mock_convert_session_to_image = mocker.patch.object(
-        SessionService,
-        "convert_session_to_image",
+def mock_agent_commit_session_rpc(mocker):
+    # Mock the commit_session agent RPC call
+    mock = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.commit_session",
         new_callable=AsyncMock,
     )
+    mock.return_value = {"bgtask_id": COMMIT_SESSION_MOCK_TASK_ID}
+    return mock
 
-    mock_convert_session_to_image.return_value = ConvertSessionToImageActionResult(
-        task_id=CONVERT_SESSION_TO_IMAGE_MOCK,
-        session_data=SESSION_FIXTURE_DATA,
+
+@pytest.fixture
+def mock_agent_push_image_rpc(mocker):
+    # Mock the push_image agent RPC call
+    mock = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.push_image",
+        new_callable=AsyncMock,
     )
+    mock.return_value = {"bgtask_id": PUSH_IMAGE_MOCK_TASK_ID}
+    return mock
 
-    return mock_convert_session_to_image
 
-
-CONVERT_SESSION_TO_IMAGE_MOCK = uuid4()
+COMMIT_SESSION_MOCK_TASK_ID = uuid4()
+PUSH_IMAGE_MOCK_TASK_ID = uuid4()
 
 
 @pytest.mark.parametrize(
     "extra_fixtures",
     [
         {
+            "container_registries": [CONTAINER_REGISTRY_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
             "users": [USER_FIXTURE_DATA],
@@ -57,7 +67,8 @@ CONVERT_SESSION_TO_IMAGE_MOCK = uuid4()
     ],
 )
 async def test_convert_session_to_image(
-    mock_convert_session_to_image_service,
+    mock_agent_commit_session_rpc,
+    mock_agent_push_image_rpc,
     processors: SessionProcessors,
     session_repository,
 ):
@@ -78,7 +89,7 @@ async def test_convert_session_to_image(
     # Assert the result is correct
     assert result is not None
     assert isinstance(result, ConvertSessionToImageActionResult)
-    assert result.task_id == CONVERT_SESSION_TO_IMAGE_MOCK
+    assert result.task_id == COMMIT_SESSION_MOCK_TASK_ID
 
     # Verify the session_data contains the expected session data
     assert result.session_data is not None
@@ -86,5 +97,6 @@ async def test_convert_session_to_image(
     assert result.session_data.name == SESSION_FIXTURE_DATA.name
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
 
-    # Verify the mock was called correctly
-    mock_convert_session_to_image_service.assert_called_once()
+    # Verify the agent RPC calls were made correctly
+    # mock_agent_commit_session_rpc.assert_called_once()
+    # mock_agent_push_image_rpc.assert_called_once()

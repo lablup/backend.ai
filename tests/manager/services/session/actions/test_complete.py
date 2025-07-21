@@ -31,7 +31,6 @@ def mock_agent_complete_session_rpc(mocker, mock_agent_response_result):
 
 @pytest.fixture
 def mock_session_service_complete(mocker, mock_agent_response_result):
-    # Only mock the AgentRegistry increment_session_usage method
     mock_increment_usage = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,

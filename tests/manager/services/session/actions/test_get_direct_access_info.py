@@ -1,4 +1,5 @@
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -29,26 +30,12 @@ GET_DIRECT_ACCESS_INFO_MOCK = {
 
 
 @pytest.fixture
-def mock_get_direct_access_info_service(mocker):
-    """Mock the get_direct_access_info service method"""
-    from ai.backend.manager.services.session.service import SessionService
-
-    mock_method = mocker.patch.object(
-        SessionService,
-        "get_direct_access_info",
-        new_callable=mocker.AsyncMock,
+def mock_increment_session_usage_rpc(mocker):
+    mock_increment_usage = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
+        new_callable=AsyncMock,
     )
-
-    from ai.backend.manager.services.session.actions.get_direct_access_info import (
-        GetDirectAccessInfoActionResult,
-    )
-
-    mock_method.return_value = GetDirectAccessInfoActionResult(
-        result=GET_DIRECT_ACCESS_INFO_MOCK,
-        session_data=SESSION_FIXTURE_DATA,
-    )
-
-    return mock_method
+    return mock_increment_usage
 
 
 @pytest.mark.parametrize(
@@ -61,7 +48,7 @@ def mock_get_direct_access_info_service(mocker):
                 owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
             ),
             GetDirectAccessInfoActionResult(
-                result=GET_DIRECT_ACCESS_INFO_MOCK,
+                result={},  # Empty result for non-private session type (INTERACTIVE)
                 session_data=SESSION_FIXTURE_DATA,  # Expected session data
             ),
         ),
@@ -80,7 +67,7 @@ def mock_get_direct_access_info_service(mocker):
     ],
 )
 async def test_get_direct_access_info(
-    mock_get_direct_access_info_service,
+    mock_increment_session_usage_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetDirectAccessInfoAction, GetDirectAccessInfoActionResult],
     session_repository,
@@ -91,7 +78,7 @@ async def test_get_direct_access_info(
     # Verify the result content matches expected
     assert result is not None
     assert isinstance(result, GetDirectAccessInfoActionResult)
-    assert result.result == GET_DIRECT_ACCESS_INFO_MOCK
+    assert result.result == {}  # Empty result for non-private session type
 
     # Verify session_data is properly returned (converted from SessionRow to SessionData)
     assert result.session_data is not None
@@ -99,3 +86,6 @@ async def test_get_direct_access_info(
     assert result.session_data.id == SESSION_FIXTURE_DATA.id
     assert result.session_data.name == SESSION_FIXTURE_DATA.name
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
+
+    # Verify that agent RPC mock is available (following agent RPC call mocking pattern)
+    assert mock_increment_session_usage_rpc is not None

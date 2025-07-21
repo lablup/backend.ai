@@ -19,65 +19,82 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_start_service_rpc(mocker, mock_agent_response_result):
-    # Only mock external dependencies - use real SessionRepository
+def mock_start_service_rpc(mocker):
+    # Mock increment_session_usage
+    mock_increment_usage = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
+        new_callable=AsyncMock,
+    )
+
+    # Mock start_service agent RPC call
+    mock_start_service = mocker.patch(
+        "ai.backend.manager.registry.AgentRegistry.start_service",
+        new_callable=AsyncMock,
+    )
+    mock_start_service.return_value = {"status": "success"}
 
     # Mock query_wsproxy_status
-    mocker.patch(
-        "ai.backend.manager.api.scaling_group.query_wsproxy_status",
-        new_callable=AsyncMock,
-        return_value={"advertise_address": "localhost:8080"},
-    )
-
-    # Mock the start_service method directly
-    from ai.backend.manager.services.session.service import SessionService
-
-    mock_start_service = mocker.patch.object(
-        SessionService,
-        "start_service",
+    mock_query_wsproxy = mocker.patch(
+        "ai.backend.manager.services.session.service.query_wsproxy_status",
         new_callable=AsyncMock,
     )
+    mock_query_wsproxy.return_value = {"advertise_address": "localhost:8080"}
 
-    from ai.backend.manager.services.session.actions.start_service import (
-        StartServiceActionResult,
+    # Mock get_scaling_group_wsproxy_addr to return a valid address
+    mock_get_wsproxy_addr = mocker.patch.object(
+        mocker.MagicMock(),
+        "get_scaling_group_wsproxy_addr",
+        new_callable=AsyncMock,
     )
+    mock_get_wsproxy_addr.return_value = "localhost:8080"
 
-    mock_start_service.return_value = StartServiceActionResult(
-        result=mock_agent_response_result,
-        session_data=SESSION_FIXTURE_DATA,
-        token="test_token",
-        wsproxy_addr="localhost:8080",
-    )
+    # Mock aiohttp client session for wsproxy POST request
+    mock_response = mocker.MagicMock()
+    mock_response.json = AsyncMock(return_value={"token": "test_token"})
 
-    return mock_agent_response_result
+    mock_post_context = mocker.MagicMock()
+    mock_post_context.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_post_context.__aexit__ = AsyncMock(return_value=None)
+
+    mock_session_context = mocker.MagicMock()
+    mock_session_context.post = mocker.MagicMock(return_value=mock_post_context)
+    mock_session_context.__aenter__ = AsyncMock(return_value=mock_session_context)
+    mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+    mock_client_session = mocker.patch("aiohttp.ClientSession")
+    mock_client_session.return_value = mock_session_context
+
+    return {
+        "increment_usage": mock_increment_usage,
+        "start_service": mock_start_service,
+        "query_wsproxy": mock_query_wsproxy,
+        "client_session": mock_client_session,
+    }
 
 
 START_SERVICE_MOCK = {"started": True, "port": 8080}
 
 
 @pytest.mark.parametrize(
-    ("test_scenario", "mock_agent_response_result"),
+    "test_scenario",
     [
-        (
-            TestScenario.success(
-                "Start service",
-                StartServiceAction(
-                    session_name=cast(str, SESSION_FIXTURE_DATA.name),
-                    access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    service="test_service",
-                    login_session_token="test_token",
-                    port=8080,
-                    arguments=None,
-                    envs=None,
-                ),
-                StartServiceActionResult(
-                    result=START_SERVICE_MOCK,
-                    session_data=SESSION_FIXTURE_DATA,
-                    token="test_token",
-                    wsproxy_addr="localhost:8080",
-                ),
+        TestScenario.success(
+            "Start service",
+            StartServiceAction(
+                session_name=cast(str, SESSION_FIXTURE_DATA.name),
+                access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
+                service="test_service",
+                login_session_token="test_token",
+                port=8080,
+                arguments=None,
+                envs=None,
             ),
-            START_SERVICE_MOCK,
+            StartServiceActionResult(
+                result=None,  # start_service returns None in result
+                session_data=SESSION_FIXTURE_DATA,
+                token="test_token",
+                wsproxy_addr="localhost:8080",
+            ),
         ),
     ],
 )
@@ -86,7 +103,20 @@ START_SERVICE_MOCK = {"started": True, "port": 8080}
     [
         {
             "sessions": [SESSION_FIXTURE_DICT],
-            "kernels": [KERNEL_FIXTURE_DICT],
+            "kernels": [
+                {
+                    **KERNEL_FIXTURE_DICT,
+                    "service_ports": [
+                        {
+                            "name": "test_service",
+                            "protocol": "http",
+                            "container_ports": [8080],
+                            "host_ports": [18080],
+                            "is_inference": False,
+                        }
+                    ],
+                }
+            ],
         }
     ],
 )
@@ -95,8 +125,26 @@ async def test_start_service(
     processors: SessionProcessors,
     test_scenario: TestScenario[StartServiceAction, StartServiceActionResult],
 ):
-    # Expected result will use the session data from the database fixture
-    assert test_scenario.expected is not None
-    test_scenario.expected.session_data = SESSION_FIXTURE_DATA
-    test_scenario.expected.wsproxy_addr = "localhost:8080"
-    await test_scenario.test(processors.start_service.wait_for_complete)
+    # Execute the action
+    result = await processors.start_service.wait_for_complete(test_scenario.input)
+
+    # Verify the result
+    assert result is not None
+    assert isinstance(result, StartServiceActionResult)
+    assert result.result is None  # start_service returns None in result
+    assert result.token == "test_token"
+    assert result.wsproxy_addr == "localhost:8080"
+
+    # Verify session_data is properly returned
+    assert result.session_data is not None
+    assert result.session_data.id == SESSION_FIXTURE_DATA.id
+    assert result.session_data.name == SESSION_FIXTURE_DATA.name
+    assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
+
+    # Verify that agent RPC calls were made
+    mock_start_service_rpc["increment_usage"].assert_called_once()
+    mock_start_service_rpc["start_service"].assert_called_once()
+
+    # Verify external dependencies were called
+    mock_start_service_rpc["query_wsproxy"].assert_called_once()
+    assert mock_start_service_rpc["client_session"].called  # aiohttp.ClientSession was called
