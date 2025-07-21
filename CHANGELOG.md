@@ -16,6 +16,98 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.12.0rc1 (2025-07-21)
+
+### Breaking Changes
+* - Health check capability temporarily broken on OSS AppProxy due to architectural changes
+  - Users must disable health check feature in `model-definition.yaml` to use model services on Open Source Backend.AI
+  - OSS AppProxy support will be restored in future releases ([#5134](https://github.com/lablup/backend.ai/issues/5134))
+
+### Features
+* Add VFolder share test verifying shared project vfolder has override permission to shared user ([#4971](https://github.com/lablup/backend.ai/issues/4971))
+* Add metadata support to event handling and message payloads ([#4992](https://github.com/lablup/backend.ai/issues/4992))
+* Add tests for both successful and failed purge group operations ([#5006](https://github.com/lablup/backend.ai/issues/5006))
+* Add RBAC DB schema ([#5025](https://github.com/lablup/backend.ai/issues/5025))
+* Apply valkey client for redis_image ([#5031](https://github.com/lablup/backend.ai/issues/5031))
+* Implement ValkeyLiveClient for Redis interactions and add related tests ([#5032](https://github.com/lablup/backend.ai/issues/5032))
+* Apply ValkeyStatClient ([#5035](https://github.com/lablup/backend.ai/issues/5035))
+* Implement ValkeyRateLimitClient ([#5036](https://github.com/lablup/backend.ai/issues/5036))
+* Add ValkeyStreamLockClient ([#5039](https://github.com/lablup/backend.ai/issues/5039))
+* Unify valkey client codes ([#5053](https://github.com/lablup/backend.ai/issues/5053))
+* Support OTEL to storage-proxy and webserver components ([#5054](https://github.com/lablup/backend.ai/issues/5054))
+* Add TRACE Level for log ([#5092](https://github.com/lablup/backend.ai/issues/5092))
+* Implement configuration management CLI for agent, storage, and webserver ([#5103](https://github.com/lablup/backend.ai/issues/5103))
+* Implement ValkeySessionClient for session management using Valkey-Glide ([#5114](https://github.com/lablup/backend.ai/issues/5114))
+* Add `triggered_by` to `AuditLog` table ([#5115](https://github.com/lablup/backend.ai/issues/5115))
+* - Offload model service health check architecture to AppProxy with Redis-based route management for improved scalability and real-time endpoint monitoring ([#5134](https://github.com/lablup/backend.ai/issues/5134))
+* Impl Role management Service ([#5159](https://github.com/lablup/backend.ai/issues/5159))
+* Add layer-aware repository decorators to various layers ([#5161](https://github.com/lablup/backend.ai/issues/5161))
+* Add `type` field to `ImageNode` ([#5207](https://github.com/lablup/backend.ai/issues/5207))
+* Add chown feature to Agent to allow change owner of mount path ([#5213](https://github.com/lablup/backend.ai/issues/5213))
+* Apply client pool in web component ([#5223](https://github.com/lablup/backend.ai/issues/5223))
+* Sync model service's health information real-time with AppProxy ([#5230](https://github.com/lablup/backend.ai/issues/5230))
+
+### Improvements
+* Apply provisioner pattern to Agent kernel lifecycle "mount" stage ([#4979](https://github.com/lablup/backend.ai/issues/4979))
+* Apply provisioner pattern to Agent kernel lifecycle "image" stage ([#4981](https://github.com/lablup/backend.ai/issues/4981))
+* Apply provisioner pattern to Agent kernel lifecycle "network" stage ([#4982](https://github.com/lablup/backend.ai/issues/4982))
+* Apply provisioner pattern to Agent kernel lifecycle "resource" stage ([#4983](https://github.com/lablup/backend.ai/issues/4983))
+* Apply provisioner pattern to Agent kernel lifecycle "scratch" stage ([#4984](https://github.com/lablup/backend.ai/issues/4984))
+* Apply provisioner pattern to Agent kernel lifecycle "ssh" stage ([#4985](https://github.com/lablup/backend.ai/issues/4985))
+* Apply provisioner pattern to Agent kernel lifecycle "environ" stage ([#4986](https://github.com/lablup/backend.ai/issues/4986))
+* Apply pydantic config in storage-proxy ([#5062](https://github.com/lablup/backend.ai/issues/5062))
+* Apply pydantic config in webserver ([#5064](https://github.com/lablup/backend.ai/issues/5064))
+* Apply pydantic config in agent ([#5068](https://github.com/lablup/backend.ai/issues/5068))
+* Separate repository layer from auth service ([#5071](https://github.com/lablup/backend.ai/issues/5071))
+* Separate repository layer from model serving service ([#5072](https://github.com/lablup/backend.ai/issues/5072))
+* Separate repository layer from image service ([#5074](https://github.com/lablup/backend.ai/issues/5074))
+* Separate repository layer from user service ([#5076](https://github.com/lablup/backend.ai/issues/5076))
+* Separate repository layer from container registry service ([#5095](https://github.com/lablup/backend.ai/issues/5095))
+* Add repository and inject repositories dependency ([#5097](https://github.com/lablup/backend.ai/issues/5097))
+* Separate repository layer from domain service ([#5099](https://github.com/lablup/backend.ai/issues/5099))
+* Separate repository layer from scheduler ([#5101](https://github.com/lablup/backend.ai/issues/5101))
+* Separate repository layer from group service ([#5107](https://github.com/lablup/backend.ai/issues/5107))
+* Refactor endpoint status resolution to use `EndpointStatus` enum instead of string literals ([#5109](https://github.com/lablup/backend.ai/issues/5109))
+* Separate repository layer from session service ([#5110](https://github.com/lablup/backend.ai/issues/5110))
+* Separate repository layer from vfolder service ([#5111](https://github.com/lablup/backend.ai/issues/5111))
+* Separate repository layer from agent service ([#5128](https://github.com/lablup/backend.ai/issues/5128))
+* Separate repository layer from resource preset service ([#5130](https://github.com/lablup/backend.ai/issues/5130))
+* Separate agent client layer ([#5157](https://github.com/lablup/backend.ai/issues/5157))
+* Separate exceptions file ([#5164](https://github.com/lablup/backend.ai/issues/5164))
+* Separate wsproxy client ([#5165](https://github.com/lablup/backend.ai/issues/5165))
+* Implement Storage Proxy client layer ([#5224](https://github.com/lablup/backend.ai/issues/5224))
+
+### Fixes
+* Wrong `service ports` field name of Session creation response ([#5047](https://github.com/lablup/backend.ai/issues/5047))
+* Fix GraphQL resolver for compute session to return only a unique set of vfolder mount names ([#5056](https://github.com/lablup/backend.ai/issues/5056))
+* Fix unbound `vfolder_id` when model-type folder is used in service `extra_mounts` ([#5059](https://github.com/lablup/backend.ai/issues/5059))
+* Manager correctly handles already-deleted VFolders ([#5080](https://github.com/lablup/backend.ai/issues/5080))
+* Fix cloud provider detection working on Azure and future-compatible by using versioned metadata URLs instead of hacky sysfs DMI vendor information checks ([#5086](https://github.com/lablup/backend.ai/issues/5086))
+* Enable continuous code execution tasks to work properly in Agent ([#5112](https://github.com/lablup/backend.ai/issues/5112))
+* Enable Agent starts if scratch already cleaned before destroy container ([#5118](https://github.com/lablup/backend.ai/issues/5118))
+* Handle empty consumer handlers in EventDispatcher to avoid retry ([#5136](https://github.com/lablup/backend.ai/issues/5136))
+* Relax Decimal serialization of Agent stats ([#5142](https://github.com/lablup/backend.ai/issues/5142))
+* Fix webserver 404 not found issue ([#5170](https://github.com/lablup/backend.ai/issues/5170))
+* Fix auth action to pass stoken param ([#5211](https://github.com/lablup/backend.ai/issues/5211))
+* `status_data` not initialized properly when creating single node session ([#5217](https://github.com/lablup/backend.ai/issues/5217))
+* Fix potential consumer loop hang by handling `glide.TimeoutError` from Valkey-glide `xreadgroup` ([#5222](https://github.com/lablup/backend.ai/issues/5222))
+
+### Miscellaneous
+* Add `[tool.pyright]` section to `pyproject.toml` so that IDEs using Pyright as the default LSP works out of the box by detecting Pants-specific configurations ([#5088](https://github.com/lablup/backend.ai/issues/5088))
+
+### Test Updates
+* Add session service unit test ([#4265](https://github.com/lablup/backend.ai/issues/4265))
+* Add unit test for Project Resource Policy service & repository ([#5192](https://github.com/lablup/backend.ai/issues/5192))
+* Add test code for container utilization metric service ([#5194](https://github.com/lablup/backend.ai/issues/5194))
+* Add test code for resource preset service ([#5195](https://github.com/lablup/backend.ai/issues/5195))
+* Add `Domain` service unit test ([#5196](https://github.com/lablup/backend.ai/issues/5196))
+* Add test code for user service ([#5197](https://github.com/lablup/backend.ai/issues/5197))
+* Add test code for user resource policy service ([#5198](https://github.com/lablup/backend.ai/issues/5198))
+* Add `KeypairResourcePolicy` service unit test ([#5203](https://github.com/lablup/backend.ai/issues/5203))
+* Add service layer, repository layer unit test for `Model Service` ([#5214](https://github.com/lablup/backend.ai/issues/5214))
+* Add unit(service, repository layer), integration test for `Auth` ([#5234](https://github.com/lablup/backend.ai/issues/5234))
+
+
 ## 25.11.0 (2025-07-09)
 
 ### Features
