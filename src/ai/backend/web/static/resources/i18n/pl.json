@@ -210,17 +210,7 @@
     "UserStatus": "Status użytkownika",
     "Users": "Użytkownicy",
     "WarningLessRateLimit": "Jeśli wartość Rate Limit jest niska, operacje API, takie jak logowanie, mogą zostać zablokowane.",
-    "YouAreAboutToDeleteCredential": "Zamierzasz usunąć dane uwierzytelniające tego użytkownika:",
-    "validation": {
-      "InvalidEmailAddress": "Niepoprawny adres email.",
-      "LetterNumber-_dot": "Dopuszcza litery, cyfry i -_.",
-      "NameAlreadyExists": "Nazwa zasady już istnieje!",
-      "NumbersOnly": "Zezwala tylko na liczby",
-      "PleaseSelectOption": "Proszę wybrać jedną opcję",
-      "PleaseSelectOptions": "Wybierz co najmniej jedną opcję lub więcej.",
-      "PolicyName": "Nazwa zasady Wymagane.",
-      "ValidationFailed": "Weryfikacja nie powiodła się"
-    }
+    "YouAreAboutToDeleteCredential": "Zamierzasz usunąć dane uwierzytelniające tego użytkownika:"
   },
   "data": {
     "Active": "Aktywny",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Nie można usunąć folderu zamontowanego w co najmniej jednej sesji. Najpierw zakończ sesję.",
+      "CannotDeletePipelineFolder": "Nie możesz usunąć folderów rurociągów.",
+      "CannotRestorePipelineFolder": "Nie możesz przywrócić folderów rurociągów.",
       "CloneAFolder": "Sklonuj folder",
       "CloneFolder": "Klonowanie folderu",
       "Cloneable": "Możliwość klonowania",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Usuń folder",
       "DeleteForever": "Usuń na zawsze",
       "DescYouAreFolderOwner": "Jesteś właścicielem tego folderu.",
+      "DownloadingModel": "Model pobierania ...",
       "Edit": "Edytować",
       "EditDelete": "Edytuj+Usuń",
       "FileDeleted": "Plik usunięty",
@@ -378,7 +371,7 @@
       "FolderUsage": "Użycie folderu",
       "FolderUsing": "Korzystanie z",
       "InviteUsers": "Zaproś użytkownika",
-      "KickOut": "",
+      "KickOut": "Przestań dzielić się",
       "KickOutConfirm": "Przestać udostępniać {{email}}?",
       "Leave": "Wychodzić",
       "LeaveAFolder": "Zostaw folder",
@@ -679,7 +672,17 @@
     "StorageProxies": "Magazyny",
     "TotalItems": "Łącznie {{total}} pozycji",
     "Username": "Nazwa Użytkownika",
-    "ValueRequired": "Wprowadź {{ imię }}"
+    "ValueRequired": "Wprowadź {{ imię }}",
+    "validation": {
+      "InvalidEmailAddress": "Nieprawidłowy adres e -mail.",
+      "LetterNumber-_dot": "Umożliwia litery, cyfry i -_.",
+      "NameAlreadyExists": "Nazwa polityki już istnieje!",
+      "NumbersOnly": "Pozwala tylko na liczby",
+      "PleaseSelectOption": "Wybierz jedną opcję",
+      "PleaseSelectOptions": "Wybierz co najmniej jedną opcję lub więcej.",
+      "PolicyName": "Wymagana nazwa polisy.",
+      "ValidationFailed": "Walidacja nie powiodła się"
+    }
   },
   "import": {
     "CleanUpImportTask": "Oczyść zadanie importowania...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Generowanie nowego tokena",
     "GenerateToken": "Generowanie tokena",
     "GeneratedTokens": "Wygenerowane tokeny",
+    "GoToServiceDetailPage": "Przejdź do strony szczegółów serwisowych",
     "Image": "Obraz",
     "ModelDefinitionPath": "Ścieżka pliku definicji modelu",
     "ModelMountDestination": "Miejsce docelowe montażu dla folderu modelu",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Dozwolone są tylko nieujemne liczby całkowite",
     "OpenToPublic": "Otwarte dla publiczności",
     "Owner": "Właściciel",
+    "PlayYourModelNow": "Zagraj teraz w swoim modelu!",
     "PleaseSelectTime": "Wybierz czas!",
     "Processing": "Przetwarzanie...",
     "Public": "Publiczny",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Informacje o trasach",
     "RoutingInfo": "Informacje o routingu",
     "RoutingsCount": "Liczba tras",
+    "RunThisModel": "Uruchom ten model",
     "RuntimeVariant": "Inference Runtime Variant",
     "SeeContainerLogs": "Zobacz dzienniki kontenerów",
     "ServiceCreated": "Usługa modelowa {{ name }} została pomyślnie utworzona.",
@@ -956,6 +962,7 @@
     "StartNewService": "Uruchom nową usługę",
     "StartNewServing": "Rozpocznij nową porcję",
     "StartService": "Rozpoczęcie usługi",
+    "StartingModelService": "Uruchomienie modelu początkowego ...",
     "Status": "Status",
     "Success": "Powodzenie",
     "SyncRoutes": "Synchronizacja tras",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Zobacz detale",
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
     "Visit": "Wizyta"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} z {{total}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Wyszukiwanie",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Liczba utworzonych sesji obliczeniowych.",
     "UsageHistory": "Historia użytkowania",
     "UsageHistoryNote": "Pokazana tutaj historia użytkowania oparta jest na zakończonych sesjach obliczeniowych.",
+    "description": {
+      "CPUUtilization": "Reprezentuje ilość czasu procesora używanego przez sesję w wybranym okresie. \n\nPojedynczy rdzeń procesora odpowiada maksymalnie 100%.\n\nJeśli przydzielono wiele rdzeni, całkowite zużycie może przekraczać 100%, ponieważ jest obliczane przez podsumowanie maksymalnego użycia (100%) każdego rdzenia.",
+      "NetworkRx": "Wskazuje szybkość transferu sieci.\n\nReprezentuje szybkość, z jaką kontener odbiera dane sieciowe.",
+      "NetworkTx": "Wskazuje szybkość transferu sieci. \n\n\nReprezentuje szybkość, z jaką kontener wysyła dane sieciowe."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jeśli użycie jest niskie, dane dla niektórych dat mogą nie być dostępne. \nSpróbuj ponownie z krótszym zakresem dat.",
       "NoMetricsToDisplay": "Brak metryk do śledzenia"

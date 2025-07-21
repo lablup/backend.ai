@@ -210,17 +210,7 @@
     "UserStatus": "Tâm trạng người dùng",
     "Users": "Người dùng",
     "WarningLessRateLimit": "Nếu giá trị Giới hạn tốc độ nhỏ, các hoạt động API như đăng nhập có thể bị chặn.",
-    "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:",
-    "validation": {
-      "InvalidEmailAddress": "Địa chỉ email không hợp lệ.",
-      "LetterNumber-_dot": "Cho phép các chữ cái, số và -_.",
-      "NameAlreadyExists": "Tên chính sách đã tồn tại!",
-      "NumbersOnly": "Chỉ cho phép số",
-      "PleaseSelectOption": "Làm ơn chọn một giải pháp",
-      "PleaseSelectOptions": "Vui lòng chọn ít nhất một tùy chọn hoặc nhiều hơn.",
-      "PolicyName": "Tên chính sách Bắt buộc.",
-      "ValidationFailed": "Xác thực không thành công"
-    }
+    "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:"
   },
   "data": {
     "Active": "Tích cực",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Không thể xóa thư mục được gắn trong một hoặc nhiều phiên. Vui lòng kết thúc phiên trước.",
+      "CannotDeletePipelineFolder": "Bạn không thể xóa các thư mục đường ống.",
+      "CannotRestorePipelineFolder": "Bạn không thể khôi phục các thư mục đường ống.",
       "CloneAFolder": "Sao chép một thư mục",
       "CloneFolder": "Sao chép thư mục",
       "Cloneable": "Có thể nhân bản",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Xóa một thư mục",
       "DeleteForever": "Xóa vĩnh viễn",
       "DescYouAreFolderOwner": "Bạn là chủ sở hữu của thư mục này.",
+      "DownloadingModel": "Mô hình tải xuống ...",
       "Edit": "Biên tập",
       "EditDelete": "Chỉnh sửa + Xóa",
       "FileDeleted": "Tệp đã Xóa",
@@ -378,7 +371,7 @@
       "FolderUsage": "Sử dụng thư mục",
       "FolderUsing": "sử dụng",
       "InviteUsers": "Mời người dùng",
-      "KickOut": "",
+      "KickOut": "Ngừng chia sẻ",
       "KickOutConfirm": "Dừng chia sẻ với {{email}}?",
       "Leave": "Rời khỏi",
       "LeaveAFolder": "Để lại một thư mục",
@@ -679,7 +672,17 @@
     "StorageProxies": "Kho lưu trữ",
     "TotalItems": "Tổng số {{total}} mặt hàng",
     "Username": "tên tài khoản",
-    "ValueRequired": "Vui lòng nhập {{name}}"
+    "ValueRequired": "Vui lòng nhập {{name}}",
+    "validation": {
+      "InvalidEmailAddress": "Địa chỉ email không hợp lệ.",
+      "LetterNumber-_dot": "Cho phép các chữ cái, số và -_.",
+      "NameAlreadyExists": "Tên chính sách đã tồn tại!",
+      "NumbersOnly": "Chỉ cho phép số",
+      "PleaseSelectOption": "Vui lòng chọn một tùy chọn",
+      "PleaseSelectOptions": "Vui lòng chọn ít nhất một tùy chọn trở lên.",
+      "PolicyName": "Tên chính sách cần thiết.",
+      "ValidationFailed": "Xác nhận không thành công"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tác vụ nhập dọn dẹp ...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Tạo mã thông báo mới",
     "GenerateToken": "Tạo mã thông báo",
     "GeneratedTokens": "Mã thông báo được tạo",
+    "GoToServiceDetailPage": "Đi đến trang chi tiết dịch vụ",
     "Image": "Hình ảnh",
     "ModelDefinitionPath": "Đường dẫn tệp định nghĩa mô hình",
     "ModelMountDestination": "Mount đích cho thư mục mẫu",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Chỉ cho phép số nguyên không âm",
     "OpenToPublic": "Mở cửa cho công chúng",
     "Owner": "Người sở hữu",
+    "PlayYourModelNow": "Chơi mô hình của bạn ngay bây giờ!",
     "PleaseSelectTime": "Hãy chọn thời gian!",
     "Processing": "Xử lý...",
     "Public": "Công cộng",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Thông tin tuyến đường",
     "RoutingInfo": "Thông tin định tuyến",
     "RoutingsCount": "Số lượng định tuyến",
+    "RunThisModel": "Chạy mô hình này",
     "RuntimeVariant": "Biến thể thời gian chạy suy luận",
     "SeeContainerLogs": "Xem nhật ký vùng chứa",
     "ServiceCreated": "Dịch vụ mẫu {{ name }} đã được tạo thành công.",
@@ -956,6 +962,7 @@
     "StartNewService": "Bắt đầu dịch vụ mới",
     "StartNewServing": "Bắt đầu phân phát mới",
     "StartService": "Bắt đầu dịch vụ",
+    "StartingModelService": "Bắt đầu dịch vụ mô hình ...",
     "Status": "Trạng thái",
     "Success": "Thành công",
     "SyncRoutes": "Đồng bộ hóa tuyến đường",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Xem chi tiết",
     "SuccessfullyUpdated": "Cập nhật thành công",
     "Visit": "Chuyến thăm"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} của {{Total}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Tìm kiếm",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Số lượng phiên điện toán được tạo.",
     "UsageHistory": "Lịch sử sử dụng",
     "UsageHistoryNote": "Lịch sử sử dụng được hiển thị ở đây dựa trên các phiên tính toán chấm dứt.",
+    "description": {
+      "CPUUtilization": "Đại diện cho lượng thời gian CPU được sử dụng bởi phiên trong khoảng thời gian đã chọn. \n\nMột lõi CPU duy nhất tương ứng với tối đa 100%.\n\nNếu nhiều lõi được phân bổ, tổng lượng sử dụng có thể vượt quá 100%, vì nó được tính bằng cách tổng hợp mức sử dụng tối đa (100%) của mỗi lõi.",
+      "NetworkRx": "Cho biết tốc độ truyền mạng. \n\nĐại diện cho tốc độ mà container đang nhận dữ liệu mạng.",
+      "NetworkTx": "Cho biết tốc độ truyền mạng. \n\nĐại diện cho tốc độ mà container đang gửi dữ liệu mạng."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Nếu việc sử dụng thấp, dữ liệu cho một số ngày có thể không có sẵn. \nVui lòng thử lại với phạm vi ngày ngắn hơn.",
       "NoMetricsToDisplay": "Không có số liệu có giá trị để theo dõi"

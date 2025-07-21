@@ -210,17 +210,7 @@
     "UserStatus": "用户状态",
     "Users": "用户",
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
-    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据：",
-    "validation": {
-      "InvalidEmailAddress": "无效的邮件地址。",
-      "LetterNumber-_dot": "允许字母、数字和 -_。",
-      "NameAlreadyExists": "策略名称已存在！",
-      "NumbersOnly": "只允许数字",
-      "PleaseSelectOption": "请选择一个选项",
-      "PleaseSelectOptions": "请至少选择一个或多个选项。",
-      "PolicyName": "策略名称 必填。",
-      "ValidationFailed": "验证失败"
-    }
+    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据："
   },
   "data": {
     "Active": "积极的",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "无法删除安装在一个或多个会话中的文件夹。请先终止会话。",
+      "CannotDeletePipelineFolder": "您无法删除管道文件夹。",
+      "CannotRestorePipelineFolder": "您无法还原管道文件夹。",
       "CloneAFolder": "克隆文件夹",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "删除文件夹",
       "DeleteForever": "永久删除",
       "DescYouAreFolderOwner": "您是此文件夹的所有者。",
+      "DownloadingModel": "下载型号...",
       "Edit": "编辑",
       "EditDelete": "编辑+删除",
       "FileDeleted": "文件已删除",
@@ -378,7 +371,7 @@
       "FolderUsage": "文件夹的使用",
       "FolderUsing": "使用",
       "InviteUsers": "邀请用户",
-      "KickOut": "",
+      "KickOut": "停止共享",
       "KickOutConfirm": "停止与 {{email}} 共享？",
       "Leave": "离开",
       "LeaveAFolder": "留下文件夹",
@@ -679,7 +672,17 @@
     "StorageProxies": "存储",
     "TotalItems": "{{总计}}项目总数",
     "Username": "用户名",
-    "ValueRequired": "请输入 {{ 姓名 }}"
+    "ValueRequired": "请输入 {{ 姓名 }}",
+    "validation": {
+      "InvalidEmailAddress": "无效的电子邮件地址。",
+      "LetterNumber-_dot": "允许字母，数字和-_。",
+      "NameAlreadyExists": "策略名称已经存在！",
+      "NumbersOnly": "仅允许数字",
+      "PleaseSelectOption": "请选择一个选项",
+      "PleaseSelectOptions": "请选择至少一个或更多选项。",
+      "PolicyName": "需要策略名称。",
+      "ValidationFailed": "验证失败"
+    }
   },
   "import": {
     "CleanUpImportTask": "清理导入任务...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "生成新令牌",
     "GenerateToken": "生成令牌",
     "GeneratedTokens": "生成令牌",
+    "GoToServiceDetailPage": "转到服务详细信息页面",
     "Image": "图片",
     "ModelDefinitionPath": "模型定义文件路径",
     "ModelMountDestination": "模型文件夹的安装目标",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "只允许非负整数",
     "OpenToPublic": "向公众开放",
     "Owner": "所有者",
+    "PlayYourModelNow": "立即播放模型！",
     "PleaseSelectTime": "请选择时间！",
     "Processing": "加工...",
     "Public": "公众",
@@ -936,6 +941,7 @@
     "RoutesInfo": "路线信息",
     "RoutingInfo": "路由信息",
     "RoutingsCount": "路由计数",
+    "RunThisModel": "运行此模型",
     "RuntimeVariant": "推理运行时变量",
     "SeeContainerLogs": "查看容器日志",
     "ServiceCreated": "模型服务 {{ name }} 已成功创建。",
@@ -956,6 +962,7 @@
     "StartNewService": "开始新服务",
     "StartNewServing": "开始新服务",
     "StartService": "启动服务",
+    "StartingModelService": "启动型号服务...",
     "Status": "现状",
     "Success": "成功",
     "SyncRoutes": "同步路线",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "查看详情",
     "SuccessfullyUpdated": "成功更新",
     "Visit": "访问"
+  },
+  "pagination": {
+    "Total": "{{start}}  -  {{end}} {{total}}项目"
   },
   "propertyFilter": {
     "PlaceHolder": "搜索",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "创建的计算会话数。",
     "UsageHistory": "使用历史",
     "UsageHistoryNote": "此处显示的用法历史记录基于终止的计算会议。",
+    "description": {
+      "CPUUtilization": "表示会话在选定期间使用的CPU时间量。 \n\n单个CPU核心对应于最大100％。\n\n如果分配了多个核心，则总使用情况可能超过100％，因为它是通过总结每个核心的最大使用（100％）来计算的。",
+      "NetworkRx": "指示网络传输速率。\n\n表示容器接收网络数据的速率。",
+      "NetworkTx": "指示网络传输速率。\n\n表示容器发送网络数据的速率。"
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "如果用法较低，则可能无法提供某些日期的数据。\n请在较短的日期范围内重试。",
       "NoMetricsToDisplay": "没有可用的指标来跟踪"

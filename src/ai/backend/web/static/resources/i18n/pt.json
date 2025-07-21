@@ -210,17 +210,7 @@
     "UserStatus": "Estado do utilizador",
     "Users": "Comercial",
     "WarningLessRateLimit": "Se o valor do Limite de taxa for pequeno, as operações da API, como o início de sessão, podem ser bloqueadas.",
-    "YouAreAboutToDeleteCredential": "Você está prestes a excluir a credencial deste usuário:",
-    "validation": {
-      "InvalidEmailAddress": "Endereço de email invalido.",
-      "LetterNumber-_dot": "Permite letras, números e -_.",
-      "NameAlreadyExists": "O nome da política já existe!",
-      "NumbersOnly": "Permite apenas números",
-      "PleaseSelectOption": "Por favor selecione uma opção",
-      "PleaseSelectOptions": "Seleccione pelo menos uma opção ou mais.",
-      "PolicyName": "Nome da política Obrigatório.",
-      "ValidationFailed": "Falha na validação"
-    }
+    "YouAreAboutToDeleteCredential": "Você está prestes a excluir a credencial deste usuário:"
   },
   "data": {
     "Active": "Ativo",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Não é possível excluir a pasta montada em uma ou mais sessões. Por favor, termine a sessão primeiro.",
+      "CannotDeletePipelineFolder": "Você não pode excluir pastas de pipeline.",
+      "CannotRestorePipelineFolder": "Você não pode restaurar pastas de pipeline.",
       "CloneAFolder": "Clonar uma pasta",
       "CloneFolder": "Clonar pasta",
       "Cloneable": "Clonável",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Excluir uma pasta",
       "DeleteForever": "Apagar para sempre",
       "DescYouAreFolderOwner": "Você é o proprietário desta pasta.",
+      "DownloadingModel": "Modelo de download ...",
       "Edit": "Editar",
       "EditDelete": "Editar + Excluir",
       "FileDeleted": "Arquivo excluído",
@@ -378,7 +371,7 @@
       "FolderUsage": "Utilização da pasta",
       "FolderUsing": "Utilizar",
       "InviteUsers": "Convite o usuário",
-      "KickOut": "",
+      "KickOut": "Pare de compartilhar",
       "KickOutConfirm": "Deixar de partilhar com {{email}}?",
       "Leave": "Sair",
       "LeaveAFolder": "Deixe uma pasta",
@@ -679,7 +672,17 @@
     "StorageProxies": "Armazéns",
     "TotalItems": "Total de itens {{total}}",
     "Username": "Nome do usuário",
-    "ValueRequired": "Introduzir {{ nome }}"
+    "ValueRequired": "Introduzir {{ nome }}",
+    "validation": {
+      "InvalidEmailAddress": "Endereço de e -mail inválido.",
+      "LetterNumber-_dot": "Permite letras, números e -_.",
+      "NameAlreadyExists": "O nome da política já existe!",
+      "NumbersOnly": "Permite apenas números",
+      "PleaseSelectOption": "Selecione uma opção",
+      "PleaseSelectOptions": "Selecione pelo menos uma opção ou mais.",
+      "PolicyName": "Nome da política necessário.",
+      "ValidationFailed": "A validação falhou"
+    }
   },
   "import": {
     "CleanUpImportTask": "Limpar tarefa de importação ...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Gerar novo token",
     "GenerateToken": "Gerar Token",
     "GeneratedTokens": "Tokens gerados",
+    "GoToServiceDetailPage": "Vá para a página de detalhes do serviço",
     "Image": "Imagem",
     "ModelDefinitionPath": "Caminho do arquivo de definição de modelo",
     "ModelMountDestination": "Montar destino para pasta de modelo",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Só permite números inteiros não negativos",
     "OpenToPublic": "Aberto ao público",
     "Owner": "Proprietário",
+    "PlayYourModelNow": "Jogue seu modelo agora!",
     "PleaseSelectTime": "Por favor, seleccione a hora!",
     "Processing": "Em processamento...",
     "Public": "Público",
@@ -956,6 +961,7 @@
     "StartNewService": "Iniciar novo serviço",
     "StartNewServing": "Iniciar nova dose",
     "StartService": "Iniciar o serviço",
+    "StartingModelService": "Serviço de modelo inicial ...",
     "Status": "Estado",
     "Success": "Sucesso",
     "SyncRoutes": "Sincronizar rotas",
@@ -1011,6 +1017,9 @@
     "SeeDetail": "Veja detalhes",
     "SuccessfullyUpdated": "Atualizado com sucesso",
     "Visit": "Visita"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} de {{total}} itens"
   },
   "propertyFilter": {
     "PlaceHolder": "Pesquisar",
@@ -1682,6 +1691,11 @@
     "SessionsDesc": "O número de sessões de computação criadas.",
     "UsageHistory": "Histórico de utilização",
     "UsageHistoryNote": "O histórico de uso mostrado aqui é baseado em sessões de computação encerradas.",
+    "description": {
+      "CPUUtilization": "Representa a quantidade de tempo de CPU usado pela sessão durante o período selecionado. \n\nUm único núcleo de CPU corresponde a um máximo de 100%.\n\nSe vários núcleos forem alocados, o uso total poderá exceder 100%, pois é calculado resumindo o uso máximo (100%) de cada núcleo.",
+      "NetworkRx": "Indica a taxa de transferência de rede. \n\nRepresenta a taxa na qual o contêiner está recebendo dados de rede.",
+      "NetworkTx": "Indica a taxa de transferência de rede. \n\nRepresenta a taxa na qual o contêiner está enviando dados de rede."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Se o uso for baixo, os dados para algumas datas podem não estar disponíveis. \nPor favor, tente novamente com um intervalo mais curto.",
       "NoMetricsToDisplay": "Sem métricas disponíveis para rastrear"

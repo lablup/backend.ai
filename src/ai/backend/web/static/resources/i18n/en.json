@@ -212,17 +212,7 @@
     "UserStatus": "User Status",
     "Users": "Users",
     "WarningLessRateLimit": "If the Rate Limit value is small, API operations such as login may be blocked.",
-    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
-    "validation": {
-      "InvalidEmailAddress": "Invalid Email Address.",
-      "LetterNumber-_dot": "Allows letters, numbers and -_.",
-      "NameAlreadyExists": "Policy Name Already Exists!",
-      "NumbersOnly": "Allows numbers only",
-      "PleaseSelectOption": "Please select one option",
-      "PleaseSelectOptions": "Please select at least one option or more.",
-      "PolicyName": "Policy name Required.",
-      "ValidationFailed": "Validation failed"
-    }
+    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:"
   },
   "data": {
     "Active": "Active",
@@ -350,6 +340,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
+      "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
+      "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
@@ -359,6 +351,7 @@
       "DeleteAFolder": "Delete folder",
       "DeleteForever": "Delete forever",
       "DescYouAreFolderOwner": "You are the owner of this folder.",
+      "DownloadingModel": "Downloading Model...",
       "Edit": "Edit",
       "EditDelete": "Edit+Delete",
       "FileDeleted": "File deleted",
@@ -683,7 +676,17 @@
     "StorageProxies": "Storages",
     "TotalItems": "Total {{total}} items",
     "Username": "Username",
-    "ValueRequired": "Please enter {{ name }}"
+    "ValueRequired": "Please enter {{ name }}",
+    "validation": {
+      "InvalidEmailAddress": "Invalid Email Address.",
+      "LetterNumber-_dot": "Allows letters, numbers and -_.",
+      "NameAlreadyExists": "Policy Name Already Exists!",
+      "NumbersOnly": "Allows numbers only",
+      "PleaseSelectOption": "Please select one option",
+      "PleaseSelectOptions": "Please select at least one option or more.",
+      "PolicyName": "Policy name Required.",
+      "ValidationFailed": "Validation failed"
+    }
   },
   "import": {
     "CleanUpImportTask": "Cleanup import task...",
@@ -777,8 +780,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -794,8 +795,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -920,15 +923,18 @@
     "GenerateNewToken": "Generate new token",
     "GenerateToken": "Generate Token",
     "GeneratedTokens": "Generated Tokens",
+    "GoToServiceDetailPage": "Go to service detail page",
     "Image": "Image",
     "ModelDefinitionPath": "Model Definition File Path",
     "ModelMountDestination": "Mount Destination For Model Folder",
+    "ModelServiceFailedToStart": "Failed to start model service.",
     "NoExtraMounts": "No extra mounts",
     "NoServiceEndpoint": "No Service Endpoint",
     "NumberOfReplicas": "Number of replicas",
     "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
     "OpenToPublic": "Open To Public",
     "Owner": "Owner",
+    "PlayYourModelNow": "Play your model now!",
     "PleaseSelectTime": "Please select time!",
     "Processing": "Processing...",
     "Public": "Public",
@@ -940,6 +946,7 @@
     "RoutesInfo": "Routes Info",
     "RoutingInfo": "Routing Info",
     "RoutingsCount": "Routings Count",
+    "RunThisModel": "Run this model",
     "RuntimeVariant": "Inference Runtime Variant",
     "SeeContainerLogs": "See Container Logs",
     "ServiceCreated": "Model service {{ name }} has been created successfully.",
@@ -960,6 +967,7 @@
     "StartNewService": "Start New Service",
     "StartNewServing": "Start new serving",
     "StartService": "Start Service",
+    "StartingModelService": "Starting model service...",
     "Status": "Status",
     "Success": "Success",
     "SyncRoutes": "Sync routes",
@@ -1015,6 +1023,9 @@
     "SeeDetail": "See Detail",
     "SuccessfullyUpdated": "Successfully Updated",
     "Visit": "Visit"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} items"
   },
   "propertyFilter": {
     "PlaceHolder": "Search",
@@ -1687,6 +1698,11 @@
     "SessionsDesc": "The number of compute sessions created.",
     "UsageHistory": "Usage History",
     "UsageHistoryNote": "The usage history shown here are based on terminated compute sessions.",
+    "description": {
+      "CPUUtilization": "Represents the amount of CPU time used by the session during the selected period. \n\nA single CPU core corresponds to a maximum of 100%.\nIf multiple cores are allocated, the total usage can exceed 100%, as it is calculated by summing up the maximum usage (100%) of each core.",
+      "NetworkRx": "Indicates the network transfer rate.  \n\nRepresents the rate at which the container is receiving network data.",
+      "NetworkTx": "Indicates the network transfer rate. \n\n Represents the rate at which the container is sending network data."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "If usage is low, data for some dates may not be available. Please try again with a shorter date range.",
       "NoMetricsToDisplay": "No metrics avaliable for tracking"

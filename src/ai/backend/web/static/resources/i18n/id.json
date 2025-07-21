@@ -209,17 +209,7 @@
     "UserStatus": "Status Pengguna",
     "Users": "Pengguna",
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
-    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:",
-    "validation": {
-      "InvalidEmailAddress": "Alamat email salah.",
-      "LetterNumber-_dot": "Huruf, angka, dan -_. diizinkan",
-      "NameAlreadyExists": "Nama Kebijakan Sudah Ada!",
-      "NumbersOnly": "Hanya angka yang diizinkan",
-      "PleaseSelectOption": "Mohon pilih satu pilihan",
-      "PleaseSelectOptions": "Mohon pilih satu pilihan",
-      "PolicyName": "Nama kebijakan wajib diisi.",
-      "ValidationFailed": "Validasi gagal"
-    }
+    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:"
   },
   "data": {
     "Active": "Aktif",
@@ -347,6 +337,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
+      "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
+      "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
@@ -356,6 +348,7 @@
       "DeleteAFolder": "Hapus folder",
       "DeleteForever": "Hapus selamanya",
       "DescYouAreFolderOwner": "Anda adalah pemilik folder ini.",
+      "DownloadingModel": "Mengunduh model ...",
       "Edit": "Sunting",
       "EditDelete": "Sunting+Hapus",
       "FileDeleted": "File sudah dihapus",
@@ -377,7 +370,7 @@
       "FolderUsage": "Penggunaan folder",
       "FolderUsing": "Menggunakan",
       "InviteUsers": "Undang Pengguna",
-      "KickOut": "",
+      "KickOut": "Berhenti berbagi",
       "KickOutConfirm": "Berhenti berbagi dengan {{email}}?",
       "Leave": "Tinggalkan",
       "LeaveAFolder": "Tinggalkan folder",
@@ -678,7 +671,17 @@
     "StorageProxies": "Penyimpanan",
     "TotalItems": "Total item {{total}}",
     "Username": "Nama pengguna",
-    "ValueRequired": "Silakan masukkan {{ nama }}"
+    "ValueRequired": "Silakan masukkan {{ nama }}",
+    "validation": {
+      "InvalidEmailAddress": "Alamat email yang tidak valid.",
+      "LetterNumber-_dot": "Memungkinkan huruf, angka, dan -_.",
+      "NameAlreadyExists": "Nama kebijakan sudah ada!",
+      "NumbersOnly": "Memungkinkan angka saja",
+      "PleaseSelectOption": "Pilih satu opsi",
+      "PleaseSelectOptions": "Pilih setidaknya satu opsi atau lebih.",
+      "PolicyName": "Nama kebijakan diperlukan.",
+      "ValidationFailed": "Validasi gagal"
+    }
   },
   "import": {
     "CleanUpImportTask": "Membersihkan tugas impor...",
@@ -772,8 +775,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -789,8 +790,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -914,6 +917,7 @@
     "GenerateNewToken": "Hasilkan token baru",
     "GenerateToken": "Hasilkan Token",
     "GeneratedTokens": "Token yang Dihasilkan",
+    "GoToServiceDetailPage": "Pergi ke Halaman Detail Layanan",
     "Image": "Gambar",
     "ModelDefinitionPath": "Jalur File Definisi Model",
     "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
@@ -923,6 +927,7 @@
     "OnlyAllowsNonNegativeIntegers": "Hanya mengizinkan bilangan bulat non-negatif",
     "OpenToPublic": "Terbuka Untuk Umum",
     "Owner": "Pemilik",
+    "PlayYourModelNow": "Mainkan model Anda sekarang!",
     "PleaseSelectTime": "Silakan pilih waktu!",
     "Processing": "Pengolahan...",
     "Public": "Publik",
@@ -934,6 +939,7 @@
     "RoutesInfo": "Info Rute",
     "RoutingInfo": "Info Perutean",
     "RoutingsCount": "Jumlah Rute",
+    "RunThisModel": "Jalankan model ini",
     "RuntimeVariant": "Varian Runtime Inferensi",
     "SeeContainerLogs": "Lihat Log Kontainer",
     "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
@@ -954,6 +960,7 @@
     "StartNewService": "Mulai Layanan Baru",
     "StartNewServing": "Memulai sajian baru",
     "StartService": "Mulai Layanan",
+    "StartingModelService": "Mulai Layanan Model ...",
     "Status": "Status",
     "Success": "Kesuksesan",
     "SyncRoutes": "Menyinkronkan rute",
@@ -1009,6 +1016,9 @@
     "SeeDetail": "Lihat Detail",
     "SuccessfullyUpdated": "Berhasil Diperbarui",
     "Visit": "Kunjungi"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} dari {{total}} item"
   },
   "propertyFilter": {
     "PlaceHolder": "Pencarian",
@@ -1681,6 +1691,11 @@
     "SessionsDesc": "Jumlah sesi komputasi yang dibuat.",
     "UsageHistory": "Riwayat Penggunaan",
     "UsageHistoryNote": "Riwayat penggunaan yang ditampilkan di sini didasarkan pada sesi komputasi yang diakhiri.",
+    "description": {
+      "CPUUtilization": "Mewakili jumlah waktu CPU yang digunakan oleh sesi selama periode yang dipilih. \n\nInti CPU tunggal sesuai dengan maksimum 100%.\n\nJika beberapa core dialokasikan, total penggunaan dapat melebihi 100%, karena dihitung dengan meringkas penggunaan maksimum (100%) dari setiap inti.",
+      "NetworkRx": "Menunjukkan laju transfer jaringan.\n\nMewakili tingkat di mana wadah menerima data jaringan.",
+      "NetworkTx": "Menunjukkan laju transfer jaringan. \n\nMewakili tingkat di mana wadah mengirim data jaringan."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jika penggunaan rendah, data untuk beberapa tanggal mungkin tidak tersedia. \nSilakan coba lagi dengan kisaran tanggal yang lebih pendek.",
       "NoMetricsToDisplay": "Tidak ada metrik yang tersedia untuk pelacakan"

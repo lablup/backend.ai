@@ -210,17 +210,7 @@
     "UserStatus": "Statut de l'utilisateur",
     "Users": "Utilisateurs",
     "WarningLessRateLimit": "Si la valeur de la limite de débit est faible, les opérations API telles que la connexion peuvent être bloquées.",
-    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :",
-    "validation": {
-      "InvalidEmailAddress": "Adresse e-mail invalide.",
-      "LetterNumber-_dot": "Autorise les lettres, les chiffres et -_.",
-      "NameAlreadyExists": "Le nom de la stratégie existe déjà !",
-      "NumbersOnly": "Autorise uniquement les chiffres",
-      "PleaseSelectOption": "Veuillez sélectionner une option",
-      "PleaseSelectOptions": "Veuillez sélectionner optios.",
-      "PolicyName": "Nom de la stratégie Obligatoire.",
-      "ValidationFailed": "Validation échouée"
-    }
+    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :"
   },
   "data": {
     "Active": "Actif",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Impossible de supprimer le dossier monté dans une ou plusieurs sessions. Veuillez d'abord terminer la session.",
+      "CannotDeletePipelineFolder": "Vous ne pouvez pas supprimer les dossiers du pipeline.",
+      "CannotRestorePipelineFolder": "Vous ne pouvez pas restaurer les dossiers du pipeline.",
       "CloneAFolder": "Cloner un dossier",
       "CloneFolder": "Cloner un dossier",
       "Cloneable": "Clonable",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Supprimer un dossier",
       "DeleteForever": "Supprimer pour toujours",
       "DescYouAreFolderOwner": "Vous êtes le propriétaire de ce dossier.",
+      "DownloadingModel": "Modèle de téléchargement ...",
       "Edit": "Éditer",
       "EditDelete": "Modifier+Supprimer",
       "FileDeleted": "Fichier supprimé",
@@ -378,7 +371,7 @@
       "FolderUsage": "Utilisation des dossiers",
       "FolderUsing": "Utilisation",
       "InviteUsers": "Inviter l'utilisateur",
-      "KickOut": "",
+      "KickOut": "Arrêter de partager",
       "KickOutConfirm": "Ne plus partager avec {{email}} ?",
       "Leave": "Quitter",
       "LeaveAFolder": "Laisser un dossier",
@@ -679,7 +672,17 @@
     "StorageProxies": "Stockages",
     "TotalItems": "Total des éléments {{total}}",
     "Username": "Nom d'utilisateur",
-    "ValueRequired": "Veuillez saisir {{ nom }}"
+    "ValueRequired": "Veuillez saisir {{ nom }}",
+    "validation": {
+      "InvalidEmailAddress": "Adresse e-mail non valide.",
+      "LetterNumber-_dot": "Permet des lettres, des chiffres et -_.",
+      "NameAlreadyExists": "Le nom de politique existe déjà!",
+      "NumbersOnly": "Permet les nombres uniquement",
+      "PleaseSelectOption": "Veuillez sélectionner une option",
+      "PleaseSelectOptions": "Veuillez sélectionner au moins une option ou plus.",
+      "PolicyName": "Nom de la politique requis.",
+      "ValidationFailed": "La validation a échoué"
+    }
   },
   "import": {
     "CleanUpImportTask": "Nettoyage de la tâche d'importation...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Générer un nouveau jeton",
     "GenerateToken": "Générer un jeton",
     "GeneratedTokens": "Jetons générés",
+    "GoToServiceDetailPage": "Aller à la page de détail du service",
     "Image": "Image",
     "ModelDefinitionPath": "Chemin du fichier de définition du modèle",
     "ModelMountDestination": "Destination de montage pour le dossier modèle",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "N'autorise que les nombres entiers non négatifs",
     "OpenToPublic": "Ouvert au public",
     "Owner": "Propriétaire",
+    "PlayYourModelNow": "Jouez votre modèle maintenant!",
     "PleaseSelectTime": "Veuillez choisir l'heure !",
     "Processing": "Traitement...",
     "Public": "Public",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Informations sur les itinéraires",
     "RoutingInfo": "Informations sur le routage",
     "RoutingsCount": "Nombre d'itinéraires",
+    "RunThisModel": "Exécuter ce modèle",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
     "SeeContainerLogs": "Voir les journaux de conteneur",
     "ServiceCreated": "Le service modèle {{ name }} a été créé avec succès.",
@@ -956,6 +962,7 @@
     "StartNewService": "Démarrer un nouveau service",
     "StartNewServing": "Commencer une nouvelle distribution",
     "StartService": "Démarrer le service",
+    "StartingModelService": "Service de modèle de démarrage ...",
     "Status": "Statut",
     "Success": "Succès",
     "SyncRoutes": "Synchroniser les itinéraires",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Voir le détail",
     "SuccessfullyUpdated": "Mise à jour réussie",
     "Visit": "Visite"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} des éléments {{total}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Recherche",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Le nombre de sessions de calcul créées.",
     "UsageHistory": "Usage Historique",
     "UsageHistoryNote": "L'historique d'utilisation montré ici est basé sur des séances de calcul terminées.",
+    "description": {
+      "CPUUtilization": "Représente la quantité de temps de CPU utilisé par la session pendant la période sélectionnée. \n\nUn seul noyau CPU correspond à un maximum de 100%.\n\nSi plusieurs noyaux sont alloués, l'utilisation totale peut dépasser 100%, car elle est calculée en résumant l'utilisation maximale (100%) de chaque noyau.",
+      "NetworkRx": "Indique le taux de transfert de réseau.\n\nReprésente la vitesse à laquelle le conteneur reçoit des données réseau.",
+      "NetworkTx": "Indique le taux de transfert de réseau. \n\nReprésente la vitesse à laquelle le conteneur envoie des données de réseau."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Si l'utilisation est faible, les données pour certaines dates peuvent ne pas être disponibles. \nVeuillez réessayer avec une plage de dates plus courte.",
       "NoMetricsToDisplay": "Aucune métrique avaliable pour le suivi"

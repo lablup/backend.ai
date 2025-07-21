@@ -210,17 +210,7 @@
     "UserStatus": "สถานะผู้ใช้",
     "Users": "ผู้ใช้",
     "WarningLessRateLimit": "หากค่าขีดจำกัดอัตราน้อยเกินไป การดำเนินการ API เช่น การเข้าสู่ระบบอาจถูกบล็อก",
-    "YouAreAboutToDeleteCredential": "คุณกำลังจะลบข้อมูลรับรองของผู้ใช้รายนี้:",
-    "validation": {
-      "InvalidEmailAddress": "ที่อยู่อีเมลไม่ถูกต้อง",
-      "LetterNumber-_dot": "อนุญาตตัวอักษร ตัวเลข และ -_.",
-      "NameAlreadyExists": "มีชื่อนโยบายนี้อยู่แล้ว!",
-      "NumbersOnly": "อนุญาตเฉพาะตัวเลข",
-      "PleaseSelectOption": "กรุณาเลือกหนึ่งตัวเลือก",
-      "PleaseSelectOptions": "กรุณาเลือกอย่างน้อยหนึ่งตัวเลือกหรือมากกว่า",
-      "PolicyName": "ต้องระบุชื่อนโยบาย",
-      "ValidationFailed": "การตรวจสอบล้มเหลว"
-    }
+    "YouAreAboutToDeleteCredential": "คุณกำลังจะลบข้อมูลรับรองของผู้ใช้รายนี้:"
   },
   "data": {
     "Active": "คล่องแคล่ว",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "ไม่สามารถลบโฟลเดอร์ที่ถูกเมาท์ในหนึ่งหรือหลายเซสชัน กรุณายุติเซสชันก่อน",
+      "CannotDeletePipelineFolder": "คุณไม่สามารถลบโฟลเดอร์ไปป์ไลน์ได้",
+      "CannotRestorePipelineFolder": "คุณไม่สามารถกู้คืนโฟลเดอร์ไปป์ไลน์ได้",
       "CloneAFolder": "โคลนโฟลเดอร์",
       "CloneFolder": "โคลนโฟลเดอร์",
       "Cloneable": "สามารถโคลนได้",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "ลบโฟลเดอร์",
       "DeleteForever": "ลบถาวร",
       "DescYouAreFolderOwner": "คุณเป็นเจ้าของโฟลเดอร์นี้",
+      "DownloadingModel": "ดาวน์โหลดรุ่น ...",
       "Edit": "แก้ไข",
       "EditDelete": "แก้ไข+ลบ",
       "FileDeleted": "ลบไฟล์แล้ว",
@@ -378,7 +371,7 @@
       "FolderUsage": "การใช้งานโฟลเดอร์",
       "FolderUsing": "กำลังใช้",
       "InviteUsers": "เชิญผู้ใช้",
-      "KickOut": "",
+      "KickOut": "หยุดการแบ่งปัน",
       "KickOutConfirm": "หยุดการแบ่งปันกับ {{email}}?",
       "Leave": "ออก",
       "LeaveAFolder": "ออกจากโฟลเดอร์",
@@ -668,7 +661,17 @@
     "StorageProxies": "ที่เก็บข้อมูล",
     "TotalItems": "รวม {{total}} รายการ",
     "Username": "ชื่อผู้ใช้",
-    "ValueRequired": "โปรดป้อน {{name}}"
+    "ValueRequired": "โปรดป้อน {{name}}",
+    "validation": {
+      "InvalidEmailAddress": "ที่อยู่อีเมลไม่ถูกต้อง",
+      "LetterNumber-_dot": "อนุญาตตัวอักษรตัวเลขและ -_",
+      "NameAlreadyExists": "ชื่อนโยบายมีอยู่แล้ว!",
+      "NumbersOnly": "อนุญาตให้ตัวเลขเท่านั้น",
+      "PleaseSelectOption": "กรุณาเลือกหนึ่งตัวเลือก",
+      "PleaseSelectOptions": "โปรดเลือกตัวเลือกอย่างน้อยหนึ่งตัวหรือมากกว่า",
+      "PolicyName": "ต้องใช้ชื่อนโยบาย",
+      "ValidationFailed": "การตรวจสอบล้มเหลว"
+    }
   },
   "import": {
     "CleanUpImportTask": "กำลังทำความสะอาดงานนำเข้า...",
@@ -762,8 +765,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -779,8 +780,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -905,6 +908,7 @@
     "GenerateNewToken": "สร้างโทเคนใหม่",
     "GenerateToken": "สร้างโทเคน",
     "GeneratedTokens": "โทเคนที่สร้างขึ้น",
+    "GoToServiceDetailPage": "ไปที่หน้ารายละเอียดบริการ",
     "Image": "อิมเมจ",
     "ModelDefinitionPath": "เส้นทางไฟล์กำหนดโมเดล",
     "ModelMountDestination": "ปลายทางการเมาท์สำหรับโฟลเดอร์โมเดล",
@@ -914,6 +918,7 @@
     "OnlyAllowsNonNegativeIntegers": "อนุญาตเฉพาะจำนวนเต็มที่ไม่ติดลบ",
     "OpenToPublic": "เปิดให้สาธารณะ",
     "Owner": "เจ้าของ",
+    "PlayYourModelNow": "เล่นโมเดลของคุณตอนนี้!",
     "PleaseSelectTime": "กรุณาเลือกเวลา!",
     "Processing": "กำลังประมวลผล...",
     "Public": "สาธารณะ",
@@ -925,6 +930,7 @@
     "RoutesInfo": "ข้อมูลเส้นทาง",
     "RoutingInfo": "ข้อมูลการกำหนดเส้นทาง",
     "RoutingsCount": "จำนวนการกำหนดเส้นทาง",
+    "RunThisModel": "เรียกใช้รุ่นนี้",
     "RuntimeVariant": "ตัวแปรรันไทม์การอนุมาน",
     "SeeContainerLogs": "ดูบันทึกคอนเทนเนอร์",
     "ServiceCreated": "สร้างบริการโมเดล {{ name }} สำเร็จแล้ว",
@@ -945,6 +951,7 @@
     "StartNewService": "เริ่มบริการใหม่",
     "StartNewServing": "เริ่มการให้บริการใหม่",
     "StartService": "เริ่มบริการ",
+    "StartingModelService": "บริการรุ่นเริ่มต้น ...",
     "Status": "สถานะ",
     "Success": "สำเร็จ",
     "SyncRoutes": "ซิงค์เส้นทาง",
@@ -1000,6 +1007,9 @@
     "SeeDetail": "ดูรายละเอียด",
     "SuccessfullyUpdated": "อัปเดตสำเร็จแล้ว",
     "Visit": "เยี่ยมชม"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} ของ {{total}} รายการ"
   },
   "propertyFilter": {
     "PlaceHolder": "ค้นหา",
@@ -1663,6 +1673,11 @@
     "SessionsDesc": "จำนวนเซสชันการคำนวณที่สร้างขึ้น",
     "UsageHistory": "ประวัติการใช้งาน",
     "UsageHistoryNote": "ประวัติการใช้งานที่แสดงที่นี่จะขึ้นอยู่กับเซสชันการคำนวณที่สิ้นสุด",
+    "description": {
+      "CPUUtilization": "แสดงถึงจำนวนเวลา CPU ที่ใช้โดยเซสชั่นในช่วงระยะเวลาที่เลือก \n\nแกนซีพียูเดียวสอดคล้องกับสูงสุด 100%\n\nหากมีการจัดสรรหลายแกนการใช้งานทั้งหมดอาจเกิน 100%เนื่องจากคำนวณโดยการรวมการใช้งานสูงสุด (100%) ของแต่ละแกน",
+      "NetworkRx": "ระบุอัตราการถ่ายโอนเครือข่าย \n\nแสดงถึงอัตราที่คอนเทนเนอร์ได้รับข้อมูลเครือข่าย",
+      "NetworkTx": "ระบุอัตราการถ่ายโอนเครือข่าย \n\nแสดงถึงอัตราที่คอนเทนเนอร์กำลังส่งข้อมูลเครือข่าย"
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "หากการใช้งานต่ำข้อมูลสำหรับวันที่บางวันอาจไม่สามารถใช้ได้ \nโปรดลองอีกครั้งด้วยช่วงวันที่ที่สั้นกว่า",
       "NoMetricsToDisplay": "ไม่มีตัวชี้วัดที่มีความสามารถในการติดตาม"

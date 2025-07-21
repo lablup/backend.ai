@@ -210,17 +210,7 @@
     "UserStatus": "Κατάσταση χρήστη",
     "Users": "Χρήστες",
     "WarningLessRateLimit": "Εάν η τιμή Όριο ρυθμού είναι μικρή, ενδέχεται να μπλοκαριστούν λειτουργίες API, όπως η σύνδεση.",
-    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:",
-    "validation": {
-      "InvalidEmailAddress": "Μη έγκυρη διεύθυνση e-mail.",
-      "LetterNumber-_dot": "Επιτρέπει γράμματα, αριθμούς και -_.",
-      "NameAlreadyExists": "Το όνομα πολιτικής υπάρχει ήδη!",
-      "NumbersOnly": "Επιτρέπει μόνο αριθμούς",
-      "PleaseSelectOption": "Επιλέξτε μία από τις επιλογές",
-      "PleaseSelectOptions": "Παρακαλούμε επιλέξτε τουλάχιστον μία ή περισσότερες επιλογές.",
-      "PolicyName": "Απαιτείται όνομα πολιτικής.",
-      "ValidationFailed": "Η επικύρωση απέτυχε"
-    }
+    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:"
   },
   "data": {
     "Active": "Ενεργός",
@@ -345,6 +335,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Δεν είναι δυνατή η διαγραφή του φακέλου που είναι τοποθετημένος σε μία ή περισσότερες περιόδους σύνδεσης. Κλείστε πρώτα τη συνεδρία.",
+      "CannotDeletePipelineFolder": "Δεν μπορείτε να διαγράψετε τους φακέλους αγωγών.",
+      "CannotRestorePipelineFolder": "Δεν μπορείτε να επαναφέρετε τους φακέλους αγωγών.",
       "CloneAFolder": "Κλωνοποίηση φακέλου",
       "CloneFolder": "Φάκελος κλωνοποίησης",
       "Cloneable": "Κλωνοποιήσιμο",
@@ -354,6 +346,7 @@
       "DeleteAFolder": "Διαγραφή φακέλου",
       "DeleteForever": "Διαγραφή για πάντα",
       "DescYouAreFolderOwner": "Είστε ο κάτοχος αυτού του φακέλου.",
+      "DownloadingModel": "Μοντέλο λήψης ...",
       "Edit": "Επεξεργασία",
       "EditDelete": "Επεξεργασία + Διαγραφή",
       "FileDeleted": "Το αρχείο διαγράφηκε",
@@ -375,7 +368,7 @@
       "FolderUsage": "Χρήση φακέλου",
       "FolderUsing": "Χρήση του",
       "InviteUsers": "Προσκαλέστε χρήστης",
-      "KickOut": "",
+      "KickOut": "Διακοπή",
       "KickOutConfirm": "Σταματήστε να μοιράζεστε με {{email}};",
       "Leave": "Αδεια",
       "LeaveAFolder": "Αφήστε έναν φάκελο",
@@ -675,7 +668,17 @@
     "StorageProxies": "Αποθήκες",
     "TotalItems": "Σύνολο {{total}} στοιχείων",
     "Username": "Όνομα χρήστη",
-    "ValueRequired": "Παρακαλώ εισάγετε {{ όνομα }}"
+    "ValueRequired": "Παρακαλώ εισάγετε {{ όνομα }}",
+    "validation": {
+      "InvalidEmailAddress": "Μη έγκυρη διεύθυνση email.",
+      "LetterNumber-_dot": "Επιτρέπει γράμματα, αριθμούς και -_.",
+      "NameAlreadyExists": "Το όνομα πολιτικής υπάρχει ήδη!",
+      "NumbersOnly": "Επιτρέπει μόνο τους αριθμούς",
+      "PleaseSelectOption": "Επιλέξτε μία επιλογή",
+      "PleaseSelectOptions": "Επιλέξτε τουλάχιστον μία ή περισσότερες επιλογές.",
+      "PolicyName": "Απαιτείται όνομα πολιτικής.",
+      "ValidationFailed": "Η επικύρωση απέτυχε"
+    }
   },
   "import": {
     "CleanUpImportTask": "Εργασία εισαγωγής καθαρισμού ...",
@@ -769,8 +772,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -786,8 +787,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -912,6 +915,7 @@
     "GenerateNewToken": "Δημιουργία νέου token",
     "GenerateToken": "Δημιουργία Token",
     "GeneratedTokens": "Παραγόμενα Tokens",
+    "GoToServiceDetailPage": "Μεταβείτε στη σελίδα λεπτομερειών υπηρεσίας",
     "Image": "Εικόνα",
     "ModelDefinitionPath": "Διαδρομή αρχείου ορισμού μοντέλου",
     "ModelMountDestination": "Προσάρτηση προορισμού για φάκελο μοντέλου",
@@ -921,6 +925,7 @@
     "OnlyAllowsNonNegativeIntegers": "Επιτρέπει μόνο μη αρνητικούς ακέραιους αριθμούς",
     "OpenToPublic": "Ανοιχτό για το κοινό",
     "Owner": "Ιδιοκτήτης",
+    "PlayYourModelNow": "Παίξτε το μοντέλο σας τώρα!",
     "PleaseSelectTime": "Παρακαλώ επιλέξτε χρόνο!",
     "Processing": "Επεξεργασία...",
     "Public": "Δημόσιο",
@@ -932,6 +937,7 @@
     "RoutesInfo": "Πληροφορίες διαδρομών",
     "RoutingInfo": "Πληροφορίες δρομολόγησης",
     "RoutingsCount": "Αριθμός δρομολογίων",
+    "RunThisModel": "Εκτελέστε αυτό το μοντέλο",
     "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
     "SeeContainerLogs": "Βλέπε αρχεία καταγραφής κοντέινερ",
     "ServiceCreated": "Η υπηρεσία μοντέλου {{ όνομα }} δημιουργήθηκε με επιτυχία.",
@@ -952,6 +958,7 @@
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
     "StartNewServing": "Έναρξη νέου σερβιρίσματος",
     "StartService": "Έναρξη υπηρεσίας",
+    "StartingModelService": "Εκκίνηση της υπηρεσίας μοντέλου ...",
     "Status": "Κατάσταση",
     "Success": "Επιτυχία",
     "SyncRoutes": "Διαδρομές συγχρονισμού",
@@ -1007,6 +1014,9 @@
     "SeeDetail": "Δείτε Λεπτομέρεια",
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
     "Visit": "Επίσκεψη"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} των στοιχείων {{Total}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Αναζήτηση",
@@ -1678,6 +1688,11 @@
     "SessionsDesc": "Ο αριθμός των συνόδων υπολογισμού που δημιουργήθηκαν.",
     "UsageHistory": "Ιστορικό χρήσης",
     "UsageHistoryNote": "Το ιστορικό χρήσης που παρουσιάζεται εδώ βασίζεται σε τερματισμένες συνεδρίες υπολογισμού.",
+    "description": {
+      "CPUUtilization": "Αντιπροσωπεύει το ποσό του χρόνου CPU που χρησιμοποιείται από τη συνεδρία κατά τη διάρκεια της επιλεγμένης περιόδου. \n\nΈνας μόνο πυρήνας CPU αντιστοιχεί σε μέγιστο 100%.\n\nΕάν διατεθούν πολλαπλοί πυρήνες, η συνολική χρήση μπορεί να υπερβεί το 100%, καθώς υπολογίζεται με τη συνοπτική συνοπτική χρήση της μέγιστης χρήσης (100%) κάθε πυρήνα.",
+      "NetworkRx": "Υποδεικνύει το ποσοστό μεταφοράς δικτύου. \n\nΑντιπροσωπεύει το ρυθμό με τον οποίο το δοχείο λαμβάνει δεδομένα δικτύου.",
+      "NetworkTx": "Υποδεικνύει το ποσοστό μεταφοράς δικτύου. \n\nΑντιπροσωπεύει το ρυθμό με τον οποίο το δοχείο στέλνει δεδομένα δικτύου."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Εάν η χρήση είναι χαμηλή, τα δεδομένα για ορισμένες ημερομηνίες ενδέχεται να μην είναι διαθέσιμα. \nΔοκιμάστε ξανά με μικρότερο εύρος ημερομηνιών.",
       "NoMetricsToDisplay": "Δεν υπάρχουν μετρήσεις για την παρακολούθηση"

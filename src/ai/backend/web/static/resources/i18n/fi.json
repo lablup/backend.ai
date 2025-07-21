@@ -210,17 +210,7 @@
     "UserStatus": "Käyttäjän tila",
     "Users": "Käyttäjät",
     "WarningLessRateLimit": "Jos Rate Limit -arvo on pieni, API-toiminnot, kuten kirjautuminen, voivat estyä.",
-    "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:",
-    "validation": {
-      "InvalidEmailAddress": "Virheellinen sähköpostiosoite.",
-      "LetterNumber-_dot": "Sallii kirjaimet, numerot ja -_.",
-      "NameAlreadyExists": "Käytännön nimi on jo olemassa!",
-      "NumbersOnly": "Sallii vain numerot",
-      "PleaseSelectOption": "Valitse yksi vaihtoehto",
-      "PleaseSelectOptions": "Valitse vähintään yksi tai useampi vaihtoehto.",
-      "PolicyName": "Vakuutuksen nimi Pakollinen.",
-      "ValidationFailed": "Validointi epäonnistui"
-    }
+    "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:"
   },
   "data": {
     "Active": "Aktiivinen",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
+      "CannotDeletePipelineFolder": "Et voi poistaa putkilinjan kansioita.",
+      "CannotRestorePipelineFolder": "Putkilinjan kansiot eivät voi palauttaa.",
       "CloneAFolder": "Kloonaa kansio",
       "CloneFolder": "Kloonattu kansio",
       "Cloneable": "Kloonattavissa",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Poista kansio",
       "DeleteForever": "Poista ikuisesti",
       "DescYouAreFolderOwner": "Olet tämän kansion omistaja.",
+      "DownloadingModel": "Latausmalli ...",
       "Edit": "Muokkaa",
       "EditDelete": "Muokkaa+Poista",
       "FileDeleted": "Tiedosto poistettu",
@@ -378,7 +371,7 @@
       "FolderUsage": "Kansion käyttö",
       "FolderUsing": "Käyttämällä",
       "InviteUsers": "Kutsua käyttäjää",
-      "KickOut": "",
+      "KickOut": "Lopeta jakaminen",
       "KickOutConfirm": "Lopeta jakaminen {{email}} kanssa?",
       "Leave": "Jätä",
       "LeaveAFolder": "Jätä kansio",
@@ -679,7 +672,17 @@
     "StorageProxies": "Varastot",
     "TotalItems": "Yhteensä {{total}} kohteita",
     "Username": "Käyttäjätunnus",
-    "ValueRequired": "Kirjoita {{ nimi }}"
+    "ValueRequired": "Kirjoita {{ nimi }}",
+    "validation": {
+      "InvalidEmailAddress": "Virheellinen sähköpostiosoite.",
+      "LetterNumber-_dot": "Sallii kirjaimet, numerot ja -_.",
+      "NameAlreadyExists": "Politiikan nimi on jo olemassa!",
+      "NumbersOnly": "Sallii vain numerot",
+      "PleaseSelectOption": "Valitse yksi vaihtoehto",
+      "PleaseSelectOptions": "Valitse vähintään yksi vaihtoehto tai enemmän.",
+      "PolicyName": "Poliittisen nimi vaaditaan.",
+      "ValidationFailed": "Validointi epäonnistui"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -915,6 +918,7 @@
     "GenerateNewToken": "Luo uusi merkki",
     "GenerateToken": "Luo tunniste",
     "GeneratedTokens": "Generoidut tunnukset",
+    "GoToServiceDetailPage": "Siirry Service Detail -sivulle",
     "Image": "Kuva",
     "ModelDefinitionPath": "Mallin määritelmän tiedostopolku",
     "ModelMountDestination": "Kiinnityskohde mallikansioon",
@@ -924,6 +928,7 @@
     "OnlyAllowsNonNegativeIntegers": "Sallii vain ei-negatiiviset kokonaisluvut",
     "OpenToPublic": "Avoinna yleisölle",
     "Owner": "Omistaja",
+    "PlayYourModelNow": "Pelaa malliasi nyt!",
     "PleaseSelectTime": "Valitse aika!",
     "Processing": "Käsitellään...",
     "Public": "Julkinen",
@@ -935,6 +940,7 @@
     "RoutesInfo": "Reittien tiedot",
     "RoutingInfo": "Reititystiedot",
     "RoutingsCount": "Reittien määrä",
+    "RunThisModel": "Suorita tämä malli",
     "RuntimeVariant": "Päättelyn suoritusaikamuunnos",
     "SeeContainerLogs": "Katso Säilön lokit",
     "ServiceCreated": "Mallipalvelun {{ name }} luominen onnistui.",
@@ -955,6 +961,7 @@
     "StartNewService": "Aloita uusi palvelu",
     "StartNewServing": "Aloita uusi annos",
     "StartService": "Käynnistä palvelu",
+    "StartingModelService": "Aloitusmallipalvelu ...",
     "Status": "Tila",
     "Success": "Menestys",
     "SyncRoutes": "Synkronoi reitit",
@@ -1010,6 +1017,9 @@
     "SeeDetail": "Katso lisätietoja",
     "SuccessfullyUpdated": "Päivitetty onnistuneesti",
     "Visit": "Käy osoitteessa"
+  },
+  "pagination": {
+    "Total": "{{start}}–{{end}} yhteensä {{total}} kohteesta"
   },
   "propertyFilter": {
     "PlaceHolder": "Etsi",
@@ -1681,6 +1691,11 @@
     "SessionsDesc": "Luotujen laskenta-istuntojen määrä.",
     "UsageHistory": "Käyttöhistoria",
     "UsageHistoryNote": "Tässä esitetty käyttöhistoria perustuu lopetettuihin laskentaistuntoihin.",
+    "description": {
+      "CPUUtilization": "Edustaa istunnon käyttämän prosessorin määrää valitun ajanjakson aikana. \n\nYksi CPU -ydin vastaa enintään 100%.\n\nJos useita ytimiä allokoidaan, kokonaiskäyttö voi ylittää 100%, koska se lasketaan summaamalla enimmäiskäyttö (100%) jokaisesta ytimestä.",
+      "NetworkRx": "Osoittaa verkonsiirtonopeuden.\n\nEdustaa nopeutta, jolla säilö vastaanottaa verkkotietoja.",
+      "NetworkTx": "Osoittaa verkonsiirtonopeuden. \n\nEdustaa nopeutta, jolla säilö lähettää verkkotietoja."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jos käyttö on alhainen, joihinkin päivämääriin tietoja ei välttämättä ole käytettävissä. \nYritä uudelleen lyhyemmällä ajanjaksolla.",
       "NoMetricsToDisplay": "Ei mittareita, joita on saatavana seurantaan"

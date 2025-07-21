@@ -210,17 +210,7 @@
     "UserStatus": "Статус пользователя",
     "Users": "Пользователи",
     "WarningLessRateLimit": "Если значение Rate Limit мало, то такие операции API, как вход в систему, могут быть заблокированы.",
-    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:",
-    "validation": {
-      "InvalidEmailAddress": "Неверный адрес электронной почты.",
-      "LetterNumber-_dot": "Допускает буквы, цифры и -_.",
-      "NameAlreadyExists": "Название политики уже существует!",
-      "NumbersOnly": "Допускает только числа",
-      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
-      "PleaseSelectOptions": "Пожалуйста, выберите варианты",
-      "PolicyName": "Название политики Обязательно.",
-      "ValidationFailed": "Проверка не удалась"
-    }
+    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:"
   },
   "data": {
     "Active": "Активный",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Невозможно удалить папку, установленную в одном или нескольких сеансах. Пожалуйста, сначала завершите сеанс.",
+      "CannotDeletePipelineFolder": "Вы не можете удалить папки трубопровода.",
+      "CannotRestorePipelineFolder": "Вы не можете восстановить папки трубопровода.",
       "CloneAFolder": "Клонировать папку",
       "CloneFolder": "Клонировать папку",
       "Cloneable": "Клонируемый",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Удалить папку",
       "DeleteForever": "Удалить навсегда",
       "DescYouAreFolderOwner": "Вы являетесь владельцем этой папки.",
+      "DownloadingModel": "Модель загрузки ...",
       "Edit": "Редактировать",
       "EditDelete": "Изменить + Удалить",
       "FileDeleted": "Файл удален",
@@ -378,7 +371,7 @@
       "FolderUsage": "Использование папок",
       "FolderUsing": "Использование сайта",
       "InviteUsers": "Пригласить пользователя",
-      "KickOut": "",
+      "KickOut": "Перестань делиться",
       "KickOutConfirm": "Перестать делиться с {{email}}?",
       "Leave": "Покинуть",
       "LeaveAFolder": "Обновить настройки папки",
@@ -679,7 +672,17 @@
     "StorageProxies": "Хранилища данных",
     "TotalItems": "Всего {{total}} предметов",
     "Username": "Имя пользователя",
-    "ValueRequired": "Пожалуйста, введите {{ имя }}"
+    "ValueRequired": "Пожалуйста, введите {{ имя }}",
+    "validation": {
+      "InvalidEmailAddress": "Неверный адрес электронной почты.",
+      "LetterNumber-_dot": "Позволяет письма, цифры и -_.",
+      "NameAlreadyExists": "Название политики уже существует!",
+      "NumbersOnly": "Позволяет только числа",
+      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
+      "PleaseSelectOptions": "Пожалуйста, выберите хотя бы один вариант или несколько.",
+      "PolicyName": "Требуется имя политики.",
+      "ValidationFailed": "Проверка не удалась"
+    }
   },
   "import": {
     "CleanUpImportTask": "Очистить задачу импорта ...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Генерация нового токена",
     "GenerateToken": "Сгенерировать токен",
     "GeneratedTokens": "Сгенерированные токены",
+    "GoToServiceDetailPage": "Перейти на страницу сведений об обслуживании",
     "Image": "Изображение",
     "ModelDefinitionPath": "Путь к файлу определения модели",
     "ModelMountDestination": "Место установки папки модели",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Допускаются только неотрицательные целые числа",
     "OpenToPublic": "Открыт для посещения",
     "Owner": "Владелец",
+    "PlayYourModelNow": "Играйте в свою модель сейчас!",
     "PleaseSelectTime": "Пожалуйста, выберите время!",
     "Processing": "Обработка...",
     "Public": "Публичный",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Информация о маршрутах",
     "RoutingInfo": "Маршрутная информация",
     "RoutingsCount": "Количество маршрутов",
+    "RunThisModel": "Запустите эту модель",
     "RuntimeVariant": "Вариант времени выполнения вывода",
     "SeeContainerLogs": "См. журналы контейнеров",
     "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
@@ -956,6 +962,7 @@
     "StartNewService": "Запустить новую услугу",
     "StartNewServing": "Запуск новой порции",
     "StartService": "Начало обслуживания",
+    "StartingModelService": "Служба начала модели ...",
     "Status": "Статус",
     "Success": "Успех",
     "SyncRoutes": "Синхронизация маршрутов",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "См детали",
     "SuccessfullyUpdated": "Успешно обновлено",
     "Visit": "Посещение"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} элементы"
   },
   "propertyFilter": {
     "PlaceHolder": "Поиск",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Количество созданных вычислительных сессий.",
     "UsageHistory": "История использования",
     "UsageHistoryNote": "История использования, показанная здесь, основана на прекращенных вычислительных сеансах.",
+    "description": {
+      "CPUUtilization": "Представляет количество времени процессора, используемого сеансом в течение выбранного периода. \n\nОдно ядро ​​процессора соответствует максимум 100%.\n\nЕсли выделяются несколько ядер, общее использование может превышать 100%, так как оно рассчитывается путем суммирования максимального использования (100%) каждого ядра.",
+      "NetworkRx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер получает сетевые данные.",
+      "NetworkTx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер отправляет сетевые данные."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Если использование низкое, данные для некоторых дат могут быть недоступны. \nПожалуйста, попробуйте еще раз с более коротким диапазоном дат.",
       "NoMetricsToDisplay": "Нет метрик доступных для отслеживания"

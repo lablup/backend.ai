@@ -210,17 +210,7 @@
     "UserStatus": "Kullanıcı Durumu",
     "Users": "Kullanıcılar",
     "WarningLessRateLimit": "Hız Sınırı değeri küçükse, oturum açma gibi API işlemleri engellenebilir.",
-    "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:",
-    "validation": {
-      "InvalidEmailAddress": "Geçersiz e-posta adresi.",
-      "LetterNumber-_dot": "Harflere, sayılara ve -_'ye izin verir.",
-      "NameAlreadyExists": "Politika Adı Zaten Var!",
-      "NumbersOnly": "Yalnızca sayılara izin verir",
-      "PleaseSelectOption": "Lütfen bir seçeneği seçin",
-      "PleaseSelectOptions": "Lütfen en az bir veya daha fazla seçenek işaretleyiniz.",
-      "PolicyName": "İlke adı Gerekli.",
-      "ValidationFailed": "Doğrulama başarısız"
-    }
+    "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:"
   },
   "data": {
     "Active": "Aktif",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Bir veya daha fazla oturuma bağlı klasör silinemez. Lütfen önce oturumu sonlandırın.",
+      "CannotDeletePipelineFolder": "Boru hattı klasörlerini silemezsiniz.",
+      "CannotRestorePipelineFolder": "Boru hattı klasörlerini geri yükleyemezsiniz.",
       "CloneAFolder": "Klasörü klonla",
       "CloneFolder": "Klasör klonlama",
       "Cloneable": "klonlanabilir",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Klasörü sil",
       "DeleteForever": "Tamamen sil",
       "DescYouAreFolderOwner": "Bu klasörün sahibi sizsiniz.",
+      "DownloadingModel": "İndirme Modeli ...",
       "Edit": "Düzenle",
       "EditDelete": "Düzenle+Sil",
       "FileDeleted": "Dosya Silindi",
@@ -378,7 +371,7 @@
       "FolderUsage": "Klasör kullanımı",
       "FolderUsing": "Kullanma",
       "InviteUsers": "Kullanıcıyı davet et",
-      "KickOut": "",
+      "KickOut": "Paylaşmayı Durdur",
       "KickOutConfirm": "{{email}} ile paylaşmayı keser misiniz?",
       "Leave": "Ayrılmak",
       "LeaveAFolder": "klasör bırak",
@@ -679,7 +672,17 @@
     "StorageProxies": "Depolar",
     "TotalItems": "Toplam {{toplam}} öğe",
     "Username": "Kullanıcı adı",
-    "ValueRequired": "Lütfen {{isim }} girin"
+    "ValueRequired": "Lütfen {{isim }} girin",
+    "validation": {
+      "InvalidEmailAddress": "Geçersiz e -posta adresi.",
+      "LetterNumber-_dot": "Harfler, sayılar ve -_ sağlar.",
+      "NameAlreadyExists": "Politika adı zaten var!",
+      "NumbersOnly": "Yalnızca numaralara izin verir",
+      "PleaseSelectOption": "Lütfen bir seçenek seçin",
+      "PleaseSelectOptions": "Lütfen en az bir veya daha fazla seçenek seçin.",
+      "PolicyName": "Politika adı gerekli.",
+      "ValidationFailed": "Doğrulama başarısız oldu"
+    }
   },
   "import": {
     "CleanUpImportTask": "İçe aktarma görevini temizle...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Yeni belirteç oluşturun",
     "GenerateToken": "Belirteç Oluştur",
     "GeneratedTokens": "Oluşturulan Jetonlar",
+    "GoToServiceDetailPage": "Servis Ayrıntısı sayfasına gidin",
     "Image": "Resim",
     "ModelDefinitionPath": "Model Tanımı Dosya Yolu",
     "ModelMountDestination": "Model Klasörü İçin Montaj Hedefi",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Yalnızca negatif olmayan tam sayılara izin verir",
     "OpenToPublic": "Halka Açık",
     "Owner": "Mal sahibi",
+    "PlayYourModelNow": "Modelinizi şimdi oynayın!",
     "PleaseSelectTime": "Lütfen zaman seçin!",
     "Processing": "İşleme...",
     "Public": "Kamu",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Güzergah Bilgileri",
     "RoutingInfo": "Yönlendirme Bilgisi",
     "RoutingsCount": "Güzergah Sayısı",
+    "RunThisModel": "Bu modeli çalıştır",
     "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
     "SeeContainerLogs": "Konteyner Günlüklerini görün",
     "ServiceCreated": "Model hizmeti {{ name }} başarıyla oluşturuldu.",
@@ -956,6 +962,7 @@
     "StartNewService": "Yeni Hizmeti Başlat",
     "StartNewServing": "Yeni servis başlatın",
     "StartService": "Hizmeti Başlat",
+    "StartingModelService": "Başlangıç ​​Model Hizmeti ...",
     "Status": "Durum",
     "Success": "Başarı",
     "SyncRoutes": "Rotaları senkronize et",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Ayrıntıları gör",
     "SuccessfullyUpdated": "Başarıyla güncellendi",
     "Visit": "Ziyaret etmek"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{total}} öğelerinin {{end}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Arama",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Oluşturulan hesaplama oturumlarının sayısı.",
     "UsageHistory": "Kullanım Geçmişi",
     "UsageHistoryNote": "Burada gösterilen kullanım geçmişi, sonlandırılmış hesaplama oturumlarına dayanmaktadır.",
+    "description": {
+      "CPUUtilization": "Seçilen dönemde oturum tarafından kullanılan CPU süresinin miktarını temsil eder. \n\nTek bir CPU çekirdeği maksimum%100'e karşılık gelir.\n\nBirden fazla çekirdek tahsis edilirse, toplam kullanım%1000'i aşabilir, çünkü her bir çekirdeğin maksimum kullanımını (%100) özetleyerek hesaplanır.",
+      "NetworkRx": "Ağ aktarım hızını gösterir. \n\nKapsayıcının ağ verilerini alma oranını temsil eder.",
+      "NetworkTx": "Ağ aktarım hızını gösterir.\n\nKapsayıcının ağ verilerini gönderme oranını temsil eder."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Kullanım düşükse, bazı tarihler için veriler mevcut olmayabilir. \nLütfen daha kısa bir tarih aralığı ile tekrar deneyin.",
       "NoMetricsToDisplay": "İzleme için Avalifable Metrics yok"

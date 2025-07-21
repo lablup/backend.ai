@@ -210,17 +210,7 @@
     "UserStatus": "Estado del usuario",
     "Users": "Usuarios",
     "WarningLessRateLimit": "Si el valor de Rate Limit es pequeño, es posible que se bloqueen operaciones de la API como el inicio de sesión.",
-    "YouAreAboutToDeleteCredential": "Estás a punto de eliminar la credencial de este usuario:",
-    "validation": {
-      "InvalidEmailAddress": "Dirección de correo electrónico no válida.",
-      "LetterNumber-_dot": "Permite letras, números y -_.",
-      "NameAlreadyExists": "El nombre de la póliza ya existe.",
-      "NumbersOnly": "Sólo admite números",
-      "PleaseSelectOption": "Seleccione una opción",
-      "PleaseSelectOptions": "Por favor, seleccione al menos una opción o más.",
-      "PolicyName": "Nombre de la póliza Obligatorio.",
-      "ValidationFailed": "Validación fallida"
-    }
+    "YouAreAboutToDeleteCredential": "Estás a punto de eliminar la credencial de este usuario:"
   },
   "data": {
     "Active": "Activo",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "No se puede eliminar la carpeta montada en una o más sesiones. Por favor, termine la sesión primero.",
+      "CannotDeletePipelineFolder": "No puede eliminar las carpetas de tuberías.",
+      "CannotRestorePipelineFolder": "No puedes restaurar las carpetas de tuberías.",
       "CloneAFolder": "Clonar una carpeta",
       "CloneFolder": "Clonar carpeta",
       "Cloneable": "Clonable",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Eliminar una carpeta",
       "DeleteForever": "Borrar para siempre",
       "DescYouAreFolderOwner": "Usted es el propietario de esta carpeta.",
+      "DownloadingModel": "Modelo de descarga ...",
       "Edit": "Editar",
       "EditDelete": "Editar+Borrar",
       "FileDeleted": "Archivo eliminado",
@@ -378,7 +371,7 @@
       "FolderUsage": "Uso de la carpeta",
       "FolderUsing": "Utilizando",
       "InviteUsers": "Invitar al usuario",
-      "KickOut": "",
+      "KickOut": "Dejar de compartir",
       "KickOutConfirm": "¿Dejar de compartir con {{email}}?",
       "Leave": "Deja",
       "LeaveAFolder": "Dejar una carpeta",
@@ -679,7 +672,17 @@
     "StorageProxies": "Almacenes",
     "TotalItems": "Total {{total}} artículos",
     "Username": "Nombre de usuario",
-    "ValueRequired": "Por favor, introduzca {{ nombre }}"
+    "ValueRequired": "Por favor, introduzca {{ nombre }}",
+    "validation": {
+      "InvalidEmailAddress": "Dirección de correo electrónico no válida.",
+      "LetterNumber-_dot": "Permite letras, números y -_.",
+      "NameAlreadyExists": "¡El nombre de la política ya existe!",
+      "NumbersOnly": "Permite solo números",
+      "PleaseSelectOption": "Seleccione una opción",
+      "PleaseSelectOptions": "Seleccione al menos una opción o más.",
+      "PolicyName": "Nombre de la política requerido.",
+      "ValidationFailed": "La validación falló"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Generar nuevo token",
     "GenerateToken": "Generar token",
     "GeneratedTokens": "Fichas generadas",
+    "GoToServiceDetailPage": "Vaya a la página Detalle del servicio",
     "Image": "Imagen",
     "ModelDefinitionPath": "Ruta del archivo de definición del modelo",
     "ModelMountDestination": "Destino de montaje para carpeta de modelo",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Sólo admite números enteros no negativos",
     "OpenToPublic": "Abierto al público",
     "Owner": "Dueño",
+    "PlayYourModelNow": "¡Juega tu modelo ahora!",
     "PleaseSelectTime": "Seleccione la hora",
     "Processing": "Procesando...",
     "Public": "Público",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Rutas",
     "RoutingInfo": "Información de ruta",
     "RoutingsCount": "Recuento de rutas",
+    "RunThisModel": "Ejecutar este modelo",
     "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
     "SeeContainerLogs": "Ver registros de contenedores",
     "ServiceCreated": "El servicio modelo {{ name }} se ha creado correctamente.",
@@ -956,6 +962,7 @@
     "StartNewService": "Iniciar nuevo servicio",
     "StartNewServing": "Iniciar nuevo servicio",
     "StartService": "Iniciar servicio",
+    "StartingModelService": "Servicio de modelo inicial ...",
     "Status": "Estado",
     "Success": "Éxito",
     "SyncRoutes": "Rutas de sincronización",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Ver detalle",
     "SuccessfullyUpdated": "Actualizado con éxito",
     "Visit": "Visite"
+  },
+  "pagination": {
+    "Total": "{{inicio}} - {{end}} de {{Total}} elementos"
   },
   "propertyFilter": {
     "PlaceHolder": "Buscar en",
@@ -1682,6 +1692,11 @@
     "SessionsDesc": "Número de sesiones de cálculo creadas.",
     "UsageHistory": "Historial de uso",
     "UsageHistoryNote": "El historial de uso que se muestra aquí se basa en sesiones de cómputo terminadas.",
+    "description": {
+      "CPUUtilization": "Representa la cantidad de tiempo de CPU utilizado por la sesión durante el período seleccionado. \n\nUn solo núcleo de CPU corresponde a un máximo de 100%.\n\nSi se asignan múltiples núcleos, el uso total puede exceder el 100%, ya que se calcula sumando el uso máximo (100%) de cada núcleo.",
+      "NetworkRx": "Indica la tasa de transferencia de red. \n\nRepresenta la tasa a la que el contenedor recibe datos de red.",
+      "NetworkTx": "Indica la tasa de transferencia de red. \n\nRepresenta la tasa a la que el contenedor está enviando datos de red."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Si el uso es bajo, los datos para algunas fechas pueden no estar disponibles. \nVuelva a intentarlo con un rango de fecha más corto.",
       "NoMetricsToDisplay": "No hay métricas disponibles para el seguimiento"

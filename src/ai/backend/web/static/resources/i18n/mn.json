@@ -209,17 +209,7 @@
     "UserStatus": "Хэрэглэгчийн статус",
     "Users": "Хэрэглэгчид",
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
-    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:",
-    "validation": {
-      "InvalidEmailAddress": "Хүчингүй мэйл хаяг.",
-      "LetterNumber-_dot": "Үсэг, тоо ба -_-г зөвшөөрдөг.",
-      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
-      "NumbersOnly": "Зөвхөн дугаарыг зөвшөөрдөг",
-      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
-      "PleaseSelectOptions": "сонголтуудыг сонгоно уу",
-      "PolicyName": "Бодлогын нэр шаардлагатай.",
-      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
-    }
+    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:"
   },
   "data": {
     "Active": "Идэвхтэй",
@@ -347,6 +337,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Нэг буюу хэд хэдэн хэсэгт суулгасан фолдерыг устгах боломжгүй. Эхлээд хуралдааныг зогсооно уу.",
+      "CannotDeletePipelineFolder": "Та дамжуулах хоолойн хавтасыг устгах боломжгүй.",
+      "CannotRestorePipelineFolder": "Та дамжуулах хоолойн хавтасыг сэргээх боломжгүй.",
       "CloneAFolder": "Фолдерыг хуул",
       "CloneFolder": "Фолдерыг хувилах",
       "Cloneable": "Cloneable",
@@ -356,6 +348,7 @@
       "DeleteAFolder": "Фолдер устгах",
       "DeleteForever": "Бүрмөсөн устгах",
       "DescYouAreFolderOwner": "Та энэ фолдерын эзэн юм.",
+      "DownloadingModel": "Загварыг татаж байна ...",
       "Edit": "Засах",
       "EditDelete": "Засах + Устгах",
       "FileDeleted": "Файлыг устгасан",
@@ -377,7 +370,7 @@
       "FolderUsage": "Хавтас ашиглалт",
       "FolderUsing": "Ашиглаж байна",
       "InviteUsers": "Урих хэрэглэгч",
-      "KickOut": "",
+      "KickOut": "Хуваалцах гэж",
       "KickOutConfirm": "{{Имэйл}} -тай хуваалцахаа болих уу?",
       "Leave": "Орхи",
       "LeaveAFolder": "Фолдер үлдээнэ үү",
@@ -677,7 +670,17 @@
     "StorageProxies": "Хадгалах сан",
     "TotalItems": "Нийт {{total}} зүйл",
     "Username": "Хэрэглэгчийн нэр",
-    "ValueRequired": "{{Нэр}}}}"
+    "ValueRequired": "{{Нэр}}}}",
+    "validation": {
+      "InvalidEmailAddress": "И-мэйл хаяг буруу байна.",
+      "LetterNumber-_dot": "Үсэг, тоо, -_-ийг зөвшөөрдөг.",
+      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
+      "NumbersOnly": "Дугаарыг л зөвшөөрдөг",
+      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
+      "PleaseSelectOptions": "Дор хаяж нэг сонголтыг сонгоно уу.",
+      "PolicyName": "Бодлогын нэр шаардлагатай.",
+      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
+    }
   },
   "import": {
     "CleanUpImportTask": "Импортын ажлыг цэвэрлэх ...",
@@ -771,8 +774,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -788,8 +789,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -914,6 +917,7 @@
     "GenerateNewToken": "Шинэ токен үүсгэх",
     "GenerateToken": "Токен үүсгэх",
     "GeneratedTokens": "Үүсгэсэн токенууд",
+    "GoToServiceDetailPage": "Үйлчилгээний дэлгэрэнгүй хуудсанд очно уу",
     "Image": "Зураг",
     "ModelDefinitionPath": "Загварын тодорхойлолтын файлын зам",
     "ModelMountDestination": "Загварын хавтасыг холбох газар",
@@ -923,6 +927,7 @@
     "OnlyAllowsNonNegativeIntegers": "Зөвхөн сөрөг бус бүхэл тоог зөвшөөрдөг",
     "OpenToPublic": "Олон нийтэд нээлттэй",
     "Owner": "Эзэмшигч",
+    "PlayYourModelNow": "Одоо загвараа тоглоорой!",
     "PleaseSelectTime": "Цаг сонгоно уу!",
     "Processing": "Боловсруулж байна...",
     "Public": "Олон нийтийн",
@@ -934,6 +939,7 @@
     "RoutesInfo": "Маршрутын мэдээлэл",
     "RoutingInfo": "Чиглүүлэлтийн мэдээлэл",
     "RoutingsCount": "Чиглүүлэлтийн тоо",
+    "RunThisModel": "Энэ загварыг ажиллуул",
     "RuntimeVariant": "Дүгнэлт Runtime Variant",
     "SeeContainerLogs": "Контейнерийн бүртгэлийг үзнэ үү",
     "ServiceCreated": "Загвар үйлчилгээ {{ name }} амжилттай үүсгэгдсэн.",
@@ -954,6 +960,7 @@
     "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
     "StartNewServing": "Шинээр үйлчилж эхлэх",
     "StartService": "Үйлчилгээг эхлүүлэх",
+    "StartingModelService": "Загварын үйлчилгээг эхлүүлэх ...",
     "Status": "Статус",
     "Success": "Амжилт",
     "SyncRoutes": "Замуудыг синк хийх",
@@ -1009,6 +1016,9 @@
     "SeeDetail": "Дэлгэрэнгүйг үзнэ үү",
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
     "Visit": "Айлчлах"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{{End}} {{нийт}}}} зүйл"
   },
   "propertyFilter": {
     "PlaceHolder": "Хайх",
@@ -1679,6 +1689,11 @@
     "SessionsDesc": "Үүсгэсэн тооцооллын сешнүүдийн тоо.",
     "UsageHistory": "Хэрэглээ түүх",
     "UsageHistoryNote": "Ашиглалтын түүхийг энд харуулав.",
+    "description": {
+      "CPUUtilization": "Сонгосон хугацаанд ашигласан хуралдааны цагаар ашигладаг CPU-ийн хэмжээг илэрхийлнэ. \n\nНэг CPU цөм нь дээд тал нь хамгийн ихдээ 100% -тай тохирч байна.\n\nХэрэв олон цоорхойг хуваарилсан бол нийт хэрэглээний хамгийн их хэрэглээг (100%) тооцоолох замаар тооцоолох боломжтой.",
+      "NetworkRx": "Сүлжээний дамжуулах хурдыг заана. \n\nСавыг сүлжээний өгөгдлийг хүлээн авч байгаа хувь хэмжээг илэрхийлнэ.",
+      "NetworkTx": "Сүлжээний дамжуулах хурдыг заана.\n\nСавыг сүлжээний өгөгдлийг илгээж байгаа хувь хэмжээг илэрхийлнэ."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Хэрэв USERES бага бол зарим болзоонд өгөгдөл байхгүй байж магадгүй юм. \nБогино хугацаанд дахин оролдоно уу.",
       "NoMetricsToDisplay": "Хяналт хийх боломжтой хэмжигдэхүүн байхгүй"

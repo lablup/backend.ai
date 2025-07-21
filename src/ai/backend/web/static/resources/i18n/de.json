@@ -210,17 +210,7 @@
     "UserStatus": "Benutzer-Status",
     "Users": "Benutzer",
     "WarningLessRateLimit": "Wenn der Wert für das Ratenlimit klein ist, können API-Vorgänge wie die Anmeldung blockiert werden.",
-    "YouAreAboutToDeleteCredential": "Sie sind dabei, die Anmeldeinformationen dieses Benutzers zu löschen:",
-    "validation": {
-      "InvalidEmailAddress": "Ungültige E-Mail-Adresse.",
-      "LetterNumber-_dot": "Erlaubt Buchstaben, Zahlen und -_.",
-      "NameAlreadyExists": "Richtlinienname ist bereits vorhanden!",
-      "NumbersOnly": "Erlaubt nur Zahlen",
-      "PleaseSelectOption": "Bitte wählen Sie eine Option",
-      "PleaseSelectOptions": "Bitte wählen Sie mindestens eine oder mehrere Optionen aus.",
-      "PolicyName": "Richtlinienname Erforderlich.",
-      "ValidationFailed": "Überprüfung fehlgeschlagen"
-    }
+    "YouAreAboutToDeleteCredential": "Sie sind dabei, die Anmeldeinformationen dieses Benutzers zu löschen:"
   },
   "data": {
     "Active": "Aktiv",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Der in einer oder mehreren Sitzungen bereitgestellte Ordner kann nicht gelöscht werden. Bitte beenden Sie zuerst die Sitzung.",
+      "CannotDeletePipelineFolder": "Sie können Pipeline -Ordner nicht löschen.",
+      "CannotRestorePipelineFolder": "Sie können Pipeline -Ordner nicht wiederherstellen.",
       "CloneAFolder": "Einen Ordner klonen",
       "CloneFolder": "Ordner klonen",
       "Cloneable": "klonbar",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Einen Ordner löschen",
       "DeleteForever": "Unwiederuflich löschen",
       "DescYouAreFolderOwner": "Sie sind der Eigentümer dieses Ordners.",
+      "DownloadingModel": "Modell herunterladen ...",
       "Edit": "Bearbeiten",
       "EditDelete": "Bearbeiten+Löschen",
       "FileDeleted": "Datei gelöscht",
@@ -378,7 +371,7 @@
       "FolderUsage": "Verwendung von Ordnern",
       "FolderUsing": "Verwendung von",
       "InviteUsers": "Benutzer einladen",
-      "KickOut": "",
+      "KickOut": "Hör auf zu teilen",
       "KickOutConfirm": "Nicht mehr mit {{email}} teilen?",
       "Leave": "Verlassen",
       "LeaveAFolder": "Hinterlasse einen Ordner",
@@ -679,7 +672,17 @@
     "StorageProxies": "Speicher",
     "TotalItems": "Insgesamt {{Gesamt}} Artikel",
     "Username": "Nutzername",
-    "ValueRequired": "Bitte geben Sie {{ Name }}"
+    "ValueRequired": "Bitte geben Sie {{ Name }}",
+    "validation": {
+      "InvalidEmailAddress": "Ungültige E -Mail -Adresse.",
+      "LetterNumber-_dot": "Ermöglicht Buchstaben, Zahlen und -_.",
+      "NameAlreadyExists": "Der politische Name gibt es bereits!",
+      "NumbersOnly": "Erlaubt nur Zahlen",
+      "PleaseSelectOption": "Bitte wählen Sie eine Option aus",
+      "PleaseSelectOptions": "Bitte wählen Sie mindestens eine Option oder mehr.",
+      "PolicyName": "Richtlinienname erforderlich.",
+      "ValidationFailed": "Validierung fehlgeschlagen"
+    }
   },
   "import": {
     "CleanUpImportTask": "Importaufgabe bereinigen...",
@@ -773,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +919,7 @@
     "GenerateNewToken": "Neues Token generieren",
     "GenerateToken": "Token generieren",
     "GeneratedTokens": "Generierte Token",
+    "GoToServiceDetailPage": "Gehen Sie zur Service -Detail -Seite",
     "Image": "Bild",
     "ModelDefinitionPath": "Pfad der Modelldefinitionsdatei",
     "ModelMountDestination": "Mount-Ziel für Modellordner",
@@ -925,6 +929,7 @@
     "OnlyAllowsNonNegativeIntegers": "Erlaubt nur nicht-negative ganze Zahlen",
     "OpenToPublic": "Offen für die Öffentlichkeit",
     "Owner": "Eigentümer",
+    "PlayYourModelNow": "Spielen Sie jetzt Ihr Modell!",
     "PleaseSelectTime": "Bitte Zeit wählen!",
     "Processing": "Wird bearbeitet...",
     "Public": "Öffentlich",
@@ -936,6 +941,7 @@
     "RoutesInfo": "Infos zu den Routen",
     "RoutingInfo": "Routing-Informationen",
     "RoutingsCount": "Routings zählen",
+    "RunThisModel": "Führen Sie dieses Modell aus",
     "RuntimeVariant": "Inferenz Laufzeitvariante",
     "SeeContainerLogs": "Siehe Containerprotokolle",
     "ServiceCreated": "Der Modelldienst {{ name }} wurde erfolgreich erstellt.",
@@ -956,6 +962,7 @@
     "StartNewService": "Neuen Dienst starten",
     "StartNewServing": "Neue Portion starten",
     "StartService": "Dienst starten",
+    "StartingModelService": "Startmodellservice ...",
     "Status": "Status",
     "Success": "Erfolg",
     "SyncRoutes": "Routen synchronisieren",
@@ -1011,6 +1018,9 @@
     "SeeDetail": "Siehe Detail",
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
     "Visit": "Besuch"
+  },
+  "pagination": {
+    "Total": "{{Start}} - {{end}} von {{Total}} Elementen"
   },
   "propertyFilter": {
     "PlaceHolder": "Suche",
@@ -1680,6 +1690,11 @@
     "SessionsDesc": "Die Anzahl der erstellten Rechensitzungen.",
     "UsageHistory": "Geschichte der Verwendung",
     "UsageHistoryNote": "Die hier gezeigte Nutzungsgeschichte basiert auf beendeten Berechnungssitzungen.",
+    "description": {
+      "CPUUtilization": "Repräsentiert die Menge an CPU -Zeit, die von der Sitzung während des ausgewählten Zeitraums verwendet wird. \n\nEin einzelner CPU -Kern entspricht maximal 100%.\n\nWenn mehrere Kerne zugewiesen werden, kann die Gesamtnutzung 100%überschreiten, da sie berechnet wird, indem die maximale Verwendung (100%) jedes Kerns summiert wird.",
+      "NetworkRx": "Zeigt die Netzwerkübertragungsrate an. \n\nRepräsentiert die Rate, mit der der Container Netzwerkdaten empfängt.",
+      "NetworkTx": "Zeigt die Netzwerkübertragungsrate an. \n\nRepräsentiert die Rate, mit der der Container Netzwerkdaten sendet."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Wenn die Verwendung niedrig ist, sind Daten für einige Daten möglicherweise nicht verfügbar. \nBitte versuchen Sie es erneut mit einem kürzeren Datumsbereich.",
       "NoMetricsToDisplay": "Keine Metriken für die Verfolgung"

@@ -209,17 +209,7 @@
     "UserStatus": "ユーザーステータス",
     "Users": "ユーザー",
     "WarningLessRateLimit": "Rate Limit値が小さいと、ログインなどのAPI操作がブロックされることがあります。",
-    "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:",
-    "validation": {
-      "InvalidEmailAddress": "無効な電子メールアドレス。",
-      "LetterNumber-_dot": "文字、数字、および-_を許可します。",
-      "NameAlreadyExists": "ポリシー名はすでに存在します！",
-      "NumbersOnly": "数字のみを許可",
-      "PleaseSelectOption": "オプションを1つ選択してください",
-      "PleaseSelectOptions": "一つ以上のオプションを選択してください。",
-      "PolicyName": "ポリシー名が必要です。",
-      "ValidationFailed": "検証に失敗しました"
-    }
+    "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:"
   },
   "data": {
     "Active": "アクティブ",
@@ -347,6 +337,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "1つ以上のセッションでマウントされたフォルダを削除できません。最初にセッションを終了してください。",
+      "CannotDeletePipelineFolder": "パイプラインフォルダーを削除することはできません。",
+      "CannotRestorePipelineFolder": "パイプラインフォルダーを復元することはできません。",
       "CloneAFolder": "フォルダのクローンを作成する",
       "CloneFolder": "フォルダクローン",
       "Cloneable": "クローン可能",
@@ -356,6 +348,7 @@
       "DeleteAFolder": "フォルダを削除する",
       "DeleteForever": "永久に削除",
       "DescYouAreFolderOwner": "あなたはこのフォルダの所有者です。",
+      "DownloadingModel": "モデルのダウンロード...",
       "Edit": "編集",
       "EditDelete": "編集+削除",
       "FileDeleted": "ファイルが削除されました",
@@ -377,7 +370,7 @@
       "FolderUsage": "フォルダ使用量",
       "FolderUsing": "使用量",
       "InviteUsers": "ユーザーを招待します",
-      "KickOut": "",
+      "KickOut": "共有を停止します",
       "KickOutConfirm": "{email}}との共有を停止しますか？",
       "Leave": "去る",
       "LeaveAFolder": "フォルダを離れる",
@@ -678,7 +671,17 @@
     "StorageProxies": "ストレージ",
     "TotalItems": "合計{{total}}項目",
     "Username": "ユーザー名",
-    "ValueRequired": "名前}}を入力してください。"
+    "ValueRequired": "名前}}を入力してください。",
+    "validation": {
+      "InvalidEmailAddress": "無効なメールアドレス。",
+      "LetterNumber-_dot": "文字、数字、-_を許可します。",
+      "NameAlreadyExists": "ポリシー名はすでに存在します！",
+      "NumbersOnly": "数字のみを許可します",
+      "PleaseSelectOption": "1つのオプションを選択してください",
+      "PleaseSelectOptions": "少なくとも1つ以上のオプションを選択してください。",
+      "PolicyName": "ポリシー名が必要です。",
+      "ValidationFailed": "検証に失敗しました"
+    }
   },
   "import": {
     "CleanUpImportTask": "インポートタスクのクリーンアップ...",
@@ -772,8 +775,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -789,8 +790,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "__NOT_TRANSLATED__",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -915,6 +918,7 @@
     "GenerateNewToken": "新しいトークンを作成する",
     "GenerateToken": "トークン生成",
     "GeneratedTokens": "生成されたトークン一覧",
+    "GoToServiceDetailPage": "サービスの詳細ページに移動します",
     "Image": "イメージ",
     "ModelDefinitionPath": "モデル定義ファイルのパス",
     "ModelMountDestination": "モデルフォルダーのマウント先",
@@ -924,6 +928,7 @@
     "OnlyAllowsNonNegativeIntegers": "0以上を入力してください。",
     "OpenToPublic": "アプリを外部に公開",
     "Owner": "所有者",
+    "PlayYourModelNow": "今すぐモデルを再生してください！",
     "PleaseSelectTime": "有効期限を選択してください",
     "Processing": "処理...",
     "Public": "公開",
@@ -935,6 +940,7 @@
     "RoutesInfo": "ルート情報",
     "RoutingInfo": "ルーティング情報",
     "RoutingsCount": "ルーティング数",
+    "RunThisModel": "このモデルを実行します",
     "RuntimeVariant": "推論ランタイム・バリアント",
     "SeeContainerLogs": "コンテナログを参照",
     "ServiceCreated": "モデル サービス {{ name }} が正常に作成されました。",
@@ -955,6 +961,7 @@
     "StartNewService": "新しいサービスを開始する",
     "StartNewServing": "新サービス開始",
     "StartService": "サービス開始",
+    "StartingModelService": "モデルサービスの開始...",
     "Status": "状態",
     "Success": "成功",
     "SyncRoutes": "同期ルート",
@@ -1010,6 +1017,9 @@
     "SeeDetail": "詳細を見る",
     "SuccessfullyUpdated": "正常に更新されました",
     "Visit": "訪問"
+  },
+  "pagination": {
+    "Total": "{{start}}  -  {{end}} of {{attol}}アイテム"
   },
   "propertyFilter": {
     "PlaceHolder": "検索",
@@ -1681,6 +1691,11 @@
     "SessionsDesc": "生成された演算セッションの数です。",
     "UsageHistory": "使用履歴",
     "UsageHistoryNote": "ここに示す使用履歴は、終了した計算セッションに基づいています。",
+    "description": {
+      "CPUUtilization": "選択した期間中にセッションで使用されるCPU時間の量を表します。 \n\n単一のCPUコアは、最大100％に対応します。\n\n複数のコアが割り当てられている場合、各コアの最大使用量（100％）を合計することで計算されるため、合計使用量は100％を超える可能性があります。",
+      "NetworkRx": "ネットワーク転送率を示します。\n\nコンテナがネットワークデータを受信して​​いるレートを表します。",
+      "NetworkTx": "ネットワーク転送率を示します。\n\nコンテナがネットワークデータを送信しているレートを表します。"
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "使用法が低い場合、一部の日付のデータは利用できない場合があります。\n短い日付範囲で再試行してください。",
       "NoMetricsToDisplay": "追跡に利用可能なメトリックはありません"
