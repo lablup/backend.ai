@@ -804,6 +804,17 @@ class APIConfig(BaseModel):
         validation_alias=AliasChoices("auth_token_name", "auth-token-name"),
         serialization_alias="auth-token-name",
     )
+    connection_limit: int = Field(
+        default=100,
+        ge=1,
+        description="""
+        Maximum number of simultaneous API connections.
+        This limits the number of concurrent API requests that can be processed.
+        """,
+        examples=[100, 200],
+        validation_alias=AliasChoices("connection_limit", "connection-limit"),
+        serialization_alias="connection-limit",
+    )
 
 
 class RedisHelperConfig(BaseModel):

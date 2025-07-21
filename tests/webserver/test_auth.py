@@ -5,6 +5,7 @@ import pytest
 import yarl
 from aiohttp import web
 
+from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
 from ai.backend.web.auth import get_anonymous_session, get_api_session
 
 
@@ -25,8 +26,14 @@ class DummyRequest:
         self.app = app_data
 
 
+@pytest.fixture
+async def test_client_pool() -> ClientPool:
+    config = ClientConfig(ssl=False, limit=10, limit_per_host=5)
+    return ClientPool(config=config, cleanup_interval_seconds=100)
+
+
 @pytest.mark.asyncio
-async def test_get_api_session(mocker):
+async def test_get_api_session(mocker, test_client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -34,7 +41,8 @@ async def test_get_api_session(mocker):
                 endpoint=[yarl.URL("https://api.backend.ai")],
                 ssl_verify=False,
             )
-        )
+        ),
+        "client_pool": test_client_pool,
     })
 
     mock_get_session = AsyncMock(
@@ -44,7 +52,7 @@ async def test_get_api_session(mocker):
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
     with pytest.raises(web.HTTPUnauthorized):
-        await get_api_session(mock_request)
+        await get_api_session(mock_request)  # type: ignore
     mock_get_session.assert_awaited_once()
 
     mock_get_session = AsyncMock(
@@ -55,7 +63,7 @@ async def test_get_api_session(mocker):
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
     with pytest.raises(web.HTTPBadRequest):
-        await get_api_session(mock_request)
+        await get_api_session(mock_request)  # type: ignore
     mock_get_session.assert_awaited_once()
 
     mock_get_session = AsyncMock(
@@ -65,7 +73,7 @@ async def test_get_api_session(mocker):
         }
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_api_session(mock_request)
+    api_session = await get_api_session(mock_request)  # type: ignore
     mock_get_session.assert_awaited_once()
     async with api_session:
         assert not api_session.config.is_anonymous
@@ -76,7 +84,9 @@ async def test_get_api_session(mocker):
 
 
 @pytest.mark.asyncio
-async def test_get_api_session_with_specific_api_endpoint(mocker):
+async def test_get_api_session_with_specific_api_endpoint(
+    mocker, test_client_pool: ClientPool
+) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -84,7 +94,8 @@ async def test_get_api_session_with_specific_api_endpoint(mocker):
                 endpoint=[yarl.URL("https://api.backend.ai")],
                 ssl_verify=False,
             )
-        )
+        ),
+        "client_pool": test_client_pool,
     })
     mock_get_session = AsyncMock(
         return_value={
@@ -94,14 +105,14 @@ async def test_get_api_session_with_specific_api_endpoint(mocker):
     )
     specific_api_endpoint = "https://alternative.backend.ai"
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_api_session(mock_request, specific_api_endpoint)
+    api_session = await get_api_session(mock_request, specific_api_endpoint)  # type: ignore
     mock_get_session.assert_awaited_once()
     async with api_session:
         assert str(api_session.config.endpoint) == specific_api_endpoint
 
 
 @pytest.mark.asyncio
-async def test_get_anonymous_session(mocker):
+async def test_get_anonymous_session(mocker, test_client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -109,11 +120,12 @@ async def test_get_anonymous_session(mocker):
                 endpoint=[yarl.URL("https://api.backend.ai")],
                 ssl_verify=False,
             )
-        )
+        ),
+        "client_pool": test_client_pool,
     })
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_anonymous_session(mock_request)
+    api_session = await get_anonymous_session(mock_request)  # type: ignore
     mock_get_session.assert_not_called()
     async with api_session:
         assert api_session.config.is_anonymous
@@ -124,7 +136,9 @@ async def test_get_anonymous_session(mocker):
 
 
 @pytest.mark.asyncio
-async def test_get_anonymous_session_with_specific_api_endpoint(mocker):
+async def test_get_anonymous_session_with_specific_api_endpoint(
+    mocker, test_client_pool: ClientPool
+) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -132,12 +146,13 @@ async def test_get_anonymous_session_with_specific_api_endpoint(mocker):
                 endpoint=[yarl.URL("https://api.backend.ai")],
                 ssl_verify=False,
             )
-        )
+        ),
+        "client_pool": test_client_pool,
     })
     specific_api_endpoint = "https://alternative.backend.ai"
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_anonymous_session(mock_request, specific_api_endpoint)
+    api_session = await get_anonymous_session(mock_request, specific_api_endpoint)  # type: ignore
     mock_get_session.assert_not_called()
     async with api_session:
         assert str(api_session.config.endpoint) == specific_api_endpoint

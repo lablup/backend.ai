@@ -5,6 +5,7 @@ from aiohttp import web
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.web.session import get_session
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
@@ -46,6 +47,14 @@ async def get_api_session(
             content_type="application/problem+json",
         )
     ak, sk = token["access_key"], token["secret_key"]
+    client_pool: ClientPool = request.app["client_pool"]
+    client_session = client_pool.load_client_session(
+        ClientKey(
+            endpoint=api_endpoint,
+            domain=config.api.domain,
+            access_key=ak,
+        )
+    )
     api_config = APIConfig(
         domain=config.api.domain,
         endpoint=api_endpoint,
@@ -55,7 +64,7 @@ async def get_api_session(
         user_agent=user_agent,
         skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=api_config, proxy_mode=True, aiohttp_session=client_session)
 
 
 async def get_anonymous_session(
@@ -66,6 +75,14 @@ async def get_anonymous_session(
     api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
+    client_pool: ClientPool = request.app["client_pool"]
+    client_session = client_pool.load_client_session(
+        ClientKey(
+            endpoint=api_endpoint,
+            domain=config.api.domain,
+            access_key="",
+        )
+    )
     api_config = APIConfig(
         domain=config.api.domain,
         endpoint=api_endpoint,
@@ -75,7 +92,7 @@ async def get_anonymous_session(
         user_agent=user_agent,
         skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=api_config, proxy_mode=True, aiohttp_session=client_session)
 
 
 def get_client_ip(request: web.Request) -> Optional[str]:
