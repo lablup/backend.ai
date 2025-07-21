@@ -510,7 +510,9 @@ def extra_fixtures():
 
 
 @pytest.fixture()
-def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Iterator[None]:
+async def database_fixture(
+    bootstrap_config, test_db, database, extra_fixtures
+) -> AsyncIterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -564,7 +566,7 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
         finally:
             await engine.dispose()
 
-    asyncio.run(init_fixture())
+    await init_fixture()
 
     yield
 
@@ -591,7 +593,7 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
         finally:
             await engine.dispose()
 
-    asyncio.run(clean_fixture())
+    await clean_fixture()
 
 
 @pytest.fixture
