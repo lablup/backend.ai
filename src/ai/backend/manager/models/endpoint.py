@@ -70,6 +70,7 @@ from .base import (
 from .image import ImageRow
 from .routing import RouteStatus
 from .scaling_group import scaling_groups
+from .session import SessionStatus
 from .user import UserRow
 from .vfolder import prepare_vfolder_mounts
 
@@ -543,7 +544,9 @@ class EndpointRow(Base):
             [
                 r.session
                 for r in active_routes
-                if r.status in RouteStatus.active_route_statuses() and r.session
+                if r.status in RouteStatus.active_route_statuses()
+                and r.session
+                and r.session_row.status == SessionStatus.RUNNING
             ],
         )
         session_id_to_route_map = {r.session: r for r in active_routes}

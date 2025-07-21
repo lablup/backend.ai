@@ -3649,7 +3649,8 @@ class AgentRegistry:
 
         model = await VFolderRow.get(db_sess, endpoint.model)
 
-        health_check_information = await self.get_health_check_info(endpoint, model)
+        health_check_config = await self.get_health_check_info(endpoint, model)
+
         request_body = {
             "version": "v2",
             "service_name": endpoint.name,
@@ -3666,8 +3667,8 @@ class AgentRegistry:
                 },
             },
             "open_to_public": endpoint.open_to_public,
-            "health_check": health_check_information.model_dump(mode="json")
-            if health_check_information
+            "health_check": health_check_config.model_dump(mode="json")
+            if health_check_config
             else None,
         }
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
@@ -3692,12 +3693,13 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_sess:
             endpoint = await EndpointRow.get(db_sess, endpoint_id)
             connection_info = await endpoint.generate_redis_route_info(db_sess)
+            model = await VFolderRow.get(db_sess, endpoint.model)
 
-        await self.valkey_live.delete_key(f"endpoint.{endpoint.id}.route_connection_info")
-        await self.valkey_live.store_live_data(
-            f"endpoint.{endpoint.id}.route_connection_info",
-            json.dumps(connection_info),
-            ex=3600,
+        health_check_config = await self.get_health_check_info(endpoint, model)
+        await self.valkey_live.update_appproxy_redis_info(
+            endpoint.id,
+            connection_info,
+            health_check_config,
         )
 
         await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
