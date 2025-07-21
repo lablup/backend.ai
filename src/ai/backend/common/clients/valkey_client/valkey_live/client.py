@@ -483,22 +483,24 @@ class ValkeyLiveClient:
         connection_info: dict[str, Any],
         health_check_config: HealthCheckConfig | None,
     ) -> None:
-        await self._client.client.set(
+        pipe = self._create_batch()
+        pipe.set(
             f"endpoint.{endpoint_id}.route_connection_info",
             json.dumps(connection_info),
             expiry=ExpirySet(ExpiryType.SEC, 3600),
         )
-        await self._client.client.set(
+        pipe.set(
             f"endpoint.{endpoint_id}.health_check_enabled",
             "true" if health_check_config is not None else "false",
             expiry=ExpirySet(ExpiryType.SEC, 3600),
         )
         if health_check_config:
-            await self._client.client.set(
+            pipe.set(
                 f"endpoint.{endpoint_id}.health_check_config",
                 health_check_config.model_dump_json(),
                 expiry=ExpirySet(ExpiryType.SEC, 3600),
             )
+        await self._client.client.exec(pipe, True)
 
     @valkey_decorator()
     async def delete_key(self, key: str) -> int:
