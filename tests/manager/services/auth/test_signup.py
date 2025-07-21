@@ -1,3 +1,4 @@
+import random
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -10,6 +11,12 @@ from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.service import AuthService
+
+
+def generate_fake_keypair():
+    ak = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=20))
+    sk = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
+    return ak, sk
 
 
 @pytest.fixture
@@ -63,16 +70,17 @@ async def test_signup_successful_with_minimal_data(
     mock_auth_repository.create_user_with_keypair.return_value = mock_user
 
     # Mock the generated keypair
+    ak, sk = generate_fake_keypair()
     mocker.patch(
         "ai.backend.manager.services.auth.service.generate_keypair",
-        return_value=("AKIA1234567890ABCDEF", "abcdef1234567890abcdef1234567890abcdef12"),
+        return_value=(ak, sk),
     )
 
     result = await auth_service.signup(action)
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
-    assert result.access_key == "AKIA1234567890ABCDEF"
-    assert result.secret_key == "abcdef1234567890abcdef1234567890abcdef12"
+    assert result.access_key == ak
+    assert result.secret_key == sk
 
 
 @pytest.mark.asyncio
@@ -80,6 +88,7 @@ async def test_signup_successful_with_full_data(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mocker,
 ):
     """Test successful user signup with full data"""
     action = SignupAction(
@@ -107,17 +116,17 @@ async def test_signup_successful_with_full_data(
     mock_auth_repository.create_user_with_keypair.return_value = mock_user
 
     # Mock the generated keypair
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(
-            "ai.backend.manager.services.auth.service.generate_keypair",
-            lambda: ("AKIA0987654321FEDCBA", "fedcba0987654321fedcba0987654321fedcba09"),
-        )
+    ak, sk = generate_fake_keypair()
+    mocker.patch(
+        "ai.backend.manager.services.auth.service.generate_keypair",
+        return_value=(ak, sk),
+    )
 
-        result = await auth_service.signup(action)
+    result = await auth_service.signup(action)
 
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
-    assert result.access_key == "AKIA0987654321FEDCBA"
-    assert result.secret_key == "fedcba0987654321fedcba0987654321fedcba09"
+    assert result.access_key == ak
+    assert result.secret_key == sk
 
 
 @pytest.mark.asyncio
@@ -158,6 +167,7 @@ async def test_signup_with_hook_override(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mocker,
 ):
     """Test signup when PRE_SIGNUP hook overrides user data"""
     action = SignupAction(
@@ -193,12 +203,12 @@ async def test_signup_with_hook_override(
     mock_user.uuid = UUID("11111111-1111-1111-1111-111111111111")
     mock_auth_repository.create_user_with_keypair.return_value = mock_user
 
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(
-            "ai.backend.manager.services.auth.service.generate_keypair",
-            lambda: ("AKIAHOOK12345678", "hooksecret123456789012345678901234567890"),
-        )
-        result = await auth_service.signup(action)
+    ak, sk = generate_fake_keypair()
+    mocker.patch(
+        "ai.backend.manager.services.auth.service.generate_keypair",
+        return_value=(ak, sk),
+    )
+    result = await auth_service.signup(action)
 
     # Verify the repository was called with modified data
     call_args = mock_auth_repository.create_user_with_keypair.call_args
@@ -213,7 +223,7 @@ async def test_signup_with_hook_override(
     assert call_args.kwargs["group_name"] == "special"
 
     assert result.user_id == mock_user.uuid
-    assert result.access_key == "AKIAHOOK12345678"
+    assert result.access_key == ak
 
 
 @pytest.mark.asyncio
@@ -254,6 +264,7 @@ async def test_signup_post_hook_notification(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mocker,
 ):
     """Test that POST_SIGNUP hook is notified after successful signup"""
     request_mock = MagicMock()
@@ -281,12 +292,12 @@ async def test_signup_post_hook_notification(
     mock_user.uuid = UUID("99999999-9999-9999-9999-999999999999")
     mock_auth_repository.create_user_with_keypair.return_value = mock_user
 
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(
-            "ai.backend.manager.services.auth.service.generate_keypair",
-            lambda: ("AKIANOTIFY123456", "notifysecret12345678901234567890abcdef12"),
-        )
-        result = await auth_service.signup(action)
+    ak, sk = generate_fake_keypair()
+    mocker.patch(
+        "ai.backend.manager.services.auth.service.generate_keypair",
+        return_value=(ak, sk),
+    )
+    result = await auth_service.signup(action)
 
     # Verify POST_SIGNUP notification was called
     mock_hook_plugin_ctx.notify.assert_called_once_with(
