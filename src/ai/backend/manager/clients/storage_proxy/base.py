@@ -26,12 +26,12 @@ class StorageProxyClientArgs:
 
 
 class StorageProxyHTTPClient:
-    _session_client: aiohttp.ClientSession
+    _client_session: aiohttp.ClientSession
     _endpoint: yarl.URL
     _secret: str
 
-    def __init__(self, session_client: aiohttp.ClientSession, args: StorageProxyClientArgs):
-        self._session_client = session_client
+    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs):
+        self._client_session = client_session
         self._endpoint = args.endpoint
         self._secret = args.secret
 
@@ -54,7 +54,7 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
-        async with self._session_client.request(
+        async with self._client_session.request(
             method,
             self._endpoint / url,
             headers=headers,
