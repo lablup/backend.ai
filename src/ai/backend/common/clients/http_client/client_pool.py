@@ -50,17 +50,15 @@ class ClientPool:
 
     async def _cleanup_loop(self, cleanup_interval_seconds: int) -> None:
         while True:
-            try:
-                await asyncio.sleep(cleanup_interval_seconds)
-                now = time.perf_counter()
-                for key, client in list(self._clients.items()):
-                    if now - client.last_used > cleanup_interval_seconds:
+            await asyncio.sleep(cleanup_interval_seconds)
+            now = time.perf_counter()
+            for key, client in list(self._clients.items()):
+                if now - client.last_used > cleanup_interval_seconds:
+                    del self._clients[key]
+                    try:
                         await client.session.close()
-                        del self._clients[key]
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                log.exception("Error during client pool cleanup: {}", e)
+                    except Exception as e:
+                        log.exception("Error closing client session: {}", e)
 
     def _make_client_session(self) -> aiohttp.ClientSession:
         connector = aiohttp.TCPConnector(
