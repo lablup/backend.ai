@@ -136,6 +136,7 @@ async def created_user(
 class TestCreateUserIntegration:
     """Integration tests for Create User functionality"""
 
+    @pytest.mark.asyncio
     async def test_create_user_normal(
         self,
         processors: UserProcessors,
@@ -168,6 +169,7 @@ class TestCreateUserIntegration:
         assert result.data.domain_name == "default"
         assert result.data.status == UserStatus.ACTIVE
 
+    @pytest.mark.asyncio
     async def test_create_user_admin_with_sudo(
         self,
         processors: UserProcessors,
@@ -196,6 +198,7 @@ class TestCreateUserIntegration:
         assert result.data.role == UserRole.ADMIN
         assert result.data.sudo_session_enabled is True
 
+    @pytest.mark.asyncio
     async def test_create_user_container_config(
         self,
         processors: UserProcessors,
@@ -225,6 +228,7 @@ class TestCreateUserIntegration:
         assert result.data.container_main_gid == 2000
         assert result.data.container_gids == [2000, 2001]
 
+    @pytest.mark.asyncio
     async def test_create_user_resource_policy_and_ip_restriction(
         self,
         processors: UserProcessors,
@@ -256,6 +260,7 @@ class TestCreateUserIntegration:
 class TestModifyUserIntegration:
     """Integration tests for Modify User functionality"""
 
+    @pytest.mark.asyncio
     async def test_modify_user_basic_info(
         self,
         processors: UserProcessors,
@@ -284,6 +289,7 @@ class TestModifyUserIntegration:
         assert result.data.full_name == "Updated Name"
         assert result.data.description == "Senior Developer"
 
+    @pytest.mark.asyncio
     async def test_modify_user_role_elevation(
         self,
         processors: UserProcessors,
@@ -310,6 +316,7 @@ class TestModifyUserIntegration:
         assert result.data is not None
         assert result.data.role == UserRole.ADMIN
 
+    @pytest.mark.asyncio
     async def test_modify_user_group_changes(
         self,
         processors: UserProcessors,
@@ -392,6 +399,7 @@ class TestModifyUserIntegration:
 class TestDeleteUserIntegration:
     """Integration tests for Delete User functionality"""
 
+    @pytest.mark.asyncio
     async def test_delete_user_normal(
         self,
         processors: UserProcessors,
@@ -422,6 +430,7 @@ class TestDeleteUserIntegration:
 class TestPurgeUserIntegration:
     """Integration tests for Purge User functionality"""
 
+    @pytest.mark.asyncio
     async def test_purge_user_complete(
         self,
         processors: UserProcessors,
@@ -470,9 +479,7 @@ class TestPurgeUserIntegration:
 class TestUserStatsIntegration:
     """Integration tests for User Statistics functionality"""
 
-    @pytest.mark.skip(
-        reason="Stats tests require real ValkeyStatClient - skipping for integration tests"
-    )
+    @pytest.mark.asyncio
     async def test_user_month_stats_current_month(
         self,
         processors: UserProcessors,
@@ -492,9 +499,7 @@ class TestUserStatsIntegration:
         # The stats will be an empty list since we don't have any kernel data in the test DB
         assert isinstance(result.stats, list)
 
-    @pytest.mark.skip(
-        reason="Stats tests require real ValkeyStatClient - skipping for integration tests"
-    )
+    @pytest.mark.asyncio
     async def test_admin_month_stats_all_system(
         self,
         processors: UserProcessors,
