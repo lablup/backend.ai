@@ -436,7 +436,3 @@ async def test_create_from_params_with_vfolder_uuids(
 
     # Verify the mocks were called
     mock_create_from_params_rpc["create_session"].assert_called_once()
-
-    # # Verify that the agent RPC was called with converted vfolder names
-    # call_args = mock_create_from_params_rpc["create_session"].call_args
-    # # The agent should receive vfolder names, not UUIDs
