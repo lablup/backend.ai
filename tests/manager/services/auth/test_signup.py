@@ -35,6 +35,7 @@ async def test_signup_successful_with_minimal_data(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mocker,
 ):
     """Test successful user signup with minimal data"""
     action = SignupAction(
@@ -62,13 +63,12 @@ async def test_signup_successful_with_minimal_data(
     mock_auth_repository.create_user_with_keypair.return_value = mock_user
 
     # Mock the generated keypair
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(
-            "ai.backend.manager.services.auth.service.generate_keypair",
-            lambda: ("AKIA1234567890ABCDEF", "abcdef1234567890abcdef1234567890abcdef12"),
-        )
+    mocker.patch(
+        "ai.backend.manager.services.auth.service.generate_keypair",
+        return_value=("AKIA1234567890ABCDEF", "abcdef1234567890abcdef1234567890abcdef12"),
+    )
 
-        result = await auth_service.signup(action)
+    result = await auth_service.signup(action)
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
     assert result.access_key == "AKIA1234567890ABCDEF"
