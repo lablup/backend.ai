@@ -6,7 +6,7 @@ from uuid import UUID
 import aiohttp_cors
 import jwt
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field
 
 from ai.backend.wsproxy.exceptions import ObjectNotFound
 from ai.backend.wsproxy.types import (
@@ -44,6 +44,10 @@ class InferenceAppConfig(BaseModel):
 
 
 class EndpointCreationRequestModel(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
     service_name: Annotated[str, Field(description="Name of the model service.")]
     tags: Annotated[
         EndpointTagConfig,

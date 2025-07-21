@@ -3661,6 +3661,7 @@ class AgentRegistry:
                     "existing_url": str(endpoint.url) if endpoint.url else None,
                 },
             },
+            "apps": {},
             "open_to_public": endpoint.open_to_public,
             "health_check": health_check_config.model_dump(mode="json")
             if health_check_config

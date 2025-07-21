@@ -41,7 +41,12 @@ class AdminModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             endpoint = await self._get_endpoint_by_id(
-                session, endpoint_id, load_routes=True, load_session_owner=True, load_model=True
+                session,
+                endpoint_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_model=True,
+                load_image=True,
             )
             if not endpoint:
                 return None
@@ -190,6 +195,7 @@ class AdminModelServingRepository:
         load_routes: bool = False,
         load_session_owner: bool = False,
         load_model: bool = False,
+        load_image: bool = False,
     ) -> Optional[EndpointRow]:
         """
         Private method to get endpoint by ID using an existing session.
@@ -201,6 +207,7 @@ class AdminModelServingRepository:
                 load_routes=load_routes,
                 load_session_owner=load_session_owner,
                 load_model=load_model,
+                load_image=load_image,
             )
         except NoResultFound:
             return None

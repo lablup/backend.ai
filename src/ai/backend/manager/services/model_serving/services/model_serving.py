@@ -296,7 +296,9 @@ class ModelServingService:
             runtime_variant=action.creator.runtime_variant,
         )
 
-        endpoint_data = await self._repository.create_endpoint_validated(endpoint)
+        endpoint_data = await self._repository.create_endpoint_validated(
+            endpoint, self._agent_registry
+        )
         endpoint_id = endpoint_data.id
 
         return CreateModelServiceActionResult(
