@@ -5,11 +5,13 @@ from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.base import BaseAction
-from ai.backend.manager.actions.action.types import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.base import ProcessResult
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+from ..types import ActionTriggerMeta, ProcessResult
+from .monitor import ActionMonitor
 
 _BLANK_ID: Final[str] = "(unknown)"
 
@@ -31,7 +33,7 @@ class AuditLogMonitor(ActionMonitor):
                 entity_type=action.entity_type(),
                 operation=action.operation_type(),
                 created_at=result.meta.started_at,
-                entity_id=result.meta.entity_id or _BLANK_ID,
+                entity_id=result.meta.target.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
                 triggered_by=str(user.user_id) if user else None,
                 description=result.meta.description,
@@ -43,7 +45,7 @@ class AuditLogMonitor(ActionMonitor):
             await db_sess.flush()
 
     @override
-    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseAction, meta: ActionTriggerMeta) -> None:
         pass
 
     @override
