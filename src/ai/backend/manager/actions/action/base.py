@@ -1,11 +1,5 @@
-import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Optional, TypeVar
-
-from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import OperationStatus
 
 from ..types import ActionSpec
 
@@ -64,18 +58,6 @@ class BaseBatchActionResult(ABC):
     @abstractmethod
     def entity_ids(self) -> list[str]:
         raise NotImplementedError
-
-
-@dataclass
-class BaseActionResultMeta:
-    action_id: uuid.UUID
-    entity_id: Optional[str]
-    status: OperationStatus
-    description: str
-    started_at: datetime
-    ended_at: datetime
-    duration: timedelta
-    error_code: Optional[ErrorCode]
 
 
 TAction = TypeVar("TAction", bound=BaseAction)
