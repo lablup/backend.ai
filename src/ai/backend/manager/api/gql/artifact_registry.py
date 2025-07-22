@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, Optional
 
 import strawberry
 from strawberry.relay import Connection, Edge, GlobalID, Node, NodeID
@@ -49,6 +49,23 @@ class ArtifactStatus(Enum):
 
 
 @strawberry.enum
+class ArtifactOrderField(Enum):
+    ID = "ID"
+    NAME = "NAME"
+    TYPE = "TYPE"
+    SIZE = "SIZE"
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"
+    LATEST_VERSION = "LATEST_VERSION"
+
+
+@strawberry.enum
+class OrderDirection(Enum):
+    ASC = "ASC"
+    DESC = "DESC"
+
+
+@strawberry.enum
 class Ordering(Enum):
     ASC = "ASC"
     ASC_NULLS_FIRST = "ASC_NULLS_FIRST"
@@ -72,8 +89,8 @@ class StringFilter:
 
 @strawberry.input
 class ArtifactFilter:
-    type: Optional[List[ArtifactType]] = None
-    status: Optional[List[ArtifactStatus]] = None
+    type: Optional[list[ArtifactType]] = None
+    status: Optional[list[ArtifactStatus]] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
@@ -82,6 +99,12 @@ class ArtifactFilter:
     OR: Optional["ArtifactFilter"] = None
     NOT: Optional["ArtifactFilter"] = None
     DISTINCT: Optional[bool] = None
+
+
+@strawberry.input
+class ArtifactOrderBy:
+    field: ArtifactOrderField
+    direction: OrderDirection = OrderDirection.ASC
 
 
 @strawberry.input
@@ -178,6 +201,7 @@ class ArtifactGroup(Node):
         self,
         filter: Optional[ArtifactFilter] = None,
         order: Optional[ArtifactOrder] = None,
+        orderBy: Optional[list[ArtifactOrderBy]] = None,
         first: Optional[int] = None,
         after: Optional[str] = None,
     ) -> ArtifactConnection:
@@ -236,6 +260,7 @@ class CancelPullPayload:
 def artifacts(
     filter: Optional[ArtifactFilter] = None,
     order: Optional[ArtifactOrder] = None,
+    orderBy: Optional[list[ArtifactOrderBy]] = None,
     first: Optional[int] = None,
     after: Optional[str] = None,
 ) -> ArtifactConnection:
@@ -253,8 +278,10 @@ def artifacts(
 
 @strawberry.field(name="artifactGroups")
 def artifact_groups(
-    filter: Optional[ArtifactFilter] = None, order: Optional[ArtifactOrder] = None
-) -> List[ArtifactGroup]:
+    filter: Optional[ArtifactFilter] = None,
+    order: Optional[ArtifactOrder] = None,
+    orderBy: Optional[list[ArtifactOrderBy]] = None,
+) -> list[ArtifactGroup]:
     # Mock implementation - return empty list
     return []
 
