@@ -140,10 +140,10 @@ class Artifact(Node):
     updatedAt: DateTime
     version: str
 
-    @classmethod
-    def resolve_node(cls, node_id: GlobalID) -> Optional["Artifact"]:
-        # Mock implementation - in real implementation, fetch from database
-        return None
+    # @classmethod
+    # def resolve_node(cls, node_id: GlobalID) -> Optional["Artifact"]:
+    #     # Mock implementation - in real implementation, fetch from database
+    #     return None
 
 
 # Use Strawberry's built-in Relay types
@@ -168,10 +168,10 @@ class ArtifactGroup(Node):
     status: ArtifactStatus
     description: Optional[str]
 
-    @classmethod
-    def resolve_node(cls, node_id: GlobalID) -> Optional["ArtifactGroup"]:
-        # Mock implementation - in real implementation, fetch from database
-        return None
+    # @classmethod
+    # def resolve_node(cls, node_id: GlobalID) -> Optional["ArtifactGroup"]:
+    #     # Mock implementation - in real implementation, fetch from database
+    #     return None
 
     @strawberry.field
     def artifacts(

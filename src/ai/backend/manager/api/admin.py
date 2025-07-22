@@ -175,7 +175,7 @@ async def handle_gql_v2(request: web.Request, params: Any) -> web.Response:
 
     result = await app_ctx.gql_v2_schema.execute(
         params["query"],
-        root_value=None,  # root
+        root_value=None,
         variable_values=params["variables"],
         operation_name=params["operation_name"],
         context_value=strawberry_ctx,
@@ -190,13 +190,17 @@ async def handle_gql_v2(request: web.Request, params: Any) -> web.Response:
             log.error("ADMIN.GQL Exception: {}", errmsg)
             log.debug("{}", "".join(traceback.format_exception(e)))
 
-    return web.json_response(
-        {
-            "data": result.data,
-            "errors": [error.formatted for error in result.errors] if result.errors else None,
-        },
-        status=HTTPStatus.OK,
-    )
+    response_data: dict[str, Any] = {
+        "data": result.data,
+    }
+
+    if result.errors:
+        response_data["errors"] = [
+            error.formatted if hasattr(error, "formatted") else {"message": str(error)}
+            for error in result.errors
+        ]
+
+    return web.json_response(response_data, status=HTTPStatus.OK)
 
 
 @auth_required
