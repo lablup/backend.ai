@@ -89,7 +89,7 @@ GRAPHIQL_V2_HTML = """
     ></script>
 
     <script>
-      const fetcher = GraphiQL.createFetcher({ url: '../admin/gql/v2' });
+      const fetcher = GraphiQL.createFetcher({ url: '../../admin/gql/v2' });
 
       ReactDOM.render(
         React.createElement(GraphiQL, { fetcher: fetcher }),

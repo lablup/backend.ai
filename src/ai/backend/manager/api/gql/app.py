@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, Union, override
 
 import aiohttp_cors
 import attrs
@@ -21,7 +21,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class StrawberryGraphQLView(GraphQLView):
-    async def get_context(self, request: web.Request, response: web.Response) -> Any:
+    @override
+    async def get_context(
+        self, request: web.Request, response: Union[web.Response, web.WebSocketResponse]
+    ) -> Any:
         """Create context for Strawberry GraphQL execution"""
         root_ctx: RootContext = request.app["_root.context"]
 
