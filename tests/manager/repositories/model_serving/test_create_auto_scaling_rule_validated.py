@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
 )
 from ai.backend.manager.models.user import UserRole
@@ -77,7 +77,7 @@ async def test_create_auto_scaling_rule_validated_success(
 
     # Assert
     assert result is not None
-    assert isinstance(result, EndpointAutoScalingRuleRow)
+    assert isinstance(result, EndpointAutoScalingRuleData)
     assert result.id == sample_auto_scaling_rule.id
 
     mock_create.assert_called_once_with(
