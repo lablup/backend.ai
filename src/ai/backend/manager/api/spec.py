@@ -71,6 +71,36 @@ GRAPHIQL_HTML = """
 """
 
 
+GRAPHIQL_V2_HTML = """
+<html>
+  <head>
+    <title>Backend.AI GraphQL V2 API Reference</title>
+	<meta charset="UTF-8">
+    <link href="../../static/vendor/graphiql.min.css" rel="stylesheet" />
+  </head>
+  <body style="margin: 0;">
+    <div id="graphiql" style="height: 100vh;"></div>
+
+    <script src="../../static/vendor/react.production.min.js"
+    ></script>
+    <script src="../../static/vendor/react-dom.production.min.js"
+    ></script>
+    <script src="../../static/vendor/graphiql.min.js"
+    ></script>
+
+    <script>
+      const fetcher = GraphiQL.createFetcher({ url: '../admin/gql/v2' });
+
+      ReactDOM.render(
+        React.createElement(GraphiQL, { fetcher: fetcher }),
+        document.getElementById('graphiql'),
+      );
+    </script>
+  </body>
+</html>
+"""
+
+
 @auth_required
 async def render_graphiql_html(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -79,6 +109,18 @@ async def render_graphiql_html(request: web.Request) -> web.Response:
 
     return web.Response(
         body=GRAPHIQL_HTML,
+        status=HTTPStatus.OK,
+        content_type="text/html",
+    )
+
+
+async def render_graphiql_v2_html(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        raise GenericForbidden
+
+    return web.Response(
+        body=GRAPHIQL_V2_HTML,
         status=HTTPStatus.OK,
         content_type="text/html",
     )
@@ -124,6 +166,7 @@ def create_app(
     app.on_startup.append(init)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", "/graphiql", render_graphiql_html))
+    cors.add(app.router.add_route("GET", "/graphiql/v2", render_graphiql_v2_html))
     cors.add(app.router.add_route("GET", "/openapi", render_openapi_html))
     cors.add(app.router.add_route("GET", "/openapi/spec.json", generate_openapi_spec))
 
