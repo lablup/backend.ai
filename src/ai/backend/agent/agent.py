@@ -69,6 +69,9 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
@@ -823,7 +826,7 @@ class AbstractAgent(
             log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
         )
-        self.valkey_container_log_client = await ValkeyStatClient.create(
+        self.valkey_container_log_client = await ValkeyContainerLogClient.create(
             redis_profile_target.profile_target(RedisRole.CONTAINER_LOG),
             human_readable_name="agent.container_log",
             db_id=REDIS_CONTAINER_LOG,

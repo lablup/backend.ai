@@ -554,7 +554,7 @@ def create_layer_aware_valkey_decorator_with_default(
 
                 if default_return is not _SENTINEL:
                     log.warning("Returning default value from {} after failure", func.__name__)
-                    return cast(R, default_return)  # None도 포함해서 정확히 반환됨
+                    return cast(R, default_return)
                 else:
                     raise RuntimeError(f"{func.__name__} failed after {retry_count} attempts")
 
