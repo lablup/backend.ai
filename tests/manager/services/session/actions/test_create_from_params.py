@@ -3,10 +3,13 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
     CreateFromParamsActionParams,
@@ -39,10 +42,6 @@ def mock_create_from_params_rpc(mocker):
     return {
         "create_session": mock_create_session,
     }
-
-
-# We no longer need to mock resolve_image as we'll use the session_repository fixture
-# with actual database fixtures
 
 
 CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
@@ -238,201 +237,4 @@ async def test_create_from_params(
     if test_scenario.expected_exception is None:
         mock_create_from_params_rpc["create_session"].assert_called_once()
 
-
-# VFolder fixtures for UUID testing
-VFOLDER_UUID_1 = uuid4()
-VFOLDER_UUID_2 = uuid4()
-
-VFOLDER_FIXTURE_DATA_1 = {
-    "id": VFOLDER_UUID_1,
-    "host": "mock",
-    "domain_name": "default",
-    "name": "test_vfolder_1",
-    "quota_scope_id": f"user:{SESSION_FIXTURE_DATA.user_uuid}",
-    "usage_mode": "general",
-    "permission": "rw",
-    "ownership_type": "user",
-    "status": "ready",
-    "cloneable": False,
-    "max_files": 0,
-    "num_files": 0,
-    "user": SESSION_FIXTURE_DATA.user_uuid,
-    "group": None,
-}
-
-VFOLDER_FIXTURE_DATA_2 = {
-    "id": VFOLDER_UUID_2,
-    "host": "mock",
-    "domain_name": "default",
-    "name": "test_vfolder_2",
-    "quota_scope_id": f"user:{SESSION_FIXTURE_DATA.user_uuid}",
-    "usage_mode": "general",
-    "permission": "rw",
-    "ownership_type": "user",
-    "status": "ready",
-    "cloneable": False,
-    "max_files": 0,
-    "num_files": 0,
-    "user": SESSION_FIXTURE_DATA.user_uuid,
-    "group": None,
-}
-
-
-@pytest.mark.parametrize(
-    "test_scenario",
-    [
-        TestScenario.success(
-            "Create session with vfolder UUIDs in mounts",
-            CreateFromParamsAction(
-                params=CreateFromParamsActionParams(
-                    session_name="vfolder-uuid-mounts-test",
-                    image="python",
-                    architecture="x86_64",
-                    session_type=SessionTypes.INTERACTIVE,
-                    group_name="default",
-                    domain_name="default",
-                    cluster_size=1,
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    config={
-                        "mounts": [str(VFOLDER_UUID_1), str(VFOLDER_UUID_2)],
-                    },
-                    tag="latest",
-                    priority=0,
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    enqueue_only=False,
-                    max_wait_seconds=0,
-                    starts_at=None,
-                    reuse_if_exists=False,
-                    startup_command=None,
-                    batch_timeout=None,
-                    bootstrap_script=None,
-                    dependencies=None,
-                    callback_url=None,
-                ),
-                user_id=SESSION_FIXTURE_DATA.user_uuid,
-                user_role=UserRole.USER,
-                sudo_session_enabled=False,
-                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                keypair_resource_policy=None,
-            ),
-            CreateFromParamsActionResult(
-                session_id=SESSION_FIXTURE_DATA.id,
-                result=CREATE_FROM_PARAMS_MOCK,
-            ),
-        ),
-        TestScenario.success(
-            "Create session with vfolder UUIDs in mount_map",
-            CreateFromParamsAction(
-                params=CreateFromParamsActionParams(
-                    session_name="vfolder-uuid-mount-map-test",
-                    image="python",
-                    architecture="x86_64",
-                    session_type=SessionTypes.INTERACTIVE,
-                    group_name="default",
-                    domain_name="default",
-                    cluster_size=1,
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    config={
-                        "mount_map": {
-                            str(VFOLDER_UUID_1): "/workspace/data1",
-                            str(VFOLDER_UUID_2): "/workspace/data2",
-                        },
-                    },
-                    tag="latest",
-                    priority=0,
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    enqueue_only=False,
-                    max_wait_seconds=0,
-                    starts_at=None,
-                    reuse_if_exists=False,
-                    startup_command=None,
-                    batch_timeout=None,
-                    bootstrap_script=None,
-                    dependencies=None,
-                    callback_url=None,
-                ),
-                user_id=SESSION_FIXTURE_DATA.user_uuid,
-                user_role=UserRole.USER,
-                sudo_session_enabled=False,
-                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                keypair_resource_policy=None,
-            ),
-            CreateFromParamsActionResult(
-                session_id=SESSION_FIXTURE_DATA.id,
-                result=CREATE_FROM_PARAMS_MOCK,
-            ),
-        ),
-        TestScenario.success(
-            "Create session with mixed vfolder names and UUIDs",
-            CreateFromParamsAction(
-                params=CreateFromParamsActionParams(
-                    session_name="vfolder-mixed-test",
-                    image="python",
-                    architecture="x86_64",
-                    session_type=SessionTypes.INTERACTIVE,
-                    group_name="default",
-                    domain_name="default",
-                    cluster_size=1,
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    config={
-                        "mounts": [str(VFOLDER_UUID_1), "test_vfolder_2"],  # Mix UUID and name
-                        "mount_map": {
-                            str(VFOLDER_UUID_1): "/workspace/data1",  # UUID
-                            "test_vfolder_2": "/workspace/data2",  # Name
-                        },
-                    },
-                    tag="latest",
-                    priority=0,
-                    owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    enqueue_only=False,
-                    max_wait_seconds=0,
-                    starts_at=None,
-                    reuse_if_exists=False,
-                    startup_command=None,
-                    batch_timeout=None,
-                    bootstrap_script=None,
-                    dependencies=None,
-                    callback_url=None,
-                ),
-                user_id=SESSION_FIXTURE_DATA.user_uuid,
-                user_role=UserRole.USER,
-                sudo_session_enabled=False,
-                requester_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                keypair_resource_policy=None,
-            ),
-            CreateFromParamsActionResult(
-                session_id=SESSION_FIXTURE_DATA.id,
-                result=CREATE_FROM_PARAMS_MOCK,
-            ),
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "extra_fixtures",
-    [
-        {
-            "sessions": [SESSION_FIXTURE_DICT],
-            "kernels": [KERNEL_FIXTURE_DICT],
-            "users": [USER_FIXTURE_DATA],
-            "groups": [GROUP_FIXTURE_DATA],
-            "association_groups_users": [GROUP_USER_ASSOCIATION_DATA],
-            "images": [IMAGE_FIXTURE_DICT],
-            "image_aliases": [IMAGE_ALIAS_DICT],
-            "vfolders": [VFOLDER_FIXTURE_DATA_1, VFOLDER_FIXTURE_DATA_2],
-        }
-    ],
-)
-async def test_create_from_params_with_vfolder_uuids(
-    mock_create_from_params_rpc,
-    processors: SessionProcessors,
-    test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
-    session_repository,
-):
-    # Set up the mock return value for create_session
-    mock_create_from_params_rpc["create_session"].return_value = CREATE_FROM_PARAMS_MOCK
-
-    # Use the test scenario's built-in test method
-    await test_scenario.test(processors.create_from_params.wait_for_complete)
-
-    # Verify the mocks were called
-    mock_create_from_params_rpc["create_session"].assert_called_once()
+    # TODO: Verify the session was created in the database

@@ -969,18 +969,8 @@ class AgentRegistry:
                 await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
 
-            # 타입 보면 그냥 단순히 합쳐도 될 것 같은데
-            # 겹치는 경우에 대한 테스트는 필요할 듯?
-
-            # Combine mounts and mount_ids (resolved to names)
             combined_mounts = requested_mounts + requested_mount_ids
-            # Combine mount_map and mount_id_map (resolved to names)
             combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
-
-            # for k, v in requested_mount_id_map.items():
-            #     async with self.db.begin_session() as session:
-            #         vfolder_name = await VFolderRow.id_to_name(session, k)
-            #         combined_mount_map[vfolder_name] = v
 
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
