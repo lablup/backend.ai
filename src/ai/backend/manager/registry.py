@@ -690,17 +690,11 @@ class AgentRegistry:
 
         mounts = []
         mount_map = {}
-        mount_ids = []
-        mount_id_map = {}
         environ = {}
 
         if _mounts := template["spec"].get("mounts"):  # noqa
             mounts = list(_mounts.keys())
             mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
-
-        if _mount_ids := template["spec"].get("mount_ids"):  # noqa
-            mount_ids = list(_mount_ids.keys())
-            mount_id_map = {key: value for (key, value) in _mount_ids.items() if len(value) > 0}
 
         if _environ := template["spec"].get("environ"):  # noqa
             environ = _environ
@@ -715,7 +709,6 @@ class AgentRegistry:
                 "creation_config": {
                     # TODO: Rename this to `mounts`
                     "mount": mounts,
-                    "mount_ids": mount_ids,
                     "environ": environ,
                 },
             }
@@ -819,7 +812,6 @@ class AgentRegistry:
                         {
                             "creation_config": {
                                 "mount_map": mount_map,
-                                "mount_id_map": mount_id_map,
                                 "environ": environ,
                             },
                             "kernel_configs": kernel_configs,
