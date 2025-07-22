@@ -4,8 +4,10 @@ from typing import Final, override
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
+from ai.backend.manager.actions.action.base import BaseAction
+from ai.backend.manager.actions.action.types import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor.base import ProcessResult
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

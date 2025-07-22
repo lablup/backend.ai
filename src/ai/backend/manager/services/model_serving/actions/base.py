@@ -1,6 +1,6 @@
 from typing import override
 
-from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.actions.action.base import BaseAction
 
 
 class ModelServiceAction(BaseAction):

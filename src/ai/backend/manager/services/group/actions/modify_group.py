@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.group.actions.base import GroupAction
 from ai.backend.manager.services.group.types import GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState
