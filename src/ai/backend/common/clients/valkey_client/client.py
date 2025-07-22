@@ -377,7 +377,13 @@ def create_valkey_client(
 
 P = ParamSpec("P")
 R = TypeVar("R")
-_SENTINEL = object()
+
+
+class _Sentinel:
+    pass
+
+
+_SENTINEL = _Sentinel()
 
 
 def create_layer_aware_valkey_decorator(
@@ -537,7 +543,7 @@ def create_layer_aware_valkey_decorator_with_default(
         *,
         retry_count: int = 1,
         retry_delay: float = 0.1,
-        default_return: Union[R, object] = _SENTINEL,
+        default_return: Union[R, _Sentinel] = _SENTINEL,
     ):
         #    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         """
