@@ -130,8 +130,8 @@ class Dispatchers:
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(
             args.valkey_container_log,
-            args.valkey_stream,
             args.valkey_stat,
+            args.valkey_stream,
             args.agent_registry,
             args.db,
         )
