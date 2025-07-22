@@ -10,9 +10,8 @@ from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action.base import (
     BaseActionResult,
 )
-from ai.backend.manager.actions.action.types import ActionResultMeta, ActionTargetMeta
 from ai.backend.manager.actions.processor.base import ActionProcessor
-from ai.backend.manager.actions.processor.types import ProcessResult
+from ai.backend.manager.actions.types import ActionResultMeta, ActionTargetMeta, ProcessResult
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
