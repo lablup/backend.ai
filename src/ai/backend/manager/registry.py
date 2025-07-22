@@ -405,29 +405,35 @@ class AgentRegistry:
         current_task = asyncio.current_task()
         assert current_task is not None
 
+        mount_id_map = config.get("mount_id_map", {})
+        mount_map = config.get("mount_map", {})
+
+        combined_mount_map = {**mount_map}
+        for identifier, path in mount_id_map.items():
+            async with self.db.begin_session() as db_session:
+                vfolder_name = await VFolderRow.id_to_name(db_session, identifier)
+                combined_mount_map[vfolder_name] = path
+
         # Check work directory and reserved name directory.
-        mount_map = config.get("mount_map")
+        original_folders = combined_mount_map.keys()
+        alias_folders = combined_mount_map.values()
+        if len(alias_folders) != len(set(alias_folders)):
+            raise InvalidAPIParameters("Duplicate alias folder name exists.")
 
-        if mount_map is not None:
-            original_folders = mount_map.keys()
-            alias_folders = mount_map.values()
-            if len(alias_folders) != len(set(alias_folders)):
-                raise InvalidAPIParameters("Duplicate alias folder name exists.")
-
-            alias_name: str
-            for alias_name in alias_folders:
-                if alias_name is None:
-                    continue
-                if alias_name.startswith("/home/work/"):
-                    alias_name = alias_name.replace("/home/work/", "")
-                if alias_name == "":
-                    raise InvalidAPIParameters("Alias name cannot be empty.")
-                if not verify_vfolder_name(alias_name):
-                    raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
-                if alias_name in original_folders:
-                    raise InvalidAPIParameters(
-                        "Alias name cannot be set to an existing folder name: " + str(alias_name)
-                    )
+        alias_name: str
+        for alias_name in alias_folders:
+            if alias_name is None:
+                continue
+            if alias_name.startswith("/home/work/"):
+                alias_name = alias_name.replace("/home/work/", "")
+            if alias_name == "":
+                raise InvalidAPIParameters("Alias name cannot be empty.")
+            if not verify_vfolder_name(alias_name):
+                raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
+            if alias_name in original_folders:
+                raise InvalidAPIParameters(
+                    "Alias name cannot be set to an existing folder name: " + str(alias_name)
+                )
 
         if _resources := config["resources"]:
             available_resource_slots = (
@@ -712,7 +718,7 @@ class AgentRegistry:
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
                     "mount": mounts,
-                    "mount_ids": mount_ids,  # ?
+                    "mount_ids": mount_ids,
                     "environ": environ,
                 },
             }
