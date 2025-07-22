@@ -73,6 +73,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
+    REDIS_CONTAINER_LOG,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     UNKNOWN_CONTAINER_ID,
@@ -809,6 +810,7 @@ class AbstractAgent(
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             self.local_config.model_dump(by_alias=True)["redis"]
         )
+
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
         self.event_producer = EventProducer(
@@ -820,6 +822,11 @@ class AbstractAgent(
             mq,
             log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
+        )
+        self.valkey_container_log_client = await ValkeyStatClient.create(
+            redis_profile_target.profile_target(RedisRole.CONTAINER_LOG),
+            human_readable_name="agent.container_log",
+            db_id=REDIS_CONTAINER_LOG,
         )
         self.redis_stream_client = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM),
@@ -989,6 +996,7 @@ class AbstractAgent(
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
         await self.event_dispatcher.close()
+        await self.valkey_container_log_client.close()
         await self.redis_stream_client.close()
         await self.valkey_stat_client.close()
 
@@ -1137,7 +1145,7 @@ class AbstractAgent(
                         chunk_log_item = ContainerLogData.from_log(
                             ContainerLogType.ZLIB, bytes(cb[:chunk_size])
                         )
-                        await self.valkey_stat_client.enqueue_container_logs(
+                        await self.valkey_container_log_client.enqueue_container_logs(
                             container_id,
                             chunk_log_item.serialize(),
                         )
@@ -1153,7 +1161,7 @@ class AbstractAgent(
                 chunk_log_item = ContainerLogData.from_log(
                     ContainerLogType.ZLIB, chunk_buffer.getvalue()
                 )
-                await self.valkey_stat_client.enqueue_container_logs(
+                await self.valkey_container_log_client.enqueue_container_logs(
                     container_id,
                     chunk_log_item.serialize(),
                 )

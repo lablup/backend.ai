@@ -1,9 +1,10 @@
 import asyncio
+import functools
 import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar
+from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, Union
 
 import glide
 from glide import (
@@ -376,6 +377,7 @@ def create_valkey_client(
 
 P = ParamSpec("P")
 R = TypeVar("R")
+_SENTINEL = object()
 
 
 def create_layer_aware_valkey_decorator(
@@ -531,23 +533,21 @@ def create_layer_aware_valkey_decorator_with_default(
         A valkey_decorator function configured for the specified layer
     """
 
-    def valkey_decorator_with_default(
+    def valkey_decorator(
         *,
-        retry_count: int = 3,
+        retry_count: int = 1,
         retry_delay: float = 0.1,
-        default_return: Optional[R] = None,  # 새로 추가되지만 backward compatible
-    ) -> Callable[
-        [Callable[P, Awaitable[R]]],
-        Callable[P, Awaitable[R]],
-    ]:
+        default_return: Union[R, object] = _SENTINEL,
+    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         """
         Decorator for Valkey client operations that adds retry logic and metrics.
-        If default_return is set, it will be returned instead of raising the final exception.
+        If `default_return` is set (even to None), it will be returned on final failure.
         """
 
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             observer = LayerMetricObserver.instance()
 
+            @functools.wraps(func)
             async def wrapper(*args, **kwargs) -> R:
                 log.trace("Calling {}", func.__name__)
                 start = time.perf_counter()
@@ -584,7 +584,7 @@ def create_layer_aware_valkey_decorator_with_default(
                             success=False,
                             duration=time.perf_counter() - start,
                         )
-                        break  # 실패 후 default로
+                        break
                     except Exception as e:
                         if attempt < retry_count - 1:
                             await asyncio.sleep(retry_delay)
@@ -606,12 +606,14 @@ def create_layer_aware_valkey_decorator_with_default(
                         )
                         break
 
-                if default_return is not None:
+                if default_return is not _SENTINEL:
                     log.warning("Returning default value from {} after failure", func.__name__)
-                    return default_return
+                    return default_return  # None도 포함해서 정확히 반환됨
                 else:
                     raise RuntimeError(f"{func.__name__} failed after {retry_count} attempts")
 
             return wrapper
 
         return decorator
+
+    return valkey_decorator
