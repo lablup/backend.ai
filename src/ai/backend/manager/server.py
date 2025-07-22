@@ -199,7 +199,7 @@ VALID_VERSIONS: Final = frozenset([
     # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
     # added dependents/dependees/graph query fields to ComputeSessioNode
     "v8.20240915",
-    # added explicit attach_network option to session creation config,
+    # added explicit attach_network option to session creation config
     "v9.20250722",
     # added model_ids, model_id_map options to session creation config
     # <future>
