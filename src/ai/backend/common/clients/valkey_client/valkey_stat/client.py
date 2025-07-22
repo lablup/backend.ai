@@ -22,7 +22,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_layer_aware_valkey_decorator,
-    create_layer_aware_valkey_decorator_with_default,
     create_valkey_client,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -33,9 +32,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for valkey_stat client
 valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STAT)
-valkey_decorator_with_default = create_layer_aware_valkey_decorator_with_default(
-    LayerType.VALKEY_STAT
-)
 
 _DEFAULT_EXPIRATION = 86400  # 24 hours default expiration
 _KEYPAIR_CONCURRENCY_PREFIX: Final[str] = "keypair.concurrency_used"
@@ -106,7 +102,7 @@ class ValkeyStatClient:
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def get_keypair_query_count(self, access_key: str) -> int:
         """
         Get API query count for a keypair.
@@ -122,7 +118,7 @@ class ValkeyStatClient:
         except (ValueError, UnicodeDecodeError):
             return 0
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def get_keypair_concurrency_used(self, access_key: str) -> int:
         """
         Get current concurrency usage for a keypair.
@@ -138,7 +134,7 @@ class ValkeyStatClient:
         except (ValueError, UnicodeDecodeError):
             return 0
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_keypair_last_used_time(self, access_key: str) -> Optional[float]:
         """
         Get last API call timestamp for a keypair.
@@ -154,7 +150,7 @@ class ValkeyStatClient:
         except (ValueError, UnicodeDecodeError):
             return None
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_gpu_allocation_map(self, agent_id: str) -> Optional[dict[str, float]]:
         """
         Get GPU allocation mapping for an agent.
@@ -175,7 +171,7 @@ class ValkeyStatClient:
             )
             return None
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_kernel_statistics(self, kernel_id: str) -> Optional[dict[str, Any]]:
         """
         Get kernel utilization statistics.
@@ -214,7 +210,7 @@ class ValkeyStatClient:
         """
         return f"{_CONTAINER_COUNT_PREFIX}.{agent_id}"
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_kernel_commit_statuses(self, kernel_ids: list[str]) -> list[Optional[bytes]]:
         """
         Get commit statuses for multiple kernels efficiently.
@@ -228,7 +224,7 @@ class ValkeyStatClient:
         keys = [self._get_kernel_commit_key(kernel_id) for kernel_id in kernel_ids]
         return await self._get_multiple_keys(keys)
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_abuse_report(self, kernel_id: str) -> Optional[str]:
         """
         Get abuse report for a specific kernel.
@@ -244,7 +240,7 @@ class ValkeyStatClient:
         except UnicodeDecodeError:
             return None
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_agent_container_count(self, agent_id: str, container_count: int) -> None:
         """
         Set the current container count for an agent.
@@ -258,7 +254,7 @@ class ValkeyStatClient:
             key, str(container_count), expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION)
         )
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_session_statistics_batch(self, session_ids: list[str]) -> list[Optional[dict]]:
         """
         Get statistics for multiple sessions efficiently.
@@ -290,7 +286,7 @@ class ValkeyStatClient:
                 stats.append(None)
         return stats
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_user_kernel_statistics_batch(
         self, kernel_ids: list[str]
     ) -> list[Optional[bytes]]:
@@ -302,7 +298,7 @@ class ValkeyStatClient:
         """
         return await self._get_multiple_keys(kernel_ids)
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[Optional[dict]]:
         """
         Get agent statistics for multiple agents.
@@ -331,7 +327,7 @@ class ValkeyStatClient:
                 stats.append(None)
         return stats
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_agent_container_counts_batch(self, agent_ids: list[str]) -> list[int]:
         """
         Get container counts for multiple agents.
@@ -371,7 +367,7 @@ class ValkeyStatClient:
         """
         return f"{_MANAGER_STATUS_PREFIX}.{node_id}:{pid}"
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_manager_status(
         self, node_id: str, pid: int, status_data: bytes, lifetime: int
     ) -> None:
@@ -399,7 +395,7 @@ class ValkeyStatClient:
         """
         return f"{_INFERENCE_PREFIX}.{endpoint_id}.app"
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_inference_app_statistics_batch(
         self, endpoint_ids: list[str]
     ) -> list[Optional[dict]]:
@@ -445,7 +441,7 @@ class ValkeyStatClient:
         """
         return f"{_INFERENCE_PREFIX}.{endpoint_id}.replica.{replica_id}"
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_inference_replica_statistics_batch(
         self, endpoint_replica_pairs: list[tuple[str, str]]
     ) -> list[Optional[dict]]:
@@ -484,7 +480,7 @@ class ValkeyStatClient:
                 stats.append(None)
         return stats
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_image_distro(self, image_id: str) -> Optional[str]:
         """
         Get cached Linux distribution for a Docker image.
@@ -505,7 +501,7 @@ class ValkeyStatClient:
         except UnicodeDecodeError:
             return None
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_image_distro(self, image_id: str, distro: str) -> None:
         """
         Cache Linux distribution for a Docker image.
@@ -519,7 +515,7 @@ class ValkeyStatClient:
             expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION),
         )
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def get_volume_usage(self, proxy_name: str, volume_name: str) -> Optional[bytes]:
         """
         Get volume usage information.
@@ -530,7 +526,7 @@ class ValkeyStatClient:
         """
         return await self._client.client.get(f"volume.usage.{proxy_name}.{volume_name}")
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_volume_usage(
         self,
         proxy_name: str,
@@ -551,7 +547,7 @@ class ValkeyStatClient:
             f"volume.usage.{proxy_name}.{volume_name}", usage_data, expiry=expiry
         )
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def store_computer_metadata(
         self,
         metadata: Mapping[str, bytes],
@@ -566,7 +562,7 @@ class ValkeyStatClient:
             _COMPUTER_METADATA_KEY, cast(Mapping[str | bytes, str | bytes], metadata)
         )
 
-    @valkey_decorator_with_default(default_return={})
+    @valkey_decorator()
     async def get_computer_metadata(self) -> dict[str, bytes]:
         """
         Get all computer metadata from the hash.
@@ -584,7 +580,7 @@ class ValkeyStatClient:
             metadata[str_key] = value
         return metadata
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def _get_raw(self, key: str) -> Optional[bytes]:
         """
         Get raw value by key (internal use only for testing).
@@ -595,7 +591,7 @@ class ValkeyStatClient:
         return await self._client.client.get(key)
 
     # TODO: Remove this too generalized methods
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set(
         self,
         key: str,
@@ -616,7 +612,7 @@ class ValkeyStatClient:
             expiry=ExpirySet(ExpiryType.SEC, expiration),
         )
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def delete(self, keys: Sequence[str]) -> int:
         """
         Delete one or more keys.
@@ -643,7 +639,7 @@ class ValkeyStatClient:
         microseconds = float(microseconds_bytes)
         return seconds + (microseconds / 10**6)
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def setex(self, name: str, value: Union[str, bytes], time: int) -> None:
         """
         Set a key with an expiration time.
@@ -654,7 +650,7 @@ class ValkeyStatClient:
         """
         await self._client.client.set(name, value, expiry=ExpirySet(ExpiryType.SEC, time))
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def incr(self, key: str) -> int:
         """
         Increment the value of a key by 1.
@@ -675,7 +671,7 @@ class ValkeyStatClient:
         prefix = _KEYPAIR_SFTP_CONCURRENCY_PREFIX if is_private else _KEYPAIR_CONCURRENCY_PREFIX
         return f"{prefix}.{access_key}"
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def increment_keypair_query_count(
         self,
         access_key: str,
@@ -690,7 +686,7 @@ class ValkeyStatClient:
         batch.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
         """
         Decrement keypair concurrency counter.
@@ -702,7 +698,7 @@ class ValkeyStatClient:
         key = self._get_keypair_concurrency_key(access_key, is_private)
         return await self._client.client.incrby(key, -1)
 
-    @valkey_decorator_with_default(default_return=False)
+    @valkey_decorator()
     async def delete_keypair_concurrency(self, access_key: str, is_private: bool = False) -> bool:
         """
         Delete keypair concurrency counter.
@@ -715,7 +711,7 @@ class ValkeyStatClient:
         result = await self._client.client.delete([key])
         return result > 0
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_keypair_concurrency(
         self, access_key: str, concurrency_used: int, is_private: bool = False
     ) -> None:
@@ -729,7 +725,7 @@ class ValkeyStatClient:
         key = self._get_keypair_concurrency_key(access_key, is_private)
         await self._client.client.set(key, str(concurrency_used))
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple keys efficiently using batch operations.
@@ -741,7 +737,7 @@ class ValkeyStatClient:
             return []
         return await self._client.client.mget(cast(list[str | bytes], keys))
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def set_multiple_keys(
         self,
         key_value_map: Mapping[str, bytes],
@@ -796,7 +792,7 @@ class ValkeyStatClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def register_session_ids_for_status_update(
         self,
         status_set_key: str,
@@ -815,7 +811,7 @@ class ValkeyStatClient:
         for session_id in session_ids:
             await self._client.client.sadd(status_set_key, [session_id])
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def get_and_clear_session_ids_for_status_update(
         self,
         status_set_key: str,
@@ -833,7 +829,7 @@ class ValkeyStatClient:
         results = await self._client.client.spop_count(status_set_key, count)
         return list(results)
 
-    @valkey_decorator_with_default(default_return=0)
+    @valkey_decorator()
     async def remove_session_ids_from_status_update(
         self,
         status_set_key: str,
@@ -892,7 +888,7 @@ class ValkeyStatClient:
                 break
         return matched_keys
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def update_abuse_report(
         self,
         new_report: Mapping[str, str],
@@ -911,7 +907,7 @@ class ValkeyStatClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator_with_default(default_return=(0, 0))
+    @valkey_decorator()
     async def check_keypair_concurrency(
         self,
         redis_key: str,
@@ -947,7 +943,7 @@ class ValkeyStatClient:
         await self._client.client.incr(redis_key)
         return (1, current_count + 1)
 
-    @valkey_decorator_with_default(default_return=[])
+    @valkey_decorator()
     async def scan_and_get_manager_status(
         self,
         pattern: str,
@@ -994,7 +990,7 @@ class ValkeyStatClient:
     ) -> str:
         return f"kp:{access_key}:last_call_time"
 
-    @valkey_decorator_with_default(default_return=None)
+    @valkey_decorator()
     async def update_compute_concurrency_by_map(
         self,
         concurrency_map: Mapping[str, int],

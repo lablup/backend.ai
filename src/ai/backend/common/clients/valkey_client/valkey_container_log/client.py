@@ -132,7 +132,7 @@ class ValkeyContainerLogClient:
         self,
         container_id: str,
         count: int = 1,
-    ) -> Optional[list[bytes]]:
+    ) -> Optional[list[ContainerLogData]]:
         """
         Pop logs for a specific container.
 
@@ -141,7 +141,11 @@ class ValkeyContainerLogClient:
         :raises: GlideClientError if the logs cannot be popped.
         """
         key = self._container_log_key(container_id)
-        return await self._client.client.lpop_count(key, count)
+        logs = await self._client.client.lpop_count(key, count)
+        if logs is None:
+            return None
+
+        return [ContainerLogData.deserialize(log) for log in logs]
 
     async def clear_container_logs(
         self,
