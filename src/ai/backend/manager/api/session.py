@@ -327,29 +327,6 @@ creation_config_v7 = t.Dict({
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
 })
-creation_config_v7_template = t.Dict({
-    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.String)
-    ),
-    t.Key("mount_ids", default=undefined): UndefChecker | t.Null | t.List(tx.UUID),
-    tx.AliasedKey(["mount_id_map", "mountIdMap"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(tx.UUID, t.String)
-    ),
-    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-    # cluster_size is moved to the root-level parameters
-    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
-        UndefChecker | t.Null | t.String
-    ),
-    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | resource_opts_iv
-    ),
-    tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
-        UndefChecker | t.Null | tx.UUID
-    ),
-})
-
 
 overwritten_param_check = t.Dict({
     t.Key("template_id"): tx.UUID,
