@@ -1,6 +1,5 @@
 import logging
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -12,20 +11,20 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
-from ..action.meta import BaseActionTriggerMeta
-from ..action.scope import (
-    BaseScopeActionResultMeta,
-    TBaseScopeAction,
-    TBaseScopeActionResult,
-)
-from ..monitors.monitor import ActionMonitor
+# from ..action.scope import (
+#     BaseScopeActionResultMeta,
+#     TBaseScopeAction,
+#     TBaseScopeActionResult,
+# )
+# from ..action.types import BaseActionTriggerMeta
+# from ..monitors.monitor import ActionMonitor
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class ProcessResult:
-    meta: BaseScopeActionResultMeta
+# @dataclass
+# class ProcessResult:
+#     meta: BaseScopeActionResultMeta
 
 
 class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
@@ -46,13 +45,13 @@ class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
         self._validators = validators or []
         self._repository = permission_control_repository
 
-    async def _run(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
-        started_at = datetime.now()
-        status = OperationStatus.UNKNOWN
-        description: str = "unknown"
-        result: Optional[TBaseScopeActionResult] = None
-        error_code: Optional[ErrorCode] = None
-        object_ids: list[ObjectId] = []
+        #     async def _run(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
+        #         started_at = datetime.now()
+        #         status = OperationStatus.UNKNOWN
+        #         description: str = "unknown"
+        #         result: Optional[TBaseScopeActionResult] = None
+        #         error_code: Optional[ErrorCode] = None
+        #         object_ids: list[ObjectId] = []
 
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)

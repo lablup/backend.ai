@@ -1,7 +1,7 @@
 from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.base import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from ..actions.file import (

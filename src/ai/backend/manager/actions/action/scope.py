@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional, TypeVar
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
@@ -15,8 +15,10 @@ from ai.backend.manager.data.permission.parameters import (
 )
 from ai.backend.manager.errors.common import PermissionDeniedError
 
+from .base import BaseAction
 
-class BaseScopeAction(ABC):
+
+class BaseScopeAction(BaseAction, ABC):
     _accessible_entity_ids: Optional[Collection[ObjectId]] = None
 
     @property
@@ -29,25 +31,9 @@ class BaseScopeAction(ABC):
     def accessible_entity_ids(self, value: Collection[ObjectId]) -> None:
         self._accessible_entity_ids = value
 
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )
-
-    @classmethod
     @abstractmethod
-    def entity_type(cls) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def user_id(self) -> uuid.UUID:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def operation_type(cls) -> str:
+    def requester_user_id(self) -> uuid.UUID:
+        """Return the ID of the user who initiated this action."""
         raise NotImplementedError
 
     @classmethod
@@ -56,16 +42,17 @@ class BaseScopeAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def scope_id(self) -> str:
+    def target_scope_id(self) -> str:
+        """Return the ID of the scope this action operates on."""
         raise NotImplementedError
 
     def permission_query_params(self) -> ScopeQueryParams:
         return ScopeQueryParams(
-            user_id=self.user_id(),
+            user_id=self.requester_user_id(),
             entity_type=self.entity_type(),
             operation_type=self.operation_type(),
             scope_type=self.scope_type(),
-            scope_id=self.scope_id(),
+            scope_id=self.target_scope_id(),
         )
 
 

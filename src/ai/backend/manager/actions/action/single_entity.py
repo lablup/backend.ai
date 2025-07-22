@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional, TypeVar
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
@@ -14,8 +14,10 @@ from ai.backend.manager.data.permission.parameters import (
 )
 from ai.backend.manager.errors.common import PermissionDeniedError
 
+from .base import BaseAction
 
-class BaseSingleEntityAction(ABC):
+
+class BaseSingleEntityAction(BaseAction, ABC):
     _accessible_entity_id: Optional[ObjectId] = None
 
     @property
@@ -28,37 +30,22 @@ class BaseSingleEntityAction(ABC):
     def accessible_entity_id(self, value: ObjectId) -> None:
         self._accessible_entity_id = value
 
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )
-
-    @classmethod
     @abstractmethod
-    def entity_type(cls) -> str:
+    def requester_user_id(self) -> uuid.UUID:
+        """Return the ID of the user who initiated this action."""
         raise NotImplementedError
 
     @abstractmethod
-    def entity_id(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def user_id(self) -> uuid.UUID:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def operation_type(cls) -> str:
+    def target_entity_id(self) -> str:
+        """Return the ID of the entity this action operates on."""
         raise NotImplementedError
 
     def permission_query_params(self) -> SingleEntityQueryParams:
         return SingleEntityQueryParams(
-            user_id=self.user_id(),
+            user_id=self.requester_user_id(),
             entity_type=self.entity_type(),
             operation_type=self.operation_type(),
-            entity_id=self.entity_id(),
+            entity_id=self.target_entity_id(),
         )
 
 

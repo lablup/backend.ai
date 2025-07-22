@@ -5,7 +5,7 @@ from typing import Optional, override
 
 from aiohttp import web
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
