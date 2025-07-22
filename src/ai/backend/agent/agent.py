@@ -1150,7 +1150,7 @@ class AbstractAgent(
                         )
                         await self.valkey_container_log_client.enqueue_container_logs(
                             container_id,
-                            chunk_log_item.serialize(),
+                            chunk_log_item,
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1166,7 +1166,7 @@ class AbstractAgent(
                 )
                 await self.valkey_container_log_client.enqueue_container_logs(
                     container_id,
-                    chunk_log_item.serialize(),
+                    chunk_log_item,
                 )
 
             await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))

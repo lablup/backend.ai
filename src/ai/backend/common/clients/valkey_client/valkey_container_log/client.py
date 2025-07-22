@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.log.types import ContainerLogData
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -90,7 +91,7 @@ class ValkeyContainerLogClient:
     async def enqueue_container_logs(
         self,
         container_id: str,
-        logs: bytes,
+        logs: ContainerLogData,
     ) -> None:
         """
         Enqueue logs for a specific container.
@@ -104,7 +105,7 @@ class ValkeyContainerLogClient:
         tx = self._create_batch()
         tx.rpush(
             key,
-            [logs],
+            [logs.serialize()],
         )
         tx.expire(
             key,
