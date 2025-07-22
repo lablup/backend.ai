@@ -1,12 +1,8 @@
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Optional, TypeVar
 
-from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
@@ -64,16 +60,3 @@ class BaseScopeActionResult(ABC):
 
 TBaseScopeAction = TypeVar("TBaseScopeAction", bound=BaseScopeAction)
 TBaseScopeActionResult = TypeVar("TBaseScopeActionResult", bound=BaseScopeActionResult)
-
-
-@dataclass
-class BaseScopeActionResultMeta:
-    action_id: uuid.UUID
-    scope_id: Optional[str]
-    accessible_entity_ids: list[ObjectId]
-    status: OperationStatus
-    description: str
-    started_at: datetime
-    ended_at: datetime
-    duration: timedelta
-    error_code: Optional[ErrorCode]

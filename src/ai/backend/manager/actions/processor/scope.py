@@ -5,33 +5,29 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionTriggerMeta, OperationStatus, ProcessResult
 from ai.backend.manager.actions.validators.validator import ActionValidator
+from ai.backend.manager.data.permission.id import (
+    ObjectId,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
-# from ..action.scope import (
-#     BaseScopeActionResultMeta,
-#     TBaseScopeAction,
-#     TBaseScopeActionResult,
-# )
-# from ..action.types import BaseActionTriggerMeta
-# from ..monitors.monitor import ActionMonitor
+from ..action.scope import (
+    TBaseScopeAction,
+    TBaseScopeActionResult,
+)
+from ..monitors.monitor import ActionMonitor
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-# @dataclass
-# class ProcessResult:
-#     meta: BaseScopeActionResultMeta
 
 
 class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
     _monitors: list[ActionMonitor]
     _validators: list[ActionValidator]
     _repository: PermissionControllerRepository
-    _func: Callable[[TAction], Awaitable[TActionResult]]
+    _func: Callable[[TBaseScopeAction], Awaitable[TBaseScopeActionResult]]
 
     def __init__(
         self,
@@ -45,16 +41,16 @@ class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
         self._validators = validators or []
         self._repository = permission_control_repository
 
-        #     async def _run(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
-        #         started_at = datetime.now()
-        #         status = OperationStatus.UNKNOWN
-        #         description: str = "unknown"
-        #         result: Optional[TBaseScopeActionResult] = None
-        #         error_code: Optional[ErrorCode] = None
-        #         object_ids: list[ObjectId] = []
+    async def _run(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
+        started_at = datetime.now()
+        status = OperationStatus.UNKNOWN
+        description: str = "unknown"
+        result: Optional[TBaseScopeActionResult] = None
+        error_code: Optional[ErrorCode] = None
+        object_ids: list[ObjectId] = []
 
         action_id = uuid.uuid4()
-        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, action_trigger_meta)
