@@ -40,10 +40,6 @@ def mock_create_from_params_rpc(mocker):
     }
 
 
-# We no longer need to mock resolve_image as we'll use the session_repository fixture
-# with actual database fixtures
-
-
 CREATE_FROM_PARAMS_MOCK = {"sessionId": str(SESSION_FIXTURE_DATA.id)}
 
 
@@ -236,3 +232,5 @@ async def test_create_from_params(
     # Verify the mocks were called (only for successful cases)
     if test_scenario.expected_exception is None:
         mock_create_from_params_rpc["create_session"].assert_called_once()
+
+    # TODO: Verify the session was created in the database

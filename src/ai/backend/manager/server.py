@@ -200,6 +200,8 @@ VALID_VERSIONS: Final = frozenset([
     # added dependents/dependees/graph query fields to ComputeSessioNode
     "v8.20240915",
     # added explicit attach_network option to session creation config
+    "v9.20250722",
+    # added model_ids, model_id_map options to session creation config
     # <future>
     # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
@@ -214,8 +216,9 @@ LATEST_REV_DATES: Final = {
     6: "20230315",
     7: "20230615",
     8: "20240915",
+    9: "20250722",
 }
-LATEST_API_VERSION: Final = "v8.20240915"
+LATEST_API_VERSION: Final = "v9.20250722"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

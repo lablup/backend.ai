@@ -405,29 +405,31 @@ class AgentRegistry:
         current_task = asyncio.current_task()
         assert current_task is not None
 
+        mount_id_map = config.get("mount_id_map", {})
+        mount_map = config.get("mount_map", {})
+
+        combined_mount_map = {**mount_map, **mount_id_map}
+
         # Check work directory and reserved name directory.
-        mount_map = config.get("mount_map")
+        original_folders = combined_mount_map.keys()
+        alias_folders = combined_mount_map.values()
+        if len(alias_folders) != len(set(alias_folders)):
+            raise InvalidAPIParameters("Duplicate alias folder name exists.")
 
-        if mount_map is not None:
-            original_folders = mount_map.keys()
-            alias_folders = mount_map.values()
-            if len(alias_folders) != len(set(alias_folders)):
-                raise InvalidAPIParameters("Duplicate alias folder name exists.")
-
-            alias_name: str
-            for alias_name in alias_folders:
-                if alias_name is None:
-                    continue
-                if alias_name.startswith("/home/work/"):
-                    alias_name = alias_name.replace("/home/work/", "")
-                if alias_name == "":
-                    raise InvalidAPIParameters("Alias name cannot be empty.")
-                if not verify_vfolder_name(alias_name):
-                    raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
-                if alias_name in original_folders:
-                    raise InvalidAPIParameters(
-                        "Alias name cannot be set to an existing folder name: " + str(alias_name)
-                    )
+        alias_name: str
+        for alias_name in alias_folders:
+            if alias_name is None:
+                continue
+            if alias_name.startswith("/home/work/"):
+                alias_name = alias_name.replace("/home/work/", "")
+            if alias_name == "":
+                raise InvalidAPIParameters("Alias name cannot be empty.")
+            if not verify_vfolder_name(alias_name):
+                raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
+            if alias_name in original_folders:
+                raise InvalidAPIParameters(
+                    "Alias name cannot be set to an existing folder name: " + str(alias_name)
+                )
 
         if _resources := config["resources"]:
             available_resource_slots = (
@@ -704,6 +706,7 @@ class AgentRegistry:
                 "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
+                    # TODO: Rename this to `mounts`
                     "mount": mounts,
                     "mount_map": mount_map,
                     "environ": environ,
@@ -945,23 +948,33 @@ class AgentRegistry:
             )
             scaling_group_query_result = await sess.execute(scaling_group_query)
             scaling_group_row: ScalingGroupRow = scaling_group_query_result.scalar()
-            # Translate mounts/mount_map/mount_options into vfolder mounts
+
+            # Translate mounts (mount_ids) / mount_map (mount_id_map) / mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
+            requested_mount_ids = session_enqueue_configs["creation_config"].get("mount_ids") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_id_map = (
+                session_enqueue_configs["creation_config"].get("mount_id_map") or {}
+            )
+
             requested_mount_options = (
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
             allowed_vfolder_types = (
                 await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
+
+            combined_mounts = requested_mounts + requested_mount_ids
+            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
+
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
                 self.storage_manager,
                 allowed_vfolder_types,
                 user_scope,
                 resource_policy,
-                requested_mounts,
-                requested_mount_map,
+                combined_mounts,
+                combined_mount_map,
                 requested_mount_options,
             )
 
