@@ -2,6 +2,7 @@ import textwrap
 
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
+from ai.backend.test.templates.vfolder.general_vfolder import ProjectVFolderTemplate
 from ai.backend.test.testcases.session.creation_failure_command_timeout import (
     BatchSessionCreationFailureTimeout,
 )
@@ -17,7 +18,12 @@ from ai.backend.test.testcases.session.creation_failure_too_many_container impor
 from ai.backend.test.testcases.session.creation_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
+from ai.backend.test.testcases.session.mount_vfolder import (
+    VFolderMountByNameTest,
+    VFolderMountByUUIDTest,
+)
 from ai.backend.test.testcases.session.multi_node_multi_container.testspecs import (
+    CLUSTER_CONFIG_PARAM,
     MULTI_NODE_MULTI_CONTAINER_SESSION_TEST_SPECS,
 )
 from ai.backend.test.testcases.session.single_node_multi_container.testspecs import (
@@ -104,6 +110,50 @@ INTERACTIVE_SESSION_FAILURE_TEST_SPECS = {
     ),
 }
 
+SESSION_VFOLDER_TEST_SPECS = {
+    "creation_interactive_session_with_vfolder_uuid_mounts": TestSpec(
+        name="creation_interactive_session_with_vfolder_uuid_mounts",
+        description=textwrap.dedent("""
+        Test for creating a session with VFolder UUID in mounts list.
+        This test verifies that a session can be created with VFolder UUID in the mounts list,
+        and that the UUID is properly converted to vfolder name internally.
+        The test will:
+        1. Get the UUID of an existing vfolder.
+        2. Create a session with the UUID in the mounts list.
+        3. Verify that the session is created successfully.
+        4. Verify that the vfolder is properly mounted.
+        5. Clean up the session after completion.
+        """),
+        tags={TestTag.SESSION, TestTag.VFOLDER},
+        template=BasicTestTemplate(testcode=VFolderMountByUUIDTest()).with_wrappers(
+            KeypairAuthTemplate, ProjectVFolderTemplate
+        ),
+        parametrizes={
+            **CLUSTER_CONFIG_PARAM,
+        },
+    ),
+    "creation_interactive_session_with_vfolder_name_mounts": TestSpec(
+        name="creation_interactive_session_with_vfolder_name_mounts",
+        description=textwrap.dedent("""
+        Test for creating a session with VFolder name in mounts list.
+        This test verifies that a session can be created with VFolder name in the mounts list,
+        and that the name is properly converted to vfolder UUID internally.
+        The test will:
+        1. Get the UUID of an existing vfolder.
+        2. Create a session with the UUID in the mounts list.
+        3. Verify that the session is created successfully.
+        4. Verify that the vfolder is properly mounted.
+        5. Clean up the session after completion.
+        """),
+        tags={TestTag.SESSION, TestTag.VFOLDER},
+        template=BasicTestTemplate(testcode=VFolderMountByNameTest()).with_wrappers(
+            KeypairAuthTemplate, ProjectVFolderTemplate
+        ),
+        parametrizes={
+            **CLUSTER_CONFIG_PARAM,
+        },
+    ),
+}
 
 SESSION_TEST_SPECS = {
     **SINGLE_NODE_SIGNLE_CONTAINER_SESSION_TEST_SPECS,
@@ -111,4 +161,5 @@ SESSION_TEST_SPECS = {
     **MULTI_NODE_MULTI_CONTAINER_SESSION_TEST_SPECS,
     **BATCH_SESSION_FAILURE_TEST_SPECS,
     **INTERACTIVE_SESSION_FAILURE_TEST_SPECS,
+    **SESSION_VFOLDER_TEST_SPECS,
 }
