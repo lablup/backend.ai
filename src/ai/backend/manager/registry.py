@@ -708,6 +708,7 @@ class AgentRegistry:
                 "creation_config": {
                     # TODO: Rename this to `mounts`
                     "mount": mounts,
+                    "mount_map": mount_map,
                     "environ": environ,
                 },
             }
