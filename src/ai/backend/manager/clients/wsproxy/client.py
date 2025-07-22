@@ -3,12 +3,18 @@ from uuid import UUID
 
 import aiohttp
 
+from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
+
+client_decorator = create_layer_aware_client_decorator(LayerType.WSPROXY_CLIENT)
+
 
 class WSProxyClient:
     def __init__(self, address: str, token: str) -> None:
         self.address = address
         self.token = token
 
+    @client_decorator()
     async def create_endpoint(
         self,
         endpoint_id: UUID,
@@ -25,6 +31,7 @@ class WSProxyClient:
                 resp.raise_for_status()
                 return await resp.json()
 
+    @client_decorator()
     async def delete_endpoint(
         self,
         endpoint_id: UUID,
