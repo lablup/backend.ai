@@ -847,7 +847,7 @@ class ModelServingRepository:
                         storage_manager,
                         endpoint_row.model_row.host,
                         vfid,
-                        endpoint_row.config.model_definition_path,
+                        endpoint_row.model_definition_path,
                     )
                     await ModelServiceHelper.validate_model_definition(
                         storage_manager,

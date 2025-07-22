@@ -1,6 +1,6 @@
 import textwrap
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import Annotated, Iterable, Optional
 from uuid import UUID
 
 import aiohttp_cors
@@ -77,6 +77,11 @@ class EndpointCreationRequestModel(BaseModel):
 
     port: Annotated[int | None, Field(default=None, description="Preferred port number.")]
     subdomain: Annotated[str | None, Field(default=None, description="Preferred subdomain name.")]
+    version: Optional[str] = Field(default=None, description="Version of the API request.")
+    health_check: Optional[dict] = Field(
+        default=None,
+        description="Health check configuration for the endpoint. Not used in this version.",
+    )
 
 
 class EndpointCreationResponseModel(BaseModel):
