@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 from datetime import datetime
@@ -92,6 +91,3 @@ class ActionProcessor(Generic[TAction, TActionResult]):
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         return await self._run(action)
-
-    async def fire_and_forget(self, action: TAction) -> None:
-        asyncio.create_task(self.wait_for_complete(action))
