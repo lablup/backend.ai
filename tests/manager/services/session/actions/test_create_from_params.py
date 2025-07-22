@@ -1,15 +1,11 @@
 from typing import cast
 from unittest.mock import AsyncMock
-from uuid import uuid4
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
     CreateFromParamsActionParams,
