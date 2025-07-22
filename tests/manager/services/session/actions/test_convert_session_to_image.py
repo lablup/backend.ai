@@ -28,8 +28,7 @@ SESSION_FIXTURE_DICT = {**SESSION_FIXTURE_DICT, "group_id": GROUP_FIXTURE_DATA["
 
 
 @pytest.fixture
-def mock_agent_commit_session_rpc(mocker):
-    # Mock the commit_session agent RPC call
+def mock_commit_session_rpc(mocker):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.commit_session",
         new_callable=AsyncMock,
@@ -39,7 +38,7 @@ def mock_agent_commit_session_rpc(mocker):
 
 
 @pytest.fixture
-def mock_agent_push_image_rpc(mocker):
+def mock_push_image_rpc(mocker):
     # Mock the push_image agent RPC call
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.push_image",
@@ -68,8 +67,8 @@ PUSH_IMAGE_MOCK_TASK_ID = uuid4()
     ],
 )
 async def test_convert_session_to_image(
-    mock_agent_commit_session_rpc,
-    mock_agent_push_image_rpc,
+    mock_commit_session_rpc,
+    mock_push_image_rpc,
     processors: SessionProcessors,
     session_repository,
 ):
@@ -97,7 +96,3 @@ async def test_convert_session_to_image(
     assert result.session_data.id == SESSION_FIXTURE_DATA.id
     assert result.session_data.name == SESSION_FIXTURE_DATA.name
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
-
-    # Verify the agent RPC calls were made correctly
-    # mock_agent_commit_session_rpc.assert_called_once()
-    # mock_agent_push_image_rpc.assert_called_once()

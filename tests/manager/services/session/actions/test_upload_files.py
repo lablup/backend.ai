@@ -20,8 +20,7 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_upload_files_rpc(mocker):
-    """Mock agent RPC calls for upload_files operation"""
+def mock_upload_file_rpc(mocker):
     # Mock increment_session_usage
     mock_increment_usage = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
@@ -115,7 +114,7 @@ UPLOAD_FILES_MOCK = {"uploaded": True, "files": ["test_file1.txt", "test_file2.t
     ],
 )
 async def test_upload_files(
-    mock_upload_files_rpc,
+    mock_upload_file_rpc,
     mock_simple_file_reader,
     processors: SessionProcessors,
     test_scenario: TestScenario[UploadFilesAction, UploadFilesActionResult],
@@ -138,5 +137,5 @@ async def test_upload_files(
     assert result.session_data.access_key == SESSION_FIXTURE_DATA.access_key
 
     # Verify that agent RPC calls were made
-    mock_upload_files_rpc["increment_usage"].assert_called_once()
-    mock_upload_files_rpc["upload_file"].assert_called_once()
+    mock_upload_file_rpc["increment_usage"].assert_called_once()
+    mock_upload_file_rpc["upload_file"].assert_called_once()
