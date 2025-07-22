@@ -405,8 +405,12 @@ class AgentRegistry:
         current_task = asyncio.current_task()
         assert current_task is not None
 
-        mount_id_map = config.get("mount_id_map", {})
-        mount_map = config.get("mount_map", {})
+        mount_id_map = config.get("mount_id_map")
+        mount_map = config.get("mount_map")
+        if mount_id_map is None:
+            mount_id_map = {}
+        if mount_map is None:
+            mount_map = {}
 
         combined_mount_map = {**mount_map, **mount_id_map}
 
