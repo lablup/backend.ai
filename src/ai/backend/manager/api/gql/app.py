@@ -41,23 +41,9 @@ class StrawberryGraphQLView(GraphQLView):
 
         return context
 
-
-@auth_required
-async def handle_strawberry_gql(request: web.Request) -> web.Response:
-    """Handle Strawberry GraphQL requests"""
-
-    # Create GraphQL view instance
-    view = StrawberryGraphQLView(schema=schema)
-
-    # Log the request
-    user = request.get("user", {})
-    access_key = request.get("keypair", {}).get("access_key", "unknown")
-    log.info("STRAWBERRY.GQL request (ak:{}, user:{})", access_key, user.get("username", "unknown"))
-
-    # Handle the GraphQL request
-    response = await view.handle_request(request)
-
-    return response
+    async def handle_request(self, request: web.Request) -> web.Response:
+        """Handle GraphQL requests - compatibility method"""
+        return await super().__call__(request)
 
 
 @attrs.define(auto_attribs=True, slots=True, init=False)
@@ -91,10 +77,21 @@ def create_app(
     # Setup CORS
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
 
-    # Add Strawberry GraphQL endpoints
-    cors.add(app.router.add_route("POST", r"/artifact-registry", handle_strawberry_gql))
-    cors.add(
-        app.router.add_route("GET", r"/artifact-registry", handle_strawberry_gql)
-    )  # For GraphiQL
+    # Add Strawberry GraphQL endpoints with auth
+    view = StrawberryGraphQLView(schema=schema)
+
+    @auth_required
+    async def auth_wrapped_view(request):
+        # Log the request
+        user = request.get("user", {})
+        access_key = request.get("keypair", {}).get("access_key", "unknown")
+        log.info(
+            "STRAWBERRY.GQL request (ak:{}, user:{})", access_key, user.get("username", "unknown")
+        )
+
+        return await view(request)
+
+    cors.add(app.router.add_route("POST", r"/artifact-registry", auth_wrapped_view))
+    cors.add(app.router.add_route("GET", r"/artifact-registry", auth_wrapped_view))  # For GraphiQL
 
     return app, []
