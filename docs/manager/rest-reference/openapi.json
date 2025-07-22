@@ -4725,6 +4725,44 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "//artifact-registry": {
+      "post": {
+        "operationId": "root.handle_strawberry_gql",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "get": {
+        "operationId": "root.handle_strawberry_gql.2",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/spec/graphiql": {
       "get": {
         "operationId": "spec.render_graphiql_html",
