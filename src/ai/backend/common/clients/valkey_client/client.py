@@ -341,12 +341,16 @@ R = TypeVar("R")
 
 def create_layer_aware_valkey_decorator(
     layer: LayerType,
+    default_retry_count: int = 3,
+    default_retry_delay: float = 0.1,
 ):
     """
     Factory function to create layer-aware valkey decorators.
 
     Args:
         layer: The layer type for metric observation
+        default_retry_count: Default number of retries for valkey operations
+        default_retry_delay: Default delay between retries in seconds
 
     Returns:
         A valkey_decorator function configured for the specified layer
@@ -354,8 +358,8 @@ def create_layer_aware_valkey_decorator(
 
     def valkey_decorator(
         *,
-        retry_count: int = 3,
-        retry_delay: float = 0.1,
+        retry_count: int = default_retry_count,
+        retry_delay: float = default_retry_delay,
     ) -> Callable[
         [Callable[P, Awaitable[R]]],
         Callable[P, Awaitable[R]],
@@ -409,12 +413,12 @@ def create_layer_aware_valkey_decorator(
                         # If it's a BackendAIError, this error is intended to be handled by the caller.
                         raise e
                     except glide.TimeoutError as e:
-                        observer.observe_layer_retry(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                        )
                         if attempt < retry_count - 1:
+                            observer.observe_layer_retry(
+                                domain=DomainType.VALKEY,
+                                layer=layer,
+                                operation=operation,
+                            )
                             await asyncio.sleep(retry_delay)
                             continue
                         log.warning(
@@ -434,6 +438,18 @@ def create_layer_aware_valkey_decorator(
                         )
                     except Exception as e:
                         if attempt < retry_count - 1:
+                            log.debug(
+                                "Retrying {} due to error: {} (attempt {}/{})",
+                                operation,
+                                e,
+                                attempt + 1,
+                                retry_count,
+                            )
+                            observer.observe_layer_retry(
+                                domain=DomainType.VALKEY,
+                                layer=layer,
+                                operation=operation,
+                            )
                             await asyncio.sleep(retry_delay)
                             continue
                         log.exception(

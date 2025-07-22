@@ -16,12 +16,16 @@ R = TypeVar("R")
 
 def create_layer_aware_repository_decorator(
     layer: LayerType,
+    default_retry_count: int = 10,
+    default_retry_delay: float = 0.1,
 ):
     """
     Factory function to create layer-aware repository decorators.
 
     Args:
         layer: The layer type for metric observation
+        default_retry_count: Default number of retries for repository operations
+        default_retry_delay: Default delay between retries in seconds
 
     Returns:
         A repository_decorator function configured for the specified layer
@@ -29,8 +33,8 @@ def create_layer_aware_repository_decorator(
 
     def repository_decorator(
         *,
-        retry_count: int = 10,
-        retry_delay: float = 0.1,
+        retry_count: int = default_retry_count,
+        retry_delay: float = default_retry_delay,
     ) -> Callable[
         [Callable[P, Awaitable[R]]],
         Callable[P, Awaitable[R]],
@@ -86,12 +90,19 @@ def create_layer_aware_repository_decorator(
                         # If it's a BackendAIError, this error is intended to be handled by the caller.
                         raise e
                     except Exception as e:
-                        observer.observe_layer_retry(
-                            domain=DomainType.REPOSITORY,
-                            layer=layer,
-                            operation=operation,
-                        )
                         if attempt < retry_count - 1:
+                            log.debug(
+                                "Retrying repository method {} due to error: {} (attempt {}/{})",
+                                operation,
+                                e,
+                                attempt + 1,
+                                retry_count,
+                            )
+                            observer.observe_layer_retry(
+                                domain=DomainType.REPOSITORY,
+                                layer=layer,
+                                operation=operation,
+                            )
                             await asyncio.sleep(retry_delay)
                             continue
                         log.exception(
