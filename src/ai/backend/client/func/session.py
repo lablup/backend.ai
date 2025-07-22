@@ -421,8 +421,6 @@ class ComputeSession(BaseFunction):
         image: str | Undefined = undefined,
         mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
-        mount_ids: list[UUID] | Undefined = undefined,
-        mount_id_map: Mapping[UUID, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         batch_timeout: str | int | Undefined = undefined,
@@ -487,14 +485,6 @@ class ComputeSession(BaseFunction):
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
-        :param mount_ids: The list of vfolder ids that belongs to the current API
-            access key.
-        :param mount_id_map: Mapping which contains custom path to mount vfolder.
-            Key and value of this map should be vfolder id and custom path.
-            Default mounts or relative paths are under /home/work.
-            If you want different paths, names should be absolute paths.
-            The target mount path of vFolders should not overlap with the linux system folders.
-            vFolders which has a dot(.) prefix in its name are not affected.
         :param envs: The environment variables which always bypasses the jail policy.
         :param resources: The resource specification. (TODO: details)
         :param cluster_size: The number of containers in this compute session.
@@ -548,18 +538,12 @@ class ComputeSession(BaseFunction):
             "starts_at": starts_at,
             "config": {
                 "mounts": mounts,
-                "mount_ids": mount_ids,
                 "environ": envs,
                 "resources": resources,
                 "resource_opts": resource_opts,
                 "scalingGroup": scaling_group,
             },
         }
-        if api_session.get().api_version >= (9, "20250722"):
-            if mount_ids is not undefined:
-                params["config"]["mount_ids"] = mount_ids
-            if mount_id_map is not undefined:
-                params["config"]["mount_id_map"] = mount_id_map
         if api_session.get().api_version >= (8, "20240915"):
             if priority is not None:
                 params["priority"] = priority

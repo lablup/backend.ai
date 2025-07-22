@@ -408,11 +408,7 @@ class AgentRegistry:
         mount_id_map = config.get("mount_id_map", {})
         mount_map = config.get("mount_map", {})
 
-        combined_mount_map = {**mount_map}
-        for identifier, path in mount_id_map.items():
-            async with self.db.begin_session() as db_session:
-                vfolder_name = await VFolderRow.id_to_name(db_session, identifier)
-                combined_mount_map[vfolder_name] = path
+        combined_mount_map = {**mount_map, **mount_id_map}
 
         # Check work directory and reserved name directory.
         original_folders = combined_mount_map.keys()
