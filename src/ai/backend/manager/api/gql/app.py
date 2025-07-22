@@ -41,10 +41,6 @@ class StrawberryGraphQLView(GraphQLView):
 
         return context
 
-    async def handle_request(self, request: web.Request) -> web.Response:
-        """Handle GraphQL requests - compatibility method"""
-        return await super().__call__(request)
-
 
 @attrs.define(auto_attribs=True, slots=True, init=False)
 class StrawberryContext:
@@ -81,7 +77,7 @@ def create_app(
     view = StrawberryGraphQLView(schema=schema)
 
     @auth_required
-    async def auth_wrapped_view(request):
+    async def handle_strawberry_gql(request):
         # Log the request
         user = request.get("user", {})
         access_key = request.get("keypair", {}).get("access_key", "unknown")
@@ -89,9 +85,14 @@ def create_app(
             "STRAWBERRY.GQL request (ak:{}, user:{})", access_key, user.get("username", "unknown")
         )
 
-        return await view(request)
+        if request.method == "GET":
+            return await view.render_graphql_ide(request)
+        else:
+            return await view.run(request)
 
-    cors.add(app.router.add_route("POST", r"/artifact-registry", auth_wrapped_view))
-    cors.add(app.router.add_route("GET", r"/artifact-registry", auth_wrapped_view))  # For GraphiQL
+    cors.add(app.router.add_route("POST", r"/artifact-registry", handle_strawberry_gql))
+    cors.add(
+        app.router.add_route("GET", r"/artifact-registry", handle_strawberry_gql)
+    )  # For GraphiQL
 
     return app, []

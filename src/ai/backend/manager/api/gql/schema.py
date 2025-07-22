@@ -1,4 +1,5 @@
 import strawberry
+from strawberry.relay import Node
 
 from .artifact_registry import (
     artifact,
@@ -22,6 +23,9 @@ class Query:
     artifact_groups = artifact_groups
     artifact = artifact
     artifact_group = artifact_group
+
+    # Relay Node interface
+    node: Node = strawberry.relay.node()
 
 
 @strawberry.type
