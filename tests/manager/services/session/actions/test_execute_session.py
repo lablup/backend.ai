@@ -33,8 +33,7 @@ def mock_agent_execute_rpc(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_increment_session_usage(mocker):
-    """Mock AgentRegistry increment_session_usage method"""
+def mock_increment_session_usage_rpc(mocker):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
@@ -130,7 +129,7 @@ EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
 )
 async def test_execute_session(
     mock_agent_execute_rpc,
-    mock_increment_session_usage,
+    mock_increment_session_usage_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[ExecuteSessionAction, ExecuteSessionActionResult],
     session_repository,

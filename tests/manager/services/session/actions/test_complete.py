@@ -20,7 +20,7 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_agent_complete_session_rpc(mocker, mock_agent_response_result):
+def mock_complete_session_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.get_completions",
         new_callable=AsyncMock,
@@ -30,7 +30,7 @@ def mock_agent_complete_session_rpc(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_session_service_complete(mocker, mock_agent_response_result):
+def mock_increment_session_usage_rpc(mocker, mock_agent_response_result):
     mock_increment_usage = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
@@ -81,8 +81,8 @@ COMPLETE_ACTION = CompleteAction(
     ],
 )
 async def test_complete_session(
-    mock_session_service_complete,
-    mock_agent_complete_session_rpc,
+    mock_increment_session_usage_rpc,
+    mock_complete_session_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CompleteAction, CompleteActionResult],
 ):
@@ -97,5 +97,5 @@ async def test_complete_session(
     assert result.result == COMPLETE_SESSION_MOCK
 
     # Verify the mocks were called
-    mock_session_service_complete.assert_called_once()
-    mock_agent_complete_session_rpc.assert_called_once()
+    mock_increment_session_usage_rpc.assert_called_once()
+    mock_complete_session_rpc.assert_called_once()

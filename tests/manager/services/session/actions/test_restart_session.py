@@ -21,11 +21,17 @@ from ..fixtures import (
 @pytest.fixture
 def mock_restart_session_rpc(mocker, mock_agent_response_result):
     mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
+        "ai.backend.manager.registry.AgentRegistry.restart_session",
         new_callable=AsyncMock,
     )
+
+    return mock_agent_response_result
+
+
+@pytest.fixture
+def mock_increment_session_usage_rpc(mocker, mock_agent_response_result):
     mocker.patch(
-        "ai.backend.manager.registry.AgentRegistry.restart_session",
+        "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
     )
 
@@ -65,6 +71,7 @@ RESTART_SESSION_MOCK = None
 )
 async def test_restart_session(
     mock_restart_session_rpc,
+    mock_increment_session_usage_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[RestartSessionAction, RestartSessionActionResult],
 ):

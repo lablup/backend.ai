@@ -19,7 +19,7 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_agent_commit_session_rpc(mocker, mock_agent_response_result):
+def mock_commit_session_to_file_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.commit_session_to_file",
         new_callable=AsyncMock,
@@ -64,7 +64,7 @@ COMMIT_SESSION_ACTION = CommitSessionAction(
     ],
 )
 async def test_commit_session(
-    mock_agent_commit_session_rpc,
+    mock_commit_session_to_file_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[CommitSessionAction, CommitSessionActionResult],
 ):

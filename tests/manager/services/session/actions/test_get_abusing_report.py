@@ -20,7 +20,7 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_agent_get_abusing_report_rpc(mocker, mock_agent_response_result):
+def mock_get_abusing_report_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.get_abusing_report",
         new_callable=AsyncMock,
@@ -61,7 +61,7 @@ AGENT_GET_ABUSING_REPORT_RPC_RESP = AbuseReport(kernel=str(KERNEL_FIXTURE_DATA.i
     ],
 )
 async def test_get_abusing_report(
-    mock_agent_get_abusing_report_rpc,
+    mock_get_abusing_report_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[GetAbusingReportAction, GetAbusingReportActionResult],
 ):

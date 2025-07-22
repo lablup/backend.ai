@@ -19,7 +19,7 @@ from ..fixtures import (
 
 
 @pytest.fixture
-def mock_agent_download_files_rpc(mocker, mock_agent_response_result):
+def mock_download_file_rpc(mocker, mock_agent_response_result):
     mock = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.download_file",
         new_callable=AsyncMock,
@@ -29,8 +29,7 @@ def mock_agent_download_files_rpc(mocker, mock_agent_response_result):
 
 
 @pytest.fixture
-def mock_session_service_download_files(mocker, mock_agent_response_result):
-    # Only mock the AgentRegistry increment_session_usage method
+def mock_increment_session_usage_rpc(mocker, mock_agent_response_result):
     mock_increment_usage = mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.increment_session_usage",
         new_callable=AsyncMock,
@@ -75,8 +74,8 @@ DOWNLOAD_FILES_ACTION = DownloadFilesAction(
     ],
 )
 async def test_download_files(
-    mock_session_service_download_files,
-    mock_agent_download_files_rpc,
+    mock_increment_session_usage_rpc,
+    mock_download_file_rpc,
     processors: SessionProcessors,
     test_scenario: TestScenario[DownloadFilesAction, DownloadFilesActionResult],
 ):
@@ -90,5 +89,5 @@ async def test_download_files(
     assert result.result is not None  # MultipartWriter should be present
 
     # Verify the mocks were called correctly
-    mock_session_service_download_files.assert_called_once()
-    mock_agent_download_files_rpc.assert_called()
+    mock_increment_session_usage_rpc.assert_called_once()
+    mock_download_file_rpc.assert_called()

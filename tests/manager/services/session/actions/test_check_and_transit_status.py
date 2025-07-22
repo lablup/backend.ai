@@ -47,7 +47,6 @@ def mock_session_lifecycle_dependencies(mocker):
 
 @pytest.fixture
 def mock_trigger_batch_execution_rpc(mocker):
-    # Mock potential agent RPC calls that could be triggered during status transitions
     mocker.patch(
         "ai.backend.manager.registry.AgentRegistry.trigger_batch_execution",
         new_callable=AsyncMock,
