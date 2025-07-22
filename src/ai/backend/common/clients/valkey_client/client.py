@@ -477,7 +477,8 @@ def create_layer_aware_valkey_decorator_with_default(
         retry_count: int = 1,
         retry_delay: float = 0.1,
         default_return: Union[R, object] = _SENTINEL,
-    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+    ):
+        #    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         """
         Decorator for Valkey client operations that adds retry logic and metrics.
         If `default_return` is set (even to None), it will be returned on final failure.
