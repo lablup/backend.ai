@@ -20,12 +20,12 @@ from ai.backend.logging.utils import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for valkey_container_log client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STAT)
+valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_CONTAINER_LOG)
 
 
 class ValkeyContainerLogClient:
     """
-    Client for interacting with Valkey for statistics operations using GlideClient.
+    Client for interacting with Valkey for container log operations using GlideClient.
     """
 
     _client: AbstractValkeyClient
@@ -48,13 +48,13 @@ class ValkeyContainerLogClient:
         pubsub_channels: Optional[set[str]] = None,
     ) -> Self:
         """
-        Create a ValkeyStatClient instance.
+        Create a ValkeyContainerLogClient instance.
 
         :param redis_target: The target Redis server to connect to.
         :param db_id: The database index to use.
         :param human_readable_name: The human-readable name for the client.
         :param pubsub_channels: Set of channels to subscribe to for pub/sub functionality.
-        :return: An instance of ValkeyStatClient.
+        :return: An instance of ValkeyContainerLogClient.
         """
         client = create_valkey_client(
             target=redis_target,
@@ -70,10 +70,10 @@ class ValkeyContainerLogClient:
     @valkey_decorator()
     async def close(self) -> None:
         """
-        Close the ValkeyStatClient connection.
+        Close the ValkeyContainerLogClient connection.
         """
         if self._closed:
-            log.warning("ValkeyStatClient is already closed.")
+            log.warning("ValkeyContainerLogClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()
