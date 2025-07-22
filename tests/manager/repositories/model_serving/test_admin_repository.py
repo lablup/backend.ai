@@ -43,6 +43,7 @@ async def test_get_endpoint_by_id_force_success(
         load_routes=True,
         load_session_owner=True,
         load_model=True,
+        load_image=True,
     )
 
 
