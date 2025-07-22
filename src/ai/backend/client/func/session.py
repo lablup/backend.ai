@@ -538,6 +538,7 @@ class ComputeSession(BaseFunction):
             "starts_at": starts_at,
             "config": {
                 "mounts": mounts,
+                "mount_map": mount_map,
                 "environ": envs,
                 "resources": resources,
                 "resource_opts": resource_opts,
