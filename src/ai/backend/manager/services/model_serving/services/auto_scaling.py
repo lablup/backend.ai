@@ -32,7 +32,6 @@ from ai.backend.manager.services.model_serving.exceptions import (
     ModelServiceNotFound,
 )
 from ai.backend.manager.services.model_serving.types import (
-    EndpointAutoScalingRuleData,
     RequesterCtx,
 )
 
@@ -131,12 +130,12 @@ class AutoScalingService:
                 max_replicas=action.creator.max_replicas,
             )
 
-        if not created_rule:
+        if created_rule is None:
             raise EndpointNotFound
 
         return CreateEndpointAutoScalingRuleActionResult(
             success=True,
-            data=EndpointAutoScalingRuleData.from_row(created_rule),
+            data=created_rule,
         )
 
     async def modify_endpoint_auto_scaling_rule(
@@ -158,12 +157,12 @@ class AutoScalingService:
                 action.requester_ctx.domain_name,
             )
 
-        if not updated_rule:
+        if updated_rule is None:
             raise EndpointAutoScalingRuleNotFound
 
         return ModifyEndpointAutoScalingRuleActionResult(
             success=True,
-            data=EndpointAutoScalingRuleData.from_row(updated_rule),
+            data=updated_rule,
         )
 
     async def delete_endpoint_auto_scaling_rule(

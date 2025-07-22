@@ -335,7 +335,13 @@ class ResourceSlotColumn(TypeDecorator):
         if value is None:
             return None
         if isinstance(value, ResourceSlot):
-            return value.to_json()
+            try:
+                return value.to_json()
+            except Exception as e:
+                print("\n================", flush=True)
+                print(f"Error {type(e)}", flush=True)
+                print(f"{value = }", flush=True)
+                raise
         return value
 
     def process_result_value(

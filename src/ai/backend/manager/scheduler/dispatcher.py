@@ -71,6 +71,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -85,7 +86,6 @@ from ..errors.resource import InstanceNotAvailable
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
-    EndpointLifecycle,
     EndpointRow,
     KernelRow,
     RouteStatus,

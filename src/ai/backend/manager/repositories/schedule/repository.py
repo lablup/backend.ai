@@ -12,6 +12,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -699,8 +700,6 @@ class ScheduleRepository:
         endpoints_to_mark_terminated: set,
         already_destroyed_sessions: list[SessionId],
     ) -> None:
-        from ai.backend.manager.models import EndpointLifecycle
-
         query = (
             sa.update(EndpointRow)
             .values({
@@ -758,8 +757,6 @@ class ScheduleRepository:
             return await self._get_endpoints_for_scaling(session)
 
     async def _get_endpoints_for_scaling(self, session: SASession) -> list:
-        from ai.backend.manager.models import EndpointLifecycle
-
         endpoints = await EndpointRow.list(
             session,
             load_image=True,

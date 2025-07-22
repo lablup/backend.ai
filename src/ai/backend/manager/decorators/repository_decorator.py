@@ -85,6 +85,14 @@ def create_layer_aware_repository_decorator(
                         # If it's a BackendAIError, this error is intended to be handled by the caller.
                         raise e
                     except Exception as e:
+                        log.exception(
+                            "Unexpected error in repository method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
                         if attempt < retry_count - 1:
                             await asyncio.sleep(retry_delay)
                             continue
