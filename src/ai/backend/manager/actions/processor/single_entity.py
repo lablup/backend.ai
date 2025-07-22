@@ -17,9 +17,8 @@ from ..action.single_entity import (
     TSingleEntityAction,
     TSingleEntityActionResult,
 )
-from ..action.types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta
 from ..monitors.monitor import ActionMonitor
-from .types import ProcessResult
+from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
 
 class ActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
