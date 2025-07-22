@@ -92,6 +92,7 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.5",
 //     "setuptools~=80.0.0",
+//     "strawberry-graphql~=0.278.0",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
@@ -5374,6 +5375,61 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2815faee18156c079d91ac0092a34d18bbc67434b65ea7d34c1f97259e486f3b",
+              "url": "https://files.pythonhosted.org/packages/14/a0/7a7cbf69ed45621ea0060fdcb9f5e6206d582086d9d96e147ee29fa8c1db/strawberry_graphql-0.278.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e3fee9cd107b5b8ca69dd534c1dca6f82e4a9cf44cf46a4d338f42938896521a",
+              "url": "https://files.pythonhosted.org/packages/fe/fc/111bc073f6db82599e9df3f102bc3e73fc503203d8c6f3ff21ac0c1f4469/strawberry_graphql-0.278.0.tar.gz"
+            }
+          ],
+          "project_name": "strawberry-graphql",
+          "requires_dists": [
+            "Django>=3.2; extra == \"django\"",
+            "aiohttp<4,>=3.7.4.post0; extra == \"aiohttp\"",
+            "asgiref<4.0,>=3.2; extra == \"channels\"",
+            "asgiref<4.0,>=3.2; extra == \"django\"",
+            "chalice<2.0,>=1.22; extra == \"chalice\"",
+            "channels>=3.0.5; extra == \"channels\"",
+            "fastapi>=0.65.2; extra == \"fastapi\"",
+            "flask>=1.1; extra == \"flask\"",
+            "graphql-core<3.4.0,>=3.2.0",
+            "libcst; extra == \"cli\"",
+            "libcst; extra == \"debug\"",
+            "libcst; extra == \"debug-server\"",
+            "litestar>=2; python_version ~= \"3.10\" and extra == \"litestar\"",
+            "opentelemetry-api<2; extra == \"opentelemetry\"",
+            "opentelemetry-sdk<2; extra == \"opentelemetry\"",
+            "packaging>=23",
+            "pydantic>1.6.1; extra == \"pydantic\"",
+            "pygments<3.0,>=2.3; extra == \"cli\"",
+            "pygments<3.0,>=2.3; extra == \"debug-server\"",
+            "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
+            "python-dateutil<3.0,>=2.7",
+            "python-multipart>=0.0.7; extra == \"asgi\"",
+            "python-multipart>=0.0.7; extra == \"debug-server\"",
+            "python-multipart>=0.0.7; extra == \"fastapi\"",
+            "quart>=0.19.3; extra == \"quart\"",
+            "rich>=12.0.0; extra == \"cli\"",
+            "rich>=12.0.0; extra == \"debug\"",
+            "rich>=12.0.0; extra == \"debug-server\"",
+            "sanic>=20.12.2; extra == \"sanic\"",
+            "starlette>=0.18.0; extra == \"asgi\"",
+            "starlette>=0.18.0; extra == \"debug-server\"",
+            "typer>=0.7.0; extra == \"cli\"",
+            "typer>=0.7.0; extra == \"debug-server\"",
+            "typing-extensions>=4.5.0",
+            "uvicorn>=0.11.6; extra == \"debug-server\"",
+            "websockets<16,>=15.0.1; extra == \"debug-server\""
+          ],
+          "requires_python": "<4.0,>=3.9",
+          "version": "0.278.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "0ba055423dbaa164b9e456abe7920c5e8ed33fcc16f6d1b2f2d152c8e1e8b4fc",
               "url": "https://files.pythonhosted.org/packages/92/4e/e5a13fdb3e6f81ce11893523ff289870c87c8f1f289a7369fb0e9840c3bb/tabulate-0.8.10-py3-none-any.whl"
             },
@@ -6592,6 +6648,7 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.5",
     "setuptools~=80.0.0",
+    "strawberry-graphql~=0.278.0",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",

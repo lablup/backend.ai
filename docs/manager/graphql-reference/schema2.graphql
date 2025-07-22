@@ -1,0 +1,174 @@
+type Artifact {
+  name: String!
+  type: ArtifactType!
+  status: ArtifactStatus!
+  description: String
+  registry: SourceInfo!
+  source: SourceInfo!
+  size: HumanReadableNumber!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  version: String!
+}
+
+type ArtifactConnection {
+  edges: [ArtifactEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ArtifactEdge {
+  node: Artifact!
+  cursor: String!
+}
+
+input ArtifactFilter {
+  type: [ArtifactType!] = null
+  status: [ArtifactStatus!] = null
+  name: StringFilter = null
+  registry: StringFilter = null
+  source: StringFilter = null
+  AND: ArtifactFilter = null
+  OR: ArtifactFilter = null
+  NOT: ArtifactFilter = null
+  DISTINCT: Boolean = null
+}
+
+type ArtifactGroup {
+  id: ID!
+  name: String!
+  type: ArtifactType!
+  status: ArtifactStatus!
+  description: String
+  artifacts(filter: ArtifactFilter = null, order: ArtifactOrder = null): ArtifactConnection!
+}
+
+input ArtifactOrder {
+  name: Ordering = null
+  type: Ordering = null
+  size: Ordering = null
+  updatedAt: Ordering = null
+  createdAt: Ordering = null
+  latestVersion: Ordering = null
+}
+
+enum ArtifactStatus {
+  AVAILABLE
+  PULLING
+  VERIFYING
+  VERIFIED
+  INSTALLING
+  INSTALLED
+  FAILED
+}
+
+enum ArtifactType {
+  MODEL
+  PACKAGE
+  IMAGE
+}
+
+type CancelPullPayload {
+  artifact: Artifact
+}
+
+scalar DateTime
+
+input DeleteArtifactInput {
+  artifactId: ID!
+  version: String!
+  forceDelete: Boolean! = false
+}
+
+type DeleteArtifactPayload {
+  artifact: Artifact
+}
+
+type DownloadProgress {
+  artifactId: ID!
+  progress: Float!
+  status: ArtifactStatus!
+}
+
+scalar HumanReadableNumber
+
+input InstallArtifactInput {
+  artifactId: ID!
+  version: String!
+}
+
+type InstallArtifactPayload {
+  artifact: Artifact
+}
+
+type Mutation {
+  pullArtifact(input: PullArtifactInput!): PullArtifactPayload!
+  installArtifact(input: InstallArtifactInput!): InstallArtifactPayload!
+  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+  deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
+  verifyArtifact(artifactId: ID!, version: String = null): VerifyArtifactPayload!
+  cancelPull(artifactId: ID!): CancelPullPayload!
+}
+
+enum Ordering {
+  ASC
+  ASC_NULLS_FIRST
+  ASC_NULLS_LAST
+  DESC
+  DESC_NULLS_FIRST
+  DESC_NULLS_LAST
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input PullArtifactInput {
+  artifactId: ID!
+  version: String!
+}
+
+type PullArtifactPayload {
+  artifact: Artifact
+}
+
+type Query {
+  artifacts(filter: ArtifactFilter = null, order: ArtifactOrder = null, first: Int = null, after: String = null): ArtifactConnection!
+  artifactGroups(filter: ArtifactFilter = null, order: ArtifactOrder = null): [ArtifactGroup!]!
+  artifact(id: ID!): Artifact
+  artifactGroup(id: ID!): ArtifactGroup
+}
+
+type SourceInfo {
+  name: String
+  url: String
+}
+
+input StringFilter {
+  contains: String = null
+  startsWith: String = null
+  endsWith: String = null
+  equals: String = null
+  notEquals: String = null
+}
+
+type Subscription {
+  artifactStatusChanged(artifactId: ID = null): Artifact!
+  downloadProgress(artifactId: ID!): DownloadProgress!
+}
+
+input UpdateArtifactInput {
+  artifactId: ID!
+  targetVersion: String!
+}
+
+type UpdateArtifactPayload {
+  artifact: Artifact
+}
+
+type VerifyArtifactPayload {
+  artifact: Artifact
+}

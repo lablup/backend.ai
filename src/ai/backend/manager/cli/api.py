@@ -12,6 +12,7 @@ import graphene
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
 
+from ..api.gql.schema import schema as strawberry_schema
 from ..models.gql import Mutations, Queries
 
 if TYPE_CHECKING:
@@ -35,6 +36,15 @@ async def generate_gql_schema(output_path: Path) -> None:
             await fw.write(str(schema))
 
 
+async def generate_strawberry_gql_schema(output_path: Path) -> None:
+    if output_path == "-":
+        log.info("======== Strawberry GraphQL API Schema ========")
+        print(strawberry_schema.as_str())
+    else:
+        async with aiofiles.open(output_path, "w") as fw:
+            await fw.write(strawberry_schema.as_str())
+
+
 @cli.command()
 @click.pass_obj
 @click.option(
@@ -46,6 +56,22 @@ async def generate_gql_schema(output_path: Path) -> None:
 )
 def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
     asyncio.run(generate_gql_schema(output))
+
+
+@cli.command()
+@click.pass_obj
+@click.option(
+    "--output",
+    "-o",
+    default="-",
+    type=click.Path(dir_okay=False, writable=True),
+    help="Output file path (default: stdout)",
+)
+def dump_strawberry_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
+    """
+    Generates Strawberry GraphQL schema of Backend.AI API.
+    """
+    asyncio.run(generate_strawberry_gql_schema(output))
 
 
 @cli.command()
