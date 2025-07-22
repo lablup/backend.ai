@@ -26,10 +26,10 @@ def cli(args) -> None:
     pass
 
 
-async def generate_gql_schema(output_path: Path) -> None:
+async def generate_graphene_gql_schema(output_path: Path) -> None:
     schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
     if output_path == "-":
-        log.info("======== GraphQL API Schema ========")
+        log.info("======== Graphene GraphQL API Schema ========")
         print(str(schema))
     else:
         async with aiofiles.open(output_path, "w") as fw:
@@ -54,24 +54,17 @@ async def generate_strawberry_gql_schema(output_path: Path) -> None:
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
-    asyncio.run(generate_gql_schema(output))
-
-
-@cli.command()
-@click.pass_obj
 @click.option(
-    "--output",
-    "-o",
-    default="-",
-    type=click.Path(dir_okay=False, writable=True),
-    help="Output file path (default: stdout)",
+    "--v2",
+    is_flag=True,
+    default=False,  # TODO: Set default to True after v2 migration is complete
+    help="Generate strawberry based v2 GraphQL schema (default: False)",
 )
-def dump_strawberry_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
-    """
-    Generates Strawberry GraphQL schema of Backend.AI API.
-    """
-    asyncio.run(generate_strawberry_gql_schema(output))
+def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+    if v2:
+        asyncio.run(generate_strawberry_gql_schema(output))
+    else:
+        asyncio.run(generate_graphene_gql_schema(output))
 
 
 @cli.command()
