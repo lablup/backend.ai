@@ -717,8 +717,8 @@ class AgentRegistry:
                 "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
-                    # "mount": mounts,  # Should we keep it for legacy?
-                    "mounts": mounts,
+                    # TODO: Rename this to `mounts`
+                    "mount": mounts,
                     "mount_ids": mount_ids,
                     "environ": environ,
                 },
