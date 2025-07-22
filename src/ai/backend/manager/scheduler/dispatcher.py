@@ -340,23 +340,22 @@ class SchedulerDispatcher(aobject):
                 schedulable_scaling_groups = (
                     await self.schedule_repository.get_schedulable_scaling_groups()
                 )
-                redis_key = self._schedule_key(ScheduleType.SCHEDULE)
                 for sgroup_name in schedulable_scaling_groups:
                     try:
                         await self._schedule_in_sgroup(
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self._valkey_live.add_scheduler_metadata(
-                            redis_key,
+                        await self._update_scheduler_mark(
+                            ScheduleType.SCHEDULE,
                             {
                                 "resource_group": sgroup_name,
                             },
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await self._valkey_live.add_scheduler_metadata(
-                    redis_key,
+                await self._update_scheduler_mark(
+                    ScheduleType.SCHEDULE,
                     {
                         "finish_time": datetime.now(tzutc()).isoformat(),
                     },
@@ -993,9 +992,8 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            redis_key = self._schedule_key(ScheduleType.CHECK_PRECONDITION)
-            await self._valkey_live.add_scheduler_metadata(
-                redis_key,
+            await self._update_scheduler_mark(
+                ScheduleType.CHECK_PRECONDITION,
                 {
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
@@ -1059,9 +1057,8 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            redis_key = self._schedule_key(ScheduleType.START)
-            await self._valkey_live.add_scheduler_metadata(
-                redis_key,
+            await self._update_scheduler_mark(
+                ScheduleType.START,
                 {
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
@@ -1160,14 +1157,12 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        redis_key = self._schedule_key(ScheduleType.SCALE_SERVICES)
-        await self._valkey_live.add_scheduler_metadata(
-            redis_key,
+        await self._update_scheduler_mark(
+            ScheduleType.SCALE_SERVICES,
             {
                 "down": dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
             },
         )
-
         created_routes = []
         endpoint_create_data = []
         for endpoint, expand_count in endpoints_to_expand.items():
@@ -1176,8 +1171,8 @@ class SchedulerDispatcher(aobject):
         created_routes = await self.schedule_repository.create_routing_rows(endpoint_create_data)
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await self._valkey_live.add_scheduler_metadata(
-            redis_key,
+        await self._update_scheduler_mark(
+            ScheduleType.SCALE_SERVICES,
             {
                 "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
@@ -1374,6 +1369,20 @@ class SchedulerDispatcher(aobject):
                 "trigger_event": event_name,
                 "execution_time": datetime.now(tzutc()).isoformat(),
             },
+        )
+
+    async def _update_scheduler_mark(
+        self,
+        schedule_type: ScheduleType,
+        to_update: dict[str, Any],
+    ) -> None:
+        """
+        Updates the scheduler mark for the given schedule type with the provided data.
+        """
+        schedule_key = self._schedule_key(schedule_type)
+        await self._valkey_live.add_scheduler_metadata(
+            schedule_key,
+            to_update,
         )
 
 
