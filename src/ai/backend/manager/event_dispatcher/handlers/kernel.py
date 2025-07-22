@@ -19,9 +19,6 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
-from ai.backend.common.log.types import (
-    ContainerLogData,
-)
 from ai.backend.common.types import (
     AgentId,
 )
@@ -87,8 +84,7 @@ class KernelEventHandler:
                     log_buffer.write(b"(container log unavailable)\n")
                     break
                 for chunk in chunks:
-                    log_item = ContainerLogData.deserialize(chunk)
-                    log_buffer.write(log_item.get_content())
+                    log_buffer.write(chunk.get_content())
             try:
                 log_data = log_buffer.getvalue()
 

@@ -11,7 +11,7 @@ class ContainerLogType(StrEnum):
 
 
 class ContainerLogError(Exception):
-    """예외 처리를 명확히 하기 위한 커스텀 예외 클래스."""
+    """Exception Class for ContainerLog"""
 
 
 @dataclass
