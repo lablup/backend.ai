@@ -7,13 +7,11 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
 from ..action.base import (
-    BaseActionResultMeta,
     TAction,
     TActionResult,
 )
-from ..action.types import BaseActionTriggerMeta
 from ..monitors.monitor import ActionMonitor
-from .types import ProcessResult
+from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
@@ -36,7 +34,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         error_code: Optional[ErrorCode] = None
 
         action_id = uuid.uuid4()
-        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
             await monitor.prepare(action, action_trigger_meta)
         try:
@@ -59,9 +57,12 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             entity_id = action.entity_id()
             if entity_id is None and result is not None:
                 entity_id = result.entity_id()
-            meta = BaseActionResultMeta(
+            meta = ActionResultMeta(
                 action_id=action_id,
-                entity_id=entity_id,
+                target=ActionTargetMeta(
+                    entity_type=action.entity_type(),
+                    entity_ids=[entity_id] if entity_id else None,
+                ),
                 status=status,
                 description=description,
                 started_at=started_at,

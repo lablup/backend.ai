@@ -2,9 +2,9 @@ from typing import override
 
 from ai.backend.common.metrics.metric import ActionMetricObserver
 from ai.backend.manager.actions.action.base import BaseAction
-from ai.backend.manager.actions.action.types import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.base import ProcessResult
+
+from ..types import ActionTriggerMeta, ProcessResult
 
 
 class PrometheusMonitor(ActionMonitor):
@@ -14,7 +14,7 @@ class PrometheusMonitor(ActionMonitor):
         self._observer = ActionMetricObserver.instance()
 
     @override
-    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override
