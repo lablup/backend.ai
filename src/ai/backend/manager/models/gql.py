@@ -320,6 +320,29 @@ class GraphQueryContext:
     processors: Processors
 
 
+@attrs.define(auto_attribs=True, slots=True)
+class StrawberryGQLContext:
+    dataloader_manager: DataLoaderManager
+    config_provider: ManagerConfigProvider
+    etcd: AsyncEtcd
+    user: Mapping[str, Any]  # TODO: express using typed dict
+    access_key: str
+    db: ExtendedAsyncSAEngine
+    network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
+    valkey_stat: ValkeyStatClient
+    valkey_live: ValkeyLiveClient
+    valkey_image: ValkeyImageClient
+    manager_status: ManagerStatus
+    known_slot_types: Mapping[SlotName, SlotTypes]
+    background_task_manager: BackgroundTaskManager
+    storage_manager: StorageSessionManager
+    registry: AgentRegistry
+    idle_checker_host: IdleCheckerHost
+    metric_observer: GraphQLMetricObserver
+    processors: Processors
+
+
 class Mutations(graphene.ObjectType):
     """
     All available GraphQL mutations.

@@ -65,34 +65,51 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     """Create Strawberry GraphQL application"""
-    app = web.Application()
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    app["gql.context"] = StrawberryContext()
+    try:
+        app = web.Application()
+        app.on_startup.append(init)
+        app.on_shutdown.append(shutdown)
+        app["gql.context"] = StrawberryContext()
 
-    # Setup CORS
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+        # Setup CORS
+        cors = aiohttp_cors.setup(app, defaults=default_cors_options)
 
-    # Add Strawberry GraphQL endpoints with auth
-    view = StrawberryGraphQLView(schema=schema)
+        # Add Strawberry GraphQL endpoints with auth
+        view = StrawberryGraphQLView(schema=schema)
 
-    @auth_required
-    async def handle_strawberry_gql(request):
-        # Log the request
-        user = request.get("user", {})
-        access_key = request.get("keypair", {}).get("access_key", "unknown")
-        log.info(
-            "STRAWBERRY.GQL request (ak:{}, user:{})", access_key, user.get("username", "unknown")
-        )
+        async def handle_strawberry_gql(request):
+            if request.method == "GET":
+                # Redirect to GraphiQL v2 endpoint
+                from aiohttp import web
 
-        if request.method == "GET":
-            return await view.render_graphql_ide(request)
-        else:
+                raise web.HTTPFound("/spec/graphiql/v2")
+            else:
+                # POST requests (actual GraphQL queries) need auth
+                return await handle_strawberry_gql_with_auth(request)
+
+        @auth_required
+        async def handle_strawberry_gql_with_auth(request):
+            # Log the request
+            user = request.get("user", {})
+            access_key = request.get("keypair", {}).get("access_key", "unknown")
+            log.info(
+                "STRAWBERRY.GQL request (ak:{}, user:{})",
+                access_key,
+                user.get("username", "unknown"),
+            )
             return await view.run(request)
 
-    cors.add(app.router.add_route("POST", r"/artifact-registry", handle_strawberry_gql))
-    cors.add(
-        app.router.add_route("GET", r"/artifact-registry", handle_strawberry_gql)
-    )  # For GraphiQL
+        cors.add(app.router.add_route("POST", r"/artifact-registry", handle_strawberry_gql))
+        cors.add(
+            app.router.add_route("GET", r"/artifact-registry", handle_strawberry_gql)
+        )  # For GraphiQL
 
-    return app, []
+        return app, []
+    except Exception as e:
+        log.error("Failed to create Strawberry GraphQL app: {}", e)
+        import traceback
+
+        traceback.print_exc()
+        # Return a minimal app that won't break the server
+        app = web.Application()
+        return app, []
