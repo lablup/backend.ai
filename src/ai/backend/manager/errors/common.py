@@ -184,3 +184,16 @@ class Forbidden(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/permission-denied"
+    error_title = "Permission denied."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )

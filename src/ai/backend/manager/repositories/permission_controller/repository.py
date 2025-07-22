@@ -9,6 +9,11 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
+from ai.backend.manager.data.permission.parameters import (
+    MultipleEntityQueryParams,
+    ScopeQueryParams,
+    SingleEntityQueryParams,
+)
 from ai.backend.manager.data.permission.role import (
     PermissionCheckInput,
     RoleCreateInput,
@@ -163,3 +168,36 @@ class PermissionControllerRepository:
                     return True
 
         return False
+
+    @repository_decorator()
+    async def get_allowed_single_entity(self, param: SingleEntityQueryParams) -> Optional[ObjectId]:
+        """
+        This method is a placeholder for future implementation.
+        It should return a single allowed entity based on the provided parameters.
+        """
+        raise NotImplementedError("This method is not implemented yet.")
+
+    @repository_decorator()
+    async def get_allowed_entities_in_scope(self, param: ScopeQueryParams) -> list[ObjectId]:
+        """
+        This method is a placeholder for future implementation.
+        It should return a list of allowed entities within a specific scope.
+        """
+        raise NotImplementedError("This method is not implemented yet.")
+
+    @repository_decorator()
+    async def get_allowed_entity_ids(self, param: MultipleEntityQueryParams) -> list[ObjectId]:
+        roles = await self.get_active_roles(param.user_id)
+        allowed_entity_ids: set[ObjectId] = set()
+        for role in roles:
+            for scope_perm in role.scope_permissions:
+                if scope_perm.operation != param.operation_type:
+                    continue
+                if scope_perm.entity_type == param.entity_type:
+                    for entity in scope_perm.mapped_entities:
+                        allowed_entity_ids.add(entity.entity_id)
+            for object_perm in role.object_permissions:
+                if object_perm.operation != param.operation_type:
+                    continue
+                allowed_entity_ids.add(object_perm.object_id.entity_id)
+        return list(allowed_entity_ids)
