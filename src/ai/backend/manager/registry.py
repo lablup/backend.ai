@@ -695,7 +695,6 @@ class AgentRegistry:
         if _mounts := template["spec"].get("mounts"):  # noqa
             mounts = list(_mounts.keys())
             mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
-
         if _environ := template["spec"].get("environ"):  # noqa
             environ = _environ
 

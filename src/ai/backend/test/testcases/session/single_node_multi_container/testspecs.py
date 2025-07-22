@@ -32,7 +32,6 @@ from ai.backend.test.testcases.session.execution import (
 )
 from ai.backend.test.testcases.session.filecheck import FileExistenceCheck
 from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
-from ai.backend.test.testcases.session.mounted_vfolder import FileHandlingInMountedVFolderSuccess
 from ai.backend.test.testcases.session.rename_failure_duplicated_name import (
     SessionRenameFailureDuplicatedName,
 )
@@ -40,6 +39,7 @@ from ai.backend.test.testcases.session.session_rename import TestSessionRename
 from ai.backend.test.testcases.session.session_status_history_retriever import (
     SessionStatusHistoryRetriever,
 )
+from ai.backend.test.testcases.session.vfolder_mount import FileHandlingInMountedVFolderSuccess
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
