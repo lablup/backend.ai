@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional, override
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
 
