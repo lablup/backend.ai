@@ -328,48 +328,6 @@ class AgentRegistry:
         """Create a WSProxy client instance."""
         return WSProxyClient(address, token)
 
-    async def _resolve_vfolder_ids(self, session_enqueue_configs: SessionEnqueueingConfig) -> None:
-        """
-        Convert vfolder UUIDs to names in `mounts` and `mount_map`, in-place mutation of `session_enqueue_configs`.
-        """
-
-        session_creation_config = session_enqueue_configs["creation_config"]
-
-        cache: dict[str, str] = {}
-
-        async def _resolve_vfolder_id_to_name(identifier: Any) -> str:
-            key = str(identifier)
-            if key in cache:
-                return cache[key]
-
-            try:
-                vfolder_uuid = uuid.UUID(key)
-            except (ValueError, TypeError):
-                # Already a name (or invalid); just echo back.
-                cache[key] = key
-                return key
-
-            async with self.db.begin_readonly_session() as db_sess:
-                vfolder_name = await VFolderRow.id_to_name(db_sess, vfolder_uuid)
-
-            cache[key] = vfolder_name
-            return cache[key]
-
-        # ---- mounts: list[str] ------------------------------------------------
-        mounts = session_creation_config.get("mounts") or []
-        if mounts:
-            session_creation_config["mounts"] = [
-                await _resolve_vfolder_id_to_name(mount) for mount in mounts
-            ]
-
-        # ---- mount_map: dict[str, str] ----------------------------------------
-        mount_map = session_creation_config.get("mount_map") or {}
-        if mount_map:
-            new_mount_map = {}
-            for ident, mount_path in mount_map.items():
-                new_mount_map[await _resolve_vfolder_id_to_name(ident)] = mount_path
-            session_creation_config["mount_map"] = new_mount_map
-
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
             cols = [agents.c.id, agents.c.public_key]
@@ -730,11 +688,18 @@ class AgentRegistry:
 
         mounts = []
         mount_map = {}
+        mount_ids = []
+        mount_id_map = {}
         environ = {}
 
         if _mounts := template["spec"].get("mounts"):  # noqa
             mounts = list(_mounts.keys())
             mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
+
+        if _mount_ids := template["spec"].get("mount_ids"):  # noqa
+            mount_ids = list(_mount_ids.keys())
+            mount_id_map = {key: value for (key, value) in _mount_ids.items() if len(value) > 0}
+
         if _environ := template["spec"].get("environ"):  # noqa
             environ = _environ
 
@@ -747,7 +712,7 @@ class AgentRegistry:
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
                     "mount": mounts,
-                    "mount_map": mount_map,
+                    "mount_ids": mount_ids,  # ?
                     "environ": environ,
                 },
             }
@@ -851,6 +816,7 @@ class AgentRegistry:
                         {
                             "creation_config": {
                                 "mount_map": mount_map,
+                                "mount_id_map": mount_id_map,
                                 "environ": environ,
                             },
                             "kernel_configs": kernel_configs,
@@ -988,26 +954,42 @@ class AgentRegistry:
             scaling_group_query_result = await sess.execute(scaling_group_query)
             scaling_group_row: ScalingGroupRow = scaling_group_query_result.scalar()
 
-            # Convert vfolder UUIDs to names in mounts and mount_map if needed
-            await self._resolve_vfolder_ids(session_enqueue_configs)
-
-            # Translate mounts/mount_map/mount_options into vfolder mounts
+            # Translate mounts (mount_ids) / mount_map (mount_id_map) / mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
+            requested_mount_ids = session_enqueue_configs["creation_config"].get("mount_ids") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_id_map = (
+                session_enqueue_configs["creation_config"].get("mount_id_map") or {}
+            )
+
             requested_mount_options = (
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
             allowed_vfolder_types = (
                 await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
+
+            # 타입 보면 그냥 단순히 합쳐도 될 것 같은데
+            # 겹치는 경우에 대한 테스트는 필요할 듯?
+
+            # Combine mounts and mount_ids (resolved to names)
+            combined_mounts = requested_mounts + requested_mount_ids
+            # Combine mount_map and mount_id_map (resolved to names)
+            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
+
+            # for k, v in requested_mount_id_map.items():
+            #     async with self.db.begin_session() as session:
+            #         vfolder_name = await VFolderRow.id_to_name(session, k)
+            #         combined_mount_map[vfolder_name] = v
+
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
                 self.storage_manager,
                 allowed_vfolder_types,
                 user_scope,
                 resource_policy,
-                requested_mounts,
-                requested_mount_map,
+                combined_mounts,
+                combined_mount_map,
                 requested_mount_options,
             )
 

@@ -204,6 +204,7 @@ VALID_VERSIONS: Final = frozenset([
     # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     # TODO: added an initial version of RBAC for projects and vfolders
+    "v9.20250722",
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -214,8 +215,9 @@ LATEST_REV_DATES: Final = {
     6: "20230315",
     7: "20230615",
     8: "20240915",
+    9: "20250722",
 }
-LATEST_API_VERSION: Final = "v8.20240915"
+LATEST_API_VERSION: Final = "v9.20250722"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

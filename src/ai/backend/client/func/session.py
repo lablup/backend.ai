@@ -212,8 +212,10 @@ class ComputeSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[list[str | UUID]] = None,
-        mount_map: Optional[Mapping[str, str | UUID]] = None,
+        mounts: Optional[list[str]] = None,
+        mount_map: Optional[Mapping[str, str]] = None,
+        mount_ids: Optional[list[UUID]] = None,
+        mount_id_map: Optional[Mapping[UUID, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
@@ -279,6 +281,14 @@ class ComputeSession(BaseFunction):
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
+        :param mount_ids: The list of vfolder ids that belongs to the current API
+            access key.
+        :param mount_id_map: Mapping which contains custom path to mount vfolder.
+            Key and value of this map should be vfolder id and custom path.
+            Default mounts or relative paths are under /home/work.
+            If you want different paths, names should be absolute paths.
+            The target mount path of vFolders should not overlap with the linux system folders.
+            vFolders which has a dot(.) prefix in its name are not affected.
         :param mount_options: Mapping which contains extra options for vfolder.
         :param envs: The environment variables which always bypasses the jail policy.
         :param resources: The resource specification. (TODO: details)
@@ -308,6 +318,10 @@ class ComputeSession(BaseFunction):
             mounts = []
         if mount_map is None:
             mount_map = {}
+        if mount_ids is None:
+            mount_ids = []
+        if mount_id_map is None:
+            mount_id_map = {}
         if mount_options is None:
             mount_options = {}
         if resources is None:
@@ -328,6 +342,7 @@ class ComputeSession(BaseFunction):
             get_naming(api_session.get().api_version, "name_arg"): name,
             "config": {
                 "mounts": mounts,
+                "mount_ids": mount_ids,
                 "environ": envs,
                 "resources": resources,
                 "resource_opts": resource_opts,
@@ -354,6 +369,7 @@ class ComputeSession(BaseFunction):
             params["bootstrap_script"] = bootstrap_script
             params["config"].update({
                 "mount_map": mount_map,
+                "mount_id_map": mount_id_map,
                 "mount_options": mount_options,
                 "preopen_ports": preopen_ports,
             })
@@ -405,6 +421,8 @@ class ComputeSession(BaseFunction):
         image: str | Undefined = undefined,
         mounts: list[str | UUID] | Undefined = undefined,
         mount_map: Mapping[str, str | UUID] | Undefined = undefined,
+        mount_ids: list[UUID] | Undefined = undefined,
+        mount_id_map: Mapping[UUID, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         batch_timeout: str | int | Undefined = undefined,
@@ -461,10 +479,18 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder ids or names that belongs to the current API
+        :param mounts: The list of vfolder names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
-            Key and value of this map should be vfolder id or name and custom path.
+            Key and value of this map should be vfolder name and custom path.
+            Default mounts or relative paths are under /home/work.
+            If you want different paths, names should be absolute paths.
+            The target mount path of vFolders should not overlap with the linux system folders.
+            vFolders which has a dot(.) prefix in its name are not affected.
+        :param mount_ids: The list of vfolder ids that belongs to the current API
+            access key.
+        :param mount_id_map: Mapping which contains custom path to mount vfolder.
+            Key and value of this map should be vfolder id and custom path.
             Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
@@ -522,13 +548,18 @@ class ComputeSession(BaseFunction):
             "starts_at": starts_at,
             "config": {
                 "mounts": mounts,
-                "mount_map": mount_map,
+                "mount_ids": mount_ids,
                 "environ": envs,
                 "resources": resources,
                 "resource_opts": resource_opts,
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (9, "20250722"):
+            if mount_ids is not undefined:
+                params["config"]["mount_ids"] = mount_ids
+            if mount_id_map is not undefined:
+                params["config"]["mount_id_map"] = mount_id_map
         if api_session.get().api_version >= (8, "20240915"):
             if priority is not None:
                 params["priority"] = priority
