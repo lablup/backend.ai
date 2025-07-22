@@ -44,22 +44,23 @@ def create_layer_aware_client_decorator(
 
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             observer = LayerMetricObserver.instance()
+            operation = func.__name__
 
             async def wrapper(*args, **kwargs) -> R:
-                log.trace("Calling client method {}", func.__name__)
+                log.trace("Calling client method {}", operation)
                 start = time.perf_counter()
                 for attempt in range(retry_count):
                     try:
                         observer.observe_layer_operation_triggered(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                         )
                         res = await func(*args, **kwargs)
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=True,
                             duration=time.perf_counter() - start,
                         )
@@ -67,7 +68,7 @@ def create_layer_aware_client_decorator(
                     except BackendAIError as e:
                         log.exception(
                             "Error in client method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -76,19 +77,24 @@ def create_layer_aware_client_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
                         # If it's a BackendAIError, this error is intended to be handled by the caller.
                         raise e
                     except Exception as e:
+                        observer.observe_layer_retry(
+                            domain=DomainType.CLIENT,
+                            layer=layer,
+                            operation=operation,
+                        )
                         if attempt < retry_count - 1:
                             await asyncio.sleep(retry_delay)
                             continue
                         log.exception(
                             "Error in client method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -97,13 +103,13 @@ def create_layer_aware_client_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
                         raise e
                 raise UnreachableError(
-                    f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
+                    f"Reached unreachable code in {operation} after {retry_count} attempts"
                 )
 
             return wrapper
