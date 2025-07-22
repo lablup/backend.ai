@@ -49,7 +49,6 @@ from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
     ClusterDep,
     CodeExecutionDep,
-    ImageDep,
 )
 
 CLUSTER_CONFIG_PARAM = {
@@ -442,12 +441,6 @@ SESSION_VFOLDER_TEST_SPECS = {
         ),
         parametrizes={
             **CLUSTER_CONFIG_PARAM,
-            ContextName.IMAGE: [
-                ImageDep(
-                    name="cr.backend.ai/multiarch/python:3.13-ubuntu24.04",
-                    architecture="x86_64",
-                )
-            ],
         },
     ),
     "single_node_single_container_session_with_vfolder_name_in_mounts_list_success": TestSpec(
@@ -469,12 +462,6 @@ SESSION_VFOLDER_TEST_SPECS = {
         ),
         parametrizes={
             **CLUSTER_CONFIG_PARAM,
-            ContextName.IMAGE: [
-                ImageDep(
-                    name="cr.backend.ai/multiarch/python:3.13-ubuntu24.04",
-                    architecture="x86_64",
-                )
-            ],
         },
     ),
 }

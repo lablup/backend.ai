@@ -42,10 +42,7 @@ class VFolderMountByUUIDTest(TestCode):
             )
             assert isinstance(result, dict) and "files" in result
         finally:
-            try:
-                await client_session.ComputeSession(name=session_name).destroy()
-            except Exception:
-                pass
+            await client_session.ComputeSession(name=session_name).destroy()
 
 
 class VFolderMountByNameTest(TestCode):
@@ -81,7 +78,4 @@ class VFolderMountByNameTest(TestCode):
             )
             assert isinstance(result, dict) and "files" in result
         finally:
-            try:
-                await client_session.ComputeSession(name=session_name).destroy()
-            except Exception:
-                pass
+            await client_session.ComputeSession(name=session_name).destroy()
