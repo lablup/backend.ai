@@ -5,7 +5,7 @@ from pydantic import model_validator
 from pydantic.dataclasses import dataclass
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
 )

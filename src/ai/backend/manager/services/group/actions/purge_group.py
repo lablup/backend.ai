@@ -9,7 +9,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.group.actions.base import GroupAction
 from ai.backend.manager.services.group.types import GroupData
 

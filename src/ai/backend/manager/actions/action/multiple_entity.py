@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional, TypeVar
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.permission.id import (
     ObjectId,
 )
@@ -15,8 +15,10 @@ from ai.backend.manager.data.permission.parameters import (
 )
 from ai.backend.manager.errors.common import PermissionDeniedError
 
+from .base import BaseAction
 
-class BaseMultiEntityAction(ABC):
+
+class BaseMultiEntityAction(BaseAction, ABC):
     _accessible_entity_ids: Optional[Collection[ObjectId]] = None
 
     @property
@@ -29,37 +31,22 @@ class BaseMultiEntityAction(ABC):
     def accessible_entity_ids(self, value: Collection[ObjectId]) -> None:
         self._accessible_entity_ids = value
 
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )
-
-    @classmethod
     @abstractmethod
-    def entity_type(cls) -> str:
+    def requester_user_id(self) -> uuid.UUID:
+        """Return the ID of the user who initiated this action."""
         raise NotImplementedError
 
     @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def user_id(self) -> uuid.UUID:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def operation_type(cls) -> str:
+    def target_entity_ids(self) -> list[str]:
+        """Return the IDs of the entities this action operates on."""
         raise NotImplementedError
 
     def permission_query_params(self) -> MultipleEntityQueryParams:
         return MultipleEntityQueryParams(
-            user_id=self.user_id(),
+            user_id=self.requester_user_id(),
             entity_type=self.entity_type(),
             operation_type=self.operation_type(),
-            entity_ids=self.entity_ids(),
+            entity_ids=self.target_entity_ids(),
         )
 
 

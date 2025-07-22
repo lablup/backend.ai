@@ -6,8 +6,12 @@ import pytest
 from tenacity import BaseAction
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.action.base import (
+    BaseActionResult,
+    BaseActionResultMeta,
+)
+from ai.backend.manager.actions.processor.base import ActionProcessor
+from ai.backend.manager.actions.processor.types import ProcessResult
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"

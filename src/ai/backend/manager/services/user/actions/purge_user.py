@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.services.user.actions.base import UserAction
 from ai.backend.manager.types import OptionalState

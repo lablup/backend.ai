@@ -1,8 +1,10 @@
 from typing import override
 
 from ai.backend.common.metrics.metric import ActionMetricObserver
-from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
+from ai.backend.manager.actions.action.base import BaseAction
+from ai.backend.manager.actions.action.types import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor.base import ProcessResult
 
 
 class PrometheusMonitor(ActionMonitor):

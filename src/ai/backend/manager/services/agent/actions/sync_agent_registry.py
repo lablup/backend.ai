@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import AgentId
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.agent.actions.base import AgentAction
 from ai.backend.manager.services.agent.types import AgentData
 

@@ -5,7 +5,7 @@ from typing import Optional, override
 
 from dateutil.relativedelta import relativedelta
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.data.model_serving.types import EndpointTokenData
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 from ai.backend.manager.services.model_serving.types import RequesterCtx

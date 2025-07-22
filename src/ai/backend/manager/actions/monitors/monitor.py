@@ -1,6 +1,8 @@
 from abc import ABC
 
-from ..action import BaseAction, BaseActionTriggerMeta, ProcessResult
+from ..action.base import BaseAction
+from ..action.types import BaseActionTriggerMeta
+from ..processor.base import ProcessResult
 
 
 class ActionMonitor(ABC):
