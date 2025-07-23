@@ -1,5 +1,6 @@
 import strawberry
 from strawberry.relay import Node
+from strawberry.schema.config import StrawberryConfig
 
 from .artifact_registry import (
     artifact,
@@ -44,4 +45,9 @@ class Subscription:
     download_progress = download_progress
 
 
-schema = strawberry.Schema(query=Query, mutation=Mutation, subscription=Subscription)
+schema = strawberry.Schema(
+    query=Query,
+    mutation=Mutation,
+    subscription=Subscription,
+    config=StrawberryConfig(auto_camel_case=True),
+)
