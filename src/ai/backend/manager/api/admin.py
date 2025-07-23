@@ -18,6 +18,7 @@ from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -29,7 +30,6 @@ from ..models.gql import (
     GraphQueryContext,
     Mutations,
     Queries,
-    StrawberryGQLContext,
 )
 from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
