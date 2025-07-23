@@ -59,10 +59,10 @@ class StringFilter:
     """String filtering input"""
 
     contains: Optional[str] = None
-    startsWith: Optional[str] = None
-    endsWith: Optional[str] = None
+    starts_with: Optional[str] = None
+    ends_with: Optional[str] = None
     equals: Optional[str] = None
-    notEquals: Optional[str] = None
+    not_equals: Optional[str] = None
 
 
 @strawberry.input
@@ -87,27 +87,27 @@ class ArtifactOrderBy:
 
 @strawberry.input
 class PullArtifactInput:
-    artifactId: ID
+    artifact_id: ID
     version: str
 
 
 @strawberry.input
 class InstallArtifactInput:
-    artifactId: ID
+    artifact_id: ID
     version: str
 
 
 @strawberry.input
 class UpdateArtifactInput:
-    artifactId: ID
-    targetVersion: str
+    artifact_id: ID
+    target_version: str
 
 
 @strawberry.input
 class DeleteArtifactInput:
-    artifactId: ID
+    artifact_id: ID
     version: str
-    forceDelete: bool = False
+    force_delete: bool = False
 
 
 # Object Types
@@ -127,8 +127,8 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     size: HumanReadableNumber
-    createdAt: datetime
-    updatedAt: datetime
+    created_at: datetime
+    updated_at: datetime
     version: str
 
     # @classmethod
@@ -168,7 +168,7 @@ class ArtifactGroup(Node):
     def artifacts(
         self,
         filter: Optional[ArtifactFilter] = None,
-        orderBy: Optional[list[ArtifactOrderBy]] = None,
+        order_by: Optional[list[ArtifactOrderBy]] = None,
         first: Optional[int] = None,
         after: Optional[str] = None,
     ) -> ArtifactConnection:
@@ -186,7 +186,7 @@ class ArtifactGroup(Node):
 
 @strawberry.type
 class DownloadProgress:
-    artifactId: ID
+    artifact_id: ID
     progress: float
     status: ArtifactStatus
 
@@ -226,7 +226,7 @@ class CancelPullPayload:
 @strawberry.field
 def artifacts(
     filter: Optional[ArtifactFilter] = None,
-    orderBy: Optional[list[ArtifactOrderBy]] = None,
+    order_by: Optional[list[ArtifactOrderBy]] = None,
     first: Optional[int] = None,
     after: Optional[str] = None,
 ) -> ArtifactConnection:
@@ -245,7 +245,7 @@ def artifacts(
 @strawberry.field
 def artifact_groups(
     filter: Optional[ArtifactFilter] = None,
-    orderBy: Optional[list[ArtifactOrderBy]] = None,
+    order_by: Optional[list[ArtifactOrderBy]] = None,
     first: Optional[int] = None,
     after: Optional[str] = None,
 ) -> Connection[ArtifactGroup]:
@@ -299,13 +299,13 @@ def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
 
 
 @strawberry.mutation
-def verify_artifact(artifactId: ID, version: Optional[str] = None) -> VerifyArtifactPayload:
+def verify_artifact(artifact_id: ID, version: Optional[str] = None) -> VerifyArtifactPayload:
     # Mock implementation
     return VerifyArtifactPayload()
 
 
 @strawberry.mutation
-def cancel_pull(artifactId: ID) -> CancelPullPayload:
+def cancel_pull(artifact_id: ID) -> CancelPullPayload:
     # Mock implementation
     return CancelPullPayload()
 
@@ -313,7 +313,7 @@ def cancel_pull(artifactId: ID) -> CancelPullPayload:
 # Subscriptions
 @strawberry.subscription
 async def artifact_status_changed(
-    artifactId: Optional[ID] = None,
+    artifact_id: Optional[ID] = None,
 ) -> AsyncGenerator[Artifact, None]:
     # Mock implementation
     # In real implementation, this would yield artifacts when status changes
@@ -322,7 +322,7 @@ async def artifact_status_changed(
 
 
 @strawberry.subscription
-async def download_progress(artifactId: ID) -> AsyncGenerator[DownloadProgress, None]:
+async def download_progress(artifact_id: ID) -> AsyncGenerator[DownloadProgress, None]:
     # Mock implementation
     # In real implementation, this would yield progress updates
     if False:  # Placeholder to make this a generator
