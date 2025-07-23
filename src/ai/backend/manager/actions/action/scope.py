@@ -1,37 +1,14 @@
-import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Collection
-from typing import Optional, TypeVar
+from typing import TypeVar
 
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-)
 from ai.backend.manager.data.permission.parameters import (
     ScopeQueryParams,
 )
-from ai.backend.manager.errors.common import PermissionDeniedError
 
 from .base import BaseAction
 
 
-class BaseScopeAction(BaseAction, ABC):
-    _accessible_entity_ids: Optional[Collection[ObjectId]] = None
-
-    @property
-    def accessible_entity_ids(self) -> Collection[ObjectId]:
-        if self._accessible_entity_ids is None:
-            raise PermissionDeniedError
-        return self._accessible_entity_ids
-
-    @accessible_entity_ids.setter
-    def accessible_entity_ids(self, value: Collection[ObjectId]) -> None:
-        self._accessible_entity_ids = value
-
-    @abstractmethod
-    def requester_user_id(self) -> uuid.UUID:
-        """Return the ID of the user who initiated this action."""
-        raise NotImplementedError
-
+class BaseScopedAction(BaseAction, ABC):
     @classmethod
     @abstractmethod
     def scope_type(cls) -> str:
@@ -44,7 +21,6 @@ class BaseScopeAction(BaseAction, ABC):
 
     def permission_query_params(self) -> ScopeQueryParams:
         return ScopeQueryParams(
-            user_id=self.requester_user_id(),
             entity_type=self.entity_type(),
             operation_type=self.operation_type(),
             scope_type=self.scope_type(),
@@ -52,11 +28,11 @@ class BaseScopeAction(BaseAction, ABC):
         )
 
 
-class BaseScopeActionResult(ABC):
+class BaseScopedActionResult(ABC):
     @abstractmethod
     def scope_id(self) -> str:
         raise NotImplementedError
 
 
-TBaseScopeAction = TypeVar("TBaseScopeAction", bound=BaseScopeAction)
-TBaseScopeActionResult = TypeVar("TBaseScopeActionResult", bound=BaseScopeActionResult)
+TBaseScopedAction = TypeVar("TBaseScopedAction", bound=BaseScopedAction)
+TBaseScopedActionResult = TypeVar("TBaseScopedActionResult", bound=BaseScopedActionResult)
