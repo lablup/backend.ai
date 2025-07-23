@@ -5,11 +5,14 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.types import ActionTriggerMeta, OperationStatus, ProcessResult
-from ai.backend.manager.actions.validators.validator import ActionValidator
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.actions.types import (
+    ActionResultMeta,
+    ActionTargetMeta,
+    ActionTriggerMeta,
+    OperationStatus,
+    ProcessResult,
 )
+from ai.backend.manager.actions.validators.validator.scope import ScopedActionValidator
 
 from ..action.scope import (
     TBaseScopedAction,
@@ -22,21 +25,18 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult]):
     _monitors: list[ActionMonitor]
-    _validators: list[ActionValidator]
-    _repository: PermissionControllerRepository
+    _validators: list[ScopedActionValidator]
     _func: Callable[[TBaseScopedAction], Awaitable[TBaseScopedActionResult]]
 
     def __init__(
         self,
         func: Callable[[TBaseScopedAction], Awaitable[TBaseScopedActionResult]],
-        permission_control_repository: PermissionControllerRepository,
         monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[ActionValidator]] = None,
+        validators: Optional[list[ScopedActionValidator]] = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
         self._validators = validators or []
-        self._repository = permission_control_repository
 
     async def _run(self, action: TBaseScopedAction) -> TBaseScopedActionResult:
         started_at = datetime.now()
@@ -55,8 +55,6 @@ class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult])
         try:
             for validator in self._validators:
                 await validator.validate(action, action_trigger_meta)
-            permission_params = action.permission_query_params()
-            await self._repository.validate_auth_in_scope(permission_params)
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"
@@ -74,10 +72,12 @@ class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult])
         finally:
             ended_at = datetime.now()
             duration = ended_at - started_at
-            meta = BaseScopeActionResultMeta(
+            meta = ActionResultMeta(
                 action_id=action_id,
-                scope_id=action.scope_id(),
-                accessible_entity_ids=object_ids,
+                target=ActionTargetMeta(
+                    entity_type=action.entity_type(),
+                    scope_id=action.target_scope_id(),
+                ),
                 status=status,
                 description=description,
                 started_at=started_at,
@@ -94,6 +94,3 @@ class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult])
 
     async def wait_for_complete(self, action: TBaseScopedAction) -> TBaseScopedActionResult:
         return await self._run(action)
-
-    async def fire_and_forget(self, action: TBaseScopedAction) -> None:
-        asyncio.create_task(self.wait_for_complete(action))
