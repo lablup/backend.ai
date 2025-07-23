@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import AsyncGenerator, Optional
 
@@ -11,20 +12,6 @@ from strawberry.relay import Connection, Edge, GlobalID, Node, NodeID
 @strawberry.scalar
 class HumanReadableNumber:
     """A scalar representing human-readable numbers like '10g', '2t'"""
-
-    pass
-
-
-@strawberry.scalar
-class DateTime:
-    """A scalar representing datetime"""
-
-    pass
-
-
-@strawberry.scalar
-class JSONString:
-    """A scalar representing JSON string"""
 
     pass
 
@@ -159,8 +146,8 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     size: HumanReadableNumber
-    createdAt: DateTime
-    updatedAt: DateTime
+    createdAt: datetime
+    updatedAt: datetime
     version: str
 
     # @classmethod

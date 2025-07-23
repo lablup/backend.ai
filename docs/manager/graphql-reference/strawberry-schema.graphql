@@ -97,6 +97,7 @@ type CancelPullPayload {
   artifact: Artifact
 }
 
+"""Date with time (isoformat)"""
 scalar DateTime
 
 input DeleteArtifactInput {
