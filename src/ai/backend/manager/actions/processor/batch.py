@@ -5,29 +5,26 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
-from ..action.multiple_entity import (
-    TBaseMultiEntityAction,
-    TBaseMultiEntityActionResult,
+from ..action.batch import (
+    TBaseBatchAction,
+    TBaseBatchActionResult,
 )
 from ..monitors.monitor import ActionMonitor
 from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
 
-class ActionProcessor(Generic[TBaseMultiEntityAction, TBaseMultiEntityActionResult]):
+class BatchActionProcessor(Generic[TBaseBatchAction, TBaseBatchActionResult]):
     _monitors: list[ActionMonitor]
     _repository: PermissionControllerRepository
-    _func: Callable[[TBaseMultiEntityAction], Awaitable[TBaseMultiEntityActionResult]]
+    _func: Callable[[TBaseBatchAction], Awaitable[TBaseBatchActionResult]]
 
     def __init__(
         self,
-        func: Callable[[TBaseMultiEntityAction], Awaitable[TBaseMultiEntityActionResult]],
+        func: Callable[[TBaseBatchAction], Awaitable[TBaseBatchActionResult]],
         permission_control_repository: PermissionControllerRepository,
         monitors: Optional[list[ActionMonitor]] = None,
     ) -> None:
@@ -35,13 +32,12 @@ class ActionProcessor(Generic[TBaseMultiEntityAction, TBaseMultiEntityActionResu
         self._monitors = monitors or []
         self._repository = permission_control_repository
 
-    async def _run(self, action: TBaseMultiEntityAction) -> TBaseMultiEntityActionResult:
+    async def _run(self, action: TBaseBatchAction) -> TBaseBatchActionResult:
         started_at = datetime.now()
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
-        result: Optional[TBaseMultiEntityActionResult] = None
+        result: Optional[TBaseBatchActionResult] = None
         error_code: Optional[ErrorCode] = None
-        object_ids: list[ObjectId] = []
 
         action_id = uuid.uuid4()
         action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
@@ -50,8 +46,7 @@ class ActionProcessor(Generic[TBaseMultiEntityAction, TBaseMultiEntityActionResu
 
         try:
             permission_params = action.permission_query_params()
-            object_ids = await self._repository.get_allowed_entity_ids(permission_params)
-            action.accessible_entity_ids = object_ids
+            await self._repository.filter_allowed_entity_ids(permission_params)
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"
@@ -89,10 +84,8 @@ class ActionProcessor(Generic[TBaseMultiEntityAction, TBaseMultiEntityActionResu
             for monitor in reversed(self._monitors):
                 await monitor.done(action, process_result)
 
-    async def wait_for_complete(
-        self, action: TBaseMultiEntityAction
-    ) -> TBaseMultiEntityActionResult:
+    async def wait_for_complete(self, action: TBaseBatchAction) -> TBaseBatchActionResult:
         return await self._run(action)
 
-    async def fire_and_forget(self, action: TBaseMultiEntityAction) -> None:
+    async def fire_and_forget(self, action: TBaseBatchAction) -> None:
         asyncio.create_task(self.wait_for_complete(action))
