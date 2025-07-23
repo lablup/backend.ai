@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.common.metrics.metric import ActionMetricObserver
 from ai.backend.manager.actions.action.base import BaseAction
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 
 from ..types import ActionTriggerMeta, ProcessResult
 
