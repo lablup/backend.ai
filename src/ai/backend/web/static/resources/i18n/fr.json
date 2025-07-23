@@ -210,17 +210,7 @@
     "UserStatus": "Statut de l'utilisateur",
     "Users": "Utilisateurs",
     "WarningLessRateLimit": "Si la valeur de la limite de débit est faible, les opérations API telles que la connexion peuvent être bloquées.",
-    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :",
-    "validation": {
-      "InvalidEmailAddress": "Adresse e-mail invalide.",
-      "LetterNumber-_dot": "Autorise les lettres, les chiffres et -_.",
-      "NameAlreadyExists": "Le nom de la stratégie existe déjà !",
-      "NumbersOnly": "Autorise uniquement les chiffres",
-      "PleaseSelectOption": "Veuillez sélectionner une option",
-      "PleaseSelectOptions": "Veuillez sélectionner optios.",
-      "PolicyName": "Nom de la stratégie Obligatoire.",
-      "ValidationFailed": "Validation échouée"
-    }
+    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :"
   },
   "data": {
     "Active": "Actif",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Impossible de supprimer le dossier monté dans une ou plusieurs sessions. Veuillez d'abord terminer la session.",
+      "CannotDeletePipelineFolder": "Vous ne pouvez pas supprimer les dossiers du pipeline.",
+      "CannotRestorePipelineFolder": "Vous ne pouvez pas restaurer les dossiers du pipeline.",
       "CloneAFolder": "Cloner un dossier",
       "CloneFolder": "Cloner un dossier",
       "Cloneable": "Clonable",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Supprimer un dossier",
       "DeleteForever": "Supprimer pour toujours",
       "DescYouAreFolderOwner": "Vous êtes le propriétaire de ce dossier.",
+      "DownloadingModel": "Modèle de téléchargement ...",
       "Edit": "Éditer",
       "EditDelete": "Modifier+Supprimer",
       "FileDeleted": "Fichier supprimé",
@@ -378,7 +371,7 @@
       "FolderUsage": "Utilisation des dossiers",
       "FolderUsing": "Utilisation",
       "InviteUsers": "Inviter l'utilisateur",
-      "KickOut": "",
+      "KickOut": "Arrêter de partager",
       "KickOutConfirm": "Ne plus partager avec {{email}} ?",
       "Leave": "Quitter",
       "LeaveAFolder": "Laisser un dossier",
@@ -555,6 +548,7 @@
     "Digest": "Digérer",
     "Disabled": "désactivée",
     "ErrorMinimumValue": "{{key}} doit être au moins {{value}}",
+    "FailedToDeleteCustomizedImage": "Échec de la suppression de l'image personnalisée.",
     "FullImagePath": "Chemin d'accès complet à l'image",
     "ImageReinstallationRequired": "Réinstallation d'image requise",
     "Images": "Images",
@@ -679,7 +673,17 @@
     "StorageProxies": "Stockages",
     "TotalItems": "Total des éléments {{total}}",
     "Username": "Nom d'utilisateur",
-    "ValueRequired": "Veuillez saisir {{ nom }}"
+    "ValueRequired": "Veuillez saisir {{ nom }}",
+    "validation": {
+      "InvalidEmailAddress": "Adresse e-mail non valide.",
+      "LetterNumber-_dot": "Permet des lettres, des chiffres et -_.",
+      "NameAlreadyExists": "Le nom de politique existe déjà!",
+      "NumbersOnly": "Permet les nombres uniquement",
+      "PleaseSelectOption": "Veuillez sélectionner une option",
+      "PleaseSelectOptions": "Veuillez sélectionner au moins une option ou plus.",
+      "PolicyName": "Nom de la politique requis.",
+      "ValidationFailed": "La validation a échoué"
+    }
   },
   "import": {
     "CleanUpImportTask": "Nettoyage de la tâche d'importation...",
@@ -760,7 +764,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Souhaitez-vous vous connecter avec le compte {{nom d'utilisateur}} ({{email}}) ?",
     "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",
-    "ServiceName": "Nom du service",
+    "ServiceName": "Nom de service",
     "UseAnotherAccount": "Se connecter avec un autre compte"
   },
   "kernel": {
@@ -773,8 +777,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +792,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +920,7 @@
     "GenerateNewToken": "Générer un nouveau jeton",
     "GenerateToken": "Générer un jeton",
     "GeneratedTokens": "Jetons générés",
+    "GoToServiceDetailPage": "Aller à la page de détail du service",
     "Image": "Image",
     "ModelDefinitionPath": "Chemin du fichier de définition du modèle",
     "ModelMountDestination": "Destination de montage pour le dossier modèle",
@@ -925,6 +930,7 @@
     "OnlyAllowsNonNegativeIntegers": "N'autorise que les nombres entiers non négatifs",
     "OpenToPublic": "Ouvert au public",
     "Owner": "Propriétaire",
+    "PlayYourModelNow": "Jouez votre modèle maintenant!",
     "PleaseSelectTime": "Veuillez choisir l'heure !",
     "Processing": "Traitement...",
     "Public": "Public",
@@ -936,17 +942,21 @@
     "RoutesInfo": "Informations sur les itinéraires",
     "RoutingInfo": "Informations sur le routage",
     "RoutingsCount": "Nombre d'itinéraires",
+    "RunThisModel": "Exécuter ce modèle",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
     "SeeContainerLogs": "Voir les journaux de conteneur",
+    "ServiceAlreadyExists": "Le nom du service existe déjà",
     "ServiceCreated": "Le service modèle {{ name }} a été créé avec succès.",
     "ServiceDelegatedFrom": "Le service modèle est créé par {{ createdUser }} mais la propriété de la session sera déléguée à {{ sessionOwner }}.",
     "ServiceEndpoint": "Point final du service",
     "ServiceInfo": "Informations sur le service",
-    "ServiceName": "Nom du service",
+    "ServiceName": "Nom de service",
     "ServiceNameCannotStartWithHyphen": "Les tirets (-) ne peuvent pas être utilisés à chaque extrémité.",
+    "ServiceNameInvalidCharacter": "Au milieu du nom du service, seul l'alphabet, le numéro, le '_' ','. ',' - 'ne peut être inclus que.",
     "ServiceNameMaxLength": "Veuillez saisir 24 caractères ou moins.",
     "ServiceNameMinLength": "Veuillez saisir au moins 4 caractères.",
-    "ServiceNameRule": "Autorisez uniquement les caractères alphanumériques, les traits de soulignement (_) et les traits d'union (-) et ils doivent se terminer par un caractère alphanumérique.",
+    "ServiceNameShouldEndWith": "Il doit se terminer avec l'alphabet, les grands et petits caractères, les nombres et «_».",
+    "ServiceNameShouldStartWith": "It must start with alphabetic and small characters, numbers or '_'.",
     "ServiceTerminated": "Une demande d'arrêt a été envoyée pour le service modèle '{{ name }}'.",
     "ServiceUpdated": "Le service modèle {{ name }} a été mis à jour avec succès.",
     "Services": "Services",
@@ -956,6 +966,7 @@
     "StartNewService": "Démarrer un nouveau service",
     "StartNewServing": "Commencer une nouvelle distribution",
     "StartService": "Démarrer le service",
+    "StartingModelService": "Service de modèle de démarrage ...",
     "Status": "Statut",
     "Success": "Succès",
     "SyncRoutes": "Synchroniser les itinéraires",
@@ -1011,6 +1022,9 @@
     "SeeDetail": "Voir le détail",
     "SuccessfullyUpdated": "Mise à jour réussie",
     "Visit": "Visite"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} des éléments {{total}}"
   },
   "propertyFilter": {
     "PlaceHolder": "Recherche",
@@ -1405,6 +1419,7 @@
       "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
       "InteractiveMode": "Interactif",
       "InteractiveModeDesc": "vous permet de créer, de tester et d'exécuter du code de manière interactive via jupyter notebook, visual studio code, etc.",
+      "InvalidMountsSelectionWarning": "Les informations de sélection des dossiers ne sont pas valides. Découvrez le dossier sélectionné.",
       "InvalidPortFormat": "Le format du numéro de port est incorrect.",
       "Launch": "Lancer",
       "LaunchConfirmationDialog": "Pour conserver votre code et vos données, ou les partager avec d'autres collaborateurs, créez simplement un dossier de stockage dans la barre latérale Données et stockage, puis montez ce dossier lorsque vous démarrez la ressource et conservez-le.",
@@ -1682,6 +1697,11 @@
     "SessionsDesc": "Le nombre de sessions de calcul créées.",
     "UsageHistory": "Usage Historique",
     "UsageHistoryNote": "L'historique d'utilisation montré ici est basé sur des séances de calcul terminées.",
+    "description": {
+      "CPUUtilization": "Représente la quantité de temps de CPU utilisé par la session pendant la période sélectionnée. \n\nUn seul noyau CPU correspond à un maximum de 100%.\n\nSi plusieurs noyaux sont alloués, l'utilisation totale peut dépasser 100%, car elle est calculée en résumant l'utilisation maximale (100%) de chaque noyau.",
+      "NetworkRx": "Indique le taux de transfert de réseau.\n\nReprésente la vitesse à laquelle le conteneur reçoit des données réseau.",
+      "NetworkTx": "Indique le taux de transfert de réseau. \n\nReprésente la vitesse à laquelle le conteneur envoie des données de réseau."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Si l'utilisation est faible, les données pour certaines dates peuvent ne pas être disponibles. \nVeuillez réessayer avec une plage de dates plus courte.",
       "NoMetricsToDisplay": "Aucune métrique avaliable pour le suivi"
@@ -1948,6 +1968,10 @@
       "MyAccount": "Modifier les informations utilisateur",
       "MyAccountInformation": "Modifier les informations utilisateur",
       "MyEnvironments": "Mes environnements",
+      "MyResources": "Mes ressources",
+      "MyResourcesDescription": "<p> Ce panneau montre votre utilisation totale des ressources et restez dans tous les projets et groupes de ressources. </p> <p> Lorsqu'il existe plusieurs limites (telles que le domaine, le projet ou la clé), la limite la plus restrictive est appliquée pour montrer votre utilisation et votre capacité restante. </p>",
+      "MyResourcesIn": "Mes ressources dans",
+      "MyResourcesInResourceGroupDescription": "Ce panneau montre votre utilisation actuelle des ressources et restant dans le groupe de ressources sélectionné.",
       "NewPassword": "Nouveau mot de passe",
       "NewPasswordAgain": "Retapez le nouveau mot de passe",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
@@ -1963,6 +1987,7 @@
       "Preferences": "Préférences",
       "PrivacyPolicy": "Politique de confidentialité",
       "Project": "Projet",
+      "Remaining": "Restant",
       "ResourcePolicy": "Politique des ressources",
       "Resources": "Ressources",
       "Serving": "Servir",
@@ -1975,8 +2000,11 @@
       "Summary": "Résumé",
       "Tasks": "Tâches",
       "TermsOfService": "Conditions d'utilisation",
+      "TotalResourcesIn": "Ressources totales dans",
+      "TotalResourcesInResourceGroupDescription": "Ce panneau montre le total des ressources utilisées et restantes. \nLes valeurs sont calculées en additionnant l'utilisation et les quantités restantes de tous les agents à l'aide du groupe de ressources sélectionné.",
       "TotpActivated": "2FA activé",
       "Update": "Mettre à jour",
+      "Usage": "Usage",
       "UsageHistory": "Historique d'allocation",
       "UserCredentials&Policies": "Identifiants et politiques",
       "UserSessionHistory": "Historique des sessions utilisateur",

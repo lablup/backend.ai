@@ -210,17 +210,7 @@
     "UserStatus": "用户状态",
     "Users": "用戶",
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
-    "YouAreAboutToDeleteCredential": "您將要刪除該使用者的憑證：",
-    "validation": {
-      "InvalidEmailAddress": "無效的郵件地址。",
-      "LetterNumber-_dot": "允許字母、數字和 -_。",
-      "NameAlreadyExists": "策略名稱已存在！",
-      "NumbersOnly": "只允許數字",
-      "PleaseSelectOption": "請選擇一個選項",
-      "PleaseSelectOptions": "请至少选择一个或多个选项。",
-      "PolicyName": "策略名稱 必填。",
-      "ValidationFailed": "驗證失敗"
-    }
+    "YouAreAboutToDeleteCredential": "您將要刪除該使用者的憑證："
   },
   "data": {
     "Active": "積極的",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "無法刪除安裝在一個或多個會話中的文件夾。請先終止會話。",
+      "CannotDeletePipelineFolder": "您無法刪除管道文件夾。",
+      "CannotRestorePipelineFolder": "您無法還原管道文件夾。",
       "CloneAFolder": "克隆文件夾",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "刪除文件夾",
       "DeleteForever": "永久刪除",
       "DescYouAreFolderOwner": "您是此文件夾的所有者。",
+      "DownloadingModel": "下載型號...",
       "Edit": "編輯",
       "EditDelete": "編輯+刪除",
       "FileDeleted": "文件已刪除",
@@ -378,7 +371,7 @@
       "FolderUsage": "文件夹的使用",
       "FolderUsing": "使用",
       "InviteUsers": "邀請用戶",
-      "KickOut": "",
+      "KickOut": "停止共享",
       "KickOutConfirm": "停止与 {{email}} 共享？",
       "Leave": "離開",
       "LeaveAFolder": "留下文件夾",
@@ -556,6 +549,7 @@
     "Digest": "消化",
     "Disabled": "殘疾",
     "ErrorMinimumValue": "{{key}}必須至少為{{value}}",
+    "FailedToDeleteCustomizedImage": "無法刪除自定義圖像。",
     "FullImagePath": "完整影像路徑",
     "ImageReinstallationRequired": "需要恢復圖像",
     "Images": "圖片",
@@ -679,7 +673,17 @@
     "StorageProxies": "存儲",
     "TotalItems": "{{总计}}项目总数",
     "Username": "用戶名",
-    "ValueRequired": "请输入 {{ 姓名 }}"
+    "ValueRequired": "请输入 {{ 姓名 }}",
+    "validation": {
+      "InvalidEmailAddress": "無效的電子郵件地址。",
+      "LetterNumber-_dot": "允許字母，數字和-_。",
+      "NameAlreadyExists": "策略名稱已經存在！",
+      "NumbersOnly": "僅允許數字",
+      "PleaseSelectOption": "請選擇一個選項",
+      "PleaseSelectOptions": "請選擇至少一個或更多選項。",
+      "PolicyName": "需要策略名稱。",
+      "ValidationFailed": "驗證失敗"
+    }
   },
   "import": {
     "CleanUpImportTask": "清理導入任務...",
@@ -760,7 +764,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
     "InteractiveLoginWithBackendAI": "使用 Backend.AI 账户登录",
-    "ServiceName": "服务名称",
+    "ServiceName": "服務名稱",
     "UseAnotherAccount": "使用其他账户登录"
   },
   "kernel": {
@@ -773,8 +777,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +792,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -917,6 +921,7 @@
     "GenerateNewToken": "生成新令牌",
     "GenerateToken": "生成令牌",
     "GeneratedTokens": "生成令牌",
+    "GoToServiceDetailPage": "轉到服務詳細信息頁面",
     "Image": "图片",
     "ModelDefinitionPath": "模型定義檔路徑",
     "ModelMountDestination": "模型資料夾的安裝目標",
@@ -925,6 +930,7 @@
     "OnlyAllowsNonNegativeIntegers": "只允许非负整数",
     "OpenToPublic": "向公众开放",
     "Owner": "擁有者",
+    "PlayYourModelNow": "立即播放模型！",
     "PleaseSelectTime": "请选择时间！",
     "Processing": "加工...",
     "Public": "公众",
@@ -936,17 +942,21 @@
     "RoutesInfo": "路线信息",
     "RoutingInfo": "路由信息",
     "RoutingsCount": "路由计数",
+    "RunThisModel": "運行此模型",
     "RuntimeVariant": "推理运行时变量",
     "SeeContainerLogs": "查看容器日誌",
+    "ServiceAlreadyExists": "服務名稱已經存在",
     "ServiceCreated": "模型服務 {{ name }} 已成功建立。",
     "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}",
     "ServiceEndpoint": "服务端点",
     "ServiceInfo": "服务信息",
-    "ServiceName": "服务名称",
+    "ServiceName": "服務名稱",
     "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。",
+    "ServiceNameInvalidCharacter": "在服務名稱的中間，只有字母，數字，'_'，'。'，' - '只能包括在內。",
     "ServiceNameMaxLength": "請輸入 24 個或更少的字元。",
     "ServiceNameMinLength": "請輸入至少 4 個字元。",
-    "ServiceNameRule": "僅允許使用字母數字、底線 (_) 和連字符 (-)，並且必須以字母數字字元結尾。",
+    "ServiceNameShouldEndWith": "會話名稱必須以字母，大字符，數字和“ _”結尾。",
+    "ServiceNameShouldStartWith": "會話名稱應從字母和小字符，數字或“ _”開始。",
     "ServiceTerminated": "已為模型服務“{{ name }}”發送關閉請求。",
     "ServiceUpdated": "模型服務 {{ name }} 已成功更新。",
     "Services": "服务",
@@ -956,6 +966,7 @@
     "StartNewService": "開始新服務",
     "StartNewServing": "开始新服务",
     "StartService": "启动服务",
+    "StartingModelService": "啟動型號服務...",
     "Status": "现状",
     "Success": "成功",
     "SyncRoutes": "同步路线",
@@ -1011,6 +1022,9 @@
     "SeeDetail": "查看詳情",
     "SuccessfullyUpdated": "成功更新",
     "Visit": "訪問"
+  },
+  "pagination": {
+    "Total": "{{start}}  -  {{end}} {{total}}項目"
   },
   "propertyFilter": {
     "PlaceHolder": "搜索",
@@ -1404,6 +1418,7 @@
       "InsufficientAllocationOfResourcesWarning": "可分配資源低於所選映像所需的最低資源。",
       "InteractiveMode": "交互式",
       "InteractiveModeDesc": "允许您通过 jupyter notebook、visual studio code 等交互式创建、测试和运行代码。",
+      "InvalidMountsSelectionWarning": "文件夾選擇信息無效。請再次檢查選定的文件夾。",
       "InvalidPortFormat": "端口号格式不正确。",
       "Launch": "發射",
       "LaunchConfirmationDialog": "要保留您的代碼和數據，或與其他協作者共享，只需在數據和存儲側欄中創建一個存儲文件夾，然後在啟動資源時掛載該文件夾並將其保留在那裡。",
@@ -1681,6 +1696,11 @@
     "SessionsDesc": "创建的计算会话数。",
     "UsageHistory": "使用历史",
     "UsageHistoryNote": "此處顯示的用法歷史記錄基於終止的計算會議。",
+    "description": {
+      "CPUUtilization": "表示會話在選定期間使用的CPU時間數量。 \n\n單個CPU核心對應於最大100％。\n\n如果分配了多個核心，則總使用情況可能超過100％，因為它是通過總結每個核心的最大使用（100％）來計算的。",
+      "NetworkRx": "指示網絡傳輸速率。\n\n>表示容器接收網絡數據的速率。",
+      "NetworkTx": "指示網絡傳輸速率。\n\n 表示容器發送網絡數據的速率。"
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "如果用法較低，則可能無法提供某些日期的數據。請在較短的日期範圍內重試。",
       "NoMetricsToDisplay": "沒有可用的指標來跟踪"
@@ -1947,6 +1967,10 @@
       "MyAccount": "更改用戶信息",
       "MyAccountInformation": "更改用戶信息",
       "MyEnvironments": "我的環境",
+      "MyResources": "我的資源",
+      "MyResourcesDescription": "<p>此面板顯示了您的總資源使用情況，並保留在所有項目和資源組中。 </p> <p>當有多個限制（例如域，項目或按鍵）時，最限制的限制將用於顯示您的用法和剩餘能力。 </p> </p>",
+      "MyResourcesIn": "我的資源",
+      "MyResourcesInResourceGroupDescription": "該面板顯示了您當前的資源使用情況和所選資源組中的可用容量。",
       "NewPassword": "新密碼",
       "NewPasswordAgain": "確認新密碼）",
       "NewPasswordCannotBeSame": "请输入与当前密码不同的密码。",
@@ -1962,6 +1986,7 @@
       "Preferences": "首選項",
       "PrivacyPolicy": "隱私政策",
       "Project": "項目",
+      "Remaining": "其餘的",
       "ResourcePolicy": "資源政策",
       "Resources": "資源",
       "Serving": "服务",
@@ -1974,8 +1999,11 @@
       "Summary": "概括",
       "Tasks": "任务",
       "TermsOfService": "服務條款",
+      "TotalResourcesIn": "總資源中",
+      "TotalResourcesInResourceGroupDescription": "該面板顯示了使用的總和剩餘資源。這些值是通過使用所選資源組添加所有代理的使用量和剩餘數量來計算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",
+      "Usage": "用法",
       "UsageHistory": "分配歷史",
       "UserCredentials&Policies": "用戶憑證和政策",
       "UserSessionHistory": "用戶會話歷史記錄",

@@ -209,17 +209,7 @@
     "UserStatus": "Хэрэглэгчийн статус",
     "Users": "Хэрэглэгчид",
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
-    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:",
-    "validation": {
-      "InvalidEmailAddress": "Хүчингүй мэйл хаяг.",
-      "LetterNumber-_dot": "Үсэг, тоо ба -_-г зөвшөөрдөг.",
-      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
-      "NumbersOnly": "Зөвхөн дугаарыг зөвшөөрдөг",
-      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
-      "PleaseSelectOptions": "сонголтуудыг сонгоно уу",
-      "PolicyName": "Бодлогын нэр шаардлагатай.",
-      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
-    }
+    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:"
   },
   "data": {
     "Active": "Идэвхтэй",
@@ -347,6 +337,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Нэг буюу хэд хэдэн хэсэгт суулгасан фолдерыг устгах боломжгүй. Эхлээд хуралдааныг зогсооно уу.",
+      "CannotDeletePipelineFolder": "Та дамжуулах хоолойн хавтасыг устгах боломжгүй.",
+      "CannotRestorePipelineFolder": "Та дамжуулах хоолойн хавтасыг сэргээх боломжгүй.",
       "CloneAFolder": "Фолдерыг хуул",
       "CloneFolder": "Фолдерыг хувилах",
       "Cloneable": "Cloneable",
@@ -356,6 +348,7 @@
       "DeleteAFolder": "Фолдер устгах",
       "DeleteForever": "Бүрмөсөн устгах",
       "DescYouAreFolderOwner": "Та энэ фолдерын эзэн юм.",
+      "DownloadingModel": "Загварыг татаж байна ...",
       "Edit": "Засах",
       "EditDelete": "Засах + Устгах",
       "FileDeleted": "Файлыг устгасан",
@@ -377,7 +370,7 @@
       "FolderUsage": "Хавтас ашиглалт",
       "FolderUsing": "Ашиглаж байна",
       "InviteUsers": "Урих хэрэглэгч",
-      "KickOut": "",
+      "KickOut": "Хуваалцах гэж",
       "KickOutConfirm": "{{Имэйл}} -тай хуваалцахаа болих уу?",
       "Leave": "Орхи",
       "LeaveAFolder": "Фолдер үлдээнэ үү",
@@ -553,6 +546,7 @@
     "Digest": "Хоол боловсруулах",
     "Disabled": "Идэвхгүй",
     "ErrorMinimumValue": "{{ key }} нь дор хаяж {{ value }} байх ёстой",
+    "FailedToDeleteCustomizedImage": "Өөрчлөгдсөн зургийг устгах ажиллагаа амжилтгүй боллоо.",
     "FullImagePath": "Зургийн бүрэн зам",
     "ImageReinstallationRequired": "Зургийг дахин суулгах шаардлагатай",
     "Images": "Image",
@@ -677,7 +671,17 @@
     "StorageProxies": "Хадгалах сан",
     "TotalItems": "Нийт {{total}} зүйл",
     "Username": "Хэрэглэгчийн нэр",
-    "ValueRequired": "{{Нэр}}}}"
+    "ValueRequired": "{{Нэр}}}}",
+    "validation": {
+      "InvalidEmailAddress": "И-мэйл хаяг буруу байна.",
+      "LetterNumber-_dot": "Үсэг, тоо, -_-ийг зөвшөөрдөг.",
+      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
+      "NumbersOnly": "Дугаарыг л зөвшөөрдөг",
+      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
+      "PleaseSelectOptions": "Дор хаяж нэг сонголтыг сонгоно уу.",
+      "PolicyName": "Бодлогын нэр шаардлагатай.",
+      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
+    }
   },
   "import": {
     "CleanUpImportTask": "Импортын ажлыг цэвэрлэх ...",
@@ -758,7 +762,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?",
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",
-    "ServiceName": "Үйлчилгээний нэр",
+    "ServiceName": "С УНKЦны нэр",
     "UseAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү"
   },
   "kernel": {
@@ -771,8 +775,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -788,8 +790,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -914,6 +918,7 @@
     "GenerateNewToken": "Шинэ токен үүсгэх",
     "GenerateToken": "Токен үүсгэх",
     "GeneratedTokens": "Үүсгэсэн токенууд",
+    "GoToServiceDetailPage": "Үйлчилгээний дэлгэрэнгүй хуудсанд очно уу",
     "Image": "Зураг",
     "ModelDefinitionPath": "Загварын тодорхойлолтын файлын зам",
     "ModelMountDestination": "Загварын хавтасыг холбох газар",
@@ -923,6 +928,7 @@
     "OnlyAllowsNonNegativeIntegers": "Зөвхөн сөрөг бус бүхэл тоог зөвшөөрдөг",
     "OpenToPublic": "Олон нийтэд нээлттэй",
     "Owner": "Эзэмшигч",
+    "PlayYourModelNow": "Одоо загвараа тоглоорой!",
     "PleaseSelectTime": "Цаг сонгоно уу!",
     "Processing": "Боловсруулж байна...",
     "Public": "Олон нийтийн",
@@ -934,17 +940,21 @@
     "RoutesInfo": "Маршрутын мэдээлэл",
     "RoutingInfo": "Чиглүүлэлтийн мэдээлэл",
     "RoutingsCount": "Чиглүүлэлтийн тоо",
+    "RunThisModel": "Энэ загварыг ажиллуул",
     "RuntimeVariant": "Дүгнэлт Runtime Variant",
     "SeeContainerLogs": "Контейнерийн бүртгэлийг үзнэ үү",
+    "ServiceAlreadyExists": "Үйлчилгээний нэр аль хэдийн байна",
     "ServiceCreated": "Загвар үйлчилгээ {{ name }} амжилттай үүсгэгдсэн.",
     "ServiceDelegatedFrom": "Загвар үйлчилгээг {{ createdUser }} үүсгэсэн боловч сессийн эрхийг {{ sessionOwner }}-д шилжүүлнэ.",
     "ServiceEndpoint": "Үйлчилгээний эцсийн цэг",
     "ServiceInfo": "Үйлчилгээний мэдээлэл",
-    "ServiceName": "Үйлчилгээний нэр",
+    "ServiceName": "С УНKЦны нэр",
     "ServiceNameCannotStartWithHyphen": "Хоёр төгсгөлд зураас (-) ашиглах боломжгүй.",
+    "ServiceNameInvalidCharacter": "Үйлчилгээний голд зөвхөн цагаан толгой, цагаан толгой, тоо, '_', '_'.",
     "ServiceNameMaxLength": "24 ба түүнээс бага тэмдэгт оруулна уу.",
     "ServiceNameMinLength": "Дор хаяж 4 тэмдэгт оруулна уу.",
-    "ServiceNameRule": "Зөвхөн үсэг тоо, доогуур зураас(_), зураас(-) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
+    "ServiceNameShouldEndWith": "Сешн нэр нь цагаан толгой, том, жижиг тэмдэгтүүд, тоо, тоонууд, тоонууд, тоонууд, ба '_'.",
+    "ServiceNameShouldStartWith": "Хурлын нэр цагаан толгойн болон жижиг тэмдэгтүүдээс эхлэх ёстой.",
     "ServiceTerminated": "'{{ name }}' загварын үйлчилгээнд хаах хүсэлт илгээсэн.",
     "ServiceUpdated": "Загвар үйлчилгээ {{ name }} амжилттай шинэчлэгдсэн.",
     "Services": "Үйлчилгээ",
@@ -954,6 +964,7 @@
     "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
     "StartNewServing": "Шинээр үйлчилж эхлэх",
     "StartService": "Үйлчилгээг эхлүүлэх",
+    "StartingModelService": "Загварын үйлчилгээг эхлүүлэх ...",
     "Status": "Статус",
     "Success": "Амжилт",
     "SyncRoutes": "Замуудыг синк хийх",
@@ -1009,6 +1020,9 @@
     "SeeDetail": "Дэлгэрэнгүйг үзнэ үү",
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
     "Visit": "Айлчлах"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{{End}} {{нийт}}}} зүйл"
   },
   "propertyFilter": {
     "PlaceHolder": "Хайх",
@@ -1403,6 +1417,7 @@
       "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна.",
       "InteractiveMode": "Интерактив",
       "InteractiveModeDesc": "jupyter notebook, visual studio код гэх мэтээр интерактив код үүсгэх, турших, ажиллуулах боломжийг танд олгоно.",
+      "InvalidMountsSelectionWarning": "Фолдерын сонголтын мэдээлэл буруу байна. Сонгосон фолдерыг шалгана уу.",
       "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
       "Launch": "Эхлэх",
       "LaunchConfirmationDialog": "Өөрийн код, өгөгдлийг хадгалах, эсвэл бусад хамтран ажиллагсадтайгаа хуваалцахын тулд өгөгдөл & хадгалах талын самбар дээр хадгалах хавтас үүсгээд нөөцөө эхлүүлэхдээ уг хавтасыг холбоод хадгална уу.",
@@ -1679,6 +1694,11 @@
     "SessionsDesc": "Үүсгэсэн тооцооллын сешнүүдийн тоо.",
     "UsageHistory": "Хэрэглээ түүх",
     "UsageHistoryNote": "Ашиглалтын түүхийг энд харуулав.",
+    "description": {
+      "CPUUtilization": "Сонгосон хугацаанд ашигласан хуралдааны цагаар ашигладаг CPU-ийн хэмжээг илэрхийлнэ. \n\nНэг CPU цөм нь дээд тал нь хамгийн ихдээ 100% -тай тохирч байна.\n\nХэрэв олон цоорхойг хуваарилсан бол нийт хэрэглээний хамгийн их хэрэглээг (100%) тооцоолох замаар тооцоолох боломжтой.",
+      "NetworkRx": "Сүлжээний дамжуулах хурдыг заана. \n\nСавыг сүлжээний өгөгдлийг хүлээн авч байгаа хувь хэмжээг илэрхийлнэ.",
+      "NetworkTx": "Сүлжээний дамжуулах хурдыг заана.\n\nСавыг сүлжээний өгөгдлийг илгээж байгаа хувь хэмжээг илэрхийлнэ."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Хэрэв USERES бага бол зарим болзоонд өгөгдөл байхгүй байж магадгүй юм. \nБогино хугацаанд дахин оролдоно уу.",
       "NoMetricsToDisplay": "Хяналт хийх боломжтой хэмжигдэхүүн байхгүй"
@@ -1945,6 +1965,10 @@
       "MyAccount": "Хэрэглэгчийн мэдээллийг өөрчлөх",
       "MyAccountInformation": "Хэрэглэгчийн мэдээллийг өөрчлөх",
       "MyEnvironments": "Миний орчин",
+      "MyResources": "Миний нөөц",
+      "MyResourcesDescription": "<p> Энэ самбар нь таны нөөцийн ашиглалтыг харуулж, бүх төслүүд, проп, эсвэл товчлуурын бүлгүүдийн хязгаарлалттай байх.",
+      "MyResourcesIn": "Миний нөөц",
+      "MyResourcesInResourceGroupDescription": "Энэ самбар нь таны одоогийн нөөцийн хэрэглээ, сонгосон нөөцийн бүлэгт ашиглах боломжтой.",
       "NewPassword": "Шинэ нууц үг",
       "NewPasswordAgain": "Шинэ нууц үг (дахиад)",
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
@@ -1960,6 +1984,7 @@
       "Preferences": "Тохиргоо",
       "PrivacyPolicy": "Нууцлалын бодлого",
       "Project": "Төсөл",
+      "Remaining": "Үлдсэн",
       "ResourcePolicy": "Нөөцийн бодлого",
       "Resources": "Нөөц",
       "Serving": "Үйлчилж байна",
@@ -1972,8 +1997,11 @@
       "Summary": "Хураангуй",
       "Tasks": "Даалгаврууд",
       "TermsOfService": "Үйлчилгээний нөхцөл",
+      "TotalResourcesIn": "Нийт нөөц",
+      "TotalResourcesInResourceGroupDescription": "Энэ самбар нь ашиглагдаж, үлдсэн нөөцийг нийтлүүлнэ. \nУтга нь сонгосон нөөцийн бүлгийг ашиглан бүх агентуудын болон үлдсэн агентуудын үлдэгдлийг нэмж, үлдсэн хэмжээгээр тооцдог.",
       "TotpActivated": "2FA идэвхжүүлсэн",
       "Update": "Шинэчлэх",
+      "Usage": "Угаалах",
       "UsageHistory": "Хуваарилах түүх",
       "UserCredentials&Policies": "Хэрэглэгчийн итгэмжлэл ба тохиргоо",
       "UserSessionHistory": "Хэрэглэгчийн хурлын түүх",

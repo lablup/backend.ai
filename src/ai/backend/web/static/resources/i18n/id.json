@@ -209,17 +209,7 @@
     "UserStatus": "Status Pengguna",
     "Users": "Pengguna",
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
-    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:",
-    "validation": {
-      "InvalidEmailAddress": "Alamat email salah.",
-      "LetterNumber-_dot": "Huruf, angka, dan -_. diizinkan",
-      "NameAlreadyExists": "Nama Kebijakan Sudah Ada!",
-      "NumbersOnly": "Hanya angka yang diizinkan",
-      "PleaseSelectOption": "Mohon pilih satu pilihan",
-      "PleaseSelectOptions": "Mohon pilih satu pilihan",
-      "PolicyName": "Nama kebijakan wajib diisi.",
-      "ValidationFailed": "Validasi gagal"
-    }
+    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:"
   },
   "data": {
     "Active": "Aktif",
@@ -347,6 +337,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
+      "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
+      "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
@@ -356,6 +348,7 @@
       "DeleteAFolder": "Hapus folder",
       "DeleteForever": "Hapus selamanya",
       "DescYouAreFolderOwner": "Anda adalah pemilik folder ini.",
+      "DownloadingModel": "Mengunduh model ...",
       "Edit": "Sunting",
       "EditDelete": "Sunting+Hapus",
       "FileDeleted": "File sudah dihapus",
@@ -377,7 +370,7 @@
       "FolderUsage": "Penggunaan folder",
       "FolderUsing": "Menggunakan",
       "InviteUsers": "Undang Pengguna",
-      "KickOut": "",
+      "KickOut": "Berhenti berbagi",
       "KickOutConfirm": "Berhenti berbagi dengan {{email}}?",
       "Leave": "Tinggalkan",
       "LeaveAFolder": "Tinggalkan folder",
@@ -554,6 +547,7 @@
     "Digest": "Intisari",
     "Disabled": "di-nonaktifkan",
     "ErrorMinimumValue": "{{key}} harus setidaknya {{value}}",
+    "FailedToDeleteCustomizedImage": "Gagal menghapus gambar yang disesuaikan.",
     "FullImagePath": "Jalur gambar penuh",
     "ImageReinstallationRequired": "Diperlukan pemasangan ulang gambar",
     "Images": "Image",
@@ -678,7 +672,17 @@
     "StorageProxies": "Penyimpanan",
     "TotalItems": "Total item {{total}}",
     "Username": "Nama pengguna",
-    "ValueRequired": "Silakan masukkan {{ nama }}"
+    "ValueRequired": "Silakan masukkan {{ nama }}",
+    "validation": {
+      "InvalidEmailAddress": "Alamat email yang tidak valid.",
+      "LetterNumber-_dot": "Memungkinkan huruf, angka, dan -_.",
+      "NameAlreadyExists": "Nama kebijakan sudah ada!",
+      "NumbersOnly": "Memungkinkan angka saja",
+      "PleaseSelectOption": "Pilih satu opsi",
+      "PleaseSelectOptions": "Pilih setidaknya satu opsi atau lebih.",
+      "PolicyName": "Nama kebijakan diperlukan.",
+      "ValidationFailed": "Validasi gagal"
+    }
   },
   "import": {
     "CleanUpImportTask": "Membersihkan tugas impor...",
@@ -759,7 +763,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
     "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",
-    "ServiceName": "Nama layanan",
+    "ServiceName": "Nama Layanan",
     "UseAnotherAccount": "Masuk dengan akun yang berbeda"
   },
   "kernel": {
@@ -772,8 +776,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -789,8 +791,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -914,6 +918,7 @@
     "GenerateNewToken": "Hasilkan token baru",
     "GenerateToken": "Hasilkan Token",
     "GeneratedTokens": "Token yang Dihasilkan",
+    "GoToServiceDetailPage": "Pergi ke Halaman Detail Layanan",
     "Image": "Gambar",
     "ModelDefinitionPath": "Jalur File Definisi Model",
     "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
@@ -923,6 +928,7 @@
     "OnlyAllowsNonNegativeIntegers": "Hanya mengizinkan bilangan bulat non-negatif",
     "OpenToPublic": "Terbuka Untuk Umum",
     "Owner": "Pemilik",
+    "PlayYourModelNow": "Mainkan model Anda sekarang!",
     "PleaseSelectTime": "Silakan pilih waktu!",
     "Processing": "Pengolahan...",
     "Public": "Publik",
@@ -934,17 +940,21 @@
     "RoutesInfo": "Info Rute",
     "RoutingInfo": "Info Perutean",
     "RoutingsCount": "Jumlah Rute",
+    "RunThisModel": "Jalankan model ini",
     "RuntimeVariant": "Varian Runtime Inferensi",
     "SeeContainerLogs": "Lihat Log Kontainer",
+    "ServiceAlreadyExists": "Nama layanan sudah ada",
     "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
     "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
     "ServiceEndpoint": "Titik Akhir Layanan",
     "ServiceInfo": "Info Layanan",
     "ServiceName": "Nama Layanan",
     "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya.",
+    "ServiceNameInvalidCharacter": "Di tengah nama layanan, hanya alfabet, nomor, '_', '.', '-' hanya dapat dimasukkan.",
     "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
     "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
-    "ServiceNameRule": "Hanya diperbolehkan alfanumerik, garis bawah(_), dan tanda hubung(-) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameShouldEndWith": "Nama sesi harus diakhiri dengan alfabet, karakter besar dan kecil, angka, dan '_'.",
+    "ServiceNameShouldStartWith": "Nama sesi harus dimulai dengan karakter alfabet dan kecil, angka atau '_'.",
     "ServiceTerminated": "Permintaan penutupan dikirim untuk layanan model '{{ nama }}'.",
     "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
     "Services": "Layanan",
@@ -954,6 +964,7 @@
     "StartNewService": "Mulai Layanan Baru",
     "StartNewServing": "Memulai sajian baru",
     "StartService": "Mulai Layanan",
+    "StartingModelService": "Mulai Layanan Model ...",
     "Status": "Status",
     "Success": "Kesuksesan",
     "SyncRoutes": "Menyinkronkan rute",
@@ -1009,6 +1020,9 @@
     "SeeDetail": "Lihat Detail",
     "SuccessfullyUpdated": "Berhasil Diperbarui",
     "Visit": "Kunjungi"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} dari {{total}} item"
   },
   "propertyFilter": {
     "PlaceHolder": "Pencarian",
@@ -1404,6 +1418,7 @@
       "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
       "InteractiveMode": "Interaktif",
       "InteractiveModeDesc": "memungkinkan Anda untuk membuat, menguji, dan menjalankan kode secara interaktif melalui jupyter notebook, kode visual studio, dll.",
+      "InvalidMountsSelectionWarning": "Informasi pemilihan folder tidak valid. Lihat folder yang dipilih.",
       "InvalidPortFormat": "Format nomor port salah.",
       "Launch": "Luncurkan",
       "LaunchConfirmationDialog": "Untuk menyimpan kode dan data Anda, atau membagikannya dengan kolaborator lain, cukup buat folder penyimpanan di bilah sisi Data & Penyimpanan, lalu pasang folder itu saat Anda memulai sumber daya dan simpan di sana.",
@@ -1681,6 +1696,11 @@
     "SessionsDesc": "Jumlah sesi komputasi yang dibuat.",
     "UsageHistory": "Riwayat Penggunaan",
     "UsageHistoryNote": "Riwayat penggunaan yang ditampilkan di sini didasarkan pada sesi komputasi yang diakhiri.",
+    "description": {
+      "CPUUtilization": "Mewakili jumlah waktu CPU yang digunakan oleh sesi selama periode yang dipilih. \n\nInti CPU tunggal sesuai dengan maksimum 100%.\n\nJika beberapa core dialokasikan, total penggunaan dapat melebihi 100%, karena dihitung dengan meringkas penggunaan maksimum (100%) dari setiap inti.",
+      "NetworkRx": "Menunjukkan laju transfer jaringan.\n\nMewakili tingkat di mana wadah menerima data jaringan.",
+      "NetworkTx": "Menunjukkan laju transfer jaringan. \n\nMewakili tingkat di mana wadah mengirim data jaringan."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jika penggunaan rendah, data untuk beberapa tanggal mungkin tidak tersedia. \nSilakan coba lagi dengan kisaran tanggal yang lebih pendek.",
       "NoMetricsToDisplay": "Tidak ada metrik yang tersedia untuk pelacakan"
@@ -1947,6 +1967,10 @@
       "MyAccount": "Akun Saya",
       "MyAccountInformation": "Informasi Akun Saya",
       "MyEnvironments": "Lingkungan Saya",
+      "MyResources": "Sumber daya saya",
+      "MyResourcesDescription": "<p> Panel ini menunjukkan penggunaan total sumber daya Anda dan tetap di semua proyek dan grup sumber daya. </p> <p> Ketika ada beberapa batasan (seperti domain, proyek, atau keypair), batas yang paling membatasi diterapkan untuk menunjukkan penggunaan dan sisa kapasitas Anda. </p>",
+      "MyResourcesIn": "Sumber daya saya di",
+      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber daya Anda saat ini dan tersisa di grup sumber daya yang dipilih.",
       "NewPassword": "Kata sandi baru",
       "NewPasswordAgain": "Kata sandi (konfirmasi)",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
@@ -1962,6 +1986,7 @@
       "Preferences": "Preferensi",
       "PrivacyPolicy": "Kebijakan Privasi",
       "Project": "Proyek",
+      "Remaining": "Tersisa",
       "ResourcePolicy": "Kebijakan Sumber Daya",
       "Resources": "Sumber daya",
       "Serving": "Penyajian",
@@ -1974,8 +1999,11 @@
       "Summary": "Ringkasan",
       "Tasks": "Tugas",
       "TermsOfService": "Persyaratan Layanan",
+      "TotalResourcesIn": "Total sumber daya di",
+      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan total sumber daya yang digunakan dan sisa. \nNilai dihitung dengan menambahkan penggunaan dan jumlah yang tersisa dari semua agen menggunakan grup sumber daya yang dipilih.",
       "TotpActivated": "2FA Diaktifkan",
       "Update": "Perbarui",
+      "Usage": "Penggunaan",
       "UsageHistory": "Riwayat alokasi",
       "UserCredentials&Policies": "Kredensial & Kebijakan Pengguna",
       "UserSessionHistory": "Riwayat sesi pengguna",
