@@ -29,6 +29,8 @@ class Query:
     node: Node = strawberry.relay.node()
 
 
+# TODO: How about Nested mutations?
+# https://strawberry.rocks/docs/general/mutations
 @strawberry.type
 class Mutation:
     pull_artifact = pull_artifact

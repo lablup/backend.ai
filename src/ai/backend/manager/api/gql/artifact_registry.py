@@ -10,6 +10,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 
 # Scalars
+# TODO: ByteSize?
 @strawberry.scalar
 class HumanReadableNumber:
     """A scalar representing human-readable numbers like '10g', '2t'"""
@@ -56,8 +57,6 @@ class OrderDirection(StrEnum):
 # Input Types
 @strawberry.input
 class StringFilter:
-    """String filtering input"""
-
     contains: Optional[str] = None
     starts_with: Optional[str] = None
     ends_with: Optional[str] = None
@@ -107,6 +106,7 @@ class UpdateArtifactInput:
 class DeleteArtifactInput:
     artifact_id: ID
     version: str
+    # TODO: Split as separate option type?
     force_delete: bool = False
 
 
@@ -131,22 +131,14 @@ class Artifact(Node):
     updated_at: datetime
     version: str
 
-    # @classmethod
-    # def resolve_node(cls, node_id: ID) -> Optional["Artifact"]:
-    #     # Mock implementation - in real implementation, fetch from database
-    #     return None
 
-
-# Use Strawberry's built-in Relay types
 ArtifactEdge = Edge[Artifact]
 
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
-    """Connection for Artifact with totalCount"""
-
     @strawberry.field
-    def totalCount(self) -> int:
+    def total_count(self) -> int:
         # Mock implementation - in real implementation, count from database
         return 0
 
@@ -159,18 +151,15 @@ class ArtifactGroup(Node):
     status: ArtifactStatus
     description: Optional[str]
 
-    # @classmethod
-    # def resolve_node(cls, node_id: ID) -> Optional["ArtifactGroup"]:
-    #     # Mock implementation - in real implementation, fetch from database
-    #     return None
-
     @strawberry.field
     def artifacts(
         self,
         filter: Optional[ArtifactFilter] = None,
         order_by: Optional[list[ArtifactOrderBy]] = None,
-        first: Optional[int] = None,
+        before: Optional[str] = None,
         after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
     ) -> ArtifactConnection:
         # Mock implementation - return empty connection
         return ArtifactConnection(
@@ -246,8 +235,10 @@ def artifacts(
 def artifact_groups(
     filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
-    first: Optional[int] = None,
+    before: Optional[str] = None,
     after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
 ) -> Connection[ArtifactGroup]:
     # Mock implementation - return empty connection
     return Connection(
