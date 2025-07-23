@@ -106,7 +106,6 @@ class UpdateArtifactInput:
 class DeleteArtifactInput:
     artifact_id: ID
     version: str
-    # TODO: Split as separate option type?
     force_delete: bool = False
 
 
