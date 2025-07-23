@@ -7,7 +7,7 @@ type Artifact implements Node {
   description: String
   registry: SourceInfo!
   source: SourceInfo!
-  size: HumanReadableNumber!
+  size: ByteSize!
   createdAt: DateTime!
   updatedAt: DateTime!
   version: String!
@@ -102,6 +102,8 @@ enum ArtifactType {
   IMAGE
 }
 
+scalar ByteSize
+
 type CancelPullPayload {
   artifact: Artifact
 }
@@ -124,8 +126,6 @@ type DownloadProgress {
   progress: Float!
   status: ArtifactStatus!
 }
-
-scalar HumanReadableNumber
 
 input InstallArtifactInput {
   artifactId: ID!
