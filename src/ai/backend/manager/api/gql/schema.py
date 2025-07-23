@@ -1,5 +1,4 @@
 import strawberry
-from strawberry.relay import Node
 from strawberry.schema.config import StrawberryConfig
 
 from .artifact_registry import (
@@ -25,12 +24,7 @@ class Query:
     artifact = artifact
     artifact_group = artifact_group
 
-    # Relay Node interface
-    node: Node = strawberry.relay.node()
 
-
-# TODO: How about Nested mutations?
-# https://strawberry.rocks/docs/general/mutations
 @strawberry.type
 class Mutation:
     pull_artifact = pull_artifact

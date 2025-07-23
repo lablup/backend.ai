@@ -181,10 +181,6 @@ type PullArtifactPayload {
 }
 
 type Query {
-  node(
-    """The ID of the object."""
-    id: ID!
-  ): Node!
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
   artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
   artifact(id: ID!): Artifact
