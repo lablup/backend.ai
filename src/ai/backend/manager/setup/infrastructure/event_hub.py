@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.events.hub import EventHub
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.stage.types import Provisioner
 
 
