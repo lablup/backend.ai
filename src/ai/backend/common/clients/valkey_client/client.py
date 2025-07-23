@@ -4,7 +4,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, Union, cast
+from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
 
 import glide
 from glide import (
