@@ -5,10 +5,6 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-)
-from ai.backend.manager.errors.common import PermissionDeniedError
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -21,7 +17,7 @@ from ..monitors.monitor import ActionMonitor
 from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
 
-class ActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
+class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
     _monitors: list[ActionMonitor]
     _repository: PermissionControllerRepository
     _func: Callable[[TSingleEntityAction], Awaitable[TSingleEntityActionResult]]
@@ -42,7 +38,6 @@ class ActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
         description: str = "unknown"
         result: Optional[TSingleEntityActionResult] = None
         error_code: Optional[ErrorCode] = None
-        object_id: Optional[ObjectId] = None
 
         action_id = uuid.uuid4()
         action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
@@ -51,10 +46,7 @@ class ActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
 
         try:
             permission_params = action.permission_query_params()
-            object_id = await self._repository.get_allowed_single_entity(permission_params)
-            if object_id is None:
-                raise PermissionDeniedError
-            action.accessible_entity_id = object_id
+            await self._repository.validate_auth_single_entity(permission_params)
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"

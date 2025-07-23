@@ -11,7 +11,7 @@ from ...data.permission.id import (
     ObjectId,
 )
 from ai.backend.manager.data.permission.parameters import (
-    MultipleEntityQueryParams,
+    BatchQueryParams,
     ScopeQueryParams,
     SingleEntityQueryParams,
 )
@@ -170,23 +170,23 @@ class PermissionControllerRepository:
         return False
 
     @repository_decorator()
-    async def get_allowed_single_entity(self, param: SingleEntityQueryParams) -> Optional[ObjectId]:
+    async def validate_auth_single_entity(self, param: SingleEntityQueryParams) -> None:
         """
         This method is a placeholder for future implementation.
-        It should return a single allowed entity based on the provided parameters.
+        It should validate if the user has permission to access a single entity.
         """
         raise NotImplementedError("This method is not implemented yet.")
 
     @repository_decorator()
-    async def get_allowed_entities_in_scope(self, param: ScopeQueryParams) -> list[ObjectId]:
+    async def validate_auth_in_scope(self, param: ScopeQueryParams) -> None:
         """
         This method is a placeholder for future implementation.
-        It should return a list of allowed entities within a specific scope.
+        It should validate if the user has permission to access entities within a specific scope.
         """
         raise NotImplementedError("This method is not implemented yet.")
 
     @repository_decorator()
-    async def get_allowed_entity_ids(self, param: MultipleEntityQueryParams) -> list[ObjectId]:
+    async def filter_allowed_entity_ids(self, param: BatchQueryParams) -> list[ObjectId]:
         """
         This method is a placeholder for future implementation.
         It should return a list of allowed entity IDs based on the provided parameters.

@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TypeVar
@@ -6,7 +5,6 @@ from typing import TypeVar
 
 @dataclass
 class BaseQueryParams:
-    user_id: uuid.UUID
     entity_type: str
     operation_type: str
 
@@ -23,7 +21,7 @@ class ScopeQueryParams(BaseQueryParams):
 
 
 @dataclass
-class MultipleEntityQueryParams(BaseQueryParams):
+class BatchQueryParams(BaseQueryParams):
     entity_ids: Iterable[str]
 
 
