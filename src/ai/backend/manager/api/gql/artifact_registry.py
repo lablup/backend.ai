@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import AsyncGenerator, Optional
 
 import strawberry
@@ -18,14 +18,14 @@ class HumanReadableNumber:
 
 # Enums
 @strawberry.enum
-class ArtifactType(Enum):
+class ArtifactType(StrEnum):
     MODEL = "MODEL"
     PACKAGE = "PACKAGE"
     IMAGE = "IMAGE"
 
 
 @strawberry.enum
-class ArtifactStatus(Enum):
+class ArtifactStatus(StrEnum):
     AVAILABLE = "AVAILABLE"
     PULLING = "PULLING"
     VERIFYING = "VERIFYING"
@@ -36,7 +36,7 @@ class ArtifactStatus(Enum):
 
 
 @strawberry.enum
-class ArtifactOrderField(Enum):
+class ArtifactOrderField(StrEnum):
     ID = "ID"
     NAME = "NAME"
     TYPE = "TYPE"
@@ -47,19 +47,9 @@ class ArtifactOrderField(Enum):
 
 
 @strawberry.enum
-class OrderDirection(Enum):
+class OrderDirection(StrEnum):
     ASC = "ASC"
     DESC = "DESC"
-
-
-@strawberry.enum
-class Ordering(Enum):
-    ASC = "ASC"
-    ASC_NULLS_FIRST = "ASC_NULLS_FIRST"
-    ASC_NULLS_LAST = "ASC_NULLS_LAST"
-    DESC = "DESC"
-    DESC_NULLS_FIRST = "DESC_NULLS_FIRST"
-    DESC_NULLS_LAST = "DESC_NULLS_LAST"
 
 
 # Input Types
@@ -92,16 +82,6 @@ class ArtifactFilter:
 class ArtifactOrderBy:
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-
-@strawberry.input
-class ArtifactOrder:
-    name: Optional[Ordering] = None
-    type: Optional[Ordering] = None
-    size: Optional[Ordering] = None
-    updatedAt: Optional[Ordering] = None
-    createdAt: Optional[Ordering] = None
-    latestVersion: Optional[Ordering] = None
 
 
 @strawberry.input
