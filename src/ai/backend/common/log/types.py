@@ -57,8 +57,6 @@ class ContainerLogData:
         except Exception as e:
             raise ContainerLogError("Failed to deserialize log data") from e
 
-    # --- 내부 유틸리티 메서드 ---
-
     @staticmethod
     def _encode_base64(data: bytes) -> str:
         return b64encode(data).decode("utf-8")
