@@ -210,17 +210,7 @@
     "UserStatus": "Статус пользователя",
     "Users": "Пользователи",
     "WarningLessRateLimit": "Если значение Rate Limit мало, то такие операции API, как вход в систему, могут быть заблокированы.",
-    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:",
-    "validation": {
-      "InvalidEmailAddress": "Неверный адрес электронной почты.",
-      "LetterNumber-_dot": "Допускает буквы, цифры и -_.",
-      "NameAlreadyExists": "Название политики уже существует!",
-      "NumbersOnly": "Допускает только числа",
-      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
-      "PleaseSelectOptions": "Пожалуйста, выберите варианты",
-      "PolicyName": "Название политики Обязательно.",
-      "ValidationFailed": "Проверка не удалась"
-    }
+    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:"
   },
   "data": {
     "Active": "Активный",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Невозможно удалить папку, установленную в одном или нескольких сеансах. Пожалуйста, сначала завершите сеанс.",
+      "CannotDeletePipelineFolder": "Вы не можете удалить папки трубопровода.",
+      "CannotRestorePipelineFolder": "Вы не можете восстановить папки трубопровода.",
       "CloneAFolder": "Клонировать папку",
       "CloneFolder": "Клонировать папку",
       "Cloneable": "Клонируемый",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Удалить папку",
       "DeleteForever": "Удалить навсегда",
       "DescYouAreFolderOwner": "Вы являетесь владельцем этой папки.",
+      "DownloadingModel": "Модель загрузки ...",
       "Edit": "Редактировать",
       "EditDelete": "Изменить + Удалить",
       "FileDeleted": "Файл удален",
@@ -378,7 +371,7 @@
       "FolderUsage": "Использование папок",
       "FolderUsing": "Использование сайта",
       "InviteUsers": "Пригласить пользователя",
-      "KickOut": "",
+      "KickOut": "Перестань делиться",
       "KickOutConfirm": "Перестать делиться с {{email}}?",
       "Leave": "Покинуть",
       "LeaveAFolder": "Обновить настройки папки",
@@ -555,6 +548,7 @@
     "Digest": "Дайджест",
     "Disabled": "отключен",
     "ErrorMinimumValue": "{{key}} должен быть как минимум {{value}}",
+    "FailedToDeleteCustomizedImage": "Не удалось удалить индивидуальное изображение.",
     "FullImagePath": "Полный путь к изображению",
     "ImageReinstallationRequired": "Требуется переустановка изображения",
     "Images": "Изображений",
@@ -679,7 +673,17 @@
     "StorageProxies": "Хранилища данных",
     "TotalItems": "Всего {{total}} предметов",
     "Username": "Имя пользователя",
-    "ValueRequired": "Пожалуйста, введите {{ имя }}"
+    "ValueRequired": "Пожалуйста, введите {{ имя }}",
+    "validation": {
+      "InvalidEmailAddress": "Неверный адрес электронной почты.",
+      "LetterNumber-_dot": "Позволяет письма, цифры и -_.",
+      "NameAlreadyExists": "Название политики уже существует!",
+      "NumbersOnly": "Позволяет только числа",
+      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
+      "PleaseSelectOptions": "Пожалуйста, выберите хотя бы один вариант или несколько.",
+      "PolicyName": "Требуется имя политики.",
+      "ValidationFailed": "Проверка не удалась"
+    }
   },
   "import": {
     "CleanUpImportTask": "Очистить задачу импорта ...",
@@ -760,7 +764,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
     "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
-    "ServiceName": "Название услуги",
+    "ServiceName": "Название службы",
     "UseAnotherAccount": "Войдите в систему под другой учетной записью"
   },
   "kernel": {
@@ -773,8 +777,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +792,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +920,7 @@
     "GenerateNewToken": "Генерация нового токена",
     "GenerateToken": "Сгенерировать токен",
     "GeneratedTokens": "Сгенерированные токены",
+    "GoToServiceDetailPage": "Перейти на страницу сведений об обслуживании",
     "Image": "Изображение",
     "ModelDefinitionPath": "Путь к файлу определения модели",
     "ModelMountDestination": "Место установки папки модели",
@@ -925,6 +930,7 @@
     "OnlyAllowsNonNegativeIntegers": "Допускаются только неотрицательные целые числа",
     "OpenToPublic": "Открыт для посещения",
     "Owner": "Владелец",
+    "PlayYourModelNow": "Играйте в свою модель сейчас!",
     "PleaseSelectTime": "Пожалуйста, выберите время!",
     "Processing": "Обработка...",
     "Public": "Публичный",
@@ -936,17 +942,21 @@
     "RoutesInfo": "Информация о маршрутах",
     "RoutingInfo": "Маршрутная информация",
     "RoutingsCount": "Количество маршрутов",
+    "RunThisModel": "Запустите эту модель",
     "RuntimeVariant": "Вариант времени выполнения вывода",
     "SeeContainerLogs": "См. журналы контейнеров",
+    "ServiceAlreadyExists": "Название услуги уже существует",
     "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
     "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}.",
     "ServiceEndpoint": "Конечная точка обслуживания",
     "ServiceInfo": "Служебная информация",
-    "ServiceName": "Название услуги",
+    "ServiceName": "Название службы",
     "ServiceNameCannotStartWithHyphen": "Дефисы (-) нельзя использовать ни на одном конце.",
+    "ServiceNameInvalidCharacter": "В середине имени службы, только алфавит, номер,« _ »,». ','-'может быть включен только.",
     "ServiceNameMaxLength": "Введите не более 24 символов.",
     "ServiceNameMinLength": "Пожалуйста, введите не менее 4 символов.",
-    "ServiceNameRule": "Разрешены только буквы, цифры, подчеркивание (_) и дефис (-), и они должны заканчиваться буквенно-цифровым символом.",
+    "ServiceNameShouldEndWith": "Имя сеанса должно заканчиваться алфавитом, большими и маленькими символами, номерами и «_».",
+    "ServiceNameShouldStartWith": "Имя сеанса должно начинаться с алфавитных и маленьких символов, чисел или «_».",
     "ServiceTerminated": "Для службы модели «{{ name }}» отправлен запрос на завершение работы.",
     "ServiceUpdated": "Сервис модели {{ name }} успешно обновлен.",
     "Services": "Услуги",
@@ -956,6 +966,7 @@
     "StartNewService": "Запустить новую услугу",
     "StartNewServing": "Запуск новой порции",
     "StartService": "Начало обслуживания",
+    "StartingModelService": "Служба начала модели ...",
     "Status": "Статус",
     "Success": "Успех",
     "SyncRoutes": "Синхронизация маршрутов",
@@ -1011,6 +1022,9 @@
     "SeeDetail": "См детали",
     "SuccessfullyUpdated": "Успешно обновлено",
     "Visit": "Посещение"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} элементы"
   },
   "propertyFilter": {
     "PlaceHolder": "Поиск",
@@ -1405,6 +1419,7 @@
       "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения.",
       "InteractiveMode": "Интерактивный",
       "InteractiveModeDesc": "позволяет создавать, тестировать и запускать код в интерактивном режиме через jupyter notebook, visual studio code и т.д.",
+      "InvalidMountsSelectionWarning": "Информация о выборе папок не действительна. Проверьте выбранную папку.",
       "InvalidPortFormat": "Неверный формат номера порта.",
       "Launch": "Запуск",
       "LaunchConfirmationDialog": "Чтобы сохранить свой код и данные или поделиться ими с другими соавторами, просто создайте папку хранения на боковой панели данных и хранилища, затем подключите эту папку при запуске ресурса и сохраните ее там.",
@@ -1682,6 +1697,11 @@
     "SessionsDesc": "Количество созданных вычислительных сессий.",
     "UsageHistory": "История использования",
     "UsageHistoryNote": "История использования, показанная здесь, основана на прекращенных вычислительных сеансах.",
+    "description": {
+      "CPUUtilization": "Представляет количество времени процессора, используемого сеансом в течение выбранного периода. \n\nОдно ядро ​​процессора соответствует максимум 100%.\n\nЕсли выделяются несколько ядер, общее использование может превышать 100%, так как оно рассчитывается путем суммирования максимального использования (100%) каждого ядра.",
+      "NetworkRx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер получает сетевые данные.",
+      "NetworkTx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер отправляет сетевые данные."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Если использование низкое, данные для некоторых дат могут быть недоступны. \nПожалуйста, попробуйте еще раз с более коротким диапазоном дат.",
       "NoMetricsToDisplay": "Нет метрик доступных для отслеживания"
@@ -1948,6 +1968,10 @@
       "MyAccount": "Изменить информацию о пользователе",
       "MyAccountInformation": "Изменить информацию о пользователе",
       "MyEnvironments": "Моя среда",
+      "MyResources": "Мои ресурсы",
+      "MyResourcesDescription": "<p> Эта панель показывает ваше общее использование ресурсов и оставшееся во всех проектах и группах ресурсов.",
+      "MyResourcesIn": "Мои ресурсы в",
+      "MyResourcesInResourceGroupDescription": "Эта панель показывает ваше текущее использование ресурсов и доступную емкость в выбранной группе ресурсов.",
       "NewPassword": "Новый пароль",
       "NewPasswordAgain": "Новый пароль (ещё раз)",
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
@@ -1963,6 +1987,7 @@
       "Preferences": "Настройки",
       "PrivacyPolicy": "Политика конфиденциальности",
       "Project": "Проект",
+      "Remaining": "Оставшийся",
       "ResourcePolicy": "Ресурсная политика",
       "Resources": "Ресурсы",
       "Serving": "Обслуживание",
@@ -1975,8 +2000,11 @@
       "Summary": "Обзор",
       "Tasks": "Задачи",
       "TermsOfService": "Условия использования",
+      "TotalResourcesIn": "Общие ресурсы в",
+      "TotalResourcesInResourceGroupDescription": "На этой панели показаны общие и оставшиеся ресурсы. \nЗначения рассчитываются путем добавления использования и оставшихся сумм всех агентов, использующих выбранную группу ресурсов.",
       "TotpActivated": "2FA Enabled",
       "Update": "Обновить",
+      "Usage": "Использование",
       "UsageHistory": "История распределения",
       "UserCredentials&Policies": "Учетные данные и политики пользователя",
       "UserSessionHistory": "История сеанса пользователя",
