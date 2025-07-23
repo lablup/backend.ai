@@ -12,7 +12,7 @@ from ..action.base import (
     TAction,
     TActionResult,
 )
-from ..monitors.monitor import ActionMonitor
+from ..monitors.monitor.base import ActionMonitor
 from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

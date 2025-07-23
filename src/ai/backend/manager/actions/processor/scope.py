@@ -18,7 +18,7 @@ from ..action.scope import (
     TBaseScopedAction,
     TBaseScopedActionResult,
 )
-from ..monitors.monitor import ActionMonitor
+from ..monitors.monitor.base import ActionMonitor
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
