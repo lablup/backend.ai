@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.user_resource_policy.repository import (
