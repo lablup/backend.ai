@@ -53,6 +53,24 @@ type ArtifactGroup implements Node {
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
 }
 
+"""A connection to a list of items."""
+type ArtifactGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactGroupEdge!]!
+}
+
+"""An edge in a connection."""
+type ArtifactGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactGroup!
+}
+
 input ArtifactOrderBy {
   field: ArtifactOrderField!
   direction: OrderDirection! = ASC
@@ -168,7 +186,7 @@ type Query {
     id: ID!
   ): Node!
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
-  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null): [ArtifactGroup!]!
+  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactGroupConnection!
   artifact(id: ID!): Artifact
   artifactGroup(id: ID!): ArtifactGroup
 }

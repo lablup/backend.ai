@@ -5,7 +5,8 @@ from enum import StrEnum
 from typing import AsyncGenerator, Optional
 
 import strawberry
-from strawberry.relay import Connection, Edge, GlobalID, Node, NodeID
+from strawberry import ID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 
 # Scalars
@@ -86,25 +87,25 @@ class ArtifactOrderBy:
 
 @strawberry.input
 class PullArtifactInput:
-    artifactId: GlobalID
+    artifactId: ID
     version: str
 
 
 @strawberry.input
 class InstallArtifactInput:
-    artifactId: GlobalID
+    artifactId: ID
     version: str
 
 
 @strawberry.input
 class UpdateArtifactInput:
-    artifactId: GlobalID
+    artifactId: ID
     targetVersion: str
 
 
 @strawberry.input
 class DeleteArtifactInput:
-    artifactId: GlobalID
+    artifactId: ID
     version: str
     forceDelete: bool = False
 
@@ -131,7 +132,7 @@ class Artifact(Node):
     version: str
 
     # @classmethod
-    # def resolve_node(cls, node_id: GlobalID) -> Optional["Artifact"]:
+    # def resolve_node(cls, node_id: ID) -> Optional["Artifact"]:
     #     # Mock implementation - in real implementation, fetch from database
     #     return None
 
@@ -159,7 +160,7 @@ class ArtifactGroup(Node):
     description: Optional[str]
 
     # @classmethod
-    # def resolve_node(cls, node_id: GlobalID) -> Optional["ArtifactGroup"]:
+    # def resolve_node(cls, node_id: ID) -> Optional["ArtifactGroup"]:
     #     # Mock implementation - in real implementation, fetch from database
     #     return None
 
@@ -185,7 +186,7 @@ class ArtifactGroup(Node):
 
 @strawberry.type
 class DownloadProgress:
-    artifactId: GlobalID
+    artifactId: ID
     progress: float
     status: ArtifactStatus
 
@@ -241,60 +242,70 @@ def artifacts(
     )
 
 
-@strawberry.field(name="artifactGroups")
+@strawberry.field
 def artifact_groups(
     filter: Optional[ArtifactFilter] = None,
     orderBy: Optional[list[ArtifactOrderBy]] = None,
-) -> list[ArtifactGroup]:
-    # Mock implementation - return empty list
-    return []
+    first: Optional[int] = None,
+    after: Optional[str] = None,
+) -> Connection[ArtifactGroup]:
+    # Mock implementation - return empty connection
+    return Connection(
+        edges=[],
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=None,
+            end_cursor=None,
+        ),
+    )
 
 
 @strawberry.field
-def artifact(id: GlobalID) -> Optional[Artifact]:
+def artifact(id: ID) -> Optional[Artifact]:
     # Mock implementation
     return None
 
 
-@strawberry.field(name="artifactGroup")
-def artifact_group(id: GlobalID) -> Optional[ArtifactGroup]:
+@strawberry.field
+def artifact_group(id: ID) -> Optional[ArtifactGroup]:
     # Mock implementation
     return None
 
 
 # Mutations
-@strawberry.mutation(name="pullArtifact")
+@strawberry.mutation
 def pull_artifact(input: PullArtifactInput) -> PullArtifactPayload:
     # Mock implementation
     return PullArtifactPayload()
 
 
-@strawberry.mutation(name="installArtifact")
+@strawberry.mutation
 def install_artifact(input: InstallArtifactInput) -> InstallArtifactPayload:
     # Mock implementation
     return InstallArtifactPayload()
 
 
-@strawberry.mutation(name="updateArtifact")
+@strawberry.mutation
 def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
     # Mock implementation
     return UpdateArtifactPayload()
 
 
-@strawberry.mutation(name="deleteArtifact")
+@strawberry.mutation
 def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
     # Mock implementation
     return DeleteArtifactPayload()
 
 
-@strawberry.mutation(name="verifyArtifact")
-def verify_artifact(artifactId: GlobalID, version: Optional[str] = None) -> VerifyArtifactPayload:
+@strawberry.mutation
+def verify_artifact(artifactId: ID, version: Optional[str] = None) -> VerifyArtifactPayload:
     # Mock implementation
     return VerifyArtifactPayload()
 
 
-@strawberry.mutation(name="cancelPull")
-def cancel_pull(artifactId: GlobalID) -> CancelPullPayload:
+@strawberry.mutation
+def cancel_pull(artifactId: ID) -> CancelPullPayload:
     # Mock implementation
     return CancelPullPayload()
 
@@ -302,7 +313,7 @@ def cancel_pull(artifactId: GlobalID) -> CancelPullPayload:
 # Subscriptions
 @strawberry.subscription
 async def artifact_status_changed(
-    artifactId: Optional[GlobalID] = None,
+    artifactId: Optional[ID] = None,
 ) -> AsyncGenerator[Artifact, None]:
     # Mock implementation
     # In real implementation, this would yield artifacts when status changes
@@ -311,7 +322,7 @@ async def artifact_status_changed(
 
 
 @strawberry.subscription
-async def download_progress(artifactId: GlobalID) -> AsyncGenerator[DownloadProgress, None]:
+async def download_progress(artifactId: ID) -> AsyncGenerator[DownloadProgress, None]:
     # Mock implementation
     # In real implementation, this would yield progress updates
     if False:  # Placeholder to make this a generator
