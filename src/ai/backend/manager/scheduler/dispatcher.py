@@ -13,6 +13,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from functools import partial
 from typing import (
     Any,
@@ -324,16 +325,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        manager_id = self.config_provider.config.manager.id
-        redis_key = f"manager.{manager_id}.schedule"
-
-        await self._valkey_live.replace_schedule_data(
-            redis_key,
-            {
-                "trigger_event": event_name,
-                "execution_time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        await self._mark_scheduler_start(ScheduleType.SCHEDULE, event_name)
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -354,16 +346,16 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self._valkey_live.add_scheduler_metadata(
-                            redis_key,
+                        await self._update_scheduler_mark(
+                            ScheduleType.SCHEDULE,
                             {
                                 "resource_group": sgroup_name,
                             },
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                await self._valkey_live.add_scheduler_metadata(
-                    redis_key,
+                await self._update_scheduler_mark(
+                    ScheduleType.SCHEDULE,
                     {
                         "finish_time": datetime.now(tzutc()).isoformat(),
                     },
@@ -970,16 +962,7 @@ class SchedulerDispatcher(aobject):
         Let event handlers transit session and kernel status from
         `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
-        manager_id = self.config_provider.config.manager.id
-        redis_key = f"manager.{manager_id}.check_precondition"
-
-        await self._valkey_live.replace_schedule_data(
-            redis_key,
-            {
-                "trigger_event": event_name,
-                "execution_time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        await self._mark_scheduler_start(ScheduleType.CHECK_PRECONDITION, event_name)
         lock_lifetime = self.config_provider.config.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
@@ -1009,8 +992,8 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
-            await self._valkey_live.add_scheduler_metadata(
-                redis_key,
+            await self._update_scheduler_mark(
+                ScheduleType.CHECK_PRECONDITION,
                 {
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
@@ -1035,15 +1018,7 @@ class SchedulerDispatcher(aobject):
 
         Session status transition: PREPARED -> CREATING
         """
-        manager_id = self.config_provider.config.manager.id
-        redis_key = f"manager.{manager_id}.start"
-        await self._valkey_live.replace_schedule_data(
-            redis_key,
-            {
-                "trigger_event": event_name,
-                "execution_time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        await self._mark_scheduler_start(ScheduleType.START, event_name)
         lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
@@ -1082,8 +1057,8 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-            await self._valkey_live.add_scheduler_metadata(
-                redis_key,
+            await self._update_scheduler_mark(
+                ScheduleType.START,
                 {
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
@@ -1099,29 +1074,14 @@ class SchedulerDispatcher(aobject):
         except asyncio.TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
-    async def _autoscale_endpoints(self) -> None:
-        # This method has been moved to repository
-        await self.schedule_repository.autoscale_endpoints()
-
     async def scale_services(
         self,
         event_name: str,
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
-        manager_id = self.config_provider.config.manager.id
-        redis_key = f"manager.{manager_id}.scale_services"
-
-        await self._valkey_live.replace_schedule_data(
-            redis_key,
-            {
-                "trigger_event": event_name,
-                "execution_time": datetime.now(tzutc()).isoformat(),
-            },
-        )
-
+        await self._mark_scheduler_start(ScheduleType.SCALE_SERVICES, event_name)
         await execute_with_retry(lambda: self.schedule_repository.autoscale_endpoints())
-
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
@@ -1197,13 +1157,12 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
-        await self._valkey_live.add_scheduler_metadata(
-            redis_key,
+        await self._update_scheduler_mark(
+            ScheduleType.SCALE_SERVICES,
             {
                 "down": dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
             },
         )
-
         created_routes = []
         endpoint_create_data = []
         for endpoint, expand_count in endpoints_to_expand.items():
@@ -1212,8 +1171,8 @@ class SchedulerDispatcher(aobject):
         created_routes = await self.schedule_repository.create_routing_rows(endpoint_create_data)
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await self._valkey_live.add_scheduler_metadata(
-            redis_key,
+        await self._update_scheduler_mark(
+            ScheduleType.SCALE_SERVICES,
             {
                 "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
@@ -1390,3 +1349,45 @@ class SchedulerDispatcher(aobject):
                     pending_sess,
                 ),
             )
+
+    def _schedule_key(self, schedule_type: ScheduleType) -> str:
+        """
+        Returns the Redis key for the given schedule type.
+        """
+        manager_id = self.config_provider.config.manager.id
+        return f"manager.{manager_id}.{str(schedule_type)}"
+
+    async def _mark_scheduler_start(
+        self,
+        schedule_type: ScheduleType,
+        event_name: str,
+    ) -> None:
+        schedule_key = self._schedule_key(schedule_type)
+        await self._valkey_live.replace_schedule_data(
+            schedule_key,
+            {
+                "trigger_event": event_name,
+                "execution_time": datetime.now(tzutc()).isoformat(),
+            },
+        )
+
+    async def _update_scheduler_mark(
+        self,
+        schedule_type: ScheduleType,
+        to_update: dict[str, Any],
+    ) -> None:
+        """
+        Updates the scheduler mark for the given schedule type with the provided data.
+        """
+        schedule_key = self._schedule_key(schedule_type)
+        await self._valkey_live.add_scheduler_metadata(
+            schedule_key,
+            to_update,
+        )
+
+
+class ScheduleType(StrEnum):
+    SCHEDULE = "schedule"
+    START = "start"
+    CHECK_PRECONDITION = "check_precondition"
+    SCALE_SERVICES = "scale_services"
