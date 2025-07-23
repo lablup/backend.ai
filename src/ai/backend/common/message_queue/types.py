@@ -5,7 +5,8 @@ from typing import Iterator, Mapping, Optional, Self, cast
 
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
-from ai.backend.common.contexts.user_id import with_user_id
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import with_log_context_fields
 
@@ -49,6 +50,7 @@ class MQMessage:
 class MessageMetadata:
     request_id: Optional[str] = None
     user_id: Optional[str] = None
+    user: Optional[UserData] = None
 
     def serialize(self) -> bytes:
         """
@@ -73,9 +75,9 @@ class MessageMetadata:
             if self.request_id:
                 stack.enter_context(with_request_id(self.request_id))
                 log_fields["request_id"] = self.request_id
-            if self.user_id:
-                stack.enter_context(with_user_id(self.user_id))
-                log_fields["user_id"] = self.user_id
+            if self.user:
+                stack.enter_context(with_user(self.user))
+                log_fields["user_id"] = str(self.user.user_id)
             if log_fields:
                 stack.enter_context(with_log_context_fields(log_fields))
             yield

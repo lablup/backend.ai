@@ -29,7 +29,7 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
 from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user_id import current_user_id
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,
@@ -698,8 +698,12 @@ class EventProducer:
 
         # Capture current request_id and other metadata
         request_id = current_request_id()
-        user_id = current_user_id()
-        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        user = current_user()
+        metadata = MessageMetadata(
+            request_id=request_id,
+            user_id=str(user.user_id) if user else None,
+            user=user,
+        )
         raw_event = MessagePayload(
             name=event.event_name(),
             source=source,
@@ -720,9 +724,12 @@ class EventProducer:
             source = source_override
         # Capture current request_id and other metadata
         request_id = current_request_id()
-        user_id = current_user_id()
-        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
-
+        user = current_user()
+        metadata = MessageMetadata(
+            request_id=request_id,
+            user_id=str(user.user_id) if user else None,
+            user=user,
+        )
         raw_event = MessagePayload(
             name=event.event_name(),
             source=source,
@@ -742,8 +749,12 @@ class EventProducer:
         """
         # Capture current request_id and other metadata
         request_id = current_request_id()
-        user_id = current_user_id()
-        metadata = MessageMetadata(request_id=request_id, user_id=user_id)
+        user = current_user()
+        metadata = MessageMetadata(
+            request_id=request_id,
+            user_id=str(user.user_id) if user else None,
+            user=user,
+        )
         # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
         raw_event = MessagePayload(
             name=event.event_name(),
