@@ -2,9 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Mapping, Optional, Self, Sequence, override
+from typing import Any, Optional, Self, Sequence, override
 
-import yarl
 from pydantic import AnyUrl, BaseModel, Field, HttpUrl
 
 from ai.backend.common.types import (
@@ -14,12 +13,9 @@ from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
     MountTypes,
-    ResourceSlot,
     RuntimeVariant,
     VFolderMount,
 )
-from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
@@ -169,138 +165,6 @@ class RuntimeVariantData:
 
 
 @dataclass
-class EndpointData:
-    id: uuid.UUID
-    image: Optional[ImageData]
-    domain: str
-    project: uuid.UUID
-    resource_group: str
-    resource_slots: ResourceSlot
-    url: str
-
-    model: uuid.UUID
-    model_definition_path: str | None
-    model_mount_destination: Optional[str]
-
-    created_user_id: uuid.UUID
-    created_user_email: Optional[str]
-
-    session_owner_id: uuid.UUID
-    session_owner_email: str
-
-    tag: Optional[str]
-
-    startup_command: Optional[str]
-    bootstrap_script: Optional[str]
-    callback_url: Optional[yarl.URL]
-    environ: Optional[Mapping[str, Any]]
-
-    name: str
-
-    resource_opts: Optional[Mapping[str, Any]]
-    replicas: int
-
-    cluster_mode: ClusterMode
-    cluster_size: int
-    open_to_public: bool
-    created_at: datetime
-    destroyed_at: datetime
-    retries: int
-
-    routings: Optional[list[RoutingData]]
-    lifecycle_stage: str
-    runtime_variant: RuntimeVariant
-
-    @classmethod
-    def from_row(cls, row: Optional[EndpointRow]) -> Optional[Self]:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            image=row.image_row.to_dataclass(),
-            domain=row.domain,
-            project=row.project,
-            resource_group=row.resource_group,
-            resource_slots=row.resource_slots,
-            url=row.url,
-            model=row.model,
-            model_definition_path=row.model_definition_path,
-            model_mount_destination=row.model_mount_destination,
-            created_user_id=row.created_user,
-            created_user_email=row.created_user_row.email
-            if row.created_user_row is not None
-            else None,
-            session_owner_id=row.session_owner,
-            session_owner_email=row.session_owner_row.email,
-            tag=row.tag,
-            startup_command=row.startup_command,
-            bootstrap_script=row.bootstrap_script,
-            callback_url=row.callback_url,
-            environ=row.environ,
-            name=row.name,
-            resource_opts=row.resource_opts,
-            replicas=row.replicas,
-            cluster_mode=ClusterMode(row.cluster_mode),
-            cluster_size=row.cluster_size,
-            open_to_public=row.open_to_public,
-            created_at=row.created_at,
-            destroyed_at=row.destroyed_at,
-            retries=row.retries,
-            routings=[RoutingData.from_row(routing) for routing in row.routings]
-            if row.routings
-            else None,
-            lifecycle_stage=row.lifecycle_stage.name,
-            runtime_variant=row.runtime_variant,
-        )
-
-
-@dataclass
-class EndpointTokenData:
-    id: uuid.UUID
-    token: str
-    endpoint: uuid.UUID
-    session_owner: uuid.UUID
-    domain: str
-    project: uuid.UUID
-    created_at: datetime
-
-
-@dataclass
-class EndpointAutoScalingRuleData:
-    id: uuid.UUID
-    metric_source: AutoScalingMetricSource
-    metric_name: str
-    threshold: str
-    comparator: AutoScalingMetricComparator
-    step_size: int
-    cooldown_seconds: int
-    min_replicas: int
-    max_replicas: int
-    created_at: datetime
-    last_triggered_at: datetime
-    endpoint: uuid.UUID
-
-    @classmethod
-    def from_row(cls, row: Optional[EndpointAutoScalingRuleRow]) -> Optional[Self]:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            metric_source=row.metric_source,
-            metric_name=row.metric_name,
-            threshold=row.threshold,
-            comparator=row.comparator,
-            step_size=row.step_size,
-            cooldown_seconds=row.cooldown_seconds,
-            min_replicas=row.min_replicas,
-            max_replicas=row.max_replicas,
-            created_at=row.created_at,
-            last_triggered_at=row.last_triggered_at,
-            endpoint=row.endpoint,
-        )
-
-
-@dataclass
 class ModelServiceCreator(Creator):
     service_name: str
     replicas: int
@@ -323,67 +187,6 @@ class ModelServiceCreator(Creator):
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {}
-
-
-@dataclass
-class ImageRef:
-    name: str
-    registry: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    architecture: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-
-
-@dataclass
-class ExtraMount:
-    vfolder_id: OptionalState[uuid.UUID] = field(default_factory=OptionalState[uuid.UUID].nop)
-    mount_destination: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    type: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    permission: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-
-
-@dataclass
-class EndpointModifier(PartialModifier):
-    resource_slots: OptionalState[ResourceSlot] = field(
-        default_factory=OptionalState[ResourceSlot].nop
-    )
-    resource_opts: TriState[dict[str, Any]] = field(default_factory=TriState[dict[str, Any]].nop)
-    cluster_mode: OptionalState[ClusterMode] = field(default_factory=OptionalState[ClusterMode].nop)
-    cluster_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    desired_session_count: OptionalState[int] = field(default_factory=OptionalState.nop)
-    image: TriState[ImageRef] = field(default_factory=TriState.nop)
-    name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    resource_group: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    model_definition_path: TriState[str] = field(default_factory=TriState[str].nop)
-    open_to_public: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    extra_mounts: OptionalState[list[ExtraMount]] = field(
-        default_factory=OptionalState[list[ExtraMount]].nop
-    )
-    environ: TriState[dict[str, str]] = field(default_factory=TriState[dict[str, str]].nop)
-    runtime_variant: OptionalState[RuntimeVariant] = field(
-        default_factory=OptionalState[RuntimeVariant].nop
-    )
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.resource_slots.update_dict(to_update, "resource_slots")
-        self.resource_opts.update_dict(to_update, "resource_opts")
-        self.cluster_mode.update_dict(to_update, "cluster_mode")
-        self.cluster_size.update_dict(to_update, "cluster_size")
-        self.model_definition_path.update_dict(to_update, "model_definition_path")
-        self.runtime_variant.update_dict(to_update, "runtime_variant")
-        self.resource_group.update_dict(to_update, "resource_group")
-        return to_update
-
-    def fields_to_update_require_none_check(self) -> dict[str, Any]:
-        # This method is used to update fields that require a check for None values
-        to_update: dict[str, Any] = {}
-        # The order of replicas and desired_session_count is important
-        # as desired_session_count is legacy field and value of replicas need to override it
-        self.desired_session_count.update_dict(to_update, "desired_session_count")
-        self.replicas.update_dict(to_update, "replicas")
-        self.environ.update_dict(to_update, "environ")
-        return to_update
 
 
 @dataclass

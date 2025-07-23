@@ -145,6 +145,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -3618,7 +3619,7 @@ class AgentRegistry:
         }
 
     async def get_health_check_info(
-        self, endpoint: EndpointRow, model: VFolderRow
+        self, endpoint: EndpointData, model: VFolderRow
     ) -> HealthCheckConfig | None:
         _info: HealthCheckConfig | None = None
 
@@ -3653,7 +3654,7 @@ class AgentRegistry:
     async def create_appproxy_endpoint(
         self,
         db_sess: AsyncSession,
-        endpoint: EndpointRow,
+        endpoint: EndpointData,
     ) -> str:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
@@ -3676,7 +3677,7 @@ class AgentRegistry:
             "service_name": endpoint.name,
             "tags": {
                 "session": {
-                    "user_uuid": str(endpoint.session_owner),
+                    "user_uuid": str(endpoint.session_owner_id),
                     "group_id": str(endpoint.project),
                     "domain_name": endpoint.domain,
                 },
@@ -3712,11 +3713,19 @@ class AgentRegistry:
 
     async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
         async with self.db.begin_readonly_session() as db_sess:
-            endpoint = await EndpointRow.get(db_sess, endpoint_id)
+            endpoint = await EndpointRow.get(
+                db_sess,
+                endpoint_id,
+                load_created_user=True,
+                load_session_owner=True,
+                load_image=True,
+                load_routes=True,
+            )
             connection_info = await endpoint.generate_redis_route_info(db_sess)
             model = await VFolderRow.get(db_sess, endpoint.model)
+            endpoint_data = endpoint.to_data()
 
-        health_check_config = await self.get_health_check_info(endpoint, model)
+        health_check_config = await self.get_health_check_info(endpoint_data, model)
         await self.valkey_live.update_appproxy_redis_info(
             endpoint.id,
             connection_info,
