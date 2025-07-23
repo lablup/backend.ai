@@ -1,18 +1,30 @@
 import itertools
+import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from functools import partial
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.common.types import (
+    AgentId,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+)
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -21,6 +33,7 @@ from ai.backend.manager.models import (
     AgentStatus,
     EndpointRow,
     KernelRow,
+    KernelStatistics,
     KernelStatus,
     RoutingRow,
     ScalingGroupOpts,
@@ -29,8 +42,14 @@ from ai.backend.manager.models import (
     SessionStatus,
     recalc_agent_resource_occupancy,
 )
-from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointStatistics,
+)
 from ai.backend.manager.models.kernel import recalc_concurrency_used
+from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -42,15 +61,19 @@ from ai.backend.manager.scheduler.types import (
     SchedulingContext,
 )
 
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+
 # Layer-specific decorator for schedule repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
 
 
 class ScheduleRepository:
     _db: ExtendedAsyncSAEngine
+    _valkey_stat: ValkeyStatClient
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, valkey_stat: ValkeyStatClient) -> None:
         self._db = db
+        self._valkey_stat = valkey_stat
 
     async def _get_kernel_count_per_agent_at_endpoint(
         self,
@@ -622,109 +645,83 @@ class ScheduleRepository:
     @repository_decorator()
     async def mark_sessions_and_kernels_creating(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
-            return await self._mark_sessions_and_kernels_creating(session)
-
-    async def _mark_sessions_and_kernels_creating(self, session: SASession) -> list[SessionRow]:
-        now = datetime.now(timezone.utc)
-        session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
-        for row in session_rows:
-            for kernel_row in row.kernels:
-                _kernel_row = cast(KernelRow, kernel_row)
-                _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
-            row.set_status(SessionStatus.CREATING, status_changed_at=now)
-        return session_rows
+            now = datetime.now(timezone.utc)
+            session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
+            for row in session_rows:
+                for kernel_row in row.kernels:
+                    _kernel_row = cast(KernelRow, kernel_row)
+                    _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
+                row.set_status(SessionStatus.CREATING, status_changed_at=now)
+            return session_rows
 
     @repository_decorator()
     async def clean_zombie_routes(self) -> int:
         async with self._db.begin_session() as session:
-            return await self._clean_zombie_routes(session)
-
-    async def _clean_zombie_routes(self, session: SASession) -> int:
-        from ai.backend.manager.models import RouteStatus
-
-        query = (
-            sa.select(RoutingRow)
-            .join(
-                RoutingRow.session_row.and_(
-                    SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
+            query = (
+                sa.select(RoutingRow)
+                .join(
+                    RoutingRow.session_row.and_(
+                        SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
+                    )
                 )
+                .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
+                .options(selectinload(RoutingRow.session_row))
             )
-            .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
-            .options(selectinload(RoutingRow.session_row))
-        )
-        result = await session.execute(query)
-        zombie_routes = result.scalars().all()
-        if len(zombie_routes) > 0:
-            query = sa.delete(RoutingRow).where(RoutingRow.id.in_([r.id for r in zombie_routes]))
             result = await session.execute(query)
-            return result.rowcount
-        return 0
+            zombie_routes = result.scalars().all()
+            if len(zombie_routes) > 0:
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.id.in_([r.id for r in zombie_routes])
+                )
+                result = await session.execute(query)
+                return result.rowcount
+            return 0
 
     @repository_decorator()
     async def create_routing_rows(self, endpoint_create_data: list[tuple]) -> list[uuid.UUID]:
         async with self._db.begin_session() as session:
-            return await self._create_routing_rows(session, endpoint_create_data)
-
-    async def _create_routing_rows(
-        self, session: SASession, endpoint_create_data: list[tuple]
-    ) -> list[uuid.UUID]:
-        created_routes = []
-        for endpoint, expand_count in endpoint_create_data:
-            for _ in range(expand_count):
-                route_id = uuid.uuid4()
-                routing_row = RoutingRow(
-                    route_id,
-                    endpoint.id,
-                    None,
-                    endpoint.session_owner,
-                    endpoint.domain,
-                    endpoint.project,
-                )
-                session.add(routing_row)
-                created_routes.append(route_id)
-        await session.commit()
-        return created_routes
+            created_routes = []
+            for endpoint, expand_count in endpoint_create_data:
+                for _ in range(expand_count):
+                    route_id = uuid.uuid4()
+                    routing_row = RoutingRow(
+                        route_id,
+                        endpoint.id,
+                        None,
+                        endpoint.session_owner,
+                        endpoint.domain,
+                        endpoint.project,
+                    )
+                    session.add(routing_row)
+                    created_routes.append(route_id)
+            await session.commit()
+            return created_routes
 
     @repository_decorator()
     async def destroy_terminated_endpoints_and_routes(
         self, endpoints_to_mark_terminated: set, already_destroyed_sessions: list[SessionId]
     ) -> None:
         async with self._db.begin_session() as session:
-            await self._destroy_terminated_endpoints_and_routes(
-                session, endpoints_to_mark_terminated, already_destroyed_sessions
+            query = (
+                sa.update(EndpointRow)
+                .values({
+                    "destroyed_at": sa.func.now(),
+                    "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                })
+                .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
             )
-
-    async def _destroy_terminated_endpoints_and_routes(
-        self,
-        session: SASession,
-        endpoints_to_mark_terminated: set,
-        already_destroyed_sessions: list[SessionId],
-    ) -> None:
-        query = (
-            sa.update(EndpointRow)
-            .values({
-                "destroyed_at": sa.func.now(),
-                "lifecycle_stage": EndpointLifecycle.DESTROYED,
-            })
-            .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
-        )
-        await session.execute(query)
-        query = sa.delete(RoutingRow).where(RoutingRow.session.in_(already_destroyed_sessions))
-        await session.execute(query)
+            await session.execute(query)
+            query = sa.delete(RoutingRow).where(RoutingRow.session.in_(already_destroyed_sessions))
+            await session.execute(query)
 
     @repository_decorator()
     async def get_container_info_for_destroyed_kernels(self, session_id: SessionId) -> dict:
         async with self._db.begin_readonly_session() as session:
-            return await self._get_container_info_for_destroyed_kernels(session, session_id)
-
-    async def _get_container_info_for_destroyed_kernels(
-        self, session: SASession, session_id: SessionId
-    ) -> dict:
-        query = sa.select(KernelRow.id, KernelRow.container_id).where(
-            KernelRow.session_id == session_id
-        )
-        rows = (await session.execute(query)).fetchall()
-        return {row["id"]: row["container_id"] for row in rows}
+            query = sa.select(KernelRow.id, KernelRow.container_id).where(
+                KernelRow.session_id == session_id
+            )
+            rows = (await session.execute(query)).fetchall()
+            return {row["id"]: row["container_id"] for row in rows}
 
     @repository_decorator()
     async def autoscale_endpoints(self) -> None:
@@ -735,35 +732,165 @@ class ScheduleRepository:
         current_datetime = datetime.now(timezone.utc)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
-        # TODO: Check this implementation
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
-        # endpoints = await EndpointRow.batch_load(
-        #     session, [rule.endpoint for rule in rules], load_routes=True
-        # )
-        # endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        # To fetch aggregated kernel metrics among every kernels managed by a single endpoint
+        # we first need to collect every routings, and then the sessions tied to each routing,
+        # and finally the child kernels of each session
+        endpoints = await EndpointRow.batch_load(
+            session, [rule.endpoint for rule in rules], load_routes=True
+        )
+        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        metric_requested_sessions: list[SessionId] = []
+        metric_requested_kernels: list[KernelId] = []
+        metric_requested_endpoints: list[uuid.UUID] = []
 
-        # For now, we'll just update the last_triggered_at and replicas
-        # The actual metric evaluation logic should stay in the service layer
+        kernel_statistics_by_id: dict[KernelId, Any] = {}
+        endpoint_statistics_by_id: dict[uuid.UUID, Any] = {}
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+
         for rule in rules:
-            if rule.last_triggered_at is None or rule.last_triggered_at < (
-                current_datetime - timedelta(seconds=rule.cooldown_seconds)
-            ):
-                # This is just a placeholder - actual logic would be moved here
-                pass
+            match rule.metric_source:
+                case AutoScalingMetricSource.KERNEL:
+                    metric_requested_sessions += [
+                        route.session for route in endpoint_by_id[rule.endpoint].routings
+                    ]
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    metric_requested_endpoints.append(rule.endpoint)
+
+        kernel_rows = await KernelRow.batch_load_by_session_id(
+            session, list(metric_requested_sessions)
+        )
+        for kernel in kernel_rows:
+            kernels_by_session_id[kernel.session_id].append(kernel)
+            metric_requested_kernels.append(kernel.id)
+
+        # To speed up and lower the pressure to the redis we must load every metrics
+        # in bulk, not querying each key at once
+        kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
+            self._valkey_stat,
+            cast(list[SessionId], list(metric_requested_kernels)),
+        )
+        endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
+            self._valkey_stat,
+            cast(list[SessionId], list(metric_requested_endpoints)),
+        )
+
+        kernel_statistics_by_id = {
+            kernel_id: metric
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+        }
+        endpoint_statistics_by_id = {
+            endpoint_id: metric
+            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+        }
+
+        log_skip_due_to_missing_metric = partial(
+            log.warning,
+            "AUTOSCALE(e:{0.endpoint}, rule:{0.id}): skipping the rule because metric {0.metric_name} does not exist",
+        )
+
+        for rule in rules:
+            should_trigger = False
+            match rule.metric_source:
+                # Kernel metrics should be evaluated by the average of the metric across every kernels
+                case AutoScalingMetricSource.KERNEL:
+                    metric_aggregated_value = Decimal("0")
+                    metric_found_kernel_count = 0
+                    for route in endpoint_by_id[rule.endpoint].routings:
+                        for kernel in kernels_by_session_id[route.session]:
+                            if not kernel_statistics_by_id.get(kernel.id):
+                                continue
+                            live_stat = kernel_statistics_by_id[kernel.id]
+                            if rule.metric_name not in live_stat:
+                                continue
+                            metric_found_kernel_count += 1
+                            metric_aggregated_value += Decimal(live_stat[rule.metric_name]["pct"])
+                    if metric_found_kernel_count == 0:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    if not endpoint_statistics_by_id[rule.endpoint]:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    live_stat = endpoint_statistics_by_id[rule.endpoint]
+                    if rule.metric_name not in live_stat:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = Decimal(live_stat[rule.metric_name]["current"]) / len(
+                        endpoint_by_id[rule.endpoint].routings
+                    )
+                case _:
+                    raise NotImplementedError
+
+            match rule.comparator:
+                case AutoScalingMetricComparator.LESS_THAN:
+                    should_trigger = current_value < rule.threshold
+                case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
+                    should_trigger = current_value <= rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN:
+                    should_trigger = current_value > rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL:
+                    should_trigger = current_value >= rule.threshold
+
+            log.debug(
+                "AUTOSCALE(e:{}, rule:{}): {} {} {}: {}",
+                rule.endpoint,
+                rule.id,
+                current_value,
+                rule.comparator,
+                rule.threshold,
+                should_trigger,
+            )
+            if should_trigger:
+                new_replica_count = max(0, rule.endpoint_row.replicas + rule.step_size)
+                if (rule.min_replicas is not None and new_replica_count < rule.min_replicas) or (
+                    rule.max_replicas is not None and new_replica_count > rule.max_replicas
+                ):
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) [min: {}, max: {}]",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.min_replicas,
+                        rule.max_replicas,
+                    )
+                    continue
+                if rule.last_triggered_at is None or rule.last_triggered_at < (
+                    current_datetime - timedelta(seconds=rule.cooldown_seconds)
+                ):
+                    # Changes applied here will be reflected at consequent queries (at `scale_services()`)
+                    # so we do not have to propagate the changes on the function level
+                    rule.endpoint_row.replicas = new_replica_count
+                    rule.last_triggered_at = current_datetime
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): applied the new replica count {} ({})",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                    )
+                else:
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) as the rule is on a cooldown period until {}",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.last_triggered_at + timedelta(seconds=rule.cooldown_seconds),
+                    )
 
     @repository_decorator()
     async def get_endpoints_for_scaling(self) -> list:
         async with self._db.begin_readonly_session() as session:
-            return await self._get_endpoints_for_scaling(session)
-
-    async def _get_endpoints_for_scaling(self, session: SASession) -> list:
-        endpoints = await EndpointRow.list(
-            session,
-            load_image=True,
-            load_routes=True,
-            status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
-        )
-        return endpoints
+            endpoints = await EndpointRow.list(
+                session,
+                load_image=True,
+                load_routes=True,
+                status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
+            )
+            return endpoints
 
     @repository_decorator()
     async def get_sessions_to_destroy_for_scaling(
@@ -775,10 +902,6 @@ class ScheduleRepository:
     async def _get_sessions_to_destroy_for_scaling(
         self, session: SASession, route_sessions: list[SessionId]
     ) -> list[SessionRow]:
-        from sqlalchemy.orm import noload, selectinload
-
-        from ai.backend.manager.models.session import _build_session_fetch_query
-
         # Optimized loading for session destruction - load kernels with agent info
         kernel_loading_op = (
             noload("*"),
