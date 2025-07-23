@@ -187,17 +187,8 @@ class PermissionControllerRepository:
 
     @repository_decorator()
     async def get_allowed_entity_ids(self, param: MultipleEntityQueryParams) -> list[ObjectId]:
-        roles = await self.get_active_roles(param.user_id)
-        allowed_entity_ids: set[ObjectId] = set()
-        for role in roles:
-            for scope_perm in role.scope_permissions:
-                if scope_perm.operation != param.operation_type:
-                    continue
-                if scope_perm.entity_type == param.entity_type:
-                    for entity in scope_perm.mapped_entities:
-                        allowed_entity_ids.add(entity.entity_id)
-            for object_perm in role.object_permissions:
-                if object_perm.operation != param.operation_type:
-                    continue
-                allowed_entity_ids.add(object_perm.object_id.entity_id)
-        return list(allowed_entity_ids)
+        """
+        This method is a placeholder for future implementation.
+        It should return a list of allowed entity IDs based on the provided parameters.
+        """
+        raise NotImplementedError("This method is not implemented yet.")
