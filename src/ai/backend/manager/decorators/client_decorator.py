@@ -16,12 +16,16 @@ R = TypeVar("R")
 
 def create_layer_aware_client_decorator(
     layer: LayerType,
+    default_retry_count: int = 3,
+    default_retry_delay: float = 0.1,
 ):
     """
     Factory function to create layer-aware client decorators.
 
     Args:
         layer: The layer type for metric observation
+        default_retry_count: Default number of retries for client operations
+        default_retry_delay: Default delay between retries in seconds
 
     Returns:
         A client_decorator function configured for the specified layer
@@ -29,8 +33,8 @@ def create_layer_aware_client_decorator(
 
     def client_decorator(
         *,
-        retry_count: int = 10,
-        retry_delay: float = 0.1,
+        retry_count: int = default_retry_count,
+        retry_delay: float = default_retry_delay,
     ) -> Callable[
         [Callable[P, Awaitable[R]]],
         Callable[P, Awaitable[R]],
@@ -44,22 +48,23 @@ def create_layer_aware_client_decorator(
 
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             observer = LayerMetricObserver.instance()
+            operation = func.__name__
 
             async def wrapper(*args, **kwargs) -> R:
-                log.trace("Calling client method {}", func.__name__)
+                log.trace("Calling client method {}", operation)
                 start = time.perf_counter()
                 for attempt in range(retry_count):
                     try:
                         observer.observe_layer_operation_triggered(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                         )
                         res = await func(*args, **kwargs)
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=True,
                             duration=time.perf_counter() - start,
                         )
@@ -67,7 +72,7 @@ def create_layer_aware_client_decorator(
                     except BackendAIError as e:
                         log.exception(
                             "Error in client method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -76,7 +81,7 @@ def create_layer_aware_client_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
@@ -84,11 +89,24 @@ def create_layer_aware_client_decorator(
                         raise e
                     except Exception as e:
                         if attempt < retry_count - 1:
+                            log.debug(
+                                "Error in client method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                                operation,
+                                args,
+                                kwargs,
+                                retry_count,
+                                e,
+                            )
+                            observer.observe_layer_retry(
+                                domain=DomainType.CLIENT,
+                                layer=layer,
+                                operation=operation,
+                            )
                             await asyncio.sleep(retry_delay)
                             continue
                         log.exception(
                             "Error in client method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -97,13 +115,13 @@ def create_layer_aware_client_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.CLIENT,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
                         raise e
                 raise UnreachableError(
-                    f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
+                    f"Reached unreachable code in {operation} after {retry_count} attempts"
                 )
 
             return wrapper
