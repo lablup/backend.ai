@@ -340,13 +340,6 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class _Sentinel:
-    pass
-
-
-_SENTINEL = _Sentinel()
-
-
 def create_layer_aware_valkey_decorator(
     layer: LayerType,
 ):
@@ -482,7 +475,7 @@ def create_layer_aware_valkey_decorator_with_default(
         *,
         retry_count: int = 1,
         retry_delay: float = 0.1,
-        default_return: Union[R, _Sentinel] = _SENTINEL,
+        default_return: R,
     ):
         #    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         """
@@ -552,11 +545,8 @@ def create_layer_aware_valkey_decorator_with_default(
                         )
                         break
 
-                if default_return is not _SENTINEL:
-                    log.warning("Returning default value from {} after failure", func.__name__)
-                    return cast(R, default_return)
-                else:
-                    raise RuntimeError(f"{func.__name__} failed after {retry_count} attempts")
+                log.warning("Returning default value from {} after failure", func.__name__)
+                return cast(R, default_return)
 
             return wrapper
 
