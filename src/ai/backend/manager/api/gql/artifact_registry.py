@@ -8,14 +8,7 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-
-# Scalars
-# TODO: ByteSize?
-@strawberry.scalar
-class HumanReadableNumber:
-    """A scalar representing human-readable numbers like '10g', '2t'"""
-
-    pass
+from ai.backend.manager.api.gql.base import ByteSize
 
 
 # Enums
@@ -125,7 +118,7 @@ class Artifact(Node):
     description: Optional[str]
     registry: SourceInfo
     source: SourceInfo
-    size: HumanReadableNumber
+    size: ByteSize
     created_at: datetime
     updated_at: datetime
     version: str
