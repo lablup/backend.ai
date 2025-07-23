@@ -1,4 +1,4 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.actions.processor.base import ActionProcessor
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
