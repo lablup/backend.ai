@@ -1,12 +1,13 @@
-import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.actions.validators.validator.single_entity import (
+    SingleEntityActionValidator,
 )
 
 from ..action.single_entity import (
@@ -16,21 +17,23 @@ from ..action.single_entity import (
 from ..monitors.monitor import ActionMonitor
 from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 
 class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
     _monitors: list[ActionMonitor]
-    _repository: PermissionControllerRepository
+    _validators: list[SingleEntityActionValidator]
     _func: Callable[[TSingleEntityAction], Awaitable[TSingleEntityActionResult]]
 
     def __init__(
         self,
         func: Callable[[TSingleEntityAction], Awaitable[TSingleEntityActionResult]],
-        permission_control_repository: PermissionControllerRepository,
         monitors: Optional[list[ActionMonitor]] = None,
+        validators: Optional[list[SingleEntityActionValidator]] = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
-        self._repository = permission_control_repository
+        self._validators = validators or []
 
     async def _run(self, action: TSingleEntityAction) -> TSingleEntityActionResult:
         started_at = datetime.now()
@@ -42,11 +45,13 @@ class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActi
         action_id = uuid.uuid4()
         action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
-            await monitor.prepare(action, action_trigger_meta)
-
+            try:
+                await monitor.prepare(action, action_trigger_meta)
+            except Exception as e:
+                log.warning("Error in monitor prepare method: {}", e)
         try:
-            permission_params = action.permission_query_params()
-            await self._repository.validate_auth_single_entity(permission_params)
+            for validator in self._validators:
+                await validator.validate(action, action_trigger_meta)
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"
@@ -82,10 +87,10 @@ class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActi
             )
             process_result = ProcessResult(meta=meta)
             for monitor in reversed(self._monitors):
-                await monitor.done(action, process_result)
+                try:
+                    await monitor.done(action, process_result)
+                except Exception as e:
+                    log.warning("Error in monitor done method: {}", e)
 
     async def wait_for_complete(self, action: TSingleEntityAction) -> TSingleEntityActionResult:
         return await self._run(action)
-
-    async def fire_and_forget(self, action: TSingleEntityAction) -> None:
-        asyncio.create_task(self.wait_for_complete(action))
