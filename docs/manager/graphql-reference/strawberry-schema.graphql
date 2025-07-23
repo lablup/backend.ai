@@ -50,16 +50,7 @@ type ArtifactGroup implements Node {
   type: ArtifactType!
   status: ArtifactStatus!
   description: String
-  artifacts(filter: ArtifactFilter = null, order: ArtifactOrder = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
-}
-
-input ArtifactOrder {
-  name: Ordering = null
-  type: Ordering = null
-  size: Ordering = null
-  updatedAt: Ordering = null
-  createdAt: Ordering = null
-  latestVersion: Ordering = null
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
 }
 
 input ArtifactOrderBy {
@@ -147,15 +138,6 @@ enum OrderDirection {
   DESC
 }
 
-enum Ordering {
-  ASC
-  ASC_NULLS_FIRST
-  ASC_NULLS_LAST
-  DESC
-  DESC_NULLS_FIRST
-  DESC_NULLS_LAST
-}
-
 """Information to aid in pagination."""
 type PageInfo {
   """When paginating forwards, are there more items?"""
@@ -185,8 +167,8 @@ type Query {
     """The ID of the object."""
     id: ID!
   ): Node!
-  artifacts(filter: ArtifactFilter = null, order: ArtifactOrder = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
-  artifactGroups(filter: ArtifactFilter = null, order: ArtifactOrder = null, orderBy: [ArtifactOrderBy!] = null): [ArtifactGroup!]!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
+  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null): [ArtifactGroup!]!
   artifact(id: ID!): Artifact
   artifactGroup(id: ID!): ArtifactGroup
 }

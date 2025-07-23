@@ -187,7 +187,6 @@ class ArtifactGroup(Node):
     def artifacts(
         self,
         filter: Optional[ArtifactFilter] = None,
-        order: Optional[ArtifactOrder] = None,
         orderBy: Optional[list[ArtifactOrderBy]] = None,
         first: Optional[int] = None,
         after: Optional[str] = None,
@@ -246,7 +245,6 @@ class CancelPullPayload:
 @strawberry.field
 def artifacts(
     filter: Optional[ArtifactFilter] = None,
-    order: Optional[ArtifactOrder] = None,
     orderBy: Optional[list[ArtifactOrderBy]] = None,
     first: Optional[int] = None,
     after: Optional[str] = None,
@@ -266,7 +264,6 @@ def artifacts(
 @strawberry.field(name="artifactGroups")
 def artifact_groups(
     filter: Optional[ArtifactFilter] = None,
-    order: Optional[ArtifactOrder] = None,
     orderBy: Optional[list[ArtifactOrderBy]] = None,
 ) -> list[ArtifactGroup]:
     # Mock implementation - return empty list
