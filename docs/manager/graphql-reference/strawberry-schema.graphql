@@ -50,7 +50,7 @@ type ArtifactGroup implements Node {
   type: ArtifactType!
   status: ArtifactStatus!
   description: String
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
 }
 
 """A connection to a list of items."""
@@ -186,7 +186,7 @@ type Query {
     id: ID!
   ): Node!
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
-  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactGroupConnection!
+  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
   artifact(id: ID!): Artifact
   artifactGroup(id: ID!): ArtifactGroup
 }
