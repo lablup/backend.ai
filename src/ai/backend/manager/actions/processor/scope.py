@@ -7,31 +7,28 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionTriggerMeta, OperationStatus, ProcessResult
 from ai.backend.manager.actions.validators.validator import ActionValidator
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
 from ..action.scope import (
-    TBaseScopeAction,
-    TBaseScopeActionResult,
+    TBaseScopedAction,
+    TBaseScopedActionResult,
 )
 from ..monitors.monitor import ActionMonitor
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
+class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult]):
     _monitors: list[ActionMonitor]
     _validators: list[ActionValidator]
     _repository: PermissionControllerRepository
-    _func: Callable[[TBaseScopeAction], Awaitable[TBaseScopeActionResult]]
+    _func: Callable[[TBaseScopedAction], Awaitable[TBaseScopedActionResult]]
 
     def __init__(
         self,
-        func: Callable[[TBaseScopeAction], Awaitable[TBaseScopeActionResult]],
+        func: Callable[[TBaseScopedAction], Awaitable[TBaseScopedActionResult]],
         permission_control_repository: PermissionControllerRepository,
         monitors: Optional[list[ActionMonitor]] = None,
         validators: Optional[list[ActionValidator]] = None,
@@ -41,13 +38,12 @@ class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
         self._validators = validators or []
         self._repository = permission_control_repository
 
-    async def _run(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
+    async def _run(self, action: TBaseScopedAction) -> TBaseScopedActionResult:
         started_at = datetime.now()
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
-        result: Optional[TBaseScopeActionResult] = None
+        result: Optional[TBaseScopedActionResult] = None
         error_code: Optional[ErrorCode] = None
-        object_ids: list[ObjectId] = []
 
         action_id = uuid.uuid4()
         action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
@@ -59,6 +55,8 @@ class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
         try:
             for validator in self._validators:
                 await validator.validate(action, action_trigger_meta)
+            permission_params = action.permission_query_params()
+            await self._repository.validate_auth_in_scope(permission_params)
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"
@@ -94,5 +92,8 @@ class ActionProcessor(Generic[TBaseScopeAction, TBaseScopeActionResult]):
                 except Exception as e:
                     log.warning("Error in monitor done method: {}", e)
 
-    async def wait_for_complete(self, action: TBaseScopeAction) -> TBaseScopeActionResult:
+    async def wait_for_complete(self, action: TBaseScopedAction) -> TBaseScopedActionResult:
         return await self._run(action)
+
+    async def fire_and_forget(self, action: TBaseScopedAction) -> None:
+        asyncio.create_task(self.wait_for_complete(action))
