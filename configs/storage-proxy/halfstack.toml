@@ -106,4 +106,3 @@ path = "vfolder/local/volume1"
 enabled = true
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
->>>>>>> Stashed changes
