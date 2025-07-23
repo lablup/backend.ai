@@ -146,10 +146,26 @@ async def handle_gql(request: web.Request, params: Any) -> web.Response:
 )
 async def handle_gql_v2(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["admin.context"]
+
+    rules = []
+    if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        rules.append(DisableIntrospection)
+    max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
+    if max_depth is not None:
+        rules.append(depth_limit_validator(max_depth=max_depth))
+    if rules:
+        validate_errors = validate(
+            schema=app_ctx.gql_schema.graphql_schema,
+            document_ast=parse(params["query"]),
+            rules=rules,
+        )
+        if validate_errors:
+            validation_result = ExecutionResult(None, errors=validate_errors)
+            return web.json_response(validation_result.formatted, status=HTTPStatus.BAD_REQUEST)
+
     manager_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
     known_slot_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-
-    app_ctx: PrivateContext = request.app["admin.context"]
 
     strawberry_ctx = StrawberryGQLContext(
         dataloader_manager=DataLoaderManager(),
@@ -187,7 +203,7 @@ async def handle_gql_v2(request: web.Request, params: Any) -> web.Response:
                 errmsg = e.formatted
             else:
                 errmsg = {"message": str(e)}
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.error("ADMIN.GQL-V2 Exception: {}", errmsg)
             log.debug("{}", "".join(traceback.format_exception(e)))
 
     response_data: dict[str, Any] = {
