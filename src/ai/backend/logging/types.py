@@ -60,6 +60,7 @@ class LogLevel(CIStrEnum):
     WARNING = "WARNING"
     INFO = "INFO"
     DEBUG = "DEBUG"
+    TRACE = "TRACE"
     NOTSET = "NOTSET"
 
 
