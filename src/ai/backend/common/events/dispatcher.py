@@ -701,7 +701,6 @@ class EventProducer:
         user = current_user()
         metadata = MessageMetadata(
             request_id=request_id,
-            user_id=str(user.user_id) if user else None,
             user=user,
         )
         raw_event = MessagePayload(
@@ -727,7 +726,6 @@ class EventProducer:
         user = current_user()
         metadata = MessageMetadata(
             request_id=request_id,
-            user_id=str(user.user_id) if user else None,
             user=user,
         )
         raw_event = MessagePayload(
@@ -752,7 +750,6 @@ class EventProducer:
         user = current_user()
         metadata = MessageMetadata(
             request_id=request_id,
-            user_id=str(user.user_id) if user else None,
             user=user,
         )
         # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.

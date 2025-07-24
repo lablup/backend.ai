@@ -49,7 +49,6 @@ class MQMessage:
 @dataclass
 class MessageMetadata:
     request_id: Optional[str] = None
-    user_id: Optional[str] = None
     user: Optional[UserData] = None
 
     def serialize(self) -> bytes:
@@ -63,7 +62,15 @@ class MessageMetadata:
         """
         Deserialize the metadata from bytes.
         """
-        return cls(**load_json(data))
+        result = load_json(data)
+        if "user" in result:
+            user_data = result["user"]
+            if isinstance(user_data, dict):
+                user = UserData(**user_data)
+                result["user"] = user
+            else:
+                result["user"] = None
+        return cls(**result)
 
     @contextmanager
     def apply_context(self) -> Iterator[None]:
