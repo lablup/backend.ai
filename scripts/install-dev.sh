@@ -299,6 +299,9 @@ POSTGRES_PORT="8101"
 MANAGER_PORT="8091"
 ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
+APPPROXY_COORDINATOR_PORT="10200"
+APPPROXY_WORKER_PORT="10201"
+APPPROXY_IMPL="port"  # frontend server mode ("port" or "traefik")
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
@@ -341,6 +344,12 @@ while [ $# -gt 0 ]; do
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
     --webserver-port)       WEBSERVER_PORT=$2; shift ;;
     --webserver-port=*)     WEBSERVER_PORT="${1#*=}" ;;
+    --app-proxy-coordinator-port)    APPPROXY_COORDINATOR_PORT=$2; shift ;;
+    --app-proxy-coordinator-port=*)  APPPROXY_COORDINATOR_PORT="${1#*=}" ;;
+    --app-proxy-worker-port)         APPPROXY_WORKER_PORT=$2; shift ;;
+    --app-proxy-worker-port=*)       APPPROXY_WORKER_PORT="${1#*=}" ;;
+    --app-proxy-impl)                APPPROXY_IMPL=$2; shift ;;
+    --app-proxy-impl=*)              APPPROXY_IMPL="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -786,8 +795,7 @@ setup_environment() {
     --resolve=pants-plugins \
     --resolve=towncrier \
     --resolve=ruff \
-    --resolve=mypy \
-    --resolve=black
+    --resolve=mypy
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.
 
@@ -921,7 +929,30 @@ configure_backendai() {
   cp configs/account-manager/halfstack.alembic.ini ./alembic-accountmgr.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-accountmgr.ini
 
-  # configure halfstack ports
+  # configure app-proxy
+  # TODO: traefik mode option
+  # TODO: support ha config
+  show_info "Copy default configuration files to app-proxy root..."
+  APPPROXY_API_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  APPPROXY_JWT_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  APPPROXY_PERMIT_HASH_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  cp configs/app-proxy-coordinator/halfstack.toml ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 10200/port = ${APPPROXY_COORDINATOR_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-coordinator.toml
+  cp configs/app-proxy-worker/halfstack.toml ./app-proxy-worker.toml
+  sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-worker.toml
+  sed_inplace "s/port = 10201/port = ${APPPROXY_WORKER_PORT}/" ./app-proxy-worker.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-worker.toml
+  cp configs/app-proxy-coordinator/halfstack.alembic.ini ./alembic-appproxy.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-appproxy.ini
+
+  # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
   mkdir -p "$VAR_BASE_PATH"
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
@@ -930,7 +961,7 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
 
-  # configure backend mode
+  # configure agent (container backend)
   if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
     sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
     sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
@@ -947,7 +978,7 @@ configure_backendai() {
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
 
-  # configure agent
+  # configure agent (dummy backend)
   cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
@@ -1001,7 +1032,9 @@ configure_backendai() {
   fi
 
   # initialize the DB schema
-  show_info "Setting up databases..."
+  POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+
+  show_info "Setting up databases... (core)"
   ./backend.ai mgr schema oneshot
 
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
@@ -1009,6 +1042,26 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+
+  show_info "Setting up databases... (account-manager)"
+  # TODO: add "schema oneshot" command for account-manager
+  # ./py -m alembic -c alembic-accountmgr.ini upgrade head
+  # TODO: populate fixtures
+
+  show_info "Setting up databases... (app-proxy)"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "\
+    CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove'; \
+    CREATE DATABASE appproxy; \
+    GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy; \
+    \c appproxy; \
+    GRANT ALL ON SCHEMA public TO appproxy;"
+  # TODO: add "schema oneshot" command for app-proxy
+  ./py -m alembic -c alembic-appproxy.ini upgrade head
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c \
+    "UPDATE scaling_groups SET \
+    wsproxy_api_token = '${APPPROXY_API_SECRET}', \
+    wsproxy_addr = 'http://localhost:${APPPROXY_COORDINATOR_PORT}' \
+    WHERE name = 'default';"
 
   # Scan the container image registry
   show_info "Scanning the image registry..."
@@ -1027,7 +1080,6 @@ configure_backendai() {
   echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
-  POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
   ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
   $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
   $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
