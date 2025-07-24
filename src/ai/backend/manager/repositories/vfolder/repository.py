@@ -24,6 +24,7 @@ from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -124,7 +125,9 @@ class VfolderRepository:
             user_row: Optional[UserRow] = await db_session.scalar(
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
-                .options(selectinload(UserRow.main_keypair))
+                .options(
+                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                )
             )
             if user_row is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
@@ -153,12 +156,12 @@ class VfolderRepository:
             user_row: Optional[UserRow] = await db_session.scalar(
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
-                .options(selectinload(UserRow.main_keypair))
+                .options(selectinload(UserRow.resource_policy_row))
             )
             if user_row is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
-            return user_row.main_keypair.resource_policy_row.max_vfolder_count
+            return user_row.resource_policy_row.max_vfolder_count
 
     @repository_decorator()
     async def list_accessible_vfolders(
@@ -1067,16 +1070,8 @@ class VfolderRepository:
                     query = sa.insert(vfolders).values(**insert_values)
                     await db_session.execute(query)
 
-            # Create destination vfolder in storage
-            manager_client = storage_manager.get_manager_facing_client(target_proxy)
-            await manager_client.create_folder(
-                target_volume,
-                str(target_folder_id),
-                0,  # quota (will be set later if needed)
-                None,  # permission mode
-            )
-
             # Clone the vfolder contents
+            manager_client = storage_manager.get_manager_facing_client(target_proxy)
             await manager_client.clone_folder(
                 source_volume,
                 str(vfolder_info.source_vfolder_id),
