@@ -286,6 +286,8 @@ class Circuit(Base):
                     case FrontendMode.WILDCARD_DOMAIN:
                         assert self.subdomain
                         return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
+                    case _:
+                        raise ValueError(f"Invalid frontend_mode: {self.frontend_mode}")
 
     @property
     def traefik_entrypoint(self) -> str:
@@ -295,6 +297,8 @@ class Circuit(Base):
             case FrontendMode.PORT:
                 assert self.port
                 return f"portproxy_{self.port}"
+            case _:
+                raise ValueError(f"Invalid frontend_mode: {self.frontend_mode}")
 
     @property
     def traefik_routers(self) -> dict[str, Any]:
