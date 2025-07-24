@@ -63,7 +63,6 @@ from .rbac.permission_defs import ProjectPermission
 from .types import (
     QueryCondition,
     QueryOption,
-    QuerySingleCondition,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
@@ -241,7 +240,7 @@ class GroupRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        condition: QueryCondition,
+        conditions: Sequence[QueryCondition],
         options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
@@ -256,7 +255,9 @@ class GroupRow(Base):
         Raises:
             EmptySQLCondition: If the condition is empty.
         """
-        query_stmt = sa.select(GroupRow).where(condition.final_sql_condition)
+        query_stmt = sa.select(GroupRow)
+        for cond in conditions:
+            query_stmt = cond(query_stmt)
 
         for option in options:
             query_stmt = option(query_stmt)
@@ -289,7 +290,7 @@ class GroupRow(Base):
             ObjectNotFound: If the project not found.
         """
         rows = await cls.query_by_condition(
-            QueryCondition.single(by_id(project_id)),
+            [by_id(project_id)],
             [load_related_field(cls.load_resource_policy)],
             db=db,
         )
@@ -298,8 +299,13 @@ class GroupRow(Base):
         return rows[0]
 
 
-def by_id(project_id: uuid.UUID) -> QuerySingleCondition:
-    return GroupRow.id == project_id
+def by_id(project_id: uuid.UUID) -> QueryCondition:
+    def _by_id(
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(GroupRow.id == project_id)
+
+    return _by_id
 
 
 @dataclass

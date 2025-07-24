@@ -25,7 +25,6 @@ from ai.backend.manager.registry import AgentRegistry
 
 from ...models.agent import AgentStatus, agents
 from ...models.kernel import (
-    ConditionMerger,
     KernelRow,
     by_kernel_ids,
 )
@@ -165,12 +164,8 @@ class AgentEventHandler:
         all_kernel_ids: set[KernelId] = {k.kernel_id for k in event.active_kernels} | {
             c.kernel_id for c in event.active_containers
         }
-        kernel_condition = by_kernel_ids(
-            all_kernel_ids,
-            ConditionMerger.AND,
-        )
         kernel_rows = await KernelRow.get_kernels(
-            [kernel_condition],
+            [by_kernel_ids(all_kernel_ids)],
             db=self._db,
         )
         kernel_should_alive: set[KernelId] = {

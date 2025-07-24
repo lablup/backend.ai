@@ -267,7 +267,6 @@ from .scaling_group import (
     query_allowed_sgroups,
 )
 from .session import (
-    SessionQueryConditions,
     SessionStatus,
 )
 from .storage import StorageVolume, StorageVolumeList
@@ -2728,18 +2727,12 @@ class Queries(graphene.ObjectType):
     ) -> TotalResourceSlot:
         graph_ctx: GraphQueryContext = info.context
 
-        if statuses is not None:
-            status_list = [SessionStatus[s] for s in statuses]
-        else:
-            status_list = None
         return await TotalResourceSlot.get_data(
             graph_ctx,
-            SessionQueryConditions(
-                statuses=status_list,
-                domain_name=domain_name,
-                resource_group_name=resource_group_name,
-                raw_filter=filter,
-            ),
+            statuses=statuses,
+            domain_name=domain_name,
+            resource_group_name=resource_group_name,
+            raw_filter=filter,
         )
 
     @staticmethod

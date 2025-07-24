@@ -52,6 +52,7 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ScalingGroupPermission
+from .types import QueryCondition
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
 
@@ -283,9 +284,6 @@ class ScalingGroupRow(Base):
             stmt = cond(stmt)
         async with db.begin_readonly_session() as db_session:
             return await db_session.scalars(stmt)
-
-
-type QueryCondition = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
 
 
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
