@@ -40,6 +40,8 @@ class MsgpackOptions(TypedDict):
 
 
 class NoopLogger(AbstractLogger):
+    def __init__(self, logging_config: MutableMapping[str, Any]) -> None:
+        super().__init__(logging_config)
     @override
     def __enter__(self) -> Self:
         return self
