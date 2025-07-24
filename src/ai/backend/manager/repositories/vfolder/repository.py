@@ -1044,7 +1044,11 @@ class VfolderRepository:
         if source_proxy != target_proxy:
             raise VFolderInvalidParameter("proxy name of source and target vfolders must be equal.")
 
-        # Generate the ID of the destination vfolder
+        # Generate the ID of the destination vfolder.
+        # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
+        #       the actual object (with RETURNING clause).  In that case, we need to temporarily
+        #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
+        #       vfolder.  After done, we need to make another transaction to clear the unusable state.
         target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
         async def _clone(reporter: ProgressReporter) -> None:
@@ -1058,20 +1062,20 @@ class VfolderRepository:
                         "permission": vfolder_info.permission,
                         "last_used": None,
                         "host": vfolder_info.target_host,
+                        # TODO: add quota_scope_id
                         "creator": vfolder_info.email,
                         "ownership_type": VFolderOwnershipType("user"),
                         "user": vfolder_info.user_id,
                         "group": None,
                         "unmanaged_path": None,
                         "cloneable": vfolder_info.cloneable,
-                        "quota_scope_id": vfolder_info.target_quota_scope_id,
-                        "status": VFolderOperationStatus.READY,
+                        "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
                     }
                     query = sa.insert(vfolders).values(**insert_values)
                     await db_session.execute(query)
 
             # Clone the vfolder contents
-            manager_client = storage_manager.get_manager_facing_client(target_proxy)
+            manager_client = storage_manager.get_manager_facing_client(source_proxy)
             await manager_client.clone_folder(
                 source_volume,
                 str(vfolder_info.source_vfolder_id),
