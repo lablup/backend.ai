@@ -1316,7 +1316,7 @@ async def initiate_vfolder_clone(
     # Generate the ID of the destination vfolder.
     # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
     #       the actual object (with RETURNING clause).  In that case, we need to temporarily
-    #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
+    #       mark the object to be "unusable-yet" until the storage proxy creates the destination
     #       vfolder.  After done, we need to make another transaction to clear the unusable state.
     target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 

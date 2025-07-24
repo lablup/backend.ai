@@ -645,7 +645,7 @@ class VFolderService:
 
         # Create source and target VFolderID
         source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
-        target_quota_scope_id = str(QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid))
+        target_quota_scope_id = "..."  # TODO: implement
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(
