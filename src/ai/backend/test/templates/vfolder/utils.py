@@ -8,7 +8,9 @@ async def retrieve_all_files(
     Recursively retrieves all file paths in a virtual folder.
     """
 
+    print('vfolder_name!', vfolder_name)
     response = await client_session.VFolder(vfolder_name).list_files(path)
+    print('response!', response)
     assert "items" in response, "Response does not contain 'items' key."
 
     all_files = set()

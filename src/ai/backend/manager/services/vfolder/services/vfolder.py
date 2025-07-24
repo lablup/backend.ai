@@ -569,6 +569,11 @@ class VFolderService:
             for entry in vfolder_list_result.vfolders:
                 if entry.vfolder_data.name == action.target_name:
                     raise VFolderAlreadyExists
+                if (
+                    entry.vfolder_data.name.startswith(".")
+                    and entry.vfolder_data.name == action.target_name
+                ):
+                    raise VFolderInvalidParameter("VFolder name conflicts with your dotfile.")
 
         # Get target host
         target_folder_host = action.target_host or source_vfolder_data.host
@@ -585,24 +590,6 @@ class VFolderService:
                 f"{action.target_name} is reserved for internal operations."
             )
 
-        # Check name conflicts for dot-prefixed folders
-        if action.target_name.startswith("."):
-            all_accessible_vfolders = await self._vfolder_repository.list_accessible_vfolders(
-                user_id=action.requester_user_uuid,
-                user_role=user_role,
-                domain_name=user_domain_name,
-                allowed_vfolder_types=list(allowed_vfolder_types),
-            )
-            for access_info in all_accessible_vfolders.vfolders:
-                if access_info.vfolder_data.name == action.target_name:
-                    raise VFolderAlreadyExists
-                # Check for conflicts with dotfile paths
-                if (
-                    access_info.vfolder_data.name.startswith(".")
-                    and access_info.vfolder_data.name == action.target_name
-                ):
-                    raise VFolderInvalidParameter("VFolder name conflicts with your dotfile.")
-
         # Check for duplicate vfolder names
         name_exists = await self._vfolder_repository.check_vfolder_name_exists(
             action.target_name,
@@ -618,12 +605,12 @@ class VFolderService:
             )
 
         # Get user's keypair resource policy
-        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        if not user:
+        user_data = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
+        if not user_data:
             raise VFolderInvalidParameter("User not found.")
 
         allowed_vfolder_hosts = await self._vfolder_repository.get_allowed_vfolder_hosts(
-            user.id, source_vfolder_data.group
+            user_data.id, source_vfolder_data.group
         )
 
         # Check host permissions using the user's actual resource policy
@@ -638,7 +625,7 @@ class VFolderService:
         )
 
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            user.id, source_vfolder_data.group
+            user_data.id, source_vfolder_data.group
         )
 
         # Check resource policy's max_vfolder_count
