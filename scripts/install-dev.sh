@@ -1051,10 +1051,11 @@ configure_backendai() {
 
   show_info "Setting up databases... (app-proxy)"
   $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "\
+    DROP ROLE IF EXISTS appproxy;
     CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove'; \
-    CREATE DATABASE appproxy; \
-    GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy; \
-    \c appproxy; \
+    CREATE DATABASE appproxy IF NOT EXISTS; \
+    GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://appproxy:develove@localhost:5432/appproxy database -c "\
     GRANT ALL ON SCHEMA public TO appproxy;"
   # TODO: add "schema oneshot" command for app-proxy
   ./py -m alembic -c alembic-appproxy.ini upgrade head
