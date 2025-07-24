@@ -8,7 +8,8 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import ByteSize, StringFilter
+from ai.backend.manager.api.gql.base import ByteSize
+from ai.backend.manager.api.gql.types import OrderDirection, StringFilter
 
 
 # Enums
@@ -36,12 +37,6 @@ class ArtifactOrderField(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
     LATEST_VERSION = "LATEST_VERSION"
-
-
-@strawberry.enum
-class OrderDirection(StrEnum):
-    ASC = "ASC"
-    DESC = "DESC"
 
 
 # Input Types

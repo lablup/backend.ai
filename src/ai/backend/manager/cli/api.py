@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import aiofiles
 import click
@@ -43,6 +44,95 @@ async def generate_strawberry_gql_schema(output_path: Path) -> None:
     else:
         async with aiofiles.open(output_path, "w") as fw:
             await fw.write(strawberry_schema.as_str())
+
+
+def generate_supergraph_schema(
+    schema_file_path: str | Path,
+    supergraph_config_path: str | Path,
+    output_dir: Optional[str | Path] = None,
+) -> None:
+    """
+    Post-processes GraphQL schema and generates supergraph.
+
+    Args:
+        schema_file_path: Path to the main schema file (e.g., schema2.graphql)
+        supergraph_config_path: Path to the supergraph.yaml configuration file
+        output_dir: Output directory (defaults to same directory as schema file)
+    """
+    log.info("Generating supergraph schema...")
+
+    schema_path = Path(schema_file_path)
+    config_path = Path(supergraph_config_path)
+    output_dir = Path(output_dir) if output_dir else schema_path.parent
+
+    # Post-process schema file
+    content = schema_path.read_text(encoding="utf-8")
+
+    content = content.replace(
+        'schema @link(url: "https://specs.apollo.dev/federation/v2.7"',
+        'schema @link(url: "https://specs.apollo.dev/federation/v2.3"',
+    ).replace("type PageInfo {", "type PageInfo @shareable {")
+
+    schema_path.write_text(content, encoding="utf-8")
+    print(f"Schema post-processed at: {schema_path}")
+
+    # Generate supergraph
+    supergraph_path = output_dir / "supergraph.graphql"
+    result = subprocess.run(
+        ["rover", "supergraph", "compose", "--config", str(config_path)],
+        cwd=config_path.parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    supergraph_path.write_text(result.stdout, encoding="utf-8")
+    print(f"Supergraph generated at: {supergraph_path}")
+
+
+@cli.command()
+@click.pass_obj
+@click.option(
+    "--schema-file",
+    "-s",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to the GraphQL schema file to process",
+)
+@click.option(
+    "--config",
+    "-c",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to the supergraph.yaml configuration file",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    default=None,
+    type=click.Path(file_okay=False, writable=True),
+    help="Output directory for supergraph.graphql (default: same as schema file directory)",
+)
+def generate_supergraph(
+    cli_ctx: CLIContext, schema_file: Path, config: Path, output_dir: Optional[Path]
+) -> None:
+    """Post-process GraphQL schema and generate supergraph."""
+    try:
+        generate_supergraph_schema(
+            schema_file_path=schema_file,
+            supergraph_config_path=config,
+            output_dir=output_dir,
+        )
+        click.echo("✅ Supergraph generation completed successfully!")
+    except FileNotFoundError as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        raise click.Abort()
+    except subprocess.CalledProcessError as e:
+        click.echo(f"❌ Rover command failed: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"❌ Unexpected error: {e}", err=True)
+        raise click.Abort()
 
 
 @cli.command()
