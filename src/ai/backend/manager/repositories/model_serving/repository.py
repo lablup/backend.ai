@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError, StatementError
@@ -19,7 +19,9 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
+    EndpointAutoScalingRuleData,
     EndpointData,
     EndpointTokenData,
     RoutingData,
@@ -29,6 +31,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -86,7 +89,7 @@ class ModelServingRepository:
             ):
                 return None
 
-            return EndpointData.from_row(endpoint)
+            return endpoint.to_data()
 
     @repository_decorator()
     async def get_endpoint_by_name_validated(
@@ -100,7 +103,7 @@ class ModelServingRepository:
             endpoint = await self._get_endpoint_by_name(session, name, user_id)
             if not endpoint:
                 return None
-            return EndpointData.from_row(endpoint)
+            return endpoint.to_data()
 
     @repository_decorator()
     async def list_endpoints_by_owner_validated(
@@ -122,8 +125,8 @@ class ModelServingRepository:
                 .options(selectinload(EndpointRow.routings))
             )
             result = await session.execute(query)
-            rows = result.scalars().all()
-            data_list = [EndpointData.from_row(row) for row in rows]
+            rows = cast(list[EndpointRow], result.scalars().all())
+            data_list = [row.to_data() for row in rows]
 
             return data_list
 
@@ -145,20 +148,30 @@ class ModelServingRepository:
 
     @repository_decorator()
     async def create_endpoint_validated(
-        self, endpoint_row: EndpointRow, registry: AgentRegistry
+        self, endpoint_creator: EndpointCreator, registry: AgentRegistry
     ) -> EndpointData:
         """
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
-            data = EndpointData.from_row(endpoint_row)
-            endpoint_row.url = await registry.create_appproxy_endpoint(db_sess, endpoint_row)
+            endpoint_row = EndpointRow.from_creator(endpoint_creator)
             db_sess.add(endpoint_row)
-
             await db_sess.flush()
-            await db_sess.refresh(endpoint_row)
+            endpoint_row = await EndpointRow.get(
+                db_sess,
+                endpoint_row.id,
+                load_created_user=True,
+                load_session_owner=True,
+                load_image=True,
+                load_routes=True,
+            )
+            endpoint_before_assign_url = endpoint_row.to_data()
+            endpoint_row.url = await registry.create_appproxy_endpoint(
+                db_sess, endpoint_before_assign_url
+            )
+            data = endpoint_row.to_data()
 
-            return data
+        return data
 
     @repository_decorator()
     async def update_endpoint_lifecycle_validated(
@@ -253,7 +266,7 @@ class ModelServingRepository:
             ):
                 return None
 
-            return RoutingData.from_row(route)
+            return route.to_data()
 
     @repository_decorator()
     async def update_route_traffic_validated(
@@ -295,7 +308,7 @@ class ModelServingRepository:
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
                 str(traffic_ratio),
             )
-            return EndpointData.from_row(endpoint)
+            return endpoint.to_data()
 
     @repository_decorator()
     async def decrease_endpoint_replicas_validated(
@@ -346,7 +359,7 @@ class ModelServingRepository:
             await session.commit()
             await session.refresh(token_row)
 
-            return EndpointTokenData.from_row(token_row)
+            return token_row.to_dataclass()
 
     @repository_decorator()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
@@ -554,7 +567,7 @@ class ModelServingRepository:
         user_id: uuid.UUID,
         user_role: UserRole,
         domain_name: str,
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Get auto scaling rule by ID with access validation.
         Returns None if rule doesn't exist or user doesn't have access.
@@ -570,8 +583,8 @@ class ModelServingRepository:
                 ):
                     return None
 
-                return rule
-            except NoResultFound:
+                return rule.to_data()
+            except ObjectNotFound:
                 return None
 
     @repository_decorator()
@@ -589,7 +602,7 @@ class ModelServingRepository:
         cooldown_seconds: int,
         min_replicas: Optional[int] = None,
         max_replicas: Optional[int] = None,
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Create auto scaling rule with access validation.
         Returns the created rule if successful, None if no access.
@@ -618,7 +631,7 @@ class ModelServingRepository:
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
-            return rule
+            return rule.to_data()
 
     @repository_decorator()
     async def update_auto_scaling_rule_validated(
@@ -628,7 +641,7 @@ class ModelServingRepository:
         user_id: uuid.UUID,
         user_role: UserRole,
         domain_name: str,
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Update auto scaling rule with access validation.
         Returns the updated rule if successful, None if not found or no access.
@@ -650,8 +663,8 @@ class ModelServingRepository:
                 for key, value in fields_to_update.items():
                     setattr(rule, key, value)
 
-                return rule
-            except NoResultFound:
+                return rule.to_data()
+            except ObjectNotFound:
                 return None
 
     @repository_decorator()
@@ -917,7 +930,7 @@ class ModelServingRepository:
                 return MutationResult(
                     success=True,
                     message="success",
-                    data=EndpointData.from_row(endpoint_row),
+                    data=endpoint_row.to_data(),
                 )
 
         try:

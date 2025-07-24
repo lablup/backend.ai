@@ -8,7 +8,6 @@ from collections.abc import (
     Sequence,
 )
 from decimal import Decimal
-from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -23,7 +22,6 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 import trafaret as t
-import yarl
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
@@ -50,6 +48,13 @@ from ai.backend.logging import BraceStyleAdapter
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.model_serving.creator import EndpointCreator
+from ai.backend.manager.data.model_serving.types import (
+    EndpointAutoScalingRuleData,
+    EndpointData,
+    EndpointLifecycle,
+    EndpointTokenData,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.types import MountOptionModel, UserScope
 
@@ -75,13 +80,10 @@ from .user import UserRow
 from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.model_serving.types import EndpointTokenData
-
     from .gql import GraphQueryContext
 
 __all__ = (
     "EndpointRow",
-    "EndpointLifecycle",
     "ModelServiceHelper",
     "EndpointStatistics",
     "EndpointTokenRow",
@@ -92,16 +94,6 @@ __all__ = (
 ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
-
-
-class EndpointLifecycle(Enum):
-    CREATED = "created"
-    DESTROYING = "destroying"
-    DESTROYED = "destroyed"
-
-    @classmethod
-    def inactive_states(cls) -> set[EndpointLifecycle]:
-        return {cls.DESTROYING, cls.DESTROYED}
 
 
 class EndpointRow(Base):
@@ -240,58 +232,6 @@ class EndpointRow(Base):
         foreign_keys=[session_owner],
         primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
     )
-
-    def __init__(
-        self,
-        name: str,
-        model_definition_path: str | None,
-        created_user: UUID,
-        session_owner: UUID,
-        replicas: int,
-        image: ImageRow,
-        model: UUID,
-        domain: str,
-        project: UUID,
-        resource_group: str,
-        resource_slots: Mapping[str, Any],
-        cluster_mode: ClusterMode,
-        cluster_size: int,
-        extra_mounts: Sequence[VFolderMount],
-        runtime_variant: RuntimeVariant,
-        *,
-        model_mount_destination: Optional[str] = None,
-        tag: Optional[str] = None,
-        startup_command: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        callback_url: Optional[yarl.URL] = None,
-        environ: Optional[Mapping[str, Any]] = None,
-        resource_opts: Optional[Mapping[str, Any]] = None,
-        open_to_public: bool = False,
-    ):
-        self.id = uuid4()
-        self.name = name
-        self.model_definition_path = model_definition_path
-        self.created_user = created_user
-        self.session_owner = session_owner
-        self.replicas = replicas
-        self.image = image.id
-        self.model = model
-        self.domain = domain
-        self.project = project
-        self.resource_group = resource_group
-        self.resource_slots = resource_slots
-        self.cluster_mode = cluster_mode
-        self.cluster_size = cluster_size
-        self.extra_mounts = extra_mounts
-        self.model_mount_destination = model_mount_destination or "/models"
-        self.tag = tag
-        self.startup_command = startup_command
-        self.bootstrap_script = bootstrap_script
-        self.callback_url = callback_url
-        self.environ = environ
-        self.resource_opts = resource_opts
-        self.open_to_public = open_to_public
-        self.runtime_variant = runtime_variant
 
     @classmethod
     async def get(
@@ -562,6 +502,75 @@ class EndpointRow(Base):
                     })
         return connection_info
 
+    def to_data(self) -> EndpointData:
+        return EndpointData(
+            id=self.id,
+            name=self.name,
+            image=self.image_row.to_dataclass() if self.image_row else None,
+            domain=self.domain,
+            project=self.project,
+            resource_group=self.resource_group,
+            resource_slots=self.resource_slots,
+            url=self.url,
+            model=self.model,
+            model_definition_path=self.model_definition_path,
+            model_mount_destination=self.model_mount_destination,
+            created_user_id=self.created_user,
+            created_user_email=self.created_user_row.email
+            if self.created_user_row is not None
+            else None,
+            session_owner_id=self.session_owner,
+            session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
+            tag=self.tag,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
+            callback_url=self.callback_url,
+            environ=self.environ,
+            resource_opts=self.resource_opts,
+            replicas=self.replicas,
+            cluster_mode=ClusterMode(self.cluster_mode),
+            cluster_size=self.cluster_size,
+            open_to_public=self.open_to_public,
+            created_at=self.created_at,
+            destroyed_at=self.destroyed_at,
+            retries=self.retries,
+            lifecycle_stage=self.lifecycle_stage,
+            runtime_variant=self.runtime_variant,
+            extra_mounts=self.extra_mounts,
+            routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+        )
+
+    @classmethod
+    def from_creator(cls, creator: EndpointCreator) -> Self:
+        """
+        Create an EndpointRow instance from an EndpointCreator instance.
+        """
+        return cls(
+            name=creator.name,
+            model_definition_path=creator.model_definition_path,
+            created_user=creator.created_user,
+            session_owner=creator.session_owner,
+            replicas=creator.replicas,
+            image=creator.image,
+            model=creator.model,
+            domain=creator.domain,
+            project=creator.project,
+            resource_group=creator.resource_group,
+            resource_slots=creator.resource_slots,
+            cluster_mode=creator.cluster_mode,
+            cluster_size=creator.cluster_size,
+            extra_mounts=creator.extra_mounts,
+            runtime_variant=creator.runtime_variant,
+            model_mount_destination=creator.model_mount_destination,
+            tag=creator.tag,
+            startup_command=creator.startup_command,
+            bootstrap_script=creator.bootstrap_script,
+            callback_url=creator.callback_url,
+            environ=creator.environ,
+            resource_opts=creator.resource_opts,
+            open_to_public=creator.open_to_public,
+        )
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
@@ -666,8 +675,6 @@ class EndpointTokenRow(Base):
         self.session_owner = user_uuid
 
     def to_dataclass(self) -> EndpointTokenData:
-        from ai.backend.manager.services.model_serving.types import EndpointTokenData
-
         return EndpointTokenData(
             id=self.id,
             token=self.token,
@@ -756,6 +763,22 @@ class EndpointAutoScalingRuleRow(Base):
         session: AsyncSession,
     ) -> None:
         await session.delete(self)
+
+    def to_data(self) -> EndpointAutoScalingRuleData:
+        return EndpointAutoScalingRuleData(
+            id=self.id,
+            metric_source=self.metric_source,
+            metric_name=self.metric_name,
+            threshold=self.threshold,
+            comparator=self.comparator,
+            step_size=self.step_size,
+            cooldown_seconds=self.cooldown_seconds,
+            min_replicas=self.min_replicas,
+            max_replicas=self.max_replicas,
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
+            endpoint=self.endpoint,
+        )
 
 
 class ModelServiceHelper:

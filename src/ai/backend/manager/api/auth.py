@@ -18,7 +18,8 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
 from ai.backend.common import validators as tx
-from ai.backend.common.contexts.user_id import with_user_id
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -539,7 +540,18 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     with ExitStack() as stack:
         user_id = request.get("user", {}).get("uuid")
         if user_id is not None:
-            stack.enter_context(with_user_id(str(user_id)))
+            stack.enter_context(
+                with_user(
+                    UserData(
+                        user_id=user_id,
+                        is_authorized=request.get("is_authorized", False),
+                        is_admin=request.get("is_admin", False),
+                        is_superadmin=request.get("is_superadmin", False),
+                        role=request["user"]["role"],
+                        domain_name=request["user"]["domain_name"],
+                    )
+                )
+            )
             stack.enter_context(
                 with_log_context_fields({
                     "user_id": str(user_id),

@@ -6,4 +6,4 @@ providers:
     disableDeletion: false
     editable: true
     options:
-      path: /etc/grafana/dashboards
+      path: /var/lib/grafana/dashboards

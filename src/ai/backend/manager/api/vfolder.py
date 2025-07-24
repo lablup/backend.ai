@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -73,7 +74,6 @@ from ..errors.storage import (
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
-    EndpointLifecycle,
     EndpointRow,
     KernelStatus,
     UserRole,

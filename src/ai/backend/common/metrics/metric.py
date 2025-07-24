@@ -441,6 +441,7 @@ class LayerMetricObserver:
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
+    _layer_retry_count: Counter
     _layer_operation_duration_sec: Histogram
 
     def __init__(self) -> None:
@@ -453,6 +454,11 @@ class LayerMetricObserver:
             name="backendai_layer_operation_count",
             documentation="Total number of layer operations",
             labelnames=["domain", "layer", "operation", "success"],
+        )
+        self._layer_retry_count = Counter(
+            name="backendai_layer_retry_count",
+            documentation="Number of retries for layer operations",
+            labelnames=["domain", "layer", "operation"],
         )
         self._layer_operation_duration_sec = Histogram(
             name="backendai_layer_operation_duration_sec",
@@ -475,6 +481,19 @@ class LayerMetricObserver:
         operation: str,
     ) -> None:
         self._layer_operation_triggered_count.labels(
+            domain=domain,
+            layer=layer,
+            operation=operation,
+        ).inc()
+
+    def observe_layer_retry(
+        self,
+        *,
+        domain: DomainType,
+        layer: LayerType,
+        operation: str,
+    ) -> None:
+        self._layer_retry_count.labels(
             domain=domain,
             layer=layer,
             operation=operation,

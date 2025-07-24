@@ -1,0 +1,22 @@
+apiVersion: 1
+datasources:
+  - name: backendai-half-prometheus
+    type: prometheus
+    access: proxy
+    uid: prom_ds_001
+    url: http://backendai-half-prometheus:9090
+  - name: backendai-half-pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    uid: pyroscope_ds_001
+    url: http://backendai-half-pyroscope:4040
+  - name: backendai-half-loki
+    type: loki
+    access: proxy
+    uid: loki_ds_001
+    url: http://backendai-half-loki:3100
+  - name: backendai-half-tempo
+    type: tempo
+    access: proxy
+    uid: tempo_ds_001
+    url: http://backendai-half-tempo:3200

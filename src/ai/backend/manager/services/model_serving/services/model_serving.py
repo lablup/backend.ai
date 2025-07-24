@@ -36,6 +36,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.creator import EndpointCreator
+from ai.backend.manager.data.model_serving.types import (
+    EndpointTokenData as ServiceEndpointTokenData,
+)
 from ai.backend.manager.errors.service import (
     EndpointNotFound,
     ModelServiceNotFound,
@@ -43,7 +47,6 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
-    EndpointRow,
     EndpointTokenRow,
 )
 from ai.backend.manager.models.image import ImageIdentifier
@@ -116,9 +119,6 @@ from ai.backend.manager.services.model_serving.types import (
     RequesterCtx,
     RouteInfo,
     ServiceInfo,
-)
-from ai.backend.manager.services.model_serving.types import (
-    EndpointTokenData as ServiceEndpointTokenData,
 )
 from ai.backend.manager.types import UserScope
 
@@ -268,21 +268,21 @@ class ModelServingService:
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {action.creator.group_name}")
 
-        endpoint = EndpointRow(
+        endpoint = EndpointCreator(
             action.creator.service_name,
-            service_prepare_ctx.model_definition_path,
-            action.request_user_id,
-            service_prepare_ctx.owner_uuid,
-            action.creator.replicas,
-            image_row,
-            service_prepare_ctx.model_id,
-            action.creator.domain_name,
-            project_id,
-            service_prepare_ctx.scaling_group,
-            action.creator.config.resources,
-            action.creator.cluster_mode,
-            action.creator.cluster_size,
-            service_prepare_ctx.extra_mounts,
+            model_definition_path=service_prepare_ctx.model_definition_path,
+            created_user=action.request_user_id,
+            session_owner=service_prepare_ctx.owner_uuid,
+            replicas=action.creator.replicas,
+            image=image_row.id,
+            model=service_prepare_ctx.model_id,
+            domain=action.creator.domain_name,
+            project=project_id,
+            resource_group=service_prepare_ctx.scaling_group,
+            resource_slots=action.creator.config.resources,
+            cluster_mode=action.creator.cluster_mode,
+            cluster_size=action.creator.cluster_size,
+            extra_mounts=list(service_prepare_ctx.extra_mounts),
             model_mount_destination=action.creator.config.model_mount_destination,
             tag=action.creator.tag,
             startup_command=action.creator.startup_command,

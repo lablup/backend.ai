@@ -3,10 +3,10 @@ import uuid
 import pytest
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
 )
 from ai.backend.manager.models.user import UserRole
@@ -39,7 +39,7 @@ async def test_update_auto_scaling_rule_validated_success(
 
     # Assert
     assert result is not None
-    assert isinstance(result, EndpointAutoScalingRuleRow)
+    assert isinstance(result, EndpointAutoScalingRuleData)
     assert result.id == rule_id
 
     # Verify fields were updated

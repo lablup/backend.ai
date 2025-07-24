@@ -69,7 +69,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  allow-compute-plugins = [ "cuda", "rocm",]
+  allow-compute-plugins = [ "rocm", "cuda",]
   # Blocked compute plugins
   block-compute-plugins = [ "cpu",]
   # Allowed network plugins
@@ -88,6 +88,8 @@
   use-experimental-redis-event-dispatcher = true
   # Docker mode detected based on kernel version (linuxkit/native)
   docker-mode = "linuxkit"
+  # Owner uid:gid of the mount directory
+  mount-path-uid-gid = "root:root"
 
 [agent.rpc-listen-addr]
     # Host address of the service.

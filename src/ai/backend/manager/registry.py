@@ -54,6 +54,7 @@ from yarl import URL
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientKey, ClientPool
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -144,6 +145,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -246,6 +248,7 @@ class AgentRegistry:
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
     webhook_ptask_group: aiotools.PersistentTaskGroup
+    _client_pool: ClientPool
 
     def __init__(
         self,
@@ -288,6 +291,7 @@ class AgentRegistry:
             hook_plugin_ctx,
             self,
         )
+        self._client_pool = ClientPool(ClientConfig())
 
     def _get_agent_client(
         self,
@@ -324,9 +328,14 @@ class AgentRegistry:
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
 
-    def _create_wsproxy_client(self, address: str, token: str) -> WSProxyClient:
-        """Create a WSProxy client instance."""
-        return WSProxyClient(address, token)
+    def _load_wsproxy_client(self, address: str, token: str) -> WSProxyClient:
+        client_session = self._client_pool.load_client_session(
+            ClientKey(
+                endpoint=address,
+                domain="wsproxy",
+            )
+        )
+        return WSProxyClient(client_session, address, token)
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -405,8 +414,12 @@ class AgentRegistry:
         current_task = asyncio.current_task()
         assert current_task is not None
 
-        mount_id_map = config.get("mount_id_map", {})
-        mount_map = config.get("mount_map", {})
+        mount_id_map = config.get("mount_id_map")
+        mount_map = config.get("mount_map")
+        if mount_id_map is None:
+            mount_id_map = {}
+        if mount_map is None:
+            mount_map = {}
 
         combined_mount_map = {**mount_map, **mount_id_map}
 
@@ -3606,7 +3619,7 @@ class AgentRegistry:
         }
 
     async def get_health_check_info(
-        self, endpoint: EndpointRow, model: VFolderRow
+        self, endpoint: EndpointData, model: VFolderRow
     ) -> HealthCheckConfig | None:
         _info: HealthCheckConfig | None = None
 
@@ -3641,7 +3654,7 @@ class AgentRegistry:
     async def create_appproxy_endpoint(
         self,
         db_sess: AsyncSession,
-        endpoint: EndpointRow,
+        endpoint: EndpointData,
     ) -> str:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
@@ -3653,7 +3666,7 @@ class AgentRegistry:
         sgroup = result.first()
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
-        wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
 
         model = await VFolderRow.get(db_sess, endpoint.model)
 
@@ -3664,7 +3677,7 @@ class AgentRegistry:
             "service_name": endpoint.name,
             "tags": {
                 "session": {
-                    "user_uuid": str(endpoint.session_owner),
+                    "user_uuid": str(endpoint.session_owner_id),
                     "group_id": str(endpoint.project),
                     "domain_name": endpoint.domain,
                 },
@@ -3695,16 +3708,24 @@ class AgentRegistry:
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
 
-        wsproxy_client = self._create_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
         await wsproxy_client.delete_endpoint(endpoint.id)
 
     async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
         async with self.db.begin_readonly_session() as db_sess:
-            endpoint = await EndpointRow.get(db_sess, endpoint_id)
+            endpoint = await EndpointRow.get(
+                db_sess,
+                endpoint_id,
+                load_created_user=True,
+                load_session_owner=True,
+                load_image=True,
+                load_routes=True,
+            )
             connection_info = await endpoint.generate_redis_route_info(db_sess)
             model = await VFolderRow.get(db_sess, endpoint.model)
+            endpoint_data = endpoint.to_data()
 
-        health_check_config = await self.get_health_check_info(endpoint, model)
+        health_check_config = await self.get_health_check_info(endpoint_data, model)
         await self.valkey_live.update_appproxy_redis_info(
             endpoint.id,
             connection_info,

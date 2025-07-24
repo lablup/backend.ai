@@ -73,8 +73,6 @@ class ContainerRegistryRepository:
     @repository_decorator()
     async def get_known_registries(self) -> dict[str, str]:
         async with self._db.begin_readonly_session() as session:
-            from ai.backend.manager.models.container_registry import ContainerRegistryRow
-
             known_registries_map = await ContainerRegistryRow.get_known_container_registries(
                 session
             )
@@ -82,11 +80,8 @@ class ContainerRegistryRepository:
             known_registries = {}
             for project, registries in known_registries_map.items():
                 for registry_name, url in registries.items():
-                    if project:
-                        key = f"{project}/{registry_name}"
-                    else:
-                        key = registry_name
-                    known_registries[key] = url.human_repr()
+                    if project not in known_registries:
+                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
 
             return known_registries
 
@@ -107,7 +102,7 @@ class ContainerRegistryRepository:
             if project:
                 stmt = stmt.where(ContainerRegistryRow.project == project)
 
-            row = await session.scalar(stmt)
+            row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
             if not row:
                 raise ContainerRegistryNotFound()
             return row
@@ -124,7 +119,7 @@ class ContainerRegistryRepository:
         if project:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
-        row = await session.scalar(stmt)
+        row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
         return row.to_dataclass() if row else None
 
     async def _get_by_registry_name(
@@ -136,11 +131,11 @@ class ContainerRegistryRepository:
             ContainerRegistryRow.registry_name == registry_name
         )
         result = await session.execute(stmt)
-        rows = result.scalars().all()
+        rows: list[ContainerRegistryRow] = result.scalars().all()
         return [row.to_dataclass() for row in rows]
 
     async def _get_all(self, session: SASession) -> list[ContainerRegistryData]:
         stmt = sa.select(ContainerRegistryRow)
         result = await session.execute(stmt)
-        rows = result.scalars().all()
+        rows: list[ContainerRegistryRow] = result.scalars().all()
         return [row.to_dataclass() for row in rows]

@@ -2,7 +2,7 @@ import logging
 from typing import Final, override
 
 from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user_id import current_user_id
+from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -23,6 +23,7 @@ class AuditLogMonitor(ActionMonitor):
 
     async def _generate_log(self, action: BaseAction, result: ProcessResult) -> None:
         async with self._db.begin_session() as db_sess:
+            user = current_user()
             db_row = AuditLogRow(
                 action_id=result.meta.action_id,
                 entity_type=action.entity_type(),
@@ -30,7 +31,7 @@ class AuditLogMonitor(ActionMonitor):
                 created_at=result.meta.started_at,
                 entity_id=result.meta.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
-                triggered_by=current_user_id(),
+                triggered_by=str(user.user_id) if user else None,
                 description=result.meta.description,
                 status=result.meta.status,
                 duration=result.meta.duration,

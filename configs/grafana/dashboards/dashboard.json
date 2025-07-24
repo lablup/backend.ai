@@ -38,7 +38,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "fer3d2oq5szk0a"
+        "uid": "loki_ds_001"
       },
       "fieldConfig": {
         "defaults": {},
@@ -66,7 +66,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "fer3d2oq5szk0a"
+            "uid": "loki_ds_001"
           },
           "editorMode": "code",
           "expr": "{job=\"$services\", level!=\"INFO\"}",
@@ -80,7 +80,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -162,7 +162,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_api_request_count_total{service_group=\"$services\"}[5m])",
@@ -177,7 +177,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -258,7 +258,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(increase(backendai_api_request_count_total{service_group=\"$services\", status_code=~\"4..|500\"}[5m])) by (method, endpoint, status_code)",
@@ -273,7 +273,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -355,7 +355,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (method, endpoint) (increase(backendai_api_request_duration_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (method, endpoint) (increase(backendai_api_request_duration_sec_count{service_group=\"$services\"}[5m]))",
@@ -370,7 +370,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -452,7 +452,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(backendai_api_request_duration_sec_bucket{service_group=\"$services\"}) by (le, method, endpoint))",
@@ -463,7 +463,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_api_request_duration_sec_bucket{service_group=\"$services\"}) by (le, method, endpoint))",
@@ -479,7 +479,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -561,7 +561,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"True\"}[5m])",
@@ -572,7 +572,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])",
@@ -588,7 +588,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -669,7 +669,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])) by (parent_type, operation_type, operation_name, field_name)",
@@ -684,7 +684,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -766,7 +766,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"True\"}[5m]))",
@@ -777,7 +777,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"False\"}[5m]))",
@@ -793,7 +793,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -875,7 +875,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
@@ -886,7 +886,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
@@ -898,7 +898,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
@@ -910,7 +910,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
@@ -926,7 +926,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1008,7 +1008,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(increase(backendai_event_count_total{service_group=\"$services\"}[5m])) by (event_type)",
@@ -1023,7 +1023,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1105,7 +1105,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(increase(backendai_event_failure_count{service_group=\"$services\"}[5m])) by (event_type)",
@@ -1120,7 +1120,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1202,7 +1202,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (event_type) (increase(backendai_event_processing_time_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (event_type) (increase(backendai_event_processing_time_sec_count{service_group=\"$services\"}[5m]))",
@@ -1217,7 +1217,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1299,7 +1299,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(backendai_event_processing_time_sec_bucket{service_group=\"$services\"}) by (le, event_type))",
@@ -1310,7 +1310,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_event_processing_time_sec_bucket{service_group=\"$services\"}) by (le, event_type))",
@@ -1326,7 +1326,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1408,7 +1408,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(backendai_bgtask_count{service_group=\"$services\"}) by (task_name)",
@@ -1423,7 +1423,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1505,7 +1505,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum(increase(backendai_bgtask_done_count_total{service_group=\"$services\"}[5m])) by (task_name, status)",
@@ -1520,7 +1520,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1602,7 +1602,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_count{service_group=\"$services\"}[5m]))",
@@ -1617,7 +1617,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1699,7 +1699,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(backendai_bgtask_processing_time_sec_bucket{service_group=\"$services\"}) by (le, task_name, status))",
@@ -1710,7 +1710,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_bgtask_processing_time_sec_bucket{service_group=\"$services\"}) by (le, task_name, status))",
@@ -1726,7 +1726,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1808,7 +1808,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_rpc_requests_total{service_group=\"$services\"}[1m])",
@@ -1823,7 +1823,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -1905,7 +1905,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_rpc_failure_requests_total{service_group=\"$services\"}[1m])",
@@ -1920,7 +1920,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2002,7 +2002,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "sum by (method, endpoint) (increase(backendai_rpc_request_duration_seconds_sum{service_group=\"$services\"}[5m])) \n/\nsum by (method, endpoint) (increase(backendai_rpc_request_duration_seconds_count{service_group=\"$services\"}[5m]))",
@@ -2017,7 +2017,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2099,7 +2099,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(backendai_rpc_request_duration_seconds_bucket{service_group=\"$services\"}) by (le, method))",
@@ -2110,7 +2110,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.90, sum(backendai_rpc_request_duration_seconds_bucket{service_group=\"$services\"}) by (le, method))",
@@ -2126,7 +2126,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2208,7 +2208,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_sweep_session_count_total{service_group=\"$services\"}[5m])",
@@ -2223,7 +2223,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2305,7 +2305,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "increase(backendai_sweep_kernel_count_total{service_group=\"$services\"}[5m])",
@@ -2320,7 +2320,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2402,7 +2402,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "backendai_async_task_count{service_group=\"$services\"}",
@@ -2417,7 +2417,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {},
@@ -2436,7 +2436,7 @@
         {
           "datasource": {
             "type": "grafana-pyroscope-datasource",
-            "uid": "PF9B21A99B3AC1886"
+            "uid": "pyroscope_ds_001"
           },
           "editorMode": "code",
           "expr": "",
@@ -2456,7 +2456,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2537,7 +2537,7 @@
         {
           "datasource": {
             "type": "grafana-pyroscope-datasource",
-            "uid": "PF9B21A99B3AC1886"
+            "uid": "pyroscope_ds_001"
           },
           "editorMode": "code",
           "expr": "",
@@ -2557,7 +2557,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2639,7 +2639,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "backendai_cpu_usage_percent{service_group=\"$services\"}",
@@ -2654,7 +2654,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2736,7 +2736,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "backendai_memory_used_rss{service_group=\"$services\"}",
@@ -2751,7 +2751,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "aeqpnu56uytj4f"
+        "uid": "prom_ds_001"
       },
       "fieldConfig": {
         "defaults": {
@@ -2833,7 +2833,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "be3td1qwoaxhcc"
+            "uid": "prom_ds_001"
           },
           "editorMode": "code",
           "expr": "backendai_memory_used_vms{service_group=\"$services\"}",
@@ -2856,6 +2856,10 @@
         "current": {
           "text": "agent",
           "value": "agent"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prom_ds_001"
         },
         "definition": "label_values(up,service_group)",
         "description": "",

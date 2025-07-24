@@ -212,17 +212,7 @@
     "UserStatus": "User Status",
     "Users": "Users",
     "WarningLessRateLimit": "If the Rate Limit value is small, API operations such as login may be blocked.",
-    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
-    "validation": {
-      "InvalidEmailAddress": "Invalid Email Address.",
-      "LetterNumber-_dot": "Allows letters, numbers and -_.",
-      "NameAlreadyExists": "Policy Name Already Exists!",
-      "NumbersOnly": "Allows numbers only",
-      "PleaseSelectOption": "Please select one option",
-      "PleaseSelectOptions": "Please select at least one option or more.",
-      "PolicyName": "Policy name Required.",
-      "ValidationFailed": "Validation failed"
-    }
+    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:"
   },
   "data": {
     "Active": "Active",
@@ -350,6 +340,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
+      "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
+      "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
@@ -359,6 +351,7 @@
       "DeleteAFolder": "Delete folder",
       "DeleteForever": "Delete forever",
       "DescYouAreFolderOwner": "You are the owner of this folder.",
+      "DownloadingModel": "Downloading Model...",
       "Edit": "Edit",
       "EditDelete": "Edit+Delete",
       "FileDeleted": "File deleted",
@@ -557,6 +550,7 @@
     "Digest": "Digest",
     "Disabled": "disabled",
     "ErrorMinimumValue": "{{ key }} must be at least {{ value }}",
+    "FailedToDeleteCustomizedImage": "Failed to delete customized image.",
     "FullImagePath": "Full image path",
     "ImageReinstallationRequired": "Image reinstallation required",
     "Images": "Images",
@@ -683,7 +677,17 @@
     "StorageProxies": "Storages",
     "TotalItems": "Total {{total}} items",
     "Username": "Username",
-    "ValueRequired": "Please enter {{ name }}"
+    "ValueRequired": "Please enter {{ name }}",
+    "validation": {
+      "InvalidEmailAddress": "Invalid Email Address.",
+      "LetterNumber-_dot": "Allows letters, numbers and -_.",
+      "NameAlreadyExists": "Policy Name Already Exists!",
+      "NumbersOnly": "Allows numbers only",
+      "PleaseSelectOption": "Please select one option",
+      "PleaseSelectOptions": "Please select at least one option or more.",
+      "PolicyName": "Policy name Required.",
+      "ValidationFailed": "Validation failed"
+    }
   },
   "import": {
     "CleanUpImportTask": "Cleanup import task...",
@@ -764,7 +768,7 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
     "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
-    "ServiceName": "Service name",
+    "ServiceName": "Service Name",
     "UseAnotherAccount": "Sign in with a different account"
   },
   "kernel": {
@@ -777,8 +781,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -794,8 +796,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -920,15 +924,18 @@
     "GenerateNewToken": "Generate new token",
     "GenerateToken": "Generate Token",
     "GeneratedTokens": "Generated Tokens",
+    "GoToServiceDetailPage": "Go to service detail page",
     "Image": "Image",
     "ModelDefinitionPath": "Model Definition File Path",
     "ModelMountDestination": "Mount Destination For Model Folder",
+    "ModelServiceFailedToStart": "Failed to start model service.",
     "NoExtraMounts": "No extra mounts",
     "NoServiceEndpoint": "No Service Endpoint",
     "NumberOfReplicas": "Number of replicas",
     "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
     "OpenToPublic": "Open To Public",
     "Owner": "Owner",
+    "PlayYourModelNow": "Play your model now!",
     "PleaseSelectTime": "Please select time!",
     "Processing": "Processing...",
     "Public": "Public",
@@ -940,17 +947,21 @@
     "RoutesInfo": "Routes Info",
     "RoutingInfo": "Routing Info",
     "RoutingsCount": "Routings Count",
+    "RunThisModel": "Run this model",
     "RuntimeVariant": "Inference Runtime Variant",
     "SeeContainerLogs": "See Container Logs",
+    "ServiceAlreadyExists": "Service name already exists",
     "ServiceCreated": "Model service {{ name }} has been created successfully.",
     "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}",
     "ServiceEndpoint": "Service Endpoint",
     "ServiceInfo": "Service Info",
     "ServiceName": "Service Name",
     "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end.",
+    "ServiceNameInvalidCharacter": "In the middle of the service name, only the alphabet, the number, the '_', '.', '-' can only be included.",
     "ServiceNameMaxLength": "Please enter 24 characters or less.",
     "ServiceNameMinLength": "Please enter at least 4 characters.",
-    "ServiceNameRule": "Only allow alphanumeric, underscore(_), and hyphen(-) and it must end with an alphanumeric character.",
+    "ServiceNameShouldEndWith": "It must end with alphabet, large and small characters, numbers, and '_'.",
+    "ServiceNameShouldStartWith": "It must start with alphabetic and small characters, numbers or '_'.",
     "ServiceTerminated": "A shutdown request was sent for model service '{{ name }}'.",
     "ServiceUpdated": "Model service {{ name }} has been updated successfully.",
     "Services": "Services",
@@ -960,6 +971,7 @@
     "StartNewService": "Start New Service",
     "StartNewServing": "Start new serving",
     "StartService": "Start Service",
+    "StartingModelService": "Starting model service...",
     "Status": "Status",
     "Success": "Success",
     "SyncRoutes": "Sync routes",
@@ -1015,6 +1027,9 @@
     "SeeDetail": "See Detail",
     "SuccessfullyUpdated": "Successfully Updated",
     "Visit": "Visit"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} items"
   },
   "propertyFilter": {
     "PlaceHolder": "Search",
@@ -1409,6 +1424,7 @@
       "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
       "InteractiveMode": "Interactive",
       "InteractiveModeDesc": "allows you to create, test and run code interactively via jupyter notebook, visual studio code, etc.",
+      "InvalidMountsSelectionWarning": "Folder selection information is not valid. \nCheck out the selected folder.",
       "InvalidPortFormat": "The port number format is incorrect.",
       "Launch": "Launch",
       "LaunchConfirmationDialog": "To keep your code and data, or share it with other collaborators, simply create a storage folder in the data & storage sidebar, then mount that folder when you start the resource and keep it there.",
@@ -1687,6 +1703,11 @@
     "SessionsDesc": "The number of compute sessions created.",
     "UsageHistory": "Usage History",
     "UsageHistoryNote": "The usage history shown here are based on terminated compute sessions.",
+    "description": {
+      "CPUUtilization": "Represents the amount of CPU time used by the session during the selected period. \n\nA single CPU core corresponds to a maximum of 100%.\nIf multiple cores are allocated, the total usage can exceed 100%, as it is calculated by summing up the maximum usage (100%) of each core.",
+      "NetworkRx": "Indicates the network transfer rate.  \n\nRepresents the rate at which the container is receiving network data.",
+      "NetworkTx": "Indicates the network transfer rate. \n\n Represents the rate at which the container is sending network data."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "If usage is low, data for some dates may not be available. Please try again with a shorter date range.",
       "NoMetricsToDisplay": "No metrics avaliable for tracking"
@@ -1955,6 +1976,10 @@
       "MyAccount": "My Account",
       "MyAccountInformation": "My Account Information",
       "MyEnvironments": "My Environments",
+      "MyResources": "My Resources",
+      "MyResourcesDescription": "<p>This panel shows your total resource usage and remaining across all projects and resource groups.</p><p>When there are multiple limits (such as domain, project, or keypair), the most restrictive limit is applied to show your usage and remaining capacity.</p>\n",
+      "MyResourcesIn": "My Resources in",
+      "MyResourcesInResourceGroupDescription": "This panel shows your current resource usage and available capacity in the selected resource group.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
@@ -1969,6 +1994,7 @@
       "Preferences": "Preferences",
       "PrivacyPolicy": "Privacy Policy",
       "Project": "Project",
+      "Remaining": "Remaining",
       "ResourcePolicy": "Resource Policy",
       "Resources": "Resources",
       "Serving": "Serving",
@@ -1981,8 +2007,11 @@
       "Summary": "Summary",
       "Tasks": "Tasks",
       "TermsOfService": "Terms of Service",
+      "TotalResourcesIn": "Total Resources in",
+      "TotalResourcesInResourceGroupDescription": "This panel shows the total used and remaining resources. The values are calculated by adding up the usage and remaining amounts of all agents using the selected resource group.",
       "TotpActivated": "2FA Enabled",
       "Update": "Update",
+      "Usage": "Usage",
       "UsageHistory": "Allocation History",
       "UserCredentials&Policies": "User Credentials & Policies",
       "UserSessionHistory": "User Session History",

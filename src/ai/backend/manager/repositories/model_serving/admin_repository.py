@@ -7,10 +7,12 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.manager.data.model_serving.types import (
+    EndpointAutoScalingRuleData,
     EndpointData,
     EndpointTokenData,
     RoutingData,
 )
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -50,7 +52,7 @@ class AdminModelServingRepository:
             )
             if not endpoint:
                 return None
-            data = EndpointData.from_row(endpoint)
+            data = endpoint.to_data()
         return data
 
     async def update_endpoint_lifecycle_force(
@@ -115,7 +117,7 @@ class AdminModelServingRepository:
             route = await self._get_route_by_id(session, route_id, load_endpoint=True)
             if not route or route.endpoint != service_id:
                 return None
-            data = RoutingData.from_row(route)
+            data = route.to_data()
         return data
 
     async def update_route_traffic_force(
@@ -144,7 +146,7 @@ class AdminModelServingRepository:
             endpoint = await self._get_endpoint_by_id(session, service_id, load_routes=True)
             if endpoint is None:
                 raise NoResultFound
-            data = EndpointData.from_row(endpoint)
+            data = endpoint.to_data()
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
@@ -185,7 +187,7 @@ class AdminModelServingRepository:
             session.add(token_row)
             await session.commit()
             await session.refresh(token_row)
-            data = EndpointTokenData.from_row(token_row)
+            data = token_row.to_dataclass()
         return data
 
     async def _get_endpoint_by_id(
@@ -249,16 +251,17 @@ class AdminModelServingRepository:
 
     async def get_auto_scaling_rule_by_id_force(
         self, rule_id: uuid.UUID
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Get auto scaling rule by ID without access validation.
         Returns None if rule doesn't exist.
         """
         async with self._db.begin_readonly_session() as session:
             try:
-                return await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except NoResultFound:
+                row = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
+            except ObjectNotFound:
                 return None
+            return row.to_data()
 
     async def create_auto_scaling_rule_force(
         self,
@@ -271,7 +274,7 @@ class AdminModelServingRepository:
         cooldown_seconds: int = 300,
         min_replicas: Optional[int] = None,
         max_replicas: Optional[int] = None,
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Create auto scaling rule without access validation.
         Returns the created rule if successful, None if endpoint not found.
@@ -295,11 +298,11 @@ class AdminModelServingRepository:
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
-            return rule
+            return rule.to_data()
 
     async def update_auto_scaling_rule_force(
         self, rule_id: uuid.UUID, fields_to_update: dict[str, Any]
-    ) -> Optional[EndpointAutoScalingRuleRow]:
+    ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Update auto scaling rule without access validation.
         Returns the updated rule if successful, None if not found.
@@ -316,8 +319,8 @@ class AdminModelServingRepository:
                 for key, value in fields_to_update.items():
                     setattr(rule, key, value)
 
-                return rule
-            except NoResultFound:
+                return rule.to_data()
+            except ObjectNotFound:
                 return None
 
     async def delete_auto_scaling_rule_force(self, rule_id: uuid.UUID) -> bool:

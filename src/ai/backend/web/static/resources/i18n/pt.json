@@ -210,17 +210,7 @@
     "UserStatus": "Estado do utilizador",
     "Users": "Comercial",
     "WarningLessRateLimit": "Se o valor do Limite de taxa for pequeno, as operações da API, como o início de sessão, podem ser bloqueadas.",
-    "YouAreAboutToDeleteCredential": "Você está prestes a excluir a credencial deste usuário:",
-    "validation": {
-      "InvalidEmailAddress": "Endereço de email invalido.",
-      "LetterNumber-_dot": "Permite letras, números e -_.",
-      "NameAlreadyExists": "O nome da política já existe!",
-      "NumbersOnly": "Permite apenas números",
-      "PleaseSelectOption": "Por favor selecione uma opção",
-      "PleaseSelectOptions": "Seleccione pelo menos uma opção ou mais.",
-      "PolicyName": "Nome da política Obrigatório.",
-      "ValidationFailed": "Falha na validação"
-    }
+    "YouAreAboutToDeleteCredential": "Você está prestes a excluir a credencial deste usuário:"
   },
   "data": {
     "Active": "Ativo",
@@ -348,6 +338,8 @@
     },
     "folders": {
       "CannotDeleteFolder": "Não é possível excluir a pasta montada em uma ou mais sessões. Por favor, termine a sessão primeiro.",
+      "CannotDeletePipelineFolder": "Você não pode excluir pastas de pipeline.",
+      "CannotRestorePipelineFolder": "Você não pode restaurar pastas de pipeline.",
       "CloneAFolder": "Clonar uma pasta",
       "CloneFolder": "Clonar pasta",
       "Cloneable": "Clonável",
@@ -357,6 +349,7 @@
       "DeleteAFolder": "Excluir uma pasta",
       "DeleteForever": "Apagar para sempre",
       "DescYouAreFolderOwner": "Você é o proprietário desta pasta.",
+      "DownloadingModel": "Modelo de download ...",
       "Edit": "Editar",
       "EditDelete": "Editar + Excluir",
       "FileDeleted": "Arquivo excluído",
@@ -378,7 +371,7 @@
       "FolderUsage": "Utilização da pasta",
       "FolderUsing": "Utilizar",
       "InviteUsers": "Convite o usuário",
-      "KickOut": "",
+      "KickOut": "Pare de compartilhar",
       "KickOutConfirm": "Deixar de partilhar com {{email}}?",
       "Leave": "Sair",
       "LeaveAFolder": "Deixe uma pasta",
@@ -555,6 +548,7 @@
     "Digest": "Digerir",
     "Disabled": "Desativado",
     "ErrorMinimumValue": "{{key}} deve ser pelo menos {{value}}",
+    "FailedToDeleteCustomizedImage": "Falha ao excluir a imagem personalizada.",
     "FullImagePath": "Caminho completo da imagem",
     "ImageReinstallationRequired": "Reinstalação de imagem necessária",
     "Images": "Imagens",
@@ -679,7 +673,17 @@
     "StorageProxies": "Armazéns",
     "TotalItems": "Total de itens {{total}}",
     "Username": "Nome do usuário",
-    "ValueRequired": "Introduzir {{ nome }}"
+    "ValueRequired": "Introduzir {{ nome }}",
+    "validation": {
+      "InvalidEmailAddress": "Endereço de e -mail inválido.",
+      "LetterNumber-_dot": "Permite letras, números e -_.",
+      "NameAlreadyExists": "O nome da política já existe!",
+      "NumbersOnly": "Permite apenas números",
+      "PleaseSelectOption": "Selecione uma opção",
+      "PleaseSelectOptions": "Selecione pelo menos uma opção ou mais.",
+      "PolicyName": "Nome da política necessário.",
+      "ValidationFailed": "A validação falhou"
+    }
   },
   "import": {
     "CleanUpImportTask": "Limpar tarefa de importação ...",
@@ -773,8 +777,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +792,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -916,6 +920,7 @@
     "GenerateNewToken": "Gerar novo token",
     "GenerateToken": "Gerar Token",
     "GeneratedTokens": "Tokens gerados",
+    "GoToServiceDetailPage": "Vá para a página de detalhes do serviço",
     "Image": "Imagem",
     "ModelDefinitionPath": "Caminho do arquivo de definição de modelo",
     "ModelMountDestination": "Montar destino para pasta de modelo",
@@ -925,6 +930,7 @@
     "OnlyAllowsNonNegativeIntegers": "Só permite números inteiros não negativos",
     "OpenToPublic": "Aberto ao público",
     "Owner": "Proprietário",
+    "PlayYourModelNow": "Jogue seu modelo agora!",
     "PleaseSelectTime": "Por favor, seleccione a hora!",
     "Processing": "Em processamento...",
     "Public": "Público",
@@ -938,15 +944,18 @@
     "RoutingsCount": "Contagem de rotas",
     "RuntimeVariant": "Variante de tempo de execução de inferência",
     "SeeContainerLogs": "Consulte os registros do contêiner",
+    "ServiceAlreadyExists": "O nome do serviço já existe",
     "ServiceCreated": "O serviço de modelo {{ name }} foi criado com sucesso.",
     "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}",
     "ServiceEndpoint": "Ponto final do serviço",
     "ServiceInfo": "Informações sobre o serviço",
     "ServiceName": "Nome do serviço",
     "ServiceNameCannotStartWithHyphen": "Hífens (-) não podem ser usados ​​em nenhuma das extremidades.",
+    "ServiceNameInvalidCharacter": "No meio do nome do serviço, apenas o alfabeto, o número, o '_', '.', '-' só pode ser incluído.",
     "ServiceNameMaxLength": "Insira 24 caracteres ou menos.",
     "ServiceNameMinLength": "Por favor insira pelo menos 4 caracteres.",
-    "ServiceNameRule": "Permitir apenas alfanumérico, sublinhado (_) e hífen (-) e deve terminar com um caractere alfanumérico.",
+    "ServiceNameShouldEndWith": "O nome da sessão deve terminar com alfabeto, caracteres grandes e pequenos, números e '_'.",
+    "ServiceNameShouldStartWith": "O nome da sessão deve começar com caracteres alfabéticos e pequenos, números ou '_'.",
     "ServiceTerminated": "Uma solicitação de encerramento foi enviada para o serviço de modelo '{{ name }}'.",
     "ServiceUpdated": "O serviço de modelo {{ name }} foi atualizado com sucesso.",
     "Services": "Serviços",
@@ -956,6 +965,7 @@
     "StartNewService": "Iniciar novo serviço",
     "StartNewServing": "Iniciar nova dose",
     "StartService": "Iniciar o serviço",
+    "StartingModelService": "Serviço de modelo inicial ...",
     "Status": "Estado",
     "Success": "Sucesso",
     "SyncRoutes": "Sincronizar rotas",
@@ -1011,6 +1021,9 @@
     "SeeDetail": "Veja detalhes",
     "SuccessfullyUpdated": "Atualizado com sucesso",
     "Visit": "Visita"
+  },
+  "pagination": {
+    "Total": "{{start}} - {{end}} de {{total}} itens"
   },
   "propertyFilter": {
     "PlaceHolder": "Pesquisar",
@@ -1405,6 +1418,7 @@
       "InsufficientAllocationOfResourcesWarning": "Os recursos alocáveis ​​ficam abaixo do recurso mínimo exigido na imagem selecionada.",
       "InteractiveMode": "Interativo",
       "InteractiveModeDesc": "permite-lhe criar, testar e executar código de forma interactiva através do jupyter notebook, visual studio code, etc.",
+      "InvalidMountsSelectionWarning": "As informações de seleção de pastas não são válidas. Confira a pasta selecionada.",
       "InvalidPortFormat": "O formato do número da porta está incorreto.",
       "Launch": "Lançar",
       "LaunchConfirmationDialog": "Para manter seu código e dados, ou compartilhá-los com outros colaboradores, basta criar uma pasta de armazenamento na barra lateral de dados e armazenamento e, em seguida, montar essa pasta quando iniciar o recurso e mantê-la lá.",
@@ -1682,6 +1696,11 @@
     "SessionsDesc": "O número de sessões de computação criadas.",
     "UsageHistory": "Histórico de utilização",
     "UsageHistoryNote": "O histórico de uso mostrado aqui é baseado em sessões de computação encerradas.",
+    "description": {
+      "CPUUtilization": "Representa a quantidade de tempo de CPU usado pela sessão durante o período selecionado. \n\nUm único núcleo de CPU corresponde a um máximo de 100%.\n\nSe vários núcleos forem alocados, o uso total poderá exceder 100%, pois é calculado resumindo o uso máximo (100%) de cada núcleo.",
+      "NetworkRx": "Indica a taxa de transferência de rede. \n\nRepresenta a taxa na qual o contêiner está recebendo dados de rede.",
+      "NetworkTx": "Indica a taxa de transferência de rede. \n\nRepresenta a taxa na qual o contêiner está enviando dados de rede."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Se o uso for baixo, os dados para algumas datas podem não estar disponíveis. \nPor favor, tente novamente com um intervalo mais curto.",
       "NoMetricsToDisplay": "Sem métricas disponíveis para rastrear"
@@ -1948,6 +1967,10 @@
       "MyAccount": "Alterar informações do usuário",
       "MyAccountInformation": "Alterar as informações do usuário",
       "MyEnvironments": "Meus ambientes",
+      "MyResources": "Meus recursos",
+      "MyResourcesDescription": "<p> Este painel mostra o uso total de recursos e permanecendo em todos os projetos e grupos de recursos.",
+      "MyResourcesIn": "Meus recursos em",
+      "MyResourcesInResourceGroupDescription": "Este painel mostra o uso atual de recursos e a capacidade disponível no grupo de recursos selecionados.",
       "NewPassword": "Nova Senha",
       "NewPasswordAgain": "Nova senha (novamente)",
       "NewPasswordCannotBeSame": "Introduza uma palavra-passe diferente da sua palavra-passe atual.",
@@ -1963,6 +1986,7 @@
       "Preferences": "Preferências",
       "PrivacyPolicy": "Política de Privacidade",
       "Project": "Projeto",
+      "Remaining": "Restante",
       "ResourcePolicy": "Política de Recursos",
       "Resources": "Recursos",
       "Serving": "Servir",
@@ -1975,8 +1999,11 @@
       "Summary": "Resumo",
       "Tasks": "Tarefas",
       "TermsOfService": "Termos de serviço",
+      "TotalResourcesIn": "Recursos totais em",
+      "TotalResourcesInResourceGroupDescription": "Este painel mostra o total de recursos usados ​​e restantes. \nOs valores são calculados adicionando o uso e as quantidades restantes de todos os agentes usando o grupo de recursos selecionados.",
       "TotpActivated": "2FA ativado",
       "Update": "Atualizar",
+      "Usage": "Uso",
       "UsageHistory": "Histórico de alocação",
       "UserCredentials&Policies": "Credenciais e políticas do usuário",
       "UserSessionHistory": "Histórico da sessão do usuário",

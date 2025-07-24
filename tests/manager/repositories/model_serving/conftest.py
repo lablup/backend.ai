@@ -6,6 +6,7 @@ import pytest
 import yarl
 
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -173,9 +174,8 @@ def sample_vfolder():
 
 
 @pytest.fixture
-def sample_endpoint(sample_user, sample_image, sample_vfolder):
-    """Create a sample endpoint for testing."""
-    endpoint = EndpointRow(
+def sample_endpoint_creator(sample_user, sample_image, sample_vfolder) -> EndpointCreator:
+    return EndpointCreator(
         name="test-endpoint",
         model=sample_vfolder.id,
         model_mount_destination="/models",
@@ -189,7 +189,7 @@ def sample_endpoint(sample_user, sample_image, sample_vfolder):
         environ={"MODEL_NAME": "test"},
         resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
         resource_opts={},
-        image=sample_image,
+        image=sample_image.id,
         replicas=1,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
@@ -199,6 +199,14 @@ def sample_endpoint(sample_user, sample_image, sample_vfolder):
         domain="default",
         resource_group="default",
     )
+
+
+@pytest.fixture
+def sample_endpoint(
+    sample_endpoint_creator: EndpointCreator, sample_user, sample_image
+) -> EndpointRow:
+    """Create a sample endpoint for testing."""
+    endpoint = EndpointRow.from_creator(sample_endpoint_creator)
     # Set attributes that are normally set by the database
     endpoint.id = uuid.uuid4()
     endpoint.created_at = datetime.now(timezone.utc)

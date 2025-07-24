@@ -16,12 +16,16 @@ R = TypeVar("R")
 
 def create_layer_aware_repository_decorator(
     layer: LayerType,
+    default_retry_count: int = 10,
+    default_retry_delay: float = 0.1,
 ):
     """
     Factory function to create layer-aware repository decorators.
 
     Args:
         layer: The layer type for metric observation
+        default_retry_count: Default number of retries for repository operations
+        default_retry_delay: Default delay between retries in seconds
 
     Returns:
         A repository_decorator function configured for the specified layer
@@ -29,8 +33,8 @@ def create_layer_aware_repository_decorator(
 
     def repository_decorator(
         *,
-        retry_count: int = 10,
-        retry_delay: float = 0.1,
+        retry_count: int = default_retry_count,
+        retry_delay: float = default_retry_delay,
     ) -> Callable[
         [Callable[P, Awaitable[R]]],
         Callable[P, Awaitable[R]],
@@ -46,22 +50,23 @@ def create_layer_aware_repository_decorator(
 
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             observer = LayerMetricObserver.instance()
+            operation = func.__name__
 
             async def wrapper(*args, **kwargs) -> R:
-                log.trace("Calling repository method {}", func.__name__)
+                log.trace("Calling repository method {}", operation)
                 start = time.perf_counter()
                 for attempt in range(retry_count):
                     try:
                         observer.observe_layer_operation_triggered(
                             domain=DomainType.REPOSITORY,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                         )
                         res = await func(*args, **kwargs)
                         observer.observe_layer_operation(
                             domain=DomainType.REPOSITORY,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=True,
                             duration=time.perf_counter() - start,
                         )
@@ -69,7 +74,7 @@ def create_layer_aware_repository_decorator(
                     except BackendAIError as e:
                         log.exception(
                             "Error in repository method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -78,7 +83,7 @@ def create_layer_aware_repository_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.REPOSITORY,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
@@ -86,11 +91,23 @@ def create_layer_aware_repository_decorator(
                         raise e
                     except Exception as e:
                         if attempt < retry_count - 1:
+                            log.debug(
+                                "Retrying repository method {} due to error: {} (attempt {}/{})",
+                                operation,
+                                e,
+                                attempt + 1,
+                                retry_count,
+                            )
+                            observer.observe_layer_retry(
+                                domain=DomainType.REPOSITORY,
+                                layer=layer,
+                                operation=operation,
+                            )
                             await asyncio.sleep(retry_delay)
                             continue
                         log.exception(
                             "Error in repository method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            func.__name__,
+                            operation,
                             args,
                             kwargs,
                             retry_count,
@@ -99,13 +116,13 @@ def create_layer_aware_repository_decorator(
                         observer.observe_layer_operation(
                             domain=DomainType.REPOSITORY,
                             layer=layer,
-                            operation=func.__name__,
+                            operation=operation,
                             success=False,
                             duration=time.perf_counter() - start,
                         )
                         raise e
                 raise UnreachableError(
-                    f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
+                    f"Reached unreachable code in {operation} after {retry_count} attempts"
                 )
 
             return wrapper

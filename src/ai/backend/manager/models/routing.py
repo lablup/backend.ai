@@ -1,6 +1,5 @@
 import logging
 import uuid
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
 
 import graphene
@@ -12,6 +11,7 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.model_serving.types import RouteStatus, RoutingData
 
 from ..errors.service import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
@@ -25,18 +25,6 @@ __all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
-
-
-class RouteStatus(Enum):
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    TERMINATING = "terminating"
-    PROVISIONING = "provisioning"
-    FAILED_TO_START = "failed_to_start"
-
-    @classmethod
-    def active_route_statuses(cls) -> set["RouteStatus"]:
-        return {RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.PROVISIONING}
 
 
 class RoutingRow(Base):
@@ -203,6 +191,17 @@ class RoutingRow(Base):
 
     def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
         self.session_owner = user_uuid
+
+    def to_data(self) -> RoutingData:
+        return RoutingData(
+            id=self.id,
+            endpoint=self.endpoint,
+            session=self.session,
+            status=self.status,
+            traffic_ratio=self.traffic_ratio,
+            created_at=self.created_at,
+            error_data=self.error_data or {},
+        )
 
 
 class Routing(graphene.ObjectType):
