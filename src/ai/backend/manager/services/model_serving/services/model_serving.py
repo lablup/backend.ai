@@ -191,7 +191,7 @@ class ModelServingService:
                 "service-definition.toml", model_vfolder_row
             )
         except UnexpectedStorageProxyResponseError:
-            chunks = b""
+            chunks = None
 
         if chunks:
             raw_service_definition = chunks.decode("utf-8")
