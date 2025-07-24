@@ -8,11 +8,13 @@ Backend.AI
 
 Backend.AI is a streamlined, container-based computing cluster platform
 that hosts popular computing/ML frameworks and diverse programming languages,
-with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
+with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU,
+Rebellions, FuriosaAI, HyperAccel, Google TPU, Graphcore IPU and other NPUs.
 
 It allocates and isolates the underlying computing resources for multi-tenant
-computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator.
-All its functions are exposed as REST/GraphQL/WebSocket APIs.
+computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator named "Sokovan".
+
+All its functions are exposed as REST and GraphQL APIs.
 
 
 Contents in This Repository
@@ -24,25 +26,33 @@ as a reference implementation of API clients.
 ### Directory Structure
 
 * `src/ai/backend/`: Source codes
-  - `manager/`: Manager
+  - `manager/`: Manager as the cluster control-plane
   - `manager/api`: Manager API handlers
-  - `agent/`: Agent
+  - `account_manager/`: Unified user profile and SSO management
+  - `agent/`: Agent as per-node controller
   - `agent/docker/`: Agent's Docker backend
   - `agent/k8s/`: Agent's Kubernetes backend
+  - `agent/dummy/`: Agent's dummy backend
   - `kernel/`: Agent's kernel runner counterpart
   - `runner/`: Agent's in-kernel prebuilt binaries
   - `helpers/`: Agent's in-kernel helper package
   - `common/`: Shared utilities
   - `client/`: Client SDK
   - `cli/`: Unified CLI for all components
-  - `storage/`: Storage proxy
+  - `install/`: SCIE-based TUI installer
+  - `storage/`: Storage proxy for offloading storage operations
   - `storage/api`: Storage proxy's manager-facing and client-facing APIs
+  - `appproxy/`: App proxy for accessing container apps from outside
+  - `appproxy/coordinator`: App proxy coordinator who provisions routing circuits
+  - `appproxy/worker`: App proxy worker who forwards the traffic
   - `web/`: Web UI server
     - `static/`: Backend.AI WebUI release artifacts
+  - `logging/`: Logging subsystem
   - `plugin/`: Plugin subsystem
   - `test/`: Integration test suite
   - `testutils/`: Shared utilities used by unit tests
   - `meta/`: Legacy meta package
+  - `accelerator/`: Intrinsic accelerator plugins
 * `docs/`: Unified documentation
 * `tests/`
   - `manager/`, `agent/`, ...: Per-component unit tests
@@ -63,6 +73,7 @@ as a reference implementation of API clients.
 * `BUILD`: The root build config file
 * `**/BUILD`: Per-directory build config files
 * `BUILD_ROOT`: An indicator to mark the build root directory for Pants
+* `CLAUDE.md`: The steering guide for agent-assisted development
 * `requirements.txt`: The unified requirements file
 * `*.lock`, `tools/*.lock`: The dependency lock files
 * `docker-compose.*.yml`: Per-version recommended halfstack container configs
@@ -220,6 +231,9 @@ commercial and non-commercial software products and services.
 
 Plugins
 -------
+
+Plugins are detected and loaded via Python package entrypoints.
+The followings are the mainly used entrypoint names:
 
 * `backendai_accelerator_v21`
   - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_open): CUDA accelerator plugin
