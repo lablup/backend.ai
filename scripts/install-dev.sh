@@ -866,7 +866,7 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/pyroscope-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/tempo-data"
 
-  sudo chown -R 472:472 "${HALFSTACK_VOLUME_PATH}/grafana-data"
+  sudo chown -R 472 "${HALFSTACK_VOLUME_PATH}/grafana-data"
   sudo chown -R 10001:10001 "${HALFSTACK_VOLUME_PATH}/tempo-data"
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
