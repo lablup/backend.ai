@@ -1,11 +1,12 @@
 import logging
 import uuid
+from pathlib import PurePosixPath
 from typing import (
     Optional,
 )
 
 import aiohttp
-from aiohttp import web
+from aiohttp import hdrs, web
 from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -25,6 +26,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    UnexpectedStorageProxyResponseError,
     VFolderAlreadyExists,
     VFolderCreationFailure,
     VFolderFilterStatusFailed,
@@ -677,10 +679,53 @@ class VFolderService:
         )
 
     async def get_task_logs(self, action: GetTaskLogsAction) -> GetTaskLogsActionResult:
-        # TODO: Implement task log retrieval
-        # For now, return empty response
-        response = web.StreamResponse(status=200)
-        return GetTaskLogsActionResult(
-            response=response,
-            vfolder_data={"id": "placeholder"},
+        user_uuid = action.user_id
+        user_role = action.user_role
+        kernel_id_str = action.kernel_id.hex
+
+        # Get user info using repository
+        user_info = await self._vfolder_repository.get_user_info(user_uuid)
+        if not user_info:
+            raise ObjectNotFound(object_name="User")
+        user_role, user_domain_name = user_info
+
+        # Get the .logs vfolder using repository
+        log_vfolder_data = await self._vfolder_repository.get_logs_vfolder(
+            user_uuid, user_role, user_domain_name
         )
+        if not log_vfolder_data:
+            raise ObjectNotFound(
+                extra_data={"vfolder_name": ".logs"},
+                object_name="vfolder",
+            )
+
+        _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            log_vfolder_data.host, is_unmanaged(log_vfolder_data.unmanaged_path)
+        )
+        response = web.StreamResponse(status=200)
+        response.headers[hdrs.CONTENT_TYPE] = "text/plain"
+        prepared = False
+
+        try:
+            vfid = str(VFolderID(log_vfolder_data.quota_scope_id, log_vfolder_data.id))
+            relpath = str(
+                PurePosixPath("task")
+                / kernel_id_str[:2]
+                / kernel_id_str[2:4]
+                / f"{kernel_id_str[4:]}.log",
+            )
+            storage_proxy_client = self._storage_manager.get_manager_facing_client(
+                log_vfolder_data.host
+            )
+
+            async for chunk in storage_proxy_client.fetch_file_content_streaming(
+                volume_name, vfid, relpath
+            ):
+                await response.write(chunk)
+
+        except aiohttp.ClientResponseError as e:
+            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message)
+        finally:
+            if prepared:
+                await response.write_eof()
+        return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
