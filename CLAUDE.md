@@ -134,8 +134,8 @@ Use the special entrypoint script `./backend.ai` to execute project-specific CLI
 ./backend.ai ag ...            # Run agent CLI
 ./backend.ai storage ...       # Run storage-proxy CLI
 ./backend.ai web ...           # Run webserver CLI
-./backend.ai worker ...        # Run app-proxy coordinator CLI
-./backend.ai coordinator ...   # Run app-proxy worker CLI
+./backend.ai app-proxy-coordiantor ...  # Run app-proxy coordinator CLI
+./backend.ai app-proxy-worker ...       # Run app-proxy worker CLI
 ```
 
 Use the generic entrypoint script `./py` to execute modules inside the virtualenv of the main source tree (python-default) like:

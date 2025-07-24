@@ -19,8 +19,8 @@ python_distribution(
     ),
     entry_points={
         "backendai_cli_v10": {
-            "worker": "ai.backend.appproxy.worker.cli.__main__:main",
-            "worker.start-server": "ai.backend.appproxy.worker.server:main",
+            "app-proxy-worker": "ai.backend.appproxy.worker.cli.__main__:main",
+            "app-proxy-worker.start-server": "ai.backend.appproxy.worker.server:main",
         },
     },
     generate_setup=True,

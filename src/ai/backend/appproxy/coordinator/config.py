@@ -240,7 +240,7 @@ class ServerConfig(BaseSchema):
 
 def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
     # Determine where to read configuration.
-    raw_cfg, _ = config.read_from_file(config_path, "proxy-coordinator")
+    raw_cfg, _ = config.read_from_file(config_path, "app-proxy-coordinator")
 
     config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
     config.override_key(raw_cfg, ("logging", "level"), log_level.upper())

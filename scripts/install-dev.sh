@@ -175,8 +175,9 @@ show_guide() {
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
-  show_note "How to run Backend.AI wsproxy:"
-  echo "  > ${WHITE}./py -m ai.backend.wsproxy.server${NC}"
+  show_note "How to run Backend.AI app-proxy:"
+  echo "  > ${WHITE}./backend.ai app-proxy-coordinator start-server --debug${NC}"
+  echo "  > ${WHITE}./backend.ai app-proxy-worker start-server --debug${NC}"
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -1004,8 +1005,8 @@ configure_backendai() {
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
-  # configure wsproxy
-  cp configs/wsproxy/halfstack.toml ./wsproxy.toml
+  # # configure wsproxy (deprecated)
+  # cp configs/wsproxy/halfstack.toml ./wsproxy.toml
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
