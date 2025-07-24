@@ -528,7 +528,9 @@ class StorageProxyManagerFacingClient:
         ) as response_stream:
             yield response_stream
 
-    @client_decorator()
+    # TODO: Some cases where fetch_file_content returns empty chunks are expected successful scenarios.
+    # Let's re-attach the commented-out decorator after refactoring the code.
+    # @client_decorator()
     async def fetch_file_content(
         self,
         volume: str,
