@@ -21,6 +21,7 @@ Read `README.md` for overall architecture and purpose of directories.
 
 ### Code Quality
 
+* Maintain high code quality throughout development
 * Eliminate duplication ruthlessly
 * Express intent clearly through naming and structure
 * Make dependencies explicit
@@ -56,6 +57,17 @@ Read `README.md` for overall architecture and purpose of directories.
 - Unit tests in `tests/{package}` subdirectories and written in pytest
 - Integration tests in `src/ai/backend/test`
 - Reusable helper utilities for testing in `src/ai/backend/testutils`
+
+Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
+
+### Writing Tests
+
+* Write the simplest failing test first
+* Implement the minimum code needed to make tests pass
+* Refactor only after tests are passing
+* Use pytest to write tests with following markers:
+  - `integration`: for tests requiring externally provisioned resources
+  - `asyncio`: for tests using async/await codes
 
 
 ## Build System & Development Commands
@@ -133,6 +145,7 @@ Use the generic entrypoint script `./py` to execute modules inside the virtualen
 ### Databases
 
 When working with SQLAlchemy schema migrations, we use Alembic to generate and run migrations.
+Always specify the appropriate alembic configuration path depending on the target pacakge.
 
 ```bash
 ./py -m alembic -c {alembic-ini-path} ...
@@ -147,7 +160,13 @@ There are multiple `alembic.ini` files, namely:
 - `alembic-accountmgr.ini`: The alembic config for account manager
 - `alembic-appproxy.ini`: The alembic config for app proxy
 
-### Verifying Changes
+### Verifying Code Changes
+
+We use the follwoing linting and typecheck tools:
+
+- **Ruff**: Primary linter with line length 100, preview features and formatter enabled
+- **MyPy**: Type checking with strict settings
+- Git pre-commit (lint only) and pre-push (lint and typecheck) hooks
 
 Once you finish or want to validate a job requested by the user after changing multiple files,
 use the following commands to automatically format, lint, and do type checks:
@@ -164,46 +183,6 @@ and fix any Ruff and Mypy errors displayed after running them.
 ### Pre-commit Hooks
 
 The project uses pre-commit hooks that automatically run `pants lint --changed-since="HEAD~1"` on changed files.
-
-
-## Architecture Overview
-
-### Core Components
-
-1. **Common Module** (`src/ai/backend/appproxy/common/`)
-   - Shared utilities, configuration, logging, types
-   - Database utilities and distributed locking mechanisms
-   - Configuration validation with Pydantic
-
-2. **Coordinator** (`src/ai/backend/appproxy/coordinator/`)
-   - REST API endpoints for circuit/worker management
-   - PostgreSQL database models with SQLAlchemy 2.0
-   - Alembic database migrations
-   - CLI interface for server management
-
-3. **Worker** (`src/ai/backend/appproxy/worker/`)
-   - Multiple proxy backends: HTTP, H2, TCP, Traefik
-   - Port-based and subdomain-based proxy frontends
-   - Health check API
-   - CLI interface for worker management
-
-### Key Technologies
-
-- **Web Framework**: aiohttp (fully async)
-- **Database**: PostgreSQL with asyncpg and SQLAlchemy 2.0
-- **Migrations**: Alembic
-- **Configuration**: TOML with Pydantic validation
-- **Service Discovery**: etcd integration
-- **Caching**: Redis with sentinel support
-- **Type Checking**: MyPy with Pydantic plugin
-
-## Configuration
-
-Configuration files are located in `configs/` with separate files for coordinator and worker:
-- `configs/proxy-coordinator/example.toml` - Coordinator configuration template
-- `configs/proxy-worker/example.toml` - Worker configuration template
-- `configs/proxy-coordinator/halfstack.toml` - Development setup
-- `configs/proxy-worker/halfstack.toml` - Development setup
 
 ## Database Migrations
 
@@ -232,15 +211,3 @@ When you observe migration failures due to multiple heads, do the followings:
   rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
   base branch like main and top_head is the topmost revision ID of the migrations added in the current working
   branch.
-
-## Code Quality Tools
-
-- **Ruff**: Primary linter with line length 100, preview features and formatter enabled
-- **MyPy**: Type checking with strict settings
-- **Pre-commit**: Automated linting on commit
-
-## Testing
-
-- **Framework**: pytest with asyncio support
-- **Markers**: `integration` for tests requiring Dockerized kernel sessions
-- **Async Mode**: Automatic asyncio test detection
