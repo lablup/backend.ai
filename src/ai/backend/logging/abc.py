@@ -3,13 +3,15 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Any, MutableMapping, Self
 
+from .utils import _register_custom_loglevels
+
 
 class AbstractLogger(metaclass=ABCMeta):
     def __init__(
         self,
         logging_config: MutableMapping[str, Any],
     ) -> None:
-        pass
+        _register_custom_loglevels()
 
     @abstractmethod
     def __enter__(self) -> Self:

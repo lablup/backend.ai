@@ -40,12 +40,6 @@ class MsgpackOptions(TypedDict):
 
 
 class NoopLogger(AbstractLogger):
-    def __init__(
-        self,
-        logging_config: MutableMapping[str, Any],
-    ) -> None:
-        pass
-
     @override
     def __enter__(self) -> Self:
         return self
@@ -60,6 +54,7 @@ class LocalLogger(AbstractLogger):
         self,
         logging_config: MutableMapping[str, Any],
     ) -> None:
+        super().__init__(logging_config)
         cfg = logging_config_iv.check(logging_config)
         _check_driver_config_exists_if_activated(cfg, "console")
         self.logging_config = cfg
@@ -124,6 +119,7 @@ class Logger(AbstractLogger):
         log_endpoint: str,
         msgpack_options: MsgpackOptions,
     ) -> None:
+        super().__init__(logging_config)
         if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
             p = Path(env_legacy_logfile_path)
             override_key(logging_config, ("file", "path"), p.parent)
