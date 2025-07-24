@@ -26,10 +26,12 @@ class BaseAction(ABC):
         """Return the operation type of this action."""
         raise NotImplementedError
 
-    @abstractmethod
     def entity_id(self) -> Optional[str]:
-        """Return the ID of the entity this action operates on."""
-        raise NotImplementedError
+        """
+        Return the ID of the entity this action operates on.
+        Returns None to avoid overriding in subclasses that do not require an entity ID.
+        """
+        return None
 
 
 class BaseActionResult(ABC):

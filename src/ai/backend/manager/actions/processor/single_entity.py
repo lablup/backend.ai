@@ -15,7 +15,7 @@ from ..action.single_entity import (
     TSingleEntityActionResult,
 )
 from ..monitors.monitor.base import ActionMonitor
-from ..types import ActionResultMeta, ActionTargetMeta, ActionTriggerMeta, ProcessResult
+from ..types import ActionResultMeta, ActionResultTargetMeta, ActionTriggerMeta, ProcessResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -74,7 +74,7 @@ class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActi
                 entity_id = result.entity_id()
             meta = ActionResultMeta(
                 action_id=action_id,
-                target=ActionTargetMeta(
+                target=ActionResultTargetMeta(
                     entity_type=action.entity_type(),
                     entity_ids=[entity_id] if entity_id else None,
                 ),

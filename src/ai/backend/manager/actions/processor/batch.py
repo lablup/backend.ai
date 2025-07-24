@@ -7,7 +7,7 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import (
     ActionResultMeta,
-    ActionTargetMeta,
+    ActionResultTargetMeta,
     ActionTriggerMeta,
     OperationStatus,
     ProcessResult,
@@ -77,7 +77,7 @@ class BatchActionProcessor(Generic[TBaseBatchAction, TBaseBatchActionResult]):
                 entity_ids = result.entity_ids()
             meta = ActionResultMeta(
                 action_id=action_id,
-                target=ActionTargetMeta(
+                target=ActionResultTargetMeta(
                     entity_type=action.entity_type(),
                     entity_ids=entity_ids,
                 ),
