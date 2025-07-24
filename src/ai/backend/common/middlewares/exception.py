@@ -15,7 +15,7 @@ async def general_exception_middleware(
 ) -> web.StreamResponse:
     method = request.method
     endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
-    log.info("Handling request: ({}) {}", method, endpoint)
+    log.trace("Handling request: ({}) {}", method, endpoint)
     try:
         resp = await handler(request)
     except web.HTTPException as ex:
