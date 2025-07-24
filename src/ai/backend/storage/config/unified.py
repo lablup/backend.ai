@@ -563,6 +563,50 @@ class StorageProxyConfig(BaseModel):
     )
 
 
+# TODO: Remove this.
+class ObjectStorageConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the storage configuration.
+        """,
+    )
+    endpoint: str = Field(
+        description="""
+        Endpoint URL for the object storage service.
+        Should include the protocol (http or https) and port if non-standard.
+        """,
+        examples=["http://localhost:9000", "https://storage.example.com"],
+    )
+    access_key: str = Field(
+        description="""
+        Access key for authenticating with the object storage service.
+        Required for services that use access keys for authentication.
+        """,
+        examples=["my-access-key"],
+    )
+    secret_key: str = Field(
+        description="""
+        Secret key for authenticating with the object storage service.
+        Required for services that use secret keys for authentication.
+        """,
+        examples=["my-secret-key"],
+    )
+    bucket: str = Field(
+        description="""
+        Name of the bucket to use in the object storage service.
+        All operations will be performed within this bucket.
+        """,
+        examples=["my-bucket"],
+    )
+    region: str = Field(
+        description="""
+        Region where the object storage service is located.
+        Required for services that require region specification.
+        """,
+        examples=["us-west-1", "eu-central-1"],
+    )
+
+
 class StorageProxyUnifiedConfig(BaseModel):
     storage_proxy: StorageProxyConfig = Field(
         description="""
@@ -626,6 +670,13 @@ class StorageProxyUnifiedConfig(BaseModel):
         description="""
         Etcd configuration settings.
         Used for distributed coordination.
+        """,
+    )
+    storages: list[ObjectStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        Configuration for external storages.
+        Defines how to connect and interact with external storage systems.
         """,
     )
 
