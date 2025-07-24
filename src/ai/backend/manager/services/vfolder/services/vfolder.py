@@ -35,6 +35,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
@@ -686,7 +687,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound(object_name="User")
         user_role, user_domain_name = user_info
 
         # Get the .logs vfolder using repository
@@ -694,9 +695,8 @@ class VFolderService:
             user_uuid, user_role, user_domain_name
         )
         if not log_vfolder_data:
-            raise ObjectNotFound(
+            raise VFolderNotFound(
                 extra_data={"vfolder_name": ".logs"},
-                object_name="vfolder",
             )
 
         _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(

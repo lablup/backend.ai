@@ -1113,9 +1113,9 @@ class VfolderRepository:
         Get the accessible .logs vfolder for a user.
         Returns VFolderData if found, None otherwise.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly() as conn:
             vfolder_dicts = await query_accessible_vfolders(
-                session.bind,
+                conn,
                 user_id,
                 user_role=user_role,
                 domain_name=domain_name,
