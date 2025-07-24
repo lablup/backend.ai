@@ -127,7 +127,6 @@ class ValkeyContainerLogClient:
         key = self._container_log_key(container_id)
         return await self._client.client.llen(key)
 
-    @valkey_decorator()
     async def pop_container_logs(
         self,
         container_id: str,
