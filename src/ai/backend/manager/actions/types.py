@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from ai.backend.common.exception import ErrorCode
+from ai.backend.manager.data.permission.id import ScopeId
 
 
 class OperationStatus(enum.StrEnum):
@@ -43,11 +44,10 @@ class ActionTriggerMeta:
 
 
 @dataclass
-class ActionTargetMeta:
+class ActionResultTargetMeta:
     entity_type: str
     entity_ids: Optional[list[str]] = None
-    scope_type: Optional[str] = None
-    scope_id: Optional[str] = None
+    scope: Optional[ScopeId] = None
 
     @property
     def entity_id(self) -> Optional[str]:
@@ -58,7 +58,7 @@ class ActionTargetMeta:
 @dataclass
 class ActionResultMeta:
     action_id: uuid.UUID
-    target: ActionTargetMeta
+    target: ActionResultTargetMeta
     status: OperationStatus
     description: str
     started_at: datetime
