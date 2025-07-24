@@ -1,14 +1,16 @@
 import logging
 import uuid
-from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
+
+if TYPE_CHECKING:
+    pass
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm import relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import (
@@ -27,7 +29,7 @@ from ai.backend.appproxy.common.types import (
     Slot,
 )
 
-from .base import Base, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
+from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
 from .circuit import Circuit
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -47,77 +49,67 @@ class WorkerStatus(StrEnum):
     TERMINATED = "TERMINATED"
 
 
-class Worker(Base):
+class Worker(Base, BaseMixin):
     __tablename__ = "workers"
 
     id = IDColumn()
 
-    authority: Mapped[str] = mapped_column(
+    authority = sa.Column(
         sa.String(length=255), nullable=False, unique=True
     )  # Human-readable identity of each AppProxy worker, must be identical across all AppProxy workers under single VIP when HA is set up
-    frontend_mode: Mapped[FrontendMode] = mapped_column(
+    frontend_mode = sa.Column(
         EnumType(FrontendMode), nullable=False
     )  # will be fixed as `port` when `protocol` is set to `tcp`
-    protocol: Mapped[ProxyProtocol] = mapped_column(
-        EnumType(ProxyProtocol), nullable=False
-    )  # type of traffic to procy
+    protocol = sa.Column(EnumType(ProxyProtocol), nullable=False)  # type of traffic to procy
 
-    hostname: Mapped[str] = mapped_column(
+    hostname = sa.Column(
         sa.String(length=1024), nullable=False
     )  # Hostname which users utilize to access this AppProxy
-    tls_listen: Mapped[bool] = mapped_column(
+    tls_listen = sa.Column(
         sa.Boolean(), default=False
     )  # Indicates if TLS is required to access the AppProxy
-    tls_advertised: Mapped[bool] = mapped_column(
+    tls_advertised = sa.Column(
         sa.Boolean(), default=False
     )  # Indicates if TLS is required to access the AppProxy
 
-    api_port: Mapped[int] = mapped_column(sa.Integer(), nullable=False)  # REST API port
+    api_port = sa.Column(sa.Integer(), nullable=False)  # REST API port
 
-    available_slots: Mapped[int] = mapped_column(
+    available_slots = sa.Column(
         sa.Integer(), default=0, nullable=False
     )  # set to -1 when `frontend_mode` is set to `wildcard`
-    occupied_slots: Mapped[int] = mapped_column(sa.Integer(), default=0, nullable=False)
+    occupied_slots = sa.Column(sa.Integer(), default=0, nullable=False)
 
     # Only set if `frontend_mode` is `port`
-    port_range: Mapped[tuple[int, int] | None] = mapped_column(
-        pgsql.ARRAY(sa.Integer), nullable=True
-    )
+    port_range = sa.Column(pgsql.ARRAY(sa.Integer), nullable=True)
 
     # Only set if `frontend_mode` is `wildcard`
     # .example.com
-    wildcard_domain: Mapped[str | None] = mapped_column(sa.String(length=1024), nullable=True)
+    wildcard_domain = sa.Column(sa.String(length=1024), nullable=True)
     # Only set if `frontend_mode` is `wildcard`
-    wildcard_traffic_port: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
+    wildcard_traffic_port = sa.Column(sa.Integer(), nullable=True)
 
-    nodes: Mapped[int] = mapped_column(sa.Integer(), default=1, nullable=False)
+    nodes = sa.Column(sa.Integer(), default=1, nullable=False)
 
-    accepted_traffics: Mapped[list[AppMode]] = mapped_column(
-        pgsql.ARRAY(EnumType(AppMode)), nullable=False
-    )
-    filtered_apps_only: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
+    accepted_traffics = sa.Column(pgsql.ARRAY(EnumType(AppMode)), nullable=False)
+    filtered_apps_only = sa.Column(sa.Boolean(), default=False, nullable=False)
 
-    traefik_last_used_marker_path: Mapped[str | None] = mapped_column(
-        sa.String(length=1024), nullable=True
-    )
+    traefik_last_used_marker_path = sa.Column(sa.String(length=1024), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
+    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
 
-    status: Mapped[WorkerStatus] = mapped_column(
+    status = sa.Column(
         StrEnumType(WorkerStatus),
         default=WorkerStatus.ALIVE,
         nullable=False,
     )
 
-    filters: Mapped[list["WorkerAppFilter"]] = relationship(
+    filters = relationship(
+        "WorkerAppFilter",
         back_populates="worker_row",
     )
-    circuits: Mapped[list[Circuit]] = relationship(
+    circuits = relationship(
+        "Circuit",
         back_populates="worker_row",
     )
 
@@ -239,7 +231,7 @@ class Worker(Base):
         For workers working with PORT-based frontend_mode, this will list all available and occupied slots
         For workers with SUBDOMAIN, this will list occupied slots only - we can't list all available slots since it is infinite
         """
-        circuits: list[Circuit] = await self.awaitable_attrs.circuits
+        circuits: list[Circuit] = self.circuits
         match self.frontend_mode:
             case FrontendMode.PORT:
                 assert self.port_range
@@ -268,16 +260,16 @@ class Worker(Base):
         return slots
 
 
-class WorkerAppFilter(Base):
+class WorkerAppFilter(Base, BaseMixin):
     __tablename__ = "worker_app_filters"
 
     id = IDColumn()
 
-    property_name: Mapped[str] = mapped_column(sa.VARCHAR(96), nullable=False)
-    property_value: Mapped[str] = mapped_column(sa.VARCHAR(1024), nullable=False)
+    property_name = sa.Column(sa.VARCHAR(96), nullable=False)
+    property_value = sa.Column(sa.VARCHAR(1024), nullable=False)
     worker = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
 
-    worker_row: Mapped["Worker"] = relationship(back_populates="filters")
+    worker_row = relationship("Worker", back_populates="filters")
 
     __table_args__ = (
         sa.UniqueConstraint(

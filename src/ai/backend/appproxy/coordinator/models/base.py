@@ -20,8 +20,7 @@ import sqlalchemy as sa
 import yarl
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
-from sqlalchemy.ext.asyncio import AsyncAttrs
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.appproxy.common.exceptions import InvalidAPIParameters
@@ -47,9 +46,10 @@ metadata_obj = sa.MetaData(naming_convention=convention)
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
-class Base(AsyncAttrs, DeclarativeBase):
-    metadata = metadata_obj
+Base = declarative_base(metadata=metadata_obj)
 
+
+class BaseMixin:
     def dump_model(self, serializable=True) -> dict[str, Any]:
         o = dict(self.__dict__)
         del o["_sa_instance_state"]
@@ -345,9 +345,9 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                     return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-def IDColumn(name="id") -> Mapped[uuid.UUID]:
-    return mapped_column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+def IDColumn(name="id"):
+    return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def ForeignKeyIDColumn(name, fk_field, nullable=True) -> Mapped[uuid.UUID]:
-    return mapped_column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
+def ForeignKeyIDColumn(name, fk_field, nullable=True):
+    return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)

@@ -1,22 +1,22 @@
-from datetime import datetime
 from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
 from ai.backend.appproxy.common.types import HealthCheckConfig
 
 from .base import (
     Base,
+    BaseMixin,
     IDColumn,
     StructuredJSONObjectColumn,
 )
 
 if TYPE_CHECKING:
-    from .circuit import Circuit
+    pass
 
 
 __all__ = [
@@ -24,31 +24,29 @@ __all__ = [
 ]
 
 
-class Endpoint(Base):
+class Endpoint(Base, BaseMixin):
     __tablename__ = "endpoints"
 
     """
     Store model service endpoint information and health check configuration
     """
 
-    id: Mapped[UUID] = IDColumn()
+    id = IDColumn()
 
-    health_check_enabled: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
-    health_check_config: Mapped[HealthCheckConfig | None] = mapped_column(
-        StructuredJSONObjectColumn(HealthCheckConfig), nullable=True
-    )
+    health_check_enabled = sa.Column(sa.Boolean(), nullable=False, default=False)
+    health_check_config = sa.Column(StructuredJSONObjectColumn(HealthCheckConfig), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
+    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    updated_at = sa.Column(
         sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()
     )
 
-    circuit_row: Mapped["Circuit"] = relationship(
+    circuit_row = relationship(
+        "Circuit",
         back_populates="endpoint_row",
         primaryjoin="Circuit.endpoint_id == Endpoint.id",
         foreign_keys="Circuit.endpoint_id",
+        uselist=False,
     )
 
     @classmethod

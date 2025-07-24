@@ -5,7 +5,16 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+    TypeVar,
+    override,
+)
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
@@ -16,7 +25,20 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.ext.asyncio import async_sessionmaker as sessionmaker
+
+try:
+    # SQLAlchemy 2.0
+    from sqlalchemy.ext.asyncio import async_sessionmaker  # type: ignore
+except ImportError:
+    # SQLAlchemy 1.4
+    from sqlalchemy.orm import sessionmaker
+
+    class async_sessionmaker(sessionmaker):  # type: ignore[no-redef]
+        @override
+        def __init__(self, *args, class_=SASession, **kwargs) -> None:
+            super().__init__(*args, class_=class_, **kwargs)  # type: ignore
+
+
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -55,7 +77,7 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(bind=self, expire_on_commit=False, class_=SASession)
+        self._sess_factory = async_sessionmaker(bind=self, expire_on_commit=False)
 
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:

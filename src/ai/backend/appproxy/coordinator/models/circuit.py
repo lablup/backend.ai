@@ -5,7 +5,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm import relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
@@ -23,16 +23,16 @@ from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
 from .base import (
     GUID,
     Base,
+    BaseMixin,
     EnumType,
     ForeignKeyIDColumn,
     IDColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
 )
-from .endpoint import Endpoint
 
 if TYPE_CHECKING:
-    from .worker import Worker
+    pass
 
 
 __all__ = [
@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class Circuit(Base):
+class Circuit(Base, BaseMixin):
     __tablename__ = "circuits"
 
     """
@@ -48,55 +48,49 @@ class Circuit(Base):
     port-based TCP and/or websocket proxy server.
     """
 
-    id: Mapped[UUID] = IDColumn()
+    id = IDColumn()
 
-    app: Mapped[str] = mapped_column(sa.String(length=255), nullable=True)
-    protocol: Mapped[ProxyProtocol] = mapped_column(EnumType(ProxyProtocol), nullable=False)
+    app = sa.Column(sa.String(length=255), nullable=True)
+    protocol = sa.Column(EnumType(ProxyProtocol), nullable=False)
 
-    worker: Mapped[UUID] = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
+    worker = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
 
-    app_mode: Mapped[AppMode] = mapped_column(EnumType(AppMode), nullable=False)
+    app_mode = sa.Column(EnumType(AppMode), nullable=False)
 
-    frontend_mode: Mapped[FrontendMode] = mapped_column(EnumType(FrontendMode), nullable=False)
-    port: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
-    subdomain: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
+    frontend_mode = sa.Column(EnumType(FrontendMode), nullable=False)
+    port = sa.Column(sa.Integer(), nullable=True)
+    subdomain = sa.Column(sa.String(length=255), nullable=True)
 
-    envs: Mapped[dict | None] = mapped_column(pgsql.JSONB(), nullable=True)
-    arguments: Mapped[str | None] = mapped_column(sa.String(length=1000), nullable=True)
+    envs = sa.Column(pgsql.JSONB(), nullable=True)
+    arguments = sa.Column(sa.String(length=1000), nullable=True)
 
-    open_to_public: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
-    allowed_client_ips: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
+    open_to_public = sa.Column(sa.Boolean(), nullable=False, default=False)
+    allowed_client_ips = sa.Column(sa.String(length=255), nullable=True)
 
-    user_id: Mapped[UUID | None] = mapped_column(
-        GUID, nullable=True
-    )  # null if `app_mode` is set to `INFERENCE`
-    endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
+    user_id = sa.Column(GUID, nullable=True)  # null if `app_mode` is set to `INFERENCE`
+    endpoint_id = sa.Column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
-    runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
+    runtime_variant = sa.Column(
         StrEnumType(RuntimeVariant), nullable=True
     )  # null if `app_mode` is set to `INTERACTIVE`
 
-    session_ids: Mapped[list[UUID]] = mapped_column(
+    session_ids = sa.Column(
         pgsql.ARRAY(GUID),
         nullable=False,
         default=[],
     )
-    route_info: Mapped[list[RouteInfo]] = mapped_column(
-        StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[]
-    )
+    route_info = sa.Column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
 
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
+    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
 
-    worker_row: Mapped["Worker"] = relationship(back_populates="circuits")
-    endpoint_row: Mapped["Endpoint | None"] = relationship(
+    worker_row = relationship("Worker", back_populates="circuits")
+    endpoint_row = relationship(
+        "Endpoint",
         back_populates="circuit_row",
         primaryjoin="Circuit.endpoint_id == Endpoint.id",
         foreign_keys="Circuit.endpoint_id",
+        uselist=False,
     )
 
     # TODO: Create primary key - worker, port, subdomain
@@ -240,7 +234,9 @@ class Circuit(Base):
         return c
 
     async def get_endpoint_url(self) -> URL:
-        worker: Worker = await self.awaitable_attrs.worker_row
+        from .worker import Worker
+
+        worker: Worker = self.worker_row
         match (worker.use_tls, self.protocol):
             case (True, ProxyProtocol.TCP):
                 scheme = "tls"
@@ -271,7 +267,9 @@ class Circuit(Base):
         return URL(url)
 
     async def get_slot_identity(self) -> str:
-        worker: Worker = await self.awaitable_attrs.worker_row
+        from .worker import Worker
+
+        worker: Worker = self.worker_row
         return f"{worker.authority}:{self.port or self.subdomain}"
 
     @property
@@ -287,7 +285,9 @@ class Circuit(Base):
                         assert self.subdomain
                         return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
                     case _:
-                        raise ValueError(f"Invalid frontend_mode: {self.frontend_mode}")
+                        raise ValueError(
+                            f"Invalid frontend mode for traefik setup: {self.frontend_mode}"
+                        )
 
     @property
     def traefik_entrypoint(self) -> str:
@@ -298,7 +298,7 @@ class Circuit(Base):
                 assert self.port
                 return f"portproxy_{self.port}"
             case _:
-                raise ValueError(f"Invalid frontend_mode: {self.frontend_mode}")
+                raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
 
     @property
     def traefik_routers(self) -> dict[str, Any]:
