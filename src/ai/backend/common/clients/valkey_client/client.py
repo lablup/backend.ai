@@ -219,7 +219,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             return
 
         await self._create_valkey_client()
-        self._monitor_task = asyncio.create_task(self._monitor_master())
+        self._monitor_task = asyncio.create_task(self._monitor_connction())
 
     async def disconnect(self) -> None:
         if self._monitor_task:
@@ -284,23 +284,62 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return None
 
-    async def _monitor_master(self) -> None:
+    async def _ping(self) -> bool:
+        """
+        Ping the current master to check if the connection is alive.
+        """
+        if self._valkey_client is None:
+            return False
+        try:
+            await self._valkey_client.ping()
+            return True
+        except glide.ClosingError as e:
+            log.warning(
+                "Valkey client is closed for service '{}', human readable name '{}': {}",
+                self._target.service_name,
+                self._human_readable_name,
+                e,
+            )
+            return False
+        except Exception as e:
+            log.warning(
+                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+            )
+            return True
+
+    async def _check_connection(self) -> bool:
+        """
+        Check if the current master connection is alive.
+        If not, attempt to reconnect.
+        """
+        if not await self._ping():
+            log.warning(
+                "Connection to master {}:{} is down, attempting to reconnect",
+                self._master_address[0] if self._master_address else "unregistered",
+                self._master_address[1] if self._master_address else "unregistered",
+            )
+            return False
+        current_master = await self._get_master_address()
+        if current_master is None or current_master == self._master_address:
+            return True
+        log.warning(
+            "Master change detected for service '{}': {}:{} -> {}:{} in {}",
+            self._target.service_name,
+            self._master_address[0] if self._master_address else "unregistered",
+            self._master_address[1] if self._master_address else "unregistered",
+            current_master[0],
+            current_master[1],
+            self._human_readable_name,
+        )
+        return False
+
+    async def _monitor_connction(self) -> None:
         while True:
             try:
-                await asyncio.sleep(5.0)
-                current_master = await self._get_master_address()
-                if current_master is None or current_master == self._master_address:
+                await asyncio.sleep(10.0)
+                if await self._check_connection():
                     continue
-
-                log.info(
-                    "Master change detected for service '{}': {}:{} -> {}:{} in {}",
-                    self._target.service_name,
-                    self._master_address[0] if self._master_address else "unregistered",
-                    self._master_address[1] if self._master_address else "unregistered",
-                    current_master[0],
-                    current_master[1],
-                    self._human_readable_name,
-                )
+                log.info("Reconnecting to new master for service '{}'", self._target.service_name)
                 await self._reconnect_to_new_master()
 
             except asyncio.CancelledError:
