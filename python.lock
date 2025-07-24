@@ -96,6 +96,7 @@
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
 //     "textual~=0.79.1",
+//     "tomli-w~=1.2.0",
 //     "tomli~=2.0.1",
 //     "tomlkit~=0.13.2",
 //     "toml~=0.10.2",
@@ -5527,6 +5528,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90",
+              "url": "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021",
+              "url": "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz"
+            }
+          ],
+          "project_name": "tomli-w",
+          "requires_dists": [],
+          "requires_python": ">=3.9",
+          "version": "1.2.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "c89c649d79ee40629a9fda55f8ace8c6a1b42deb912b2a8fd8d942ddadb606b0",
               "url": "https://files.pythonhosted.org/packages/bd/75/8539d011f6be8e29f339c42e633aae3cb73bffa95dd0f9adec09b9c58e85/tomlkit-0.13.3-py3-none-any.whl"
             },
@@ -6577,6 +6596,7 @@
     "temporenc~=0.1.0",
     "tenacity>=9.0",
     "textual~=0.79.1",
+    "tomli-w~=1.2.0",
     "tomli~=2.0.1",
     "tomlkit~=0.13.2",
     "toml~=0.10.2",
