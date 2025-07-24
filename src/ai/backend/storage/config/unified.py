@@ -676,6 +676,13 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
+    storages: list[ObjectStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        Configuration for external storages.
+        Defines how to connect and interact with external storage systems.
+        """,
+    )
 
     # TODO: Remove me after changing config injection logic
     class Config:
