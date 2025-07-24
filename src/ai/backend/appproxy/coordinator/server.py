@@ -371,14 +371,20 @@ async def on_route_update_event(
             f"endpoint.{event.endpoint_id}.health_check_config",
         ),
     )
-    assert route_connection_info_json, f"EndpointRouteListUpdatedEvent fired but no route info present on redis - expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
-    assert health_check_enabled_str, f"EndpointRouteListUpdatedEvent fired but no health check info present on redis - expected 'endpoint.{event.endpoint_id}.health_check_enabled' key to be present on redis_live"
+    assert route_connection_info_json, (
+        f"EndpointRouteListUpdatedEvent fired but no route info present on redis - expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
+    )
+    assert health_check_enabled_str, (
+        f"EndpointRouteListUpdatedEvent fired but no health check info present on redis - expected 'endpoint.{event.endpoint_id}.health_check_enabled' key to be present on redis_live"
+    )
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
     health_check_enabled = health_check_enabled_str == "true"
     health_check_config: HealthCheckConfig | None
     if health_check_enabled:
-        assert health_check_config_json, f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
+        assert health_check_config_json, (
+            f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
+        )
         health_check_config = HealthCheckConfig.model_validate_json(health_check_config_json)
     else:
         health_check_config = None
@@ -397,12 +403,10 @@ async def on_route_update_event(
             circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
             traffic_ratios = await redis_helper.execute(
                 context.core_redis_live,
-                lambda r: r.mget(
-                    *[
-                        f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
-                        for route in new_routes.values()
-                    ]
-                ),
+                lambda r: r.mget(*[
+                    f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
+                    for route in new_routes.values()
+                ]),
             )
             for idx, route in enumerate(new_routes.values()):
                 route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
@@ -422,9 +426,9 @@ async def on_route_update_event(
             if not endpoint.health_check_enabled:
                 # mark all routes as healthy
                 # Publish health status transition events
-                await context.health_engine.publish_health_transition_events(
-                    [(r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info]
-                )
+                await context.health_engine.publish_health_transition_events([
+                    (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
+                ])
 
                 # Propagate updated route information to AppProxy workers
                 await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
@@ -527,12 +531,9 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                         return []
                     last_access = await redis_helper.execute(
                         root_ctx.redis_live,
-                        lambda r: r.mget(
-                            [
-                                f"circuit.{str(c.id)}.last_access"
-                                for c in non_inference_http_circuits
-                            ]
-                        ),
+                        lambda r: r.mget([
+                            f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                        ]),
                     )
                     unused_circuits = [
                         non_inference_http_circuits[idx]
@@ -872,9 +873,9 @@ async def server_main(
         if os.geteuid() == 0:
             uid = root_ctx.local_config.proxy_coordinator.user
             gid = root_ctx.local_config.proxy_coordinator.group
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem]
-            )
+            os.setgroups([
+                g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+            ])
             os.setgid(gid)
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)

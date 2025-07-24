@@ -32,16 +32,14 @@ async def status(request: web.Request) -> web.Response:
             - worker_config.port_proxy.bind_port_range[0]
             + 1
         )
-    return web.json_response(
-        {
-            "version": __version__,
-            "authority": worker_config.authority,
-            "app_mode": worker_config.frontend_mode,
-            "protocol": worker_config.protocol,
-            "occupied_slots": len(root_ctx.proxy_frontend.circuits),
-            "available_slots": available_slots,
-        }
-    )
+    return web.json_response({
+        "version": __version__,
+        "authority": worker_config.authority,
+        "app_mode": worker_config.frontend_mode,
+        "protocol": worker_config.protocol,
+        "occupied_slots": len(root_ctx.proxy_frontend.circuits),
+        "available_slots": available_slots,
+    })
 
 
 async def init(app: web.Application) -> None:

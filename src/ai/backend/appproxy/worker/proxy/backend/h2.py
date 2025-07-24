@@ -21,9 +21,9 @@ class H2Backend(AbstractBackend):
         self.api_endpoint = api_endpoint
 
     async def update_config(self, backends: list[BackendConfig]) -> None:
-        new_config = "\n".join(
-            [f"backend={b.hostname},b.port;{b.domain or ''};proto=h2" for b in backends]
-        )
+        new_config = "\n".join([
+            f"backend={b.hostname},b.port;{b.domain or ''};proto=h2" for b in backends
+        ])
         async with aiohttp.ClientSession(base_url=self.api_endpoint) as sess:
             async with sess.post("/api/v1beta1/backendconfig", data=new_config) as resp:
                 resp.raise_for_status()

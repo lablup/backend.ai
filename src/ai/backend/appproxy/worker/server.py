@@ -211,12 +211,10 @@ async def request_counter_marker_experimental(root_ctx: RootContext) -> None:
         ) as client:
             try:
                 redis_key = await root_ctx.request_counter_redis_queue.get()
-                await client.execute(
-                    [
-                        "INCR",
-                        redis_key,
-                    ]
-                )
+                await client.execute([
+                    "INCR",
+                    redis_key,
+                ])
             except Exception:
                 log.exception("request_counter_marker(): error while handling request:")
 
@@ -241,13 +239,11 @@ async def last_used_time_marker_experimental(root_ctx: RootContext) -> None:
             try:
                 redis_keys, target_time = await root_ctx.last_used_time_marker_redis_queue.get()
                 for key in redis_keys:
-                    await client.execute(
-                        [
-                            "SET",
-                            key,
-                            target_time,
-                        ]
-                    )
+                    await client.execute([
+                        "SET",
+                        key,
+                        target_time,
+                    ])
             except Exception:
                 log.exception("last_used_time_marker(): error while handling request:")
 
@@ -513,11 +509,9 @@ async def hello(request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
-    return web.json_response(
-        {
-            "proxy-worker": __version__,
-        }
-    )
+    return web.json_response({
+        "proxy-worker": __version__,
+    })
 
 
 async def status(request: web.Request) -> web.Response:
@@ -771,9 +765,9 @@ async def server_main(
         if os.geteuid() == 0:
             uid = root_ctx.local_config.proxy_worker.user
             gid = root_ctx.local_config.proxy_worker.group
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem]
-            )
+            os.setgroups([
+                g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+            ])
             os.setgid(gid)
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)

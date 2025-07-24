@@ -34,15 +34,13 @@ class AbstractBackend(metaclass=ABCMeta):
         self.last_used = time.time()
 
     async def mark_last_used_time(self, route: RouteInfo) -> None:
-        await self.root_context.last_used_time_marker_redis_queue.put(
-            (
-                [
-                    f"session.{route.session_id}.last_access",
-                    f"circuit.{self.circuit.id}.last_access",
-                ],
-                time.time(),
-            )
-        )
+        await self.root_context.last_used_time_marker_redis_queue.put((
+            [
+                f"session.{route.session_id}.last_access",
+                f"circuit.{self.circuit.id}.last_access",
+            ],
+            time.time(),
+        ))
 
     async def increase_request_counter(self) -> None:
         await self.root_context.request_counter_redis_queue.put(

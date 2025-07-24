@@ -39,13 +39,11 @@ class SubdomainFrontend(AbstractHTTPFrontend[str]):
             )
         app = web.Application()
         app.on_response_prepare.append(self.append_cors_headers)
-        app.middlewares.extend(
-            [
-                self.ensure_slot_middleware,
-                self.metric_collector_middleware,
-                self.exception_middleware,
-            ]
-        )
+        app.middlewares.extend([
+            self.ensure_slot_middleware,
+            self.metric_collector_middleware,
+            self.exception_middleware,
+        ])
         app.router.add_route("*", "/{path:.*$}", self.proxy)
 
         with importlib.resources.as_file(

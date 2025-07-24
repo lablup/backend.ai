@@ -114,12 +114,12 @@ async def gather_prometheus_inference_measures(
     measures: list[InferenceMeasurement] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
         aggregated_buckets = add_matrices(*per_route_histogram_metrics.values())
-        aggregated_count = sum(
-            [d for d in histogram_count_metrics[metric_name].values() if d is not None]
-        )
-        aggregated_sum = sum(
-            [d for d in histogram_sum_metrics[metric_name].values() if d is not None]
-        ) or Decimal("0")  # sum returns Literal['0'] if empty
+        aggregated_count = sum([
+            d for d in histogram_count_metrics[metric_name].values() if d is not None
+        ])
+        aggregated_sum = sum([
+            d for d in histogram_sum_metrics[metric_name].values() if d is not None
+        ]) or Decimal("0")  # sum returns Literal['0'] if empty
 
         aggregated_histogram_measurement = HistogramMeasurement(
             buckets={

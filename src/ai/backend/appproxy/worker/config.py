@@ -346,7 +346,9 @@ def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConf
                         raise ConfigValidationError(
                             "port proxy mode set but config is not populated"
                         )
-                    case FrontendMode.WILDCARD_DOMAIN if not cfg.proxy_worker.traefik.wildcard_domain:
+                    case FrontendMode.WILDCARD_DOMAIN if (
+                        not cfg.proxy_worker.traefik.wildcard_domain
+                    ):
                         raise ConfigValidationError(
                             "wildcard_domain mode set but config is not populated"
                         )

@@ -63,26 +63,24 @@ async def list_slots(request: web.Request) -> PydanticResponse[list[SlotResponse
 
     async with root_ctx.db.begin_readonly_session() as sess:
         circuits = await Circuit.list_circuits(sess, load_worker=True)
-        return PydanticResponse(
-            [
-                SlotResponseModel(
-                    port=c.port,
-                    rel=c.id,
-                    subdomain=c.subdomain,
-                    wsproxy_version="v2",
-                    worker__authority=c.worker_row.authority,
-                    circuit__app=c.app,
-                    circuit__session_id=c.session_ids[0] if c.session_ids else None,
-                    circuit__open_to_public=c.open_to_public,
-                    circuit__allowed_client_ips=c.allowed_client_ips,
-                    circuit__envs=json.dumps(c.envs) if c.envs else None,
-                    circuit__arguments=c.arguments,
-                    circuit__created=c.created_at,
-                    circuit__modified=c.updated_at,
-                )
-                for c in circuits
-            ]
-        )
+        return PydanticResponse([
+            SlotResponseModel(
+                port=c.port,
+                rel=c.id,
+                subdomain=c.subdomain,
+                wsproxy_version="v2",
+                worker__authority=c.worker_row.authority,
+                circuit__app=c.app,
+                circuit__session_id=c.session_ids[0] if c.session_ids else None,
+                circuit__open_to_public=c.open_to_public,
+                circuit__allowed_client_ips=c.allowed_client_ips,
+                circuit__envs=json.dumps(c.envs) if c.envs else None,
+                circuit__arguments=c.arguments,
+                circuit__created=c.created_at,
+                circuit__modified=c.updated_at,
+            )
+            for c in circuits
+        ])
 
 
 async def init(app: web.Application) -> None:

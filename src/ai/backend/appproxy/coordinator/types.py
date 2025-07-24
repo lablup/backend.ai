@@ -170,25 +170,21 @@ class CircuitManager:
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
         old = set(
-            RouteInfo(
-                **{
-                    **r.model_dump(),
-                    "health_status": None,
-                    "last_health_check": None,
-                    "consecutive_failures": 0,
-                }
-            )
+            RouteInfo(**{
+                **r.model_dump(),
+                "health_status": None,
+                "last_health_check": None,
+                "consecutive_failures": 0,
+            })
             for r in old_routes
         )
         new = set(
-            RouteInfo(
-                **{
-                    **r.model_dump(),
-                    "health_status": None,
-                    "last_health_check": None,
-                    "consecutive_failures": 0,
-                }
-            )
+            RouteInfo(**{
+                **r.model_dump(),
+                "health_status": None,
+                "last_health_check": None,
+                "consecutive_failures": 0,
+            })
             for r in circuit.healthy_routes
         )
         intersect = old & new

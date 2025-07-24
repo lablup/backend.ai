@@ -68,22 +68,20 @@ async def list_workers(request: web.Request) -> PydanticResponse[list[WorkerResp
 
     async with root_ctx.db.begin_readonly_session() as sess:
         workers = await Worker.list_workers(sess, load_circuits=True)
-        return PydanticResponse(
-            [
-                WorkerResponseModel(
-                    authority=w.authority,
-                    endpoint=str(w.api_endpoint),
-                    total_slots=(w.port_range[1] - w.port_range[0] + 1) if w.port_range else -1,
-                    ports_in_use=len(w.circuits),
-                    min_range=w.port_range[0] if w.port_range else None,
-                    max_range=w.port_range[1] if w.port_range else None,
-                    wildcard_domain=w.wildcard_domain,
-                    created=w.created_at,
-                    updated=w.updated_at,
-                )
-                for w in workers
-            ]
-        )
+        return PydanticResponse([
+            WorkerResponseModel(
+                authority=w.authority,
+                endpoint=str(w.api_endpoint),
+                total_slots=(w.port_range[1] - w.port_range[0] + 1) if w.port_range else -1,
+                ports_in_use=len(w.circuits),
+                min_range=w.port_range[0] if w.port_range else None,
+                max_range=w.port_range[1] if w.port_range else None,
+                wildcard_domain=w.wildcard_domain,
+                created=w.created_at,
+                updated=w.updated_at,
+            )
+            for w in workers
+        ])
 
 
 async def init(app: web.Application) -> None:

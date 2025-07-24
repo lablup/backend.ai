@@ -414,28 +414,22 @@ class Circuit(Base):
         match self.protocol:
             case ProxyProtocol.HTTP:
                 for r in healthy_routes:
-                    base.update(
-                        {
-                            f"bai_session_{r.session_id}_{self.id}": {
-                                "loadBalancer": {
-                                    "servers": [
-                                        {"url": f"http://{r.kernel_host}:{r.kernel_port}/"}
-                                    ],
-                                }
+                    base.update({
+                        f"bai_session_{r.session_id}_{self.id}": {
+                            "loadBalancer": {
+                                "servers": [{"url": f"http://{r.kernel_host}:{r.kernel_port}/"}],
                             }
                         }
-                    )
+                    })
             case ProxyProtocol.TCP:
                 for r in healthy_routes:
-                    base.update(
-                        {
-                            f"bai_session_{r.session_id}_{self.id}": {
-                                "loadBalancer": {
-                                    "servers": [{"address": f"{r.kernel_host}:{r.kernel_port}"}],
-                                }
+                    base.update({
+                        f"bai_session_{r.session_id}_{self.id}": {
+                            "loadBalancer": {
+                                "servers": [{"address": f"{r.kernel_host}:{r.kernel_port}"}],
                             }
                         }
-                    )
+                    })
         return base
 
     def get_traefik_middlewares(self, local_config: ServerConfig) -> dict[str, Any]:

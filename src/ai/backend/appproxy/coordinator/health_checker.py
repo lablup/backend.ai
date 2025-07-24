@@ -347,9 +347,11 @@ class HealthCheckEngine:
 
                             if route_info and old_status != status and status is not None:
                                 # Health status transition detected
-                                health_transitions.append(
-                                    (route_info.session_id, old_status, status)
-                                )
+                                health_transitions.append((
+                                    route_info.session_id,
+                                    old_status,
+                                    status,
+                                ))
                                 log.info(
                                     "Health status transition detected for session {} (route {}): {} -> {}",
                                     route_info.session_id,

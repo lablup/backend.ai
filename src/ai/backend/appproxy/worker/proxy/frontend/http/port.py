@@ -46,13 +46,11 @@ class PortFrontend(AbstractHTTPFrontend[int]):
             # Keep in mind that implementation of ensure_slot_middleware should manually handle exception and respond with
             # appropriate HTTP response, which usually is automatically covered by exception_middleware
             # That can be achieved by wraping whole execution block with AbstractHTTPFrontend.exception_safe_handler_wrapper()
-            app.middlewares.extend(
-                [
-                    self.ensure_slot_middleware,
-                    self.metric_collector_middleware,
-                    self.exception_middleware,
-                ]
-            )
+            app.middlewares.extend([
+                self.ensure_slot_middleware,
+                self.metric_collector_middleware,
+                self.exception_middleware,
+            ])
             app.router.add_route("*", "/{path:.*$}", self.proxy)
 
             with importlib.resources.as_file(
