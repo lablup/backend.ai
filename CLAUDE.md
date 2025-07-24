@@ -1,11 +1,14 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 
 ## Project Overview
 
 Read `README.md` for overall architecture and purpose of directories.
+
+This project uses a monorepo structure containing multiple Python pacakges under `ai.backend` namespace.
+Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 
 ## General
@@ -57,8 +60,6 @@ Read `README.md` for overall architecture and purpose of directories.
 - Unit tests in `tests/{package}` subdirectories and written in pytest
 - Integration tests in `src/ai/backend/test`
 - Reusable helper utilities for testing in `src/ai/backend/testutils`
-
-Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 ### Writing Tests
 
