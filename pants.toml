@@ -26,6 +26,7 @@ pants_ignore = [
     "/tools/pants-plugins",
     "/wheelhouse/*/",
     "/wheelhouse/*.whl",
+    "src/ai/backend/web/static"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
