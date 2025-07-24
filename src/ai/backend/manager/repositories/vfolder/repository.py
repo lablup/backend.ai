@@ -113,9 +113,7 @@ class VfolderRepository:
         async with self._db.begin_readonly_session() as db_session:
             if group_uuid:
                 group_row: Optional[GroupRow] = await db_session.scalar(
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == group_uuid)
-                    .options(selectinload(GroupRow.resource_policy_row))
+                    sa.select(GroupRow).where(GroupRow.id == group_uuid)
                 )
                 if group_row is None:
                     raise GroupNotFound(object_name="Group", object_id=group_uuid)
