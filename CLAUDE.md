@@ -30,9 +30,10 @@ Read `README.md` for overall architecture and purpose of directories.
 
 ### Working with Long Contexts
 
+* Keep the intention and direction in SPEC.md if exists
 * Split large work into step by step sprints
-* Write or update your original plan in SPEC.md in such cases
-* Do not make changes beyond those originally asked for but explicitly proceed user confirmation
+* Update the current design and next plans in SPEC.md when completing a sprint
+* Do not make changes beyond those originally asked for but explicitly proceed with user confirmation
 
 ### Python Specifics
 
