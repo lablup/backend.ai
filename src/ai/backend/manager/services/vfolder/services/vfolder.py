@@ -699,7 +699,7 @@ class VFolderService:
                 extra_data={"vfolder_name": ".logs"},
             )
 
-        _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             log_vfolder_data.host, is_unmanaged(log_vfolder_data.unmanaged_path)
         )
         response = web.StreamResponse(status=200)
@@ -714,13 +714,14 @@ class VFolderService:
                 / kernel_id_str[2:4]
                 / f"{kernel_id_str[4:]}.log",
             )
-            storage_proxy_client = self._storage_manager.get_manager_facing_client(
-                log_vfolder_data.host
-            )
+            storage_proxy_client = self._storage_manager.get_manager_facing_client(proxy_name)
 
             async for chunk in storage_proxy_client.fetch_file_content_streaming(
                 volume_name, vfid, relpath
             ):
+                if not prepared:
+                    await response.prepare(action.request)
+                    prepared = True
                 await response.write(chunk)
 
         except aiohttp.ClientResponseError as e:
