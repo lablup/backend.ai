@@ -33,3 +33,63 @@ class VFolderMetadataResponse(BaseResponseModel):
     item: VFolderMetaField = Field(
         description="Provides metadata for a vfolder, used for storage tracking and access management."
     )
+
+
+# S3 Storage API Response Models
+class UploadResponse(BaseResponseModel):
+    """Response for file upload operations."""
+
+    success: bool
+    key: str
+
+
+class ErrorResponse(BaseResponseModel):
+    """Generic error response."""
+
+    error: str
+
+
+class PresignedUploadResponse(BaseResponseModel):
+    """Response containing presigned upload URL and form fields."""
+
+    url: str
+    fields: dict[str, str]
+
+
+class PresignedDownloadResponse(BaseResponseModel):
+    """Response containing presigned download URL."""
+
+    url: str
+
+
+class ObjectInfoResponse(BaseResponseModel):
+    """Response containing S3 object metadata."""
+
+    content_length: int | None = None
+    content_type: str | None = None
+    last_modified: str | None = None
+    etag: str | None = None
+
+
+class DeleteResponse(BaseResponseModel):
+    """Response for object deletion operations."""
+
+    success: bool
+
+
+class S3ObjectInfo(BaseResponseModel):
+    """Pydantic model for S3 object metadata information."""
+
+    content_length: Optional[int] = None
+    content_type: Optional[str] = None
+    last_modified: Optional[str] = None
+    etag: Optional[str] = None
+    metadata: dict[str, str] = {}
+
+
+class S3PresignedUploadData(BaseResponseModel):
+    """Pydantic model for S3 presigned upload URL data."""
+
+    url: str
+    fields: dict[str, str]
+    key: str
