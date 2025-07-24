@@ -59,6 +59,7 @@
 //     "kubernetes-asyncio~=9.1.0",
 //     "kubernetes~=10.0.0",
 //     "lark~=1.1.5",
+//     "memray~=1.17.2",
 //     "more-itertools~=10.5.0",
 //     "msgpack~=1.1.0",
 //     "multidict~=6.2.0",
@@ -1091,36 +1092,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "056cfa2440fe1a157a7c2be897c749c83e1a322144aa4dad889f2fca66571019",
-              "url": "https://files.pythonhosted.org/packages/15/70/723d2ab259aeaed6c96e5c1857ebe7d474ed9aa8f487dea352c60f33798f/boto3-1.39.3-py3-none-any.whl"
+              "hash": "bbf7a8d374b513975c305883ae40e623cc261dbdc25ea86ae435647cae837a15",
+              "url": "https://files.pythonhosted.org/packages/78/b6/c717416e67b1bef84be9c05f2686d353544eda2af5b43af06996a43f6481/boto3-1.39.12-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0a367106497649ae3d8a7b571b8c3be01b7b935a0fe303d4cc2574ed03aecbb4",
-              "url": "https://files.pythonhosted.org/packages/02/42/712a74bb86d06538c55067a35b8a82c57aa303eba95b2b1ee91c829288f4/boto3-1.39.3.tar.gz"
+              "hash": "1a715cb40ea9df6b666148b243b5b9adbfa5be50d28e2f660330c0581d94b639",
+              "url": "https://files.pythonhosted.org/packages/a2/f6/9021213a36aefc43dc300c89882a52d348f3a7a344fefda145f1b741d0a5/boto3-1.39.12.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.40.0,>=1.39.3",
+            "botocore<1.40.0,>=1.39.12",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.14.0,>=0.13.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.3"
+          "version": "1.39.12"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "66a81cfac18ad5e9f47696c73fdf44cdbd8f8ca51ab3fca1effca0aabf61f02f",
-              "url": "https://files.pythonhosted.org/packages/53/e4/3698dbb037a44d82a501577c6e3824c19f4289f4afbcadb06793866250d8/botocore-1.39.3-py3-none-any.whl"
+              "hash": "60bfa0f1e0eb03997e22254e2e6a0e3f7e02b8f845253a4bb235d9240d195c72",
+              "url": "https://files.pythonhosted.org/packages/c8/af/3b82594c5fa26464b548da35a6affe27a44993f65c4149ed8cf8a5df8387/botocore-1.39.12-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "da8f477e119f9f8a3aaa8b3c99d9c6856ed0a243680aa3a3fbbfc15a8d4093fb",
-              "url": "https://files.pythonhosted.org/packages/60/66/96e89cc261d75f0b8125436272c335c74d2a39df84504a0c3956adcd1301/botocore-1.39.3.tar.gz"
+              "hash": "d20b53a196af32ff153cbdbef3cb89e6a9065dc5e90ce23d009e03364601a266",
+              "url": "https://files.pythonhosted.org/packages/16/de/136cb340bc7edc2709e0b4f1b422a101f1756982d774384c5cfb0eb27987/botocore-1.39.12.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -1132,7 +1133,7 @@
             "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.3"
+          "version": "1.39.12"
         },
         {
           "artifacts": [
@@ -1231,19 +1232,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2e0c7ce7cb5d8f8634ca55d2ba7e6ec2689a2fd6537d8dec1296a477a4910057",
-              "url": "https://files.pythonhosted.org/packages/84/ae/320161bd181fc06471eed047ecce67b693fd7515b16d495d8932db763426/certifi-2025.6.15-py3-none-any.whl"
+              "hash": "6b31f564a415d79ee77df69d757bb49a5bb53bd9f756cbbe24394ffd6fc1f4b2",
+              "url": "https://files.pythonhosted.org/packages/4f/52/34c6cf5bb9285074dc3531c437b3919e825d976fde097a7a73f79e726d03/certifi-2025.7.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d747aa5a8b9bbbb1bb8c22bb13e22bd1f18e9796defa16bab421f7f7a317323b",
-              "url": "https://files.pythonhosted.org/packages/73/f7/f14b46d4bcd21092d7d3ccef689615220d8a08fb25e564b65d20738e672e/certifi-2025.6.15.tar.gz"
+              "hash": "8ea99dbdfaaf2ba2f9bac77b9249ef62ec5218e7c2b2e903378ed5fccf765995",
+              "url": "https://files.pythonhosted.org/packages/b3/76/52c535bcebe74590f296d6c77c86dabf761c41980e1347a2422e4aa2ae41/certifi-2025.7.14.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2025.6.15"
+          "version": "2025.7.14"
         },
         {
           "artifacts": [
@@ -2975,6 +2976,96 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "63f0a8d5d9d179648e7e336f8a185e8f4a1b70f28ec62476e193c024aa992313",
+              "url": "https://files.pythonhosted.org/packages/a6/d4/7adf788b3bb1652131bdd086434ec4e337c46fc8df9809a8d0887aebd400/memray-1.17.2-cp313-cp313-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "aa655a28d10958a6a4feb98f123e4d7bbf156a7fef79edebbfca6198509aada2",
+              "url": "https://files.pythonhosted.org/packages/39/36/5ccb56f1a8f39e24025c2b8203b68980607810731735a33b14b5db3823f4/memray-1.17.2-cp313-cp313-macosx_10_14_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e816e7157b4e2e17ec3fa08fa59a058a5ba264dddd35e04e44862e7800db07f3",
+              "url": "https://files.pythonhosted.org/packages/75/30/62b2da40ef34afefe0df91a9d098bcaed46e9848d8e74c8742a11684d325/memray-1.17.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b7d9c90ab17629a0b38851fd004c5301de0f3c4668a88986da22dd016c4416cd",
+              "url": "https://files.pythonhosted.org/packages/a5/b2/1f74ee01af4c7eedf94ad12e48e40f96ef522141d5c2efaf7282a971c256/memray-1.17.2-cp313-cp313-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "48fe99afa391bdc67f2415b968b31c1ace5d045a0af91312a8e24cfa4ff577c6",
+              "url": "https://files.pythonhosted.org/packages/a6/74/9f5fb772cdb7b203ece295dc429507a28e0ecda9fef6c3dc2fdf02c7f1cd/memray-1.17.2-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e871af5a88006f9c0d16cb234e9d18244ffeb28f5c8aa17bd6babc8418fdda1d",
+              "url": "https://files.pythonhosted.org/packages/b9/69/06c3b2776c90257354176d6a3caf3c4a74f2d2920c96c456b149109a6456/memray-1.17.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "eb75c075874a6eccddf361513d9d4a9223dd940580c6370a6ba5339bae5d0ba2",
+              "url": "https://files.pythonhosted.org/packages/df/40/66e6ae86c0a22b8b998779fa8d6c0ab9ee63f0943198adcf714934286cbf/memray-1.17.2.tar.gz"
+            }
+          ],
+          "project_name": "memray",
+          "requires_dists": [
+            "Cython; extra == \"dev\"",
+            "Cython; extra == \"test\"",
+            "IPython; extra == \"dev\"",
+            "IPython; extra == \"docs\"",
+            "asv; extra == \"benchmark\"",
+            "asv; extra == \"dev\"",
+            "black; extra == \"dev\"",
+            "black; extra == \"lint\"",
+            "bump2version; extra == \"dev\"",
+            "bump2version; extra == \"docs\"",
+            "check-manifest; extra == \"dev\"",
+            "check-manifest; extra == \"lint\"",
+            "flake8; extra == \"dev\"",
+            "flake8; extra == \"lint\"",
+            "furo; extra == \"dev\"",
+            "furo; extra == \"docs\"",
+            "greenlet; python_version < \"3.14\" and extra == \"dev\"",
+            "greenlet; python_version < \"3.14\" and extra == \"test\"",
+            "ipython; extra == \"dev\"",
+            "ipython; extra == \"test\"",
+            "isort; extra == \"dev\"",
+            "isort; extra == \"lint\"",
+            "jinja2>=2.9",
+            "mypy; extra == \"dev\"",
+            "mypy; extra == \"lint\"",
+            "packaging; extra == \"dev\"",
+            "packaging; extra == \"test\"",
+            "pytest-cov; extra == \"dev\"",
+            "pytest-cov; extra == \"test\"",
+            "pytest-textual-snapshot; extra == \"dev\"",
+            "pytest-textual-snapshot; extra == \"test\"",
+            "pytest; extra == \"dev\"",
+            "pytest; extra == \"test\"",
+            "rich>=11.2.0",
+            "setuptools; python_version >= \"3.12\" and extra == \"dev\"",
+            "setuptools; python_version >= \"3.12\" and extra == \"test\"",
+            "sphinx-argparse; extra == \"dev\"",
+            "sphinx-argparse; extra == \"docs\"",
+            "sphinx; extra == \"dev\"",
+            "sphinx; extra == \"docs\"",
+            "textual!=0.65.2,!=0.66,>=0.43; extra == \"dev\"",
+            "textual!=0.65.2,!=0.66,>=0.43; extra == \"test\"",
+            "textual>=0.41.0",
+            "towncrier; extra == \"dev\"",
+            "towncrier; extra == \"docs\"",
+            "typing_extensions; python_version < \"3.8.0\""
+          ],
+          "requires_python": ">=3.7.0",
+          "version": "1.17.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "037b0d3203ce90cca8ab1defbbdac29d5f993fc20131f3664dc8d6acfa872aef",
               "url": "https://files.pythonhosted.org/packages/48/7e/3a64597054a70f7c86eb0a7d4fc315b8c1ab932f64883a297bdffeb5f967/more_itertools-10.5.0-py3-none-any.whl"
             },
@@ -4502,17 +4593,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4f024da9f1ef945e680dc68610b52550e36590a67fd31bb3b4943979a1f90ef3",
-              "url": "https://files.pythonhosted.org/packages/30/05/ce271016e351fddc8399e546f6e23761967ee09c8c568bbfbecb0c150171/pytest_asyncio-1.0.0-py3-none-any.whl"
+              "hash": "5fe2d69607b0bd75c656d1211f969cadba035030156745ee09e7d71740e58ecf",
+              "url": "https://files.pythonhosted.org/packages/c7/9d/bf86eddabf8c6c9cb1ea9a869d6873b46f105a5d292d3a6f7071f5b07935/pytest_asyncio-1.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d15463d13f4456e1ead2594520216b225a16f781e144f8fdf6c5bb4667c48b3f",
-              "url": "https://files.pythonhosted.org/packages/d0/d4/14f53324cb1a6381bef29d698987625d80052bb33932d8e7cbf9b337b17c/pytest_asyncio-1.0.0.tar.gz"
+              "hash": "796aa822981e01b68c12e4827b8697108f7205020f24b5793b3c41555dab68ea",
+              "url": "https://files.pythonhosted.org/packages/4e/51/f8794af39eeb870e87a8c8068642fc07bce0c854d6865d7dd0f2a9d338c2/pytest_asyncio-1.1.0.tar.gz"
             }
           ],
           "project_name": "pytest-asyncio",
           "requires_dists": [
+            "backports-asyncio-runner<2,>=1.1; python_version < \"3.11\"",
             "coverage>=6.2; extra == \"testing\"",
             "hypothesis>=5.7.1; extra == \"testing\"",
             "pytest<9,>=8.2",
@@ -4521,7 +4613,7 @@
             "typing-extensions>=4.12; python_version < \"3.10\""
           ],
           "requires_python": ">=3.9",
-          "version": "1.0.0"
+          "version": "1.1.0"
         },
         {
           "artifacts": [
@@ -4991,13 +5083,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0148ef34d6dd964d0d8cf4311b2b21c474693e57c2e069ec708ce043d2b527be",
-              "url": "https://files.pythonhosted.org/packages/18/17/22bf8155aa0ea2305eefa3a6402e040df7ebe512d1310165eda1e233c3f8/s3transfer-0.13.0-py3-none-any.whl"
+              "hash": "a981aa7429be23fe6dfc13e80e4020057cbab622b08c0315288758d67cabc724",
+              "url": "https://files.pythonhosted.org/packages/6d/4f/d073e09df851cfa251ef7840007d04db3293a0482ce607d2b993926089be/s3transfer-0.13.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f5e6db74eb7776a37208001113ea7aa97695368242b364d73e91c981ac522177",
-              "url": "https://files.pythonhosted.org/packages/ed/5d/9dcc100abc6711e8247af5aa561fc07c4a046f72f659c3adea9a449e191a/s3transfer-0.13.0.tar.gz"
+              "hash": "c3fdba22ba1bd367922f27ec8032d6a1cf5f10c934fb5d68cf60fd5a23d936cf",
+              "url": "https://files.pythonhosted.org/packages/6d/05/d52bf1e65044b4e5e27d4e63e8d1579dbdec54fce685908ae09bc3720030/s3transfer-0.13.1.tar.gz"
             }
           ],
           "project_name": "s3transfer",
@@ -5006,7 +5098,7 @@
             "botocore[crt]<2.0a.0,>=1.37.4; extra == \"crt\""
           ],
           "requires_python": ">=3.9",
-          "version": "0.13.0"
+          "version": "0.13.1"
         },
         {
           "artifacts": [
@@ -5643,19 +5735,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1de8f0fe4bdcb187a48d2026c1e3672830f67943ad2bf3486abe031b632f1252",
-              "url": "https://files.pythonhosted.org/packages/47/8c/4ab0a17ece30fe608270b89cf066387051862899fff9f54ab12511fc7fdd/types_cachetools-6.0.0.20250525-py3-none-any.whl"
+              "hash": "bba4b8d42262460d24e570097d2d9040e60311934603caa642efd971f3658ed0",
+              "url": "https://files.pythonhosted.org/packages/61/bb/554208964e901e9e1992a7ea0bcab1590a4b2e94d20a9e6200826110ec89/types_cachetools-6.1.0.20250717-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "baf06f234cac3aeb44c07893447ba03ecdb6c0742ba2607e28a35d38e6821b02",
-              "url": "https://files.pythonhosted.org/packages/03/d0/55ff0eeda141436c1bd2142cd026906870c661b3f7755070d6da7ea7210f/types_cachetools-6.0.0.20250525.tar.gz"
+              "hash": "4acc8e25de9f5f84dd176ea81dcffa7cb24393869bb2e59e692dfd0139a1e66f",
+              "url": "https://files.pythonhosted.org/packages/5a/14/e98ea3b3fda81787659268bbf09dec56961c39db060fdca74cb521df0515/types_cachetools-6.1.0.20250717.tar.gz"
             }
           ],
           "project_name": "types-cachetools",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "6.0.0.20250525"
+          "version": "6.1.0.20250717"
         },
         {
           "artifacts": [
@@ -6448,6 +6540,7 @@
     "kubernetes-asyncio~=9.1.0",
     "kubernetes~=10.0.0",
     "lark~=1.1.5",
+    "memray~=1.17.2",
     "more-itertools~=10.5.0",
     "msgpack~=1.1.0",
     "multidict~=6.2.0",

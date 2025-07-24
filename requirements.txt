@@ -41,6 +41,7 @@ jupyter-client>=8.6
 kubernetes~=10.0.0
 kubernetes-asyncio~=9.1.0
 lark~=1.1.5
+memray~=1.17.2
 more-itertools~=10.5.0
 msgpack~=1.1.0
 multidict~=6.2.0
