@@ -79,7 +79,12 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             endpoint = await self._get_endpoint_by_id(
-                session, endpoint_id, load_routes=True, load_session_owner=True, load_model=True
+                session,
+                endpoint_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_model=True,
+                load_image=True,
             )
             if not endpoint:
                 return None
@@ -400,6 +405,7 @@ class ModelServingRepository:
         session: SASession,
         endpoint_id: uuid.UUID,
         load_routes: bool = False,
+        load_image: bool = False,
         load_session_owner: bool = False,
         load_model: bool = False,
     ) -> Optional[EndpointRow]:
@@ -411,6 +417,7 @@ class ModelServingRepository:
                 session,
                 endpoint_id,
                 load_routes=load_routes,
+                load_image=load_image,
                 load_session_owner=load_session_owner,
                 load_model=load_model,
             )
