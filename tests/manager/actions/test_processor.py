@@ -11,7 +11,7 @@ from ai.backend.manager.actions.action.base import (
     BaseActionResult,
 )
 from ai.backend.manager.actions.processor.base import ActionProcessor
-from ai.backend.manager.actions.types import ActionResultMeta, ActionTargetMeta, ProcessResult
+from ai.backend.manager.actions.types import ActionResultMeta, ActionResultTargetMeta, ProcessResult
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -101,7 +101,7 @@ async def test_processor_success():
         expected_done_result=ProcessResult(
             meta=ActionResultMeta(
                 action_id=uuid.uuid4(),
-                target=ActionTargetMeta(
+                target=ActionResultTargetMeta(
                     entity_type=_MOCK_ACTION_TYPE,
                     entity_ids=["1"],
                 ),
@@ -134,7 +134,7 @@ async def test_processor_exception():
         expected_done_result=ProcessResult(
             meta=ActionResultMeta(
                 action_id=uuid.uuid4(),
-                target=ActionTargetMeta(
+                target=ActionResultTargetMeta(
                     entity_type=_MOCK_ACTION_TYPE,
                     entity_ids=["1"],
                 ),

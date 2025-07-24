@@ -7,12 +7,13 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import (
     ActionResultMeta,
-    ActionTargetMeta,
+    ActionResultTargetMeta,
     ActionTriggerMeta,
     OperationStatus,
     ProcessResult,
 )
 from ai.backend.manager.actions.validators.validator.scope import ScopedActionValidator
+from ai.backend.manager.data.permission.id import ScopeId
 
 from ..action.scope import (
     TBaseScopedAction,
@@ -74,9 +75,9 @@ class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult])
             duration = ended_at - started_at
             meta = ActionResultMeta(
                 action_id=action_id,
-                target=ActionTargetMeta(
+                target=ActionResultTargetMeta(
                     entity_type=action.entity_type(),
-                    scope_id=action.target_scope_id(),
+                    scope=ScopeId(action.scope_type(), action.target_scope_id()),
                 ),
                 status=status,
                 description=description,
