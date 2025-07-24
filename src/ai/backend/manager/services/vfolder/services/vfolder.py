@@ -586,7 +586,7 @@ class VFolderService:
             )
 
         # Check for duplicate vfolder names
-        name_exists = await self._vfolder_repository.check_vfolder_name_exists(
+        duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
             action.target_name,
             action.requester_user_uuid,
             user_role,
@@ -594,18 +594,13 @@ class VFolderService:
             list(allowed_vfolder_types),
         )
 
-        if name_exists:
+        if duplication_exists:
             raise VFolderAlreadyExists(
                 f"VFolder with the given name already exists. ({action.target_name})"
             )
 
-        # Get user's keypair resource policy
-        user_data = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        if not user_data:
-            raise VFolderInvalidParameter("User not found.")
-
         allowed_vfolder_hosts = await self._vfolder_repository.get_allowed_vfolder_hosts(
-            user_data.id, source_vfolder_data.group
+            action.requester_user_uuid, source_vfolder_data.group
         )
 
         # Check host permissions using the user's actual resource policy
@@ -620,7 +615,7 @@ class VFolderService:
         )
 
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            user_data.id, source_vfolder_data.group
+            action.requester_user_uuid, source_vfolder_data.group
         )
 
         # Check resource policy's max_vfolder_count
