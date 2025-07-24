@@ -3,10 +3,7 @@ from typing import Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.internal_types.permission_controller.id import (
-    ObjectId,
-    ScopeId,
-)
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
