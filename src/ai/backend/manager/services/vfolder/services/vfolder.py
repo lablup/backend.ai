@@ -569,11 +569,6 @@ class VFolderService:
             for entry in vfolder_list_result.vfolders:
                 if entry.vfolder_data.name == action.target_name:
                     raise VFolderAlreadyExists
-                if (
-                    entry.vfolder_data.name.startswith(".")
-                    and entry.vfolder_data.name == action.target_name
-                ):
-                    raise VFolderInvalidParameter("VFolder name conflicts with your dotfile.")
 
         # Get target host
         target_folder_host = action.target_host or source_vfolder_data.host
