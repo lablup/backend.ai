@@ -411,7 +411,7 @@ class ScheduleRepository:
             await session.execute(query)
 
     @repository_decorator()
-    async def finalize_scheduled_session(
+    async def finalize_multi_node_session(
         self,
         session_id: SessionId,
         sgroup_name: str,
@@ -438,7 +438,10 @@ class ScheduleRepository:
             for kernel_row in session_row.kernels:
                 kernel_row = cast(KernelRow, kernel_row)
                 kernel_row.set_status(
-                    KernelStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+                    KernelStatus.SCHEDULED,
+                    status_info="scheduled",
+                    status_data={},
+                    status_changed_at=now,
                 )
                 kernel_row.scaling_group = sgroup_name
                 bind_agent_id, bind_agent_addr = kernel_agent_id_addr[kernel_row.id]
@@ -447,7 +450,10 @@ class ScheduleRepository:
                     kernel_row.agent = bind_agent_id
                     kernel_row.agent_addr = bind_agent_addr
             session_row.set_status(
-                SessionStatus.SCHEDULED, status_info="scheduled", status_changed_at=now
+                SessionStatus.SCHEDULED,
+                status_info="scheduled",
+                status_data={},
+                status_changed_at=now,
             )
             session_row.scaling_group_name = sgroup_name
             session_row.agent_ids = agent_ids
