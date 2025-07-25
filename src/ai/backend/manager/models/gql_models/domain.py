@@ -12,6 +12,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -130,6 +131,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+@graphene_federation.key("id")
 class DomainNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

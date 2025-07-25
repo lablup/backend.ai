@@ -13,6 +13,7 @@ from typing import (
 from uuid import UUID
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -84,6 +85,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

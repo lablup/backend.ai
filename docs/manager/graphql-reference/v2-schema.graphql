@@ -1,6 +1,6 @@
 directive @oneOf on INPUT_OBJECT
 
-schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key"]) {
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
@@ -107,8 +107,6 @@ enum ArtifactType {
   IMAGE
 }
 
-scalar ByteSize
-
 type BlueGreenConfig {
   autoPromotionEnabled: Boolean!
   terminationWaitTime: Int!
@@ -166,7 +164,6 @@ input CreateModelDeploymentInput {
 
 type CreateModelDeploymentPayload {
   deployment: ModelDeployment!
-  resolveDeployment: ModelDeployment!
 }
 
 input CreateModelRevisionInput {
@@ -298,16 +295,14 @@ input ImageInput {
 
 extend type ImageNode @key(fields: "id") {
   id: ID! @external
-  name: String! @external
-  architecture: String! @external
 }
 
-type InferenceSessionError {
-  sessionId: UUID!
+type InferenceSessionError @shareable {
+  session_id: UUID!
   errors: [InferenceSessionErrorInfo!]!
 }
 
-type InferenceSessionErrorInfo {
+type InferenceSessionErrorInfo @shareable {
   src: String!
   name: String!
   repr: String!
@@ -374,21 +369,6 @@ type ModelReplica implements Node {
   name: String!
   revision: ModelRevision!
   routings: [RoutingNode!]!
-  resolveRoutings(
-    """Returns the items in the list that come before the specified cursor."""
-    before: String = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    after: String = null
-
-    """Returns the first n items from the list."""
-    first: Int = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    last: Int = null
-  ): RoutingNodeConnection!
-  resolveName: String!
-  resolveRevision: ModelRevision!
 }
 
 type ModelRevision implements Node {
@@ -463,8 +443,8 @@ type ModelVFolderConfig {
 
 input ModelVFolderConfigInput {
   vfolderId: ID!
-  mountDestination: String! = "/models"
-  definitionPath: String! = "model-definition.yaml"
+  mountDestination: String!
+  definitionPath: String!
 }
 
 type Mount {
@@ -520,7 +500,7 @@ enum OrderDirection {
 }
 
 """Information to aid in pagination."""
-type PageInfo {
+type PageInfo @shareable {
   """When paginating forwards, are there more items?"""
   hasNextPage: Boolean!
 
@@ -546,7 +526,7 @@ type PullArtifactPayload {
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
   artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
   artifact(id: ID!): Artifact
   artifactGroup(id: ID!): ArtifactGroup
@@ -592,9 +572,6 @@ type ReplicaManagement {
   desiredReplicaCount: Int!
   replicas: [ModelReplica!]!
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
-  resolveDesiredReplicaCount: Int!
-  resolveReplicas: [ModelReplica!]!
-  resolveAutoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
 type ReplicaMetric {
@@ -606,8 +583,8 @@ type ReplicaMetric {
 
 type ResourceConfig {
   resourceGroup: ScalingGroupNode!
-  resourceSlots: ResourceSlots!
-  resourceOpts: ResourceOpts
+  resourceSlots: JSONString!
+  resourceOpts: JSONString
 }
 
 input ResourceConfigInput {
@@ -616,20 +593,9 @@ input ResourceConfigInput {
   resourceOpts: ResourceOptsInput = null
 }
 
-type ResourceOpts {
-  shmem: String
-  extra: JSONString
-}
-
 input ResourceOptsInput {
   shmem: String = null
   extra: JSONString = null
-}
-
-type ResourceSlots {
-  cpu: Int!
-  mem: String!
-  extra: JSONString
 }
 
 input ResourceSlotsInput {
@@ -667,23 +633,6 @@ type RoutingNode implements Node {
   liveStat: JSONString!
 }
 
-type RoutingNodeConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [RoutingNodeEdge!]!
-}
-
-"""An edge in a connection."""
-type RoutingNodeEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: RoutingNode!
-}
-
 type SGLANGServiceConfig {
   config: JSONString!
 }
@@ -710,11 +659,6 @@ input StringFilter {
   endsWith: String = null
   equals: String = null
   notEquals: String = null
-  iContains: String = null
-  iStartsWith: String = null
-  iEndsWith: String = null
-  iEquals: String = null
-  iNotEquals: String = null
 }
 
 type Subscription {
@@ -746,7 +690,6 @@ input UpdateModelDeploymentInput {
 
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment!
-  resolveDeployment: ModelDeployment!
 }
 
 extend type UserNode @key(fields: "id") {

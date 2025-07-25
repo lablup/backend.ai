@@ -11,6 +11,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -81,6 +82,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

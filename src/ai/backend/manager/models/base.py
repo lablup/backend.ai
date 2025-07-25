@@ -32,6 +32,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 import trafaret as t
 import yarl
@@ -1425,7 +1426,9 @@ async def populate_fixture(
                     await conn.execute(stmt, update_data)
 
 
+@graphene_federation.shareable
 class InferenceSessionError(graphene.ObjectType):
+    @graphene_federation.shareable
     class InferenceSessionErrorInfo(graphene.ObjectType):
         src = graphene.String(required=True)
         name = graphene.String(required=True)

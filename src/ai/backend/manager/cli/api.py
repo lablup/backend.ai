@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 
 import aiofiles
 import click
-import graphene
+import graphene_federation
 
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
@@ -28,7 +28,12 @@ def cli(args) -> None:
 
 
 async def generate_graphene_gql_schema(output_path: Path) -> None:
-    schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
+    schema = graphene_federation.build_schema(
+        query=Queries,
+        mutation=Mutations,
+        auto_camelcase=False,
+        federation_version=graphene_federation.LATEST_VERSION,
+    )
     if output_path == "-":
         log.info("======== Graphene GraphQL API Schema ========")
         print(str(schema))
@@ -67,27 +72,35 @@ def generate_supergraph_schema(
 
     # Post-process schema file
     content = schema_path.read_text(encoding="utf-8")
-
-    content = content.replace(
-        'schema @link(url: "https://specs.apollo.dev/federation/v2.7"',
-        'schema @link(url: "https://specs.apollo.dev/federation/v2.3"',
-    ).replace("type PageInfo {", "type PageInfo @shareable {")
-
+    original_content = content
+    content = content.replace("type PageInfo {", "type PageInfo @shareable {")
     schema_path.write_text(content, encoding="utf-8")
     print(f"Schema post-processed at: {schema_path}")
 
-    # Generate supergraph
-    supergraph_path = output_dir / "supergraph.graphql"
-    result = subprocess.run(
-        ["rover", "supergraph", "compose", "--config", str(config_path)],
-        cwd=config_path.parent,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        # Generate supergraph
+        supergraph_path = output_dir / "supergraph.graphql"
+        # Find the project root directory (where the supergraph.yaml paths are relative to)
+        project_root = config_path
+        while project_root.parent != project_root:
+            if (project_root / "pyproject.toml").exists() or (project_root / ".git").exists():
+                break
+            project_root = project_root.parent
 
-    supergraph_path.write_text(result.stdout, encoding="utf-8")
-    print(f"Supergraph generated at: {supergraph_path}")
+        result = subprocess.run(
+            ["rover", "supergraph", "compose", "--config", str(config_path)],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        supergraph_path.write_text(result.stdout, encoding="utf-8")
+        print(f"Supergraph generated at: {supergraph_path}")
+    except subprocess.CalledProcessError:
+        # Restore original schema file on error
+        schema_path.write_text(original_content, encoding="utf-8")
+        raise
 
 
 @cli.command()
@@ -129,6 +142,8 @@ def generate_supergraph(
         raise click.Abort()
     except subprocess.CalledProcessError as e:
         click.echo(f"❌ Rover command failed: {e}", err=True)
+        if hasattr(e, "stderr") and e.stderr:
+            click.echo(f"Error details: {e.stderr}", err=True)
         raise click.Abort()
     except Exception as e:
         click.echo(f"❌ Unexpected error: {e}", err=True)

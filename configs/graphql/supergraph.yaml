@@ -1,10 +1,9 @@
-federation_version: =2.3.2
 subgraphs:
   graphene:
     routing_url: http://host.docker.internal:8091/admin/gql
     schema:
-      file: ./schema1.graphql
+      file: ../../docs/manager/graphql-reference/schema.graphql
   strawberry:
     routing_url: http://host.docker.internal:8091/admin/gql/v2
     schema:
-      file: ./schema2.graphql
+      file: ../../docs/manager/graphql-reference/v2-schema.graphql
