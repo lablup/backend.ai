@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum, StrEnum
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Optional, cast
 
 import strawberry
 from strawberry import ID, Info, relay
@@ -58,23 +58,10 @@ class ModelVFolderConfig:
 
 
 @strawberry.type
-class ResourceSlots:
-    cpu: int
-    mem: str
-    extra: Optional[JSONString] = None
-
-
-@strawberry.type
-class ResourceOpts:
-    shmem: Optional[str] = None
-    extra: Optional[JSONString] = None
-
-
-@strawberry.type
 class ResourceConfig:
     resource_group: ResourceGroup
-    resource_slots: ResourceSlots
-    resource_opts: Optional[ResourceOpts] = None
+    resource_slots: JSONString
+    resource_opts: Optional[JSONString] = None
 
 
 # Service Config Union Types
@@ -305,8 +292,14 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
         cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
         resource_config=ResourceConfig(
             resource_group=ResourceGroup(id=ID("rg-id")),
-            resource_slots=ResourceSlots(cpu=1, mem="1G", extra=None),
-            resource_opts=ResourceOpts(shmem=None, extra=None),
+            resource_slots=cast(
+                JSONString,
+                '{"cpu": 1, "mem": "1G", "extra": {"gpu_type": "A100", "storage": "100GB"}}',
+            ),
+            resource_opts=cast(
+                JSONString,
+                '{"shmem": , "extra": {"network": "high_bandwidth", "priority": "high"}}',
+            ),
         ),
         model_runtime_config=ModelRuntimeConfig(
             runtime_variant="vllm", service_config=None, environ=None

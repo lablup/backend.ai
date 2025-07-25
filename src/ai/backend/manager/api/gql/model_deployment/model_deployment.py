@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, AsyncGenerator, Optional
+from typing import Annotated, AsyncGenerator, Optional, cast
 
 import strawberry
 from strawberry import ID, Info, relay
@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.federated_types import (
     VFolder,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import RoutingNode
-from ai.backend.manager.api.gql.types import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import JSONString, OrderDirection, StringFilter
 
 from .model_revision import (
     ClusterConfig,
@@ -29,8 +29,6 @@ from .model_revision import (
     ModelRuntimeConfig,
     ModelVFolderConfig,
     ResourceConfig,
-    ResourceOpts,
-    ResourceSlots,
 )
 
 
@@ -484,8 +482,14 @@ async def replica_status_changed(revision_id: ID) -> AsyncGenerator[ModelReplica
                 cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfig(
                     resource_group=ResourceGroup(id=ID("rg-id")),
-                    resource_slots=ResourceSlots(cpu=1, mem="1G", extra=None),
-                    resource_opts=ResourceOpts(shmem=None, extra=None),
+                    resource_slots=cast(
+                        JSONString,
+                        '{"cpu": 1, "mem": "1G", "extra": {"gpu_type": "A100", "storage": "100GB"}}',
+                    ),
+                    resource_opts=cast(
+                        JSONString,
+                        '{"shmem": null, "extra": {"network": "high_bandwidth", "priority": "high"}}',
+                    ),
                 ),
                 model_runtime_config=ModelRuntimeConfig(
                     runtime_variant="vllm", service_config=None, environ=None
@@ -496,7 +500,7 @@ async def replica_status_changed(revision_id: ID) -> AsyncGenerator[ModelReplica
                     definition_path="model.yaml",
                 ),
                 mounts=[],
-                image=Image(id=ID("image-id"), name="placeholder:latest", architecture="x86_64"),
+                image=Image(id=ID("image-id")),
                 error_data=None,
                 created_at=datetime.now(),
             ),
