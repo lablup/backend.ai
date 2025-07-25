@@ -17,7 +17,7 @@ from ai.backend.manager.api.gql.federated_types import (
     User,
     VFolder,
 )
-from ai.backend.manager.api.gql.model_deployment.routing import RoutingNode, RoutingNodeConnection
+from ai.backend.manager.api.gql.model_deployment.routing import RoutingNode
 from ai.backend.manager.api.gql.types import OrderDirection, StringFilter
 
 from .model_revision import (
@@ -95,36 +95,12 @@ class ModelReplica(Node):
     revision: ModelRevision
     routings: list[RoutingNode]
 
-    @relay.connection(RoutingNodeConnection)
-    async def resolve_routings(self) -> list[RoutingNode]:
-        return []
-
-    @strawberry.field
-    async def resolve_name(self) -> str:
-        return self.name
-
-    @strawberry.field
-    async def resolve_revision(self) -> ModelRevision:
-        return self.revision
-
 
 @strawberry.type
 class ReplicaManagement:
     desired_replica_count: int
     replicas: list[ModelReplica]
     auto_scaling_rules: list[AutoScalingRule]
-
-    @strawberry.field
-    async def resolve_desired_replica_count(self) -> int:
-        return self.desired_replica_count
-
-    @strawberry.field
-    async def resolve_replicas(self) -> list[ModelReplica]:
-        return self.replicas
-
-    @strawberry.field
-    async def resolve_auto_scaling_rules(self) -> list[AutoScalingRule]:
-        return self.auto_scaling_rules
 
 
 # Main ModelDeployment Type
@@ -207,18 +183,10 @@ class DeploymentMetricsFilter:
 class CreateModelDeploymentPayload:
     deployment: ModelDeployment
 
-    @strawberry.field
-    async def resolve_deployment(self) -> ModelDeployment:
-        return self.deployment
-
 
 @strawberry.type
 class UpdateModelDeploymentPayload:
     deployment: ModelDeployment
-
-    @strawberry.field
-    async def resolve_deployment(self) -> ModelDeployment:
-        return self.deployment
 
 
 # Input Types
