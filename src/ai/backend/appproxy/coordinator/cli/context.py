@@ -23,7 +23,7 @@ class CLIContext:
     def local_config(self) -> ServerConfig:
         # Lazy-load the configuration only when requested.
         if self.config_path is None:
-            self.config_path = find_config_file("proxy-coordinator")
+            self.config_path = find_config_file("app-proxy-coordinator")
         if self._local_config is None:
             self._local_config = load_config(self.config_path, self.log_level)
         return self._local_config

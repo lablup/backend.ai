@@ -5,13 +5,10 @@ user = "appproxy"
 password = "develove"
 pool_size = 8
 max_overflow = 64
-
-[db.addr]
-host = "127.0.0.1"
-port = 8100
+addr = { host = "127.0.0.1", port = 8100 }
 
 [redis]
-addr = { host = "127.0.0.1", port = 8110}
+addr = { host = "127.0.0.1", port = 8110 }
 
 [proxy_coordinator]
 tls_listen = false

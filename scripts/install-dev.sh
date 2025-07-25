@@ -941,17 +941,17 @@ configure_backendai() {
   sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./app-proxy-coordinator.toml
   sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-coordinator.toml
   sed_inplace "s/port = 10200/port = ${APPPROXY_COORDINATOR_PORT}/" ./app-proxy-coordinator.toml
-  sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-coordinator.toml
-  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-coordinator.toml
-  sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/api_secret = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-coordinator.toml
   cp configs/app-proxy-coordinator/halfstack.alembic.ini ./alembic-appproxy.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-appproxy.ini
   cp configs/app-proxy-worker/halfstack.toml ./app-proxy-worker.toml
   sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-worker.toml
   sed_inplace "s/port = 10201/port = ${APPPROXY_WORKER_PORT}/" ./app-proxy-worker.toml
-  sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
-  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
-  sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/api_secret = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-worker.toml
 
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
