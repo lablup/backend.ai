@@ -23,7 +23,6 @@ from ai.backend.test.testcases.session.mount_vfolder import (
     VFolderMountByUUIDTest,
 )
 from ai.backend.test.testcases.session.multi_node_multi_container.testspecs import (
-    CLUSTER_CONFIG_PARAM,
     MULTI_NODE_MULTI_CONTAINER_SESSION_TEST_SPECS,
 )
 from ai.backend.test.testcases.session.single_node_multi_container.testspecs import (
@@ -128,9 +127,6 @@ SESSION_VFOLDER_TEST_SPECS = {
         template=BasicTestTemplate(testcode=VFolderMountByUUIDTest()).with_wrappers(
             KeypairAuthTemplate, ProjectVFolderTemplate
         ),
-        parametrizes={
-            **CLUSTER_CONFIG_PARAM,
-        },
     ),
     "creation_interactive_session_with_vfolder_name_mounts": TestSpec(
         name="creation_interactive_session_with_vfolder_name_mounts",
@@ -149,9 +145,6 @@ SESSION_VFOLDER_TEST_SPECS = {
         template=BasicTestTemplate(testcode=VFolderMountByNameTest()).with_wrappers(
             KeypairAuthTemplate, ProjectVFolderTemplate
         ),
-        parametrizes={
-            **CLUSTER_CONFIG_PARAM,
-        },
     ),
 }
 

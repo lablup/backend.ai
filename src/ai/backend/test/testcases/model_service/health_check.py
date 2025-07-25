@@ -17,7 +17,7 @@ def _make_endpoint_health_check_url(endpoint_url: str) -> str:
     """
     Constructs the health check URL for the given endpoint URL.
     """
-    return f"{endpoint_url}/health"
+    return f"{endpoint_url.rstrip('/')}/health"
 
 
 class EndpointHealthCheck(TestCode):

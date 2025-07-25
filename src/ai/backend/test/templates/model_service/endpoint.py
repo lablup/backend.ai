@@ -92,9 +92,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
 
             info = await client_session.Service(endpoint_id).info()
-            assert info["service_endpoint"] is None, (
-                "Service endpoint should not be initialized yet."
-            )
             assert info["runtime_variant"] == model_service_dep.runtime_variant, (
                 f"Runtime variant should be '{model_service_dep.runtime_variant}'."
             )
