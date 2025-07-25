@@ -1,5 +1,5 @@
 [redis]
-addr = { host = "127.0.0.1", port = 8110}
+addr = { host = "127.0.0.1", port = 8110 }
 
 [proxy_worker]
 coordinator_endpoint = "http://127.0.0.1:10200"
@@ -10,22 +10,16 @@ aiomonitor_termui_port = 48610
 aiomonitor_webui_port = 49610
 frontend_mode = "port"
 protocol = "http"
-accepted_traffics = [
-    "inference",
-    "interactive",
-]
-api_bind_addr = { host = "127.0.0.1", port = 10201}
+accepted_traffics = ["inference", "interactive"]
+api_bind_addr = { host = "127.0.0.1", port = 10201 }
 
 [proxy_worker.port_proxy]
 bind_host = "127.0.0.1"
-bind_port_range = [
-    10205,
-    10300,
-]
+bind_port_range = [10205, 10300]
 
 [secrets]
-jwt_secret = "some_jwt_secret"
 api_secret = "some_api_secret"
+jwt_secret = "some_jwt_secret"
 
 [permit_hash]
 secret = "some_permit_hash_secret"
