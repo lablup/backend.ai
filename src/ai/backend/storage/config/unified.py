@@ -583,6 +583,8 @@ class ObjectStorageConfig(BaseModel):
         Required for services that use access keys for authentication.
         """,
         examples=["my-access-key"],
+        validation_alias=AliasChoices("access-key", "access_key"),
+        serialization_alias="access-key",
     )
     secret_key: str = Field(
         description="""
@@ -590,6 +592,8 @@ class ObjectStorageConfig(BaseModel):
         Required for services that use secret keys for authentication.
         """,
         examples=["my-secret-key"],
+        validation_alias=AliasChoices("secret-key", "secret_key"),
+        serialization_alias="secret-key",
     )
     bucket: str = Field(
         description="""
