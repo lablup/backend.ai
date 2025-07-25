@@ -588,7 +588,6 @@ class VfolderRepository:
         Get group resource information by group ID or name.
         Returns (group_uuid, max_vfolder_count, max_quota_scope_size, group_type) or None.
         """
-        from ai.backend.manager.models.group import GroupRow
 
         async with self._db.begin_session() as session:
             if isinstance(group_id_or_name, str):
@@ -1102,3 +1101,31 @@ class VfolderRepository:
         # Start background task for cloning
         task_id = await background_task_manager.start(_clone)
         return task_id, target_folder_id.folder_id
+
+    @repository_decorator()
+    async def get_logs_vfolder(
+        self,
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
+    ) -> Optional[VFolderData]:
+        """
+        Get the accessible .logs vfolder for a user.
+        Returns VFolderData if found, None otherwise.
+        """
+        async with self._db.begin_readonly() as conn:
+            vfolder_dicts = await query_accessible_vfolders(
+                conn,
+                user_id,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=["user"],
+                extra_vf_conds=(vfolders.c.name == ".logs"),
+            )
+
+            if not vfolder_dicts:
+                return None
+
+            # Return the first (and should be only) matching .logs vfolder
+            vfolder_dict = vfolder_dicts[0]
+            return self._vfolder_dict_to_data(dict(vfolder_dict))
