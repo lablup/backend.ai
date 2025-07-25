@@ -5,8 +5,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import VFolderHostPermission
+from ai.backend.common.types import VFolderHostPermission, VFolderID
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -19,11 +20,16 @@ from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
+    VFolderCloneInfo,
     VFolderInvitationRow,
     VFolderInvitationState,
     VFolderOperationStatus,
@@ -33,8 +39,11 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    is_unmanaged,
     query_accessible_vfolders,
+    vfolders,
 )
+from ai.backend.manager.services.vfolder.exceptions import VFolderInvalidParameter
 
 # Layer-specific decorator for vfolder repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.VFOLDER)
@@ -93,6 +102,64 @@ class VfolderRepository:
             if not vfolder_row:
                 return None
             return self._vfolder_row_to_data(vfolder_row)
+
+    @repository_decorator()
+    async def get_allowed_vfolder_hosts(
+        self, user_uuid: uuid.UUID, group_uuid: Optional[uuid.UUID]
+    ) -> str:
+        """
+        Get the allowed VFolder hosts for a user.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            if group_uuid:
+                group_row: Optional[GroupRow] = await db_session.scalar(
+                    sa.select(GroupRow).where(GroupRow.id == group_uuid)
+                )
+                if group_row is None:
+                    raise GroupNotFound(object_name="Group", object_id=group_uuid)
+
+                return group_row.allowed_vfolder_hosts
+
+            user_row: Optional[UserRow] = await db_session.scalar(
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                )
+            )
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+
+            return user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+
+    @repository_decorator()
+    async def get_max_vfolder_count(
+        self, user_uuid: uuid.UUID, group_uuid: Optional[uuid.UUID]
+    ) -> int:
+        """
+        Get the maximum VFolder count for a user or group.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            if group_uuid:
+                group_row: Optional[GroupRow] = await db_session.scalar(
+                    sa.select(GroupRow)
+                    .where(GroupRow.id == group_uuid)
+                    .options(selectinload(GroupRow.resource_policy_row))
+                )
+                if group_row is None:
+                    raise GroupNotFound(object_name="Group", object_id=group_uuid)
+
+                return group_row.resource_policy_row.max_vfolder_count
+
+            user_row: Optional[UserRow] = await db_session.scalar(
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(selectinload(UserRow.resource_policy_row))
+            )
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+
+            return user_row.resource_policy_row.max_vfolder_count
 
     @repository_decorator()
     async def list_accessible_vfolders(
@@ -942,3 +1009,96 @@ class VfolderRepository:
             cloneable=vfolder_dict["cloneable"],
             status=vfolder_dict["status"],
         )
+
+    @repository_decorator()
+    async def initiate_vfolder_clone(
+        self,
+        vfolder_info: VFolderCloneInfo,
+        storage_manager: StorageSessionManager,
+        background_task_manager: BackgroundTaskManager,
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        """
+        Initiate VFolder cloning process.
+        Returns (task_id, target_folder_id).
+        """
+        source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
+
+        async def _update_source_status() -> None:
+            async with self._db.begin_session() as db_session:
+                query = (
+                    sa.update(vfolders)
+                    .values(status=VFolderOperationStatus.CLONING)
+                    .where(source_vf_cond)
+                )
+                await db_session.execute(query)
+
+        await execute_with_retry(_update_source_status)
+
+        target_proxy, target_volume = storage_manager.get_proxy_and_volume(vfolder_info.target_host)
+        source_proxy, source_volume = storage_manager.get_proxy_and_volume(
+            vfolder_info.source_host, is_unmanaged(vfolder_info.unmanaged_path)
+        )
+
+        if source_proxy != target_proxy:
+            raise VFolderInvalidParameter(
+                f"Proxy names of source and target vfolders must be equal. "
+                f"Source proxy: {source_proxy}, Target proxy: {target_proxy}."
+            )
+
+        # Generate the ID of the destination vfolder.
+        # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
+        #       the actual object (with RETURNING clause).  In that case, we need to temporarily
+        #       mark the object to be "unusable-yet" until the storage proxy creates the destination
+        #       vfolder.  After done, we need to make another transaction to clear the unusable state.
+        target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
+
+        async def _clone(reporter: ProgressReporter) -> None:
+            async def _insert_vfolder() -> None:
+                async with self._db.begin_session() as db_session:
+                    insert_values = {
+                        "id": target_folder_id.folder_id,
+                        "name": vfolder_info.target_vfolder_name,
+                        "domain_name": vfolder_info.domain_name,
+                        "usage_mode": vfolder_info.usage_mode,
+                        "permission": vfolder_info.permission,
+                        "last_used": None,
+                        "host": vfolder_info.target_host,
+                        # TODO: add quota_scope_id
+                        "creator": vfolder_info.email,
+                        "ownership_type": VFolderOwnershipType("user"),
+                        "user": vfolder_info.user_id,
+                        "group": None,
+                        "unmanaged_path": None,
+                        "cloneable": vfolder_info.cloneable,
+                        "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+                    }
+                    query = sa.insert(vfolders).values(**insert_values)
+                    await db_session.execute(query)
+
+            # Clone the vfolder contents
+            manager_client = storage_manager.get_manager_facing_client(source_proxy)
+            await manager_client.clone_folder(
+                source_volume,
+                str(vfolder_info.source_vfolder_id),
+                target_volume,
+                str(target_folder_id),
+            )
+
+            # Insert the new vfolder record
+            await execute_with_retry(_insert_vfolder)
+
+            # Update source vfolder status back to READY
+            async def _update_source_status_ready() -> None:
+                async with self._db.begin_session() as db_session:
+                    query = (
+                        sa.update(vfolders)
+                        .values(status=VFolderOperationStatus.READY)
+                        .where(source_vf_cond)
+                    )
+                    await db_session.execute(query)
+
+            await execute_with_retry(_update_source_status_ready)
+
+        # Start background task for cloning
+        task_id = await background_task_manager.start(_clone)
+        return task_id, target_folder_id.folder_id
