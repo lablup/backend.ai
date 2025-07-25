@@ -314,6 +314,7 @@ async def server_main(
                 ),
             )
 
+            await event_dispatcher.start()
             if local_config.otel.enabled:
                 meta = sd_loop.metadata
                 otel_spec = OpenTelemetrySpec(
@@ -324,7 +325,6 @@ async def server_main(
                     endpoint=local_config.otel.endpoint,
                 )
                 BraceStyleAdapter.apply_otel(otel_spec)
-            await event_dispatcher.start()
             try:
                 yield
             finally:

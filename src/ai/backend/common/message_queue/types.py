@@ -63,6 +63,8 @@ class MessageMetadata:
         Deserialize the metadata from bytes.
         """
         result = load_json(data)
+        if "user_id" in result:
+            del result["user_id"]
         if "user" in result:
             user_data = result["user"]
             if isinstance(user_data, dict):

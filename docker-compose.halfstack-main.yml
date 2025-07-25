@@ -102,7 +102,7 @@ services:
       - GF_SECURITY_ADMIN_USER=backend
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
-      - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
+      - half-grafana:/var/lib/grafana:rw
       - "./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro"
       - "./configs/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
       - "./configs/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
@@ -115,7 +115,7 @@ services:
     ports:
       - "4040:4040"
     volumes:
-      - "./volumes/${DATADIR_PREFIX:-.}/pyroscope-data:/var/lib/pyroscope:rw"
+      - half-pyroscope:/var/lib/pyroscope:rw
 
   backendai-half-prometheus:
     image: prom/prometheus:v3.1.0
@@ -159,10 +159,15 @@ services:
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./configs/tempo/tempo-config.yaml:/etc/tempo.yaml
-      - ./volumes/${DATADIR_PREFIX:-.}/tempo-data:/var/tempo
+      - half-tempo:/var/tempo
     ports:
       - "3200" # tempo
       - "4317" # otlp grpc
 
 networks:
   half:
+
+volumes:
+  half-grafana:
+  half-pyroscope:
+  half-tempo:
