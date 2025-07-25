@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.12.1 (2025-07-25)
+
+### Features
+* Agent heartbeat handler queries Kernel ids instead of Agent id ([#4766](https://github.com/lablup/backend.ai/issues/4766))
+* Implement ActionValidator ([#5244](https://github.com/lablup/backend.ai/issues/5244))
+* Implement reconnection logic in ValkeySentinelClient ([#5276](https://github.com/lablup/backend.ai/issues/5276))
+
+### Improvements
+* Apply simple model query pattern for readability ([#4767](https://github.com/lablup/backend.ai/issues/4767))
+
+### Fixes
+* Fix model service creation failure when `service-definition.toml` is missing ([#5264](https://github.com/lablup/backend.ai/issues/5264))
+* Fix model service deletion failure for non super-admin users ([#5266](https://github.com/lablup/backend.ai/issues/5266))
+* Broken VFolder `Clone` service ([#5269](https://github.com/lablup/backend.ai/issues/5269))
+* Fixed a problem with deserializing dataclass ([#5271](https://github.com/lablup/backend.ai/issues/5271))
+* Fix broken VFolder `GetTaskLogs` service ([#5272](https://github.com/lablup/backend.ai/issues/5272))
+* Add missing TRACE log-level option in ai.backend.logging package ([#5274](https://github.com/lablup/backend.ai/issues/5274))
+* `status_data` not initialized properly when creating multi node session ([#5280](https://github.com/lablup/backend.ai/issues/5280))
+* Apply a workaround to avoid segfault upon fast termination of `mgr etcd` CLI commands that queries and updates etcd configurations ([#5283](https://github.com/lablup/backend.ai/issues/5283))
+
+
 ## 25.12.0 (2025-07-23)
 
 ### Breaking Changes
