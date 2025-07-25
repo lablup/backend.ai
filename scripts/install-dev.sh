@@ -871,6 +871,8 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+  mkdir -p -m 757 "${HALFSTACK_VOLUME_PATH}/grafana-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/minio-data"
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
@@ -1004,6 +1006,12 @@ configure_backendai() {
   sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+
+  # Replace placeholder values in the [[storages]] section with actual MinIO configuration
+  sed_inplace 's/bucket = "enter_bucket_name"/bucket = "backendai-storage"/' ./storage-proxy.toml
+  sed_inplace 's#endpoint = "http://minio.example.com:9000"#endpoint = "http://127.0.0.1:9000"#' ./storage-proxy.toml
+  sed_inplace "s/access-key = \"<minio-access-key>\"/access-key = \"${MINIO_ACCESS_KEY}\"/" ./storage-proxy.toml
+  sed_inplace "s/secret-key = \"<minio-secret-key>\"/secret-key = \"${MINIO_SECRET_KEY}\"/" ./storage-proxy.toml
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
