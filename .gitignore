@@ -105,6 +105,7 @@ pyrightconfig.json
 
 # Local configurations
 /account-manager*.toml
+/app-proxy*.toml
 /manager*.toml
 /agent*.toml
 /storage-proxy*.toml
