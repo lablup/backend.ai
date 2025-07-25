@@ -175,19 +175,6 @@ class ClusterConfigInput:
 
 
 @strawberry.input
-class ResourceSlotsInput:
-    cpu: int
-    mem: str
-    extra: Optional[JSONString] = None
-
-
-@strawberry.input
-class ResourceOptsInput:
-    shmem: Optional[str] = None
-    extra: Optional[JSONString] = None
-
-
-@strawberry.input
 class ResourceGroupInput:
     id: ID
 
@@ -200,8 +187,8 @@ class ScalingGroupNodeInput:
 @strawberry.input
 class ResourceConfigInput:
     resource_group: ScalingGroupNodeInput
-    resource_slots: ResourceSlotsInput
-    resource_opts: Optional[ResourceOptsInput] = None
+    resource_slots: JSONString
+    resource_opts: Optional[JSONString] = None
 
 
 @strawberry.input
