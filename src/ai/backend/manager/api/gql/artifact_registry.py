@@ -8,8 +8,7 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import ByteSize
-from ai.backend.manager.api.gql.types import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
 
 
 # Enums

@@ -7,7 +7,7 @@ from strawberry.relay import Connection, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 from strawberry.types import Info
 
-from ai.backend.manager.api.gql.types import JSONString
+from ai.backend.manager.api.gql.base import JSONString
 
 
 @strawberry.federation.type(shareable=True)

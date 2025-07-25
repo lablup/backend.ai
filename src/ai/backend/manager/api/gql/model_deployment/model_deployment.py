@@ -7,6 +7,7 @@ from strawberry import ID, Info, relay
 from strawberry.relay import Connection, Node, NodeID
 from strawberry.relay.types import NodeIterableType
 
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.federated_types import (
     AccessToken,
     AutoScalingRule,
@@ -18,7 +19,6 @@ from ai.backend.manager.api.gql.federated_types import (
     VFolder,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import RoutingNode
-from ai.backend.manager.api.gql.types import JSONString, OrderDirection, StringFilter
 
 from .model_revision import (
     ClusterConfig,

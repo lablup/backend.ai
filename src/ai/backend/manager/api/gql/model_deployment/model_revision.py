@@ -7,8 +7,8 @@ from strawberry import ID, Info, relay
 from strawberry.relay import Connection, PageInfo
 from strawberry.relay.types import NodeIterableType
 
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.federated_types import Image, ResourceGroup, VFolder
-from ai.backend.manager.api.gql.types import JSONString, OrderDirection, StringFilter
 
 
 @strawberry.enum
