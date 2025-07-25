@@ -1139,7 +1139,6 @@ input CreateModelRevisionInput
 {
   deploymentId: ID!
   name: String = null
-  tags: [String!] = null
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelVfolderConfig: ModelVFolderConfigInput!
@@ -1484,7 +1483,7 @@ type DeploymentStrategy
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
-  config: DeploymentStrategyConfig
+  config: DeploymentStrategyConfig!
 }
 
 """Different deployment strategy configurations"""
@@ -2555,7 +2554,6 @@ type ModelRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   name: String
-  tags: [String!]!
   clusterConfig: ClusterConfig!
   resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
@@ -2590,8 +2588,9 @@ type ModelRevisionEdge
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
+  id: StringFilter = null
+  name: StringFilter = null
   status: RevisionStatus = null
-  tags: [StringFilter!] = null
   deploymentId: ID = null
   AND: ModelRevisionFilter = null
   OR: ModelRevisionFilter = null
@@ -4197,8 +4196,8 @@ input ResourceConfigInput
   @join__type(graph: STRAWBERRY)
 {
   resourceGroup: ScalingGroupNodeInput!
-  resourceSlots: ResourceSlotsInput!
-  resourceOpts: ResourceOptsInput = null
+  resourceSlots: JSONString!
+  resourceOpts: JSONString = null
 }
 
 type ResourceLimit
@@ -4217,13 +4216,6 @@ input ResourceLimitInput
   max: String
 }
 
-input ResourceOptsInput
-  @join__type(graph: STRAWBERRY)
-{
-  shmem: String = null
-  extra: JSONString = null
-}
-
 type ResourcePreset
   @join__type(graph: GRAPHENE)
 {
@@ -4237,14 +4229,6 @@ type ResourcePreset
   Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
-}
-
-input ResourceSlotsInput
-  @join__type(graph: STRAWBERRY)
-{
-  cpu: Int!
-  mem: String!
-  extra: JSONString = null
 }
 
 enum RevisionStatus
