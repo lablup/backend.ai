@@ -872,7 +872,6 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   mkdir -p -m 757 "${HALFSTACK_VOLUME_PATH}/grafana-data"
-  mkdir -p "${HALFSTACK_VOLUME_PATH}/minio-data"
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
@@ -891,63 +890,9 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
 
-  # Configure MinIO client and create S3 storage configuration
-  show_info "Configuring MinIO storage..."
-  MINIO_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-minio[-_]" | awk '{print $1}')
-  if [ ! -z "$MINIO_CONTAINER_ID" ]; then
-    # Wait for MinIO container to be healthy
-    show_info "Waiting for MinIO to be ready..."
-    max_attempts=30
-    attempt=0
-    while [ $attempt -lt $max_attempts ]; do
-      if $docker_sudo docker exec $MINIO_CONTAINER_ID curl -f http://localhost:9000/minio/health/live > /dev/null 2>&1; then
-        break
-      fi
-      attempt=$((attempt + 1))
-      echo "Waiting for MinIO... ($attempt/$max_attempts)"
-      sleep 2
-    done
-    
-    if [ $attempt -eq $max_attempts ]; then
-      show_warning "MinIO did not become ready in time, using default credentials"
-      MINIO_ACCESS_KEY="minioadmin"
-      MINIO_SECRET_KEY="minioadmin"
-    else
-      # Create MinIO configuration and credentials  
-      $docker_sudo docker exec $MINIO_CONTAINER_ID sh -c "
-        # Create mc alias for the MinIO instance
-        mc alias set localminio http://localhost:9000 minioadmin minioadmin
-        # Create a new user for Backend.AI
-        MINIO_ACCESS_KEY=\$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20)
-        MINIO_SECRET_KEY=\$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 40)
-        mc admin user add localminio \$MINIO_ACCESS_KEY \$MINIO_SECRET_KEY
-        mc admin policy attach localminio readwrite --user \$MINIO_ACCESS_KEY
-        # Create a bucket for Backend.AI
-        mc mb localminio/backendai-storage
-        # Output the credentials
-        echo \"MINIO_ACCESS_KEY=\$MINIO_ACCESS_KEY\"
-        echo \"MINIO_SECRET_KEY=\$MINIO_SECRET_KEY\"
-      " > minio_credentials.tmp
-      
-      # Extract credentials from the output
-      MINIO_ACCESS_KEY=$(grep "MINIO_ACCESS_KEY=" minio_credentials.tmp | cut -d'=' -f2)
-      MINIO_SECRET_KEY=$(grep "MINIO_SECRET_KEY=" minio_credentials.tmp | cut -d'=' -f2)
-      rm -f minio_credentials.tmp
-      
-      if [ ! -z "$MINIO_ACCESS_KEY" ] && [ ! -z "$MINIO_SECRET_KEY" ]; then
-        show_info "MinIO credentials generated successfully"
-        show_info "Access Key: $MINIO_ACCESS_KEY"
-      else
-        show_warning "Failed to generate MinIO credentials, using default credentials"
-        MINIO_ACCESS_KEY="minioadmin"
-        MINIO_SECRET_KEY="minioadmin"
-      fi
-    fi
-  else
-    show_warning "MinIO container not found, using default credentials"
-    MINIO_ACCESS_KEY="minioadmin"
-    MINIO_SECRET_KEY="minioadmin"
-  fi
+  # Configure MinIO using separate configuration script
+  source "$(dirname "$0")/configure-minio.sh"
+  configure_minio "docker-compose.halfstack.current.yml"
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
@@ -1061,11 +1006,8 @@ configure_backendai() {
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-  # Replace placeholder values in the [[storages]] section with actual MinIO configuration
-  sed_inplace 's/bucket = "enter_bucket_name"/bucket = "backendai-storage"/' ./storage-proxy.toml
-  sed_inplace 's#endpoint = "http://minio.example.com:9000"#endpoint = "http://127.0.0.1:9000"#' ./storage-proxy.toml
-  sed_inplace "s/access-key = \"<minio-access-key>\"/access-key = \"${MINIO_ACCESS_KEY}\"/" ./storage-proxy.toml
-  sed_inplace "s/secret-key = \"<minio-secret-key>\"/secret-key = \"${MINIO_SECRET_KEY}\"/" ./storage-proxy.toml
+  # Configure storage-proxy MinIO settings using separate configuration script
+  configure_storage_proxy_minio "./storage-proxy.toml"
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf

@@ -176,7 +176,7 @@ services:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
-      - "./volumes/${DATADIR_PREFIX:-.}/minio-data:/data:rw"
+      - half-minio:/data:rw
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -191,3 +191,4 @@ volumes:
   half-grafana:
   half-pyroscope:
   half-tempo:
+  half-minio:
