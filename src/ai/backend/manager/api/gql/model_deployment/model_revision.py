@@ -8,7 +8,7 @@ from strawberry.relay import Connection, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.federated_types import Image, ResourceGroup, VFolder
-from ai.backend.manager.api.gql.types import JSONString, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import JSONString, OrderDirection
 
 
 @strawberry.enum
@@ -116,7 +116,6 @@ class ModelRuntimeConfig:
 class ModelRevision(relay.Node):
     id: relay.NodeID
     name: Optional[str] = None
-    tags: list[str]
 
     cluster_config: ClusterConfig
     resource_config: ResourceConfig
@@ -134,7 +133,6 @@ class ModelRevision(relay.Node):
 @strawberry.input
 class ModelRevisionFilter:
     status: Optional[RevisionStatus] = None
-    tags: Optional[list[StringFilter]] = None
     deployment_id: Optional[ID] = None
 
     AND: Optional["ModelRevisionFilter"] = None
@@ -230,7 +228,6 @@ class MountInput:
 class CreateModelRevisionInput:
     deployment_id: ID
     name: Optional[str] = None
-    tags: Optional[list[str]] = None
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_vfolder_config: ModelVFolderConfigInput
@@ -288,7 +285,6 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
     revision = ModelRevision(
         id=ID("revision-id"),
         name="placeholder-revision",
-        tags=[],
         cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
         resource_config=ResourceConfig(
             resource_group=ResourceGroup(id=ID("rg-id")),
