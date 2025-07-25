@@ -168,8 +168,7 @@ type CreateModelDeploymentPayload {
 
 input CreateModelRevisionInput {
   deploymentId: ID!
-  name: String = null
-  tags: [String!] = null
+  name: String!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelVfolderConfig: ModelVFolderConfigInput!
@@ -243,7 +242,7 @@ enum DeploymentStatus {
 
 type DeploymentStrategy {
   type: DeploymentStrategyType!
-  config: DeploymentStrategyConfig
+  config: DeploymentStrategyConfig!
 }
 
 """Different deployment strategy configurations"""
@@ -374,8 +373,7 @@ type ModelReplica implements Node {
 type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String
-  tags: [String!]!
+  name: String!
   clusterConfig: ClusterConfig!
   resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
@@ -404,8 +402,9 @@ type ModelRevisionEdge {
 }
 
 input ModelRevisionFilter {
+  id: StringFilter = null
+  name: StringFilter = null
   status: RevisionStatus = null
-  tags: [StringFilter!] = null
   deploymentId: ID = null
   AND: ModelRevisionFilter = null
   OR: ModelRevisionFilter = null
@@ -500,7 +499,7 @@ enum OrderDirection {
 }
 
 """Information to aid in pagination."""
-type PageInfo @shareable {
+type PageInfo {
   """When paginating forwards, are there more items?"""
   hasNextPage: Boolean!
 
@@ -589,19 +588,8 @@ type ResourceConfig {
 
 input ResourceConfigInput {
   resourceGroup: ScalingGroupNodeInput!
-  resourceSlots: ResourceSlotsInput!
-  resourceOpts: ResourceOptsInput = null
-}
-
-input ResourceOptsInput {
-  shmem: String = null
-  extra: JSONString = null
-}
-
-input ResourceSlotsInput {
-  cpu: Int!
-  mem: String!
-  extra: JSONString = null
+  resourceSlots: JSONString!
+  resourceOpts: JSONString = null
 }
 
 enum RevisionStatus {
@@ -659,6 +647,11 @@ input StringFilter {
   endsWith: String = null
   equals: String = null
   notEquals: String = null
+  iContains: String = null
+  iStartsWith: String = null
+  iEndsWith: String = null
+  iEquals: String = null
+  iNotEquals: String = null
 }
 
 type Subscription {
