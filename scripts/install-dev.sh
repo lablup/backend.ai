@@ -817,12 +817,12 @@ setup_environment() {
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_MASTER_PORT}/9500/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_SLAVE1_PORT}/9501/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_SLAVE2_PORT}/9502/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_SENTINEL1_PORT}/9503/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_SENTINEL2_PORT}/9504/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/${REDIS_SENTINEL3_PORT}/9505/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -944,14 +944,14 @@ configure_backendai() {
   sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-coordinator.toml
   sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-coordinator.toml
   sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-coordinator.toml
+  cp configs/app-proxy-coordinator/halfstack.alembic.ini ./alembic-appproxy.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-appproxy.ini
   cp configs/app-proxy-worker/halfstack.toml ./app-proxy-worker.toml
   sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-worker.toml
   sed_inplace "s/port = 10201/port = ${APPPROXY_WORKER_PORT}/" ./app-proxy-worker.toml
   sed_inplace "s/api_secret = \"some_api_secret\"/port = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/jwt_secret = \"some_jwt_secret\"/port = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/secret = \"some_permit_hash_secret\"/port = \"${APPPROXY_PERMIT_HSAH_SECRET}\"/" ./app-proxy-worker.toml
-  cp configs/app-proxy-coordinator/halfstack.alembic.ini ./alembic-appproxy.ini
-  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-appproxy.ini
 
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
@@ -1036,6 +1036,7 @@ configure_backendai() {
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
 
   show_info "Setting up databases... (core)"
+  echo "(postgres container: ${POSTGRES_CONTAINER_ID})"
   ./backend.ai mgr schema oneshot
 
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
@@ -1050,17 +1051,25 @@ configure_backendai() {
   # TODO: populate fixtures
 
   show_info "Setting up databases... (app-proxy)"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "\
-    DROP ROLE IF EXISTS appproxy;
-    CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove'; \
-    CREATE DATABASE appproxy IF NOT EXISTS; \
-    GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://appproxy:develove@localhost:5432/appproxy database -c "\
-    GRANT ALL ON SCHEMA public TO appproxy;"
+  _psql_core="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
+  _psql_appproxy="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
+  $_psql_core -c "\
+    DO \$\$
+    BEGIN
+       IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'appproxy') THEN
+          CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';
+       ELSE
+          ALTER ROLE appproxy WITH LOGIN PASSWORD 'develove';
+       END IF;
+    END
+    \$\$;"
+  $_psql_core -tc "SELECT 1 FROM pg_database WHERE datname = 'appproxy'" | grep -q 1 || $_psql_core -c "CREATE DATABASE appproxy"
+  $_psql_core -c "GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;"
+  $_psql_appproxy -c "GRANT ALL ON SCHEMA public TO appproxy;"
   # TODO: add "schema oneshot" command for app-proxy
   ./py -m alembic -c alembic-appproxy.ini upgrade head
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c \
-    "UPDATE scaling_groups SET \
+  $_psql_core -c "\
+    UPDATE scaling_groups SET \
     wsproxy_api_token = '${APPPROXY_API_SECRET}', \
     wsproxy_addr = 'http://localhost:${APPPROXY_COORDINATOR_PORT}' \
     WHERE name = 'default';"
@@ -1083,10 +1092,10 @@ configure_backendai() {
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
   ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+  $_psql_core -c "UPDATE domains SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE groups SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE keypair_resource_policies SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE vfolders SET host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' WHERE host='${LOCAL_STORAGE_VOLUME}';"
 
   # Client backend endpoint configuration shell script
   CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
