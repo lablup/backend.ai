@@ -199,8 +199,10 @@ class CancelPullPayload:
 def artifacts(
     filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
-    first: Optional[int] = None,
+    before: Optional[str] = None,
     after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
 ) -> ArtifactConnection:
     # Mock implementation - return empty connection
     return ArtifactConnection(

@@ -181,7 +181,7 @@ type PullArtifactPayload {
 }
 
 type Query {
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, first: Int = null, after: String = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
   artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
   artifact(id: ID!): Artifact
   artifactGroup(id: ID!): ArtifactGroup
