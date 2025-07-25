@@ -115,7 +115,7 @@ class ModelRuntimeConfig:
 @strawberry.type
 class ModelRevision(relay.Node):
     id: relay.NodeID
-    name: Optional[str] = None
+    name: str
 
     cluster_config: ClusterConfig
     resource_config: ResourceConfig
@@ -216,7 +216,7 @@ class MountInput:
 @strawberry.input
 class CreateModelRevisionInput:
     deployment_id: ID
-    name: Optional[str] = None
+    name: str
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_vfolder_config: ModelVFolderConfigInput

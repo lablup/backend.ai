@@ -1138,7 +1138,7 @@ input CreateModelRevisionInput
   @join__type(graph: STRAWBERRY)
 {
   deploymentId: ID!
-  name: String = null
+  name: String!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelVfolderConfig: ModelVFolderConfigInput!
@@ -2553,7 +2553,7 @@ type ModelRevision implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String
+  name: String!
   clusterConfig: ClusterConfig!
   resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
