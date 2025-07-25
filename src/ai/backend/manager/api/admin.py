@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 import aiohttp_cors
 import attrs
 import graphene
+import strawberry
 import trafaret as t
 from aiohttp import web
 from graphene.validation import DisableIntrospection, depth_limit_validator
@@ -17,7 +18,9 @@ from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
+from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
 from ..models.base import DataLoaderManager
 from ..models.gql import (
@@ -141,6 +144,89 @@ async def handle_gql(request: web.Request, params: Any) -> web.Response:
         tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
     })
 )
+async def handle_gql_v2(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["admin.context"]
+
+    rules = []
+    if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        rules.append(DisableIntrospection)
+    max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
+    if max_depth is not None:
+        rules.append(depth_limit_validator(max_depth=max_depth))
+    if rules:
+        validate_errors = validate(
+            schema=app_ctx.gql_schema.graphql_schema,
+            document_ast=parse(params["query"]),
+            rules=rules,
+        )
+        if validate_errors:
+            validation_result = ExecutionResult(None, errors=validate_errors)
+            return web.json_response(validation_result.formatted, status=HTTPStatus.BAD_REQUEST)
+
+    manager_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
+    known_slot_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+
+    strawberry_ctx = StrawberryGQLContext(
+        dataloader_manager=DataLoaderManager(),
+        config_provider=root_ctx.config_provider,
+        etcd=root_ctx.etcd,
+        user=request["user"],
+        access_key=request["keypair"]["access_key"],
+        db=root_ctx.db,
+        valkey_stat=root_ctx.valkey_stat,
+        valkey_image=root_ctx.valkey_image,
+        valkey_live=root_ctx.valkey_live,
+        network_plugin_ctx=root_ctx.network_plugin_ctx,
+        manager_status=manager_status,
+        known_slot_types=known_slot_types,
+        background_task_manager=root_ctx.background_task_manager,
+        services_ctx=root_ctx.services_ctx,
+        storage_manager=root_ctx.storage_manager,
+        registry=root_ctx.registry,
+        idle_checker_host=root_ctx.idle_checker_host,
+        metric_observer=root_ctx.metrics.gql,
+        processors=root_ctx.processors,
+    )
+
+    result = await app_ctx.gql_v2_schema.execute(
+        params["query"],
+        root_value=None,
+        variable_values=params["variables"],
+        operation_name=params["operation_name"],
+        context_value=strawberry_ctx,
+    )
+
+    if result.errors:
+        for e in result.errors:
+            if isinstance(e, GraphQLError):
+                errmsg = e.formatted
+            else:
+                errmsg = {"message": str(e)}
+            log.error("ADMIN.GQL-V2 Exception: {}", errmsg)
+            log.debug("{}", "".join(traceback.format_exception(e)))
+
+    response_data: dict[str, Any] = {
+        "data": result.data,
+    }
+
+    if result.errors:
+        response_data["errors"] = [
+            error.formatted if hasattr(error, "formatted") else {"message": str(error)}
+            for error in result.errors
+        ]
+
+    return web.json_response(response_data, status=HTTPStatus.OK)
+
+
+@auth_required
+@check_api_params(
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
+)
 async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     # FIXME: remove in v21.09
     result = await _handle_gql_common(request, params)
@@ -161,6 +247,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
 @attrs.define(auto_attribs=True, slots=True, init=False)
 class PrivateContext:
     gql_schema: graphene.Schema
+    gql_v2_schema: strawberry.Schema
 
 
 async def init(app: web.Application) -> None:
@@ -170,6 +257,7 @@ async def init(app: web.Application) -> None:
         mutation=Mutations,
         auto_camelcase=False,
     )
+    app_ctx.gql_v2_schema = strawberry_schema
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         log.warning(
@@ -192,4 +280,5 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))
+    cors.add(app.router.add_route("POST", r"/gql/v2", handle_gql_v2))
     return app, []
