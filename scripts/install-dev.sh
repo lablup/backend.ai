@@ -808,12 +808,12 @@ setup_environment() {
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_MASTER_PORT}/${REDIS_MASTER_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_PORT}/${REDIS_SLAVE1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_PORT}/${REDIS_SLAVE2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL1_PORT}/${REDIS_SENTINEL1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL2_PORT}/${REDIS_SENTINEL2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL3_PORT}/${REDIS_SENTINEL3_PORT}/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
