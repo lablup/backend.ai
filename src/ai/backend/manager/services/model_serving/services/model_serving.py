@@ -45,6 +45,7 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
+from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointTokenRow,
@@ -185,9 +186,12 @@ class ModelServingService:
                 "Cannot create model service with the project type's vfolder"
             )
 
-        chunks = await self._fetch_file_from_storage_proxy(
-            "service-definition.toml", model_vfolder_row
-        )
+        try:
+            chunks = await self._fetch_file_from_storage_proxy(
+                "service-definition.toml", model_vfolder_row
+            )
+        except UnexpectedStorageProxyResponseError:
+            chunks = None
 
         if chunks:
             raw_service_definition = chunks.decode("utf-8")

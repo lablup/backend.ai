@@ -20,18 +20,10 @@ __all__ = (
 _TRACE_LEVEL = 5
 _TRACE_LEVEL_NAME = "TRACE"
 
-_module_loaded = False
 
-
-def init_logger():
-    global _module_loaded
-    if _module_loaded:
-        return
-    _module_loaded = True
-    logging.addLevelName(_TRACE_LEVEL, _TRACE_LEVEL_NAME)
-
-
-init_logger()
+def _register_custom_loglevels() -> None:
+    if _TRACE_LEVEL_NAME not in logging.getLevelNamesMapping():
+        logging.addLevelName(_TRACE_LEVEL, _TRACE_LEVEL_NAME)
 
 
 class BraceMessage:

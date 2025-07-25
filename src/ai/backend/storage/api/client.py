@@ -32,6 +32,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
@@ -436,6 +437,7 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
             general_exception_middleware,
+            build_api_metric_middleware(ctx.metric_registry.api),
         ]
     )
     app["ctx"] = ctx

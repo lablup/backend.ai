@@ -1167,11 +1167,7 @@ async def _shutdown(app: web.Application) -> None:
 
 
 def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
-    app = web.Application(
-        middlewares=[
-            general_exception_middleware,
-        ]
-    )
+    app = web.Application()
     handler = VFolderHandler(service_ctx.volume_service)
     app.router.add_route("GET", "/volumes", handler.get_volumes)
     app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
@@ -1223,6 +1219,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
             token_auth_middleware,
+            general_exception_middleware,
             build_api_metric_middleware(ctx.metric_registry.api),
         ],
     )

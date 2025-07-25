@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
@@ -339,9 +340,8 @@ class GetTaskLogsAction(VFolderAction):
 class GetTaskLogsActionResult(BaseActionResult):
     # TODO: Add proper type
     response: Any
-    # TODO: Replace this with VFolderData
-    vfolder_data: Any
+    vfolder_data: VFolderData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.vfolder_data["id"])
+        return str(self.vfolder_data.id)

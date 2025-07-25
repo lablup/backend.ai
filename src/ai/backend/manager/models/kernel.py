@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import uuid
-from collections.abc import Callable, Container, Iterable, Mapping
+from collections.abc import Container, Iterable, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -65,6 +64,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from .types import QueryCondition
 from .user import users
 from .utils import (
     ExtendedAsyncSAEngine,
@@ -679,19 +679,16 @@ class KernelRow(Base):
     @classmethod
     async def get_kernels(
         cls,
-        conditions: Iterable[QueryCondition],
+        conditions: Sequence[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
-        stmt = sa.select(KernelRow)
-        condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in conditions:
-            condition = cond_callable(condition)
-        if condition is not None:
-            stmt = stmt.where(condition)
+        query_stmt = sa.select(KernelRow)
+        for cond in conditions:
+            query_stmt = cond(query_stmt)
 
         async def fetch(db_session: SASession) -> list[KernelRow]:
-            return (await db_session.scalars(stmt)).all()
+            return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
@@ -995,68 +992,34 @@ async def recalc_concurrency_used(
     )
 
 
-type QueryConditionCallable = Callable[
-    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
-]
-type QueryCondition = Callable[..., QueryConditionCallable]
-
-
-class ConditionMerger(enum.Enum):
-    AND = "AND"
-    OR = "OR"
-
-    @property
-    def to_sql_operator(self) -> Callable:
-        match self:
-            case ConditionMerger.AND:
-                return sa.and_
-            case ConditionMerger.OR:
-                return sa.or_
-
-
-def _append_condition(
-    condition: Optional[sa.sql.expression.BinaryExpression],
-    new_condition: sa.sql.expression.BinaryExpression,
-    operator: ConditionMerger,
-) -> sa.sql.expression.BinaryExpression:
-    return (
-        operator.to_sql_operator(condition, new_condition)
-        if condition is not None
-        else new_condition
-    )
-
-
 def by_status(
     status: Iterable[KernelStatus],
-    operator: ConditionMerger,
 ) -> QueryCondition:
     def _by_status(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, KernelRow.status.in_(status), operator)
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(KernelRow.status.in_(status))
 
     return _by_status
 
 
 def by_agent_id(
     agent_id: str,
-    operator: ConditionMerger,
 ) -> QueryCondition:
     def _by_agent_id(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, KernelRow.agent == agent_id, operator)
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(KernelRow.agent == agent_id)
 
     return _by_agent_id
 
 
 def by_kernel_ids(
     kernel_ids: Iterable[KernelId],
-    operator: ConditionMerger,
 ) -> QueryCondition:
-    def _by_kernel_ids(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, KernelRow.id.in_(kernel_ids), operator)
+    def _by_kernel_id(
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(KernelRow.id.in_(kernel_ids))
 
-    return _by_kernel_ids
+    return _by_kernel_id

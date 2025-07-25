@@ -73,20 +73,20 @@ from ..session import (
     DEFAULT_SESSION_ORDERING,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
-    QueryCondition,
-    QueryOption,
-    RelatedFields,
     SessionDependencyRow,
-    SessionQueryConditions,
     SessionRow,
     SessionStatus,
     SessionTypes,
-    and_domain_name,
-    and_raw_filter,
-    and_resource_group_name,
-    and_status,
+    by_domain_name,
+    by_raw_filter,
+    by_resource_group_name,
+    by_status,
     get_permission_ctx,
-    join_related_field,
+)
+from ..types import (
+    QueryCondition,
+    QueryOption,
+    join_by_related_field,
     load_related_field,
 )
 from ..user import UserRole, UserRow
@@ -275,15 +275,15 @@ class ComputeSessionNode(graphene.ObjectType):
         cls, stmt: sa.sql.Select, is_count: bool = False
     ) -> sa.sql.Select:
         options = [
-            join_related_field(RelatedFields.USER),
-            join_related_field(RelatedFields.PROJECT),
+            join_by_related_field(SessionRow.user),
+            join_by_related_field(SessionRow.group),
         ]
         if not is_count:
             options = [
                 *options,
-                load_related_field(RelatedFields.KERNEL),
-                load_related_field(RelatedFields.USER, already_joined=True),
-                load_related_field(RelatedFields.PROJECT, already_joined=True),
+                load_related_field(SessionRow.kernel_load_option()),
+                load_related_field(SessionRow.user_load_option(already_joined=True)),
+                load_related_field(SessionRow.project_load_option(already_joined=True)),
             ]
         for option in options:
             stmt = option(stmt)
@@ -673,24 +673,29 @@ class TotalResourceSlot(graphene.ObjectType):
     async def get_data(
         cls,
         ctx: GraphQueryContext,
-        conditions: SessionQueryConditions,
+        statuses: Optional[Iterable[str]] = None,
+        raw_filter: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
     ) -> Self:
+        if statuses is not None:
+            status_list = [SessionStatus[s] for s in statuses]
+        else:
+            status_list = None
         query_conditions: list[QueryCondition] = []
-        if conditions.raw_filter is not None:
-            query_conditions.append(and_raw_filter(_queryfilter_fieldspec, conditions.raw_filter))
-        if conditions.statuses is not None:
-            query_conditions.append(and_status(conditions.statuses))
-        if conditions.domain_name is not None:
-            query_conditions.append(and_domain_name(conditions.domain_name))
-        if conditions.resource_group_name is not None:
-            query_conditions.append(and_resource_group_name(conditions.resource_group_name))
-
+        if raw_filter is not None:
+            query_conditions.append(by_raw_filter(_queryfilter_fieldspec, raw_filter))
+        if status_list is not None:
+            query_conditions.append(by_status(status_list))
+        if domain_name is not None:
+            query_conditions.append(by_domain_name(domain_name))
+        if resource_group_name is not None:
+            query_conditions.append(by_resource_group_name(resource_group_name))
         query_options: list[QueryOption] = [
-            load_related_field(RelatedFields.KERNEL),
-            join_related_field(RelatedFields.USER),
-            join_related_field(RelatedFields.PROJECT),
+            load_related_field(SessionRow.kernel_load_option()),
+            join_by_related_field(SessionRow.user),
+            join_by_related_field(SessionRow.group),
         ]
-
         session_rows = await SessionRow.list_session_by_condition(
             query_conditions, query_options, db=ctx.db
         )

@@ -528,7 +528,9 @@ class StorageProxyManagerFacingClient:
         ) as response_stream:
             yield response_stream
 
-    @client_decorator()
+    # TODO: There are some cases where `fetch_file_content` returns empty chunks are expected as successful scenarios.
+    # Re-attach the commented-out decorator after refactoring the code.
+    # @client_decorator()
     async def fetch_file_content(
         self,
         volume: str,
@@ -559,6 +561,31 @@ class StorageProxyManagerFacingClient:
                     f"No content received for {volume}/{vfid}/{relpath}"
                 )
             return chunks
+
+    # TODO: Support AsyncIterator for `client_decorator`
+    async def fetch_file_content_streaming(
+        self,
+        volume: str,
+        vfid: str,
+        relpath: str,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+    ) -> AsyncIterator[bytes]:
+        """
+        Fetch file content from the storage proxy as a byte-stream.
+
+        :param volume: Volume name
+        :param vfid: Virtual folder ID
+        :param relpath: Relative path of the file
+        :param chunk_size: Size of each chunk to read
+        :yield: Chunks of bytes
+        """
+        async with self._fetch_file(volume=volume, vfid=vfid, relpath=relpath) as resp:
+            resp.raise_for_status()
+
+            async for chunk in resp.content.iter_chunked(chunk_size):
+                if not chunk:
+                    break
+                yield chunk
 
     @client_decorator()
     async def get_folder_usage(

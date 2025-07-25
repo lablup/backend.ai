@@ -61,7 +61,7 @@ from ai.backend.manager.scheduler.types import (
     SchedulingContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for schedule repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
@@ -932,9 +932,4 @@ class ScheduleRepository:
             try:
                 await registry.delete_appproxy_endpoint(session, endpoint)
             except Exception as e:
-                import logging
-
-                from ai.backend.logging import BraceStyleAdapter
-
-                log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
                 log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
