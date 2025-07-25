@@ -83,7 +83,7 @@ DeploymentStrategyConfig = Annotated[
 @strawberry.type
 class DeploymentStrategy:
     type: DeploymentStrategyType
-    config: Optional[DeploymentStrategyConfig] = None
+    config: DeploymentStrategyConfig
 
 
 @strawberry.type
@@ -346,7 +346,10 @@ async def deployment(id: ID) -> Optional[ModelDeployment]:
         replica_management=ReplicaManagement(
             desired_replica_count=1, replicas=[], auto_scaling_rules=[]
         ),
-        deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING, config=None),
+        deployment_strategy=DeploymentStrategy(
+            type=DeploymentStrategyType.ROLLING,
+            config=RollingConfig(max_surge=1, max_unavailable=0),
+        ),
         domain=Domain(id=ID("domain-id")),
         project=Project(id=ID("project-id")),
         created_user=User(id=ID("user-id")),
@@ -388,7 +391,10 @@ async def create_model_deployment(
         replica_management=ReplicaManagement(
             desired_replica_count=1, replicas=[], auto_scaling_rules=[]
         ),
-        deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING, config=None),
+        deployment_strategy=DeploymentStrategy(
+            type=DeploymentStrategyType.ROLLING,
+            config=RollingConfig(max_surge=1, max_unavailable=0),
+        ),
         domain=Domain(id=ID("domain-id")),
         project=Project(id=ID("project-id")),
         created_user=User(id=ID("user-id")),
@@ -416,7 +422,10 @@ async def update_model_deployment(
         replica_management=ReplicaManagement(
             desired_replica_count=1, replicas=[], auto_scaling_rules=[]
         ),
-        deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING, config=None),
+        deployment_strategy=DeploymentStrategy(
+            type=DeploymentStrategyType.ROLLING,
+            config=RollingConfig(max_surge=1, max_unavailable=0),
+        ),
         domain=Domain(id=ID("domain-id")),
         project=Project(id=ID("project-id")),
         created_user=User(id=ID("user-id")),
@@ -451,7 +460,8 @@ async def deployment_status_changed(deployment_id: ID) -> AsyncGenerator[ModelDe
                 desired_replica_count=1, replicas=[], auto_scaling_rules=[]
             ),
             deployment_strategy=DeploymentStrategy(
-                type=DeploymentStrategyType.ROLLING, config=None
+                type=DeploymentStrategyType.ROLLING,
+                config=RollingConfig(max_surge=1, max_unavailable=0),
             ),
             domain=Domain(id=ID("domain-id")),
             project=Project(id=ID("project-id")),
@@ -478,7 +488,6 @@ async def replica_status_changed(revision_id: ID) -> AsyncGenerator[ModelReplica
             revision=ModelRevision(
                 id=ID("revision-id"),
                 name="placeholder-revision",
-                tags=[],
                 cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfig(
                     resource_group=ResourceGroup(id=ID("rg-id")),
