@@ -8,7 +8,7 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import ByteSize
+from ai.backend.manager.api.gql.base import ByteSize, StringFilter
 
 
 # Enums
@@ -48,15 +48,6 @@ class OrderDirection(StrEnum):
 
 
 # Input Types
-@strawberry.input
-class StringFilter:
-    contains: Optional[str] = None
-    starts_with: Optional[str] = None
-    ends_with: Optional[str] = None
-    equals: Optional[str] = None
-    not_equals: Optional[str] = None
-
-
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
