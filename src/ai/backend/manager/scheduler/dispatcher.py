@@ -940,7 +940,7 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
-            await self.schedule_repository.finalize_scheduled_session(
+            await self.schedule_repository.finalize_multi_node_session(
                 sess_ctx.id, sgroup_name, kernel_agent_bindings
             )
 
