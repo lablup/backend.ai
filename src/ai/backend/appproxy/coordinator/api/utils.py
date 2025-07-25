@@ -38,6 +38,8 @@ def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Ha
                             raise AuthorizationFailed("Unauthorized access")
                     case _:
                         raise AuthorizationFailed(f"Unsupported authorization method {method}")
+            else:
+                raise AuthorizationFailed("Unauthorized access")
             return await handler(request, *args, **kwargs)
 
         original_attrs = getattr(handler, "_backend_attrs", {})

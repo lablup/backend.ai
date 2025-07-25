@@ -377,7 +377,10 @@ class Circuit(Base, BaseMixin):
         """
         for route in self.route_info:
             if route.route_id == route_id:
-                route.health_status = health_status
+                did_update_status = False
+                if route.health_status != health_status:
+                    route.health_status = health_status
+                    did_update_status = True
                 if last_check_time is not None:
                     route.last_health_check = last_check_time
                 if consecutive_failures is not None:
@@ -390,7 +393,7 @@ class Circuit(Base, BaseMixin):
 
                 attributes.flag_modified(self, "route_info")
 
-                return True
+                return did_update_status
         return False
 
     @property
