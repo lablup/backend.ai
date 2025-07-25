@@ -8,7 +8,7 @@ from strawberry.relay import Connection, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.federated_types import Image, ResourceGroup, VFolder
-from ai.backend.manager.api.gql.types import JSONString, OrderDirection
+from ai.backend.manager.api.gql.types import JSONString, OrderDirection, StringFilter
 
 
 @strawberry.enum
@@ -132,6 +132,8 @@ class ModelRevision(relay.Node):
 # Filter and Order Types
 @strawberry.input
 class ModelRevisionFilter:
+    id: Optional[StringFilter] = None
+    name: Optional[StringFilter] = None
     status: Optional[RevisionStatus] = None
     deployment_id: Optional[ID] = None
 
