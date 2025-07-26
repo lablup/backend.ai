@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Final
+from typing import Any, AsyncIterator, Final, override
 
 import aiohttp
 import aiotools
@@ -27,6 +27,49 @@ class HTTPBackend(AbstractBackend):
     def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
+        self.client_timeout = aiohttp.ClientTimeout(
+            total=None,
+            connect=10.0,
+            sock_connect=10.0,
+            sock_read=None,
+        )
+        self.client_opts: dict[str, Any] = {
+            "auto_decompress": False,
+        }
+        self.client_sessions = {
+            route.route_id: aiohttp.ClientSession(
+                base_url=f"http://{route.kernel_host}:{route.kernel_port}",
+                timeout=self.client_timeout,
+                **self.client_opts,
+            )
+            for route in routes
+        }
+        self.route_lock = asyncio.Lock()
+
+    @override
+    async def close(self) -> None:
+        async with self.route_lock, asyncio.TaskGroup() as tg:
+            for session in self.client_sessions.values():
+                tg.create_task(session.close())
+
+    @override
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        # Take a diff of new/old routes to create-or-destroy client sessions
+        async with self.route_lock:
+            old_route_ids = {route.route_id for route in self.routes}
+            new_route_ids = {route.route_id for route in routes}
+            await super().update_routes(routes)
+            new_routes_map = {route.route_id: route for route in self.routes}
+            async with asyncio.TaskGroup() as tg:
+                for route_id in old_route_ids - new_route_ids:
+                    tg.create_task(self.client_sessions.pop(route_id).close())
+            for route_id in new_route_ids - old_route_ids:
+                route = new_routes_map[route_id]
+                self.client_sessions[route_id] = aiohttp.ClientSession(
+                    base_url=f"http://{route.kernel_host}:{route.kernel_port}",
+                    timeout=self.client_timeout,
+                    **self.client_opts,
+                )
 
     @property
     def selected_route(self) -> RouteInfo:
@@ -57,60 +100,35 @@ class HTTPBackend(AbstractBackend):
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         metrics = self.root_context.metrics
         remote = f"{route.kernel_host}:{route.kernel_port}"
-
-        base_url = f"http://{route.kernel_host}:{route.kernel_port}"
         headers = dict(request.headers)
 
         if headers.get("Transfer-Encoding", "").lower() == "chunked":
             del headers["Transfer-Encoding"]
 
-        timeout = aiohttp.ClientTimeout(
-            total=None,
-            connect=10.0,
-            sock_connect=10.0,
-            sock_read=None,
+        metrics.proxy.observe_upstream_http_request(
+            remote=remote, total_bytes_size=request.body.total_bytes
         )
-        async with aiohttp.ClientSession(
-            base_url=base_url,
-            auto_decompress=False,
-            timeout=timeout,
-        ) as session:
-            metrics.proxy.observe_upstream_http_request(
-                remote=remote, total_bytes_size=request.body.total_bytes
+        client_session = self.client_sessions[route.route_id]
+        async with client_session.request(
+            request.method,
+            request.path,
+            headers=headers,
+            data=request.body,
+        ) as response:
+            metrics.proxy.observe_upstream_http_response(
+                remote=remote, total_bytes_size=response.content.total_bytes
             )
-            async with session.request(
-                request.method,
-                request.path,
-                headers=headers,
-                data=request.body,
-            ) as response:
-                metrics.proxy.observe_upstream_http_response(
-                    remote=remote, total_bytes_size=response.content.total_bytes
-                )
-
-                yield response
+            yield response
 
     @asynccontextmanager
     async def connect_websocket(
         self, route: RouteInfo, request: web.Request, protocols: list[str] = []
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
-        base_url = f"http://{route.kernel_host}:{route.kernel_port}"
-
-        timeout = aiohttp.ClientTimeout(
-            total=None,
-            connect=10.0,
-            sock_connect=10.0,
-            sock_read=None,
-        )
-        async with aiohttp.ClientSession(
-            base_url=base_url,
-            auto_decompress=False,
-            timeout=timeout,
-        ) as session:
-            log.debug("connecting to {}{}", base_url, request.rel_url)
-            async with session.ws_connect(request.rel_url, protocols=protocols) as ws:
-                log.debug("connected")
-                yield ws
+        client_session = self.client_sessions[route.route_id]
+        log.debug("connecting to {}{}", client_session._base_url, request.rel_url)
+        async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
+            log.debug("connected")
+            yield ws
 
     async def proxy_http(self, request: web.Request) -> web.StreamResponse:
         protocol = self.get_x_forwarded_proto(request)
