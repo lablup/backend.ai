@@ -62,7 +62,7 @@ class SubdomainFrontend(H2Frontend[str]):
             asyncio.create_task(self._log_monitor_task(proc.stderr, "stderr"))
         )
         self.proc_monitor_task = asyncio.create_task(self._proc_monitor_task(proc))
-        print("accepting proxy requests at {}:{}", service_addr.host, service_addr.port)
+        log.info("accepting proxy requests at {}:{}", service_addr.host, service_addr.port)
 
     async def stop(self) -> None:
         if not self.proc_monitor_task:
