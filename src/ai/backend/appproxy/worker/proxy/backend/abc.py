@@ -33,6 +33,12 @@ class AbstractBackend(metaclass=ABCMeta):
         self.circuit = circuit
         self.last_used = time.time()
 
+    async def close(self) -> None:
+        pass
+
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        self.routes = routes
+
     async def mark_last_used_time(self, route: RouteInfo) -> None:
         await self.root_context.last_used_time_marker_redis_queue.put((
             [
