@@ -232,7 +232,7 @@ class Worker(Base, BaseMixin):
         For workers with SUBDOMAIN, this will list occupied slots only - we can't list all available slots since it is infinite
         """
         circuit_list_query = sa.select(Circuit).where(Circuit.worker == self.id)
-        circuits: list[Circuit] = (await session.execute(circuit_list_query)).all()
+        circuits: list[Circuit] = (await session.execute(circuit_list_query)).scalars().all()
         match self.frontend_mode:
             case FrontendMode.PORT:
                 assert self.port_range
