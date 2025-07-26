@@ -87,7 +87,7 @@ class PortFrontend(AbstractHTTPFrontend[int]):
     async def ensure_slot_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
-        async def _exception_safe_handler(requst: web.Request) -> web.StreamResponse:
+        async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             port: int = request.app["port"]
             circuit = self.circuits[port]
             if not circuit:
