@@ -139,7 +139,7 @@ async def get_worker(request: web.Request) -> PydanticResponse[WorkerResponseMod
         worker = await Worker.get(sess, UUID(request.match_info["worker_id"]))
         return PydanticResponse(
             WorkerResponseModel(
-                slots=[SlotModel(**dataclasses.asdict(s)) for s in await worker.list_slots()],
+                slots=[SlotModel(**dataclasses.asdict(s)) for s in await worker.list_slots(sess)],
                 **worker.dump_model(),
             )
         )
@@ -159,7 +159,9 @@ async def list_workers(request: web.Request) -> PydanticResponse[WorkerListRespo
             WorkerListResponseModel(
                 workers=[
                     WorkerResponseModel(
-                        slots=[SlotModel(**dataclasses.asdict(s)) for s in await w.list_slots()],
+                        slots=[
+                            SlotModel(**dataclasses.asdict(s)) for s in await w.list_slots(sess)
+                        ],
                         **w.dump_model(),
                     )
                     for w in workers
@@ -247,7 +249,9 @@ async def update_worker(
                 sess.add(filter_row)
 
         result = dict(worker.dump_model())
-        result["slots"] = [SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())]
+        result["slots"] = [
+            SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots(sess))
+        ]
         log.info("Worker {} joined", worker.authority)
         return result
 
@@ -288,7 +292,9 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         worker.updated_at = datetime.now()
         worker.status = WorkerStatus.ALIVE
         result = dict(worker.dump_model())
-        result["slots"] = [SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())]
+        result["slots"] = [
+            SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots(sess))
+        ]
         # Update "last seen" timestamp for liveness tracking
         await redis_helper.execute(
             root_ctx.redis_live,

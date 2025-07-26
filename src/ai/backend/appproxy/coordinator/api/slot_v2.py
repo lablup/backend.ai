@@ -52,7 +52,7 @@ async def slots(
         for worker in workers:
             slots += [
                 SlotModel(**dataclasses.asdict(s))
-                for s in (await worker.list_slots())
+                for s in (await worker.list_slots(sess))
                 if s.in_use or (not params.in_use)
             ]
 

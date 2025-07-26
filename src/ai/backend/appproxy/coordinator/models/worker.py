@@ -226,12 +226,13 @@ class Worker(Base, BaseMixin):
             base_url += f":{self.api_port}"
         return URL(base_url)
 
-    async def list_slots(self) -> list[Slot]:
+    async def list_slots(self, session: AsyncSession) -> list[Slot]:
         """
         For workers working with PORT-based frontend_mode, this will list all available and occupied slots
         For workers with SUBDOMAIN, this will list occupied slots only - we can't list all available slots since it is infinite
         """
-        circuits: list[Circuit] = self.circuits
+        circuit_list_query = sa.select(Circuit).where(Circuit.worker == self.id)
+        circuits: list[Circuit] = (await session.execute(circuit_list_query)).all()
         match self.frontend_mode:
             case FrontendMode.PORT:
                 assert self.port_range
@@ -257,6 +258,8 @@ class Worker(Base, BaseMixin):
                     )
                     for c in self.circuits
                 ]
+            case _:
+                raise ValueError(f"Invalid frontend mode: {self.frontend_mode}")
         return slots
 
 
