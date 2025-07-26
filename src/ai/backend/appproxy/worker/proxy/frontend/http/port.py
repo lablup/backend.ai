@@ -90,9 +90,8 @@ class PortFrontend(AbstractHTTPFrontend[int]):
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             port: int = request.app["port"]
             circuit = self.circuits[port]
-            if not circuit:
-                raise GenericBadRequest(f"Unregistered slot {port}")  # noqa: F821
-
+            if circuit is None:
+                raise GenericBadRequest(f"Unregistered slot {port}")
             self.ensure_credential(request, circuit)
             circuit = self.circuits[port]
             backend = self.backends[port]
