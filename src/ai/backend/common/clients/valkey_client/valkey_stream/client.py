@@ -341,79 +341,11 @@ class ValkeyStreamClient:
         message = await self._client.client.get_pubsub_message()
         return load_json(message.message)
 
-    @valkey_decorator()
-    async def enqueue_container_logs(
-        self,
-        container_id: str,
-        logs: bytes,
-    ) -> None:
-        """
-        Enqueue logs for a specific container.
-        TODO: Replace with a more efficient log storage solution.
-
-        :param container_id: The ID of the container.
-        :param logs: The logs to enqueue.
-        :raises: GlideClientError if the logs cannot be enqueued.
-        """
-        key = self._container_log_key(container_id)
-        tx = self._create_batch()
-        tx.rpush(
-            key,
-            [logs],
-        )
-        tx.expire(
-            key,
-            3600,  # 1 hour expiration
-        )
-        await self._client.client.exec(tx, raise_on_error=True)
-
-    @valkey_decorator()
-    async def container_log_len(
-        self,
-        container_id: str,
-    ) -> int:
-        """
-        Get the length of logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :return: The number of logs for the container.
-        :raises: GlideClientError if the length cannot be retrieved.
-        """
-        key = self._container_log_key(container_id)
-        return await self._client.client.llen(key)
-
-    @valkey_decorator()
-    async def pop_container_logs(
-        self,
-        container_id: str,
-        count: int = 1,
-    ) -> Optional[list[bytes]]:
-        """
-        Pop logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :return: List of logs for the container.
-        :raises: GlideClientError if the logs cannot be popped.
-        """
-        key = self._container_log_key(container_id)
-        return await self._client.client.lpop_count(key, count)
-
-    @valkey_decorator()
-    async def clear_container_logs(
-        self,
-        container_id: str,
-    ) -> None:
-        """
-        Clear logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :raises: GlideClientError if the logs cannot be cleared.
-        """
-        key = self._container_log_key(container_id)
-        await self._client.client.delete([key])
-
-    def _container_log_key(self, container_id: str) -> str:
-        return f"containerlog.{container_id}"
-
     def _create_batch(self, is_atomic: bool = False) -> Batch:
+        """
+        Create a batch object for batch operations.
+
+        :param is_atomic: Whether the batch should be atomic (transaction-like).
+        :return: A Batch object.
+        """
         return Batch(is_atomic=is_atomic)
