@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-sentinel: Final = Sentinel.token
+sentinel: Final = Sentinel.TOKEN
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
 

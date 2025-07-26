@@ -13,6 +13,7 @@ python_requirements(
         "pyroscope-io": ["pyroscope"],
         "pyzmq": ["zmq"],
         "PyYAML": ["yaml"],
+        "tomli-w": ["tomli_w"],
         "typing-extensions": ["typing_extensions"],
         "more-itertools": ["more_itertools"],
         "zipstream-new": ["zipstream"],

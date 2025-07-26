@@ -41,6 +41,7 @@ jupyter-client>=8.6
 kubernetes~=10.0.0
 kubernetes-asyncio~=9.1.0
 lark~=1.1.5
+memray~=1.17.2
 more-itertools~=10.5.0
 msgpack~=1.1.0
 multidict~=6.2.0
@@ -79,6 +80,7 @@ temporenc~=0.1.0
 tenacity>=9.0
 toml~=0.10.2
 tomli~=2.0.1
+tomli-w~=1.2.0
 tomlkit~=0.13.2
 tqdm~=4.67.1
 trafaret~=2.1
@@ -110,4 +112,4 @@ types-toml
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
 
-etcd-client-py~=0.4.0
+etcd-client-py~=0.4.1
