@@ -3,8 +3,14 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import Iterable, Optional, Self
 
+from ai.backend.agent.resources import Mount
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.types import KernelId
+
+
+def is_mount_ssh(mount: Mount) -> bool:
+    container_path = mount.target
+    return container_path == Path("/home/work/.ssh")
 
 
 class ScratchUtil:

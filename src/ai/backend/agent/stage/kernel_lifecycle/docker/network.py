@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Optional, override
 
 from ai.backend.agent.exception import NetworkPluginNotFound
-from ai.backend.agent.plugin.network import NetworkPluginContext
+from ai.backend.agent.plugin.network import AbstractNetworkAgentPlugin, NetworkPluginContext
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
@@ -17,17 +17,8 @@ from ai.backend.common.types import (
     KernelCreationConfig,
 )
 
-
-@dataclass
-class NetworkConfig:
-    mode: Optional[str]
-    network_name: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "mode": self.mode,
-            "network_name": self.network_name,
-        }
+from .defs import BRIDGE_NETWORK_MODE
+from .types import NetworkConfig
 
 
 @dataclass
@@ -50,7 +41,9 @@ class NetworkSpecGenerator(ArgsSpecGenerator[NetworkSpec]):
 
 @dataclass
 class NetworkResult:
-    container_configs: list[dict[str, Any]]
+    mode: str
+    container_arg: list[dict[str, Any]]
+    network_plugin: Optional[AbstractNetworkAgentPlugin]
 
 
 class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
@@ -64,33 +57,46 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
 
     @override
     async def setup(self, spec: NetworkSpec) -> NetworkResult:
-        configs = await self._prepare_network_config(spec)
-        return NetworkResult(
-            container_configs=configs,
-        )
+        bridge_network_config = await self._parse_arg_bridge_network(spec)
 
-    async def _prepare_network_config(self, spec: NetworkSpec) -> list[dict[str, Any]]:
-        # FIXME: find out way to inect network ID to kernel resource spec
-        base_networks = await self._prepare_base_network(spec)
-        alternative_bridge_networks = await self._prepare_alternative_bridge_network(spec)
-        rdma_networks = await self._prepare_rdma_network(spec)
-        return [
-            *base_networks,
+        network_plugin = self._get_network_plugin(spec)
+        plugin_network_config = await self._parse_arg_plugin_network(network_plugin, spec)
+
+        alternative_bridge_networks = await self._parse_arg_alternative_bridge_network(spec)
+        rdma_networks = await self._parse_arg_rdma_network(spec)
+
+        configs = [
+            *bridge_network_config,
+            *plugin_network_config,
             *alternative_bridge_networks,
             *rdma_networks,
         ]
+        mode = spec.network_config.mode or BRIDGE_NETWORK_MODE
+        return NetworkResult(
+            mode=mode,
+            container_arg=configs,
+            network_plugin=network_plugin,
+        )
 
-    async def _prepare_base_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
-        match spec.network_config.mode:
-            case "bridge":
-                return await self._prepare_bridge_network(spec)
-            case mode if mode:
-                return await self._prepare_plugin_network(spec, mode)
-            case _:
-                # TODO: handle case when no network mode is specified
-                return []
+    def _get_network_plugin(self, spec: NetworkSpec) -> Optional[AbstractNetworkAgentPlugin]:
+        """
+        Retrieve the network plugin based on the specified network mode.
+        """
+        if spec.network_config.mode == BRIDGE_NETWORK_MODE:
+            return None  # No plugin needed for bridge mode
+        elif spec.network_config.mode:
+            try:
+                return self.network_plugin_ctx.plugins[spec.network_config.mode]
+            except KeyError:
+                raise NetworkPluginNotFound(
+                    f"Network plugin {spec.network_config.mode} not loaded!"
+                )
+        return None
 
-    async def _prepare_bridge_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
+    async def _parse_arg_bridge_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
+        is_bridge_network = spec.network_config.mode == BRIDGE_NETWORK_MODE
+        if not is_bridge_network:
+            return []
         result: list[dict[str, Any]] = []
         result.append({
             "HostConfig": {
@@ -106,12 +112,11 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
         })
         return result
 
-    async def _prepare_plugin_network(self, spec: NetworkSpec, mode: str) -> list[dict[str, Any]]:
-        try:
-            plugin = self.network_plugin_ctx.plugins[mode]
-        except KeyError:
-            raise NetworkPluginNotFound(f"Network plugin {mode} not loaded!")
-
+    async def _parse_arg_plugin_network(
+        self, plugin: Optional[AbstractNetworkAgentPlugin], spec: NetworkSpec
+    ) -> list[dict[str, Any]]:
+        if plugin is None:
+            return []
         cluster_info = ClusterInfo(
             mode=spec.kernel_config["cluster_mode"],
             size=spec.cluster_size,
@@ -131,7 +136,9 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
             })
         return result
 
-    async def _prepare_alternative_bridge_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
+    async def _parse_arg_alternative_bridge_network(
+        self, spec: NetworkSpec
+    ) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
         if spec.alternative_bridge is not None:
             result.append({
@@ -141,7 +148,7 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
             })
         return result
 
-    async def _prepare_rdma_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
+    async def _parse_arg_rdma_network(self, spec: NetworkSpec) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
         # RDMA mounts
         ib_root = Path("/dev/infiniband")

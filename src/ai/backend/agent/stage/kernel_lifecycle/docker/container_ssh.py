@@ -9,31 +9,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, override
 
-from ai.backend.agent.resources import Mount
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import ContainerSSHKeyPair
 
+from .types import ContainerOwnershipData
 from .utils import ChownUtil, PathOwnerDeterminer
-
-
-@dataclass
-class AgentConfig:
-    kernel_features: frozenset[str]
-    kernel_uid: int
-    kernel_gid: int
 
 
 @dataclass
 class ContainerSSHSpec:
     work_dir: Path
     ssh_keypair: ContainerSSHKeyPair
-    mounts: list[Mount]
+    ssh_already_mounted: bool
 
-    # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
-
-    agent_config: AgentConfig
+    container_ownership: ContainerOwnershipData
 
 
 class ContainerSSHSpecGenerator(ArgsSpecGenerator[ContainerSSHSpec]):
@@ -63,12 +52,9 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
         if not spec.ssh_keypair:
             return ContainerSSHResult(ssh_dir=None)
 
-        # Check if /home/work/.ssh is already mounted
-        for mount in spec.mounts:
-            container_path = mount.target
-            if container_path == Path("/home/work/.ssh"):
-                # SSH directory is already mounted, skip setup
-                return ContainerSSHResult(ssh_dir=None)
+        if spec.ssh_already_mounted:
+            # If SSH is already mounted, skip setup
+            return ContainerSSHResult(ssh_dir=None)
 
         loop = asyncio.get_running_loop()
 
@@ -106,13 +92,15 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
 
         chowner = ChownUtil()
         owner_determiner = PathOwnerDeterminer.by_kernel_features(
-            spec.agent_config.kernel_uid,
-            spec.agent_config.kernel_gid,
-            spec.agent_config.kernel_features,
+            spec.container_ownership.kernel_uid,
+            spec.container_ownership.kernel_gid,
+            spec.container_ownership.kernel_features,
         )
         for path in paths:
             uid, gid = owner_determiner.determine(
-                path, uid_override=spec.uid_override, gid_override=spec.gid_override
+                path,
+                uid_override=spec.container_ownership.uid_override,
+                gid_override=spec.container_ownership.gid_override,
             )
             chowner.chown_path(path, uid, gid)
 

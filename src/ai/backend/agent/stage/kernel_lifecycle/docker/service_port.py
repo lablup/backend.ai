@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import override
 
@@ -7,6 +8,7 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
+    ProvisionStage,
 )
 from ai.backend.common.types import ClusterRole, ServicePort, ServicePortProtocols
 
@@ -15,10 +17,9 @@ REPL_PORTS = (2000, 2001)
 
 @dataclass
 class ServicePortSpec:
-    model_service_ports: list[ServicePort]
     preopen_ports: list[int]
     cluster_role: ClusterRole
-    image_labels: dict[LabelName, str]
+    image_labels: Mapping[LabelName, str]
     allocated_host_ports: list[int]
 
 
@@ -39,7 +40,7 @@ class ServiceProvisioner(Provisioner[ServicePortSpec, ServicePortResult]):
 
     @override
     async def setup(self, spec: ServicePortSpec) -> ServicePortResult:
-        service_ports = [*spec.model_service_ports]
+        service_ports: list[ServicePort] = []
         service_ports += self._prepare_intrinsic_service_ports(spec)
         self._check_overlapping_ports(service_ports)
         service_ports += self._prepare_preopen_port(spec)
@@ -125,3 +126,7 @@ class ServiceProvisioner(Provisioner[ServicePortSpec, ServicePortResult]):
     @override
     async def teardown(self, resource: ServicePortResult) -> None:
         return
+
+
+class ServicePortStage(ProvisionStage[ServicePortSpec, ServicePortResult]):
+    pass

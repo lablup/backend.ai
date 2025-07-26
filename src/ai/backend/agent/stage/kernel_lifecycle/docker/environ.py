@@ -29,7 +29,6 @@ ADDITIONAL_GIDS: Final[str] = "ADDITIONAL_GIDS"
 @dataclass
 class AgentInfo:
     computers: Mapping[DeviceName, ComputerContext]
-    distro: str
     architecture: str
     kernel_uid: int
     kernel_gid: int
@@ -38,6 +37,7 @@ class AgentInfo:
 @dataclass
 class KernelInfo:
     kernel_creation_config: KernelCreationConfig
+    distro: str
     kernel_features: frozenset[str]
     resource_spec: KernelResourceSpec
     overriding_uid: Optional[int]
@@ -172,7 +172,7 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
                 continue
             computer_ctx = spec.agent_info.computers[dev_type]
             hook_paths = await computer_ctx.instance.get_hooks(
-                spec.agent_info.distro, spec.agent_info.architecture
+                spec.kernel_info.distro, spec.agent_info.architecture
             )
             for p in hook_paths:
                 hook_path = p.absolute()
