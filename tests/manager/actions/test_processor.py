@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Optional
@@ -6,8 +7,11 @@ import pytest
 from tenacity import BaseAction
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.action.base import (
+    BaseActionResult,
+)
+from ai.backend.manager.actions.processor.base import ActionProcessor
+from ai.backend.manager.actions.types import ActionResultMeta, ActionResultTargetMeta, ProcessResult
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -74,7 +78,7 @@ class MockActionMonitor:
         assert result.meta.started_at < current_time
         assert result.meta.started_at <= result.meta.ended_at
         assert result.meta.ended_at < current_time
-        assert result.meta.entity_id == self.expected_done_result.meta.entity_id
+        assert result.meta.target.entity_id == self.expected_done_result.meta.target.entity_id
         assert result.meta.duration.total_seconds() >= 0
 
 
@@ -95,9 +99,12 @@ async def test_processor_success():
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
         ),
         expected_done_result=ProcessResult(
-            meta=BaseActionResultMeta(
-                action_id=None,
-                entity_id="1",
+            meta=ActionResultMeta(
+                action_id=uuid.uuid4(),
+                target=ActionResultTargetMeta(
+                    entity_type=_MOCK_ACTION_TYPE,
+                    entity_ids=["1"],
+                ),
                 status="success",
                 description="Success",
                 started_at=None,
@@ -125,9 +132,12 @@ async def test_processor_exception():
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
         ),
         expected_done_result=ProcessResult(
-            meta=BaseActionResultMeta(
-                action_id=None,
-                entity_id="1",
+            meta=ActionResultMeta(
+                action_id=uuid.uuid4(),
+                target=ActionResultTargetMeta(
+                    entity_type=_MOCK_ACTION_TYPE,
+                    entity_ids=["1"],
+                ),
                 status="error",
                 description="Mock exception",
                 started_at=None,

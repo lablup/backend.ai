@@ -2,10 +2,12 @@ from typing import Final, override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.action.base import BaseAction
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
 from ai.backend.manager.reporters.hub import ReporterHub
+
+from ..types import ActionTriggerMeta, ProcessResult
 
 _BLANK_ID: Final[str] = "(unknown)"
 
@@ -17,7 +19,7 @@ class ReporterMonitor(ActionMonitor):
         self._reporter_hub = reporter_hub
 
     @override
-    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseAction, meta: ActionTriggerMeta) -> None:
         user = current_user()
         message = StartedActionMessage(
             action_id=meta.action_id,
@@ -37,7 +39,7 @@ class ReporterMonitor(ActionMonitor):
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
             action_type=action.spec().type(),
-            entity_id=result.meta.entity_id,
+            entity_id=result.meta.target.entity_id,
             request_id=current_request_id() or _BLANK_ID,
             triggered_by=str(user.user_id) if user else None,
             entity_type=action.entity_type(),
