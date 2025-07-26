@@ -5,27 +5,38 @@ This stage handles creation of the final DockerKernel object.
 """
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence, override
+from typing import Mapping, Sequence, override
 
-from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.docker.kernel import DockerCodeRunner
+
+# TODO: Implement DockerCodeRunner
+from ai.backend.agent.kernel import default_client_features
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
-from ai.backend.common.types import ClusterInfo, ServicePort
+from ai.backend.common.types import ServicePort
+
+from .types import KernelObject
 
 
 @dataclass
 class KernelObjectSpec:
     ownership_data: KernelOwnershipData
-    kernel_config: Mapping[str, Any]
     image_ref: ImageRef
-    kspec_version: int
-    cluster_info: ClusterInfo
-    agent_config: Mapping[str, Any]
+
+    repl_in_port: int
+    repl_out_port: int
+
+    network_id: str
+    network_mode: str
+
     service_ports: Sequence[ServicePort]
     resource_spec: KernelResourceSpec
     environ: Mapping[str, str]
+
+    event_producer: EventProducer
 
 
 class KernelObjectSpecGenerator(ArgsSpecGenerator[KernelObjectSpec]):
@@ -34,7 +45,7 @@ class KernelObjectSpecGenerator(ArgsSpecGenerator[KernelObjectSpec]):
 
 @dataclass
 class KernelObjectResult:
-    kernel: DockerKernel
+    kernel: KernelObject
 
 
 class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult]):
@@ -51,29 +62,44 @@ class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult])
 
     @override
     async def setup(self, spec: KernelObjectSpec) -> KernelObjectResult:
-        # Extract network configuration
-        network_mode = spec.cluster_info["network_config"].get("mode", "bridge")
+        code_runner = await self._init_code_runner(spec)
 
         # Create DockerKernel instance
-        kernel = DockerKernel(
+        kernel = KernelObject(
             ownership_data=spec.ownership_data,
-            network_id=spec.kernel_config["network_id"],
-            image=spec.image_ref,
-            version=spec.kspec_version,
-            network_driver=network_mode,
-            agent_config=spec.agent_config,
-            service_ports=spec.service_ports,
+            image_ref=spec.image_ref,
+            network_id=spec.network_id,
+            network_mode=spec.network_mode,
+            service_ports=list(spec.service_ports),
             resource_spec=spec.resource_spec,
             environ=spec.environ,
-            data={},  # Additional data can be added here if needed
+            code_runner=code_runner,
         )
 
         return KernelObjectResult(kernel=kernel)
 
+    async def _init_code_runner(self, spec: KernelObjectSpec) -> DockerCodeRunner:
+        """
+        Initialize the code runner for the kernel.
+        This is a placeholder for future implementation.
+        """
+        code_runner = DockerCodeRunner(
+            spec.ownership_data.kernel_id,
+            spec.ownership_data.session_id,
+            spec.event_producer,
+            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
+            repl_in_port=spec.repl_in_port,
+            repl_out_port=spec.repl_out_port,
+            exec_timeout=0,
+            client_features=default_client_features,
+        )
+        await code_runner.__ainit__()
+        return code_runner
+
     @override
     async def teardown(self, resource: KernelObjectResult) -> None:
-        # No cleanup needed for kernel object
-        pass
+        code_runner = resource.kernel.code_runner
+        await code_runner.close()
 
 
 class KernelObjectStage(ProvisionStage[KernelObjectSpec, KernelObjectResult]):

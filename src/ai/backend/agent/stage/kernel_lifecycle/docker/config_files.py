@@ -6,10 +6,11 @@ This stage handles creation of environment and resource configuration files.
 
 import asyncio
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Mapping, override
+from typing import Any, Mapping, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
@@ -22,7 +23,7 @@ class ConfigFileSpec:
     environ: Mapping[str, str]
     resource_spec: KernelResourceSpec
     computers: Mapping[DeviceName, ComputerContext]
-    accelerator_envs: Mapping[str, str]  # Additional envs from accelerators
+    container_arg: Mapping[str, Any]
 
 
 class ConfigFileSpecGenerator(ArgsSpecGenerator[ConfigFileSpec]):
@@ -83,8 +84,9 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
                 buf.write(f"{k}={v}\n")
 
             # Write accelerator environment variables
-            for k, v in spec.accelerator_envs.items():
-                buf.write(f"{k}={v}\n")
+            accel_envs = spec.container_arg.get("Env") or []
+            for env in accel_envs:
+                buf.write(f"{env}\n")
 
             await loop.run_in_executor(
                 None,

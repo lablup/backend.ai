@@ -9,16 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, override
 
+from ai.backend.agent.backend.types import DotfileInfo
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
+from .types import ContainerOwnershipData
 from .utils import ChownUtil, PathOwnerDeterminer
-
-
-@dataclass
-class DotfileInput:
-    path: str
-    data: str
-    perm: str  # Octal permission string like "644"
 
 
 @dataclass
@@ -37,23 +32,12 @@ class DotfileProcResult:
 
 
 @dataclass
-class AgentConfig:
-    kernel_features: frozenset[str]
-    kernel_uid: int
-    kernel_gid: int
-
-
-@dataclass
 class DotfilesSpec:
-    dotfiles: list[DotfileInput]
+    dotfiles: list[DotfileInfo]
     scratch_dir: Path
     work_dir: Path
 
-    # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
-
-    agent_config: AgentConfig
+    container_ownership: ContainerOwnershipData
 
 
 class DotfilesSpecGenerator(ArgsSpecGenerator[DotfilesSpec]):
@@ -89,9 +73,9 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
             return []
         chown = ChownUtil()
         owner_determiner = PathOwnerDeterminer.by_kernel_features(
-            spec.agent_config.kernel_uid,
-            spec.agent_config.kernel_gid,
-            spec.agent_config.kernel_features,
+            spec.container_ownership.kernel_uid,
+            spec.container_ownership.kernel_gid,
+            spec.container_ownership.kernel_features,
         )
         determined_uid: Optional[int] = None
         determined_gid: Optional[int] = None
@@ -109,7 +93,9 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
             target_paths = self._get_parent_dirs(spec.work_dir, file_path, dotfile.perm)
 
             uid, gid = owner_determiner.determine(
-                file_path, uid_override=spec.uid_override, gid_override=spec.gid_override
+                file_path,
+                uid_override=spec.container_ownership.uid_override,
+                gid_override=spec.container_ownership.gid_override,
             )
             chown.chown_paths(target_paths, uid, gid)
             if determined_uid is None:
