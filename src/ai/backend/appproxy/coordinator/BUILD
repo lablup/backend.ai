@@ -25,6 +25,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
         name="backend.ai-appproxy-coordinator",
@@ -47,6 +48,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/trafaret:stubs",
     ],
 )
 
@@ -56,6 +58,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/trafaret:stubs",
     ],
 )
 
@@ -68,6 +71,7 @@ run_shell_command(
     workdir="/dist",
     execution_dependencies=[
         ":backendai-appproxy-coordinator",
+        ":backendai-appproxy-coordinator-fat",
     ],
     tags=["checksum"],
 )

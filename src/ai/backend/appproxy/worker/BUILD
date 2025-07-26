@@ -11,10 +11,11 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
         name="backend.ai-appproxy-worker",
-        description="Backend.AI AppProxy Worier",
+        description="Backend.AI AppProxy Worker",
         license="LGPLv3",
     ),
     entry_points={
@@ -46,6 +47,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/trafaret:stubs",
     ],
 )
 
@@ -55,6 +57,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/trafaret:stubs",
     ],
 )
 
@@ -67,6 +70,7 @@ run_shell_command(
     workdir="/dist",
     execution_dependencies=[
         ":backendai-appproxy-worker",
+        ":backendai-appproxy-worker-fat",
     ],
     tags=["checksum"],
 )

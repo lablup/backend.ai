@@ -22,6 +22,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
         name="backend.ai-appproxy-common",
