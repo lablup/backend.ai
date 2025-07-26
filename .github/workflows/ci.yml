@@ -26,6 +26,7 @@ jobs:
     #       with a string literal like 'false', 'true'.
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     outputs:
       skip: ${{ steps.check_skip.outputs.SKIP_CI }}
