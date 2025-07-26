@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from typing import AsyncIterator, override
 
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.service.base import ServicesContext
@@ -55,3 +55,16 @@ class ServicesProvisioner(Provisioner):
     async def teardown(self, resource: ServicesContext) -> None:
         # Nothing to clean up
         pass
+
+
+class ServicesSpecGenerator(SpecGenerator[ServicesSpec]):
+    def __init__(self, db: ExtendedAsyncSAEngine):
+        self.db = db
+
+    @override
+    async def wait_for_spec(self) -> ServicesSpec:
+        return ServicesSpec(db=self.db)
+
+
+# Type alias for Services stage
+ServicesStage = ProvisionStage[ServicesSpec, ServicesContext]

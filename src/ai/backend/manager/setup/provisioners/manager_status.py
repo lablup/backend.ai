@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, override
 
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -51,3 +51,17 @@ class ManagerStatusProvisioner(Provisioner):
     async def teardown(self, resource: ManagerStatusResult) -> None:
         # Nothing to clean up
         pass
+
+
+class ManagerStatusSpecGenerator(SpecGenerator[ManagerStatusSpec]):
+    def __init__(self, pidx: int, config_provider: ManagerConfigProvider):
+        self.pidx = pidx
+        self.config_provider = config_provider
+
+    @override
+    async def wait_for_spec(self) -> ManagerStatusSpec:
+        return ManagerStatusSpec(pidx=self.pidx, config_provider=self.config_provider)
+
+
+# Type alias for ManagerStatus stage
+ManagerStatusStage = ProvisionStage[ManagerStatusSpec, ManagerStatusResult]

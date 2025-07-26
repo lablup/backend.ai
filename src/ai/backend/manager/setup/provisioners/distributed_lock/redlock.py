@@ -4,8 +4,9 @@ from typing import override
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.lock import RedisLock
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.common.types import RedisProfileTarget
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -40,3 +41,17 @@ class RedLockProvisioner(Provisioner):
     async def teardown(self, resource: DistributedLockFactory) -> None:
         # Nothing to clean up
         pass
+
+
+class RedLockSpecGenerator(SpecGenerator[RedLockSpec]):
+    def __init__(self, redis_stage: ProvisionStage, config: ManagerUnifiedConfig):
+        self.redis_stage = redis_stage
+        self.config = config
+
+    @override
+    async def wait_for_spec(self) -> RedLockSpec:
+        redis_clients = await self.redis_stage.wait_for_resource()
+        return RedLockSpec(
+            redis_profile_target=redis_clients.redis_profile_target,
+            lock_retry_interval=0.1,  # Default retry interval
+        )

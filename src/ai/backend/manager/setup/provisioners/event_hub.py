@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 
 
 @dataclass
@@ -24,3 +24,16 @@ class EventHubProvisioner(Provisioner):
     @override
     async def teardown(self, resource: EventHub) -> None:
         await resource.shutdown()
+
+
+class EventHubSpecGenerator(SpecGenerator[EventHubSpec]):
+    def __init__(self):
+        pass
+
+    @override
+    async def wait_for_spec(self) -> EventHubSpec:
+        return EventHubSpec()
+
+
+# Type alias for EventHub stage
+EventHubStage = ProvisionStage[EventHubSpec, EventHub]

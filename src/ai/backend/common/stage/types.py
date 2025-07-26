@@ -89,11 +89,11 @@ class ProvisionStage(Stage[TSpec, TResource]):
     It waits for the spec to be ready and then uses the provisioner to set up the resource.
     """
 
-    _provisioner: Provisioner
+    _provisioner: Provisioner[TSpec, TResource]
     _resource: Optional[TResource]
     _setup_completed: asyncio.Event
 
-    def __init__(self, provisioner: Provisioner):
+    def __init__(self, provisioner: Provisioner[TSpec, TResource]):
         self._provisioner = provisioner
         self._resource = None
         self._setup_completed = asyncio.Event()

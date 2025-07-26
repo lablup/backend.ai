@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.stage.types import Provisioner
-from ai.backend.manager.config.unified import VolumesConfig
-
-from ..models.storage import StorageSessionManager
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.manager.config.unified import ManagerUnifiedConfig, VolumesConfig
+from ai.backend.manager.models.storage import StorageSessionManager
 
 
 @dataclass
@@ -26,3 +25,16 @@ class StorageManagerProvisioner(Provisioner):
     @override
     async def teardown(self, resource: StorageSessionManager) -> None:
         await resource.aclose()
+
+
+class StorageManagerSpecGenerator(SpecGenerator[StorageManagerSpec]):
+    def __init__(self, config: ManagerUnifiedConfig):
+        self.config = config
+
+    @override
+    async def wait_for_spec(self) -> StorageManagerSpec:
+        return StorageManagerSpec(volume_config=self.config.volumes)
+
+
+# Type alias for StorageManager stage
+StorageManagerStage = ProvisionStage[StorageManagerSpec, StorageSessionManager]

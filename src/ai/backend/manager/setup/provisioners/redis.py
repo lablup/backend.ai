@@ -12,9 +12,9 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.common.types import RedisProfileTarget
-from ai.backend.manager.config.unified import RedisConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig, RedisConfig
 
 
 @dataclass
@@ -74,3 +74,16 @@ class RedisProvisioner(Provisioner):
         await resource.valkey_stat.close()
         await resource.valkey_live.close()
         await resource.valkey_stream.close()
+
+
+class RedisSpecGenerator(SpecGenerator[RedisSpec]):
+    def __init__(self, config: ManagerUnifiedConfig):
+        self.config = config
+
+    @override
+    async def wait_for_spec(self) -> RedisSpec:
+        return RedisSpec(redis_config=self.config.redis)
+
+
+# Type alias for Redis stage
+RedisStage = ProvisionStage[RedisSpec, RedisClients]

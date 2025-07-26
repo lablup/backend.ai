@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, SpecGenerator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.pglock import PgAdvisoryLock
 from ai.backend.manager.types import DistributedLockFactory
@@ -26,3 +26,12 @@ class PgAdvisoryLockProvisioner(Provisioner):
     async def teardown(self, resource: DistributedLockFactory) -> None:
         # Nothing to clean up
         pass
+
+
+class PgAdvisoryLockSpecGenerator(SpecGenerator[PgAdvisoryLockSpec]):
+    def __init__(self, db: ExtendedAsyncSAEngine):
+        self.db = db
+
+    @override
+    async def wait_for_spec(self) -> PgAdvisoryLockSpec:
+        return PgAdvisoryLockSpec(db=self.db)

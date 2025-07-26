@@ -3,7 +3,7 @@ from typing import override
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.lock import EtcdLock
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, SpecGenerator
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -30,3 +30,12 @@ class EtcdLockProvisioner(Provisioner):
     async def teardown(self, resource: DistributedLockFactory) -> None:
         # Nothing to clean up
         pass
+
+
+class EtcdLockSpecGenerator(SpecGenerator[EtcdLockSpec]):
+    def __init__(self, etcd: AsyncEtcd):
+        self.etcd = etcd
+
+    @override
+    async def wait_for_spec(self) -> EtcdLockSpec:
+        return EtcdLockSpec(etcd=self.etcd)

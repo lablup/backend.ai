@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.common.lock import FileLock
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, SpecGenerator
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -30,3 +31,14 @@ class FileLockProvisioner(Provisioner):
     async def teardown(self, resource: DistributedLockFactory) -> None:
         # Nothing to clean up
         pass
+
+
+class FileLockSpecGenerator(SpecGenerator[FileLockSpec]):
+    def __init__(self, config: ManagerUnifiedConfig):
+        self.config = config
+
+    @override
+    async def wait_for_spec(self) -> FileLockSpec:
+        return FileLockSpec(
+            ipc_base_path=self.config.manager.ipc_base_path, manager_id=self.config.manager.id
+        )

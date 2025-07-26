@@ -6,7 +6,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
-from ai.backend.common.stage.types import Provisioner
+from ai.backend.common.stage.types import Provisioner, SpecGenerator
 
 
 @dataclass
@@ -28,3 +28,12 @@ class EtcdServiceDiscoveryProvisioner(Provisioner):
     async def teardown(self, resource: ETCDServiceDiscovery) -> None:
         # Nothing to clean up
         pass
+
+
+class EtcdServiceDiscoverySpecGenerator(SpecGenerator[EtcdServiceDiscoverySpec]):
+    def __init__(self, etcd: AsyncEtcd):
+        self.etcd = etcd
+
+    @override
+    async def wait_for_spec(self) -> EtcdServiceDiscoverySpec:
+        return EtcdServiceDiscoverySpec(etcd=self.etcd)
