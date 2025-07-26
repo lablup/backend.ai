@@ -4,14 +4,17 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Final, override
+from typing import Final, Optional, override
 
+import aiofiles
 import pkg_resources
 from cachetools import LRUCache, cached
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from ai.backend.agent.kernel import match_distro_data
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.utils import get_arch_name
+from ai.backend.common.json import load_json
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
@@ -47,7 +50,7 @@ class KernelRunnerInfo:
 @dataclass
 class KernelRunnerMountSpec:
     distro: str
-    krunner_volumes: Mapping[str, str]
+    krunner_volumes: Optional[Mapping[str, str]]
     sandbox_type: str  # docker, jail
 
     existing_computers: Mapping[DeviceName, ComputerContext]
@@ -58,9 +61,63 @@ class KernelRunnerMountSpecGenerator(ArgsSpecGenerator[KernelRunnerMountSpec]):
     pass
 
 
+class SyscallArg(BaseModel):
+    index: int
+    value: int
+    op: str
+
+
+class SyscallFilter(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    caps: Optional[list[str]] = Field(default=None)
+    arches: Optional[list[str]] = Field(default=None)
+
+
+class Syscall(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    names: list[str]
+    action: str
+    errno_ret: Optional[int] = Field(
+        default=None, validation_alias=AliasChoices("errnoRet", "errno_ret")
+    )
+    args: Optional[list[SyscallArg]] = Field(default=None)
+    comment: Optional[str] = Field(default=None)
+    includes: Optional[SyscallFilter] = Field(default=None)
+    excludes: Optional[SyscallFilter] = Field(default=None)
+
+
+class ArchMap(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    architecture: str
+    sub_architectures: Optional[list[str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("subArchitectures", "sub_architectures"),
+    )
+
+
+class SeccompProfile(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    default_action: str = Field(
+        validation_alias=AliasChoices("defaultAction", "default_action"),
+    )
+    default_errno_ret: int = Field(
+        validation_alias=AliasChoices("defaultErrnoRet", "default_errno_ret"),
+    )
+    arch_map: list[ArchMap] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("archMap", "arch_map"),
+    )
+    syscalls: list[Syscall] = Field()
+
+
 @dataclass
 class KernelRunnerMountResult:
     mounts: list[Mount]
+    seccomp_profile: Optional[SeccompProfile]
 
 
 class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunnerMountResult]):
@@ -86,10 +143,12 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             *self._prepare_musl_mounts(info),
             *self._prepare_jail_mounts(info, spec.sandbox_type),
         ]
-
         mounts.extend(await self._prepare_hook_mounts(spec, info))
+
+        seccomp_profile = await self._get_seccomp_profile(spec)
         return KernelRunnerMountResult(
             mounts=mounts,
+            seccomp_profile=seccomp_profile,
         )
 
     def _resolve_krunner_filepath(self, filename: str) -> Path:
@@ -256,14 +315,46 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
                     )
         return mounts
 
+    def _get_additional_syscalls(self, spec: KernelRunnerMountSpec) -> list[str]:
+        additional_syscalls: set[str] = set()
+        for dev_type, _ in spec.resource_spec.allocations.items():
+            computer_ctx = spec.existing_computers[dev_type]
+            syscall = computer_ctx.instance.get_additional_allowed_syscalls()
+            additional_syscalls.update(syscall)
+        return sorted(additional_syscalls)
+
+    async def _get_seccomp_profile(self, spec: KernelRunnerMountSpec) -> Optional[SeccompProfile]:
+        """
+        Prepares the seccomp profile based on the kernel runner information.
+        """
+        default_seccomp_path = self._resolve_krunner_filepath("runner/default-seccomp.json")
+        if not default_seccomp_path.exists():
+            return None
+
+        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
+            file_data = await fp.read()
+            raw_seccomp_profile = load_json(file_data)
+
+        additional_syscalls = self._get_additional_syscalls(spec)
+        seccomp_profile = SeccompProfile(**raw_seccomp_profile)
+        additional_syscall = Syscall(
+            names=additional_syscalls,
+            action="SCMP_ACT_ALLOW",
+            args=[],
+            comment="Additionally allowed syscalls by Backend.AI Agent",
+        )
+        seccomp_profile.syscalls.append(additional_syscall)
+        return seccomp_profile
+
     @cached(
         cache=LRUCache(maxsize=32),
         key=lambda self, distro, krunner_volumes: (distro, tuple(sorted(krunner_volumes.items()))),
     )
     def _get_krunner_info(
-        self, distro: str, krunner_volumes: Mapping[str, str]
+        self, distro: str, krunner_volumes: Optional[Mapping[str, str]]
     ) -> KernelRunnerInfo:
-        matched_distro, krunner_volume = match_distro_data(krunner_volumes, distro)
+        krunner_volume_map = krunner_volumes or {}
+        matched_distro, krunner_volume = match_distro_data(krunner_volume_map, distro)
         matched_libc_style = LibcStyle.GLIBC
         if distro.startswith("alpine"):
             matched_libc_style = LibcStyle.MUSL

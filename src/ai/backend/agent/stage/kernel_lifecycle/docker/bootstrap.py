@@ -11,14 +11,8 @@ from typing import Optional, override
 
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
+from .types import ContainerOwnershipData
 from .utils import ChownUtil, PathOwnerDeterminer
-
-
-@dataclass
-class AgentConfig:
-    kernel_features: frozenset[str]
-    kernel_uid: int
-    kernel_gid: int
 
 
 @dataclass
@@ -26,11 +20,7 @@ class BootstrapSpec:
     work_dir: Path
     bootstrap_script: Optional[str]
 
-    # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
-
-    agent_config: AgentConfig
+    container_ownership: ContainerOwnershipData
 
 
 class BootstrapSpecGenerator(ArgsSpecGenerator[BootstrapSpec]):
@@ -70,12 +60,14 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
 
         # Set proper ownership
         owner_determiner = PathOwnerDeterminer.by_kernel_features(
-            spec.agent_config.kernel_uid,
-            spec.agent_config.kernel_gid,
-            spec.agent_config.kernel_features,
+            spec.container_ownership.kernel_uid,
+            spec.container_ownership.kernel_gid,
+            spec.container_ownership.kernel_features,
         )
         final_uid, final_gid = owner_determiner.determine(
-            bootstrap_path, uid_override=spec.uid_override, gid_override=spec.gid_override
+            bootstrap_path,
+            uid_override=spec.container_ownership.uid_override,
+            gid_override=spec.container_ownership.gid_override,
         )
         ChownUtil().chown_path(bootstrap_path, final_uid, final_gid)
         return bootstrap_path
