@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 from typing import Generic, TypeVar
@@ -34,30 +37,36 @@ class AbstractFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
         log.debug(
             "circuit {} (app:{}, mode: {}) registered", circuit.id, circuit.app, circuit.app_mode
         )
-
         metrics.circuit.observe_circuit_creation(protocol=circuit.protocol.name)
 
     async def update_circuit_route_info(
         self, circuit: Circuit, new_routes: list[RouteInfo]
     ) -> None:
         key = self.get_circuit_key(circuit)
-        assert key in self.circuits, "Slot not active"
+        if key not in self.circuits:
+            log.warning("Tried to update an inactive slot: {}", key)
+            return
         await self.update_backend(self.backends[key], new_routes)
 
     async def break_circuit(self, circuit: Circuit) -> None:
         metrics = self.root_context.metrics
-
         key = self.get_circuit_key(circuit)
-        assert key in self.circuits, "Slot not active"
-        await self.terminate_backend(self.backends[key])
-        del self.backends[key]
-        del self.circuits[key]
-
-        metrics.circuit.observe_circuit_removal(protocol=circuit.protocol.name)
+        if key not in self.circuits:
+            log.warning("Tried to break an inactive slot: {}", key)
+            return
+        try:
+            await self.terminate_backend(self.backends[key])
+        except Exception:
+            log.exception("Failed to terminate backend for circuit {}: {}", key)
+        finally:
+            del self.backends[key]
+            del self.circuits[key]
+            metrics.circuit.observe_circuit_removal(protocol=circuit.protocol.name)
 
     async def terminate_all_circuits(self) -> None:
-        for circuit in list(self.circuits.values()):
-            await self.break_circuit(circuit)
+        async with asyncio.TaskGroup() as tg:
+            for circuit in list(self.circuits.values()):
+                tg.create_task(self.break_circuit(circuit))
 
     @abstractmethod
     async def start(self) -> None:

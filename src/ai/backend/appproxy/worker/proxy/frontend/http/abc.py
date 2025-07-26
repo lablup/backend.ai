@@ -71,11 +71,11 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
         return HTTPBackend(routes, self.root_context, circuit)
 
     async def update_backend(self, backend: HTTPBackend, routes: list[RouteInfo]) -> HTTPBackend:
-        backend.routes = routes
+        await backend.update_routes(routes)
         return backend
 
     async def terminate_backend(self, backend: HTTPBackend) -> None:
-        return
+        await backend.close()
 
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
