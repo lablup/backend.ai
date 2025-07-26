@@ -282,7 +282,7 @@ async def execute_with_txn_retry(
     Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
     """
 
-    result: TQueryResult | Sentinel = Sentinel.token
+    result: TQueryResult | Sentinel = Sentinel.TOKEN
     max_attempts = 10
     try:
         async for attempt in AsyncRetrying(
@@ -302,7 +302,7 @@ async def execute_with_txn_retry(
         raise asyncio.TimeoutError(
             f"DB serialization failed after {max_attempts} retry transactions"
         )
-    assert result is not Sentinel.token
+    assert result is not Sentinel.TOKEN
     return result
 
 
@@ -406,7 +406,7 @@ async def reenter_txn_session(
 # TODO: How to apply the missing execute_with_retry logic?
 async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
     max_attempts = 20
-    result: TQueryResult | Sentinel = Sentinel.token
+    result: TQueryResult | Sentinel = Sentinel.TOKEN
     try:
         async for attempt in AsyncRetrying(
             wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
@@ -422,7 +422,7 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                     raise
     except RetryError:
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
-    assert result is not Sentinel.token
+    assert result is not Sentinel.TOKEN
     return result
 
 

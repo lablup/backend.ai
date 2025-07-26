@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -10,7 +12,10 @@ import sqlalchemy as sa
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
 from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import AppMode, HealthCheckConfig, HealthCheckState, RouteInfo
-from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ai.backend.appproxy.coordinator.models.utils import (
+    ExtendedAsyncSAEngine,
+    execute_with_txn_retry,
+)
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -23,7 +28,9 @@ from ai.backend.common.types import ModelServiceStatus, RedisConnectionInfo, Ses
 from .models import Circuit, Endpoint
 
 if TYPE_CHECKING:
-    from ai.backend.appproxy.coordinator.types import CircuitManager
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+    from .types import CircuitManager
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -309,93 +316,89 @@ class HealthCheckEngine:
                 route.route_id: route.health_status for route in original_routes
             }
 
-            async def _update() -> None:
-                async with self.db.begin_session() as sess:
-                    # Re-fetch the circuit in this session to ensure we can update it
-                    circuit_in_session = await Circuit.get(
-                        sess, circuit.id, load_worker=True, load_endpoint=True
+            async def _update(sess: SASession) -> None:
+                # Re-fetch the circuit in this session to ensure we can update it
+                circuit_in_session = await Circuit.get(
+                    sess, circuit.id, load_worker=True, load_endpoint=True
+                )
+
+                updated_routes = 0
+                health_transitions = []  # List of (session_id, old_status, new_status) tuples
+
+                # Update health status for each route and detect transitions
+                for route_id, (
+                    status,
+                    last_check_time,
+                    consecutive_failures,
+                ) in route_health_results.items():
+                    # Get the old health status for this route
+                    old_status = old_health_status_map.get(route_id)
+
+                    updated = circuit_in_session.update_route_health_status(
+                        route_id, status, last_check_time, consecutive_failures
                     )
 
-                    updated_routes = 0
-                    health_transitions = []  # List of (session_id, old_status, new_status) tuples
+                    if updated:
+                        updated_routes += 1
 
-                    # Update health status for each route and detect transitions
-                    for route_id, (
-                        status,
-                        last_check_time,
-                        consecutive_failures,
-                    ) in route_health_results.items():
-                        # Get the old health status for this route
-                        old_status = old_health_status_map.get(route_id)
-
-                        updated = circuit_in_session.update_route_health_status(
-                            route_id, status, last_check_time, consecutive_failures
+                        # Find the corresponding route to get session_id
+                        route_info = next(
+                            (r for r in circuit_in_session.route_info if r.route_id == route_id),
+                            None,
                         )
 
-                        if updated:
-                            updated_routes += 1
-
-                            # Find the corresponding route to get session_id
-                            route_info = next(
-                                (
-                                    r
-                                    for r in circuit_in_session.route_info
-                                    if r.route_id == route_id
-                                ),
-                                None,
-                            )
-
-                            if route_info and old_status != status and status is not None:
-                                # Health status transition detected
-                                health_transitions.append((
-                                    route_info.session_id,
-                                    old_status,
-                                    status,
-                                ))
-                                log.info(
-                                    "Health status transition detected for session {} (route {}): {} -> {}",
-                                    route_info.session_id,
-                                    route_id,
-                                    old_status,
-                                    status,
-                                )
-
-                            log.debug(
-                                "Updated container health status for route {} to {} in circuit {} (failures: {})",
-                                route_id,
+                        if route_info and old_status != status and status is not None:
+                            # Health status transition detected
+                            health_transitions.append((
+                                route_info.session_id,
+                                old_status,
                                 status,
-                                circuit.id,
-                                consecutive_failures,
-                            )
-                        else:
-                            log.warning(
-                                "Route {} not found in circuit {} for health status update",
+                            ))
+                            log.info(
+                                "Health status transition detected for session {} (route {}): {} -> {}",
+                                route_info.session_id,
                                 route_id,
-                                circuit.id,
+                                old_status,
+                                status,
                             )
 
-                    if updated_routes > 0:
                         log.debug(
-                            "Persisted health status updates for {}/{} routes in circuit {}",
-                            updated_routes,
-                            len(route_health_results),
+                            "Updated container health status for route {} to {} in circuit {} (failures: {})",
+                            route_id,
+                            status,
                             circuit.id,
-                        )
-
-                        # Publish health status transition events
-                        await self.publish_health_transition_events(health_transitions)
-
-                        # Propagate updated route information to AppProxy workers
-                        await self.propagate_route_updates_to_workers(
-                            circuit_in_session, original_routes
+                            consecutive_failures,
                         )
                     else:
                         log.warning(
-                            "No routes were updated in circuit {} - possibly stale route IDs",
+                            "Route {} not found in circuit {} for health status update",
+                            route_id,
                             circuit.id,
                         )
 
-            await execute_with_retry(_update)
+                if updated_routes > 0:
+                    log.debug(
+                        "Persisted health status updates for {}/{} routes in circuit {}",
+                        updated_routes,
+                        len(route_health_results),
+                        circuit.id,
+                    )
+
+                    # Publish health status transition events
+                    await self.publish_health_transition_events(health_transitions)
+
+                    # Propagate updated route information to AppProxy workers
+                    await self.propagate_route_updates_to_workers(
+                        circuit_in_session, original_routes
+                    )
+                else:
+                    log.warning(
+                        "No routes were updated in circuit {} - possibly stale route IDs",
+                        circuit.id,
+                    )
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(_update, self.db.begin_session, db_conn)
         except Exception as e:
             log.error("Failed to update route health status in circuit {}: {}", circuit.id, e)
             # Re-raise the exception to ensure health check failure is properly handled

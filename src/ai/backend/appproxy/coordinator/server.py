@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import grp
@@ -14,7 +16,7 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -94,7 +96,7 @@ from .config import ServerConfig
 from .config import load as load_config
 from .defs import EVENT_DISPATCHER_CONSUMER_GROUP, LockID
 from .models import Circuit, Endpoint, Worker
-from .models.utils import execute_with_retry
+from .models.utils import execute_with_txn_retry
 from .types import (
     CircuitManager,
     CleanupContext,
@@ -103,6 +105,9 @@ from .types import (
     InferenceAppConfigDict,
     RootContext,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -342,16 +347,16 @@ async def on_worker_lost_event(
 ) -> None:
     log.warning("detected termination of proxy worker {}", event.worker_id)
 
-    async def _update() -> None:
-        async with context.db.begin_session() as sess:
-            try:
-                worker = await Worker.find_by_authority(sess, event.worker_id)
-                worker.status = WorkerStatus.LOST
-                await sess.flush()
-            except ObjectNotFound:
-                log.warning("worker {} not found in database", event.worker_id)
+    async def _update(sess: SASession) -> None:
+        try:
+            worker = await Worker.find_by_authority(sess, event.worker_id)
+            worker.status = WorkerStatus.LOST
+            await sess.flush()
+        except ObjectNotFound:
+            log.warning("worker {} not found in database", event.worker_id)
 
-    await execute_with_retry(_update)
+    async with context.db.connect() as db_conn:
+        await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
 async def on_route_update_event(
@@ -397,43 +402,43 @@ async def on_route_update_event(
         app = ""
         new_routes = {}
 
-    async def _update() -> None:
-        async with context.db.begin_session() as db_sess:
-            endpoint = await Endpoint.get(db_sess, event.endpoint_id)
-            circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
-            traffic_ratios = await redis_helper.execute(
-                context.core_redis_live,
-                lambda r: r.mget(*[
-                    f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
-                    for route in new_routes.values()
-                ]),
-            )
-            for idx, route in enumerate(new_routes.values()):
-                route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
-            old_routes = circuit.route_info or []
-            for route in old_routes:
-                if _duplicate_route := new_routes.get(route.session_id):
-                    _duplicate_route.health_status = route.health_status
-                    _duplicate_route.last_health_check = route.last_health_check
-                    _duplicate_route.consecutive_failures = route.consecutive_failures
-            circuit.route_info = list(new_routes.values())
+    async def _update(db_sess: SASession) -> None:
+        endpoint = await Endpoint.get(db_sess, event.endpoint_id)
+        circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
+        traffic_ratios = await redis_helper.execute(
+            context.core_redis_live,
+            lambda r: r.mget(*[
+                f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
+                for route in new_routes.values()
+            ]),
+        )
+        for idx, route in enumerate(new_routes.values()):
+            route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
+        old_routes = circuit.route_info or []
+        for route in old_routes:
+            if _duplicate_route := new_routes.get(route.session_id):
+                _duplicate_route.health_status = route.health_status
+                _duplicate_route.last_health_check = route.last_health_check
+                _duplicate_route.consecutive_failures = route.consecutive_failures
+        circuit.route_info = list(new_routes.values())
 
-            endpoint.health_check_enabled = health_check_enabled
-            endpoint.health_check_config = health_check_config
+        endpoint.health_check_enabled = health_check_enabled
+        endpoint.health_check_config = health_check_config
 
-            await db_sess.commit()
+        await db_sess.commit()
 
-            if not endpoint.health_check_enabled:
-                # mark all routes as healthy
-                # Publish health status transition events
-                await context.health_engine.publish_health_transition_events([
-                    (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
-                ])
+        if not endpoint.health_check_enabled:
+            # mark all routes as healthy
+            # Publish health status transition events
+            await context.health_engine.publish_health_transition_events([
+                (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
+            ])
 
-                # Propagate updated route information to AppProxy workers
-                await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
+            # Propagate updated route information to AppProxy workers
+            await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
 
-    await execute_with_retry(_update)
+    async with context.db.connect() as db_conn:
+        await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
 @actxmgr
@@ -520,54 +525,56 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
     async def _collect(context: None, src: AgentId, event: DoCheckUnusedPortEvent) -> None:
         try:
 
-            async def _update() -> list[Circuit]:
-                async with root_ctx.db.begin_session() as sess:
-                    non_inference_http_circuits = [
-                        c
-                        for c in (await Circuit.list_circuits(sess))
-                        if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
-                    ]
-                    if len(non_inference_http_circuits) == 0:
-                        return []
-                    last_access = await redis_helper.execute(
-                        root_ctx.redis_live,
-                        lambda r: r.mget([
-                            f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
-                        ]),
-                    )
-                    unused_circuits = [
-                        non_inference_http_circuits[idx]
-                        for idx in range(len(last_access))
-                        if (
-                            time.time()
-                            - (
-                                float(last_access[idx])
-                                if last_access[idx]
-                                else non_inference_http_circuits[idx].created_at.timestamp()
-                            )
+            async def _update(sess: SASession) -> list[Circuit]:
+                non_inference_http_circuits = [
+                    c
+                    for c in (await Circuit.list_circuits(sess))
+                    if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
+                ]
+                if len(non_inference_http_circuits) == 0:
+                    return []
+                last_access = await redis_helper.execute(
+                    root_ctx.redis_live,
+                    lambda r: r.mget([
+                        f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                    ]),
+                )
+                unused_circuits = [
+                    non_inference_http_circuits[idx]
+                    for idx in range(len(last_access))
+                    if (
+                        time.time()
+                        - (
+                            float(last_access[idx])
+                            if last_access[idx]
+                            else non_inference_http_circuits[idx].created_at.timestamp()
                         )
-                        > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
-                    ]
-                    if len(unused_circuits) == 0:
-                        return []
-
-                    log.info(
-                        "collecting {} unused circuits: {}",
-                        len(unused_circuits),
-                        [str(c.id) for c in unused_circuits],
                     )
+                    > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
+                ]
+                if len(unused_circuits) == 0:
+                    return []
 
-                    worker_map: dict[UUID, Worker] = {}
-                    for circuit in unused_circuits:
-                        if circuit.worker not in worker_map:
-                            worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
+                log.info(
+                    "collecting {} unused circuits: {}",
+                    len(unused_circuits),
+                    [str(c.id) for c in unused_circuits],
+                )
 
-                        worker_map[circuit.worker].occupied_slots -= 1
-                        await sess.delete(circuit)
+                worker_map: dict[UUID, Worker] = {}
+                for circuit in unused_circuits:
+                    if circuit.worker not in worker_map:
+                        worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
 
-                    return unused_circuits
+                    worker_map[circuit.worker].occupied_slots -= 1
+                    await sess.delete(circuit)
 
-            unused_circuits = await execute_with_retry(_update)
+                return unused_circuits
+
+            async with root_ctx.db.connect() as db_conn:
+                unused_circuits = await execute_with_txn_retry(
+                    _update, root_ctx.db.begin_session, db_conn
+                )
             await root_ctx.circuit_manager.unload_circuits(unused_circuits)
 
         except Exception:

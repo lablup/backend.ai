@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import dataclasses
 import logging
 import textwrap
 import uuid
 from datetime import datetime, timedelta
-from typing import Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated, Iterable
 from uuid import UUID
 
 import aiohttp_cors
@@ -35,10 +37,13 @@ from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
 
 from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_txn_retry
 from ..types import RootContext
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -191,65 +196,63 @@ async def update_worker(
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update() -> dict:
-        async with root_ctx.db.begin_session() as sess:
+    async def _update(sess: SASession) -> dict:
+        try:
+            worker = await Worker.find_by_authority(sess, params.authority)
+            worker.frontend_mode = params.frontend_mode
+            worker.protocol = params.protocol
+            worker.hostname = params.hostname
+            worker.tls_listen = params.tls_listen
+            worker.tls_advertised = params.tls_advertised
+            worker.api_port = params.api_port
+            worker.port_range = params.port_range
+            worker.wildcard_domain = params.wildcard_domain
+            worker.wildcard_traffic_port = params.wildcard_traffic_port
+            worker.filtered_apps_only = params.filtered_apps_only
+            worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
+            worker.updated_at = datetime.now()
+            worker.nodes += 1
+            worker.status = WorkerStatus.ALIVE
+        except ObjectNotFound:
+            worker = Worker.create(
+                uuid.uuid4(),
+                params.authority,
+                params.frontend_mode,
+                params.protocol,
+                params.hostname,
+                params.tls_listen,
+                params.tls_advertised,
+                params.api_port,
+                params.accepted_traffics,
+                port_range=params.port_range,
+                wildcard_domain=params.wildcard_domain,
+                wildcard_traffic_port=params.wildcard_traffic_port,
+                filtered_apps_only=params.filtered_apps_only,
+                traefik_last_used_marker_path=params.traefik_last_used_marker_path,
+                status=WorkerStatus.ALIVE,
+            )
+            sess.add(worker)
+            await sess.flush()
+
+        for filter in params.app_filters:
             try:
-                worker = await Worker.find_by_authority(sess, params.authority)
-                worker.frontend_mode = params.frontend_mode
-                worker.protocol = params.protocol
-                worker.hostname = params.hostname
-                worker.tls_listen = params.tls_listen
-                worker.tls_advertised = params.tls_advertised
-                worker.api_port = params.api_port
-                worker.port_range = params.port_range
-                worker.wildcard_domain = params.wildcard_domain
-                worker.wildcard_traffic_port = params.wildcard_traffic_port
-                worker.filtered_apps_only = params.filtered_apps_only
-                worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
-                worker.updated_at = datetime.now()
-                worker.nodes += 1
-                worker.status = WorkerStatus.ALIVE
+                await WorkerAppFilter.find_by_rule(sess, worker.id, filter.key, filter.value)
             except ObjectNotFound:
-                worker = Worker.create(
+                filter_row = WorkerAppFilter.create(
                     uuid.uuid4(),
-                    params.authority,
-                    params.frontend_mode,
-                    params.protocol,
-                    params.hostname,
-                    params.tls_listen,
-                    params.tls_advertised,
-                    params.api_port,
-                    params.accepted_traffics,
-                    port_range=params.port_range,
-                    wildcard_domain=params.wildcard_domain,
-                    wildcard_traffic_port=params.wildcard_traffic_port,
-                    filtered_apps_only=params.filtered_apps_only,
-                    traefik_last_used_marker_path=params.traefik_last_used_marker_path,
-                    status=WorkerStatus.ALIVE,
+                    property_name=filter.key,
+                    property_value=filter.value,
+                    worker=worker.id,
                 )
-                sess.add(worker)
-                await sess.flush()
+                sess.add(filter_row)
 
-            for filter in params.app_filters:
-                try:
-                    await WorkerAppFilter.find_by_rule(sess, worker.id, filter.key, filter.value)
-                except ObjectNotFound:
-                    filter_row = WorkerAppFilter.create(
-                        uuid.uuid4(),
-                        property_name=filter.key,
-                        property_value=filter.value,
-                        worker=worker.id,
-                    )
-                    sess.add(filter_row)
+        result = dict(worker.dump_model())
+        result["slots"] = [SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())]
+        log.info("Worker {} joined", worker.authority)
+        return result
 
-            result = dict(worker.dump_model())
-            result["slots"] = [
-                SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())
-            ]
-            log.info("Worker {} joined", worker.authority)
-            return result
-
-    result = await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(WorkerResponseModel(**result))
 
 
@@ -262,14 +265,14 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
     root_ctx: RootContext = request.app["_root.context"]
     worker_id = UUID(request.match_info["worker_id"])
 
-    async def _update() -> None:
-        async with root_ctx.db.begin_session() as sess:
-            worker = await Worker.get(sess, worker_id)
-            worker.nodes -= 1
-            if worker.nodes == 0:
-                await sess.delete(worker)
+    async def _update(sess: SASession) -> None:
+        worker = await Worker.get(sess, worker_id)
+        worker.nodes -= 1
+        if worker.nodes == 0:
+            await sess.delete(worker)
 
-    await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(StubResponseModel(success=True))
 
 
@@ -280,24 +283,21 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
 
-    async def _update() -> dict:
-        async with root_ctx.db.begin_session() as sess:
-            worker = await Worker.get(sess, worker_id)
-            worker.updated_at = datetime.now()
-            worker.status = WorkerStatus.ALIVE
-            result = dict(worker.dump_model())
-            result["slots"] = [
-                SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())
-            ]
-            # Update "last seen" timestamp for liveness tracking
-            await redis_helper.execute(
-                root_ctx.redis_live,
-                lambda r: r.hset("proxy-worker.last_seen", worker.authority, now.timestamp()),
-            )
+    async def _update(sess: SASession) -> dict:
+        worker = await Worker.get(sess, worker_id)
+        worker.updated_at = datetime.now()
+        worker.status = WorkerStatus.ALIVE
+        result = dict(worker.dump_model())
+        result["slots"] = [SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots())]
+        # Update "last seen" timestamp for liveness tracking
+        await redis_helper.execute(
+            root_ctx.redis_live,
+            lambda r: r.hset("proxy-worker.last_seen", worker.authority, now.timestamp()),
+        )
+        return result
 
-            return result
-
-    result = await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     request["do_not_print_access_log"] = True
     return PydanticResponse(WorkerResponseModel(**result))
 

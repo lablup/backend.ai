@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated, Iterable
 from uuid import UUID
 
 import aiohttp_cors
@@ -28,10 +30,13 @@ from ai.backend.appproxy.common.utils import (
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
 
 from ..models import Circuit, Endpoint, Worker
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_txn_retry
 from ..types import RootContext
 from .types import SessionConfig, StubResponseModel
 from .utils import auth_required
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 
 class EndpointTagConfig(BaseModel):
@@ -103,83 +108,83 @@ async def create_or_update_endpoint(
     health_check_config = params.health_check
     health_check_enabled = health_check_config is not None
 
-    async def _sync() -> URL:
-        async with root_ctx.db.begin_session() as sess:
-            # Create new endpoint record
-            endpoint = Endpoint.create(
-                endpoint_id=endpoint_id,
-                health_check_enabled=health_check_enabled,
-                health_check_config=health_check_config,
+    async def _sync(sess: SASession) -> URL:
+        # Create new endpoint record
+        endpoint = Endpoint.create(
+            endpoint_id=endpoint_id,
+            health_check_enabled=health_check_enabled,
+            health_check_config=health_check_config,
+        )
+        sess.add(endpoint)
+
+        # supported for subdomain based workers only
+        matched_worker_id: UUID | None = None
+        if _url := params.tags.endpoint.existing_url:
+            assert _url.host
+            domain = "." + ".".join(_url.host.split(".")[1:])
+
+            query = sa.select(Worker).where(
+                (
+                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                    & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
+                    & (Worker.wildcard_domain == domain)
+                )
             )
-            sess.add(endpoint)
-
-            # supported for subdomain based workers only
-            matched_worker_id: UUID | None = None
-            if _url := params.tags.endpoint.existing_url:
-                assert _url.host
-                domain = "." + ".".join(_url.host.split(".")[1:])
-
+            result = await sess.execute(query)
+            matched_worker = result.scalar()
+            if matched_worker:
+                params.subdomain = _url.host.split(".")[0]
+            else:
+                assert _url.port
                 query = sa.select(Worker).where(
                     (
                         Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                        & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
-                        & (Worker.wildcard_domain == domain)
+                        & (Worker.frontend_mode == FrontendMode.PORT)
+                        & (Worker.hostname == _url.host)
                     )
                 )
                 result = await sess.execute(query)
-                matched_worker = result.scalar()
-                if matched_worker:
-                    params.subdomain = _url.host.split(".")[0]
+                worker_candidates = result.scalars().all()
+                matched_workers = [
+                    w
+                    for w in worker_candidates
+                    if w.port_range and w.port_range[0] <= _url.port <= w.port_range[1]
+                ]
+                if matched_workers:
+                    params.port = _url.port
+                    matched_worker = matched_workers[0]
                 else:
-                    assert _url.port
-                    query = sa.select(Worker).where(
-                        (
-                            Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                            & (Worker.frontend_mode == FrontendMode.PORT)
-                            & (Worker.hostname == _url.host)
-                        )
-                    )
-                    result = await sess.execute(query)
-                    worker_candidates = result.scalars().all()
-                    matched_workers = [
-                        w
-                        for w in worker_candidates
-                        if w.port_range and w.port_range[0] <= _url.port <= w.port_range[1]
-                    ]
-                    if matched_workers:
-                        params.port = _url.port
-                        matched_worker = matched_workers[0]
-                    else:
-                        matched_worker = None
-                if matched_worker:
-                    matched_worker_id = matched_worker.id
-            circuit, worker = await add_circuit(
-                sess,
-                params.tags.session,
-                params.tags.endpoint,
-                params.service_name,
-                ProxyProtocol.HTTP,
-                AppMode.INFERENCE,
-                [],
-                open_to_public=params.open_to_public,
-                preferred_port=params.port,
-                preferred_subdomain=params.subdomain or params.service_name,
-                worker_id=matched_worker_id,
-            )
-            circuit.endpoint_id = endpoint.id
-            circuit.endpoint_row = endpoint
-            await root_ctx.circuit_manager.initialize_circuits([circuit])
+                    matched_worker = None
+            if matched_worker:
+                matched_worker_id = matched_worker.id
+        circuit, worker = await add_circuit(
+            sess,
+            params.tags.session,
+            params.tags.endpoint,
+            params.service_name,
+            ProxyProtocol.HTTP,
+            AppMode.INFERENCE,
+            [],
+            open_to_public=params.open_to_public,
+            preferred_port=params.port,
+            preferred_subdomain=params.subdomain or params.service_name,
+            worker_id=matched_worker_id,
+        )
+        circuit.endpoint_id = endpoint.id
+        circuit.endpoint_row = endpoint
+        await root_ctx.circuit_manager.initialize_circuits([circuit])
 
-            # Circuit already references endpoint by endpoint_id, no need to update
-            # The relationship is handled automatically through endpoint_id matching
+        # Circuit already references endpoint by endpoint_id, no need to update
+        # The relationship is handled automatically through endpoint_id matching
 
-            # Route health status is now managed directly in the JSON route_info
-            # Health status will be populated by the health checker when enabled
+        # Route health status is now managed directly in the JSON route_info
+        # Health status will be populated by the health checker when enabled
 
-            await sess.flush()
-            return await circuit.get_endpoint_url()
+        await sess.flush()
+        return await circuit.get_endpoint_url()
 
-    endpoint_url = await execute_with_retry(_sync)
+    async with root_ctx.db.connect() as db_conn:
+        endpoint_url = await execute_with_txn_retry(_sync, root_ctx.db.begin_session, db_conn)
 
     return PydanticResponse(
         EndpointCreationResponseModel(
@@ -200,17 +205,17 @@ async def remove_endpoint(request: web.Request) -> PydanticResponse[StubResponse
 
     endpoint_id = UUID(request.match_info["endpoint_id"])
 
-    async def _update() -> None:
-        async with root_ctx.db.begin_session() as sess:
-            endpoint = await Endpoint.get(sess, endpoint_id, load_circuit=True)
-            circuit = await Circuit.get(sess, endpoint.circuit_row.id, load_worker=True)
-            circuit.worker_row.occupied_slots -= 1
-            await sess.delete(circuit)
-            await sess.delete(endpoint)
+    async def _update(sess: SASession) -> None:
+        endpoint = await Endpoint.get(sess, endpoint_id, load_circuit=True)
+        circuit = await Circuit.get(sess, endpoint.circuit_row.id, load_worker=True)
+        circuit.worker_row.occupied_slots -= 1
+        await sess.delete(circuit)
+        await sess.delete(endpoint)
 
-            await root_ctx.circuit_manager.unload_circuits([circuit])
+        await root_ctx.circuit_manager.unload_circuits([circuit])
 
-    await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(StubResponseModel(success=True))
 
 

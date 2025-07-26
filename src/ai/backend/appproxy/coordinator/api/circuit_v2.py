@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import time
-from typing import Annotated, Iterable, Sequence
+from typing import TYPE_CHECKING, Annotated, Iterable, Sequence
 from uuid import UUID
 
 import aiohttp_cors
@@ -19,10 +21,13 @@ from ai.backend.appproxy.common.utils import pydantic_api_handler, pydantic_api_
 from ai.backend.common import redis_helper
 
 from ..models import Circuit
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_txn_retry
 from ..types import RootContext
 from .types import StubResponseModel
 from .utils import auth_required
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 
 class BulkRemoveCircuitsRequestModel(BaseModel):
@@ -65,16 +70,14 @@ async def delete_circuit(request: web.Request) -> PydanticResponse[StubResponseM
     """
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update() -> None:
-        async with root_ctx.db.begin_session() as sess:
-            circuit = await Circuit.get(
-                sess, UUID(request.match_info["circuit_id"]), load_worker=True
-            )
-            circuit.worker_row.occupied_slots -= 1
-            await sess.delete(circuit)
-            await root_ctx.circuit_manager.unload_circuits([circuit])
+    async def _update(sess: SASession) -> None:
+        circuit = await Circuit.get(sess, UUID(request.match_info["circuit_id"]), load_worker=True)
+        circuit.worker_row.occupied_slots -= 1
+        await sess.delete(circuit)
+        await root_ctx.circuit_manager.unload_circuits([circuit])
 
-    await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(StubResponseModel(success=True))
 
 
@@ -88,23 +91,23 @@ async def delete_circuit_bulk(
     """
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update() -> Sequence[Circuit]:
-        async with root_ctx.db.begin_session() as sess:
-            query = (
-                sa.select(Circuit)
-                .where(Circuit.id.in_(params.circuit_ids))
-                .options(selectinload(Circuit.worker_row))
-            )
-            result = await sess.execute(query)
-            circuits = result.scalars().all()
+    async def _update(sess: SASession) -> Sequence[Circuit]:
+        query = (
+            sa.select(Circuit)
+            .where(Circuit.id.in_(params.circuit_ids))
+            .options(selectinload(Circuit.worker_row))
+        )
+        result = await sess.execute(query)
+        circuits = result.scalars().all()
 
-            for circuit in circuits:
-                circuit.worker_row.occupied_slots -= 1
-                await sess.delete(circuit)
+        for circuit in circuits:
+            circuit.worker_row.occupied_slots -= 1
+            await sess.delete(circuit)
 
-            return circuits
+        return circuits
 
-    circuits = await execute_with_retry(_update)
+    async with root_ctx.db.connect() as db_conn:
+        circuits = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     await root_ctx.circuit_manager.unload_circuits(circuits)
 
     return PydanticResponse(StubResponseModel(success=True))

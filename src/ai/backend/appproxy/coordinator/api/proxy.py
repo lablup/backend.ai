@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import urllib.parse
-from typing import Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated, Iterable
 from uuid import UUID
 
 import jwt
@@ -25,8 +27,11 @@ from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 
 from ..models import Circuit, Token, Worker, add_circuit
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_txn_retry
 from ..types import RootContext
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -160,32 +165,34 @@ async def proxy(
             log.debug("overriding PREOPEN to HTTP")
             params.protocol = ProxyProtocol.HTTP
 
-        async def _update() -> tuple[Circuit, Worker]:
-            async with root_ctx.db.begin_session() as sess:
-                circuit, worker = await add_circuit(
-                    sess,
-                    SessionConfig(
-                        id=token.session_id,
-                        user_uuid=token.user_uuid,
-                        group_id=token.group_id,
-                        access_key=token.access_key,
-                        domain_name=token.domain_name,
-                    ),
-                    None,
-                    params.app,
-                    params.protocol,
-                    AppMode.INTERACTIVE,
-                    routes,
-                    envs=params.envs,
-                    args=params.args,
-                    open_to_public=params.open_to_public,
-                    allowed_client_ips=params.allowed_client_ips,
-                    preferred_port=params.port,
-                    preferred_subdomain=params.subdomain,
-                )
-                return circuit, worker
+        async def _update(sess: SASession) -> tuple[Circuit, Worker]:
+            circuit, worker = await add_circuit(
+                sess,
+                SessionConfig(
+                    id=token.session_id,
+                    user_uuid=token.user_uuid,
+                    group_id=token.group_id,
+                    access_key=token.access_key,
+                    domain_name=token.domain_name,
+                ),
+                None,
+                params.app,
+                params.protocol,
+                AppMode.INTERACTIVE,
+                routes,
+                envs=params.envs,
+                args=params.args,
+                open_to_public=params.open_to_public,
+                allowed_client_ips=params.allowed_client_ips,
+                preferred_port=params.port,
+                preferred_subdomain=params.subdomain,
+            )
+            return circuit, worker
 
-        circuit, worker = await execute_with_retry(_update)
+        async with root_ctx.db.connect() as db_conn:
+            circuit, worker = await execute_with_txn_retry(
+                _update, root_ctx.db.begin_session, db_conn
+            )
         log.debug("created new circuit {}", circuit.id)
 
     assert circuit and worker
