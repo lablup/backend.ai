@@ -1,11 +1,16 @@
 import asyncio
 import itertools
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator, Optional, override
 
+from aiodocker.docker import Docker, DockerError
+
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.data.kernel.kernel import KernelObject
+from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.agent.plugin.network import NetworkPluginContext
 from ai.backend.agent.resources import ComputerContext
 from ai.backend.agent.stage.kernel_lifecycle.docker.bootstrap import (
@@ -13,6 +18,12 @@ from ai.backend.agent.stage.kernel_lifecycle.docker.bootstrap import (
     BootstrapSpec,
     BootstrapSpecGenerator,
     BootstrapStage,
+)
+from ai.backend.agent.stage.kernel_lifecycle.docker.cluster_ssh import (
+    ClusterSSHProvisioner,
+    ClusterSSHSpec,
+    ClusterSSHSpecGenerator,
+    ClusterSSHStage,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.cmdarg import (
     CmdArgProvisioner,
@@ -62,6 +73,7 @@ from ai.backend.agent.stage.kernel_lifecycle.docker.credentials import (
     CredentialsSpecGenerator,
     CredentialsStage,
 )
+from ai.backend.agent.stage.kernel_lifecycle.docker.defs import DEFAULT_CONTAINER_LOG_FILE_COUNT
 from ai.backend.agent.stage.kernel_lifecycle.docker.dotfiles import (
     DotfilesProvisioner,
     DotfilesSpec,
@@ -113,12 +125,17 @@ from ai.backend.agent.stage.kernel_lifecycle.docker.mount.vfolder import (
     VFolderMountSpecGenerator,
     VFolderMountStage,
 )
-from ai.backend.agent.stage.kernel_lifecycle.docker.network import (
-    NetworkConfig,
-    NetworkProvisioner,
-    NetworkSpec,
-    NetworkSpecGenerator,
-    NetworkStage,
+from ai.backend.agent.stage.kernel_lifecycle.docker.network.post_start import (
+    NetworkPostSetupProvisioner,
+    NetworkPostSetupSpec,
+    NetworkPostSetupSpecGenerator,
+    NetworkPostSetupStage,
+)
+from ai.backend.agent.stage.kernel_lifecycle.docker.network.pre_start import (
+    NetworkPreSetupProvisioner,
+    NetworkPreSetupSpec,
+    NetworkPreSetupSpecGenerator,
+    NetworkPreSetupStage,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.resource import (
     ResourceProvisioner,
@@ -127,7 +144,6 @@ from ai.backend.agent.stage.kernel_lifecycle.docker.resource import (
     ResourceStage,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.scratch.create import (
-    ContainerOwnershipConfig,
     ScratchCreateProvisioner,
     ScratchCreateSpec,
     ScratchCreateSpecGenerator,
@@ -140,20 +156,14 @@ from ai.backend.agent.stage.kernel_lifecycle.docker.scratch.path import (
     ScratchPathStage,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.service_port import (
+    ServicePortProvisioner,
     ServicePortSpec,
     ServicePortSpecGenerator,
     ServicePortStage,
-    ServiceProvisioner,
-)
-from ai.backend.agent.stage.kernel_lifecycle.docker.ssh import (
-    SSHProvisioner,
-    SSHSpec,
-    SSHSpecGenerator,
-    SSHStage,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.types import (
     ContainerOwnershipData,
-    KernelObject,
+    NetworkConfig,
 )
 from ai.backend.agent.stage.kernel_lifecycle.docker.utils import (
     is_mount_ssh,
@@ -174,11 +184,12 @@ from ai.backend.common.types import (
 )
 
 from ..affinity_map import AffinityMap
+from ..data.cgroup import CGroupInfo
+from ..data.kernel.creator import KernelCreationInfo
 from ..types import Container
 from ..utils import get_arch_name
 from .abc import AbstractBackend
 from .defs import ACTIVE_STATUS_SET
-from .types import CGroupInfo, KernelCreationInfo
 
 
 @dataclass
@@ -189,8 +200,9 @@ class KernelLifecycleStage:
     environ: EnvironStage
     image_pull: ImagePullStage
     scratch_create: ScratchCreateStage
-    network: NetworkStage
-    ssh: SSHStage
+    network_pre_setup: NetworkPreSetupStage
+    network_post_setup: NetworkPostSetupStage
+    cluster_ssh: ClusterSSHStage
     intrinsic_mount: IntrinsicMountStage
     krunner_mount: KernelRunnerMountStage
     vfolder_mount: VFolderMountStage
@@ -214,7 +226,6 @@ class DockerBackend(AbstractBackend):
         self,
         config: AgentUnifiedConfig,
         computers: Mapping[DeviceName, ComputerContext],
-        port_pool: set[int],
         affinity_map: AffinityMap,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
@@ -226,7 +237,6 @@ class DockerBackend(AbstractBackend):
     ) -> None:
         self._config = config
         self._computers = computers
-        self._port_pool = port_pool
         self._affinity_map = affinity_map
         self._gwbridge_subnet = gwbridge_subnet
         self._agent_sockpath = agent_sockpath
@@ -242,19 +252,20 @@ class DockerBackend(AbstractBackend):
             environ=EnvironStage(EnvironProvisioner()),
             image_pull=ImagePullStage(ImagePullProvisioner()),
             scratch_create=ScratchCreateStage(ScratchCreateProvisioner()),
-            network=NetworkStage(NetworkProvisioner(network_plugin_ctx)),
-            ssh=SSHStage(SSHProvisioner()),
+            network_pre_setup=NetworkPreSetupStage(NetworkPreSetupProvisioner(network_plugin_ctx)),
+            network_post_setup=NetworkPostSetupStage(NetworkPostSetupProvisioner()),
+            cluster_ssh=ClusterSSHStage(ClusterSSHProvisioner()),
             intrinsic_mount=IntrinsicMountStage(IntrinsicMountProvisioner()),
             krunner_mount=KernelRunnerMountStage(KernelRunnerMountProvisioner()),
             vfolder_mount=VFolderMountStage(VFolderMountProvisioner()),
-            service_port=ServicePortStage(ServiceProvisioner()),
+            service_port=ServicePortStage(ServicePortProvisioner(config)),
             cmdarg=CmdArgStage(CmdArgProvisioner()),
             bootstrap_create=BootstrapStage(BootstrapProvisioner()),
             config_file=ConfigFileStage(ConfigFileProvisioner()),
             credential=CredentialsStage(CredentialsProvisioner()),
             container_ssh=ContainerSSHStage(ContainerSSHProvisioner()),
             dotfile=DotfilesStage(DotfilesProvisioner()),
-            kernel_object=KernelObjectStage(KernelObjectProvisioner()),
+            kernel_object=KernelObjectStage(KernelObjectProvisioner(self._kernel_registry)),
             container_config=ContainerConfigStage(ContainerConfigProvisioner()),
             container_create=ContainerCreateStage(ContainerCreateProvisioner()),
             container_start=ContainerStartStage(ContainerStartProvisioner()),
@@ -280,6 +291,13 @@ class DockerBackend(AbstractBackend):
         image_metadata = await self._kernel_lifecycle_stage.image_metadata.wait_for_resource()
         distro = image_metadata.distro
         kernel_features = image_metadata.kernel_features
+        container_ownership = ContainerOwnershipData(
+            uid_override=info.uid,
+            gid_override=info.main_gid,
+            kernel_features=kernel_features,
+            kernel_uid=self._config.container.kernel_uid,
+            kernel_gid=self._config.container.kernel_gid,
+        )
 
         # Scratch path setup
         scratch_path_spec = ScratchPathSpec(
@@ -364,7 +382,7 @@ class DockerBackend(AbstractBackend):
         await self._kernel_lifecycle_stage.image_pull.setup(
             ImagePullSpecGenerator(image_pull_check_spec)
         )
-        image_pull_result = await self._kernel_lifecycle_stage.image_pull.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.image_pull.wait_for_resource()
 
         # Scratch creation setup
         scartch_spec = ScratchCreateSpec(
@@ -374,34 +392,25 @@ class DockerBackend(AbstractBackend):
             work_dir=scratch_path_result.work_dir,
             config_dir=scratch_path_result.config_dir,
             scratch_type=scratch_path_result.scratch_type,
-            container_config=ContainerOwnershipConfig(
-                kernel_uid=info.uid,
-                kernel_gid=info.main_gid,
-                supplementary_gids=set(info.supplementary_gids),
-                fallback_kernel_uid=self._config.container.kernel_uid,
-                fallback_kernel_gid=self._config.container.kernel_gid,
-                kernel_features=kernel_features,
-            ),
+            scratch_size=self._config.container.scratch_size,
+            container_ownership=container_ownership,
         )
         await self._kernel_lifecycle_stage.scratch_create.setup(
             ScratchCreateSpecGenerator(scartch_spec)
         )
-        scratch_result = await self._kernel_lifecycle_stage.scratch_create.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.scratch_create.wait_for_resource()
 
-        # SSH setup
-        ssh_spec = SSHSpec(
+        # Cluster SSH setup
+        cluster_ssh_spec = ClusterSSHSpec(
             config_dir=scratch_path_result.config_dir,
             ssh_keypair=info.cluster_info.ssh_keypair,
             cluster_ssh_port_mapping=info.cluster_info.cluster_ssh_port_mapping,
-            agent_kernel_uid=self._config.container.kernel_uid,
-            agent_kernel_gid=self._config.container.kernel_gid,
-            overriding_uid=info.uid,
-            overriding_gid=info.main_gid,
-            supplementary_gids=set(info.supplementary_gids),
-            agent_kernel_features=kernel_features,
+            container_ownership=container_ownership,
         )
-        await self._kernel_lifecycle_stage.ssh.setup(SSHSpecGenerator(ssh_spec))
-        ssh_result = await self._kernel_lifecycle_stage.ssh.wait_for_resource()
+        await self._kernel_lifecycle_stage.cluster_ssh.setup(
+            ClusterSSHSpecGenerator(cluster_ssh_spec)
+        )
+        _ = await self._kernel_lifecycle_stage.cluster_ssh.wait_for_resource()
 
         # Mount vfolders
         vfolder_mount_spec = VFolderMountSpec(
@@ -430,8 +439,12 @@ class DockerBackend(AbstractBackend):
         service_port_spec = ServicePortSpec(
             preopen_ports=info.preopen_ports,
             cluster_role=info.cluster_info.cluster_role,
+            cluster_hostname=info.cluster_info.cluster_hostname,
             image_labels=info.image_labels,
             allocated_host_ports=info.allocated_host_ports,
+            container_bind_host=self._config.container.bind_host,
+            resource_group_type=self._config.agent.scaling_group_type,
+            cluster_ssh_port_mapping=info.cluster_info.cluster_ssh_port_mapping,
         )
         await self._kernel_lifecycle_stage.service_port.setup(
             ServicePortSpecGenerator(service_port_spec)
@@ -453,18 +466,12 @@ class DockerBackend(AbstractBackend):
         bootstrap_spec = BootstrapSpec(
             work_dir=scratch_path_result.work_dir,
             bootstrap_script=info.bootstrap_script,
-            container_ownership=ContainerOwnershipData(
-                uid_override=info.uid,
-                gid_override=info.main_gid,
-                kernel_features=kernel_features,
-                kernel_uid=self._config.container.kernel_uid,
-                kernel_gid=self._config.container.kernel_gid,
-            ),
+            container_ownership=container_ownership,
         )
         await self._kernel_lifecycle_stage.bootstrap_create.setup(
             BootstrapSpecGenerator(bootstrap_spec)
         )
-        bootstrap_result = await self._kernel_lifecycle_stage.bootstrap_create.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.bootstrap_create.wait_for_resource()
 
         # Config files setup
         config_file_spec = ConfigFileSpec(
@@ -477,7 +484,7 @@ class DockerBackend(AbstractBackend):
         await self._kernel_lifecycle_stage.config_file.setup(
             ConfigFileSpecGenerator(config_file_spec)
         )
-        config_file_result = await self._kernel_lifecycle_stage.config_file.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.config_file.wait_for_resource()
 
         # Credentials setup
         credentials_spec = CredentialsSpec(
@@ -487,7 +494,7 @@ class DockerBackend(AbstractBackend):
         await self._kernel_lifecycle_stage.credential.setup(
             CredentialsSpecGenerator(credentials_spec)
         )
-        credentials_result = await self._kernel_lifecycle_stage.credential.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.credential.wait_for_resource()
 
         ssh_already_mounted = any(
             is_mount_ssh(mount)
@@ -502,38 +509,26 @@ class DockerBackend(AbstractBackend):
             work_dir=scratch_path_result.work_dir,
             ssh_keypair=info.container_ssh_keypair,
             ssh_already_mounted=ssh_already_mounted,
-            container_ownership=ContainerOwnershipData(
-                uid_override=info.uid,
-                gid_override=info.main_gid,
-                kernel_features=kernel_features,
-                kernel_uid=self._config.container.kernel_uid,
-                kernel_gid=self._config.container.kernel_gid,
-            ),
+            container_ownership=container_ownership,
         )
         await self._kernel_lifecycle_stage.container_ssh.setup(
             ContainerSSHSpecGenerator(container_ssh_spec)
         )
-        container_ssh_result = await self._kernel_lifecycle_stage.container_ssh.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.container_ssh.wait_for_resource()
 
         # Dotfiles setup
         dotfiles_spec = DotfilesSpec(
             dotfiles=info.dotfiles,
             scratch_dir=scratch_path_result.scratch_dir,
             work_dir=scratch_path_result.work_dir,
-            container_ownership=ContainerOwnershipData(
-                uid_override=info.uid,
-                gid_override=info.main_gid,
-                kernel_features=kernel_features,
-                kernel_uid=self._config.container.kernel_uid,
-                kernel_gid=self._config.container.kernel_gid,
-            ),
+            container_ownership=container_ownership,
         )
         await self._kernel_lifecycle_stage.dotfile.setup(DotfilesSpecGenerator(dotfiles_spec))
-        dotfiles_result = await self._kernel_lifecycle_stage.dotfile.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.dotfile.wait_for_resource()
 
         # Network setup
         # Networking setup should be done after all container ports mapped to host ports
-        network_spec = NetworkSpec(
+        network_spec = NetworkPreSetupSpec(
             kernel_config=info.kernel_creation_config,
             cluster_size=info.cluster_info.cluster_size,
             replicas=info.cluster_info.replicas,
@@ -545,8 +540,10 @@ class DockerBackend(AbstractBackend):
             gwbridge_subnet=self._gwbridge_subnet,
             alternative_bridge=self._config.container.alternative_bridge,
         )
-        await self._kernel_lifecycle_stage.network.setup(NetworkSpecGenerator(network_spec))
-        network_result = await self._kernel_lifecycle_stage.network.wait_for_resource()
+        await self._kernel_lifecycle_stage.network_pre_setup.setup(
+            NetworkPreSetupSpecGenerator(network_spec)
+        )
+        network_result = await self._kernel_lifecycle_stage.network_pre_setup.wait_for_resource()
 
         # Update container config with compute plugin config
         container_config_spec = ContainerConfigSpec(
@@ -554,23 +551,17 @@ class DockerBackend(AbstractBackend):
             image=info.image_ref,
             image_labels=info.image_labels,
             container_log_size=self._config.container_logs.max_length,
-            container_log_file_count=5,
-            # cpus,
-            exposed_ports=service_port_result.exposed_ports,
-            host_ports=service_port_result.host_ports,
-            repl_ports=service_port_result.repl_ports,
-            service_ports=service_port_result.service_ports,
-            preopen_ports=service_port_result.preopen_ports,
+            container_log_file_count=DEFAULT_CONTAINER_LOG_FILE_COUNT,
+            port_mappings=service_port_result.port_mapping_result,
+            service_port_container_label=service_port_result.service_port_container_label,
             block_service_ports=info.block_service_ports,
             environ=environ.environ,
             cmdargs=cmdarg_result.cmdargs,
             cluster_hostname=info.cluster_info.cluster_hostname,
-            container_bind_host=info.container_bind_host,
-            protected_services=info.protected_services,
-            resource_container_args=resource_result.resource_container_args,
-            network_container_args=resource_result.network_container_args,
+            resource_container_args=resource_result.container_arg,
+            network_container_args=network_result.container_arg,
         )
-        container_config_spec = self._kernel_lifecycle_stage.container_config.setup(
+        await self._kernel_lifecycle_stage.container_config.setup(
             ContainerConfigSpecGenerator(container_config_spec)
         )
         container_config_result = (
@@ -590,31 +581,41 @@ class DockerBackend(AbstractBackend):
             await self._kernel_lifecycle_stage.container_create.wait_for_resource()
         )
 
-        # Write resource.txt & Start container & set sudo session & connect network
+        # Write resource.txt & Start container & set sudo session
         container_start_spec = ContainerStartSpec(
             container_id=container_create_result.container_id,
             service_ports=service_port_result.service_ports,
             config_dir=scratch_path_result.config_dir,
-            additional_network_names=network_result.additional_network_names,
-            network_plugin=network_result.network_plugin,
-            container_bind_host=network_result.container_bind_host,
-            host_ports=container_create_result.host_ports,
-            exposed_ports=container_create_result.exposed_ports,
         )
         await self._kernel_lifecycle_stage.container_start.setup(
             ContainerStartSpecGenerator(container_start_spec)
         )
-        container_start_result = (
-            await self._kernel_lifecycle_stage.container_start.wait_for_resource()
+        _ = await self._kernel_lifecycle_stage.container_start.wait_for_resource()
+
+        network_post_setup_spec = NetworkPostSetupSpec(
+            container_id=container_create_result.container_id,
+            mode=network_result.mode,
+            network_plugin=network_result.network_plugin,
+            container_bind_host=self._config.container.bind_host,
+            additional_network_names=resource_result.additional_network_names,
+            service_ports=service_port_result.service_ports,
+            port_mappings=service_port_result.port_mapping_result,
+            advertised_kernel_host=self._config.container.advertised_host,
+        )
+        await self._kernel_lifecycle_stage.network_post_setup.setup(
+            NetworkPostSetupSpecGenerator(network_post_setup_spec)
+        )
+        network_post_setup_result = (
+            await self._kernel_lifecycle_stage.network_post_setup.wait_for_resource()
         )
 
         # Kernel object setup
         kernel_object_spec = KernelObjectSpec(
             ownership_data=info.ownership,
             image_ref=info.image_ref,
-            repl_in_port=container_start_result.repl_in_port,
-            repl_out_port=container_start_result.repl_out_port,
-            network_id=network_result.network_id,
+            repl_in_port=network_post_setup_result.repl_in_port,
+            repl_out_port=network_post_setup_result.repl_out_port,
+            network_id=info.cluster_info.network_id,
             network_mode=network_result.mode,
             service_ports=service_port_result.service_ports,
             resource_spec=resource_result.resource_spec,
@@ -625,7 +626,6 @@ class DockerBackend(AbstractBackend):
             KernelObjectSpecGenerator(kernel_object_spec)
         )
         kernel_object_result = await self._kernel_lifecycle_stage.kernel_object.wait_for_resource()
-        self._kernel_registry[info.kernel_id] = kernel_object_result.kernel
 
         container_check_spec = ContainerCheckSpec(
             ownership_data=info.ownership,
@@ -639,9 +639,7 @@ class DockerBackend(AbstractBackend):
         await self._kernel_lifecycle_stage.container_check.setup(
             ContainerCheckSpecGenerator(container_check_spec)
         )
-        container_check_result = (
-            await self._kernel_lifecycle_stage.container_check.wait_for_resource()
-        )
+        _ = await self._kernel_lifecycle_stage.container_check.wait_for_resource()
 
     @override
     async def create_local_network(self, network_name: str) -> None:
@@ -745,3 +743,61 @@ class DockerBackend(AbstractBackend):
         This method should be implemented by the backend to handle image pulling.
         """
         raise NotImplementedError
+
+
+async def make_docker_backend(
+    config: AgentUnifiedConfig,
+    local_instance_id: str,
+    computers: Mapping[DeviceName, ComputerContext],
+    affinity_map: AffinityMap,
+    resource_lock: asyncio.Lock,
+    network_plugin_ctx: NetworkPluginContext,
+    *,
+    event_producer: EventProducer,
+    valkey_stat_client: ValkeyStatClient,
+) -> DockerBackend:
+    gwbridge_subnet: Optional[str] = None
+    try:
+        async with Docker() as docker:
+            gwbridge = await docker.networks.get("docker_gwbridge")
+            gwbridge_info = await gwbridge.show()
+            gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
+    except (DockerError, KeyError, IndexError):
+        pass
+
+    ipc_base_path = config.agent.ipc_base_path
+    agent_sockpath = ipc_base_path / "container" / f"agent.{local_instance_id}.sock"
+    if sys.platform != "darwin":
+        socket_relay_name = f"backendai-socket-relay.{local_instance_id}"
+        socket_relay_container = PersistentServiceContainer(
+            "backendai-socket-relay:latest",
+            {
+                "Cmd": [
+                    f"UNIX-LISTEN:/ipc/{agent_sockpath.name},unlink-early,fork,mode=777",
+                    f"TCP-CONNECT:127.0.0.1:{config.agent.agent_sock_port}",
+                ],
+                "HostConfig": {
+                    "Mounts": [
+                        {
+                            "Type": "bind",
+                            "Source": str(ipc_base_path / "container"),
+                            "Target": "/ipc",
+                        },
+                    ],
+                    "NetworkMode": "host",
+                },
+            },
+            name=socket_relay_name,
+        )
+        await socket_relay_container.ensure_running_latest()
+    return DockerBackend(
+        config,
+        computers,
+        affinity_map,
+        resource_lock,
+        network_plugin_ctx,
+        gwbridge_subnet,
+        agent_sockpath,
+        event_producer=event_producer,
+        valkey_stat_client=valkey_stat_client,
+    )

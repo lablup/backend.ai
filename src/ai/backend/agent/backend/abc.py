@@ -14,9 +14,10 @@ from ai.backend.common.types import (
     Sentinel,
 )
 
+from ..data.cgroup import CGroupInfo
+from ..data.kernel.creator import KernelCreationInfo
 from ..types import Container
 from .defs import ACTIVE_STATUS_SET
-from .types import CGroupInfo, KernelCreationInfo
 
 
 class AbstractBackend(ABC):

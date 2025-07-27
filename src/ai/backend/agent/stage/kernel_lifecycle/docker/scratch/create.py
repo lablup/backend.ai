@@ -4,32 +4,22 @@ import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Optional, override
+from typing import override
 
 import pkg_resources
 
-from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
     ProvisionStage,
 )
+from ai.backend.common.types import BinarySize
 
-
-@dataclass
-class ContainerOwnershipConfig:
-    kernel_uid: Optional[int]
-    kernel_gid: Optional[int]
-    supplementary_gids: set[int]
-
-    fallback_kernel_uid: int
-    fallback_kernel_gid: int
-
-    kernel_features: frozenset[str]
+from ..types import ContainerOwnershipData
+from ..utils import ChownUtil, PathOwnerDeterminer
 
 
 @dataclass
@@ -40,9 +30,10 @@ class ScratchCreateSpec:
     work_dir: Path
     config_dir: Path
 
-    container_config: ContainerOwnershipConfig
+    container_ownership: ContainerOwnershipData
 
     scratch_type: str
+    scratch_size: BinarySize
 
 
 class ScratchCreateSpecGenerator(ArgsSpecGenerator[ScratchCreateSpec]):
@@ -145,7 +136,9 @@ class ScratchCreateProvisioner(Provisioner[ScratchCreateSpec, ScratchCreateResul
         await loop.run_in_executor(
             None, functools.partial(os.makedirs, str(scratch_dir), exist_ok=True)
         )
-        await loop.run_in_executor(None, self._create_sparse_file, str(scratch_file), scratch_size)
+        await loop.run_in_executor(
+            None, self._create_sparse_file, str(scratch_file), spec.scratch_size
+        )
         mkfs = await asyncio.create_subprocess_exec(
             "/sbin/mkfs.ext4",
             str(scratch_file),
@@ -221,36 +214,19 @@ class ScratchCreateProvisioner(Provisioner[ScratchCreateSpec, ScratchCreateResul
             work_dir / ".vimrc",
             work_dir / ".tmux.conf",
         ]
-        self._chown_paths_if_root(paths, spec.container_config)
-
-    def _chown_paths_if_root(
-        self,
-        paths: Iterable[Path],
-        config: ContainerOwnershipConfig,
-    ) -> None:
-        valid_uid: Optional[int]
-        valid_gid: Optional[int]
-        if os.geteuid() == 0:  # only possible when I am root.
-            if KernelFeatures.UID_MATCH in config.kernel_features:
-                valid_uid = (
-                    config.kernel_uid
-                    if config.kernel_uid is not None
-                    else config.fallback_kernel_uid
-                )
-                valid_gid = (
-                    config.kernel_gid
-                    if config.kernel_gid is not None
-                    else config.fallback_kernel_gid
-                )
-            else:
-                valid_uid = config.kernel_uid
-                valid_gid = config.kernel_gid
-            for p in paths:
-                if valid_uid is None or valid_gid is None:
-                    stat = os.stat(p)
-                    valid_uid = stat.st_uid if valid_uid is None else valid_uid
-                    valid_gid = stat.st_gid if valid_gid is None else valid_gid
-                os.chown(p, valid_uid, valid_gid)
+        chowner = ChownUtil()
+        owner_determiner = PathOwnerDeterminer.by_kernel_features(
+            spec.container_ownership.kernel_uid,
+            spec.container_ownership.kernel_gid,
+            spec.container_ownership.kernel_features,
+        )
+        for path in paths:
+            uid, gid = owner_determiner.determine(
+                path,
+                uid_override=spec.container_ownership.uid_override,
+                gid_override=spec.container_ownership.gid_override,
+            )
+            chowner.chown_path(path, uid, gid)
 
     @override
     async def teardown(self, resource: ScratchCreateResult) -> None:

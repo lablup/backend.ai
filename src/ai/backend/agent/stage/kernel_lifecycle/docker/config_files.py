@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Mapping, override
+from typing import Any, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
