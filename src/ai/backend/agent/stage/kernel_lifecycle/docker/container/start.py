@@ -1,11 +1,10 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from aiodocker.docker import Docker, DockerContainer
 
-from ai.backend.agent.plugin.network import AbstractNetworkAgentPlugin, ContainerNetworkCapability
 from ai.backend.common.asyncio import closing_async
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import (
@@ -23,13 +22,6 @@ class ContainerStartSpec:
     service_ports: Sequence[ServicePort]
     config_dir: Path
 
-    additional_network_names: Iterable[str]
-    network_plugin: Optional[AbstractNetworkAgentPlugin]
-    container_bind_host: str
-
-    host_ports: Sequence[int]
-    exposed_ports: Sequence[int]
-
 
 class ContainerStartSpecGenerator(ArgsSpecGenerator[ContainerStartSpec]):
     pass
@@ -37,7 +29,7 @@ class ContainerStartSpecGenerator(ArgsSpecGenerator[ContainerStartSpec]):
 
 @dataclass
 class ContainerStartResult:
-    pass
+    container_id: ContainerId
 
 
 @dataclass
@@ -66,10 +58,7 @@ class ContainerStartProvisioner(Provisioner[ContainerStartSpec, ContainerStartRe
         async with closing_async(Docker()) as docker:
             container = await self._start_container(docker, spec)
             await self._set_sudo_session(container, spec)
-            await self._connect_additional_networks(docker, spec)
-
-        await self._expose_network_ports(spec)
-        return ContainerStartResult()
+        return ContainerStartResult(spec.container_id)
 
     async def _write_resource_txt(self, spec: ContainerStartSpec) -> None:
         """
@@ -100,38 +89,11 @@ class ContainerStartProvisioner(Provisioner[ContainerStartSpec, ContainerStartRe
         if shell_response:
             raise RuntimeError(f"Failed to set up sudo session in container {spec.container_id}")
 
-    async def _connect_additional_networks(self, docker: Docker, spec: ContainerStartSpec) -> None:
-        """
-        Connect the container to additional networks.
-        """
-        for network_name in spec.additional_network_names:
-            network = await docker.networks.get(network_name)
-            await network.connect({"Container": spec.container_id})
-
-    async def _expose_network_ports(self, spec: ContainerStartSpec) -> None:
-        """
-        Expose network ports for the container.
-        TODO: Move this code to network stage.
-        """
-        plugin = spec.network_plugin
-        if plugin is None:
-            return
-        if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
-            tmp_kernel_obj = TmpKernelObject(
-                service_ports=list(spec.service_ports),
-            )
-            container_network_info = await plugin.expose_ports(
-                tmp_kernel_obj,
-                spec.container_bind_host,
-                [
-                    (host_port, container_port)
-                    for host_port, container_port in zip(spec.host_ports, spec.exposed_ports)
-                ],
-            )
-
     @override
     async def teardown(self, resource: ContainerStartResult) -> None:
-        pass
+        async with closing_async(Docker()) as docker:
+            container = docker.containers.container(resource.container_id)
+            await container.stop()
 
 
 class ContainerStartStage(ProvisionStage[ContainerStartSpec, ContainerStartResult]):

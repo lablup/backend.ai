@@ -4,9 +4,11 @@ Kernel object creation stage for kernel lifecycle.
 This stage handles creation of the final DockerKernel object.
 """
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Mapping, Sequence, override
 
+from ai.backend.agent.data.kernel.kernel import KernelObject
 from ai.backend.agent.docker.kernel import DockerCodeRunner
 
 # TODO: Implement DockerCodeRunner
@@ -16,9 +18,7 @@ from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
-from ai.backend.common.types import ServicePort
-
-from .types import KernelObject
+from ai.backend.common.types import KernelId, ServicePort
 
 
 @dataclass
@@ -55,6 +55,9 @@ class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult])
     Creates the final DockerKernel instance with all prepared configurations.
     """
 
+    def __init__(self, kernel_registry: MutableMapping[KernelId, KernelObject]) -> None:
+        self._kernel_registry = kernel_registry
+
     @property
     @override
     def name(self) -> str:
@@ -75,6 +78,7 @@ class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult])
             environ=spec.environ,
             code_runner=code_runner,
         )
+        self._kernel_registry[spec.ownership_data.kernel_id] = kernel
 
         return KernelObjectResult(kernel=kernel)
 
@@ -100,6 +104,7 @@ class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult])
     async def teardown(self, resource: KernelObjectResult) -> None:
         code_runner = resource.kernel.code_runner
         await code_runner.close()
+        self._kernel_registry.pop(resource.kernel.ownership_data.kernel_id, None)
 
 
 class KernelObjectStage(ProvisionStage[KernelObjectSpec, KernelObjectResult]):

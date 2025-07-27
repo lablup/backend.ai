@@ -62,6 +62,7 @@ class ResourceResult:
     resource_spec: KernelResourceSpec
     resource_opts: Mapping[str, Any]
     accelerator_mounts: list[Mount]
+    additional_network_names: set[str]
     container_arg: dict[str, Any]
 
 
@@ -90,6 +91,8 @@ class ResourceProvisioner(Provisioner[ResourceSpec, ResourceResult]):
         # Generate accelerator mounts for all allocated devices
         accelerator_mounts = await self._prepare_accelerator_mounts(spec, resource_spec)
 
+        additional_network_names = await self._prepare_additional_networks(spec, resource_spec)
+
         # Apply accelerator-specific configurations and collect environment variables
         container_arg = await self._prepare_accelerator_configs(spec, resource_spec)
 
@@ -97,6 +100,7 @@ class ResourceProvisioner(Provisioner[ResourceSpec, ResourceResult]):
             resource_spec=resource_spec,
             resource_opts=resource_opts,
             accelerator_mounts=accelerator_mounts,
+            additional_network_names=additional_network_names,
             container_arg=container_arg,
         )
 
@@ -167,6 +171,20 @@ class ResourceProvisioner(Provisioner[ResourceSpec, ResourceResult]):
             for m in mounts
         ]
 
+    async def _prepare_additional_networks(
+        self, spec: ResourceSpec, resource_spec: KernelResourceSpec
+    ) -> set[str]:
+        """
+        Prepare additional network names for the container.
+        """
+        additional_network_names: set[str] = set()
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            network_names = await spec.computers[dev_name].instance.get_docker_networks(
+                device_alloc
+            )
+            additional_network_names.update(network_names)
+        return additional_network_names
+
     async def _prepare_accelerator_configs(
         self, spec: ResourceSpec, resource_spec: KernelResourceSpec
     ) -> dict[str, Any]:
@@ -177,10 +195,8 @@ class ResourceProvisioner(Provisioner[ResourceSpec, ResourceResult]):
                 computer_ctx = spec.computers[dev_type]
                 computer = computer_ctx.instance
 
-                update_nested_dict(
-                    container_arg,
-                    await computer.generate_docker_args(docker, device_alloc),
-                )
+                generated_arg = await computer.generate_docker_args(docker, device_alloc)
+                update_nested_dict(container_arg, generated_arg)
 
         return container_arg
 

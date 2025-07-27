@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Optional
 
+from ai.backend.agent.proxy import DomainSocketProxy
+from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -17,15 +18,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     VFolderMount,
 )
-
-from ..proxy import DomainSocketProxy
-from ..types import KernelOwnershipData
-
-
-@dataclass
-class CGroupInfo:
-    cgroup_path: Path
-    version: str
 
 
 @dataclass

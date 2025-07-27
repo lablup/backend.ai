@@ -1,15 +1,11 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 # TODO: Implement DockerCodeRunner
-from ai.backend.agent.docker.kernel import DockerCodeRunner
-from ai.backend.agent.resources import KernelResourceSpec
-from ai.backend.agent.types import KernelOwnershipData
-from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import DeviceId, ServicePort
+from ai.backend.common.types import DeviceId
 
 
 @dataclass
@@ -23,7 +19,7 @@ class ContainerOwnershipData:
     kernel_gid: int
 
 
-class PortBinding(BaseModel):
+class HostPortBinding(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     host_port: str = Field(serialization_alias="HostPort")
@@ -112,7 +108,7 @@ class ContainerConfigHostConfig(BaseModel):
         serialization_alias="Ulimits",
     )
 
-    port_bindings: dict[str, list[PortBinding]] = Field(serialization_alias="PortBindings")
+    port_bindings: dict[str, list[HostPortBinding]] = Field(serialization_alias="PortBindings")
     log_config: LogConfig = Field(serialization_alias="LogConfig")
 
     # Intrinsic resource config
@@ -192,7 +188,7 @@ class ContainerConfig(BaseModel):
     image: str = Field(
         serialization_alias="Image",
     )
-    exposed_ports: Sequence[int] = Field(serialization_alias="ExposedPorts")
+    exposed_ports: dict[str, dict] = Field(serialization_alias="ExposedPorts")
     cmd: list[str] = Field(serialization_alias="Cmd")
     env: list[str] = Field(serialization_alias="Env")
     host_name: str = Field(serialization_alias="HostName")
@@ -218,30 +214,12 @@ class NetworkConfig:
 
 
 @dataclass
-class KernelObject:
+class PortMapping:
     """
-    Represents a Docker kernel object with its configuration and ownership data.
-    This is used to create and manage Docker containers for kernels.
+    Represents a port mapping for a Docker container.
+    This is used to map container ports to host ports.
     """
 
-    ownership_data: KernelOwnershipData
-
-    image_ref: ImageRef
-
-    resource_spec: KernelResourceSpec
-    environ: Mapping[str, str]
-
-    network_id: str
-    network_mode: str
-
-    service_ports: list[ServicePort]
-
-    code_runner: DockerCodeRunner
-
-    async def check_status(self) -> Optional[dict[str, float]]:
-        result = await self.code_runner.feed_and_get_status()
-        return result
-
-    async def get_service_apps(self) -> dict[str, Any]:
-        result = await self.code_runner.feed_service_apps()
-        return result
+    exposed_port: int
+    host_port: int
+    host_ip: str

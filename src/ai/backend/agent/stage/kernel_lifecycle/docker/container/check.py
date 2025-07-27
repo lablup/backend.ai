@@ -16,6 +16,7 @@ from tenacity import (
     wait_fixed,
 )
 
+from ai.backend.agent.data.kernel.kernel import KernelObject
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import (
@@ -23,8 +24,6 @@ from ai.backend.common.types import (
     ServicePort,
 )
 from ai.backend.logging import BraceStyleAdapter
-
-from ..types import KernelObject
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
