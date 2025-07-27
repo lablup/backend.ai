@@ -78,17 +78,16 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
             ConfigScopes.NODE: "node/i-test",
         },
     )
-    try:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        yield etcd
-    finally:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        await etcd.close()
-        del etcd
+    async with etcd:
+        try:
+            await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+            await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+            await etcd.delete_prefix("", scope=ConfigScopes.NODE)
+            yield etcd
+        finally:
+            await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+            await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+            await etcd.delete_prefix("", scope=ConfigScopes.NODE)
 
 
 @pytest.fixture

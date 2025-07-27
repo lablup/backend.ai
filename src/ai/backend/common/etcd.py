@@ -15,6 +15,7 @@ import functools
 import logging
 from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
+from types import TracebackType
 from typing import (
     AsyncGenerator,
     Callable,
@@ -309,8 +310,23 @@ class AsyncEtcd(AbstractKVStore):
 
         return cls(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
 
-    async def close(self):
-        pass  # for backward compatibility
+    async def open(self) -> None:
+        await self.etcd.__aenter__()
+
+    async def close(self) -> None:
+        await self.etcd.__aexit__()
+
+    async def __aenter__(self) -> Self:
+        await self.etcd.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[func-returns-value]
 
     def _mangle_key(self, k: str) -> str:
         if k.startswith("/"):
