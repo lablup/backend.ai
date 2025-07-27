@@ -73,7 +73,7 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 ## Build System & Development Commands
 
-This project uses **Pants Build System** (version 2) and Python as specified in the `pants.toml` configuration.
+This project uses **Pantsbuild** (version 2) and Python as specified in the `pants.toml` configuration.
 All development commands use `pants` instead of `pip`, `poetry`, or `uv` commands.
 
 ### Essential Commands
@@ -105,10 +105,21 @@ pants test --changed-since=HEAD~1 --changed-dependents=transitive  # Test change
 pants test src/ai/backend/appproxy/coordinator/tests::  # Run specific test directory inside the main source tree (python-default)
 pants test tests/common::                               # Run specific test directory inside the test suite
 pants test --debug {targets}       # Run the target tests with interactive, non-retrying, interruptible mode for debugging
+                                   # NOTE: --debug flag is only available for `pants test` command.
 
 # Building
 pants package                                      # Build packages
 ```
+
+### Adding new packages and modules
+
+When adding new packages and modules, ensure that `BUILD` files are present in their directories so that the Pantsbuild system could detect them.
+
+Under the `src` directory, use `python_sources()` with explicit name set to "src".
+Under the `tests` directory, use `python_tests()` and/or `python_testutils()`.
+
+The `BUILD` files must be created or updated BEFORE running linting, typecheck, and tests via the `pants` command.
+
 
 ## Dependency Management using Lock files
 
@@ -190,8 +201,12 @@ The project uses pre-commit hooks that automatically run `pants lint --changed-s
 Alembic migrations are located in `src/ai/backend/appproxy/coordinator/models/alembic/`:
 
 ```bash
-# Run migrations
+# Run migrations for the main database
 ./py -m alembic upgrade head
+
+# Run migrations for the app proxy database
+./py -m alembic -c alembic-appproxy.ini upgrade head
+# Use '-c' option to set custom alembic.ini paths in other alembic commands, too.
 
 # Create new migration
 ./py -m alembic revision --autogenerate -m "Description"
