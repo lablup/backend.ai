@@ -11,6 +11,7 @@ from pydantic import AnyUrl, Field, FilePath, ValidationError
 
 from ai.backend.appproxy.common.exceptions import ConfigValidationError
 from ai.backend.common import config
+from ai.backend.common.types import ServiceDiscoveryType
 
 from ..common.config import (
     BaseSchema,
@@ -114,6 +115,50 @@ class TraefikConfig(BaseSchema):
     ]
     last_used_time_marker_directory: Annotated[
         Path, Field(examples=["/home/ubuntu/appproxy/worker-interactive"])
+    ]
+
+
+class OTELConfig(BaseSchema):
+    enabled: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Whether to enable OpenTelemetry for tracing or logging. "
+                "When enabled, traces or log will be collected and sent to the configured OTLP endpoint."
+            ),
+            examples=[True, False],
+        ),
+    ]
+    log_level: Annotated[
+        str,
+        Field(
+            default="INFO",
+            description="Log level for OpenTelemetry logging.",
+            examples=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        ),
+    ]
+    endpoint: Annotated[
+        str,
+        Field(
+            default="http://localhost:4317",
+            description=(
+                "OTLP (OpenTelemetry Protocol) endpoint for exporting telemetry data. "
+                "Should include the host and port of the OTLP receiver."
+            ),
+            examples=["http://localhost:4317", "http://otel-collector:4317"],
+        ),
+    ]
+
+
+class ServiceDiscoveryConfig(BaseSchema):
+    type: Annotated[
+        ServiceDiscoveryType,
+        Field(
+            default=ServiceDiscoveryType.REDIS,
+            description="Type of service discovery to use.",
+            examples=[item.value for item in ServiceDiscoveryType],
+        ),
     ]
 
 
@@ -301,15 +346,38 @@ class ProxyWorkerConfig(BaseSchema):
         float, Field(default=5.0, description="Sets the interval of inference metric collector")
     ]
 
+    announce_addr: Annotated[
+        HostPortPair,
+        Field(
+            default_factory=lambda: HostPortPair(host="http://127.0.0.1", port=10201),
+            description=(
+                "Manually set the announced address for service discovery. "
+                "If not set, it will use api_bind_addr for announcement."
+            ),
+        ),
+    ]
+
 
 class ServerConfig(BaseSchema):
     redis: RedisConfig
     proxy_worker: ProxyWorkerConfig
-    profiling: ProfilingConfig = Field(default=ProfilingConfig())
+    profiling: Annotated[ProfilingConfig, Field(default_factory=lambda: ProfilingConfig())]
     secrets: SecretConfig
     permit_hash: PermitHashConfig
     logging: LoggingConfig
     debug: DebugConfig
+    otel: Annotated[
+        OTELConfig,
+        Field(
+            default_factory=lambda: OTELConfig(
+                enabled=False, log_level="INFO", endpoint="http://localhost:4317"
+            )
+        ),
+    ]
+    service_discovery: Annotated[
+        ServiceDiscoveryConfig,
+        Field(default_factory=lambda: ServiceDiscoveryConfig(type=ServiceDiscoveryType.REDIS)),
+    ]
 
 
 def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
