@@ -2,6 +2,8 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional
 
+from ai.backend.agent.data.cgroup import CGroupInfo
+from ai.backend.agent.data.kernel.creator import KernelCreationInfo
 from ai.backend.common.docker import (
     ImageRef,
 )
@@ -14,8 +16,6 @@ from ai.backend.common.types import (
     Sentinel,
 )
 
-from ..data.cgroup import CGroupInfo
-from ..data.kernel.creator import KernelCreationInfo
 from ..types import Container
 from .defs import ACTIVE_STATUS_SET
 
