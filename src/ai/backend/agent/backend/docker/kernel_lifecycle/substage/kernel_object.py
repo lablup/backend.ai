@@ -4,7 +4,6 @@ Kernel object creation stage for kernel lifecycle.
 This stage handles creation of the final DockerKernel object.
 """
 
-from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Mapping, Sequence, override
 
@@ -55,8 +54,8 @@ class KernelObjectProvisioner(Provisioner[KernelObjectSpec, KernelObjectResult])
     Creates the final DockerKernel instance with all prepared configurations.
     """
 
-    def __init__(self, kernel_registry: MutableMapping[KernelId, KernelObject]) -> None:
-        self._kernel_registry = kernel_registry
+    def __init__(self) -> None:
+        self._kernel_registry: dict[KernelId, KernelObject] = {}
 
     @property
     @override
