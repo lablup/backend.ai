@@ -73,7 +73,7 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 ## Build System & Development Commands
 
-This project uses **Pants Build System** (version 2) and Python as specified in the `pants.toml` configuration.
+This project uses **Pantsbuild** (version 2) and Python as specified in the `pants.toml` configuration.
 All development commands use `pants` instead of `pip`, `poetry`, or `uv` commands.
 
 ### Essential Commands
@@ -105,12 +105,22 @@ pants test --changed-since=HEAD~1 --changed-dependents=transitive  # Test change
 pants test src/ai/backend/appproxy/coordinator/tests::  # Run specific test directory inside the main source tree (python-default)
 pants test tests/common::                               # Run specific test directory inside the test suite
 pants test --debug {targets}       # Run the target tests with interactive, non-retrying, interruptible mode for debugging
+                                   # NOTE: --debug flag is only available for `pants test` command.
 
 # Building
 pants package                                      # Build packages
 ```
 
-## Dependency Management using Lock files
+### Adding new packages and modules
+
+When adding new packages and modules, ensure that `BUILD` files are present in their directories so that the Pantsbuild system could detect them.
+
+Under the `src` directory, use `python_sources()` with explicit name set to "src".
+Under the `tests` directory, use `python_tests()` and/or `python_testutils()`.
+
+The `BUILD` files must be created or updated BEFORE running linting, typecheck, and tests via the `pants` command.
+
+### Dependency Management using Lock files
 
 The project uses separate lock files for different tool resolves:
 - `python.lock` - Main source tree dependencies (python-default)
@@ -143,7 +153,7 @@ Use the generic entrypoint script `./py` to execute modules inside the virtualen
 ./py -m {python-package-or-module} ...
 ```
 
-### Databases
+### Database Schema Management
 
 When working with SQLAlchemy schema migrations, we use Alembic to generate and run migrations.
 Always specify the appropriate alembic configuration path depending on the target pacakge.
@@ -160,6 +170,35 @@ There are multiple `alembic.ini` files, namely:
 - `alembic.ini`: The alembic config for manager
 - `alembic-accountmgr.ini`: The alembic config for account manager
 - `alembic-appproxy.ini`: The alembic config for app proxy
+
+Alembic migrations are located in `src/ai/backend/appproxy/coordinator/models/alembic/`:
+
+```bash
+# Run migrations for the main database
+./py -m alembic upgrade head
+
+# Run migrations for the app proxy database
+./py -m alembic -c alembic-appproxy.ini upgrade head
+
+# Create new migration
+./py -m alembic revision --autogenerate -m "Description"
+
+# Check for multiple heads (CI validation)
+python scripts/check-multiple-alembic-heads.py
+
+# Rebase the migration history
+./py -m scripts/alembic-rebase.py {base_head} {top_head}
+```
+
+When you observe migration failures due to multiple heads, do the followings:
+- Check `./py -m alembic heads` and `./py -m alembic history --verbose` to inspect the branched out
+  change history.
+- Inspect the migrations to see if there are potential conflicts like modifying the same column of
+  the same table, duplicate table or column names to be created, etc.
+- If there are no conflicts, run `./py scripts/alembic-rebase.py {base_head} {top_head}` command to
+  rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
+  base branch like main and top_head is the topmost revision ID of the migrations added in the current working
+  branch.
 
 ### Verifying Code Changes
 
@@ -184,31 +223,3 @@ and fix any Ruff and Mypy errors displayed after running them.
 ### Pre-commit Hooks
 
 The project uses pre-commit hooks that automatically run `pants lint --changed-since="HEAD~1"` on changed files.
-
-## Database Migrations
-
-Alembic migrations are located in `src/ai/backend/appproxy/coordinator/models/alembic/`:
-
-```bash
-# Run migrations
-./py -m alembic upgrade head
-
-# Create new migration
-./py -m alembic revision --autogenerate -m "Description"
-
-# Check for multiple heads (CI validation)
-python scripts/check-multiple-alembic-heads.py
-
-# Rebase the migration history
-./py -m scripts/alembic-rebase.py {base_head} {top_head}
-```
-
-When you observe migration failures due to multiple heads, do the followings:
-- Check `./py -m alembic heads` and `./py -m alembic history --verbose` to inspect the branched out
-  change history.
-- Inspect the migrations to see if there are potential conflicts like modifying the same column of
-  the same table, duplicate table or column names to be created, etc.
-- If there are no conflicts, run `./py scripts/alembic-rebase.py {base_head} {top_head}` command to
-  rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
-  base branch like main and top_head is the topmost revision ID of the migrations added in the current working
-  branch.
