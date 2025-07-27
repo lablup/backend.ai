@@ -1,4 +1,4 @@
-from __future__ import with_statement
+from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
@@ -61,11 +61,8 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    main_section = config.get_section(config.config_ini_section)
-    if main_section is None:
-        raise ValueError("The alembic configuration does not have the main [alembic] section.")
     connectable = async_engine_from_config(
-        main_section,
+        config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
