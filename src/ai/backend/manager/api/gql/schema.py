@@ -7,13 +7,11 @@ from .artifact_registry import (
     artifact_groups,
     artifact_status_changed,
     artifacts,
-    cancel_pull,
+    cancel_import_artifact,
     delete_artifact,
     download_progress,
-    install_artifact,
-    pull_artifact,
+    import_artifact,
     update_artifact,
-    verify_artifact,
 )
 
 
@@ -27,12 +25,10 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    pull_artifact = pull_artifact
-    install_artifact = install_artifact
+    import_artifact = import_artifact
     update_artifact = update_artifact
     delete_artifact = delete_artifact
-    verify_artifact = verify_artifact
-    cancel_pull = cancel_pull
+    cancel_import_artifact = cancel_import_artifact
 
 
 @strawberry.type

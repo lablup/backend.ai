@@ -163,12 +163,7 @@ class DownloadProgressPayload:
 
 # Mutation Payloads
 @strawberry.type
-class PullArtifactPayload:
-    artifact: Optional[Artifact] = None
-
-
-@strawberry.type
-class InstallArtifactPayload:
+class ImportArtifactPayload:
     artifact: Optional[Artifact] = None
 
 
@@ -183,12 +178,7 @@ class DeleteArtifactPayload:
 
 
 @strawberry.type
-class VerifyArtifactPayload:
-    artifact: Optional[Artifact] = None
-
-
-@strawberry.type
-class CancelPullPayload:
+class CancelImportArtifact:
     artifact: Optional[Artifact] = None
 
 
@@ -254,15 +244,9 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
 
 # Mutations
 @strawberry.mutation
-def pull_artifact(input: PullArtifactInput) -> PullArtifactPayload:
+def import_artifact(input: InstallArtifactInput) -> ImportArtifactPayload:
     # Mock implementation
-    return PullArtifactPayload()
-
-
-@strawberry.mutation
-def install_artifact(input: InstallArtifactInput) -> InstallArtifactPayload:
-    # Mock implementation
-    return InstallArtifactPayload()
+    return ImportArtifactPayload()
 
 
 @strawberry.mutation
@@ -278,15 +262,9 @@ def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
 
 
 @strawberry.mutation
-def verify_artifact(input: VerifyArtifactInput) -> VerifyArtifactPayload:
+def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifact:
     # Mock implementation
-    return VerifyArtifactPayload()
-
-
-@strawberry.mutation
-def cancel_pull(artifact_id: ID) -> CancelPullPayload:
-    # Mock implementation
-    return CancelPullPayload()
+    return CancelImportArtifact()
 
 
 # Subscriptions

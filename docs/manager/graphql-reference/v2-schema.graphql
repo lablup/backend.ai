@@ -105,7 +105,7 @@ enum ArtifactType {
 
 scalar ByteSize
 
-type CancelPullPayload {
+type CancelImportArtifact {
   artifact: Artifact
 }
 
@@ -127,21 +127,19 @@ type DownloadProgressPayload {
   status: ArtifactStatus!
 }
 
+type ImportArtifactPayload {
+  artifact: Artifact
+}
+
 input InstallArtifactInput {
   artifactId: ID!
 }
 
-type InstallArtifactPayload {
-  artifact: Artifact
-}
-
 type Mutation {
-  pullArtifact(input: PullArtifactInput!): PullArtifactPayload!
-  installArtifact(input: InstallArtifactInput!): InstallArtifactPayload!
+  importArtifact(input: InstallArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
-  verifyArtifact(input: VerifyArtifactInput!): VerifyArtifactPayload!
-  cancelPull(artifactId: ID!): CancelPullPayload!
+  cancelImportArtifact(artifactId: ID!): CancelImportArtifact!
 }
 
 """An object with a Globally Unique ID"""
@@ -168,14 +166,6 @@ type PageInfo {
 
   """When paginating forwards, the cursor to continue."""
   endCursor: String
-}
-
-input PullArtifactInput {
-  artifactId: ID!
-}
-
-type PullArtifactPayload {
-  artifact: Artifact
 }
 
 type Query {
@@ -213,13 +203,5 @@ input UpdateArtifactInput {
 }
 
 type UpdateArtifactPayload {
-  artifact: Artifact
-}
-
-input VerifyArtifactInput {
-  artifactId: ID!
-}
-
-type VerifyArtifactPayload {
   artifact: Artifact
 }
