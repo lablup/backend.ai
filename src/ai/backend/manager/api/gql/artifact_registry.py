@@ -66,12 +66,7 @@ class ArtifactOrderBy:
 
 
 @strawberry.input
-class PullArtifactInput:
-    artifact_id: ID
-
-
-@strawberry.input
-class InstallArtifactInput:
+class ImportArtifactInput:
     artifact_id: ID
 
 
@@ -84,11 +79,6 @@ class UpdateArtifactInput:
 class DeleteArtifactInput:
     artifact_id: ID
     force_delete: bool = False
-
-
-@strawberry.input
-class VerifyArtifactInput:
-    artifact_id: ID
 
 
 # Object Types
@@ -244,7 +234,7 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
 
 # Mutations
 @strawberry.mutation
-def import_artifact(input: InstallArtifactInput) -> ImportArtifactPayload:
+def import_artifact(input: ImportArtifactInput) -> ImportArtifactPayload:
     # Mock implementation
     return ImportArtifactPayload()
 

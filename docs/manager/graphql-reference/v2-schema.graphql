@@ -127,16 +127,16 @@ type DownloadProgressPayload {
   status: ArtifactStatus!
 }
 
+input ImportArtifactInput {
+  artifactId: ID!
+}
+
 type ImportArtifactPayload {
   artifact: Artifact
 }
 
-input InstallArtifactInput {
-  artifactId: ID!
-}
-
 type Mutation {
-  importArtifact(input: InstallArtifactInput!): ImportArtifactPayload!
+  importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
   cancelImportArtifact(artifactId: ID!): CancelImportArtifact!
