@@ -68,25 +68,21 @@ class ArtifactOrderBy:
 @strawberry.input
 class PullArtifactInput:
     artifact_id: ID
-    version: str
 
 
 @strawberry.input
 class InstallArtifactInput:
     artifact_id: ID
-    version: str
 
 
 @strawberry.input
 class UpdateArtifactInput:
     artifact_id: ID
-    target_version: str
 
 
 @strawberry.input
 class DeleteArtifactInput:
     artifact_id: ID
-    version: str
     force_delete: bool = False
 
 
@@ -272,7 +268,7 @@ def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
 
 
 @strawberry.mutation
-def verify_artifact(artifact_id: ID, version: Optional[str] = None) -> VerifyArtifactPayload:
+def verify_artifact(artifact_id: ID) -> VerifyArtifactPayload:
     # Mock implementation
     return VerifyArtifactPayload()
 

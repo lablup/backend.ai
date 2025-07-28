@@ -110,7 +110,6 @@ scalar DateTime
 
 input DeleteArtifactInput {
   artifactId: ID!
-  version: String!
   forceDelete: Boolean! = false
 }
 
@@ -126,7 +125,6 @@ type DownloadProgress {
 
 input InstallArtifactInput {
   artifactId: ID!
-  version: String!
 }
 
 type InstallArtifactPayload {
@@ -138,7 +136,7 @@ type Mutation {
   installArtifact(input: InstallArtifactInput!): InstallArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
-  verifyArtifact(artifactId: ID!, version: String = null): VerifyArtifactPayload!
+  verifyArtifact(artifactId: ID!): VerifyArtifactPayload!
   cancelPull(artifactId: ID!): CancelPullPayload!
 }
 
@@ -170,7 +168,6 @@ type PageInfo {
 
 input PullArtifactInput {
   artifactId: ID!
-  version: String!
 }
 
 type PullArtifactPayload {
@@ -209,7 +206,6 @@ type Subscription {
 
 input UpdateArtifactInput {
   artifactId: ID!
-  targetVersion: String!
 }
 
 type UpdateArtifactPayload {
