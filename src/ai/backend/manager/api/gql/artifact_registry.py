@@ -102,6 +102,7 @@ class Artifact(Node):
     version: str
 
 
+# TODO: After implementing the actual logic, remove this mock object
 mock_artifact = Artifact(
     id="1",
     name="Example Artifact",
@@ -148,7 +149,7 @@ class ArtifactGroup(Node):
     ) -> ArtifactConnection:
         # Mock implementation - return empty connection
         return ArtifactConnection(
-            edges=[],
+            edges=[ArtifactEdge(node=mock_artifact, cursor="1")],
             page_info=strawberry.relay.PageInfo(
                 has_next_page=False,
                 has_previous_page=False,
@@ -156,6 +157,18 @@ class ArtifactGroup(Node):
                 end_cursor=None,
             ),
         )
+
+
+ArtifactGroupEdge = Edge[ArtifactGroup]
+
+# TODO: After implementing the actual logic, remove this mock object
+mock_artifact_group = ArtifactGroup(
+    id="1",
+    name="Example Artifact Group",
+    type=ArtifactType.MODEL,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact group for demonstration purposes.",
+)
 
 
 @strawberry.type
@@ -226,7 +239,7 @@ def artifact_groups(
 ) -> Connection[ArtifactGroup]:
     # Mock implementation - return empty connection
     return Connection(
-        edges=[],
+        edges=[ArtifactGroupEdge(node=mock_artifact_group, cursor="1")],
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
             has_previous_page=False,
