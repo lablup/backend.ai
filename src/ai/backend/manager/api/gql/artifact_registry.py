@@ -102,6 +102,21 @@ class Artifact(Node):
     version: str
 
 
+mock_artifact = Artifact(
+    id="1",
+    name="Example Artifact",
+    type=ArtifactType.MODEL,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact for demonstration purposes.",
+    registry=SourceInfo(name="Mock Registry", url="https://mock.registry"),
+    source=SourceInfo(name="Mock Source", url="https://mock.source"),
+    size=ByteSize(),
+    created_at=datetime.now(),
+    updated_at=datetime.now(),
+    version="1.0.0",
+)
+
+
 ArtifactEdge = Edge[Artifact]
 
 
@@ -237,25 +252,25 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
 @strawberry.mutation
 def import_artifact(input: ImportArtifactInput) -> ImportArtifactPayload:
     # Mock implementation
-    return ImportArtifactPayload()
+    return ImportArtifactPayload(artifact=mock_artifact)
 
 
 @strawberry.mutation
 def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
     # Mock implementation
-    return UpdateArtifactPayload()
+    return UpdateArtifactPayload(artifact=mock_artifact)
 
 
 @strawberry.mutation
 def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
     # Mock implementation
-    return DeleteArtifactPayload()
+    return DeleteArtifactPayload(artifact=mock_artifact)
 
 
 @strawberry.mutation
 def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifact:
     # Mock implementation
-    return CancelImportArtifact()
+    return CancelImportArtifact(artifact=mock_artifact)
 
 
 # Subscriptions
