@@ -182,7 +182,7 @@ class DeleteArtifactPayload:
 
 
 @strawberry.type
-class CancelImportArtifact:
+class CancelImportArtifactPayload:
     artifact: Artifact
 
 
@@ -205,7 +205,7 @@ def artifacts(
 ) -> ArtifactConnection:
     # Mock implementation - return empty connection
     return ArtifactConnection(
-        edges=[],
+        edges=[ArtifactEdge(node=mock_artifact, cursor="1")],
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
             has_previous_page=False,
@@ -268,9 +268,9 @@ def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
 
 
 @strawberry.mutation
-def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifact:
+def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
     # Mock implementation
-    return CancelImportArtifact(artifact=mock_artifact)
+    return CancelImportArtifactPayload(artifact=mock_artifact)
 
 
 # Subscriptions

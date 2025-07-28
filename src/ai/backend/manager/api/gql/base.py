@@ -3,15 +3,27 @@ from __future__ import annotations
 from typing import Optional
 
 import strawberry
+from graphql import StringValueNode
 
 
 @strawberry.scalar
-class ByteSize:
+class ByteSize(str):
     """
     Custom scalar type for representing byte sizes in GraphQL.
     """
 
-    pass
+    @staticmethod
+    def parse_value(value: str) -> str:
+        # TODO: Implement this
+        return value
+
+    @staticmethod
+    def parse_literal(ast) -> str:
+        # TODO: Implement this
+        if not isinstance(ast, StringValueNode):
+            raise ValueError("ByteSize must be provided as a string literal")
+        value = ast.value
+        return value
 
 
 @strawberry.input

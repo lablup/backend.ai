@@ -113,7 +113,7 @@ enum ArtifactType {
 
 scalar ByteSize
 
-type CancelImportArtifact {
+type CancelImportArtifactPayload {
   artifact: Artifact!
 }
 
@@ -140,7 +140,7 @@ type Mutation {
   importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
-  cancelImportArtifact(artifactId: ID!): CancelImportArtifact!
+  cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
 }
 
 """An object with a Globally Unique ID"""
