@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import AliasChoices, Field
 
@@ -24,3 +24,21 @@ class VFolderCreateReq(BaseRequestModel):
 
 class RenameVFolderReq(BaseRequestModel):
     new_name: VFolderName = Field(description="Name of the vfolder")
+
+
+class GraphQLReq(BaseRequestModel):
+    """
+    Used in V2 API for handling GraphQL requests.
+    """
+
+    query: str = Field(
+        description="GraphQL query string, defining the operations to be performed.",
+    )
+    variables: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Variables for the GraphQL query, allowing dynamic data input.",
+    )
+    operation_name: Optional[str] = Field(
+        default=None,
+        alias="operationName",
+    )

@@ -366,30 +366,30 @@ def _parse_response(response: APIResponse) -> web.Response:
 def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     """
     This decorator processes HTTP request parameters using Pydantic models.
-    NOTICE: API hander methods must be classmethod. It handlers are not class methods it will not work as intended
+    NOTICE: API hander methods must be instance method. It handlers are not instance methods it will not work as intended
 
     1. Request Body:
         @api_handler
-        async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
+        async def handler(self, body: BodyParam[UserModel]):  # UserModel is a Pydantic model
             user = body.parsed                          # 'parsed' property gets pydantic model you defined
             # Response model should inherit BaseResponseModel
             return APIResponse.build(status_code=200, response_model=YourResponseModel(user=user.id))
 
     2. Query Parameters:
         @api_handler
-        async def handler(query: QueryParam[QueryPathModel]):
+        async def handler(self, query: QueryParam[QueryPathModel]):
             parsed_query = query.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(search=parsed_query.query))
 
     3. Headers:
         @api_handler
-        async def handler(headers: HeaderParam[HeaderModel]):
+        async def handler(self, headers: HeaderParam[HeaderModel]):
             parsed_header = headers.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(data=parsed_header.token))
 
     4. Path Parameters:
         @api_handler
-        async def handler(path: PathParam[PathModel]):
+        async def handler(self, path: PathParam[PathModel]):
             parsed_path = path.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
 
@@ -406,12 +406,13 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
                 return cls(user_id=user_id)
 
         @api_handler
-        async def handler(auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
+        async def handler(self, auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
             return APIResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
         @api_handler
         async def handler(
+            self,
             user: BodyParam[UserModel],  # body
             query: QueryParam[QueryModel],  # query parameters
             headers: HeaderParam[HeaderModel],  # headers
