@@ -3,7 +3,6 @@ S3 Storage Service for Backend.AI Storage Proxy
 """
 
 import logging
-from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator
 
 from aiohttp import web
@@ -17,13 +16,11 @@ from ai.backend.common.dto.storage.response import (
     PresignedUploadResponse,
     UploadResponse,
 )
-from ai.backend.common.json import dump_json_str
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
 from ..client.s3 import S3Client
 from ..exception import (
-    ExternalError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
     StorageObjectNotFoundError,
@@ -47,20 +44,6 @@ class StoragesService:
             storage_configs: List of storage configurations from context
         """
         self._storage_configs = {config.bucket: config for config in storage_configs}
-
-    @actxmgr
-    async def _handle_external_errors(self) -> AsyncIterator[None]:
-        """Handle external errors and convert them to appropriate HTTP responses."""
-        try:
-            yield
-        except ExternalError as e:
-            log.exception("An external error occurred: %s", str(e))
-            raise web.HTTPInternalServerError(
-                text=dump_json_str({
-                    "msg": "An internal error has occurred.",
-                }),
-                content_type="application/json",
-            )
 
     def _get_s3_client(self, bucket_name: str) -> S3Client:
         """
@@ -168,22 +151,21 @@ class StoragesService:
         await log_client_api_entry(log, "presigned_upload_url", token_data)
 
         try:
-            async with self._handle_external_errors():
-                s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(token_data.bucket)
 
-                presigned_data = await s3_client.generate_presigned_upload_url(
-                    token_data.key,
-                    expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-                    content_type=token_data.content_type,
-                    content_length_range=(token_data.min_size, token_data.max_size)
-                    if token_data.min_size and token_data.max_size
-                    else None,
-                )
+            presigned_data = await s3_client.generate_presigned_upload_url(
+                token_data.key,
+                expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
+                content_type=token_data.content_type,
+                content_length_range=(token_data.min_size, token_data.max_size)
+                if token_data.min_size and token_data.max_size
+                else None,
+            )
 
-                if presigned_data is None:
-                    raise PresignedUploadURLGenerationError()
+            if presigned_data is None:
+                raise PresignedUploadURLGenerationError()
 
-                return PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
+            return PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
 
         except Exception as e:
             log.error(f"Presigned upload URL generation failed: {e}")
@@ -207,18 +189,17 @@ class StoragesService:
         await log_client_api_entry(log, "presigned_download_url", token_data)
 
         try:
-            async with self._handle_external_errors():
-                s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(token_data.bucket)
 
-                presigned_url = await s3_client.generate_presigned_download_url(
-                    token_data.key,
-                    expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-                )
+            presigned_url = await s3_client.generate_presigned_download_url(
+                token_data.key,
+                expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
+            )
 
-                if presigned_url is None:
-                    raise PresignedDownloadURLGenerationError()
+            if presigned_url is None:
+                raise PresignedDownloadURLGenerationError()
 
-                return PresignedDownloadResponse(url=presigned_url)
+            return PresignedDownloadResponse(url=presigned_url)
 
         except Exception as e:
             log.error(f"Presigned download URL generation failed: {e}")
@@ -280,12 +261,9 @@ class StoragesService:
         await log_client_api_entry(log, "delete_object", token_data)
 
         try:
-            async with self._handle_external_errors():
-                s3_client = self._get_s3_client(token_data.bucket)
-
-                success = await s3_client.delete_object(token_data.key)
-
-                return DeleteResponse(success=success)
+            s3_client = self._get_s3_client(token_data.bucket)
+            success = await s3_client.delete_object(token_data.key)
+            return DeleteResponse(success=success)
 
         except Exception as e:
             log.error(f"Delete object failed: {e}")
