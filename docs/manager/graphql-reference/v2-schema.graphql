@@ -100,7 +100,9 @@ enum ArtifactStatus {
 }
 
 type ArtifactStatusChangedPayload {
-  artifact: Artifact
+  artifactId: ID!
+  status: ArtifactStatus!
+  updatedAt: DateTime!
 }
 
 enum ArtifactType {
@@ -112,7 +114,7 @@ enum ArtifactType {
 scalar ByteSize
 
 type CancelImportArtifact {
-  artifact: Artifact
+  artifact: Artifact!
 }
 
 """Date with time (isoformat)"""
@@ -120,11 +122,10 @@ scalar DateTime
 
 input DeleteArtifactInput {
   artifactId: ID!
-  forceDelete: Boolean! = false
 }
 
 type DeleteArtifactPayload {
-  artifact: Artifact
+  artifact: Artifact!
 }
 
 input ImportArtifactInput {
@@ -132,7 +133,7 @@ input ImportArtifactInput {
 }
 
 type ImportArtifactPayload {
-  artifact: Artifact
+  artifact: Artifact!
 }
 
 type Mutation {
@@ -203,5 +204,5 @@ input UpdateArtifactInput {
 }
 
 type UpdateArtifactPayload {
-  artifact: Artifact
+  artifact: Artifact!
 }

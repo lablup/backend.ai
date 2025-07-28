@@ -78,7 +78,6 @@ class UpdateArtifactInput:
 @strawberry.input
 class DeleteArtifactInput:
     artifact_id: ID
-    force_delete: bool = False
 
 
 # Object Types
@@ -154,27 +153,29 @@ class ArtifactImportProgressPayload:
 # Mutation Payloads
 @strawberry.type
 class ImportArtifactPayload:
-    artifact: Optional[Artifact] = None
+    artifact: Artifact
 
 
 @strawberry.type
 class UpdateArtifactPayload:
-    artifact: Optional[Artifact] = None
+    artifact: Artifact
 
 
 @strawberry.type
 class DeleteArtifactPayload:
-    artifact: Optional[Artifact] = None
+    artifact: Artifact
 
 
 @strawberry.type
 class CancelImportArtifact:
-    artifact: Optional[Artifact] = None
+    artifact: Artifact
 
 
 @strawberry.type
 class ArtifactStatusChangedPayload:
-    artifact: Optional[Artifact] = None
+    artifact_id: ID
+    status: ArtifactStatus
+    updated_at: datetime
 
 
 # Query Fields
