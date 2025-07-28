@@ -241,3 +241,57 @@ def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
         ],
         capture_output=True,
     )
+
+
+@pytest.fixture(scope="session", autouse=False)
+def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node MinIO container for a testing session.
+    random_id = secrets.token_hex(8)
+    api_port, console_port = get_next_tcp_port(2)
+    proc = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-d",
+            "--tmpfs",
+            "/data",
+            "--name",
+            f"test--minio-slot-{get_parallel_slot()}-{random_id}",
+            "-p",
+            f"127.0.0.1:{api_port}:9000",
+            "-p",
+            f"127.0.0.1:{console_port}:9090",
+            "-e",
+            "MINIO_ROOT_USER=minioadmin",
+            "-e",
+            "MINIO_ROOT_PASSWORD=minioadmin",
+            "--health-cmd",
+            "curl -f http://localhost:9000/minio/health/live",
+            "--health-interval",
+            "2s",
+            "--health-start-period",
+            "5s",
+            "minio/minio:latest",
+            "server",
+            "/data",
+            "--console-address",
+            ":9090",
+        ],
+        capture_output=True,
+    )
+    container_id = proc.stdout.decode().strip()
+    if not container_id:
+        raise RuntimeError("minio_container: failed to create container", proc.stderr.decode())
+    log.info("spawning minio container (parallel slot: %d)", get_parallel_slot())
+    wait_health_check(container_id)
+    yield container_id, HostPortPairModel(host="127.0.0.1", port=api_port)
+    subprocess.run(
+        [
+            "docker",
+            "rm",
+            "-v",
+            "-f",
+            container_id,
+        ],
+        capture_output=True,
+    )
