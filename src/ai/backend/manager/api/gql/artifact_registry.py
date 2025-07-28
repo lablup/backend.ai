@@ -150,7 +150,7 @@ class ArtifactGroup(Node):
 
 
 @strawberry.type
-class DownloadProgress:
+class DownloadProgressPayload:
     artifact_id: ID
     progress: float
     status: ArtifactStatus
@@ -296,8 +296,8 @@ async def artifact_status_changed(
 
 
 @strawberry.subscription
-async def download_progress(artifact_id: ID) -> AsyncGenerator[DownloadProgress, None]:
+async def download_progress(artifact_id: ID) -> AsyncGenerator[DownloadProgressPayload, None]:
     # Mock implementation
     # In real implementation, this would yield progress updates
     if False:  # Placeholder to make this a generator
-        yield DownloadProgress()
+        yield DownloadProgressPayload()

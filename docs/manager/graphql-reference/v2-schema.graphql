@@ -121,7 +121,7 @@ type DeleteArtifactPayload {
   artifact: Artifact
 }
 
-type DownloadProgress {
+type DownloadProgressPayload {
   artifactId: ID!
   progress: Float!
   status: ArtifactStatus!
@@ -205,7 +205,7 @@ input StringFilter {
 
 type Subscription {
   artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
-  downloadProgress(artifactId: ID!): DownloadProgress!
+  downloadProgress(artifactId: ID!): DownloadProgressPayload!
 }
 
 input UpdateArtifactInput {
