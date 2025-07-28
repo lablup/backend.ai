@@ -1,5 +1,5 @@
 """
-S3 Storage API endpoints for file upload/download operations
+S3 Storage API endpoints for file upload/download operations - v1
 """
 
 from __future__ import annotations
@@ -21,15 +21,15 @@ from ai.backend.common.dto.storage.response import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import (
+from ...exception import (
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
     StorageProxyError,
 )
-from ..services.storages import StoragesService
+from ...services.storages import StoragesService
 
 if TYPE_CHECKING:
-    from ..context import RootContext
+    from ...context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -51,7 +51,6 @@ s3_token_data_iv = t.Dict(
 ).allow_extra("*")  # allow JWT-intrinsic keys
 
 
-# TODO: Move pydantic_params_api_handler, pydantic_response_api_handler into common and use them here
 async def validate_token_request(request: web.Request) -> S3TokenData:
     """Helper function to validate JWT token and return S3TokenData."""
     ctx: RootContext = request.app["ctx"]
@@ -88,7 +87,7 @@ async def validate_token_request(request: web.Request) -> S3TokenData:
         )
 
 
-async def stream_upload(request: web.Request) -> web.Response:
+async def upload_file(request: web.Request) -> web.Response:
     """Upload a file to S3 using streaming."""
     token_data = await validate_token_request(request)
     if token_data.op != "upload":
@@ -120,6 +119,42 @@ async def stream_upload(request: web.Request) -> web.Response:
             body=dump_json_str(response.model_dump()),
             content_type="application/json",
         )
+
+    except StorageProxyError as e:
+        error_response = ErrorResponse(error=str(e))
+        return web.Response(
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            body=dump_json_str(error_response.model_dump()),
+            content_type="application/json",
+        )
+
+
+async def download_file(request: web.Request) -> web.StreamResponse:
+    """Download a file from S3."""
+    token_data = await validate_token_request(request)
+    if token_data.op != "download":
+        raise web.HTTPBadRequest(reason="Invalid token operation for download")
+
+    try:
+        ctx: RootContext = request.app["ctx"]
+        storages_service = StoragesService(ctx.local_config.storages)
+
+        # Create streaming response
+        response = web.StreamResponse(
+            status=HTTPStatus.OK,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "Content-Disposition": f'attachment; filename="{token_data.filename or "download"}"',
+            },
+        )
+
+        await response.prepare(request)
+
+        # Stream the file content
+        async for chunk in storages_service.stream_download(token_data):
+            await response.write(chunk)
+
+        return response
 
     except StorageProxyError as e:
         error_response = ErrorResponse(error=str(e))
@@ -184,8 +219,8 @@ async def presigned_download_url(request: web.Request) -> web.Response:
         )
 
 
-async def get_object_info(request: web.Request) -> web.Response:
-    """Get object information"""
+async def get_file_info(request: web.Request) -> web.Response:
+    """Get file information"""
     token_data = await validate_token_request(request)
     if token_data.op != "info":
         raise web.HTTPBadRequest(reason="Invalid token operation for info")
@@ -212,7 +247,7 @@ async def get_object_info(request: web.Request) -> web.Response:
         )
 
 
-async def delete_object(request: web.Request) -> web.Response:
+async def delete_file(request: web.Request) -> web.Response:
     """Delete object"""
     token_data = await validate_token_request(request)
     if token_data.op != "delete":
@@ -243,13 +278,13 @@ async def delete_object(request: web.Request) -> web.Response:
 def create_app(ctx: RootContext) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
-    app["prefix"] = "storages"
+    app["prefix"] = "v1/storages"
 
-    # Route definitions following the pattern from manager.py
-    app.router.add_route("POST", "/s3/upload", stream_upload)
-    app.router.add_route("POST", "/s3/presigned-upload-url", presigned_upload_url)
-    app.router.add_route("GET", "/s3/presigned-download-url", presigned_download_url)
-    app.router.add_route("GET", "/s3", get_object_info)
-    app.router.add_route("DELETE", "/s3", delete_object)
+    app.router.add_route("GET", "/s3/files", get_file_info)
+    app.router.add_route("DELETE", "/s3/files", delete_file)
+    app.router.add_route("POST", "/s3/files/upload", upload_file)
+    app.router.add_route("GET", "/s3/files/download", download_file)
+    app.router.add_route("POST", "/s3/files/presigned/upload", presigned_upload_url)
+    app.router.add_route("GET", "/s3/files/presigned/download", presigned_download_url)
 
     return app
