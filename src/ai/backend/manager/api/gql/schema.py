@@ -17,10 +17,10 @@ from .artifact_registry import (
 
 @strawberry.type
 class Query:
-    artifacts = artifacts
-    artifact_groups = artifact_groups
     artifact = artifact
+    artifacts = artifacts
     artifact_group = artifact_group
+    artifact_groups = artifact_groups
 
 
 @strawberry.type
