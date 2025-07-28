@@ -16,24 +16,17 @@ from pydantic import ValidationError
 from ai.backend.common import validators as tx
 from ai.backend.common.dto.storage.request import S3TokenData
 from ai.backend.common.dto.storage.response import (
-    DeleteResponse,
     ErrorResponse,
-    ObjectInfoResponse,
-    PresignedDownloadResponse,
-    PresignedUploadResponse,
-    UploadResponse,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
-from ..client.s3 import S3Client
 from ..exception import (
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
-    StorageObjectNotFoundError,
     StorageProxyError,
 )
-from ..utils import log_client_api_entry
+from ..services.storages import StoragesService
 
 if TYPE_CHECKING:
     from ..context import RootContext
@@ -41,7 +34,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_CHUNKS = 8192  # Default chunk size for streaming uploads
-_DEFAULT_TOKEN_DURATION = 1800  # Default token expiration time in seconds
 
 s3_token_data_iv = t.Dict(
     {
@@ -102,29 +94,9 @@ async def stream_upload(request: web.Request) -> web.Response:
     if token_data.op != "upload":
         raise web.HTTPBadRequest(reason="Invalid token operation for upload")
 
-    await log_client_api_entry(log, "stream_upload", token_data)
-
     try:
         ctx: RootContext = request.app["ctx"]
-        # Get S3 client configuration from context
-        storage_config = None
-        for storage in ctx.local_config.storages:
-            if storage.bucket == token_data.bucket:
-                storage_config = storage
-                break
-
-        if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {token_data.bucket}"
-            )
-
-        s3_client = S3Client(
-            bucket_name=token_data.bucket,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
-        )
+        storages_service = StoragesService(ctx.local_config.storages)
 
         # Read the file data as a stream
         reader = await request.multipart()
@@ -140,31 +112,22 @@ async def stream_upload(request: web.Request) -> web.Response:
                     break
                 yield chunk
 
-        # Upload the stream
-        success = await s3_client.upload_stream(
-            data_stream(),
-            token_data.key,
-            content_type=token_data.content_type,
+        # Upload the stream using service
+        response = await storages_service.stream_upload(token_data, data_stream())
+
+        return web.Response(
+            status=HTTPStatus.OK,
+            body=dump_json_str(response.model_dump()),
+            content_type="application/json",
         )
 
-        if success:
-            response = UploadResponse(success=True, key=token_data.key)
-            return web.Response(
-                status=HTTPStatus.OK,
-                body=dump_json_str(response.model_dump()),
-                content_type="application/json",
-            )
-        else:
-            error_response = ErrorResponse(error="Upload failed")
-            return web.Response(
-                status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                body=dump_json_str(error_response.model_dump()),
-                content_type="application/json",
-            )
-
-    except Exception as e:
-        log.error(f"Stream upload failed: {e}")
-        raise StorageProxyError("Upload failed") from e
+    except StorageProxyError as e:
+        error_response = ErrorResponse(error=str(e))
+        return web.Response(
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            body=dump_json_str(error_response.model_dump()),
+            content_type="application/json",
+        )
 
 
 async def presigned_upload_url(request: web.Request) -> web.Response:
@@ -173,50 +136,19 @@ async def presigned_upload_url(request: web.Request) -> web.Response:
     if token_data.op != "presigned_upload":
         raise web.HTTPBadRequest(reason="Invalid token operation for presigned upload")
 
-    await log_client_api_entry(log, "presigned_upload_url", token_data)
-
     try:
         ctx: RootContext = request.app["ctx"]
-        storage_config = None
-        for storage in ctx.local_config.storages:
-            if storage.bucket == token_data.bucket:
-                storage_config = storage
-                break
+        storages_service = StoragesService(ctx.local_config.storages)
 
-        if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {token_data.bucket}"
-            )
+        response = await storages_service.generate_presigned_upload_url(token_data)
 
-        s3_client = S3Client(
-            bucket_name=token_data.bucket,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
-        )
-
-        presigned_data = await s3_client.generate_presigned_upload_url(
-            token_data.key,
-            expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-            content_type=token_data.content_type,
-            content_length_range=(token_data.min_size, token_data.max_size)
-            if token_data.min_size and token_data.max_size
-            else None,
-        )
-
-        if presigned_data is None:
-            raise PresignedUploadURLGenerationError()
-
-        response = PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
         return web.Response(
             status=HTTPStatus.OK,
             body=dump_json_str(response.model_dump()),
             content_type="application/json",
         )
 
-    except Exception as e:
-        log.error(f"Presigned upload URL generation failed: {e}")
+    except PresignedUploadURLGenerationError as e:
         error_response = ErrorResponse(error=f"Presigned upload URL generation failed: {str(e)}")
         return web.Response(
             status=HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -231,46 +163,19 @@ async def presigned_download_url(request: web.Request) -> web.Response:
     if token_data.op != "presigned_download":
         raise web.HTTPBadRequest(reason="Invalid token operation for presigned download")
 
-    await log_client_api_entry(log, "presigned_download_url", token_data)
-
     try:
         ctx: RootContext = request.app["ctx"]
-        storage_config = None
-        for storage in ctx.local_config.storages:
-            if storage.bucket == token_data.bucket:
-                storage_config = storage
-                break
+        storages_service = StoragesService(ctx.local_config.storages)
 
-        if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {token_data.bucket}"
-            )
+        response = await storages_service.generate_presigned_download_url(token_data)
 
-        s3_client = S3Client(
-            bucket_name=token_data.bucket,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
-        )
-
-        presigned_url = await s3_client.generate_presigned_download_url(
-            token_data.key,
-            expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-        )
-
-        if presigned_url is None:
-            raise PresignedDownloadURLGenerationError()
-
-        response = PresignedDownloadResponse(url=presigned_url)
         return web.Response(
             status=HTTPStatus.OK,
             body=dump_json_str(response.model_dump()),
             content_type="application/json",
         )
 
-    except Exception as e:
-        log.error(f"Presigned download URL generation failed: {e}")
+    except PresignedDownloadURLGenerationError as e:
         error_response = ErrorResponse(error=f"Presigned download URL generation failed: {str(e)}")
         return web.Response(
             status=HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -285,40 +190,12 @@ async def get_object_info(request: web.Request) -> web.Response:
     if token_data.op != "info":
         raise web.HTTPBadRequest(reason="Invalid token operation for info")
 
-    await log_client_api_entry(log, "get_object_info", token_data)
-
     try:
         ctx: RootContext = request.app["ctx"]
-        storage_config = None
-        for storage in ctx.local_config.storages:
-            if storage.bucket == token_data.bucket:
-                storage_config = storage
-                break
+        storages_service = StoragesService(ctx.local_config.storages)
 
-        if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {token_data.bucket}"
-            )
+        response = await storages_service.get_object_info(token_data)
 
-        s3_client = S3Client(
-            bucket_name=token_data.bucket,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
-        )
-
-        object_info = await s3_client.get_object_info(token_data.key)
-
-        if object_info is None:
-            raise StorageObjectNotFoundError()
-
-        response = ObjectInfoResponse(
-            content_length=object_info.content_length,
-            content_type=object_info.content_type,
-            last_modified=object_info.last_modified,
-            etag=object_info.etag,
-        )
         return web.Response(
             status=HTTPStatus.OK,
             body=dump_json_str(response.model_dump()),
@@ -341,32 +218,12 @@ async def delete_object(request: web.Request) -> web.Response:
     if token_data.op != "delete":
         raise web.HTTPBadRequest(reason="Invalid token operation for delete")
 
-    await log_client_api_entry(log, "delete_object", token_data)
-
     try:
         ctx: RootContext = request.app["ctx"]
-        storage_config = None
-        for storage in ctx.local_config.storages:
-            if storage.bucket == token_data.bucket:
-                storage_config = storage
-                break
+        storages_service = StoragesService(ctx.local_config.storages)
 
-        if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {token_data.bucket}"
-            )
+        response = await storages_service.delete_object(token_data)
 
-        s3_client = S3Client(
-            bucket_name=token_data.bucket,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
-        )
-
-        success = await s3_client.delete_object(token_data.key)
-
-        response = DeleteResponse(success=success)
         return web.Response(
             status=HTTPStatus.OK,
             body=dump_json_str(response.model_dump()),
