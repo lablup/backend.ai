@@ -71,6 +71,12 @@ type ArtifactGroupEdge {
   node: ArtifactGroup!
 }
 
+type ArtifactImportProgressPayload {
+  artifactId: ID!
+  progress: Float!
+  status: ArtifactStatus!
+}
+
 input ArtifactOrderBy {
   field: ArtifactOrderField!
   direction: OrderDirection! = ASC
@@ -119,12 +125,6 @@ input DeleteArtifactInput {
 
 type DeleteArtifactPayload {
   artifact: Artifact
-}
-
-type DownloadProgressPayload {
-  artifactId: ID!
-  progress: Float!
-  status: ArtifactStatus!
 }
 
 input ImportArtifactInput {
@@ -195,7 +195,7 @@ input StringFilter {
 
 type Subscription {
   artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
-  downloadProgress(artifactId: ID!): DownloadProgressPayload!
+  artifactImportProgress(artifactId: ID!): ArtifactImportProgressPayload!
 }
 
 input UpdateArtifactInput {

@@ -5,11 +5,11 @@ from .artifact_registry import (
     artifact,
     artifact_group,
     artifact_groups,
+    artifact_import_progress,
     artifact_status_changed,
     artifacts,
     cancel_import_artifact,
     delete_artifact,
-    download_progress,
     import_artifact,
     update_artifact,
 )
@@ -34,7 +34,7 @@ class Mutation:
 @strawberry.type
 class Subscription:
     artifact_status_changed = artifact_status_changed
-    download_progress = download_progress
+    artifact_import_progress = artifact_import_progress
 
 
 schema = strawberry.Schema(
