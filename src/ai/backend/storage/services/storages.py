@@ -124,6 +124,32 @@ class StoragesService:
             log.error(f"Stream upload failed: {e}")
             raise StorageProxyError("Upload failed") from e
 
+    async def stream_download(self, token_data: S3TokenData) -> AsyncIterator[bytes]:
+        """
+        Download a file from S3 using streaming.
+
+        Args:
+            token_data: Validated S3 token data
+
+        Yields:
+            bytes: Chunks of file data
+
+        Raises:
+            StorageProxyError: If download fails
+        """
+        await log_client_api_entry(log, "stream_download", token_data)
+
+        try:
+            s3_client = self._get_s3_client(token_data.bucket)
+
+            # Download the stream
+            async for chunk in s3_client.download_stream(token_data.key):
+                yield chunk
+
+        except Exception as e:
+            log.error(f"Stream download failed: {e}")
+            raise StorageProxyError("Download failed") from e
+
     async def generate_presigned_upload_url(
         self, token_data: S3TokenData
     ) -> PresignedUploadResponse:

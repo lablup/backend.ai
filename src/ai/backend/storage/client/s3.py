@@ -292,7 +292,8 @@ class S3Client:
                 )
 
         except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
+            error_code = e.response["Error"]["Code"]
+            if error_code in ("NoSuchKey", "404", "NotFound"):
                 logger.debug(f"S3 object not found: s3://{self.bucket_name}/{s3_key}")
                 return None
             else:
