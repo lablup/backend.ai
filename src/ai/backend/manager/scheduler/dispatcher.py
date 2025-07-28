@@ -191,17 +191,17 @@ class LoadAgentSelectorArgs:
 
 
 class SchedulerDispatcher(aobject):
-    config_provider: ManagerConfigProvider
-    registry: AgentRegistry
-    etcd: AsyncEtcd
-    schedule_repository: ScheduleRepository
+    _config_provider: ManagerConfigProvider
+    _registry: AgentRegistry
+    _etcd: AsyncEtcd
+    _schedule_repository: ScheduleRepository
 
-    event_producer: EventProducer
-    schedule_timer: GlobalTimer
-    check_precond_timer: GlobalTimer
-    session_start_timer: GlobalTimer
-    scale_timer: GlobalTimer
-    update_session_status_timer: GlobalTimer
+    _event_producer: EventProducer
+    _schedule_timer: GlobalTimer
+    _check_precond_timer: GlobalTimer
+    _session_start_timer: GlobalTimer
+    _scale_timer: GlobalTimer
+    _update_session_status_timer: GlobalTimer
 
     _valkey_live: ValkeyLiveClient
     _valkey_stat: ValkeyStatClient
@@ -217,14 +217,14 @@ class SchedulerDispatcher(aobject):
         valkey_stat: ValkeyStatClient,
         schedule_repository: ScheduleRepository,
     ) -> None:
-        self.config_provider = config_provider
-        self.etcd = etcd
-        self.event_producer = event_producer
-        self.registry = registry
+        self._config_provider = config_provider
+        self._etcd = etcd
+        self._event_producer = event_producer
+        self._registry = registry
         self.lock_factory = lock_factory
         self._valkey_live = valkey_live
         self._valkey_stat = valkey_stat
-        self.schedule_repository = schedule_repository
+        self._schedule_repository = schedule_repository
 
     @classmethod
     async def create(
@@ -252,60 +252,60 @@ class SchedulerDispatcher(aobject):
         return instance
 
     async def __ainit__(self) -> None:
-        self.schedule_timer = GlobalTimer(
+        self._schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
-            self.event_producer,
+            self._event_producer,
             lambda: DoScheduleEvent(),
             interval=10.0,
             task_name="schedule_timer",
         )
-        self.session_start_timer = GlobalTimer(
+        self._session_start_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
-            self.event_producer,
+            self._event_producer,
             lambda: DoStartSessionEvent(),
             interval=10.0,
             initial_delay=5.0,
             task_name="session_start_timer",
         )
-        self.check_precond_timer = GlobalTimer(
+        self._check_precond_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_CHECK_PRECOND_TIMER, 10.0),
-            self.event_producer,
+            self._event_producer,
             lambda: DoCheckPrecondEvent(),
             interval=10.0,
             initial_delay=5.0,
             task_name="check_precond_timer",
         )
-        self.scale_timer = GlobalTimer(
+        self._scale_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
-            self.event_producer,
+            self._event_producer,
             lambda: DoScaleEvent(),
             interval=10.0,
             initial_delay=7.0,
             task_name="scale_timer",
         )
-        self.update_session_status_timer = GlobalTimer(
+        self._update_session_status_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SESSION_STATUS_UPDATE_TIMER, 10.0),
-            self.event_producer,
+            self._event_producer,
             lambda: DoUpdateSessionStatusEvent(),
             interval=7.0,
             initial_delay=3.0,
             task_name="update_session_status_timer",
         )
-        await self.schedule_timer.join()
-        await self.check_precond_timer.join()
-        await self.session_start_timer.join()
-        await self.scale_timer.join()
-        await self.update_session_status_timer.join()
+        await self._schedule_timer.join()
+        await self._check_precond_timer.join()
+        await self._session_start_timer.join()
+        await self._scale_timer.join()
+        await self._update_session_status_timer.join()
 
         log.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
-            tg.create_task(self.scale_timer.leave())
-            tg.create_task(self.check_precond_timer.leave())
-            tg.create_task(self.session_start_timer.leave())
-            tg.create_task(self.schedule_timer.leave())
-            tg.create_task(self.update_session_status_timer.leave())
+            tg.create_task(self._scale_timer.leave())
+            tg.create_task(self._check_precond_timer.leave())
+            tg.create_task(self._session_start_timer.leave())
+            tg.create_task(self._schedule_timer.leave())
+            tg.create_task(self._update_session_status_timer.leave())
         await self._valkey_live.close()
         await self._valkey_stat.close()
         log.info("Session scheduler stopped")
@@ -326,19 +326,21 @@ class SchedulerDispatcher(aobject):
         """
         log.debug("schedule(): triggered")
         await self._mark_scheduler_start(ScheduleType.SCHEDULE, event_name)
-        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
         sched_ctx = SchedulingContext(
-            registry=self.registry,
+            registry=self._registry,
             known_slot_types=known_slot_types,
         )
 
-        lock_lifetime = self.config_provider.config.manager.session_schedule_lock_lifetime
+        lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
             async with self.lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
                 schedulable_scaling_groups = (
-                    await self.schedule_repository.get_schedulable_scaling_groups()
+                    await self._schedule_repository.get_schedulable_scaling_groups()
                 )
                 for sgroup_name in schedulable_scaling_groups:
                     try:
@@ -371,8 +373,8 @@ class SchedulerDispatcher(aobject):
 
     def _load_scheduler(self, args: LoadSchedulerArgs) -> AbstractScheduler:
         global_scheduler_opts = {}
-        if self.config_provider.config.plugins.scheduler:
-            global_scheduler_opts = self.config_provider.config.plugins.scheduler.get(
+        if self._config_provider.config.plugins.scheduler:
+            global_scheduler_opts = self._config_provider.config.plugins.scheduler.get(
                 args.scheduler_name, {}
             )
         scheduler_config = {**global_scheduler_opts, **args.sgroup_opts.config}
@@ -395,13 +397,13 @@ class SchedulerDispatcher(aobject):
                     sgroup_opts.enforce_spreading_endpoint_replica
                     and SessionTypes(args.pending_session_type) == SessionTypes.INFERENCE
                 ):
-                    endpoint_id = await self.schedule_repository.get_endpoint_for_session(
+                    endpoint_id = await self._schedule_repository.get_endpoint_for_session(
                         SessionId(args.pending_session_id)
                     )
                     if endpoint_id:
                         dynamic_config[
                             "kernel_counts_at_same_endpoint"
-                        ] = await self.schedule_repository.get_kernel_count_per_agent_at_endpoint(
+                        ] = await self._schedule_repository.get_kernel_count_per_agent_at_endpoint(
                             endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
                         )
 
@@ -414,8 +416,8 @@ class SchedulerDispatcher(aobject):
                 )
 
         global_agselector_opts = {}
-        if self.config_provider.config.plugins.agent_selector:
-            global_agselector_opts = self.config_provider.config.plugins.agent_selector.get(
+        if self._config_provider.config.plugins.agent_selector:
+            global_agselector_opts = self._config_provider.config.plugins.agent_selector.get(
                 agselector_name, {}
             )
         agselector_config = {
@@ -425,7 +427,7 @@ class SchedulerDispatcher(aobject):
         }
 
         agent_selection_resource_priority = (
-            self.config_provider.config.manager.agent_selection_resource_priority
+            self._config_provider.config.manager.agent_selection_resource_priority
         )
 
         return load_agent_selector(
@@ -433,7 +435,7 @@ class SchedulerDispatcher(aobject):
             sgroup_opts,
             agselector_config,
             agent_selection_resource_priority,
-            self.config_provider.legacy_etcd_config_loader,
+            self._config_provider.legacy_etcd_config_loader,
         )
 
     async def _schedule_in_sgroup(
@@ -445,16 +447,16 @@ class SchedulerDispatcher(aobject):
         (
             scheduler_name,
             sgroup_opts,
-        ) = await self.schedule_repository.get_scaling_group_info(sgroup_name)
+        ) = await self._schedule_repository.get_scaling_group_info(sgroup_name)
         scheduler = self._load_scheduler(LoadSchedulerArgs(scheduler_name, sgroup_opts))
         (
             existing_sessions,
             pending_sessions,
             cancelled_sessions,
-        ) = await self.schedule_repository.list_managed_sessions(
+        ) = await self._schedule_repository.list_managed_sessions(
             sgroup_name, scheduler.sgroup_opts.pending_timeout
         )
-        await self.flush_cancelled_sessions(cancelled_sessions)
+        await self._flush_cancelled_sessions(cancelled_sessions)
         current_priority, pending_sessions = scheduler.prioritize(pending_sessions)
 
         log.debug(
@@ -469,7 +471,7 @@ class SchedulerDispatcher(aobject):
         while len(pending_sessions) > 0:
             # Part 1: Choose the pending session to try scheduling.
 
-            candidate_agents = await self.schedule_repository.get_schedulable_agents_by_sgroup(
+            candidate_agents = await self._schedule_repository.get_schedulable_agents_by_sgroup(
                 sgroup_name
             )
             total_capacity = sum((ag.available_slots for ag in candidate_agents), ResourceSlot())
@@ -517,7 +519,7 @@ class SchedulerDispatcher(aobject):
             passed_predicates = []
             async for attempt in retry_txn():
                 with attempt:
-                    check_results = await self.check_predicates(
+                    check_results = await self._check_predicates(
                         sched_ctx,
                         pending_sess,
                         exc_handler=lambda _: log.exception(log_fmt + "predicate-error", *log_args),
@@ -542,7 +544,7 @@ class SchedulerDispatcher(aobject):
             hook_result = HookResult(status=PASSED, src_plugin=[], result=[])
             async for attempt in retry_txn():
                 with attempt:
-                    hook_result = await self.check_predicates_hook(sched_ctx, pending_sess)
+                    hook_result = await self._check_predicates_hook(sched_ctx, pending_sess)
             match hook_result.src_plugin:
                 case str():
                     hook_name = hook_result.src_plugin
@@ -570,11 +572,11 @@ class SchedulerDispatcher(aobject):
             if failed_predicates:
                 log.debug(log_fmt + "predicate-checks-failed (temporary)", *log_args)
 
-                await self.schedule_repository.update_session_predicate_failure(
+                await self._schedule_repository.update_session_predicate_failure(
                     sched_ctx, pending_sess, status_update_data
                 )
                 if pending_sess.is_private:
-                    await self.event_producer.anycast_and_broadcast_event(
+                    await self._event_producer.anycast_and_broadcast_event(
                         SessionCancelledAnycastEvent(
                             pending_sess.id,
                             pending_sess.creation_id,
@@ -590,14 +592,14 @@ class SchedulerDispatcher(aobject):
                 # We need to retry the scheduling afterwards.
                 continue
             else:
-                await self.schedule_repository.update_session_status_data(
+                await self._schedule_repository.update_session_status_data(
                     pending_sess, status_update_data
                 )
 
             # Part 4: Assign agent(s) via the agent selector.
 
             schedulable_sess = (
-                await self.schedule_repository.get_schedulable_session_with_kernels_and_agents(
+                await self._schedule_repository.get_schedulable_session_with_kernels_and_agents(
                     pending_sess.id
                 )
             )
@@ -656,18 +658,18 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.anycast_event(DoCheckPrecondEvent())
+            await self._event_producer.anycast_event(DoCheckPrecondEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
     ) -> list[AgentRow]:
-        raw_value = await self.etcd.get("config/agent/max-container-count")
+        raw_value = await self._etcd.get("config/agent/max-container-count")
         if raw_value is None:
             return candidate_agents
         max_container_count = int(raw_value)
 
         agent_ids = [str(ag.id) for ag in candidate_agents]
-        raw_counts = await self.registry.valkey_stat.get_agent_container_counts_batch(agent_ids)
+        raw_counts = await self._valkey_stat.get_agent_container_counts_batch(agent_ids)
 
         def _check(cnt: int) -> bool:
             return max_container_count > cnt
@@ -735,7 +737,7 @@ class SchedulerDispatcher(aobject):
                     (
                         available_slots,
                         occupied_slots,
-                    ) = await self.schedule_repository.get_agent_available_slots(agent_id)
+                    ) = await self._schedule_repository.get_agent_available_slots(agent_id)
 
                     for key in available_slots.keys():
                         if (
@@ -768,7 +770,7 @@ class SchedulerDispatcher(aobject):
                     )
                 agent_id = cand_agent_id
 
-            agent_alloc_ctx = await self.schedule_repository.reserve_agent(
+            agent_alloc_ctx = await self._schedule_repository.reserve_agent(
                 sgroup_name,
                 agent_id,
                 sess_ctx.requested_slots,
@@ -777,7 +779,7 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "no-available-instances", *log_args)
 
             async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
-                await self.schedule_repository._update_session_scheduling_failure(
+                await self._schedule_repository._update_session_scheduling_failure(
                     sched_ctx, sess_ctx, exc.extra_msg
                 )
 
@@ -788,10 +790,10 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
+            exc_data = convert_to_status_data(e, self._config_provider.config.debug.enabled)
 
             async def _update_generic_failure() -> None:
-                await self.schedule_repository._update_session_generic_failure(
+                await self._schedule_repository._update_session_generic_failure(
                     sched_ctx, sess_ctx, exc_data
                 )
 
@@ -799,12 +801,12 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
-            await self.schedule_repository.finalize_single_node_session(
+            await self._schedule_repository.finalize_single_node_session(
                 sess_ctx.id, sgroup_name, agent_alloc_ctx
             )
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.anycast_and_broadcast_event(
+        await self._event_producer.anycast_and_broadcast_event(
             SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
             SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -840,7 +842,7 @@ class SchedulerDispatcher(aobject):
                     (
                         available_slots,
                         occupied_slots,
-                    ) = await self.schedule_repository.get_agent_available_slots(agent.id)
+                    ) = await self._schedule_repository.get_agent_available_slots(agent.id)
 
                     for key in available_slots.keys():
                         if (
@@ -900,19 +902,19 @@ class SchedulerDispatcher(aobject):
                         )
                 assert agent_id is not None
 
-                agent_alloc_ctx = await self.schedule_repository.reserve_agent(
+                agent_alloc_ctx = await self._schedule_repository.reserve_agent(
                     sgroup_name,
                     agent_id,
                     sess_ctx.requested_slots,
                 )
-                candidate_agents = await self.schedule_repository.get_schedulable_agents_by_sgroup(
+                candidate_agents = await self._schedule_repository.get_schedulable_agents_by_sgroup(
                     sgroup_name
                 )
             except InstanceNotAvailable as sched_failure:
                 log.debug(log_fmt + "no-available-instances", *log_args)
 
                 async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
-                    await self.schedule_repository.update_kernel_scheduling_failure(
+                    await self._schedule_repository.update_kernel_scheduling_failure(
                         sched_ctx, sess_ctx, kernel.id, exc.extra_msg
                     )
 
@@ -923,10 +925,10 @@ class SchedulerDispatcher(aobject):
                     log_fmt + "unexpected-error, during agent allocation",
                     *log_args,
                 )
-                exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
+                exc_data = convert_to_status_data(e, self._config_provider.config.debug.enabled)
 
                 async def _update_generic_failure() -> None:
-                    await self.schedule_repository.update_multinode_kernel_generic_failure(
+                    await self._schedule_repository.update_multinode_kernel_generic_failure(
                         sched_ctx, sess_ctx, kernel.id, exc_data
                     )
 
@@ -940,12 +942,12 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
-            await self.schedule_repository.finalize_multi_node_session(
+            await self._schedule_repository.finalize_multi_node_session(
                 sess_ctx.id, sgroup_name, kernel_agent_bindings
             )
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.anycast_and_broadcast_event(
+        await self._event_producer.anycast_and_broadcast_event(
             SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
             SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -963,12 +965,16 @@ class SchedulerDispatcher(aobject):
         `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
         await self._mark_scheduler_start(ScheduleType.CHECK_PRECONDITION, event_name)
-        lock_lifetime = self.config_provider.config.manager.session_check_precondition_lock_lifetime
+        lock_lifetime = (
+            self._config_provider.config.manager.session_check_precondition_lock_lifetime
+        )
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
 
-                scheduled_sessions = await self.schedule_repository.transit_scheduled_to_preparing()
+                scheduled_sessions = (
+                    await self._schedule_repository.transit_scheduled_to_preparing()
+                )
                 log.debug(
                     "check_precond(): checking-precond {} session(s)", len(scheduled_sessions)
                 )
@@ -983,14 +989,14 @@ class SchedulerDispatcher(aobject):
                                 allocated_host_ports=set(),
                             )
                         )
-                    await self.registry.event_producer.anycast_event(
+                    await self._event_producer.anycast_event(
                         SessionCheckingPrecondAnycastEvent(
                             scheduled_session.id,
                             scheduled_session.creation_id,
                         ),
                     )
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
-                await self.registry.check_and_pull_images(bindings)
+                await self._registry.check_and_pull_images(bindings)
 
             await self._update_scheduler_mark(
                 ScheduleType.CHECK_PRECONDITION,
@@ -1019,19 +1025,19 @@ class SchedulerDispatcher(aobject):
         Session status transition: PREPARED -> CREATING
         """
         await self._mark_scheduler_start(ScheduleType.START, event_name)
-        lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
+        lock_lifetime = self._config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 known_slot_types = (
-                    await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
+                    await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
                 )
                 sched_ctx = SchedulingContext(
-                    self.registry,
+                    self._registry,
                     known_slot_types,
                 )
 
                 scheduled_sessions = (
-                    await self.schedule_repository.mark_sessions_and_kernels_creating()
+                    await self._schedule_repository.mark_sessions_and_kernels_creating()
                 )
 
                 log.debug("starting(): starting {} session(s)", len(scheduled_sessions))
@@ -1040,7 +1046,7 @@ class SchedulerDispatcher(aobject):
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
-                        await self.registry.event_producer.anycast_and_broadcast_event(
+                        await self._event_producer.anycast_and_broadcast_event(
                             SessionPreparingAnycastEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
@@ -1081,15 +1087,15 @@ class SchedulerDispatcher(aobject):
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
         await self._mark_scheduler_start(ScheduleType.SCALE_SERVICES, event_name)
-        await execute_with_retry(lambda: self.schedule_repository.autoscale_endpoints())
+        await execute_with_retry(lambda: self._schedule_repository.autoscale_endpoints())
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
-        rowcount = await self.schedule_repository.clean_zombie_routes()
+        rowcount = await self._schedule_repository.clean_zombie_routes()
         if rowcount > 0:
             log.info("Cleared {} zombie routes", rowcount)
 
-        endpoints = await self.schedule_repository.get_endpoints_for_scaling()
+        endpoints = await self._schedule_repository.get_endpoints_for_scaling()
         for endpoint in endpoints:
             active_routings = [
                 r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses()
@@ -1140,7 +1146,7 @@ class SchedulerDispatcher(aobject):
 
         ids_of_session_to_destroy = [r.session for r in routes_to_destroy]
         target_sessions_to_destroy = (
-            await self.schedule_repository.get_sessions_to_destroy_for_scaling(
+            await self._schedule_repository.get_sessions_to_destroy_for_scaling(
                 ids_of_session_to_destroy
             )
         )
@@ -1149,7 +1155,7 @@ class SchedulerDispatcher(aobject):
         # TODO: Update logic to not to wait for sessions to actually terminate
         for session in target_sessions_to_destroy:
             try:
-                await self.registry.destroy_session(
+                await self._registry.destroy_session(
                     session,
                     forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
@@ -1168,9 +1174,9 @@ class SchedulerDispatcher(aobject):
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
             endpoint_create_data.append((endpoint, expand_count))
-        created_routes = await self.schedule_repository.create_routing_rows(endpoint_create_data)
+        created_routes = await self._schedule_repository.create_routing_rows(endpoint_create_data)
         for route_id in created_routes:
-            await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
+            await self._event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
         await self._update_scheduler_mark(
             ScheduleType.SCALE_SERVICES,
             {
@@ -1180,21 +1186,21 @@ class SchedulerDispatcher(aobject):
         )
 
         await execute_with_retry(
-            lambda: self.schedule_repository.destroy_terminated_endpoints_and_routes(
+            lambda: self._schedule_repository.destroy_terminated_endpoints_and_routes(
                 endpoints_to_mark_terminated, already_destroyed_sessions
             )
         )
 
-        await self.schedule_repository.delete_appproxy_endpoints_readonly(
-            endpoints_to_mark_terminated, self.registry
+        await self._schedule_repository.delete_appproxy_endpoints_readonly(
+            endpoints_to_mark_terminated, self._registry
         )
 
     async def update_session_status(
         self,
     ) -> None:
         log.debug("update_session_status(): triggered")
-        candidates = await self.registry.session_lifecycle_mgr.get_status_updatable_sessions()
-        await self.registry.session_lifecycle_mgr.transit_session_status(candidates)
+        candidates = await self._registry.session_lifecycle_mgr.get_status_updatable_sessions()
+        await self._registry.session_lifecycle_mgr.transit_session_status(candidates)
 
     async def start_session(
         self,
@@ -1209,22 +1215,22 @@ class SchedulerDispatcher(aobject):
         log.debug(log_fmt + "try-starting", *log_args)
         try:
             assert len(session.kernels) > 0
-            await self.registry.start_session(sched_ctx, session)
+            await self._registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
-            status_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
+            status_data = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.
 
             async def _mark_session_cancelled() -> None:
-                await self.schedule_repository._mark_session_cancelled(
+                await self._schedule_repository._mark_session_cancelled(
                     sched_ctx, session, status_data
                 )
 
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
-                await self.registry.event_producer.anycast_and_broadcast_event(
+                await self._event_producer.anycast_and_broadcast_event(
                     SessionCancelledAnycastEvent(
                         session.id,
                         session.creation_id,
@@ -1236,7 +1242,7 @@ class SchedulerDispatcher(aobject):
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
-                cid_map = await self.schedule_repository.get_container_info_for_destroyed_kernels(
+                cid_map = await self._schedule_repository.get_container_info_for_destroyed_kernels(
                     session.id
                 )
                 destroyed_kernels = [
@@ -1248,11 +1254,11 @@ class SchedulerDispatcher(aobject):
                     }
                     for k in session.kernels
                 ]
-                await self.registry.destroy_session_lowlevel(
+                await self._registry.destroy_session_lowlevel(
                     session.id,
                     destroyed_kernels,
                 )
-                await self.registry.recalc_resource_usage()
+                await self._registry.recalc_resource_usage()
             except Exception as destroy_err:
                 log.error(log_fmt + "cleanup-start-failure: error", *log_args, exc_info=destroy_err)
             finally:
@@ -1260,14 +1266,14 @@ class SchedulerDispatcher(aobject):
         else:
             log.info(log_fmt + "started", *log_args)
 
-    async def flush_cancelled_sessions(self, cancelled_sessions: Sequence[SessionRow]) -> None:
+    async def _flush_cancelled_sessions(self, cancelled_sessions: Sequence[SessionRow]) -> None:
         if not cancelled_sessions:
             return
         session_ids = [item.id for item in cancelled_sessions]
 
-        await self.schedule_repository.apply_cancellation(session_ids)
+        await self._schedule_repository.apply_cancellation(session_ids)
         for item in cancelled_sessions:
-            await self.event_producer.anycast_and_broadcast_event(
+            await self._event_producer.anycast_and_broadcast_event(
                 SessionCancelledAnycastEvent(
                     item.id,
                     item.creation_id,
@@ -1280,7 +1286,7 @@ class SchedulerDispatcher(aobject):
                 ),
             )
 
-    async def check_predicates(
+    async def _check_predicates(
         self,
         sched_ctx: SchedulingContext,
         pending_sess: SessionRow,
@@ -1288,7 +1294,7 @@ class SchedulerDispatcher(aobject):
         exc_handler: Callable[[Exception], None] | None = None,
     ) -> list[tuple[str, Union[Exception, PredicateResult]]]:
         check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
-        async with self.registry.db.begin_session() as db_sess:
+        async with self._registry.db.begin_session() as db_sess:
             predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
                 (
                     "reserved_time",
@@ -1335,13 +1341,13 @@ class SchedulerDispatcher(aobject):
                     check_results.append((predicate_name, e))
         return check_results
 
-    async def check_predicates_hook(
+    async def _check_predicates_hook(
         self,
         sched_ctx: SchedulingContext,
         pending_sess: SessionRow,
     ) -> HookResult:
-        async with self.registry.db.begin_readonly_session() as db_sess:
-            return await self.registry.hook_plugin_ctx.dispatch(
+        async with self._registry.db.begin_readonly_session() as db_sess:
+            return await self._registry.hook_plugin_ctx.dispatch(
                 "PREDICATE",
                 (
                     db_sess,
@@ -1354,7 +1360,7 @@ class SchedulerDispatcher(aobject):
         """
         Returns the Redis key for the given schedule type.
         """
-        manager_id = self.config_provider.config.manager.id
+        manager_id = self._config_provider.config.manager.id
         return f"manager.{manager_id}.{str(schedule_type)}"
 
     async def _mark_scheduler_start(
