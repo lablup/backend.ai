@@ -93,6 +93,10 @@ enum ArtifactStatus {
   FAILED
 }
 
+type ArtifactStatusChangedPayload {
+  artifact: Artifact
+}
+
 enum ArtifactType {
   MODEL
   PACKAGE
@@ -200,7 +204,7 @@ input StringFilter {
 }
 
 type Subscription {
-  artifactStatusChanged(artifactId: ID = null): Artifact!
+  artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
   downloadProgress(artifactId: ID!): DownloadProgress!
 }
 

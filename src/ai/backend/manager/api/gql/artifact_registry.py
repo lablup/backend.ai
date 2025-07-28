@@ -187,6 +187,11 @@ class CancelPullPayload:
     artifact: Optional[Artifact] = None
 
 
+@strawberry.type
+class ArtifactStatusChangedPayload:
+    artifact: Optional[Artifact] = None
+
+
 # Query Fields
 @strawberry.field
 def artifacts(
@@ -283,11 +288,11 @@ def cancel_pull(artifact_id: ID) -> CancelPullPayload:
 @strawberry.subscription
 async def artifact_status_changed(
     artifact_id: Optional[ID] = None,
-) -> AsyncGenerator[Artifact, None]:
+) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
     # Mock implementation
     # In real implementation, this would yield artifacts when status changes
     if False:  # Placeholder to make this a generator
-        yield Artifact()
+        yield ArtifactStatusChangedPayload(artifact=Artifact())
 
 
 @strawberry.subscription
