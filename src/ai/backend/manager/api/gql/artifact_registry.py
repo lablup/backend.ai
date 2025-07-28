@@ -86,6 +86,11 @@ class DeleteArtifactInput:
     force_delete: bool = False
 
 
+@strawberry.input
+class VerifyArtifactInput:
+    artifact_id: ID
+
+
 # Object Types
 @strawberry.type
 class SourceInfo:
@@ -273,7 +278,7 @@ def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
 
 
 @strawberry.mutation
-def verify_artifact(artifact_id: ID) -> VerifyArtifactPayload:
+def verify_artifact(input: VerifyArtifactInput) -> VerifyArtifactPayload:
     # Mock implementation
     return VerifyArtifactPayload()
 

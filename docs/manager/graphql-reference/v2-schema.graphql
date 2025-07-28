@@ -140,7 +140,7 @@ type Mutation {
   installArtifact(input: InstallArtifactInput!): InstallArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
-  verifyArtifact(artifactId: ID!): VerifyArtifactPayload!
+  verifyArtifact(input: VerifyArtifactInput!): VerifyArtifactPayload!
   cancelPull(artifactId: ID!): CancelPullPayload!
 }
 
@@ -214,6 +214,10 @@ input UpdateArtifactInput {
 
 type UpdateArtifactPayload {
   artifact: Artifact
+}
+
+input VerifyArtifactInput {
+  artifactId: ID!
 }
 
 type VerifyArtifactPayload {
