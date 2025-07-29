@@ -1491,6 +1491,21 @@ class AgentRegistry:
                             item.allocated_host_ports.add(port)
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
+        if scheduled_session.network_type == NetworkType.VOLATILE:
+
+            async def _update_network_id(db_sess: AsyncSession) -> None:
+                query = (
+                    sa.update(SessionRow)
+                    .values({
+                        "network_id": network_name,
+                    })
+                    .where(SessionRow.id == scheduled_session.id)
+                )
+                await db_sess.execute(query)
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(_update_network_id, self.db.begin_session, db_conn)
+
         keyfunc = lambda binding: binding.kernel.cluster_role
         replicas = {
             cluster_role: len([*group_iterator])
