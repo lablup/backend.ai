@@ -3,7 +3,7 @@ from typing import AsyncIterator
 
 from botocore.exceptions import ClientError
 
-from ai.backend.common.dto.storage.request import S3TokenData
+from ai.backend.common.dto.storage.request import ObjectStorageTokenData
 from ai.backend.common.dto.storage.response import (
     DeleteResponse,
     ObjectInfoResponse,
@@ -80,7 +80,7 @@ class StoragesService:
         )
 
     async def stream_upload(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData, data_stream
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData, data_stream
     ) -> UploadResponse:
         """
         Upload a file to S3 using streaming.
@@ -88,7 +88,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
             data_stream: Async iterator of file data chunks
 
         Returns:
@@ -115,7 +115,7 @@ class StoragesService:
             raise StorageProxyError("Upload failed") from e
 
     async def stream_download(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
     ) -> AsyncIterator[bytes]:
         """
         Download a file from S3 using streaming.
@@ -123,7 +123,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
 
         Yields:
             bytes: Chunks of file data
@@ -143,7 +143,7 @@ class StoragesService:
             raise StorageProxyError("Download failed") from e
 
     async def generate_presigned_upload_url(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
     ) -> PresignedUploadResponse:
         """
         Generate presigned upload URL.
@@ -151,7 +151,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
 
         Returns:
             PresignedUploadResponse with URL and fields
@@ -181,7 +181,7 @@ class StoragesService:
             raise PresignedUploadURLGenerationError() from e
 
     async def generate_presigned_download_url(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
     ) -> PresignedDownloadResponse:
         """
         Generate presigned download URL.
@@ -189,7 +189,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
 
         Returns:
             PresignedDownloadResponse with URL
@@ -215,7 +215,7 @@ class StoragesService:
             raise PresignedDownloadURLGenerationError() from e
 
     async def get_object_info(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
     ) -> ObjectInfoResponse:
         """
         Get object information.
@@ -223,7 +223,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
 
         Returns:
             ObjectInfoResponse with object metadata
@@ -258,7 +258,7 @@ class StoragesService:
             raise StorageProxyError(f"Get object info failed: {str(e)}") from e
 
     async def delete_object(
-        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
     ) -> DeleteResponse:
         """
         Delete object.
@@ -266,7 +266,7 @@ class StoragesService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            token_data: Validated S3 token data
+            token_data: Validated object storage token data
 
         Returns:
             DeleteResponse with success status
