@@ -124,7 +124,7 @@ ArtifactEdge = Edge[Artifact]
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
     @strawberry.field
-    def total_count(self) -> int:
+    def count(self) -> int:
         # Mock implementation - in real implementation, count from database
         return 0
 

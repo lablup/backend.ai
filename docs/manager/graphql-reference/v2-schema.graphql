@@ -19,7 +19,7 @@ type ArtifactConnection {
 
   """Contains the nodes in this connection"""
   edges: [ArtifactEdge!]!
-  totalCount: Int!
+  count: Int!
 }
 
 """An edge in a connection."""
