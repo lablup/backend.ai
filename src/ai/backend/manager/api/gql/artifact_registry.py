@@ -132,7 +132,7 @@ mock_artifact_2 = Artifact(
 )
 
 mock_artifact_3 = Artifact(
-    id="2",
+    id="3",
     name="Example Package Artifact",
     type=ArtifactType.PACKAGE,
     status=ArtifactStatus.AVAILABLE,
@@ -195,7 +195,7 @@ ArtifactGroupEdge = Edge[ArtifactGroup]
 
 # TODO: After implementing the actual logic, remove this mock object
 mock_artifact_group1 = ArtifactGroup(
-    id="1",
+    id="4",
     name="Example Artifact Group",
     type=ArtifactType.MODEL,
     status=ArtifactStatus.AVAILABLE,
@@ -203,7 +203,7 @@ mock_artifact_group1 = ArtifactGroup(
 )
 
 mock_artifact_group2 = ArtifactGroup(
-    id="1",
+    id="5",
     name="Example Artifact Group",
     type=ArtifactType.IMAGE,
     status=ArtifactStatus.AVAILABLE,
@@ -211,7 +211,7 @@ mock_artifact_group2 = ArtifactGroup(
 )
 
 mock_artifact_group3 = ArtifactGroup(
-    id="1",
+    id="6",
     name="Example Artifact Group",
     type=ArtifactType.PACKAGE,
     status=ArtifactStatus.AVAILABLE,
