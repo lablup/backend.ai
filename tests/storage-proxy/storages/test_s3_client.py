@@ -13,9 +13,7 @@ async def test_upload_stream_success(s3_client: S3Client):
         yield b"chunk2"
         yield b"chunk3"
 
-    result = await s3_client.upload_stream(data_stream(), "test/key.txt", content_type="text/plain")
-
-    assert result is True
+    await s3_client.upload_stream(data_stream(), "test/key.txt", content_type="text/plain")
 
     # Verify the file was uploaded by downloading it
     chunks = []
@@ -34,8 +32,7 @@ async def test_download_stream_success(s3_client: S3Client):
     async def data_stream():
         yield test_data
 
-    upload_result = await s3_client.upload_stream(data_stream(), "test/download.txt")
-    assert upload_result is True
+    await s3_client.upload_stream(data_stream(), "test/download.txt")
 
     # Now download and verify
     chunks = []
@@ -124,8 +121,8 @@ async def test_get_object_info_success(s3_client: S3Client):
 @pytest.mark.asyncio
 async def test_get_object_info_not_found(s3_client: S3Client):
     """Test object info retrieval with object not found"""
-    result = await s3_client.get_object_info("nonexistent/key.txt")
-    assert result is None
+    with pytest.raises(ClientError):
+        await s3_client.get_object_info("nonexistent/key.txt")
 
 
 @pytest.mark.asyncio
@@ -144,20 +141,18 @@ async def test_delete_object_success(s3_client: S3Client):
     assert info is not None
 
     # Delete the file
-    result = await s3_client.delete_object("test/delete_me.txt")
-    assert result is True
+    await s3_client.delete_object("test/delete_me.txt")
 
     # Verify file is gone
-    info_after_delete = await s3_client.get_object_info("test/delete_me.txt")
-    assert info_after_delete is None
+    with pytest.raises(ClientError):
+        await s3_client.get_object_info("test/delete_me.txt")
 
 
 @pytest.mark.asyncio
 async def test_delete_object_nonexistent(s3_client: S3Client):
     """Test deletion of nonexistent object (should succeed in S3)"""
     # In S3, deleting a nonexistent object is considered successful
-    result = await s3_client.delete_object("nonexistent/file.txt")
-    assert result is True
+    await s3_client.delete_object("nonexistent/file.txt")
 
 
 @pytest.mark.asyncio
@@ -185,8 +180,7 @@ async def test_create_bucket_success(s3_client: S3Client):
         )
 
         # This should succeed if bucket was created
-        result = await test_client.upload_stream(data_stream(), "test-key.txt")
-        assert result is True
+        await test_client.upload_stream(data_stream(), "test-key.txt")
 
     finally:
         # Clean up: delete the test bucket
@@ -204,8 +198,7 @@ async def test_create_bucket_already_exists(s3_client: S3Client):
     async def data_stream():
         yield b"test data for existing bucket"
 
-    result = await s3_client.upload_stream(data_stream(), "test-existing-bucket.txt")
-    assert result is True
+    await s3_client.upload_stream(data_stream(), "test-existing-bucket.txt")
 
 
 @pytest.mark.asyncio
@@ -232,9 +225,9 @@ async def test_delete_bucket_success(s3_client: S3Client):
     async def data_stream():
         yield b"test data"
 
-    # This should return False since bucket doesn't exist
-    result = await test_client.upload_stream(data_stream(), "test-key.txt")
-    assert result is False
+    # This should raise an exception since bucket doesn't exist
+    with pytest.raises(ClientError):
+        await test_client.upload_stream(data_stream(), "test-key.txt")
 
 
 @pytest.mark.asyncio

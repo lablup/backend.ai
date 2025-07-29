@@ -75,7 +75,7 @@ class S3Client:
         s3_key: str,
         content_type: Optional[str] = None,
         content_length: Optional[int] = None,
-    ) -> bool:
+    ) -> None:
         """
         Upload data stream to S3 bucket.
 
@@ -116,17 +116,16 @@ class S3Client:
 
                 await s3_client.put_object(**put_object_args)
                 logger.info(f"Successfully uploaded stream to s3://{self.bucket_name}/{s3_key}")
-                return True
 
         except NoCredentialsError:
             logger.error("AWS credentials not found")
-            return False
+            raise
         except ClientError as e:
             logger.error(f"Failed to upload stream to S3: {e}")
-            return False
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during upload: {e}")
-            return False
+            raise
 
     async def download_stream(
         self,
@@ -188,7 +187,7 @@ class S3Client:
         expiration: int = 3600,
         content_type: Optional[str] = None,
         content_length_range: Optional[tuple[int, int]] = None,
-    ) -> Optional[S3PresignedUploadData]:
+    ) -> S3PresignedUploadData:
         """
         Generate a presigned URL for client-side upload to S3.
 
@@ -240,10 +239,10 @@ class S3Client:
 
         except ClientError as e:
             logger.error(f"Failed to generate presigned upload URL: {e}")
-            return None
+            raise
         except Exception as e:
             logger.error(f"Unexpected error generating presigned upload URL: {e}")
-            return None
+            raise
 
     async def generate_presigned_download_url(
         self,
@@ -251,7 +250,7 @@ class S3Client:
         expiration: int = 3600,
         response_content_disposition: Optional[str] = None,
         response_content_type: Optional[str] = None,
-    ) -> Optional[str]:
+    ) -> str:
         """
         Generate a presigned URL for client-side download from S3.
 
@@ -295,12 +294,12 @@ class S3Client:
 
         except ClientError as e:
             logger.error(f"Failed to generate presigned download URL: {e}")
-            return None
+            raise
         except Exception as e:
             logger.error(f"Unexpected error generating presigned download URL: {e}")
-            return None
+            raise
 
-    async def get_object_info(self, s3_key: str) -> Optional[S3ObjectInfo]:
+    async def get_object_info(self, s3_key: str) -> S3ObjectInfo:
         """
         Get metadata information about an S3 object.
 
@@ -335,15 +334,15 @@ class S3Client:
             error_code = e.response["Error"]["Code"]
             if error_code in ("NoSuchKey", "404", "NotFound"):
                 logger.debug(f"S3 object not found: s3://{self.bucket_name}/{s3_key}")
-                return None
+                raise
             else:
                 logger.error(f"Failed to get object info from S3: {e}")
-                return None
+                raise
         except Exception as e:
             logger.error(f"Unexpected error getting object info: {e}")
-            return None
+            raise
 
-    async def delete_object(self, s3_key: str) -> bool:
+    async def delete_object(self, s3_key: str) -> None:
         """
         Delete an object from S3 bucket.
 
@@ -366,11 +365,9 @@ class S3Client:
                     Key=s3_key,
                 )
                 logger.info(f"Successfully deleted s3://{self.bucket_name}/{s3_key}")
-                return True
-
         except ClientError as e:
             logger.error(f"Failed to delete object from S3: {e}")
-            return False
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during deletion: {e}")
-            return False
+            raise
