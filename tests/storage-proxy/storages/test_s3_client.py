@@ -1,41 +1,7 @@
-import aioboto3
 import pytest
 from botocore.exceptions import ClientError
 
 from ai.backend.storage.client.s3 import S3Client, S3ObjectInfo, S3PresignedUploadData
-from ai.backend.testutils.bootstrap import minio_container  # noqa: F401
-
-
-@pytest.fixture
-async def s3_client(minio_container):  # noqa: F811
-    """Create S3Client instance for testing with MinIO container"""
-    container_id, host_port = minio_container
-
-    client = S3Client(
-        bucket_name="test-bucket",
-        endpoint_url=f"http://{host_port.host}:{host_port.port}",
-        region_name="us-east-1",
-        aws_access_key_id="minioadmin",
-        aws_secret_access_key="minioadmin",
-    )
-
-    # Create test bucket
-    session = aioboto3.Session()
-    async with session.client(
-        "s3",
-        endpoint_url=f"http://{host_port.host}:{host_port.port}",
-        region_name="us-east-1",
-        aws_access_key_id="minioadmin",
-        aws_secret_access_key="minioadmin",
-    ) as s3_admin:
-        try:
-            await s3_admin.create_bucket(Bucket="test-bucket")
-        except ClientError as e:
-            # Bucket might already exist
-            if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
-                raise
-
-    return client
 
 
 @pytest.mark.asyncio
@@ -192,3 +158,87 @@ async def test_delete_object_nonexistent(s3_client: S3Client):
     # In S3, deleting a nonexistent object is considered successful
     result = await s3_client.delete_object("nonexistent/file.txt")
     assert result is True
+
+
+@pytest.mark.asyncio
+async def test_create_bucket_success(s3_client: S3Client):
+    """Test successful bucket creation"""
+    test_bucket_name = "test-create-bucket"
+
+    # Create the bucket
+    await s3_client.create_bucket(test_bucket_name)
+
+    # Verify bucket was created by trying to list it or perform an operation
+    # Since S3Client doesn't have a list_buckets method, we'll verify by uploading to it
+    try:
+
+        async def data_stream():
+            yield b"test data"
+
+        # Create a new client instance for the test bucket
+        test_client = S3Client(
+            bucket_name=test_bucket_name,
+            endpoint_url=s3_client.endpoint_url,
+            region_name=s3_client.region_name,
+            aws_access_key_id=s3_client.aws_access_key_id,
+            aws_secret_access_key=s3_client.aws_secret_access_key,
+        )
+
+        # This should succeed if bucket was created
+        result = await test_client.upload_stream(data_stream(), "test-key.txt")
+        assert result is True
+
+    finally:
+        # Clean up: delete the test bucket
+        await s3_client.delete_bucket(test_bucket_name)
+
+
+@pytest.mark.asyncio
+async def test_create_bucket_already_exists(s3_client: S3Client):
+    """Test creating a bucket that already exists (should not fail)"""
+    # The s3_client fixture already has a "test-bucket" created
+    # Creating it again should not raise an error
+    await s3_client.create_bucket("test-bucket")
+
+    # Verify the bucket still works
+    async def data_stream():
+        yield b"test data for existing bucket"
+
+    result = await s3_client.upload_stream(data_stream(), "test-existing-bucket.txt")
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_delete_bucket_success(s3_client: S3Client):
+    """Test successful bucket deletion"""
+    test_bucket_name = "test-delete-bucket"
+
+    # First create a bucket to delete
+    await s3_client.create_bucket(test_bucket_name)
+
+    # Delete the bucket
+    await s3_client.delete_bucket(test_bucket_name)
+
+    # Verify bucket was deleted by trying to use it
+    # The upload_stream method catches ClientError and returns False instead of raising
+    test_client = S3Client(
+        bucket_name=test_bucket_name,
+        endpoint_url=s3_client.endpoint_url,
+        region_name=s3_client.region_name,
+        aws_access_key_id=s3_client.aws_access_key_id,
+        aws_secret_access_key=s3_client.aws_secret_access_key,
+    )
+
+    async def data_stream():
+        yield b"test data"
+
+    # This should return False since bucket doesn't exist
+    result = await test_client.upload_stream(data_stream(), "test-key.txt")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_delete_bucket_nonexistent(s3_client: S3Client):
+    """Test deletion of nonexistent bucket (should not fail)"""
+    # Deleting a nonexistent bucket should not raise an error
+    await s3_client.delete_bucket("nonexistent-bucket-12345")

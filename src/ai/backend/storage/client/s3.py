@@ -29,6 +29,46 @@ class S3Client:
         self.aws_secret_access_key = aws_secret_access_key
         self.session = aioboto3.Session()
 
+    async def create_bucket(self, bucket_name: str) -> None:
+        """
+        Create an S3 bucket if it does not already exist.
+
+        Args:
+            bucket_name: Name of the bucket to create.
+        """
+        try:
+            async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url,
+                region_name=self.region_name,
+                aws_access_key_id=self.aws_access_key_id,
+                aws_secret_access_key=self.aws_secret_access_key,
+            ) as s3_client:
+                await s3_client.create_bucket(Bucket=bucket_name)
+                logger.info(f"Bucket {bucket_name} created successfully.")
+        except ClientError as e:
+            logger.error(f"Failed to create bucket {bucket_name}: {e}")
+
+    async def delete_bucket(self, bucket_name: str) -> None:
+        """
+        Delete an S3 bucket if it exists.
+
+        Args:
+            bucket_name: Name of the bucket to delete.
+        """
+        try:
+            async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url,
+                region_name=self.region_name,
+                aws_access_key_id=self.aws_access_key_id,
+                aws_secret_access_key=self.aws_secret_access_key,
+            ) as s3_client:
+                await s3_client.delete_bucket(Bucket=bucket_name)
+                logger.info(f"Bucket {bucket_name} deleted successfully.")
+        except ClientError as e:
+            logger.error(f"Failed to delete bucket {bucket_name}: {e}")
+
     async def upload_stream(
         self,
         data_stream: AsyncIterator[bytes],
