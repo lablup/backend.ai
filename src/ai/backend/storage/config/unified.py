@@ -563,7 +563,7 @@ class StorageProxyConfig(BaseModel):
     )
 
 
-# TODO: Remove this.
+# TODO: Remove this after migrating this to database
 class ObjectStorageConfig(BaseModel):
     name: str = Field(
         description="""

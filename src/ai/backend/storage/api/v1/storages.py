@@ -14,7 +14,7 @@ from ai.backend.common.api_handlers import (
     api_handler,
 )
 from ai.backend.common.dto.storage.context import MultipartUploadCtx
-from ai.backend.common.dto.storage.request import S3ClientOperationType, S3TokenData
+from ai.backend.common.dto.storage.request import ObjectStorageOperationType, ObjectStorageTokenData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
@@ -52,7 +52,7 @@ class StoragesConfigCtx(MiddlewareParam):
 
 
 class TokenValidationCtx(MiddlewareParam):
-    token: S3TokenData
+    token: ObjectStorageTokenData
 
     @override
     @classmethod
@@ -74,7 +74,7 @@ class TokenValidationCtx(MiddlewareParam):
             except jwt.PyJWTError as e:
                 raise web.HTTPUnauthorized(reason=f"Invalid JWT token: {str(e)}") from e
 
-            return cls(token=S3TokenData.model_validate(token_data))
+            return cls(token=ObjectStorageTokenData.model_validate(token_data))
         except ValidationError as e:
             raise web.HTTPBadRequest(reason="Invalid S3 token data") from e
 
@@ -117,7 +117,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "upload_file", token_data)
 
-        if token_data.op != S3ClientOperationType.UPLOAD:
+        if token_data.op != ObjectStorageOperationType.UPLOAD:
             raise web.HTTPBadRequest(reason="Invalid token operation for upload")
 
         storages_service = StoragesService(config_ctx.storages)
@@ -161,7 +161,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "download_file", token_data)
 
-        if token_data.op != S3ClientOperationType.DOWNLOAD:
+        if token_data.op != ObjectStorageOperationType.DOWNLOAD:
             raise web.HTTPBadRequest(reason="Invalid token operation for download")
 
         storages_service = StoragesService(config_ctx.storages)
@@ -188,7 +188,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "presigned_upload_url", token_data)
 
-        if token_data.op != S3ClientOperationType.PRESIGNED_UPLOAD:
+        if token_data.op != ObjectStorageOperationType.PRESIGNED_UPLOAD:
             raise web.HTTPBadRequest(reason="Invalid token operation for presigned upload")
 
         storages_service = StoragesService(config_ctx.storages)
@@ -216,7 +216,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "presigned_download_url", token_data)
 
-        if token_data.op != S3ClientOperationType.PRESIGNED_DOWNLOAD:
+        if token_data.op != ObjectStorageOperationType.PRESIGNED_DOWNLOAD:
             raise web.HTTPBadRequest(reason="Invalid token operation for presigned download")
 
         storages_service = StoragesService(config_ctx.storages)
@@ -244,7 +244,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "get_file_info", token_data)
 
-        if token_data.op != S3ClientOperationType.INFO:
+        if token_data.op != ObjectStorageOperationType.INFO:
             raise web.HTTPBadRequest(reason="Invalid token operation for info")
 
         storages_service = StoragesService(config_ctx.storages)
@@ -272,7 +272,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "delete_file", token_data)
 
-        if token_data.op != S3ClientOperationType.DELETE:
+        if token_data.op != ObjectStorageOperationType.DELETE:
             raise web.HTTPBadRequest(reason="Invalid token operation for delete")
 
         storages_service = StoragesService(config_ctx.storages)
