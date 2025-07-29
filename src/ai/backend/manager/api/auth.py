@@ -574,6 +574,18 @@ def auth_required(handler):
     return wrapped
 
 
+def auth_required_for_method(method):
+    @functools.wraps(method)
+    async def wrapped(self, request, *args, **kwargs):
+        if request.get("is_authorized", False):
+            return await method(self, request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
+    return wrapped
+
+
 def admin_required(handler):
     @functools.wraps(handler)
     async def wrapped(request, *args, **kwargs):

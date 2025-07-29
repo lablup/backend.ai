@@ -19,8 +19,7 @@ from pydantic import ConfigDict, Field
 
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
-from ai.backend.common.data.user.types import UserIdentity
-from ai.backend.common.dto.manager.context import UserIdentityCtx
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
@@ -37,7 +36,7 @@ from ..models.gql import (
     Mutations,
     Queries,
 )
-from .auth import auth_required
+from .auth import auth_required, auth_required_for_method
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
@@ -165,11 +164,11 @@ class GQLInspectionConfigCtx(MiddlewareParam):
 
 
 class V2APIHandler:
+    @auth_required_for_method
     @api_handler
     async def handle_gql_v2(
         self,
         body: BodyParam[GraphQLReq],
-        user_identity_ctx: UserIdentityCtx,
         config_ctx: GQLInspectionConfigCtx,
     ) -> APIResponse:
         rules = []
@@ -196,8 +195,14 @@ class V2APIHandler:
                     ),
                 )
 
+        user = current_user()
+        if not user:
+            raise web.HTTPUnauthorized(
+                text="Unauthorized: User identity is required for GraphQL v2 API."
+            )
+
         strawberry_ctx = StrawberryGQLContext(
-            user=UserIdentity.from_ctx(user_identity_ctx),
+            user=user,
         )
 
         query, variables, operation_name = (
