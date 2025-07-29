@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterable
 from typing import AsyncIterator, Optional
 
 import aioboto3
@@ -71,7 +72,7 @@ class S3Client:
 
     async def upload_stream(
         self,
-        data_stream: AsyncIterator[bytes],
+        data_stream: AsyncIterable[bytes],
         s3_key: str,
         content_type: Optional[str] = None,
         content_length: Optional[int] = None,
