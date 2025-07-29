@@ -595,10 +595,10 @@ class ObjectStorageConfig(BaseModel):
         validation_alias=AliasChoices("secret-key", "secret_key"),
         serialization_alias="secret-key",
     )
-    bucket: str = Field(
+    buckets: list[str] = Field(
+        default_factory=list,
         description="""
-        Name of the bucket to use in the object storage service.
-        All operations will be performed within this bucket.
+        List of bucket names managed by this storage configuration.
         """,
         examples=["my-bucket"],
     )

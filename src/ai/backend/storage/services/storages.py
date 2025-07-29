@@ -1,7 +1,6 @@
 import logging
 from typing import AsyncIterator
 
-from aiohttp import web
 from botocore.exceptions import ClientError
 
 from ai.backend.common.dto.storage.request import S3TokenData
@@ -19,10 +18,11 @@ from ..client.s3 import S3Client
 from ..exception import (
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
-    StorageObjectNotFoundError,
+    StorageBucketFileNotFoundError,
+    StorageBucketNotFoundError,
+    StorageNotFoundError,
     StorageProxyError,
 )
-from ..utils import log_client_api_entry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,7 +30,11 @@ _DEFAULT_TOKEN_DURATION = 1800  # Default token expiration time in seconds
 
 
 class StoragesService:
-    """Service class for S3 storage operations."""
+    """
+    Service class for S3 storage operations.
+    """
+
+    _storage_configs: dict[str, ObjectStorageConfig]
 
     def __init__(self, storage_configs: list[ObjectStorageConfig]) -> None:
         """
@@ -39,25 +43,32 @@ class StoragesService:
         Args:
             storage_configs: List of storage configurations from context
         """
-        self._storage_configs = {config.bucket: config for config in storage_configs}
+        self._storage_configs = {config.name: config for config in storage_configs}
 
-    def _get_s3_client(self, bucket_name: str) -> S3Client:
+    def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
         """
-        Get S3 client for the specified bucket.
+        Get S3 client for the specified storage and bucket.
 
         Args:
+            storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
 
         Returns:
             S3Client instance configured for the bucket
 
         Raises:
-            web.HTTPBadRequest: If no storage configuration found for bucket
+            StorageNotFoundError: If no storage configuration found
+            StorageBucketNotFoundError: If bucket not found in storage config
         """
-        storage_config = self._storage_configs.get(bucket_name)
+        storage_config = self._storage_configs.get(storage_name)
         if not storage_config:
-            raise web.HTTPBadRequest(
-                reason=f"No storage configuration found for bucket: {bucket_name}"
+            raise StorageNotFoundError(
+                f"No storage configuration found for storage: {storage_name}"
+            )
+
+        if bucket_name not in storage_config.buckets:
+            raise StorageBucketNotFoundError(
+                f"Bucket '{bucket_name}' not found in storage '{storage_name}'"
             )
 
         return S3Client(
@@ -68,11 +79,15 @@ class StoragesService:
             aws_secret_access_key=storage_config.secret_key,
         )
 
-    async def stream_upload(self, token_data: S3TokenData, data_stream) -> UploadResponse:
+    async def stream_upload(
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData, data_stream
+    ) -> UploadResponse:
         """
         Upload a file to S3 using streaming.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
             data_stream: Async iterator of file data chunks
 
@@ -82,32 +97,32 @@ class StoragesService:
         Raises:
             StorageProxyError: If upload fails
         """
-        await log_client_api_entry(log, "stream_upload", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
 
             # Upload the stream
-            success = await s3_client.upload_stream(
+            await s3_client.upload_stream(
                 data_stream,
                 token_data.key,
                 content_type=token_data.content_type,
             )
 
-            if success:
-                return UploadResponse(success=True, key=token_data.key)
-            else:
-                raise StorageProxyError("Upload failed")
+            # If we reach here, upload was successful
+            return UploadResponse(success=True, key=token_data.key)
 
         except Exception as e:
             log.error(f"Stream upload failed: {e}")
             raise StorageProxyError("Upload failed") from e
 
-    async def stream_download(self, token_data: S3TokenData) -> AsyncIterator[bytes]:
+    async def stream_download(
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+    ) -> AsyncIterator[bytes]:
         """
         Download a file from S3 using streaming.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
 
         Yields:
@@ -116,10 +131,8 @@ class StoragesService:
         Raises:
             StorageProxyError: If download fails
         """
-        await log_client_api_entry(log, "stream_download", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
 
             # Download the stream
             async for chunk in s3_client.download_stream(token_data.key):
@@ -130,12 +143,14 @@ class StoragesService:
             raise StorageProxyError("Download failed") from e
 
     async def generate_presigned_upload_url(
-        self, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData
     ) -> PresignedUploadResponse:
         """
         Generate presigned upload URL.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
 
         Returns:
@@ -144,10 +159,8 @@ class StoragesService:
         Raises:
             PresignedUploadURLGenerationError: If URL generation fails
         """
-        await log_client_api_entry(log, "presigned_upload_url", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
 
             presigned_data = await s3_client.generate_presigned_upload_url(
                 token_data.key,
@@ -168,12 +181,14 @@ class StoragesService:
             raise PresignedUploadURLGenerationError() from e
 
     async def generate_presigned_download_url(
-        self, token_data: S3TokenData
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData
     ) -> PresignedDownloadResponse:
         """
         Generate presigned download URL.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
 
         Returns:
@@ -182,10 +197,8 @@ class StoragesService:
         Raises:
             PresignedDownloadURLGenerationError: If URL generation fails
         """
-        await log_client_api_entry(log, "presigned_download_url", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
 
             presigned_url = await s3_client.generate_presigned_download_url(
                 token_data.key,
@@ -201,11 +214,15 @@ class StoragesService:
             log.error(f"Presigned download URL generation failed: {e}")
             raise PresignedDownloadURLGenerationError() from e
 
-    async def get_object_info(self, token_data: S3TokenData) -> ObjectInfoResponse:
+    async def get_object_info(
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+    ) -> ObjectInfoResponse:
         """
         Get object information.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
 
         Returns:
@@ -214,14 +231,12 @@ class StoragesService:
         Raises:
             StorageObjectNotFoundError: If object not found
         """
-        await log_client_api_entry(log, "get_object_info", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
             object_info = await s3_client.get_object_info(token_data.key)
 
             if object_info is None:
-                raise StorageObjectNotFoundError()
+                raise StorageBucketFileNotFoundError()
 
             return ObjectInfoResponse(
                 content_length=object_info.content_length,
@@ -233,7 +248,7 @@ class StoragesService:
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
             if error_code == "404" or error_code == "NoSuchKey":
-                raise StorageObjectNotFoundError() from e
+                raise StorageBucketFileNotFoundError() from e
             else:
                 log.error(f"S3 client error in get_object_info: {e}")
                 raise StorageProxyError(f"Failed to get object info: {str(e)}") from e
@@ -242,22 +257,24 @@ class StoragesService:
             log.error(f"Get object info failed: {e}")
             raise StorageProxyError(f"Get object info failed: {str(e)}") from e
 
-    async def delete_object(self, token_data: S3TokenData) -> DeleteResponse:
+    async def delete_object(
+        self, storage_name: str, bucket_name: str, token_data: S3TokenData
+    ) -> DeleteResponse:
         """
         Delete object.
 
         Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
             token_data: Validated S3 token data
 
         Returns:
             DeleteResponse with success status
         """
-        await log_client_api_entry(log, "delete_object", token_data)
-
         try:
-            s3_client = self._get_s3_client(token_data.bucket)
-            success = await s3_client.delete_object(token_data.key)
-            return DeleteResponse(success=success)
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            await s3_client.delete_object(token_data.key)
+            return DeleteResponse(success=True)
 
         except Exception as e:
             log.error(f"Delete object failed: {e}")

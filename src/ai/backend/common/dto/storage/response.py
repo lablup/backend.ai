@@ -65,10 +65,10 @@ class PresignedDownloadResponse(BaseResponseModel):
 class ObjectInfoResponse(BaseResponseModel):
     """Response containing S3 object metadata."""
 
-    content_length: int | None = None
-    content_type: str | None = None
-    last_modified: str | None = None
-    etag: str | None = None
+    content_length: Optional[int] = None
+    content_type: Optional[str] = None
+    last_modified: Optional[str] = None
+    etag: Optional[str] = None
 
 
 class DeleteResponse(BaseResponseModel):
