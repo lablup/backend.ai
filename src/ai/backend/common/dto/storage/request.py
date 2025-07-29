@@ -1,4 +1,5 @@
-from typing import Literal, Optional
+import enum
+from typing import Optional
 
 from pydantic import Field
 
