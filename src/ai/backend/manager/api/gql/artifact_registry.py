@@ -288,9 +288,9 @@ def artifact_groups(
     # Mock implementation - return empty connection
     return Connection(
         edges=[
-            ArtifactGroupEdge(node=mock_artifact_group1, cursor="1"),
-            ArtifactGroupEdge(node=mock_artifact_group2, cursor="2"),
-            ArtifactGroupEdge(node=mock_artifact_group3, cursor="3"),
+            ArtifactGroupEdge(node=mock_artifact_group1, cursor="4"),
+            ArtifactGroupEdge(node=mock_artifact_group2, cursor="5"),
+            ArtifactGroupEdge(node=mock_artifact_group3, cursor="6"),
         ],
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
