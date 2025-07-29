@@ -194,10 +194,26 @@ class ArtifactGroup(Node):
 ArtifactGroupEdge = Edge[ArtifactGroup]
 
 # TODO: After implementing the actual logic, remove this mock object
-mock_artifact_group = ArtifactGroup(
+mock_artifact_group1 = ArtifactGroup(
     id="1",
     name="Example Artifact Group",
     type=ArtifactType.MODEL,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact group for demonstration purposes.",
+)
+
+mock_artifact_group2 = ArtifactGroup(
+    id="1",
+    name="Example Artifact Group",
+    type=ArtifactType.IMAGE,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact group for demonstration purposes.",
+)
+
+mock_artifact_group3 = ArtifactGroup(
+    id="1",
+    name="Example Artifact Group",
+    type=ArtifactType.PACKAGE,
     status=ArtifactStatus.AVAILABLE,
     description="This is a mock artifact group for demonstration purposes.",
 )
@@ -271,7 +287,11 @@ def artifact_groups(
 ) -> Connection[ArtifactGroup]:
     # Mock implementation - return empty connection
     return Connection(
-        edges=[ArtifactGroupEdge(node=mock_artifact_group, cursor="1")],
+        edges=[
+            ArtifactGroupEdge(node=mock_artifact_group1, cursor="1"),
+            ArtifactGroupEdge(node=mock_artifact_group2, cursor="2"),
+            ArtifactGroupEdge(node=mock_artifact_group3, cursor="3"),
+        ],
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
             has_previous_page=False,
