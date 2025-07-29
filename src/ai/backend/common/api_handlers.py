@@ -157,7 +157,7 @@ class PathParam(Generic[TRequestModel]):
 class MiddlewareParam(ABC, BaseModel):
     @classmethod
     @abstractmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         pass
 
 
@@ -195,7 +195,7 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
             try:
-                return input_param_type.from_request(request)
+                return await input_param_type.from_request(request)
             except ValidationError:
                 raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}")
 
@@ -348,7 +348,7 @@ async def _serialize_parameter(
             return param_instance_or_class.from_path(request.match_info)
         case _:
             try:
-                param_instance = param_instance_or_class.from_request(request)
+                param_instance = await param_instance_or_class.from_request(request)
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
                     f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
@@ -399,7 +399,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             user_id: str
             user_email: str
             @classmethod
-            def from_request(cls, request: web.Request) -> Self:
+            async def from_request(cls, request: web.Request) -> Self:
                 # Extract and validate data from request
                 user_id = request["user"]["uuid"]
                 user_email = request["user"]["email"]
