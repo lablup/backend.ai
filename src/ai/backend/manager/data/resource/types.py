@@ -36,3 +36,19 @@ class KeyPairResourcePolicyData:
     max_containers_per_session: int
     idle_timeout: int
     allowed_vfolder_hosts: dict[str, Any]
+
+
+@dataclass
+class GroupResourcePolicyData:
+    """Data class for group resource policy information"""
+
+    total_resource_slots: ResourceSlot
+    default_for_unspecified: DefaultForUnspecified
+
+
+@dataclass
+class DomainResourcePolicyData:
+    """Data class for domain resource policy information"""
+
+    total_resource_slots: ResourceSlot
+    default_for_unspecified: DefaultForUnspecified

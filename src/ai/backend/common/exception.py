@@ -158,6 +158,7 @@ class ErrorDomain(enum.StrEnum):
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
+    SCHEDULER = "scheduler"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -183,6 +184,7 @@ class ErrorOperation(enum.StrEnum):
     EXECUTE = "execute"
     SETUP = "setup"
     GRANT = "grant"
+    VALIDATE = "validate"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -236,6 +238,12 @@ class ErrorDetail(enum.StrEnum):
     # MISMATCH means the current state of the server does not match the expected state.
     # MISMATCH is used when the server is in a state that is not expected.
     MISMATCH = "mismatch"
+    # PRECONDITION_FAILED means the precondition for the operation failed.
+    PRECONDITION_FAILED = "precondition-failed"
+    # QUOTA_EXCEEDED means the user has exceeded their quota.
+    QUOTA_EXCEEDED = "quota-exceeded"
+    # DEPENDENCY_ERROR means there is an error with dependencies.
+    DEPENDENCY_ERROR = "dependency-error"
 
 
 @dataclass

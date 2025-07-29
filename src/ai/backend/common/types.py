@@ -418,6 +418,10 @@ class SessionTypes(CIStrEnum):
     INFERENCE = "inference"
     SYSTEM = "system"
 
+    def is_private(self) -> bool:
+        """Check if this is a private (system) session type"""
+        return self == SessionTypes.SYSTEM
+
 
 class SessionResult(CIStrEnum):
     UNDEFINED = "undefined"

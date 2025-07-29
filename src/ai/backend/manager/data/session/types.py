@@ -60,3 +60,13 @@ class SessionData:
 
     # Loaded from relationship
     service_ports: Optional[str]
+
+
+@dataclass
+class SessionDependencyData:
+    """Data class for session dependency information"""
+
+    id: uuid.UUID
+    name: str
+    status: "SessionStatus"
+    result: SessionResult
