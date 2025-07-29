@@ -55,32 +55,56 @@ def create_jwt_token(
 
 async def get_presigned_upload_url(
     storage_url: str,
+    storage_name: str,
+    bucket_name: str,
     token: str,
 ) -> PresignedUploadData:
     """Get presigned upload URL from storage API."""
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            f"{storage_url}/storages/s3/presigned-upload-url", params={"token": token}
+            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/files/presigned/upload",
+            params={"token": token},
         ) as response:
             if response.status != 200:
-                error_text = await response.text()
-                raise click.ClickException(f"Failed to get presigned upload URL: {error_text}")
+                # Parse API error responses for user-friendly messages
+                if response.status == 400:
+                    raise click.ClickException("Invalid request - check your parameters")
+                elif response.status == 401:
+                    raise click.ClickException("Authentication failed - check your secret key")
+                elif response.status == 404:
+                    raise click.ClickException("Storage or bucket not found")
+                else:
+                    raise click.ClickException(
+                        f"Failed to get presigned upload URL (HTTP {response.status})"
+                    )
             data = await response.json()
             return PresignedUploadData(**data)
 
 
 async def get_presigned_download_url(
     storage_url: str,
+    storage_name: str,
+    bucket_name: str,
     token: str,
 ) -> dict:
     """Get presigned download URL from storage API."""
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            f"{storage_url}/storages/s3/presigned-download-url", params={"token": token}
+            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/files/presigned/download",
+            params={"token": token},
         ) as response:
             if response.status != 200:
-                error_text = await response.text()
-                raise click.ClickException(f"Failed to get presigned download URL: {error_text}")
+                # Parse API error responses for user-friendly messages
+                if response.status == 400:
+                    raise click.ClickException("Invalid request - check your parameters")
+                elif response.status == 401:
+                    raise click.ClickException("Authentication failed - check your secret key")
+                elif response.status == 404:
+                    raise click.ClickException("Storage, bucket, or file not found")
+                else:
+                    raise click.ClickException(
+                        f"Failed to get presigned download URL (HTTP {response.status})"
+                    )
             return await response.json()
 
 
@@ -105,7 +129,21 @@ async def upload_file_to_presigned_url(
             async with session.post(url, data=data) as response:
                 if response.status not in (200, 204):
                     error_text = await response.text()
-                    raise click.ClickException(f"Failed to upload file: {error_text}")
+
+                    # Parse S3 XML error response for user-friendly messages
+                    if "AccessDenied" in error_text:
+                        raise click.ClickException("Access denied - check your credentials")
+                    elif "SignatureDoesNotMatch" in error_text:
+                        raise click.ClickException("Authentication failed - invalid signature")
+                    elif "EntityTooLarge" in error_text:
+                        raise click.ClickException("File too large for upload")
+                    elif "RequestTimeTooSkewed" in error_text or "TokenExpired" in error_text:
+                        raise click.ClickException("Request expired - try again")
+                    else:
+                        # For other errors, provide a generic message
+                        raise click.ClickException(
+                            f"Failed to upload file (HTTP {response.status})"
+                        )
 
 
 async def download_file_from_presigned_url(
@@ -117,7 +155,19 @@ async def download_file_from_presigned_url(
         async with session.get(presigned_url) as response:
             if response.status != 200:
                 error_text = await response.text()
-                raise click.ClickException(f"Failed to download file: {error_text}")
+
+                # Parse S3 XML error response for user-friendly messages
+                if response.status == 404 or "NoSuchKey" in error_text:
+                    raise click.ClickException("File not found in storage")
+                elif "AccessDenied" in error_text:
+                    raise click.ClickException("Access denied - check your credentials")
+                elif "SignatureDoesNotMatch" in error_text:
+                    raise click.ClickException("Authentication failed - invalid signature")
+                elif "RequestTimeTooSkewed" in error_text or "TokenExpired" in error_text:
+                    raise click.ClickException("Request expired - try again")
+                else:
+                    # For other errors, provide a generic message
+                    raise click.ClickException(f"Failed to download file (HTTP {response.status})")
 
             with output_path.open("wb") as f:
                 async for chunk in response.content.iter_chunked(8192):
@@ -134,6 +184,11 @@ async def download_file_from_presigned_url(
     "--secret",
     required=True,
     help="JWT secret for token generation",
+)
+@click.option(
+    "--storage-name",
+    required=True,
+    help="Storage configuration name",
 )
 @click.option(
     "--bucket",
@@ -167,6 +222,7 @@ def upload(
     cli_ctx: CLIContext,
     storage_url: str,
     secret: str,
+    storage_name: str,
     bucket: str,
     key: str,
     file_path: Path,
@@ -176,7 +232,7 @@ def upload(
     """
     Upload a file to object storage using presigned URL.
 
-    Example: backend.ai storage storages upload --secret mysecret --bucket test-bucket --key myfile.txt --file /path/to/local/file.txt
+    Example: backend.ai storage storages upload --secret mysecret --storage-name backendai-storage --bucket backendai-storage --key myfile.txt --file /path/to/local/file.txt
     """
 
     async def _upload():
@@ -203,7 +259,9 @@ def upload(
 
         try:
             # Get presigned upload URL
-            presigned_data = await get_presigned_upload_url(storage_url, token)
+            presigned_data = await get_presigned_upload_url(
+                storage_url, storage_name, bucket, token
+            )
 
             # Upload file
             await upload_file_to_presigned_url(presigned_data, file_path)
@@ -227,6 +285,11 @@ def upload(
     "--secret",
     required=True,
     help="JWT secret for token generation",
+)
+@click.option(
+    "--storage-name",
+    required=True,
+    help="Storage configuration name",
 )
 @click.option(
     "--bucket",
@@ -258,6 +321,7 @@ def download(
     cli_ctx: CLIContext,
     storage_url: str,
     secret: str,
+    storage_name: str,
     bucket: str,
     key: str,
     output: Optional[Path],
@@ -267,7 +331,7 @@ def download(
     """
     Download a file from object storage using presigned URL.
 
-    Example: backend.ai storage storages download --secret mysecret --bucket test-bucket --key myfile.txt --output /path/to/local/file.txt
+    Example: backend.ai storage storages download --secret mysecret --storage-name backendai-storage --bucket backendai-storage --key myfile.txt --output /path/to/local/file.txt
     """
 
     async def _download():
@@ -277,7 +341,7 @@ def download(
         else:
             output_path = Path(filename or os.path.basename(key) or "downloaded_file")
 
-        click.echo(f"Downloading {bucket}/{key} to {output_path}...")
+        click.echo(f"Downloading {storage_name}/{bucket}/{key} to {output_path}...")
 
         # Create JWT token for presigned download
         token = create_jwt_token(
@@ -291,13 +355,15 @@ def download(
 
         try:
             # Get presigned download URL
-            presigned_data = await get_presigned_download_url(storage_url, token)
+            presigned_data = await get_presigned_download_url(
+                storage_url, storage_name, bucket, token
+            )
             presigned_url = presigned_data["url"]
 
             # Download file
             await download_file_from_presigned_url(presigned_url, output_path)
 
-            click.echo(f"✅ Successfully downloaded {bucket}/{key} to {output_path}")
+            click.echo(f"✅ Successfully downloaded {storage_name}/{bucket}/{key} to {output_path}")
 
         except Exception as e:
             click.echo(f"❌ Download failed: {e}", err=True)
@@ -316,6 +382,11 @@ def download(
     "--secret",
     required=True,
     help="JWT secret for token generation",
+)
+@click.option(
+    "--storage-name",
+    required=True,
+    help="Storage configuration name",
 )
 @click.option(
     "--bucket",
@@ -338,6 +409,7 @@ def info(
     cli_ctx: CLIContext,
     storage_url: str,
     secret: str,
+    storage_name: str,
     bucket: str,
     key: str,
     expiration: int,
@@ -345,7 +417,7 @@ def info(
     """
     Get information about an object in storage.
 
-    Example: backend.ai storage storages info --secret mysecret --bucket test-bucket --key myfile.txt
+    Example: backend.ai storage storages info --secret mysecret --storage-name backendai-storage --bucket backendai-storage --key myfile.txt
     """
 
     async def _info():
@@ -363,11 +435,23 @@ def info(
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{storage_url}/storages/s3", params={"token": token}
+                    f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket}/files",
+                    params={"token": token},
                 ) as response:
                     if response.status != 200:
-                        error_text = await response.text()
-                        raise click.ClickException(f"Failed to get object info: {error_text}")
+                        # Parse API error responses for user-friendly messages
+                        if response.status == 400:
+                            raise click.ClickException("Invalid request - check your parameters")
+                        elif response.status == 401:
+                            raise click.ClickException(
+                                "Authentication failed - check your secret key"
+                            )
+                        elif response.status == 404:
+                            raise click.ClickException("Storage, bucket, or file not found")
+                        else:
+                            raise click.ClickException(
+                                f"Failed to get object info (HTTP {response.status})"
+                            )
 
                     info_data = await response.json()
 
