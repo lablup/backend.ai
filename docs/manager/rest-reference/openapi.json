@@ -4736,39 +4736,8 @@
             "description": "Successful response"
           }
         },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "query": {
-                    "type": "string"
-                  },
-                  "variables": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true
-                  },
-                  "operation_name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": ""
       }
     },
     "/spec/graphiql": {
