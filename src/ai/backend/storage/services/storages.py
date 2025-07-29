@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterable, AsyncIterator
 
 from botocore.exceptions import ClientError
 
@@ -80,7 +80,11 @@ class StoragesService:
         )
 
     async def stream_upload(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData, data_stream
+        self,
+        storage_name: str,
+        bucket_name: str,
+        token_data: ObjectStorageTokenData,
+        data_stream: AsyncIterable[bytes],
     ) -> UploadResponse:
         """
         Upload a file to S3 using streaming.
