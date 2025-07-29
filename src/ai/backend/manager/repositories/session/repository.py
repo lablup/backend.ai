@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional, cast
 
 import sqlalchemy as sa
@@ -10,6 +11,7 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions, find_dependent_sessions
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.session.types import SessionData, SessionDependencyData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -21,7 +23,9 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
+    SessionDependencyRow,
     SessionRow,
+    SessionStatus,
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole
@@ -433,3 +437,81 @@ class SessionRepository:
                     selectinload(SessionRow.routing).options(noload("*")),
                 ],
             )
+
+    @repository_decorator()
+    async def get_session_starts_at(
+        self,
+        session_id: SessionId,
+    ) -> datetime:
+        """Get session's starts_at timestamp for batch session scheduling"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionRow.starts_at).where(SessionRow.id == session_id)
+            starts_at = await db_sess.scalar(query)
+            if starts_at is None:
+                raise SessionNotFound(f"Session {session_id} not found")
+            return starts_at
+
+    @repository_decorator()
+    async def get_session_dependencies(
+        self,
+        session_id: SessionId,
+    ) -> list[SessionDependencyData]:
+        """Get session dependencies with their status and result"""
+        async with self._db.begin_readonly_session() as db_sess:
+            j = sa.join(
+                SessionDependencyRow,
+                SessionRow,
+                SessionDependencyRow.depends_on == SessionRow.id,
+            )
+            query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.name,
+                    SessionRow.status,
+                    SessionRow.result,
+                )
+                .select_from(j)
+                .where(SessionDependencyRow.session_id == session_id)
+            )
+            result = await db_sess.execute(query)
+            rows = result.fetchall()
+            return [
+                SessionDependencyData(
+                    id=row.id,
+                    name=row.name,
+                    status=row.status,
+                    result=row.result,
+                )
+                for row in rows
+            ]
+
+    @repository_decorator()
+    async def get_pending_sessions(
+        self,
+        access_key: AccessKey,
+    ) -> list[SessionData]:
+        """Get all pending sessions for a given access key"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(SessionRow)
+                .where(
+                    (SessionRow.access_key == access_key)
+                    & (SessionRow.status == SessionStatus.PENDING)
+                )
+                .options(noload("*"), load_only(SessionRow.requested_slots))
+            )
+            rows = (await db_sess.scalars(query)).all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
+    async def get_session_data(
+        self,
+        session_id: SessionId,
+    ) -> SessionData:
+        """Get session data by ID"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionRow).where(SessionRow.id == session_id)
+            session_row = await db_sess.scalar(query)
+            if session_row is None:
+                raise SessionNotFound(f"Session {session_id} not found")
+            return session_row.to_dataclass()

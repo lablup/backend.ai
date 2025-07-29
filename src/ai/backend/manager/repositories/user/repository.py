@@ -8,11 +8,14 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -21,8 +24,14 @@ from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_
 from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
-from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
+from ai.backend.manager.models.kernel import (
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+)
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
@@ -259,8 +268,6 @@ class UserRepository:
 
     async def _sync_keypair_roles(self, conn, user_uuid: UUID, new_role: UserRole) -> None:
         """Private method to sync keypair roles with user role."""
-        from sqlalchemy.sql.expression import bindparam
-
         result = await conn.execute(
             sa.select([
                 keypairs.c.user,
@@ -464,3 +471,151 @@ class UserRepository:
         for time_series in time_series_list:
             time_series["gpu_allocated"]["value"] = float(time_series["gpu_allocated"]["value"])
         return time_series_list
+
+    @repository_decorator()
+    async def get_main_access_key(
+        self,
+        user_uuid: UUID,
+    ) -> str:
+        """Get user's main access key"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
+            main_access_key = await db_sess.scalar(query)
+            if main_access_key is None:
+                raise UserNotFound(f"User {user_uuid} not found")
+            return main_access_key
+
+    @repository_decorator()
+    async def get_keypair_resource_policy(
+        self,
+        access_key: AccessKey,
+    ) -> KeyPairResourcePolicyData:
+        """Get resource policy for a given access key"""
+        async with self._db.begin_readonly_session() as db_sess:
+            return await self._get_keypair_resource_policy(db_sess, access_key)
+
+    async def _get_keypair_resource_policy(
+        self,
+        db_sess: SASession,
+        access_key: AccessKey,
+    ) -> KeyPairResourcePolicyData:
+        """Private method to get resource policy for a given access key"""
+        query = (
+            sa.select(KeyPairRow)
+            .where(KeyPairRow.access_key == access_key)
+            .options(
+                load_only(KeyPairRow.resource_policy),
+                joinedload(KeyPairRow.resource_policy_row).options(
+                    noload("*"),
+                    load_only(
+                        KeyPairResourcePolicyRow.name,
+                        KeyPairResourcePolicyRow.created_at,
+                        KeyPairResourcePolicyRow.default_for_unspecified,
+                        KeyPairResourcePolicyRow.total_resource_slots,
+                        KeyPairResourcePolicyRow.max_session_lifetime,
+                        KeyPairResourcePolicyRow.max_concurrent_sessions,
+                        KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
+                        KeyPairResourcePolicyRow.max_pending_session_count,
+                        KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                        KeyPairResourcePolicyRow.max_containers_per_session,
+                        KeyPairResourcePolicyRow.idle_timeout,
+                        KeyPairResourcePolicyRow.allowed_vfolder_hosts,
+                    ),
+                ),
+            )
+        )
+        keypair_row = await db_sess.scalar(query)
+        if not keypair_row:
+            raise KeyPairNotFound(f"KeyPair {access_key} not found")
+        if not keypair_row.resource_policy_row:
+            raise KeyPairNotFound(f"Resource policy for keypair {access_key} not found")
+
+        policy = keypair_row.resource_policy_row
+        return KeyPairResourcePolicyData(
+            name=policy.name,
+            created_at=policy.created_at,
+            default_for_unspecified=policy.default_for_unspecified,
+            total_resource_slots=policy.total_resource_slots,
+            max_session_lifetime=policy.max_session_lifetime,
+            max_concurrent_sessions=policy.max_concurrent_sessions,
+            max_concurrent_sftp_sessions=policy.max_concurrent_sftp_sessions,
+            max_pending_session_count=policy.max_pending_session_count,
+            max_pending_session_resource_slots=policy.max_pending_session_resource_slots,
+            max_containers_per_session=policy.max_containers_per_session,
+            idle_timeout=policy.idle_timeout,
+            allowed_vfolder_hosts=policy.allowed_vfolder_hosts,
+        )
+
+    @repository_decorator()
+    async def get_user_main_keypair_resource_policy(
+        self,
+        user_uuid: UUID,
+    ) -> KeyPairResourcePolicyData:
+        """Get resource policy for user's main keypair"""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get user's main access key
+            user_query = sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
+            main_access_key = await db_sess.scalar(user_query)
+            if main_access_key is None:
+                raise UserNotFound(f"User {user_uuid} not found")
+
+            # Get the keypair resource policy
+            return await self._get_keypair_resource_policy(db_sess, AccessKey(main_access_key))
+
+    @repository_decorator()
+    async def get_keypair_concurrency_used(self, access_key: AccessKey) -> int:
+        """Get the number of concurrent sessions currently used by the keypair"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(SessionRow)
+                .where(
+                    (SessionRow.access_key == access_key)
+                    & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_sess.scalar(query)
+            return result or 0
+
+    @repository_decorator()
+    async def get_keypair_occupancy(self, access_key: AccessKey) -> ResourceSlot:
+        """Get the total resource occupancy for the keypair"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(sa.func.sum(KernelRow.occupied_slots).label("total_occupied_slots"))
+                .select_from(KernelRow)
+                .join(SessionRow, KernelRow.session_id == SessionRow.id)
+                .where(
+                    (SessionRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_sess.scalar(query)
+            if result is None:
+                return ResourceSlot()
+            return ResourceSlot.from_json(result)
+
+    @repository_decorator()
+    async def get_user_occupancy(self, user_uuid: UUID) -> ResourceSlot:
+        """Get the total resource occupancy for the user"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(sa.func.sum(KernelRow.occupied_slots).label("total_occupied_slots"))
+                .select_from(KernelRow)
+                .join(SessionRow, KernelRow.session_id == SessionRow.id)
+                .where(
+                    (SessionRow.user_uuid == user_uuid)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_sess.scalar(query)
+            if result is None:
+                return ResourceSlot()
+            return ResourceSlot.from_json(result)
+
+    @repository_decorator()
+    async def get_user_data(self, user_uuid: UUID) -> UserData:
+        """Get user data by UUID"""
+        async with self._db.begin_readonly_session() as db_sess:
+            user = await self._get_user_by_uuid(db_sess, user_uuid)
+            return UserData.from_row(user)

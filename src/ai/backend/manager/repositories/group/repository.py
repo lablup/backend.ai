@@ -10,16 +10,26 @@ import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import ResourceSlot
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.resource.types import GroupResourcePolicyData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.models import DefaultForUnspecified
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
-from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.kernel import (
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
@@ -317,3 +327,48 @@ class GroupRepository:
     ):
         """Fetch resource usage data for projects."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
+
+    @repository_decorator()
+    async def get_group_resource_policy(
+        self,
+        group_id: UUID,
+    ) -> GroupResourcePolicyData:
+        """Get resource policy for a group"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow.total_resource_slots).where(GroupRow.id == group_id)
+            total_resource_slots = await db_sess.scalar(query)
+            if total_resource_slots is None:
+                raise GroupNotFound(f"Group not found (id: {group_id})")
+
+            return GroupResourcePolicyData(
+                total_resource_slots=total_resource_slots,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+            )
+
+    @repository_decorator()
+    async def get_group_occupancy(self, group_id: UUID) -> ResourceSlot:
+        """Get the total resource occupancy for the group"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(sa.func.sum(KernelRow.occupied_slots).label("total_occupied_slots"))
+                .select_from(KernelRow)
+                .join(SessionRow, KernelRow.session_id == SessionRow.id)
+                .where(
+                    (SessionRow.group_id == group_id)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_sess.scalar(query)
+            if result is None:
+                return ResourceSlot()
+            return ResourceSlot.from_json(result)
+
+    @repository_decorator()
+    async def get_group_name(self, group_id: UUID) -> str:
+        """Get group name by ID"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow.name).where(GroupRow.id == group_id)
+            result = await db_sess.scalar(query)
+            if result is None:
+                raise GroupNotFound(f"Group not found (id: {group_id})")
+            return result

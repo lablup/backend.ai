@@ -5,21 +5,26 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.resource.types import DomainResourcePolicyData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError
-from ai.backend.manager.models import groups, users
+from ai.backend.manager.errors.resource import DomainDataProcessingError, DomainNotFound
+from ai.backend.manager.models import DefaultForUnspecified, groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.services.domain.types import (
     DomainCreator,
@@ -350,3 +355,38 @@ class DomainRepository:
             raise ValueError(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
             )
+
+    @repository_decorator()
+    async def get_domain_resource_policy(
+        self,
+        domain_name: str,
+    ) -> DomainResourcePolicyData:
+        """Get resource policy for a domain"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DomainRow.total_resource_slots).where(DomainRow.name == domain_name)
+            total_resource_slots = await db_sess.scalar(query)
+            if total_resource_slots is None:
+                raise DomainNotFound(f"Domain not found (name: {domain_name})")
+
+            return DomainResourcePolicyData(
+                total_resource_slots=total_resource_slots,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+            )
+
+    @repository_decorator()
+    async def get_domain_occupancy(self, domain_name: str) -> ResourceSlot:
+        """Get the total resource occupancy for the domain"""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(sa.func.sum(KernelRow.occupied_slots).label("total_occupied_slots"))
+                .select_from(KernelRow)
+                .join(SessionRow, KernelRow.session_id == SessionRow.id)
+                .where(
+                    (SessionRow.domain_name == domain_name)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_sess.scalar(query)
+            if result is None:
+                return ResourceSlot()
+            return ResourceSlot.from_json(result)
