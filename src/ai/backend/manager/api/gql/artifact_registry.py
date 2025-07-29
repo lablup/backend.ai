@@ -103,15 +103,43 @@ class Artifact(Node):
 
 
 # TODO: After implementing the actual logic, remove this mock object
-mock_artifact = Artifact(
+mock_artifact_1 = Artifact(
     id="1",
-    name="Example Artifact",
+    name="Example Model Artifact",
     type=ArtifactType.MODEL,
     status=ArtifactStatus.AVAILABLE,
     description="This is a mock artifact for demonstration purposes.",
     registry=SourceInfo(name="Mock Registry", url="https://mock.registry"),
     source=SourceInfo(name="Mock Source", url="https://mock.source"),
-    size=ByteSize(),
+    size=ByteSize("2147483648"),  # 2 GB
+    created_at=datetime.now(),
+    updated_at=datetime.now(),
+    version="1.0.0",
+)
+
+mock_artifact_2 = Artifact(
+    id="2",
+    name="Example Image Artifact",
+    type=ArtifactType.IMAGE,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact for demonstration purposes.",
+    registry=SourceInfo(name="Mock Registry", url="https://mock.registry"),
+    source=SourceInfo(name="Mock Source", url="https://mock.source"),
+    size=ByteSize("2147483648"),  # 2 GB
+    created_at=datetime.now(),
+    updated_at=datetime.now(),
+    version="1.0.0",
+)
+
+mock_artifact_3 = Artifact(
+    id="2",
+    name="Example Package Artifact",
+    type=ArtifactType.PACKAGE,
+    status=ArtifactStatus.AVAILABLE,
+    description="This is a mock artifact for demonstration purposes.",
+    registry=SourceInfo(name="Mock Registry", url="https://mock.registry"),
+    source=SourceInfo(name="Mock Source", url="https://mock.source"),
+    size=ByteSize("2147483648"),  # 2 GB
     created_at=datetime.now(),
     updated_at=datetime.now(),
     version="1.0.0",
@@ -149,7 +177,11 @@ class ArtifactGroup(Node):
     ) -> ArtifactConnection:
         # Mock implementation - return empty connection
         return ArtifactConnection(
-            edges=[ArtifactEdge(node=mock_artifact, cursor="1")],
+            edges=[
+                ArtifactEdge(node=mock_artifact_1, cursor="1"),
+                ArtifactEdge(node=mock_artifact_2, cursor="2"),
+                ArtifactEdge(node=mock_artifact_3, cursor="3"),
+            ],
             page_info=strawberry.relay.PageInfo(
                 has_next_page=False,
                 has_previous_page=False,
@@ -218,7 +250,7 @@ def artifacts(
 ) -> ArtifactConnection:
     # Mock implementation - return empty connection
     return ArtifactConnection(
-        edges=[ArtifactEdge(node=mock_artifact, cursor="1")],
+        edges=[ArtifactEdge(node=mock_artifact_1, cursor="1")],
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
             has_previous_page=False,
@@ -265,25 +297,25 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
 @strawberry.mutation
 def import_artifact(input: ImportArtifactInput) -> ImportArtifactPayload:
     # Mock implementation
-    return ImportArtifactPayload(artifact=mock_artifact)
+    return ImportArtifactPayload(artifact=mock_artifact_1)
 
 
 @strawberry.mutation
 def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
     # Mock implementation
-    return UpdateArtifactPayload(artifact=mock_artifact)
+    return UpdateArtifactPayload(artifact=mock_artifact_1)
 
 
 @strawberry.mutation
 def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
     # Mock implementation
-    return DeleteArtifactPayload(artifact=mock_artifact)
+    return DeleteArtifactPayload(artifact=mock_artifact_1)
 
 
 @strawberry.mutation
 def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
     # Mock implementation
-    return CancelImportArtifactPayload(artifact=mock_artifact)
+    return CancelImportArtifactPayload(artifact=mock_artifact_1)
 
 
 # Subscriptions
