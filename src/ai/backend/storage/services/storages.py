@@ -1,7 +1,3 @@
-"""
-S3 Storage Service for Backend.AI Storage Proxy
-"""
-
 import logging
 from typing import AsyncIterator
 
@@ -222,9 +218,7 @@ class StoragesService:
 
         try:
             s3_client = self._get_s3_client(token_data.bucket)
-            print("token_data.key!", token_data.key)
             object_info = await s3_client.get_object_info(token_data.key)
-            print("object_info!", object_info)
 
             if object_info is None:
                 raise StorageObjectNotFoundError()

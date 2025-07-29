@@ -1,4 +1,5 @@
-from typing import Literal, Optional
+import enum
+from typing import Optional
 
 from pydantic import Field
 
@@ -26,10 +27,19 @@ class CloneVFolderReq(BaseRequestModel):
     )
 
 
+class S3ClientOperationType(enum.StrEnum):
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    INFO = "info"
+    DELETE = "delete"
+    PRESIGNED_UPLOAD = "presigned_upload"
+    PRESIGNED_DOWNLOAD = "presigned_download"
+
+
 class S3TokenData(BaseRequestModel):
     """JWT token data for S3 storage operations."""
 
-    op: Literal["upload", "download", "info", "delete", "presigned_upload", "presigned_download"]
+    op: S3ClientOperationType
     bucket: str
     key: str
     expiration: Optional[int] = Field(default=None, gt=0, le=604800)
