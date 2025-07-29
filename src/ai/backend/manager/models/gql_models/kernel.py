@@ -20,6 +20,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -42,13 +43,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerCurrentMetricAction,
-)
 from ai.backend.manager.services.metric.compat.container import transform_container_metrics
-from ai.backend.manager.services.metric.types import (
-    ContainerMetricOptionalLabel,
-)
 
 from ...defs import DEFAULT_ROLE
 from ..gql_relay import AsyncNode, Connection
@@ -208,15 +203,10 @@ class KernelNode(graphene.ObjectType):
             )
             return await loader.load(self.row_id)
         else:
-            action_result = await graph_ctx.processors.utilization_metric.query_container_current.wait_for_complete(
-                ContainerCurrentMetricAction(
-                    labels=ContainerMetricOptionalLabel(
-                        value_type=None,
-                        kernel_id=self.row_id,
-                    )
-                )
+            result = await graph_ctx.container_utilization_reader.get_container_utilization(
+                ContainerUtilizationQueryParameter(value_type=None, kernel_id=self.id)
             )
-            return transform_container_metrics(action_result.result)
+            return transform_container_metrics(result)
 
     @classmethod
     async def batch_load_live_stat(
@@ -340,15 +330,10 @@ class ComputeContainer(graphene.ObjectType):
             )
             return await loader.load(self.id)
         else:
-            action_result = await graph_ctx.processors.utilization_metric.query_container_current.wait_for_complete(
-                ContainerCurrentMetricAction(
-                    labels=ContainerMetricOptionalLabel(
-                        value_type=None,
-                        kernel_id=self.id,
-                    )
-                )
+            result = await graph_ctx.container_utilization_reader.get_container_utilization(
+                ContainerUtilizationQueryParameter(value_type=None, kernel_id=self.id)
             )
-            return transform_container_metrics(action_result.result)
+            return transform_container_metrics(result)
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return await self.resolve_live_stat(info)

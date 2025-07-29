@@ -7,7 +7,10 @@ from uuid import UUID
 
 import msgpack
 import sqlalchemy as sa
+import yarl
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
@@ -23,14 +26,7 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerCurrentMetricAction,
-)
 from ai.backend.manager.services.metric.compat.container import transform_container_metrics
-from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
-from ai.backend.manager.services.metric.types import (
-    ContainerMetricOptionalLabel,
-)
 
 # Layer-specific decorator for group repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
@@ -53,9 +49,10 @@ class GroupRepository:
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
 
-        self._container_utilization_metric_service = ContainerUtilizationMetricService(
-            config_provider
-        )
+        metric_query_addr = self._config_provider.config.metric.address.to_legacy()
+        endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
+        timewindow = config_provider.config.metric.timewindow
+        self._util_reader = ContainerUtilizationReader(endpoint, timewindow)
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
         """Private method to get a group by ID using an existing session."""
@@ -207,17 +204,13 @@ class GroupRepository:
                 kernel_stat_map[row["id"]] = msgpack.unpackb(raw_stat)
         else:
             for row in rows:
-                action_result = (
-                    await self._container_utilization_metric_service.query_current_metric(
-                        ContainerCurrentMetricAction(
-                            labels=ContainerMetricOptionalLabel(
-                                value_type=None,
-                                kernel_id=row["id"],
-                            )
-                        )
+                result = await self._util_reader.get_container_utilization(
+                    ContainerUtilizationQueryParameter(
+                        value_type=None,
+                        kernel_id=row["id"],
                     )
                 )
-                live_stat = transform_container_metrics(action_result.result)
+                live_stat = transform_container_metrics(result)
                 kernel_stat_map[row["id"]] = live_stat
 
         objs_per_group = {}
