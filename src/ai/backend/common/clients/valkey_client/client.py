@@ -114,6 +114,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
     _db_id: int
     _pubsub_channels: Optional[set[str]]
     _human_readable_name: str
+    _monitor_task: Optional[asyncio.Task[None]]
 
     def __init__(
         self,
@@ -127,6 +128,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._pubsub_channels = pubsub_channels
+        self._monitor_task = None
 
     @property
     def client(self) -> GlideClient:
@@ -138,6 +140,23 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         if self._valkey_client is not None:
             return
 
+        await self._create_valkey_client()
+        self._monitor_task = asyncio.create_task(self._monitor_connection())
+
+    async def disconnect(self) -> None:
+        if self._monitor_task:
+            self._monitor_task.cancel()
+            try:
+                await self._monitor_task
+            except asyncio.CancelledError:
+                pass
+            self._monitor_task = None
+
+        if self._valkey_client:
+            await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
+            self._valkey_client = None
+
+    async def _create_valkey_client(self) -> None:
         addresses = [
             NodeAddress(host=str(self._target.address.host), port=self._target.address.port)
         ]
@@ -149,7 +168,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
-            request_timeout=self._target.request_timeout or 1_000,
+            request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
                     GlideClientConfiguration.PubSubChannelModes.Exact: self._pubsub_channels,
@@ -171,10 +190,71 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             self._human_readable_name,
         )
 
-    async def disconnect(self) -> None:
+    async def _ping(self) -> bool:
+        """
+        Ping the server to check if the connection is alive.
+        """
+        if self._valkey_client is None:
+            return False
+        try:
+            await self._valkey_client.ping()
+            return True
+        except glide.ClosingError as e:
+            log.warning(
+                "Valkey client is closed for standalone at {}:{}, human readable name '{}': {}",
+                self._target.address.host,
+                self._target.address.port,
+                self._human_readable_name,
+                e,
+            )
+            return False
+        except Exception as e:
+            log.warning(
+                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+            )
+            return True
+
+    async def _check_connection(self) -> bool:
+        """
+        Check if the current connection is alive.
+        If not, return False to trigger reconnection.
+        """
+        if not await self._ping():
+            log.warning(
+                "Connection to standalone server {}:{} is down, attempting to reconnect",
+                self._target.address.host,
+                self._target.address.port,
+            )
+            return False
+        return True
+
+    async def _monitor_connection(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(10.0)
+                if await self._check_connection():
+                    continue
+                log.info(
+                    "Reconnecting to standalone server at {}:{}",
+                    self._target.address.host,
+                    self._target.address.port,
+                )
+                await self._reconnect()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                log.exception("Error in connection monitoring: {}", e)
+
+    async def _reconnect(self) -> None:
         if self._valkey_client:
-            await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
+            try:
+                await self._valkey_client.close()
+            except Exception as e:
+                log.warning("Error closing old client: {}", e)
             self._valkey_client = None
+
+        await self._create_valkey_client()
 
 
 class ValkeySentinelClient(AbstractValkeyClient):

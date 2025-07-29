@@ -9,8 +9,8 @@ services:
     ports:
       - "8100:5432"
     environment:
-      - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
+      - POSTGRES_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
     healthcheck:

@@ -69,7 +69,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  allow-compute-plugins = [ "rocm", "cuda",]
+  allow-compute-plugins = [ "cuda", "rocm",]
   # Blocked compute plugins
   block-compute-plugins = [ "cpu",]
   # Allowed network plugins
