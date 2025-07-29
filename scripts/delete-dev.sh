@@ -141,6 +141,7 @@ fi
 if [ $REMOVE_DB -eq 1 ]; then
   show_info "Removing data volumes..."
   rm -rf volumes
+  docker volume rm $(docker volume ls -q --filter 'label=com.docker.compose.project=backendai')
 fi
 
 echo ""
