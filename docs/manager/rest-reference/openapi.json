@@ -4736,8 +4736,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/spec/graphiql": {
