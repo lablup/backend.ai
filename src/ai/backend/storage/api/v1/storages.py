@@ -38,6 +38,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
+class StoragesConfigCtx(MiddlewareParam):
+    storages: list[ObjectStorageConfig]
 
 class StorageConfigsCtx(MiddlewareParam):
     storage_configs: list[ObjectStorageConfig]
