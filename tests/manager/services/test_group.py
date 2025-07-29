@@ -56,7 +56,7 @@ def mock_action_monitor() -> ActionMonitor:
 
 
 @pytest.fixture
-def processors(
+async def processors(
     database_fixture, database_engine, service_mock_args, mock_action_monitor
 ) -> GroupProcessors:
     group_repository = GroupRepository(

@@ -48,6 +48,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        container_utilization_reader=None,  # type: ignore
     )
 
 
