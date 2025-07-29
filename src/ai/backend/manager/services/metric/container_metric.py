@@ -64,7 +64,7 @@ class ContainerUtilizationMetricService:
         metric_type = self._get_metric_type(action.metric_name, action.labels)
         param = ContainerUtilizationQueryParameter(
             value_type=action.labels.value_type,
-            container_metric_name=action.labels.container_metric_name,
+            container_metric_name=action.metric_name,
             agent_id=action.labels.agent_id,
             kernel_id=action.labels.kernel_id,
             session_id=action.labels.session_id,
