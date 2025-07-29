@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 from graphql import GraphQLFormattedError
+from graphql.language.location import FormattedSourceLocation
 from pydantic import Field
 
 from ...api_handlers import BaseResponseModel
@@ -28,3 +29,12 @@ class GraphQLResponse(BaseResponseModel):
         default=None,
         description="A list of errors that occurred during the GraphQL query.",
     )
+
+
+# Ensure that thirdparty's forward-referenced types can be serialized correctly.
+GraphQLResponse.model_rebuild(
+    _types_namespace={
+        "GraphQLFormattedError": GraphQLFormattedError,
+        "FormattedSourceLocation": FormattedSourceLocation,
+    }
+)
