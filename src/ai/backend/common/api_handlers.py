@@ -435,7 +435,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     - MiddlewareParam classes must implement the from_request classmethod
     """
 
-    original_signature: Signature = inspect.signature(handler)
+    original_signature: Signature = inspect.signature(handler, eval_str=True)
 
     sanitized_signature = original_signature.replace(
         parameters=list(original_signature.parameters.values())[1:]

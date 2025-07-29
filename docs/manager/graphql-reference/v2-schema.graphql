@@ -71,7 +71,7 @@ type ArtifactGroupEdge {
   node: ArtifactGroup!
 }
 
-type ArtifactImportProgressPayload {
+type ArtifactImportProgressUpdatedPayload {
   artifactId: ID!
   progress: Float!
   status: ArtifactStatus!
@@ -196,7 +196,7 @@ input StringFilter {
 
 type Subscription {
   artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
-  artifactImportProgress(artifactId: ID!): ArtifactImportProgressPayload!
+  artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
 }
 
 input UpdateArtifactInput {

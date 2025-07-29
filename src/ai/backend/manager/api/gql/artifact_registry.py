@@ -172,7 +172,7 @@ mock_artifact_group = ArtifactGroup(
 
 
 @strawberry.type
-class ArtifactImportProgressPayload:
+class ArtifactImportProgressUpdatedPayload:
     artifact_id: ID
     progress: float
     status: ArtifactStatus
@@ -298,10 +298,10 @@ async def artifact_status_changed(
 
 
 @strawberry.subscription
-async def artifact_import_progress(
+async def artifact_import_progress_updated(
     artifact_id: ID,
-) -> AsyncGenerator[ArtifactImportProgressPayload, None]:
+) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
     # Mock implementation
     # In real implementation, this would yield progress updates
     if False:  # Placeholder to make this a generator
-        yield ArtifactImportProgressPayload()
+        yield ArtifactImportProgressUpdatedPayload()
