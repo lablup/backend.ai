@@ -27,8 +27,13 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.services.metric.actions.device import DeviceMetricAction
-from ai.backend.manager.services.metric.types import DeviceMetricOptionalLabel
+from ai.backend.manager.services.metric.actions.device import (
+    DeviceCurrentMetricAction,
+)
+from ai.backend.manager.services.metric.compat.device import transform_device_metrics
+from ai.backend.manager.services.metric.types import (
+    DeviceMetricOptionalLabel,
+)
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -200,8 +205,24 @@ class AgentNode(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
-        return await loader.load(self.id)
+        fetch_redis = ctx.config_provider.config.api.fetch_live_stat_from_redis
+        if fetch_redis:
+            loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
+            return await loader.load(self.id)
+        else:
+            action_result = (
+                await ctx.processors.utilization_metric.query_device_current.wait_for_complete(
+                    DeviceCurrentMetricAction(
+                        labels=DeviceMetricOptionalLabel(
+                            agent_id=self.id,
+                            value_type=None,
+                            device_id=None,
+                            device_metric_name=None,
+                        )
+                    )
+                )
+            )
+            return transform_device_metrics(action_result.result)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -427,8 +448,24 @@ class Agent(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
-        return await loader.load(self.id)
+        fetch_redis = ctx.config_provider.config.api.fetch_live_stat_from_redis
+        if fetch_redis:
+            loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
+            return await loader.load(self.id)
+        else:
+            action_result = (
+                await ctx.processors.utilization_metric.query_device_current.wait_for_complete(
+                    DeviceCurrentMetricAction(
+                        labels=DeviceMetricOptionalLabel(
+                            agent_id=self.id,
+                            value_type=None,
+                            device_id=None,
+                            device_metric_name=None,
+                        )
+                    )
+                )
+            )
+            return transform_device_metrics(action_result.result)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         # Deprecated since 25.12.0, use live_stat instead
@@ -598,24 +635,7 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        # TODO: make it work
-        fetch_redis = ctx.config_provider.config.fetch_stat_from_redis
-        if not fetch_redis:
-            for agent_id in agent_ids:
-                action_result = (
-                    await ctx.processors.utilization_metric.query_container.wait_for_complete(
-                        DeviceMetricAction(
-                            metric_name=None,
-                            labels=DeviceMetricOptionalLabel(
-                                device_id="",
-                                agent_id=agent_id,
-                                deviece_type="agent",
-                            ),
-                        )
-                    )
-                )
-        else:
-            return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
+        return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
 
     @classmethod
     async def batch_load_container_count(

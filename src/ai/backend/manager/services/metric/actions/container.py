@@ -3,7 +3,10 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 
-from ..types import ContainerMetricOptionalLabel, ContainerMetricResult
+from ..types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResult,
+)
 
 
 @dataclass
@@ -58,6 +61,34 @@ class ContainerMetricAction(BaseAction):
 
 @dataclass
 class ContainerMetricActionResult(BaseActionResult):
+    result: list[ContainerMetricResult]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+
+@dataclass
+class ContainerCurrentMetricAction(BaseAction):
+    labels: ContainerMetricOptionalLabel
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "container_current_metric"
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "query"
+
+
+@dataclass
+class ContainerCurrentMetricActionResult(BaseActionResult):
     result: list[ContainerMetricResult]
 
     @override

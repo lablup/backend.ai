@@ -1,11 +1,18 @@
 import enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     Optional,
+    Self,
 )
 from uuid import UUID
 
 from pydantic import BaseModel
+
+from ai.backend.common.clients.prometheus.types import (
+    ContainerUtilizationQueryResult,
+    DeviceUtilizationQueryResult,
+    ResultMetric,
+)
 
 
 class ValueType(enum.StrEnum):
@@ -37,6 +44,20 @@ class ContainerMetricResponseInfo:
     owner_user_id: Optional[str]
     session_id: Optional[str]
 
+    @classmethod
+    def from_result_metric(cls, result_metric: "ResultMetric") -> Self:
+        return cls(
+            value_type=result_metric.value_type,
+            container_metric_name=result_metric.container_metric_name,
+            agent_id=result_metric.agent_id,
+            instance=result_metric.instance,
+            job=result_metric.job,
+            kernel_id=result_metric.kernel_id,
+            owner_project_id=result_metric.owner_project_id,
+            owner_user_id=result_metric.owner_user_id,
+            session_id=result_metric.session_id,
+        )
+
 
 @dataclass
 class MetricResultValue:
@@ -46,8 +67,9 @@ class MetricResultValue:
 
 @dataclass
 class ContainerMetricOptionalLabel:
-    value_type: ValueType
+    value_type: Optional[ValueType]
 
+    container_metric_name: Optional[str] = None
     agent_id: Optional[str] = None
     kernel_id: Optional[UUID] = None
     session_id: Optional[UUID] = None
@@ -59,6 +81,16 @@ class ContainerMetricOptionalLabel:
 class ContainerMetricResult:
     metric: ContainerMetricResponseInfo
     values: list[MetricResultValue]
+
+    @classmethod
+    def from_result(cls, result: ContainerUtilizationQueryResult) -> Self:
+        return cls(
+            metric=ContainerMetricResponseInfo.from_result_metric(result.metric),
+            values=[
+                MetricResultValue(timestamp=value.timestamp, value=value.value)
+                for value in result.values
+            ],
+        )
 
 
 class UtilizationMetricType(enum.Enum):
@@ -83,25 +115,6 @@ class UtilizationMetricType(enum.Enum):
     """
 
 
-@dataclass(kw_only=True)
-class MetricSpecForQuery:
-    metric_name: str
-    metric_type: UtilizationMetricType
-    timewindow: str
-    sum_by: list[str] = field(default_factory=list)
-    labels: list[str] = field(default_factory=list)
-
-    def str_sum_by(self) -> str:
-        if not self.sum_by:
-            return ""
-        return f"sum by ({','.join(self.sum_by)})"
-
-    def str_labels(self) -> str:
-        if not self.labels:
-            return ""
-        return f"{{{','.join(self.labels)}}}"
-
-
 @dataclass
 class DeviceMetricResponseInfo:
     value_type: str
@@ -112,10 +125,21 @@ class DeviceMetricResponseInfo:
     instance: Optional[str]
     job: Optional[str]
 
+    @classmethod
+    def from_result_metric(cls, result_metric: "ResultMetric") -> Self:
+        return cls(
+            value_type=result_metric.value_type,
+            device_metric_name=result_metric.device_metric_name,
+            agent_id=result_metric.agent_id,
+            device_id=result_metric.device_id,
+            instance=result_metric.instance,
+            job=result_metric.job,
+        )
+
 
 @dataclass
 class DeviceMetricOptionalLabel:
-    value_type: ValueType
+    value_type: Optional[ValueType]
     device_metric_name: Optional[str]
     agent_id: Optional[str]
     device_id: Optional[str]
@@ -123,5 +147,15 @@ class DeviceMetricOptionalLabel:
 
 @dataclass
 class DeviceMetricResult:
-    metric: ContainerMetricResponseInfo
+    metric: DeviceMetricResponseInfo
     values: list[MetricResultValue]
+
+    @classmethod
+    def from_result(cls, result: DeviceUtilizationQueryResult) -> Self:
+        return cls(
+            metric=DeviceMetricResponseInfo.from_result_metric(result.metric),
+            values=[
+                MetricResultValue(timestamp=value.timestamp, value=value.value)
+                for value in result.values
+            ],
+        )

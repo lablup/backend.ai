@@ -42,6 +42,13 @@ from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
+from ai.backend.manager.services.metric.actions.container import (
+    ContainerCurrentMetricAction,
+)
+from ai.backend.manager.services.metric.compat.container import transform_container_metrics
+from ai.backend.manager.services.metric.types import (
+    ContainerMetricOptionalLabel,
+)
 
 from ...defs import DEFAULT_ROLE
 from ..gql_relay import AsyncNode, Connection
@@ -194,10 +201,22 @@ class KernelNode(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader_by_func(
-            graph_ctx, self.batch_load_live_stat
-        )
-        return await loader.load(self.row_id)
+        fetch_redis = graph_ctx.config_provider.config.api.fetch_live_stat_from_redis
+        if fetch_redis:
+            loader = graph_ctx.dataloader_manager.get_loader_by_func(
+                graph_ctx, self.batch_load_live_stat
+            )
+            return await loader.load(self.row_id)
+        else:
+            action_result = await graph_ctx.processors.utilization_metric.query_container_current.wait_for_complete(
+                ContainerCurrentMetricAction(
+                    labels=ContainerMetricOptionalLabel(
+                        value_type=None,
+                        kernel_id=self.row_id,
+                    )
+                )
+            )
+            return transform_container_metrics(action_result.result)
 
     @classmethod
     async def batch_load_live_stat(
@@ -315,8 +334,21 @@ class ComputeContainer(graphene.ObjectType):
     # we can leave last_stat value for legacy support, as an alias to last_stat
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
-        return await loader.load(self.id)
+        if graph_ctx.config_provider.config.api.fetch_live_stat_from_redis:
+            loader = graph_ctx.dataloader_manager.get_loader(
+                graph_ctx, "KernelStatistics.by_kernel"
+            )
+            return await loader.load(self.id)
+        else:
+            action_result = await graph_ctx.processors.utilization_metric.query_container_current.wait_for_complete(
+                ContainerCurrentMetricAction(
+                    labels=ContainerMetricOptionalLabel(
+                        value_type=None,
+                        kernel_id=self.id,
+                    )
+                )
+            )
+            return transform_container_metrics(action_result.result)
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return await self.resolve_live_stat(info)
