@@ -74,7 +74,9 @@ class UserUtilizationMetric(graphene.ObjectType):
                 ContainerMetricAction(
                     metric_name=param.metric_name,
                     labels=ContainerMetricOptionalLabel(
-                        user_id=user_id, value_type=param.value_type
+                        container_metric_name=param.metric_name,
+                        user_id=user_id,
+                        value_type=param.value_type,
                     ),
                     start=param.start,
                     end=param.end,

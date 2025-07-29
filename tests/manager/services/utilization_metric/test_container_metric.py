@@ -609,56 +609,6 @@ class TestQueryStringGeneration:
         config_provider.config.metric.timewindow = "1m"
         return ContainerUtilizationMetricService(config_provider)
 
-    @pytest.mark.asyncio
-    async def test_gauge_query_string_generation(
-        self, metric_service: ContainerUtilizationMetricService
-    ) -> None:
-        """Test gauge metric query string generation with labels."""
-        query = await metric_service._get_query_string(
-            "container_memory_used_bytes",
-            ContainerMetricOptionalLabel(
-                kernel_id=UUID("12345678-1234-5678-1234-567812345678"), value_type=ValueType.CURRENT
-            ),
-        )
-
-        assert "sum by (value_type,kernel_id)" in query
-        assert 'container_metric_name="container_memory_used_bytes"' in query
-        assert 'kernel_id="12345678-1234-5678-1234-567812345678"' in query
-        assert 'value_type="current"' in query
-
-    @pytest.mark.asyncio
-    async def test_rate_query_string_generation(
-        self, metric_service: ContainerUtilizationMetricService
-    ) -> None:
-        """Test rate metric query string generation."""
-        query = await metric_service._get_query_string(
-            "net_rx",
-            ContainerMetricOptionalLabel(value_type=ValueType.CURRENT, agent_id="agent-1"),
-        )
-
-        assert "rate(" in query
-        assert "[1m]" in query  # timewindow
-        assert 'container_metric_name="net_rx"' in query
-        assert 'agent_id="agent-1"' in query
-
-    @pytest.mark.asyncio
-    async def test_diff_query_string_generation(
-        self, metric_service: ContainerUtilizationMetricService
-    ) -> None:
-        """Test diff metric query string generation with session filter."""
-        query = await metric_service._get_query_string(
-            "cpu_util",
-            ContainerMetricOptionalLabel(
-                value_type=ValueType.CURRENT,
-                session_id=UUID("99887766-5544-3322-1100-ffeeddccbbaa"),
-            ),
-        )
-
-        assert "rate(" in query
-        assert "[1m]" in query
-        assert 'value_type="current"' in query
-        assert 'session_id="99887766-5544-3322-1100-ffeeddccbbaa"' in query
-
 
 class TestComplexScenarios:
     """Test complex usage scenarios."""

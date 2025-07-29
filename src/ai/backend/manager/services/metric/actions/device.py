@@ -63,3 +63,31 @@ class DeviceMetricActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
+
+
+@dataclass
+class DeviceCurrentMetricAction(BaseAction):
+    labels: DeviceMetricOptionalLabel
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "device_current_metric"
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "query"
+
+
+@dataclass
+class DeviceCurrentMetricActionResult(BaseActionResult):
+    result: list[DeviceMetricResult]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None

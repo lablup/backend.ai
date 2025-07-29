@@ -2,7 +2,7 @@ import copy
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from uuid import UUID
 
 import msgpack
@@ -23,6 +23,14 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.services.metric.actions.container import (
+    ContainerCurrentMetricAction,
+)
+from ai.backend.manager.services.metric.compat.container import transform_container_metrics
+from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
+from ai.backend.manager.services.metric.types import (
+    ContainerMetricOptionalLabel,
+)
 
 # Layer-specific decorator for group repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
@@ -44,6 +52,10 @@ class GroupRepository:
         self._db = db
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
+
+        self._container_utilization_metric_service = ContainerUtilizationMetricService(
+            config_provider
+        )
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
         """Private method to get a group by ID using an existing session."""
@@ -185,20 +197,39 @@ class GroupRepository:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        kernel_ids = [str(row["id"]) for row in rows]
-        raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
+        kernel_stat_map: dict[UUID, dict[str, Any]] = {}
+        if self._config_provider.config.api.fetch_live_stat_from_redis:
+            kernel_ids = [str(row["id"]) for row in rows]
+            raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
+            for row, raw_stat in zip(rows, raw_stats):
+                if raw_stat is None:
+                    continue
+                kernel_stat_map[row["id"]] = msgpack.unpackb(raw_stat)
+        else:
+            for row in rows:
+                action_result = (
+                    await self._container_utilization_metric_service.query_current_metric(
+                        ContainerCurrentMetricAction(
+                            labels=ContainerMetricOptionalLabel(
+                                value_type=None,
+                                kernel_id=row["id"],
+                            )
+                        )
+                    )
+                )
+                live_stat = transform_container_metrics(action_result.result)
+                kernel_stat_map[row["id"]] = live_stat
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row in rows:
             group_id = str(row["group_id"])
             last_stat = row["last_stat"]
-            if not last_stat:
-                if raw_stat is None:
-                    log.warning("stat object for {} not found on redis, skipping", str(row["id"]))
+            if last_stat is None:
+                last_stat = kernel_stat_map.get(row["id"])
+                if last_stat is None:
                     continue
-                last_stat = msgpack.unpackb(raw_stat)
             nfs = None
             if row["vfolder_mounts"]:
                 # For >=22.03, return used host directories instead of volume host, which is not so useful.
