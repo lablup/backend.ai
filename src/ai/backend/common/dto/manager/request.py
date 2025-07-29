@@ -36,7 +36,7 @@ class GraphQLReq(BaseRequestModel):
     )
     variables: Optional[dict[str, Any]] = Field(
         default=None,
-        description="Variables for the GraphQL query, allowing dynamic data input.",
+        description="Variables for the GraphQL query.",
     )
     operation_name: Optional[str] = Field(
         default=None,
