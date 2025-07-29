@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
 
-import yarl
-
 from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
 from ai.backend.common.clients.prometheus.types import (
     ContainerUtilizationQueryParameter,
@@ -35,21 +33,8 @@ class ContainerUtilizationMetricService:
     _config_provider: ManagerConfigProvider
     _util_reader: ContainerUtilizationReader
 
-    def __init__(self, config_provider: ManagerConfigProvider) -> None:
-        self._config_provider = config_provider
-        self._util_reader = ContainerUtilizationReader(
-            self._metric_query_endpoint, self._range_vector_timewindow
-        )
-
-    @property
-    def _metric_query_endpoint(self) -> yarl.URL:
-        metric_query_addr = self._config_provider.config.metric.address.to_legacy()
-        return yarl.URL(f"http://{metric_query_addr}/api/v1")
-
-    @property
-    def _range_vector_timewindow(self) -> str:
-        # 1m by default
-        return self._config_provider.config.metric.timewindow
+    def __init__(self, utilization_reader: ContainerUtilizationReader) -> None:
+        self._util_reader = utilization_reader
 
     def _get_metric_type(
         self,

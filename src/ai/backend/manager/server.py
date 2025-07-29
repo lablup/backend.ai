@@ -37,6 +37,7 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import yarl
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
@@ -45,6 +46,8 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.device_util.client import DeviceUtilizationReader
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -642,6 +645,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
+                container_utilization_reader=root_ctx.container_utilization_reader,
+                device_utilization_reader=root_ctx.device_utilization_reader,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -984,6 +989,24 @@ async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield None
 
 
+@actxmgr
+async def utilization_reader_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    metric_query_addr = root_ctx.config_provider.config.metric.address.to_legacy()
+    query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
+    range_vector_timewindow = root_ctx.config_provider.config.metric.timewindow
+    root_ctx.container_utilization_reader = ContainerUtilizationReader(
+        query_endpoint,
+        range_vector_timewindow,
+    )
+    root_ctx.device_utilization_reader = DeviceUtilizationReader(
+        query_endpoint,
+        range_vector_timewindow,
+    )
+    yield
+    await root_ctx.container_utilization_reader.close()
+    await root_ctx.device_utilization_reader.close()
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -1187,6 +1210,7 @@ def build_root_app(
             background_task_ctx,
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
+            utilization_reader_ctx,
             processors_ctx,
             service_discovery_ctx,
         ]

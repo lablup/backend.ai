@@ -156,6 +156,9 @@ class PrometheusHTTPClient:
         self._timewindow = timewindow
         self._client_pool = ClientPool(ClientConfig())
 
+    async def close(self) -> None:
+        await self._client_pool.close()
+
     def _load_client(self, address: str) -> aiohttp.ClientSession:
         return self._client_pool.load_client_session(ClientKey(address, "utilization"))
 

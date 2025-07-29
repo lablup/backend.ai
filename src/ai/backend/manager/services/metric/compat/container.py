@@ -1,16 +1,18 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.manager.services.metric.types import ContainerMetricResult, MetricResultValue
+from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryResult, ResultValue
 
 
 @dataclass
 class MetricByTypeValue:
-    latest: MetricResultValue
-    values: list[MetricResultValue]
+    latest: ResultValue
+    values: list[ResultValue]
 
 
-def transform_container_metrics(source_data: list[ContainerMetricResult]) -> dict[str, Any]:
+def transform_container_metrics(
+    source_data: list[ContainerUtilizationQueryResult],
+) -> dict[str, Any]:
     """
     Transform Prometheus-styled container metrics data into a legacy `live_stat` format.
     """

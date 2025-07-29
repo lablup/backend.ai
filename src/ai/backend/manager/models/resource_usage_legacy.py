@@ -1,22 +1,17 @@
 import msgpack
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerCurrentMetricAction,
-)
 from ai.backend.manager.services.metric.compat.container import transform_container_metrics
-from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
-from ai.backend.manager.services.metric.types import (
-    ContainerMetricOptionalLabel,
-)
 
 from .kernel import KernelRow, KernelStatus
 from .resource_usage import BaseResourceUsageGroup, ResourceGroupUnit, parse_resource_usage
 
 
 async def parse_resource_usage_groups(
-    utilization_metric: ContainerUtilizationMetricService,
+    utilization_reader: ContainerUtilizationReader,
     kernels: list[KernelRow],
     valkey_stat_client: ValkeyStatClient,
     config: ManagerUnifiedConfig,
@@ -33,15 +28,13 @@ async def parse_resource_usage_groups(
             stat_map[kern_id] = msgpack.unpackb(raw_stat)
     else:
         for k in kernels:
-            action_result = await utilization_metric.query_current_metric(
-                ContainerCurrentMetricAction(
-                    labels=ContainerMetricOptionalLabel(
-                        value_type=None,
-                        kernel_id=k.id,
-                    )
+            result = await utilization_reader.get_container_utilization(
+                ContainerUtilizationQueryParameter(
+                    value_type=None,
+                    kernel_id=k.id,
                 )
             )
-            live_stat = transform_container_metrics(action_result.result)
+            live_stat = transform_container_metrics(result)
             stat_map[k.id] = live_stat
 
     return [

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -45,7 +46,6 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
-from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -56,6 +56,7 @@ class GroupService:
     _storage_manager: StorageSessionManager
     _group_repository: GroupRepository
     _admin_group_repository: AdminGroupRepository
+    _container_utilization_reader: ContainerUtilizationReader
 
     def __init__(
         self,
@@ -63,6 +64,7 @@ class GroupService:
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         group_repositories: GroupRepositories,
+        container_utilization_reader: ContainerUtilizationReader,
     ) -> None:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
@@ -70,9 +72,7 @@ class GroupService:
         self._group_repository = group_repositories.repository
         self._admin_group_repository = group_repositories.admin_repository
 
-        self._container_utilization_metric_service = ContainerUtilizationMetricService(
-            config_provider
-        )
+        self._container_utilization_reader = container_utilization_reader
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         try:
@@ -152,7 +152,7 @@ class GroupService:
             start_date, end_date, project_ids=project_ids
         )
         usage_groups = await parse_resource_usage_groups(
-            self._container_utilization_metric_service,
+            self._container_utilization_reader,
             kernels,
             self._valkey_stat_client,
             self._config_provider.config,
