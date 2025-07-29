@@ -110,10 +110,40 @@ class PresignedDownloadURLGenerationError(web.HTTPInternalServerError):
         )
 
 
-class StorageObjectNotFoundError(web.HTTPNotFound):
+class StorageNotFoundError(web.HTTPNotFound):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
-            "type": "https://api.backend.ai/probs/storage/object-not-found-or-info-failed",
+            "type": "https://api.backend.ai/probs/storage/object-not-found",
+            "title": "Object not found or failed",
+        }
+        if msg is not None:
+            payload["title"] = f"Object not found or failed to get object info ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class StorageBucketNotFoundError(web.HTTPNotFound):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/bucket/object-not-found",
+            "title": "Object not found or failed to get object info",
+        }
+        if msg is not None:
+            payload["title"] = f"Object not found or failed to get object info ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class StorageBucketFileNotFoundError(web.HTTPNotFound):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/bucket/file/object-not-found",
             "title": "Object not found or failed to get object info",
         }
         if msg is not None:
