@@ -871,7 +871,6 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
-  mkdir -p -m 757 "${HALFSTACK_VOLUME_PATH}/grafana-data"
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
