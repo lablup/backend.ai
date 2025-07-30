@@ -13,7 +13,7 @@ class UserIdentityCtx(MiddlewareParam):
     domain_name: str
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
@@ -27,7 +27,7 @@ class KeypairCtx(MiddlewareParam):
     resource_policy: Mapping[str, Any]
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(
             access_key=request["keypair"]["access_key"],
             resource_policy=request["keypair"]["resource_policy"],

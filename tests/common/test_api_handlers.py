@@ -285,7 +285,7 @@ class TestAuthInfo(MiddlewareParam):
     is_authorized: bool = Field(default=False)
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(is_authorized=request.get("is_authorized", False))
 
 
@@ -358,7 +358,7 @@ class TestMiddlewareModel(MiddlewareParam):
     is_authorized: bool
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(is_authorized=request.get("is_authorized", False))
 
 

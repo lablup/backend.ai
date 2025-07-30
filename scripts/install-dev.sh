@@ -887,7 +887,11 @@ configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see six containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Configure MinIO using separate configuration script
+  source "$(dirname "$0")/configure-minio.sh"
+  configure_minio "docker-compose.halfstack.current.yml"
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
@@ -1000,6 +1004,9 @@ configure_backendai() {
   sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+
+  # Configure storage-proxy MinIO settings using separate configuration script
+  configure_storage_proxy_minio "./storage-proxy.toml"
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
