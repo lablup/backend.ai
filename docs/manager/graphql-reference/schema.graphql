@@ -1,9 +1,28 @@
+extend schema
+	@link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "@shareable"])
+
 schema {
   query: Queries
   mutation: Mutations
 }
 
-"""All available GraphQL queries."""
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo @shareable {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
 type Queries {
   node(
     """The ID of the object"""
@@ -114,7 +133,7 @@ type Queries {
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+    architecture: String = "aarch64"
   ): Image
   images(
     """
@@ -345,6 +364,8 @@ type Queries {
 
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
 }
 
 """
@@ -384,23 +405,6 @@ type AuditLogConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
@@ -558,7 +562,7 @@ type ComputeContainer implements Item {
   preopen_ports: [Int]
 }
 
-type ImageNode implements Node {
+type ImageNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -708,7 +712,7 @@ type ScalinGroupEdge {
 }
 
 """Added in 24.12.0."""
-type ScalingGroupNode implements Node {
+type ScalingGroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -946,7 +950,7 @@ type UserEdge {
   cursor: String!
 }
 
-type UserNode implements Node {
+type UserNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1439,7 +1443,7 @@ type StorageVolumeList implements PaginatedList {
 }
 
 """Added in 24.03.4"""
-type VirtualFolderNode implements Node {
+type VirtualFolderNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1798,7 +1802,7 @@ type RoutingList implements PaginatedList {
   total_count: Int!
 }
 
-type EndpointToken implements Item {
+type EndpointToken implements Item @key(fields: "token") {
   id: ID
   token: String!
   endpoint_id: UUID!
@@ -2013,7 +2017,7 @@ type NetworkEdge {
 }
 
 """Added in 25.1.0."""
-type EndpointAutoScalingRuleNode implements Node {
+type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   row_id: UUID!
@@ -2193,6 +2197,14 @@ type ServiceConfigEdge {
   cursor: String!
 }
 
+union _Entity = ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode | EndpointToken | EndpointAutoScalingRuleNode
+
+scalar _Any
+
+type _Service {
+  sdl: String
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -2270,7 +2282,7 @@ type Mutations {
   ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
@@ -2279,7 +2291,7 @@ type Mutations {
   forget_image_by_id(image_id: String!): ForgetImageById
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -2291,7 +2303,7 @@ type Mutations {
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
+  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
@@ -2863,7 +2875,7 @@ type ClearImageCustomResourceLimitPayload {
 """Added in 25.6.0."""
 input ClearImageCustomResourceLimitKey {
   image_canonical: String!
-  architecture: String! = "x86_64"
+  architecture: String! = "aarch64"
 }
 
 """Added in 24.03.0."""
@@ -3623,3 +3635,14 @@ type DeleteNetwork {
   ok: Boolean
   msg: String
 }
+
+"""
+A string-serialized scalar represents a set of fields that's passed to a federated directive, such as @key, @requires, or @provides
+"""
+scalar FieldSet
+
+"""This string-serialized scalar represents a JWT scope"""
+scalar federation__Scope
+
+"""This string-serialized scalar represents an authorization policy."""
+scalar federation__Policy

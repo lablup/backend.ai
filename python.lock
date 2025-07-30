@@ -48,6 +48,7 @@
 //     "dataclasses-json~=0.5.7",
 //     "etcd-client-py~=0.4.1",
 //     "faker~=24.7.1",
+//     "graphene-federation~=3.2.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
 //     "hiredis>=3.0.0",
@@ -2058,6 +2059,55 @@
           ],
           "requires_python": null,
           "version": "3.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "61bb005dde580ae4d3be213e1911f7374534a0ad269e09d62fa5599de38b191e",
+              "url": "https://files.pythonhosted.org/packages/d9/0a/99588fb235e2f6de47155dce5b24114d69c2a3e976622512d0dcb18f0c2f/graphene_directives-0.4.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a9a3acc424bd1a59bd16d479f4ce09605eed3cc98fe06f50bb53f0e1facf99fd",
+              "url": "https://files.pythonhosted.org/packages/f7/d1/cd3863516e1e07f194a44a6822074bac94e7ddacd67ac0b2a79a1eab9784/graphene_directives-0.4.7.tar.gz"
+            }
+          ],
+          "project_name": "graphene-directives",
+          "requires_dists": [
+            "graphene>=3"
+          ],
+          "requires_python": "<4,>=3.9",
+          "version": "0.4.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "513b57425fc4ded32cec0acafa5d82170b7f7ed8da1e0c1e538e2b531879a21e",
+              "url": "https://files.pythonhosted.org/packages/37/37/2ef3c1cedf3dc7f7b5dba7bce70d3265427ca538682a15a1737c70c238e4/graphene_federation-3.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fbe9036684036a3c6e92a9f7a9dde98674f09894dee0c418301c62cc4c838ce6",
+              "url": "https://files.pythonhosted.org/packages/db/8e/70b903cdfccad416ba851d7fb092faac29ac72a6e5456336f11f79d9d298/graphene-federation-3.2.0.tar.gz"
+            }
+          ],
+          "project_name": "graphene-federation",
+          "requires_dists": [
+            "black==23.12.1; extra == \"dev\"",
+            "flake8==4.0.1; extra == \"dev\"",
+            "graphene-directives>=0.4.6",
+            "graphene>=3.1",
+            "graphql-core>=3.1",
+            "mypy==0.961; extra == \"dev\"",
+            "pytest-cov; extra == \"dev\"",
+            "pytest-cov; extra == \"test\"",
+            "pytest==7.1.2; extra == \"dev\"",
+            "pytest==7.1.2; extra == \"test\""
+          ],
+          "requires_python": null,
+          "version": "3.2.0"
         },
         {
           "artifacts": [
@@ -6604,6 +6654,7 @@
     "dataclasses-json~=0.5.7",
     "etcd-client-py~=0.4.1",
     "faker~=24.7.1",
+    "graphene-federation~=3.2.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
     "hiredis>=3.0.0",

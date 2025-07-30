@@ -164,6 +164,20 @@ services:
       - "3200" # tempo
       - "4317" # otlp grpc
 
+  backendai-half-apollo-router:
+    image: ghcr.io/apollographql/router:v1.61.9
+    networks:
+      - half
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./src/ai/backend/manager/api/gql/supergraph.graphql:/etc/router/supergraph.graphql
+    command:
+      - "--supergraph"
+      - "/etc/router/supergraph.graphql"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 networks:
   half:
 
