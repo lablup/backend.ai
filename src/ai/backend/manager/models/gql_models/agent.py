@@ -368,34 +368,34 @@ class Agent(graphene.ObjectType):
 
     # Legacy fields
     mem_slots = graphene.Int(
-        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
     )
     cpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
     )
     gpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
     )
     tpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `available_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
     )
     used_mem_slots = graphene.Int(
-        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
     )
     used_cpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
     )
     used_gpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
     )
     used_tpu_slots = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `occupied_slots` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
     )
     cpu_cur_pct = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `live_stat` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `live_stat` instead."
     )
     mem_cur_bytes = graphene.Float(
-        deprecation_reason="Deprecated since 25.12.0. use `live_stat` instead."
+        deprecation_reason="Deprecated since 25.13.0. use `live_stat` instead."
     )
 
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
@@ -468,11 +468,11 @@ class Agent(graphene.ObjectType):
             return transform_device_metrics(action_result.result)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
-        # Deprecated since 25.12.0, use live_stat instead
+        # Deprecated since 25.13.0, use live_stat instead
         return None
 
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
-        # Deprecated since 25.12.0, use live_stat instead
+        # Deprecated since 25.13.0, use live_stat instead
         return None
 
     async def resolve_hardware_metadata(
