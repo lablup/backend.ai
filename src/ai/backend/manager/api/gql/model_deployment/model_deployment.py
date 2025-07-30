@@ -5,36 +5,29 @@ from uuid import uuid4
 
 import strawberry
 from strawberry import ID, Info, relay
-from strawberry.relay import Connection, Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.federated_types import (
     AccessToken,
     AutoScalingRule,
-    Image,
     ResourceGroup,
     User,
-    VFolder,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import (
     RoutingNode,
 )
 
 from .model_revision import (
-    ClusterConfig,
     ClusterConfigInput,
-    ClusterMode,
     CreateModelRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
-    ModelRuntimeConfig,
-    ModelVFolderConfig,
-    Mount,
-    MountPermission,
-    MountType,
-    ResourceConfig,
-    vLLMServiceConfig,
+    ModelRevisionEdge,
+    mock_model_revision_1,
+    mock_model_revision_2,
+    mock_model_revision_3,
 )
 
 
@@ -272,6 +265,215 @@ class DeleteModelDeploymentInput:
     id: ID
 
 
+# Mock Model Replicas
+mock_model_replica_1 = ModelReplica(
+    id="replica-001",
+    name="llama-3-8b-instruct-replica-01",
+    status=ReplicaStatus.HEALTHY,
+    revision=mock_model_revision_1,
+    routings=[
+        RoutingNode(
+            id=ID("routing-001"),
+            routing_id=uuid4(),
+            endpoint="https://api.backend.ai/models/dep-001/routing/01",
+            session=uuid4(),
+            status="ACTIVE",
+            traffic_ratio=0.33,
+            created_at=datetime.now() - timedelta(days=5),
+            error_data=cast(JSONString, '{"error": null}'),
+            live_stat=cast(
+                JSONString, '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}'
+            ),
+        )
+    ],
+)
+
+mock_model_replica_2 = ModelReplica(
+    id="replica-002",
+    name="llama-3-8b-instruct-replica-02",
+    status=ReplicaStatus.HEALTHY,
+    revision=mock_model_revision_1,
+    routings=[
+        RoutingNode(
+            id=ID("routing-002"),
+            routing_id=uuid4(),
+            endpoint="https://api.backend.ai/models/dep-001/routing/02",
+            session=uuid4(),
+            status="ACTIVE",
+            traffic_ratio=0.33,
+            created_at=datetime.now() - timedelta(days=5),
+            error_data=cast(JSONString, '{"error": null}'),
+            live_stat=cast(
+                JSONString, '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}'
+            ),
+        )
+    ],
+)
+
+mock_model_replica_3 = ModelReplica(
+    id="replica-003",
+    name="llama-3-8b-instruct-replica-03",
+    status=ReplicaStatus.UNHEALTHY,
+    revision=mock_model_revision_1,
+    routings=[
+        RoutingNode(
+            id=ID("routing-003"),
+            routing_id=uuid4(),
+            endpoint="https://api.backend.ai/models/dep-001/routing/03",
+            session=uuid4(),
+            status="INACTIVE",
+            traffic_ratio=0.0,
+            created_at=datetime.now() - timedelta(days=2),
+            error_data=cast(
+                JSONString, '{"error": "OOMKilled", "message": "Container exceeded memory limit"}'
+            ),
+            live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
+        )
+    ],
+)
+
+ModelReplicaEdge = Edge[ModelReplica]
+
+# TODO: After implementing the actual logic, remove these mock objects
+# Mock Model Deployments
+mock_model_deployment_1 = ModelDeployment(
+    id="dep-001",
+    name="llama-3-8b-instruct",
+    endpoint_url="https://api.backend.ai/models/dep-001",
+    preferred_domain_name="llama-3-8b.models.backend.ai",
+    status=DeploymentStatus.ACTIVE,
+    open_to_public=True,
+    tags=["production", "llm", "chat", "instruct"],
+    revision=mock_model_revision_1,
+    revision_history=ModelRevisionConnection(
+        edges=[
+            ModelRevisionEdge(node=mock_model_revision_1, cursor="rev-cursor-1"),
+            ModelRevisionEdge(node=mock_model_revision_2, cursor="rev-cursor-2"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="rev-cursor-1",
+            end_cursor="rev-cursor-2",
+        ),
+    ),
+    scale=Scale(
+        auto_scaling_rules=[
+            AutoScalingRule(id=ID("asr-cpu-001")),
+            AutoScalingRule(id=ID("asr-gpu-001")),
+        ]
+    ),
+    replica_management=ReplicaManagement(
+        desired_replica_count=3,
+        replicas=ModelReplicaConnection(
+            edges=[
+                ModelReplicaEdge(node=mock_model_replica_1, cursor="replica-cursor-1"),
+                ModelReplicaEdge(node=mock_model_replica_2, cursor="replica-cursor-2"),
+                ModelReplicaEdge(node=mock_model_replica_3, cursor="replica-cursor-3"),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor="replica-cursor-1",
+                end_cursor="replica-cursor-3",
+            ),
+        ),
+    ),
+    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
+    created_user=User(id=ID("user-001")),
+    resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+    access_tokens=[],
+    created_at=datetime.now() - timedelta(days=30),
+    updated_at=datetime.now() - timedelta(hours=2),
+)
+
+mock_model_deployment_2 = ModelDeployment(
+    id="dep-002",
+    name="mistral-7b-v0.3",
+    endpoint_url="https://api.backend.ai/models/dep-002",
+    preferred_domain_name="mistral-7b.models.backend.ai",
+    status=DeploymentStatus.ACTIVE,
+    open_to_public=False,
+    tags=["staging", "llm", "experimental"],
+    revision=mock_model_revision_3,
+    revision_history=ModelRevisionConnection(
+        edges=[
+            ModelRevisionEdge(node=mock_model_revision_3, cursor="rev-cursor-3"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="rev-cursor-3",
+            end_cursor="rev-cursor-3",
+        ),
+    ),
+    scale=Scale(auto_scaling_rules=[]),
+    replica_management=ReplicaManagement(
+        desired_replica_count=1,
+        replicas=ModelReplicaConnection(
+            edges=[
+                ModelReplicaEdge(node=mock_model_replica_1, cursor="replica-cursor-1"),
+                ModelReplicaEdge(node=mock_model_replica_2, cursor="replica-cursor-2"),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=None,
+                end_cursor=None,
+            ),
+        ),
+    ),
+    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
+    created_user=User(id=ID("user-002")),
+    resource_group=ResourceGroup(id=ID("rg-us-west-2")),
+    access_tokens=[],
+    created_at=datetime.now() - timedelta(days=20),
+    updated_at=datetime.now() - timedelta(days=1),
+)
+
+mock_model_deployment_3 = ModelDeployment(
+    id="dep-003",
+    name="gemma-2-9b",
+    endpoint_url=None,
+    preferred_domain_name=None,
+    status=DeploymentStatus.INACTIVE,
+    open_to_public=False,
+    tags=["development", "llm", "testing"],
+    revision=None,
+    revision_history=ModelRevisionConnection(
+        edges=[],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=None,
+            end_cursor=None,
+        ),
+    ),
+    scale=Scale(auto_scaling_rules=[]),
+    replica_management=ReplicaManagement(
+        desired_replica_count=0,
+        replicas=ModelReplicaConnection(
+            edges=[],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=None,
+                end_cursor=None,
+            ),
+        ),
+    ),
+    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
+    created_user=User(id=ID("user-003")),
+    resource_group=ResourceGroup(id=ID("rg-eu-west-1")),
+    access_tokens=[],
+    created_at=datetime.now() - timedelta(days=15),
+    updated_at=datetime.now() - timedelta(days=7),
+)
+
+
+ModelDeploymentEdge = Edge[ModelDeployment]
+
+
 # Connection types for Relay support
 @strawberry.type
 class ModelDeploymentConnection(Connection[ModelDeployment]):
@@ -292,8 +494,16 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
         max_results: Optional[int] = None,
         **kwargs,
     ) -> "ModelDeploymentConnection":
+        mock_deployments = [
+            mock_model_deployment_1,
+            mock_model_deployment_2,
+            mock_model_deployment_3,
+        ]
         return cls(
-            edges=[],
+            edges=[
+                Edge(node=deployment, cursor=str(i))
+                for i, deployment in enumerate(mock_deployments)
+            ],
             page_info=relay.PageInfo(
                 has_next_page=False,
                 has_previous_page=False,
@@ -313,58 +523,11 @@ async def deployments(
 ) -> list[ModelDeployment]:
     """List deployments with optional filtering and pagination."""
     # Return a list of mock deployments with more details
-    model_names = [
-        "llama-3-8b-instruct",
-        "mistral-7b-v0.3",
-        "gemma-2-9b",
-        "qwen-2.5-7b-instruct",
-        "mixtral-8x7b",
+    deployments = [
+        mock_model_deployment_1,
+        mock_model_deployment_2,
+        mock_model_deployment_3,
     ]
-
-    deployments = []
-    for i, name in enumerate(model_names):
-        deployment = ModelDeployment(
-            id=ID(f"dep-{i + 1:03d}"),
-            name=name,
-            endpoint_url=f"https://api.backend.ai/models/dep-{i + 1:03d}" if i % 2 == 0 else None,
-            preferred_domain_name=f"{name}.models.backend.ai" if i % 2 == 0 else None,
-            status=DeploymentStatus.ACTIVE if i % 2 == 0 else DeploymentStatus.INACTIVE,
-            open_to_public=i % 3 == 0,
-            tags=["production", "llm"] if i < 2 else ["staging", "experimental"],
-            revision_history=ModelRevisionConnection(
-                edges=[],
-                page_info=relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-            ),
-            replica_management=ReplicaManagement(
-                desired_replica_count=3 if i % 2 == 0 else 1,
-                replicas=ModelReplicaConnection(
-                    edges=[],
-                    page_info=relay.PageInfo(
-                        has_next_page=False,
-                        has_previous_page=False,
-                        start_cursor=None,
-                        end_cursor=None,
-                    ),
-                ),
-            ),
-            scale=Scale(auto_scaling_rules=[]),
-            deployment_strategy=DeploymentStrategy(
-                type=DeploymentStrategyType.ROLLING if i < 3 else DeploymentStrategyType.BLUE_GREEN,
-            ),
-            created_user=User(id=ID(f"user-{i % 3 + 1}")),
-            resource_group=ResourceGroup(
-                id=ID(f"rg-{['us-east-1', 'us-west-2', 'eu-west-1'][i % 3]}")
-            ),
-            access_tokens=[],
-            created_at=datetime.now() - timedelta(days=30 - i * 5),
-            updated_at=datetime.now() - timedelta(days=i),
-        )
-        deployments.append(deployment)
 
     return deployments
 
@@ -372,122 +535,7 @@ async def deployments(
 @strawberry.field
 async def deployment(id: ID) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
-    # Return a more detailed deployment
-    revision = ModelRevision(
-        id=ID("rev-001"),
-        name="llama-3-8b-instruct-v1",
-        cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-        resource_config=ResourceConfig(
-            resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-            resource_slots=cast(
-                JSONString,
-                '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-            ),
-            resource_opts=cast(
-                JSONString,
-                '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-            ),
-        ),
-        model_runtime_config=ModelRuntimeConfig(
-            runtime_variant="vllm",
-            service_config=vLLMServiceConfig(
-                max_model_length=4096,
-                parallelism=cast(JSONString, '{"tensor_parallel_size": 1}'),
-                extra_cli_parameters="--enable-prefix-caching",
-            ),
-            environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
-        ),
-        model_vfolder_config=ModelVFolderConfig(
-            vfolder=VFolder(id=ID("vf-model-001")),
-            mount_destination="/models",
-            definition_path="models/llama-3-8b/config.yaml",
-        ),
-        mounts=[
-            Mount(
-                vfolder_id=ID("vf-cache-001"),
-                destination="/cache",
-                type=MountType.VOLUME,
-                permission=MountPermission.READ_WRITE,
-            )
-        ],
-        image=Image(id=ID("img-vllm-001")),
-        error_data=None,
-        created_at=datetime.now() - timedelta(days=10),
-    )
-
-    # Create replicas with detailed info
-    replicas = []
-    for i in range(3):
-        replica = ModelReplica(
-            id=ID(f"replica-{i + 1:02d}"),
-            name=f"llama-3-8b-instruct-replica-{i + 1:02d}",
-            status=ReplicaStatus.HEALTHY if i < 2 else ReplicaStatus.UNHEALTHY,
-            revision=revision,
-            routings=[
-                RoutingNode(
-                    id=ID(f"routing-{i + 1:02d}"),
-                    routing_id=uuid4(),
-                    endpoint=f"https://api.backend.ai/models/dep-{id}/routing/{i + 1:02d}",
-                    session=uuid4(),
-                    status="ACTIVE" if i < 2 else "INACTIVE",
-                    traffic_ratio=0.5 if i < 2 else 0.0,
-                    created_at=datetime.now() - timedelta(days=i),
-                    error_data=cast(JSONString, '{"error": "No errors"}'),
-                    live_stat=cast(JSONString, '{"requests": 100, "latency": 200}'),
-                )
-            ],
-        )
-        replicas.append(replica)
-
-    replica_edges = [
-        strawberry.relay.Edge(node=rep, cursor=f"cursor-{idx}") for idx, rep in enumerate(replicas)
-    ]
-
-    return ModelDeployment(
-        id=id,
-        name="llama-3-8b-instruct",
-        endpoint_url="https://api.backend.ai/models/dep-001",
-        preferred_domain_name="llama-3-8b.models.backend.ai",
-        status=DeploymentStatus.ACTIVE,
-        open_to_public=True,
-        tags=["production", "llm", "chat"],
-        revision=revision,
-        revision_history=ModelRevisionConnection(
-            edges=[strawberry.relay.Edge(node=revision, cursor="cursor-0")],
-            page_info=relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor="cursor-0",
-                end_cursor="cursor-0",
-            ),
-        ),
-        replica_management=ReplicaManagement(
-            desired_replica_count=3,
-            replicas=ModelReplicaConnection(
-                edges=replica_edges,
-                page_info=relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor="cursor-0",
-                    end_cursor="cursor-2",
-                ),
-            ),
-        ),
-        scale=Scale(
-            auto_scaling_rules=[
-                AutoScalingRule(id=ID("asr-cpu-001")),
-                AutoScalingRule(id=ID("asr-gpu-001")),
-            ]
-        ),
-        deployment_strategy=DeploymentStrategy(
-            type=DeploymentStrategyType.ROLLING,
-        ),
-        created_user=User(id=ID("user-001")),
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-        access_tokens=[],
-        created_at=datetime.now() - timedelta(days=30),
-        updated_at=datetime.now() - timedelta(hours=2),
-    )
+    return None
 
 
 @strawberry.field
@@ -526,42 +574,12 @@ async def deployment_metrics(
 @strawberry.field
 async def replica(id: ID) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
-    revision = ModelRevision(
-        id=ID("rev-001"),
-        name="llama-3-8b-instruct-v1",
-        cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-        resource_config=ResourceConfig(
-            resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-            resource_slots=cast(
-                JSONString,
-                '{"cpu": 8, "mem": "32G", "cuda.shares": 1}',
-            ),
-            resource_opts=cast(
-                JSONString,
-                '{"shmem": "2G"}',
-            ),
-        ),
-        model_runtime_config=ModelRuntimeConfig(
-            runtime_variant="vllm",
-            service_config=None,
-            environ=None,
-        ),
-        model_vfolder_config=ModelVFolderConfig(
-            vfolder=VFolder(id=ID("vf-model-001")),
-            mount_destination="/models",
-            definition_path="model.yaml",
-        ),
-        mounts=[],
-        image=Image(id=ID("img-vllm-001")),
-        error_data=None,
-        created_at=datetime.now() - timedelta(days=10),
-    )
 
     return ModelReplica(
         id=id,
         name="llama-3-8b-instruct-replica-01",
         status=ReplicaStatus.HEALTHY,
-        revision=revision,
+        revision=mock_model_revision_1,
         routings=[],
     )
 
@@ -572,44 +590,7 @@ async def create_model_deployment(
 ) -> CreateModelDeploymentPayload:
     """Create a new model deployment."""
     # Create a dummy deployment for placeholder
-    deployment = ModelDeployment(
-        id=ID("placeholder-id"),
-        name="placeholder",
-        status=DeploymentStatus.ACTIVE,
-        open_to_public=False,
-        tags=[],
-        revision_history=ModelRevisionConnection(
-            edges=[],
-            page_info=relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        ),
-        replica_management=ReplicaManagement(
-            desired_replica_count=1,
-            replicas=ModelReplicaConnection(
-                edges=[],
-                page_info=relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-            ),
-        ),
-        scale=Scale(auto_scaling_rules=[]),
-        deployment_strategy=DeploymentStrategy(
-            type=DeploymentStrategyType.ROLLING,
-        ),
-        created_user=User(id=ID("user-current")),
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-        access_tokens=[],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-    return CreateModelDeploymentPayload(deployment=deployment)
+    return CreateModelDeploymentPayload(deployment=mock_model_deployment_1)
 
 
 @strawberry.mutation
@@ -618,44 +599,7 @@ async def update_model_deployment(
 ) -> UpdateModelDeploymentPayload:
     """Update an existing model deployment."""
     # Create a dummy deployment for placeholder
-    deployment = ModelDeployment(
-        id=ID("placeholder-id"),
-        name="placeholder",
-        status=DeploymentStatus.ACTIVE,
-        open_to_public=False,
-        tags=[],
-        revision_history=ModelRevisionConnection(
-            edges=[],
-            page_info=relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        ),
-        replica_management=ReplicaManagement(
-            desired_replica_count=1,
-            replicas=ModelReplicaConnection(
-                edges=[],
-                page_info=relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-            ),
-        ),
-        scale=Scale(auto_scaling_rules=[]),
-        deployment_strategy=DeploymentStrategy(
-            type=DeploymentStrategyType.ROLLING,
-        ),
-        created_user=User(id=ID("user-id")),
-        resource_group=ResourceGroup(id=ID("rg-id")),
-        access_tokens=[],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-    return UpdateModelDeploymentPayload(deployment=deployment)
+    return UpdateModelDeploymentPayload(deployment=mock_model_deployment_1)
 
 
 @strawberry.mutation
@@ -671,46 +615,10 @@ async def deployment_status_changed(
     deployment_id: ID,
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
+    deployment = [mock_model_deployment_1, mock_model_deployment_2, mock_model_deployment_3]
 
-    yield DeploymentStatusChangedPayload(
-        deployment=ModelDeployment(
-            id=ID("placeholder-id"),
-            name="placeholder",
-            status=DeploymentStatus.ACTIVE,
-            open_to_public=False,
-            tags=[],
-            revision_history=ModelRevisionConnection(
-                edges=[],
-                page_info=relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-            ),
-            replica_management=ReplicaManagement(
-                desired_replica_count=1,
-                replicas=ModelReplicaConnection(
-                    edges=[],
-                    page_info=relay.PageInfo(
-                        has_next_page=False,
-                        has_previous_page=False,
-                        start_cursor=None,
-                        end_cursor=None,
-                    ),
-                ),
-            ),
-            scale=Scale(auto_scaling_rules=[]),
-            deployment_strategy=DeploymentStrategy(
-                type=DeploymentStrategyType.ROLLING,
-            ),
-            created_user=User(id=ID("user-id")),
-            resource_group=ResourceGroup(id=ID("rg-id")),
-            access_tokens=[],
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-        )
-    )
+    for dep in deployment:
+        yield DeploymentStatusChangedPayload(deployment=dep)
 
 
 @strawberry.subscription
@@ -718,43 +626,10 @@ async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
     """Subscribe to replica status changes."""
+    replicas = [mock_model_replica_1, mock_model_replica_2, mock_model_replica_3]
 
-    yield ReplicaStatusChangedPayload(
-        replica=ModelReplica(
-            id=revision_id,
-            status=ReplicaStatus.HEALTHY,
-            name="placeholder",
-            revision=ModelRevision(
-                id=ID("revision-id"),
-                name="placeholder-revision",
-                cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-                resource_config=ResourceConfig(
-                    resource_group=ResourceGroup(id=ID("rg-id")),
-                    resource_slots=cast(
-                        JSONString,
-                        '{"cpu": 1, "mem": "1G", "extra": {"gpu_type": "A100", "storage": "100GB"}}',
-                    ),
-                    resource_opts=cast(
-                        JSONString,
-                        '{"shmem": null, "extra": {"network": "high_bandwidth", "priority": "high"}}',
-                    ),
-                ),
-                model_runtime_config=ModelRuntimeConfig(
-                    runtime_variant="vllm", service_config=None, environ=None
-                ),
-                model_vfolder_config=ModelVFolderConfig(
-                    vfolder=VFolder(id=ID("vf-id")),
-                    mount_destination="/models",
-                    definition_path="model.yaml",
-                ),
-                mounts=[],
-                image=Image(id=ID("image-id")),
-                error_data=None,
-                created_at=datetime.now(),
-            ),
-            routings=[],
-        )
-    )
+    for replica in replicas:
+        yield ReplicaStatusChangedPayload(replica=replica)
 
 
 @strawberry.subscription

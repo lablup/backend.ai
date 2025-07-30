@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum, StrEnum
 from typing import Annotated, Any, Optional, cast
 
 import strawberry
 from strawberry import ID, Info, relay
-from strawberry.relay import Connection, PageInfo
+from strawberry.relay import Connection, Edge, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
@@ -147,6 +147,128 @@ class ModelRevisionOrder:
     direction: OrderDirection = OrderDirection.DESC
 
 
+# TODO: After implementing the actual logic, remove these mock objects
+# Mock Model Revisions
+mock_model_revision_1 = ModelRevision(
+    id="rev-001",
+    name="llama-3-8b-instruct-v1.0",
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
+        ),
+    ),
+    model_runtime_config=ModelRuntimeConfig(
+        runtime_variant="vllm",
+        service_config=vLLMServiceConfig(
+            max_model_length=4096,
+            parallelism=cast(JSONString, '{"tensor_parallel_size": 1}'),
+            extra_cli_parameters="--enable-prefix-caching",
+        ),
+        environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
+    ),
+    model_vfolder_config=ModelVFolderConfig(
+        vfolder=VFolder(id=ID("vf-model-001")),
+        mount_destination="/models",
+        definition_path="models/llama-3-8b/config.yaml",
+    ),
+    mounts=[
+        Mount(
+            vfolder_id=ID("vf-cache-001"),
+            destination="/cache",
+            type=MountType.VOLUME,
+            permission=MountPermission.READ_WRITE,
+        )
+    ],
+    image=Image(id=ID("img-vllm-001")),
+    error_data=None,
+    created_at=datetime.now() - timedelta(days=10),
+)
+
+mock_model_revision_2 = ModelRevision(
+    id="rev-002",
+    name="llama-3-8b-instruct-v1.1",
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
+        ),
+    ),
+    model_runtime_config=ModelRuntimeConfig(
+        runtime_variant="vllm",
+        service_config=vLLMServiceConfig(
+            max_model_length=8192,
+            parallelism=cast(JSONString, '{"tensor_parallel_size": 2}'),
+            extra_cli_parameters="--enable-prefix-caching --enable-chunked-prefill",
+        ),
+        environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0,1"}'),
+    ),
+    model_vfolder_config=ModelVFolderConfig(
+        vfolder=VFolder(id=ID("vf-model-002")),
+        mount_destination="/models",
+        definition_path="models/llama-3-8b/config.yaml",
+    ),
+    mounts=[
+        Mount(
+            vfolder_id=ID("vf-cache-002"),
+            destination="/cache",
+            type=MountType.VOLUME,
+            permission=MountPermission.READ_WRITE,
+        )
+    ],
+    image=Image(id=ID("img-vllm-002")),
+    error_data=None,
+    created_at=datetime.now() - timedelta(days=5),
+)
+
+mock_model_revision_3 = ModelRevision(
+    id="rev-003",
+    name="mistral-7b-v0.3-initial",
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-west-2")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 4, "mem": "16G", "cuda.shares": 0.5, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "1G", "reserved_time": "12h", "scaling_group": "us-west-2"}',
+        ),
+    ),
+    model_runtime_config=ModelRuntimeConfig(
+        runtime_variant="vllm",
+        service_config=vLLMServiceConfig(
+            max_model_length=2048,
+            parallelism=cast(JSONString, '{"tensor_parallel_size": 1}'),
+            extra_cli_parameters="--disable-log-stats",
+        ),
+        environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "2"}'),
+    ),
+    model_vfolder_config=ModelVFolderConfig(
+        vfolder=VFolder(id=ID("vf-model-003")),
+        mount_destination="/models",
+        definition_path="models/mistral-7b/config.yaml",
+    ),
+    mounts=[],
+    image=Image(id=ID("img-vllm-003")),
+    error_data=None,
+    created_at=datetime.now() - timedelta(days=20),
+)
+
+
 # Payload Types
 @strawberry.type
 class CreateModelRevisionPayload:
@@ -216,6 +338,9 @@ class CreateModelRevisionInput:
     resource_config: ResourceConfigInput
 
 
+ModelRevisionEdge = Edge[ModelRevision]
+
+
 @strawberry.type
 class ModelRevisionConnection(Connection[ModelRevision]):
     """Connection type for ModelRevision, used for Relay pagination."""
@@ -238,8 +363,10 @@ class ModelRevisionConnection(Connection[ModelRevision]):
         **kwargs: Any,
     ):
         """Resolve the connection for Relay pagination."""
+        revisions = [mock_model_revision_1, mock_model_revision_2, mock_model_revision_3]
+        edges = [ModelRevisionEdge(node=rev, cursor=str(i)) for i, rev in enumerate(revisions)]
         return cls(
-            edges=[],
+            edges=edges,
             page_info=PageInfo(
                 has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
             ),
@@ -254,7 +381,7 @@ async def revisions(
     after: Optional[str] = None,
 ) -> list[ModelRevision]:
     """List revisions with optional filtering and pagination."""
-    return []
+    return [mock_model_revision_1, mock_model_revision_2, mock_model_revision_3]
 
 
 @strawberry.field
@@ -268,24 +395,26 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
     """Create a new model revision."""
     revision = ModelRevision(
         id=ID(f"rev-new-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
-        name=f"New Model Revision {datetime.now()}",
+        name=input.name,
         cluster_config=ClusterConfig(
             mode=ClusterMode.SINGLE_NODE,
             size=1,
         ),
         resource_config=ResourceConfig(
-            resource_group=ResourceGroup(id=ID("rg-id")),
+            resource_group=ResourceGroup(id=ID(input.resource_config.resource_group.name)),
             resource_slots=cast(
                 JSONString,
-                '{"cpu": 1, "mem": "1G", "extra": {"gpu_type": "A100", "storage": "100GB"}}',
+                input.resource_config.resource_slots,
             ),
             resource_opts=cast(
                 JSONString,
-                '{"shmem": , "extra": {"network": "high_bandwidth", "priority": "high"}}',
+                input.resource_config.resource_opts,
             ),
         ),
         model_runtime_config=ModelRuntimeConfig(
-            runtime_variant="vllm", service_config=None, environ=None
+            runtime_variant=input.model_runtime_config.runtime_variant,
+            service_config=None,
+            environ=None,
         ),
         model_vfolder_config=ModelVFolderConfig(
             vfolder=VFolder(id=ID("vf-id")),
