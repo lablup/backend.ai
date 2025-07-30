@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryResult, ResultValue
+from ai.backend.common.clients.prometheus.container_util.data.response import (
+    ContainerUtilizationQueryResult,
+)
+from ai.backend.common.clients.prometheus.data.response import ResultValue
 
 
 @dataclass

@@ -9,9 +9,11 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
-from ai.backend.common.clients.prometheus.types import (
+from ai.backend.common.clients.prometheus.container_util.data.response import (
     ContainerUtilizationQueryResult,
-    LabelValueResponse,
+)
+from ai.backend.common.clients.prometheus.data.response import (
+    LabelValueQueryResponseData,
     ResultMetric,
     ResultValue,
 )
@@ -52,7 +54,7 @@ class TestContainerMetricServiceCompatibility:
     ) -> None:
         """Test querying metadata returns list of all available metrics."""
         # Configure mock response
-        mock_utilization_reader.get_label_values.return_value = LabelValueResponse(
+        mock_utilization_reader.get_label_values.return_value = LabelValueQueryResponseData(
             status="success",
             data=[
                 "cpu_util",
@@ -81,7 +83,7 @@ class TestContainerMetricServiceCompatibility:
     ) -> None:
         """Test querying metadata handles empty metric list gracefully."""
         # Configure mock response
-        mock_utilization_reader.get_label_values.return_value = LabelValueResponse(
+        mock_utilization_reader.get_label_values.return_value = LabelValueQueryResponseData(
             status="success",
             data=[],
         )

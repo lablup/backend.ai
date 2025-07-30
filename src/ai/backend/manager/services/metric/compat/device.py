@@ -1,16 +1,19 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.manager.services.metric.types import DeviceMetricResult, MetricResultValue
+from ai.backend.common.clients.prometheus.data.response import ResultValue
+from ai.backend.common.clients.prometheus.device_util.data.response import (
+    DeviceUtilizationQueryResult,
+)
 
 
 @dataclass
 class MetricByTypeValue:
-    latest: MetricResultValue
-    values: list[MetricResultValue]
+    latest: ResultValue
+    values: list[ResultValue]
 
 
-def transform_device_metrics(source_data: list[DeviceMetricResult]) -> dict[str, Any]:
+def transform_device_metrics(source_data: list[DeviceUtilizationQueryResult]) -> dict[str, Any]:
     """
     Transform Prometheus-styled device metrics data into a legacy `live_stat` format.
     """

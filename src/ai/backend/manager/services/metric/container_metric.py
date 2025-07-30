@@ -2,10 +2,10 @@ import logging
 from datetime import datetime
 
 from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
-from ai.backend.common.clients.prometheus.types import (
+from ai.backend.common.clients.prometheus.container_util.data.request import (
     ContainerUtilizationQueryParameter,
-    QueryRange,
 )
+from ai.backend.common.clients.prometheus.data.request import QueryRange
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
 )

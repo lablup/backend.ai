@@ -8,14 +8,9 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientKey, ClientPool
 
+from .data.request import QueryData
+from .data.response import QueryResponseData, Result, ResultMetric, ResultValue
 from .exception import PrometheusException, ResultNotFound
-from .types import (
-    QueryData,
-    QueryResponseData,
-    Result,
-    ResultMetric,
-    ResultValue,
-)
 
 
 class ResultType(enum.Enum):
@@ -73,7 +68,7 @@ class _ResultMetric(BaseModel):
         )
 
 
-class ResultValuePair(NamedTuple):
+class _ResultValuePair(NamedTuple):
     timestamp: float
     value: str
 
@@ -89,7 +84,7 @@ class AbstractResult(ABC):
 
 class MatrixResult(AbstractResult, BaseModel):
     metric: _ResultMetric
-    values: list[ResultValuePair]
+    values: list[_ResultValuePair]
 
     @override
     def to_result(self) -> Result:
@@ -101,7 +96,7 @@ class MatrixResult(AbstractResult, BaseModel):
 
 class VectorResult(AbstractResult, BaseModel):
     metric: _ResultMetric
-    value: ResultValuePair
+    value: _ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -109,7 +104,7 @@ class VectorResult(AbstractResult, BaseModel):
 
 
 class ScalarResult(AbstractResult, BaseModel):
-    value: ResultValuePair
+    value: _ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -117,7 +112,7 @@ class ScalarResult(AbstractResult, BaseModel):
 
 
 class StringResult(AbstractResult, BaseModel):
-    value: ResultValuePair
+    value: _ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -135,26 +130,22 @@ class PrometheusResponse(BaseModel):
     data: PrometheusResponseData
     status: str
 
-    def to_response_data(self, status: int) -> QueryResponseData:
+    def to_response_data(self) -> QueryResponseData:
         match self.data.result_type:
             case ResultType.MATRIX:
                 return QueryResponseData(
-                    status,
                     [MatrixResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.VECTOR:
                 return QueryResponseData(
-                    status,
                     [VectorResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.SCALAR:
                 return QueryResponseData(
-                    status,
                     [ScalarResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.STRING:
                 return QueryResponseData(
-                    status,
                     [StringResult.model_validate(item).to_result() for item in self.data.result],
                 )
 
@@ -182,9 +173,9 @@ class PrometheusHTTPClient:
             form_data.add_field("step", data.step)
         return form_data
 
-    def _validate_response_data(self, status: int, data: Any) -> QueryResponseData:
+    def _validate_response_data(self, data: Any) -> QueryResponseData:
         validated = PrometheusResponse.model_validate(data)
-        return validated.to_response_data(status=status)
+        return validated.to_response_data()
 
     async def _query(self, data: QueryData) -> QueryResponseData:
         address = self._endpoint / "query"
@@ -194,7 +185,7 @@ class PrometheusHTTPClient:
             match response.status // 100:
                 case 2:
                     raw_data = await response.json()
-                    return self._validate_response_data(response.status, raw_data)
+                    return self._validate_response_data(raw_data)
                 case 4:
                     raise ResultNotFound(f"No results found for query: {data.query}")
                 case _:
@@ -210,7 +201,7 @@ class PrometheusHTTPClient:
             match response.status // 100:
                 case 2:
                     raw_data = await response.json()
-                    return self._validate_response_data(response.status, raw_data)
+                    return self._validate_response_data(raw_data)
                 case 4:
                     raise ResultNotFound(f"No results found for query: {data.query}")
                 case _:
