@@ -1051,8 +1051,8 @@ configure_backendai() {
   # TODO: populate fixtures
 
   show_info "Setting up databases... (app-proxy)"
-  _psql_core="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
-  _psql_appproxy="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
+  _psql_core="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
+  _psql_appproxy="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
   $_psql_core -c "\
     DO \$\$
     BEGIN
