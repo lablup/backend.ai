@@ -29,6 +29,10 @@ class GraphQLResponse(BaseResponseModel):
         default=None,
         description="A list of errors that occurred during the GraphQL query.",
     )
+    extensions: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Additional information about the GraphQL response.",
+    )
 
 
 # Ensure that thirdparty's forward-referenced types can be serialized correctly.

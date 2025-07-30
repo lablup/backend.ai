@@ -225,7 +225,9 @@ class V2APIHandler:
                 log.error("ADMIN.GQL-V2 Exception: {}", err.formatted)
                 errors.append(err.formatted)
 
-        response_data = GraphQLResponse(data=result.data, errors=errors)
+        response_data = GraphQLResponse(
+            data=result.data, errors=errors, extensions=result.extensions
+        )
         return APIResponse.build(
             status_code=HTTPStatus.OK,
             response_model=response_data,
