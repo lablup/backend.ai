@@ -4725,6 +4725,26 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "//gql/v2": {
+      "post": {
+        "operationId": "root.handle_gql_v2",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/spec/graphiql": {
       "get": {
         "operationId": "spec.render_graphiql_html",
@@ -4743,6 +4763,21 @@
         ],
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/spec/graphiql/v2": {
+      "get": {
+        "operationId": "spec.render_graphiql_v2_html",
+        "tags": [
+          "spec"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [],
+        "description": ""
       }
     },
     "/spec/openapi": {

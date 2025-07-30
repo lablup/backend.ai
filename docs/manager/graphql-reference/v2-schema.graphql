@@ -1,0 +1,208 @@
+type Artifact implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  type: ArtifactType!
+  status: ArtifactStatus!
+  description: String
+  registry: SourceInfo!
+  source: SourceInfo!
+  size: ByteSize!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  version: String!
+}
+
+type ArtifactConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Artifact!
+}
+
+input ArtifactFilter {
+  type: [ArtifactType!] = null
+  status: [ArtifactStatus!] = null
+  name: StringFilter = null
+  registry: StringFilter = null
+  source: StringFilter = null
+  AND: ArtifactFilter = null
+  OR: ArtifactFilter = null
+  NOT: ArtifactFilter = null
+  DISTINCT: Boolean = null
+}
+
+type ArtifactGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  type: ArtifactType!
+  status: ArtifactStatus!
+  description: String
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
+}
+
+"""A connection to a list of items."""
+type ArtifactGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactGroupEdge!]!
+}
+
+"""An edge in a connection."""
+type ArtifactGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactGroup!
+}
+
+type ArtifactImportProgressUpdatedPayload {
+  artifactId: ID!
+  progress: Float!
+  status: ArtifactStatus!
+}
+
+input ArtifactOrderBy {
+  field: ArtifactOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactOrderField {
+  ID
+  NAME
+  TYPE
+  SIZE
+  CREATED_AT
+  UPDATED_AT
+  LATEST_VERSION
+}
+
+enum ArtifactStatus {
+  AVAILABLE
+  PULLING
+  VERIFYING
+  FAILED
+}
+
+type ArtifactStatusChangedPayload {
+  artifactId: ID!
+  status: ArtifactStatus!
+  updatedAt: DateTime!
+}
+
+enum ArtifactType {
+  MODEL
+  PACKAGE
+  IMAGE
+}
+
+scalar ByteSize
+
+type CancelImportArtifactPayload {
+  artifact: Artifact!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+input DeleteArtifactInput {
+  artifactId: ID!
+}
+
+type DeleteArtifactPayload {
+  artifact: Artifact!
+}
+
+input ImportArtifactInput {
+  artifactId: ID!
+}
+
+type ImportArtifactPayload {
+  artifact: Artifact!
+}
+
+type Mutation {
+  importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
+  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+  deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
+  cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
+}
+
+"""An object with a Globally Unique ID"""
+interface Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+"""Information to aid in pagination."""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+type Query {
+  artifact(id: ID!): Artifact
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
+  artifactGroup(id: ID!): ArtifactGroup
+  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
+}
+
+type SourceInfo {
+  name: String
+  url: String
+}
+
+input StringFilter {
+  contains: String = null
+  startsWith: String = null
+  endsWith: String = null
+  equals: String = null
+  notEquals: String = null
+  iContains: String = null
+  iStartsWith: String = null
+  iEndsWith: String = null
+  iEquals: String = null
+  iNotEquals: String = null
+}
+
+type Subscription {
+  artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
+  artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
+}
+
+input UpdateArtifactInput {
+  artifactId: ID!
+}
+
+type UpdateArtifactPayload {
+  artifact: Artifact!
+}

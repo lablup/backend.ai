@@ -12,6 +12,7 @@ import graphene
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
 
+from ..api.gql.schema import schema as strawberry_schema
 from ..models.gql import Mutations, Queries
 
 if TYPE_CHECKING:
@@ -25,14 +26,23 @@ def cli(args) -> None:
     pass
 
 
-async def generate_gql_schema(output_path: Path) -> None:
+async def generate_graphene_gql_schema(output_path: Path) -> None:
     schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
     if output_path == "-":
-        log.info("======== GraphQL API Schema ========")
+        log.info("======== Graphene GraphQL API Schema ========")
         print(str(schema))
     else:
         async with aiofiles.open(output_path, "w") as fw:
             await fw.write(str(schema))
+
+
+async def generate_strawberry_gql_schema(output_path: Path) -> None:
+    if output_path == "-":
+        log.info("======== Strawberry GraphQL API Schema ========")
+        print(strawberry_schema.as_str())
+    else:
+        async with aiofiles.open(output_path, "w") as fw:
+            await fw.write(strawberry_schema.as_str())
 
 
 @cli.command()
@@ -44,8 +54,17 @@ async def generate_gql_schema(output_path: Path) -> None:
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
-    asyncio.run(generate_gql_schema(output))
+@click.option(
+    "--v2",
+    is_flag=True,
+    default=False,  # TODO: Set default to True after v2 migration is complete
+    help="Generate strawberry based v2 GraphQL schema (default: False)",
+)
+def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+    if v2:
+        asyncio.run(generate_strawberry_gql_schema(output))
+    else:
+        asyncio.run(generate_graphene_gql_schema(output))
 
 
 @cli.command()
