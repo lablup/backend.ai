@@ -17,8 +17,6 @@ from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
     deployment,
-    deployment_metrics,
-    deployment_metrics_updated,
     deployment_status_changed,
     deployments,
     replica,
@@ -42,7 +40,6 @@ class Query:
     deployment = deployment
     revisions = revisions
     revision = revision
-    deployment_metrics = deployment_metrics
     replica = replica
 
 
@@ -64,7 +61,6 @@ class Subscription:
     artifact_import_progress_updated = artifact_import_progress_updated
     deployment_status_changed = deployment_status_changed
     replica_status_changed = replica_status_changed
-    deployment_metrics_updated = deployment_metrics_updated
 
 
 schema = strawberry.federation.Schema(

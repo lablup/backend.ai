@@ -195,24 +195,6 @@ input DeploymentFilter {
   DISTINCT: Boolean = null
 }
 
-type DeploymentMetrics {
-  replicaMetrics: [ReplicaMetric!]!
-}
-
-input DeploymentMetricsFilter {
-  replicaIds: [ID!] = null
-  startTime: DateTime = null
-  endTime: DateTime = null
-  AND: DeploymentMetricsFilter = null
-  OR: DeploymentMetricsFilter = null
-  NOT: DeploymentMetricsFilter = null
-  DISTINCT: Boolean = null
-}
-
-type DeploymentMetricsUpdatedPayload {
-  metrics: DeploymentMetrics!
-}
-
 input DeploymentOrderBy {
   field: DeploymentOrderField!
   direction: OrderDirection! = DESC
@@ -526,7 +508,6 @@ type Query {
     last: Int = null
   ): ModelRevisionConnection!
   revision(id: ID!): ModelRevision
-  deploymentMetrics(id: ID!, filter: DeploymentMetricsFilter = null): [DeploymentMetrics!]!
   replica(id: ID!): ModelReplica
 }
 
@@ -538,13 +519,6 @@ type RawServiceConfig {
 type ReplicaManagement {
   desiredReplicaCount: Int!
   replicas: ModelReplicaConnection!
-}
-
-type ReplicaMetric {
-  replicaId: ID!
-  cpuUsage: Float!
-  memoryUsage: Float!
-  requestCount: Int!
 }
 
 enum ReplicaStatus {
@@ -623,7 +597,6 @@ type Subscription {
   artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
-  deploymentMetricsUpdated(deploymentId: ID!): DeploymentMetricsUpdatedPayload!
 }
 
 scalar UUID

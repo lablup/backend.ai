@@ -140,19 +140,6 @@ class ModelDeployment(Node):
     updated_at: datetime
 
 
-@strawberry.type
-class ReplicaMetric:
-    replica_id: ID
-    cpu_usage: float
-    memory_usage: float
-    request_count: int
-
-
-@strawberry.type
-class DeploymentMetrics:
-    replica_metrics: list[ReplicaMetric]
-
-
 # Filter Types
 @strawberry.input
 class DeploymentFilter:
@@ -170,18 +157,6 @@ class DeploymentFilter:
 class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-
-@strawberry.input
-class DeploymentMetricsFilter:
-    replica_ids: Optional[list[ID]] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-
-    AND: Optional["DeploymentMetricsFilter"] = None
-    OR: Optional["DeploymentMetricsFilter"] = None
-    NOT: Optional["DeploymentMetricsFilter"] = None
-    DISTINCT: Optional[bool] = None
 
 
 # Payload Types
@@ -208,11 +183,6 @@ class DeploymentStatusChangedPayload:
 @strawberry.type
 class ReplicaStatusChangedPayload:
     replica: ModelReplica
-
-
-@strawberry.type
-class DeploymentMetricsUpdatedPayload:
-    metrics: DeploymentMetrics
 
 
 # Input Types
@@ -539,39 +509,6 @@ async def deployment(id: ID) -> Optional[ModelDeployment]:
 
 
 @strawberry.field
-async def deployment_metrics(
-    id: ID,
-    filter: Optional[DeploymentMetricsFilter] = None,
-) -> list[DeploymentMetrics]:
-    """Get metrics for a deployment."""
-    # Return more realistic metrics
-    return [
-        DeploymentMetrics(
-            replica_metrics=[
-                ReplicaMetric(
-                    replica_id=ID("replica-01"),
-                    cpu_usage=65.5,
-                    memory_usage=42.3,
-                    request_count=1250,
-                ),
-                ReplicaMetric(
-                    replica_id=ID("replica-02"),
-                    cpu_usage=72.1,
-                    memory_usage=48.7,
-                    request_count=1420,
-                ),
-                ReplicaMetric(
-                    replica_id=ID("replica-03"),
-                    cpu_usage=58.9,
-                    memory_usage=39.2,
-                    request_count=980,
-                ),
-            ]
-        )
-    ]
-
-
-@strawberry.field
 async def replica(id: ID) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
 
@@ -630,23 +567,3 @@ async def replica_status_changed(
 
     for replica in replicas:
         yield ReplicaStatusChangedPayload(replica=replica)
-
-
-@strawberry.subscription
-async def deployment_metrics_updated(
-    deployment_id: ID,
-) -> AsyncGenerator[DeploymentMetricsUpdatedPayload, None]:
-    """Subscribe to metrics updates."""
-    # Generate mock metrics
-    replica_metrics = [
-        ReplicaMetric(
-            replica_id=ID(f"replica-{i}"),
-            cpu_usage=65.0 + (i * 5),
-            memory_usage=45.0 + (i * 3),
-            request_count=150 + (i * 25),
-        )
-        for i in range(3)
-    ]
-    yield DeploymentMetricsUpdatedPayload(
-        metrics=DeploymentMetrics(replica_metrics=replica_metrics)
-    )

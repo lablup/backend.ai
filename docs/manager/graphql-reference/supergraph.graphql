@@ -1424,30 +1424,6 @@ input DeploymentFilter
   DISTINCT: Boolean = null
 }
 
-type DeploymentMetrics
-  @join__type(graph: STRAWBERRY)
-{
-  replicaMetrics: [ReplicaMetric!]!
-}
-
-input DeploymentMetricsFilter
-  @join__type(graph: STRAWBERRY)
-{
-  replicaIds: [ID!] = null
-  startTime: DateTime = null
-  endTime: DateTime = null
-  AND: DeploymentMetricsFilter = null
-  OR: DeploymentMetricsFilter = null
-  NOT: DeploymentMetricsFilter = null
-  DISTINCT: Boolean = null
-}
-
-type DeploymentMetricsUpdatedPayload
-  @join__type(graph: STRAWBERRY)
-{
-  metrics: DeploymentMetrics!
-}
-
 input DeploymentOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -4109,7 +4085,6 @@ type Query
     last: Int = null
   ): ModelRevisionConnection! @join__field(graph: STRAWBERRY)
   revision(id: ID!): ModelRevision @join__field(graph: STRAWBERRY)
-  deploymentMetrics(id: ID!, filter: DeploymentMetricsFilter = null): [DeploymentMetrics!]! @join__field(graph: STRAWBERRY)
   replica(id: ID!): ModelReplica @join__field(graph: STRAWBERRY)
 }
 
@@ -4149,15 +4124,6 @@ type ReplicaManagement
 {
   desiredReplicaCount: Int!
   replicas: ModelReplicaConnection!
-}
-
-type ReplicaMetric
-  @join__type(graph: STRAWBERRY)
-{
-  replicaId: ID!
-  cpuUsage: Float!
-  memoryUsage: Float!
-  requestCount: Int!
 }
 
 enum ReplicaStatus
@@ -4529,7 +4495,6 @@ type Subscription
   artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
-  deploymentMetricsUpdated(deploymentId: ID!): DeploymentMetricsUpdatedPayload!
 }
 
 """Added in 25.5.0."""
