@@ -1,6 +1,6 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Any, Optional, override
+from typing import Any, NamedTuple, Optional, override
 
 import aiohttp
 import yarl
@@ -73,7 +73,7 @@ class _ResultMetric(BaseModel):
         )
 
 
-class _ResultValue(BaseModel):
+class ResultValuePair(NamedTuple):
     timestamp: float
     value: str
 
@@ -89,7 +89,7 @@ class AbstractResult(ABC):
 
 class MatrixResult(AbstractResult, BaseModel):
     metric: _ResultMetric
-    values: list[_ResultValue]
+    values: list[ResultValuePair]
 
     @override
     def to_result(self) -> Result:
@@ -101,7 +101,7 @@ class MatrixResult(AbstractResult, BaseModel):
 
 class VectorResult(AbstractResult, BaseModel):
     metric: _ResultMetric
-    value: _ResultValue
+    value: ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -109,7 +109,7 @@ class VectorResult(AbstractResult, BaseModel):
 
 
 class ScalarResult(AbstractResult, BaseModel):
-    value: _ResultValue
+    value: ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -117,7 +117,7 @@ class ScalarResult(AbstractResult, BaseModel):
 
 
 class StringResult(AbstractResult, BaseModel):
-    value: _ResultValue
+    value: ResultValuePair
 
     @override
     def to_result(self) -> Result:
@@ -125,28 +125,37 @@ class StringResult(AbstractResult, BaseModel):
 
 
 class PrometheusResponseData(BaseModel):
-    model_config = ConfigDict(validate_by_alias=True, extra="allow")
+    model_config = ConfigDict(validate_by_alias=True)
 
     result_type: ResultType = Field(validation_alias="resultType")
     result: list = Field(default_factory=list)
 
+
+class PrometheusResponse(BaseModel):
+    data: PrometheusResponseData
+    status: str
+
     def to_response_data(self, status: int) -> QueryResponseData:
-        match self.result_type:
+        match self.data.result_type:
             case ResultType.MATRIX:
                 return QueryResponseData(
-                    status, [MatrixResult.model_validate(item).to_result() for item in self.result]
+                    status,
+                    [MatrixResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.VECTOR:
                 return QueryResponseData(
-                    status, [VectorResult.model_validate(item).to_result() for item in self.result]
+                    status,
+                    [VectorResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.SCALAR:
                 return QueryResponseData(
-                    status, [ScalarResult.model_validate(item).to_result() for item in self.result]
+                    status,
+                    [ScalarResult.model_validate(item).to_result() for item in self.data.result],
                 )
             case ResultType.STRING:
                 return QueryResponseData(
-                    status, [StringResult.model_validate(item).to_result() for item in self.result]
+                    status,
+                    [StringResult.model_validate(item).to_result() for item in self.data.result],
                 )
 
 
@@ -174,7 +183,7 @@ class PrometheusHTTPClient:
         return form_data
 
     def _validate_response_data(self, status: int, data: Any) -> QueryResponseData:
-        validated = PrometheusResponseData.model_validate(data)
+        validated = PrometheusResponse.model_validate(data)
         return validated.to_response_data(status=status)
 
     async def _query(self, data: QueryData) -> QueryResponseData:
