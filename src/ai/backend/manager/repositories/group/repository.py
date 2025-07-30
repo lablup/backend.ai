@@ -10,7 +10,9 @@ import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
-from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
+from ai.backend.common.clients.prometheus.container_util.data.request import (
+    ContainerUtilizationQueryParameter,
+)
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget

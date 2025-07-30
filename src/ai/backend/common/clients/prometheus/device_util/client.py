@@ -1,16 +1,12 @@
 from typing import Any
 
 from ..base import PrometheusHTTPClient
+from ..data.request import QueryData, QueryStringSpec
+from ..data.response import LabelValueQueryResponseData, ResultValue
 from ..defs import UTILIZATION_METRIC_INTERVAL
 from ..exception import PrometheusException, ResultNotFound
-from ..types import (
-    DeviceUtilizationQueryParameter,
-    DeviceUtilizationQueryResult,
-    LabelValueResponse,
-    QueryData,
-    QueryStringSpec,
-    ResultValue,
-)
+from .data.request import DeviceUtilizationQueryParameter
+from .data.response import DeviceUtilizationQueryResult
 
 
 class DeviceUtilizationReader(PrometheusHTTPClient):
@@ -162,14 +158,14 @@ class DeviceUtilizationReader(PrometheusHTTPClient):
             )
         return return_val
 
-    async def get_label_values(self, label_name: str) -> LabelValueResponse:
+    async def get_label_values(self, label_name: str) -> LabelValueQueryResponseData:
         address = self._endpoint / "label" / label_name / "values"
         client = self._load_client(str(address))
         async with client.get(address) as response:
             match response.status // 100:
                 case 2:
                     raw_data = await response.json()
-                    return LabelValueResponse(**raw_data)
+                    return LabelValueQueryResponseData(**raw_data)
                 case 4:
                     raise ResultNotFound("No label values found")
                 case _:

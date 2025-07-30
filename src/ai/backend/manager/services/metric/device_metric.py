@@ -1,8 +1,11 @@
 import logging
 from datetime import datetime
 
+from ai.backend.common.clients.prometheus.data.request import QueryRange
 from ai.backend.common.clients.prometheus.device_util.client import DeviceUtilizationReader
-from ai.backend.common.clients.prometheus.types import DeviceUtilizationQueryParameter, QueryRange
+from ai.backend.common.clients.prometheus.device_util.data.request import (
+    DeviceUtilizationQueryParameter,
+)
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
 )

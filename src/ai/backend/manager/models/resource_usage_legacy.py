@@ -1,7 +1,9 @@
 import msgpack
 
 from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
-from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
+from ai.backend.common.clients.prometheus.container_util.data.request import (
+    ContainerUtilizationQueryParameter,
+)
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.services.metric.compat.container import transform_container_metrics

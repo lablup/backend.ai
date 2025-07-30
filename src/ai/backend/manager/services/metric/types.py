@@ -8,10 +8,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from ai.backend.common.clients.prometheus.types import (
+from ai.backend.common.clients.prometheus.container_util.data.response import (
     ContainerUtilizationQueryResult,
+)
+from ai.backend.common.clients.prometheus.data.response import ResultMetric
+from ai.backend.common.clients.prometheus.device_util.data.response import (
     DeviceUtilizationQueryResult,
-    ResultMetric,
 )
 
 

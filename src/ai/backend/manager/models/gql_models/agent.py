@@ -19,6 +19,9 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.clients.prometheus.device_util.data.request import (
+    DeviceUtilizationQueryParameter,
+)
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
@@ -27,13 +30,7 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.services.metric.actions.device import (
-    DeviceCurrentMetricAction,
-)
 from ai.backend.manager.services.metric.compat.device import transform_device_metrics
-from ai.backend.manager.services.metric.types import (
-    DeviceMetricOptionalLabel,
-)
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -210,19 +207,13 @@ class AgentNode(graphene.ObjectType):
             loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
             return await loader.load(self.id)
         else:
-            action_result = (
-                await ctx.processors.utilization_metric.query_device_current.wait_for_complete(
-                    DeviceCurrentMetricAction(
-                        labels=DeviceMetricOptionalLabel(
-                            agent_id=self.id,
-                            value_type=None,
-                            device_id=None,
-                            device_metric_name=None,
-                        )
-                    )
+            result = await ctx.device_utilization_reader.get_device_utilization(
+                DeviceUtilizationQueryParameter(
+                    agent_id=self.id,
+                    value_type=None,
                 )
             )
-            return transform_device_metrics(action_result.result)
+            return transform_device_metrics(result)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -453,19 +444,13 @@ class Agent(graphene.ObjectType):
             loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
             return await loader.load(self.id)
         else:
-            action_result = (
-                await ctx.processors.utilization_metric.query_device_current.wait_for_complete(
-                    DeviceCurrentMetricAction(
-                        labels=DeviceMetricOptionalLabel(
-                            agent_id=self.id,
-                            value_type=None,
-                            device_id=None,
-                            device_metric_name=None,
-                        )
-                    )
+            result = await ctx.device_utilization_reader.get_device_utilization(
+                DeviceUtilizationQueryParameter(
+                    agent_id=self.id,
+                    value_type=None,
                 )
             )
-            return transform_device_metrics(action_result.result)
+            return transform_device_metrics(result)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         # Deprecated since 25.13.0, use live_stat instead

@@ -20,7 +20,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import noload, selectinload
 
-from ai.backend.common.clients.prometheus.types import ContainerUtilizationQueryParameter
+from ai.backend.common.clients.prometheus.container_util.data.request import (
+    ContainerUtilizationQueryParameter,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

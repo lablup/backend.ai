@@ -102,6 +102,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         metric_observer=root_ctx.metrics.gql,
         processors=root_ctx.processors,
         container_utilization_reader=root_ctx.container_utilization_reader,
+        device_utilization_reader=root_ctx.device_utilization_reader,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
