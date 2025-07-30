@@ -553,11 +553,11 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                         )
                     )
                 )
-            stack.enter_context(
-                with_log_context_fields({
-                    "user_id": str(user_id),
-                })
-            )
+                stack.enter_context(
+                    with_log_context_fields({
+                        "user_id": str(user_id),
+                    })
+                )
         # No matter if authenticated or not, pass-through to the handler.
         # (if it's required, `auth_required` decorator will handle the situation.)
         return await handler(request)
