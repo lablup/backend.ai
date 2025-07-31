@@ -114,10 +114,8 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
         scope_prefix_map,
         credentials=creds,
     )
-    try:
+    async with etcd:
         yield etcd
-    finally:
-        await etcd.close()
 
 
 @contextlib.asynccontextmanager
@@ -126,13 +124,10 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 
     etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
     etcd_loader = LegacyEtcdLoader(etcd)
-    redis_config = await etcd_loader.load()
-    unified_config = ManagerUnifiedConfig(**redis_config)
-
-    try:
-        yield unified_config
-    finally:
-        await etcd_loader.close()
+    async with etcd_loader:
+        redis_config = await etcd_loader.load()
+        unified_config = ManagerUnifiedConfig(**redis_config)
+    yield unified_config
 
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)
@@ -147,10 +142,11 @@ class RedisConnectionSet:
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
-    raw_redis_config = await loader.load()
-    redis_config = RedisConfig(**raw_redis_config)
-    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
+    async with loader:
+        raw_redis_config = await loader.load()
+        redis_config = RedisConfig(**raw_redis_config)
 
+    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
     redis_live = redis_helper.get_redis_object(
         etcd_redis_config.profile_target(RedisRole.LIVE),
         name="mgr_cli.live",

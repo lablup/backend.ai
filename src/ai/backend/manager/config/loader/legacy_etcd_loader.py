@@ -1,7 +1,8 @@
 import urllib
 from collections.abc import Mapping
 from contextvars import ContextVar
-from typing import Any, Optional, Sequence, TypeAlias, override
+from types import TracebackType
+from typing import Any, Optional, Self, Sequence, TypeAlias, override
 
 import aiotools
 import yarl
@@ -35,8 +36,23 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         raw_cfg = await self._etcd.get_prefix(self._config_prefix)
         return raw_cfg
 
+    async def open(self) -> None:
+        await self._etcd.__aenter__()
+
     async def close(self) -> None:
-        await self._etcd.close()
+        await self._etcd.__aexit__(None, None, None)
+
+    async def __aenter__(self) -> Self:
+        await self._etcd.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException],
+        exc_val: BaseException,
+        exc_tb: TracebackType,
+    ) -> Optional[bool]:
+        return await self._etcd.__aexit__(exc_type, exc_val, exc_tb)
 
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.
