@@ -20,7 +20,6 @@ from ai.backend.manager.api.gql.model_deployment.routing import (
 )
 
 from .model_revision import (
-    ClusterConfigInput,
     CreateModelRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
@@ -29,6 +28,12 @@ from .model_revision import (
     mock_model_revision_2,
     mock_model_revision_3,
 )
+
+
+@strawberry.enum
+class ClusterMode(StrEnum):
+    SINGLE_NODE = "SINGLE_NODE"
+    MULTI_NODE = "MULTI_NODE"
 
 
 @strawberry.enum
@@ -102,42 +107,64 @@ class ModelReplicaConnection(Connection[ModelReplica]):
 
 
 @strawberry.type
-class ReplicaManagement:
+class ClusterConfig:
+    mode: ClusterMode
+    size: int
+
+
+@strawberry.type
+class ReplicaState:
     desired_replica_count: int
     replicas: ModelReplicaConnection
 
 
 @strawberry.type
-class Scale:
+class ScalingRule:
     auto_scaling_rules: list[AutoScalingRule]
+
+
+@strawberry.type
+class Metadata:
+    name: str
+    status: DeploymentStatus
+    tags: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+@strawberry.type
+class NetworkAccess:
+    endpoint_url: Optional[str] = None
+    preferred_domain_name: Optional[str] = None
+    open_to_public: bool = False
+    access_tokens: list[AccessToken]
+
+
+@strawberry.type
+class ResourceConfig:
+    resource_group: ResourceGroup
+    resource_slots: JSONString
+    resource_opts: Optional[JSONString] = None
 
 
 # Main ModelDeployment Type
 @strawberry.type
 class ModelDeployment(Node):
     id: NodeID
-    name: str
-    endpoint_url: Optional[str] = None
-    preferred_domain_name: Optional[str] = None
-    status: DeploymentStatus
-    open_to_public: bool
-    tags: list[str]
+    metadata: Metadata
+    network_access: NetworkAccess
 
     revision: Optional[ModelRevision] = None
     revision_history: ModelRevisionConnection
 
-    scale: Scale
-    replica_management: ReplicaManagement
+    scaling_rule: ScalingRule
+    replica_state: ReplicaState
 
     deployment_strategy: DeploymentStrategy
 
-    # Federated types from existing schema
+    cluster_config: ClusterConfig
+    resource_config: ResourceConfig
     created_user: User
-    resource_group: ResourceGroup
-    access_tokens: list[AccessToken]
-
-    created_at: datetime
-    updated_at: datetime
 
 
 # Filter Types
@@ -187,22 +214,33 @@ class ReplicaStatusChangedPayload:
 
 # Input Types
 @strawberry.input
-class RollingConfigInput:
-    max_surge: int
-    max_unavailable: int
+class ClusterConfigInput:
+    mode: ClusterMode
+    size: int
 
 
 @strawberry.input
-class BlueGreenConfigInput:
-    auto_promotion_enabled: bool
-    termination_wait_time: int
+class ResourceGroupInput:
+    name: str
 
 
 @strawberry.input
-class CanaryConfigInput:
-    canary_percentage: int
-    canary_duration: str
-    success_threshold: float
+class ResourceConfigInput:
+    resource_group: ResourceGroupInput
+    resource_slots: JSONString
+    resource_opts: Optional[JSONString] = None
+
+
+@strawberry.input
+class MetadataInput:
+    name: str
+    tags: Optional[list[str]] = None
+
+
+@strawberry.input
+class NetworkAccessInput:
+    preferred_domain_name: Optional[str] = None
+    open_to_public: bool = False
 
 
 @strawberry.input
@@ -212,11 +250,10 @@ class DeploymentStrategyInput:
 
 @strawberry.input
 class CreateModelDeploymentInput:
-    name: str
-    preferred_domain_name: Optional[str] = None
-    open_to_public: bool
-    tags: Optional[list[str]] = None
+    metadata: MetadataInput
+    network_access: NetworkAccessInput
     cluster_config: ClusterConfigInput
+    resource_config: ResourceConfigInput
     deployment_strategy: DeploymentStrategyInput
     initial_revision: CreateModelRevisionInput
 
@@ -303,12 +340,31 @@ ModelReplicaEdge = Edge[ModelReplica]
 # Mock Model Deployments
 mock_model_deployment_1 = ModelDeployment(
     id="dep-001",
-    name="llama-3-8b-instruct",
-    endpoint_url="https://api.backend.ai/models/dep-001",
-    preferred_domain_name="llama-3-8b.models.backend.ai",
-    status=DeploymentStatus.ACTIVE,
-    open_to_public=True,
-    tags=["production", "llm", "chat", "instruct"],
+    metadata=Metadata(
+        name="Llama 3.8B Instruct",
+        status=DeploymentStatus.ACTIVE,
+        tags=["production", "llm", "chat", "instruct"],
+        created_at=datetime.now() - timedelta(days=30),
+        updated_at=datetime.now() - timedelta(hours=2),
+    ),
+    network_access=NetworkAccess(
+        endpoint_url="https://api.backend.ai/models/dep-001",
+        preferred_domain_name="llama-3-8b.models.backend.ai",
+        open_to_public=True,
+        access_tokens=[],
+    ),
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
+        ),
+    ),
     revision=mock_model_revision_1,
     revision_history=ModelRevisionConnection(
         edges=[
@@ -322,13 +378,13 @@ mock_model_deployment_1 = ModelDeployment(
             end_cursor="rev-cursor-2",
         ),
     ),
-    scale=Scale(
+    scaling_rule=ScalingRule(
         auto_scaling_rules=[
             AutoScalingRule(id=ID("asr-cpu-001")),
             AutoScalingRule(id=ID("asr-gpu-001")),
         ]
     ),
-    replica_management=ReplicaManagement(
+    replica_state=ReplicaState(
         desired_replica_count=3,
         replicas=ModelReplicaConnection(
             edges=[
@@ -346,20 +402,35 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
     created_user=User(id=ID("user-001")),
-    resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-    access_tokens=[],
-    created_at=datetime.now() - timedelta(days=30),
-    updated_at=datetime.now() - timedelta(hours=2),
 )
 
 mock_model_deployment_2 = ModelDeployment(
     id="dep-002",
-    name="mistral-7b-v0.3",
-    endpoint_url="https://api.backend.ai/models/dep-002",
-    preferred_domain_name="mistral-7b.models.backend.ai",
-    status=DeploymentStatus.ACTIVE,
-    open_to_public=False,
-    tags=["staging", "llm", "experimental"],
+    metadata=Metadata(
+        name="Mistral 7B v0.3",
+        status=DeploymentStatus.ACTIVE,
+        tags=["staging", "llm", "experimental"],
+        created_at=datetime.now() - timedelta(days=20),
+        updated_at=datetime.now() - timedelta(days=1),
+    ),
+    network_access=NetworkAccess(
+        endpoint_url="https://api.backend.ai/models/dep-002",
+        preferred_domain_name="mistral-7b.models.backend.ai",
+        open_to_public=False,
+        access_tokens=[],
+    ),
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
+        ),
+    ),
     revision=mock_model_revision_3,
     revision_history=ModelRevisionConnection(
         edges=[
@@ -372,8 +443,8 @@ mock_model_deployment_2 = ModelDeployment(
             end_cursor="rev-cursor-3",
         ),
     ),
-    scale=Scale(auto_scaling_rules=[]),
-    replica_management=ReplicaManagement(
+    scaling_rule=ScalingRule(auto_scaling_rules=[]),
+    replica_state=ReplicaState(
         desired_replica_count=1,
         replicas=ModelReplicaConnection(
             edges=[
@@ -390,20 +461,35 @@ mock_model_deployment_2 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
     created_user=User(id=ID("user-002")),
-    resource_group=ResourceGroup(id=ID("rg-us-west-2")),
-    access_tokens=[],
-    created_at=datetime.now() - timedelta(days=20),
-    updated_at=datetime.now() - timedelta(days=1),
 )
 
 mock_model_deployment_3 = ModelDeployment(
     id="dep-003",
-    name="gemma-2-9b",
-    endpoint_url=None,
-    preferred_domain_name=None,
-    status=DeploymentStatus.INACTIVE,
-    open_to_public=False,
-    tags=["development", "llm", "testing"],
+    metadata=Metadata(
+        name="Gemma 2.9B",
+        status=DeploymentStatus.INACTIVE,
+        tags=["development", "llm", "testing"],
+        created_at=datetime.now() - timedelta(days=15),
+        updated_at=datetime.now() - timedelta(days=7),
+    ),
+    network_access=NetworkAccess(
+        endpoint_url=None,
+        preferred_domain_name=None,
+        open_to_public=False,
+        access_tokens=[],
+    ),
+    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
+    resource_config=ResourceConfig(
+        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_slots=cast(
+            JSONString,
+            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
+        ),
+        resource_opts=cast(
+            JSONString,
+            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
+        ),
+    ),
     revision=None,
     revision_history=ModelRevisionConnection(
         edges=[],
@@ -414,8 +500,8 @@ mock_model_deployment_3 = ModelDeployment(
             end_cursor=None,
         ),
     ),
-    scale=Scale(auto_scaling_rules=[]),
-    replica_management=ReplicaManagement(
+    scaling_rule=ScalingRule(auto_scaling_rules=[]),
+    replica_state=ReplicaState(
         desired_replica_count=0,
         replicas=ModelReplicaConnection(
             edges=[],
@@ -429,10 +515,6 @@ mock_model_deployment_3 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
     created_user=User(id=ID("user-003")),
-    resource_group=ResourceGroup(id=ID("rg-eu-west-1")),
-    access_tokens=[],
-    created_at=datetime.now() - timedelta(days=15),
-    updated_at=datetime.now() - timedelta(days=7),
 )
 
 

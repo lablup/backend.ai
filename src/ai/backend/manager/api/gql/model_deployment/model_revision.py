@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from enum import Enum, StrEnum
+from enum import Enum
 from typing import Annotated, Any, Optional, cast
 
 import strawberry
@@ -8,54 +8,14 @@ from strawberry.relay import Connection, Edge, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.federated_types import Image, ResourceGroup, VFolder
-
-
-@strawberry.enum
-class ClusterMode(StrEnum):
-    SINGLE_NODE = "SINGLE_NODE"
-    MULTI_NODE = "MULTI_NODE"
-
-
-@strawberry.enum
-class MountPermission(StrEnum):
-    READ_ONLY = "READ_ONLY"
-    READ_WRITE = "READ_WRITE"
-
-
-@strawberry.enum
-class MountType(StrEnum):
-    BIND = "BIND"
-    VOLUME = "VOLUME"
-
-
-# Types
-@strawberry.type
-class ClusterConfig:
-    mode: ClusterMode
-    size: int
+from ai.backend.manager.api.gql.federated_types import Image, VFolder
 
 
 @strawberry.type
-class Mount:
-    vfolder_id: ID
-    destination: str
-    type: MountType
-    permission: MountPermission
-
-
-@strawberry.type
-class ModelVFolderConfig:
+class ModelMountConfig:
     vfolder: VFolder
     mount_destination: str
     definition_path: str
-
-
-@strawberry.type
-class ResourceConfig:
-    resource_group: ResourceGroup
-    resource_slots: JSONString
-    resource_opts: Optional[JSONString] = None
 
 
 @strawberry.type
@@ -84,11 +44,8 @@ class ModelRevision(relay.Node):
     id: relay.NodeID
     name: str
 
-    cluster_config: ClusterConfig
-    resource_config: ResourceConfig
     model_runtime_config: ModelRuntimeConfig
-    model_vfolder_config: ModelVFolderConfig
-    mounts: list[Mount]
+    model_mount_config: ModelMountConfig
 
     image: Image
 
@@ -124,18 +81,6 @@ class ModelRevisionOrder:
 mock_model_revision_1 = ModelRevision(
     id="rev-001",
     name="llama-3-8b-instruct-v1.0",
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-        ),
-    ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
         service_config=RawServiceConfig(
@@ -146,19 +91,11 @@ mock_model_revision_1 = ModelRevision(
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
     ),
-    model_vfolder_config=ModelVFolderConfig(
+    model_mount_config=ModelMountConfig(
         vfolder=VFolder(id=ID("vf-model-001")),
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    mounts=[
-        Mount(
-            vfolder_id=ID("vf-cache-001"),
-            destination="/cache",
-            type=MountType.VOLUME,
-            permission=MountPermission.READ_WRITE,
-        )
-    ],
     image=Image(id=ID("img-vllm-001")),
     created_at=datetime.now() - timedelta(days=10),
 )
@@ -166,18 +103,6 @@ mock_model_revision_1 = ModelRevision(
 mock_model_revision_2 = ModelRevision(
     id="rev-002",
     name="llama-3-8b-instruct-v1.1",
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-        ),
-    ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
         service_config=RawServiceConfig(
@@ -188,19 +113,11 @@ mock_model_revision_2 = ModelRevision(
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0,1"}'),
     ),
-    model_vfolder_config=ModelVFolderConfig(
+    model_mount_config=ModelMountConfig(
         vfolder=VFolder(id=ID("vf-model-002")),
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    mounts=[
-        Mount(
-            vfolder_id=ID("vf-cache-002"),
-            destination="/cache",
-            type=MountType.VOLUME,
-            permission=MountPermission.READ_WRITE,
-        )
-    ],
     image=Image(id=ID("img-vllm-002")),
     created_at=datetime.now() - timedelta(days=5),
 )
@@ -208,18 +125,6 @@ mock_model_revision_2 = ModelRevision(
 mock_model_revision_3 = ModelRevision(
     id="rev-003",
     name="mistral-7b-v0.3-initial",
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-west-2")),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 4, "mem": "16G", "cuda.shares": 0.5, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "1G", "reserved_time": "12h", "scaling_group": "us-west-2"}',
-        ),
-    ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
         service_config=RawServiceConfig(
@@ -230,12 +135,11 @@ mock_model_revision_3 = ModelRevision(
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "2"}'),
     ),
-    model_vfolder_config=ModelVFolderConfig(
+    model_mount_config=ModelMountConfig(
         vfolder=VFolder(id=ID("vf-model-003")),
         mount_destination="/models",
         definition_path="models/mistral-7b/config.yaml",
     ),
-    mounts=[],
     image=Image(id=ID("img-vllm-003")),
     created_at=datetime.now() - timedelta(days=20),
 )
@@ -255,29 +159,6 @@ class ImageInput:
 
 
 @strawberry.input
-class ClusterConfigInput:
-    mode: ClusterMode
-    size: int
-
-
-@strawberry.input
-class ResourceGroupInput:
-    id: ID
-
-
-@strawberry.input
-class ScalingGroupNodeInput:
-    name: str
-
-
-@strawberry.input
-class ResourceConfigInput:
-    resource_group: ScalingGroupNodeInput
-    resource_slots: JSONString
-    resource_opts: Optional[JSONString] = None
-
-
-@strawberry.input
 class ModelRuntimeConfigInput:
     runtime_variant: str
     service_config: Optional[JSONString] = None
@@ -285,18 +166,10 @@ class ModelRuntimeConfigInput:
 
 
 @strawberry.input
-class ModelVFolderConfigInput:
+class ModelMountConfigInput:
     vfolder_id: ID
     mount_destination: str
     definition_path: str
-
-
-@strawberry.input
-class MountInput:
-    vfolder_id: ID
-    destination: str
-    type: MountType
-    permission: MountPermission
 
 
 @strawberry.input
@@ -305,9 +178,7 @@ class CreateModelRevisionInput:
     name: str
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
-    model_vfolder_config: ModelVFolderConfigInput
-    mounts: Optional[list[MountInput]] = None
-    resource_config: ResourceConfigInput
+    model_mount_config: ModelMountConfigInput
 
 
 ModelRevisionEdge = Edge[ModelRevision]
@@ -368,32 +239,16 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
     revision = ModelRevision(
         id=ID(f"rev-new-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
         name=input.name,
-        cluster_config=ClusterConfig(
-            mode=ClusterMode.SINGLE_NODE,
-            size=1,
-        ),
-        resource_config=ResourceConfig(
-            resource_group=ResourceGroup(id=ID(input.resource_config.resource_group.name)),
-            resource_slots=cast(
-                JSONString,
-                input.resource_config.resource_slots,
-            ),
-            resource_opts=cast(
-                JSONString,
-                input.resource_config.resource_opts,
-            ),
-        ),
         model_runtime_config=ModelRuntimeConfig(
             runtime_variant=input.model_runtime_config.runtime_variant,
             service_config=None,
             environ=None,
         ),
-        model_vfolder_config=ModelVFolderConfig(
+        model_mount_config=ModelMountConfig(
             vfolder=VFolder(id=ID("vf-id")),
             mount_destination="/models",
             definition_path="model.yaml",
         ),
-        mounts=[],
         image=Image(id=ID("image-id")),
         created_at=datetime.now(),
     )
