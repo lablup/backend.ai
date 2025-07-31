@@ -77,6 +77,15 @@ class ScopeData:
             id=row.scope_id,
         )
 
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderPermissionRow, VFolderRow
+
+ENTITY_TYPE = "vfolder"
+
 
 @dataclass
 class VFolderData:
