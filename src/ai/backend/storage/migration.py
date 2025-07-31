@@ -19,13 +19,14 @@ import tqdm
 import yarl
 
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
+from ai.backend.common.types import AGENTID_STORAGE
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
 from .config.loaders import load_local_config, make_etcd
@@ -227,10 +228,11 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ):
     etcd = make_etcd(local_config)
-    redis_config = redis_config_iv.check(
+    raw_redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+    redis_config = RedisConfig.model_validate(raw_redis_config)
+    redis_profile_target = redis_config.to_redis_profile_target()
     node_id = local_config.storage_proxy.node_id
     redis_mq = await RedisQueue.create(
         redis_profile_target.profile_target(RedisRole.STREAM),

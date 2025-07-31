@@ -14,12 +14,11 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
-    HostPortPair,
 )
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class ServiceMode(enum.StrEnum):
@@ -848,14 +847,7 @@ class RedisHelperConfig(BaseModel):
     )
 
 
-class RedisConfig(BaseModel):
-    addr: Optional[HostPortPair] = Field(
-        default=None,
-        description="""
-        Redis server address.
-        """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
-    )
+class WebServerRedisConfig(RedisConfig):
     db: int = Field(
         default=0,
         description="""
@@ -863,52 +855,6 @@ class RedisConfig(BaseModel):
         """,
         examples=[0, 1],
     )
-    sentinel: Optional[list[HostPortPair]] = Field(
-        default=None,
-        description="""
-        Redis sentinel addresses.
-        """,
-        examples=[None, [{"host": "127.0.0.1", "port": 26379}]],
-    )
-    service_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis service name for sentinel.
-        """,
-        examples=[None, "mymaster"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service_name",
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis password.
-        """,
-        examples=[None, "password"],
-    )
-    redis_helper_config: RedisHelperConfig = Field(
-        default_factory=RedisHelperConfig,
-        description="""
-        Redis helper configuration.
-        """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis_helper_config",
-    )
-
-    @field_validator("sentinel", mode="before")
-    @classmethod
-    def _parse_sentinel(
-        cls, v: Optional[str | list[HostPortPairModel]]
-    ) -> Optional[list[HostPortPairModel]]:
-        if v is None or isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            entries: list[HostPortPairModel] = []
-            for part in v.split(","):
-                host, port = part.strip().split(":")
-                entries.append(HostPortPairModel(host=host, port=int(port)))
-            return entries
-        raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
 
 class SessionConfig(BaseModel):

@@ -21,8 +21,8 @@ from setproctitle import setproctitle
 
 from ai.backend.common.config import (
     ConfigurationError,
-    redis_config_iv,
 )
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
@@ -49,7 +49,7 @@ from ai.backend.common.types import (
     AGENTID_STORAGE,
     RedisProfileTarget,
     ServiceDiscoveryType,
-    safe_print_redis_target,
+    safe_print_redis_config,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -136,18 +136,17 @@ async def server_main(
     try:
         etcd = make_etcd(local_config)
         try:
-            redis_config = redis_config_iv.check(
-                await etcd.get_prefix("config/redis"),
-            )
+            raw_redis_config = await etcd.get_prefix("config/redis")
+            redis_config = RedisConfig.model_validate(raw_redis_config)
             log.info(
                 "PID: {0} - configured redis_config: {1}",
                 pidx,
-                safe_print_redis_target(redis_config),
+                safe_print_redis_config(redis_config),
             )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+        redis_profile_target = redis_config.to_redis_profile_target()
         mq = await _make_message_queue(
             local_config,
             redis_profile_target,
@@ -160,7 +159,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
             pidx,
-            safe_print_redis_target(redis_config),
+            safe_print_redis_config(redis_config),
         )
         event_dispatcher = EventDispatcher(
             mq,
@@ -170,7 +169,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
             pidx,
-            safe_print_redis_target(redis_config),
+            safe_print_redis_config(redis_config),
         )
         if local_config.storage_proxy.use_watcher:
             if not _is_root():
@@ -293,9 +292,10 @@ async def server_main(
                 case ServiceDiscoveryType.ETCD:
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
-                    live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+                    valkey_profile_target = redis_config.to_valkey_profile_target()
+                    live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
                     service_discovery = await RedisServiceDiscovery.create(
-                        args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                        args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
                     )
 
             sd_loop = ServiceDiscoveryLoop(

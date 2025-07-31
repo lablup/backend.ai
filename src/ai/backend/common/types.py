@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import enum
 import ipaddress
@@ -48,8 +49,11 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator
+from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
 from redis.asyncio import Redis
+
+if TYPE_CHECKING:
+    from ai.backend.common.configs.redis import RedisConfig
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import InvalidIpAddressValue
@@ -143,7 +147,7 @@ __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "ItemResult",
     "ResultSet",
-    "safe_print_redis_target",
+    "safe_print_redis_config",
 )
 
 
@@ -1452,6 +1456,26 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
+class ValkeyTarget:
+    addr: Optional[str] = None
+    sentinel: Optional[list[str]] = None
+    service_name: Optional[str] = None
+    password: Optional[str] = None
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+
+@dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
@@ -1480,7 +1504,57 @@ class RedisTarget:
             redis_helper_config=self.redis_helper_config,
         )
 
+    def to_valkey_target(self) -> ValkeyTarget:
+        addr = str(self.addr) if self.addr else None
+        sentinel_addrs: Optional[list[str]] = None
+        if self.sentinel:
+            sentinel_addrs = None
+            if isinstance(self.sentinel, list):
+                sentinel_addrs = [str(s) for s in self.sentinel]
+            else:
+                # TODO: 이거 문제 없는지 검증.
+                from ai.backend.common.typed_validators import CommaSeparatedStrList
 
+                adapter = TypeAdapter(CommaSeparatedStrList)
+                sentinel_addrs = adapter.validate_python(self.sentinel)
+
+        return ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel_addrs,
+            service_name=self.service_name,
+            password=self.password,
+        )
+
+
+@dataclass
+class ValkeyProfileTarget:
+    _base_target: ValkeyTarget
+    _override_targets: Optional[Mapping[str, ValkeyTarget]]
+
+    def __init__(
+        self,
+        *,
+        addr: Optional[str] = None,
+        sentinel: Optional[list[str]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
+    ) -> None:
+        self._base_target = ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel,
+            service_name=service_name,
+            password=password,
+        )
+        self._override_targets = override_targets
+
+    def profile_target(self, role: RedisRole) -> ValkeyTarget:
+        if self._override_targets and (role in self._override_targets):
+            return self._override_targets[role]
+        return self._base_target
+
+
+# TODO: Remove this type
 @dataclass
 class RedisProfileTarget:
     _base_target: RedisTarget
@@ -1544,10 +1618,10 @@ class RedisProfileTarget:
         )
 
 
-def safe_print_redis_target(config: RedisTarget) -> str:
-    safe_config = config.copy()
-    if "password" in safe_config:
-        safe_config["password"] = "********"
+def safe_print_redis_config(config: RedisConfig) -> str:
+    safe_config = copy.deepcopy(config)
+    if config.password:
+        safe_config.password = "********"
     return str(safe_config)
 
 

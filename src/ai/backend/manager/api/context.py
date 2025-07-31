@@ -18,7 +18,7 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceDiscovery,
     ServiceDiscoveryLoop,
 )
-from ai.backend.common.types import RedisProfileTarget
+from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.repositories import Repositories
@@ -59,7 +59,7 @@ class RootContext(BaseContext):
     valkey_stat: ValkeyStatClient
     valkey_image: ValkeyImageClient
     valkey_stream: ValkeyStreamClient
-    redis_profile_target: RedisProfileTarget
+    valkey_profile_target: ValkeyProfileTarget
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions
 

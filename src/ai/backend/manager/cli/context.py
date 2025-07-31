@@ -24,7 +24,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.types import RedisConnectionInfo, RedisProfileTarget
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
@@ -149,7 +149,7 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)
-    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
+    etcd_redis_config = redis_config.to_redis_profile_target()
 
     redis_live = redis_helper.get_redis_object(
         etcd_redis_config.profile_target(RedisRole.LIVE),
@@ -157,12 +157,12 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         db=REDIS_LIVE_DB,
     )
     valkey_stat_client = await ValkeyStatClient.create(
-        etcd_redis_config.profile_target(RedisRole.STATISTICS),
+        etcd_redis_config.profile_target(RedisRole.STATISTICS).to_valkey_target(),
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="mgr_cli.stat",
     )
     redis_image = await ValkeyImageClient.create(
-        etcd_redis_config.profile_target(RedisRole.IMAGE),
+        etcd_redis_config.profile_target(RedisRole.IMAGE).to_valkey_target(),
         db_id=REDIS_IMAGE_DB,
         human_readable_name="mgr_cli.image",
     )

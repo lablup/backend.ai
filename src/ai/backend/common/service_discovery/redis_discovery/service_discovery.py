@@ -5,7 +5,7 @@ from typing import Any, Self, Sequence
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.types import ValkeyTarget
 
 from ..service_discovery import ServiceDiscovery, ServiceMetadata
 
@@ -15,7 +15,7 @@ _DEFAULT_TTL = 60 * 3  # 3 minutes
 
 @dataclass
 class RedisServiceDiscoveryArgs:
-    redis_target: RedisTarget
+    valkey_target: ValkeyTarget
     db_id: int = 0
     ttl: int = _DEFAULT_TTL  # 3 minutes
     prefix: str = _DEFAULT_PREFIX
@@ -27,7 +27,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
     _prefix: str
 
     def __init__(self, valkey_client: ValkeyLiveClient, args: RedisServiceDiscoveryArgs) -> None:
-        self._redis_target = args.redis_target
+        self._valkey_target = args.valkey_target
         self._db_id = args.db_id
         self._ttl = args.ttl
         self._prefix = args.prefix
@@ -36,7 +36,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
     @classmethod
     async def create(cls, args: RedisServiceDiscoveryArgs) -> Self:
         valkey_client = await ValkeyLiveClient.create(
-            args.redis_target,
+            args.valkey_target,
             db_id=args.db_id,
             human_readable_name="service_discovery",
         )

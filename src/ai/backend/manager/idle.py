@@ -65,7 +65,6 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
-    RedisProfileTarget,
     ResourceSlot,
     SessionExecutionStatus,
     SessionTypes,
@@ -1286,16 +1285,14 @@ async def init_idle_checkers(
     from the given configuration.
     """
     # Create ValkeyLiveClient for dependency injection
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config_provider.config.redis.model_dump()
-    )
+    valkey_profile_target = config_provider.config.redis.to_valkey_profile_target()
     valkey_live = await ValkeyLiveClient.create(
-        redis_profile_target.profile_target(RedisRole.LIVE),
+        valkey_profile_target.profile_target(RedisRole.LIVE),
         human_readable_name="idle.live",
         db_id=REDIS_LIVE_DB,
     )
     valkey_stat = await ValkeyStatClient.create(
-        redis_profile_target.profile_target(RedisRole.STATISTICS),
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
         human_readable_name="idle.stat",
         db_id=REDIS_STATISTICS_DB,
     )

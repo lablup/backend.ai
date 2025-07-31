@@ -12,7 +12,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
-from ai.backend.common.types import AccessKey, RedisProfileTarget
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.models.gql_models.session import ComputeSession
 from ai.backend.manager.models.keypair import (
@@ -162,12 +162,10 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            ctx.config_provider.config.redis.model_dump()
-        )
-        redis_target = redis_profile_target.profile_target(RedisRole.RATE_LIMIT)
+        valkey_profile_target = ctx.config_provider.config.redis.to_valkey_profile_target()
+        valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
         valkey_client = await ValkeyRateLimitClient.create(
-            redis_target=redis_target,
+            valkey_target=valkey_target,
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="ratelimit",
         )

@@ -636,7 +636,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             )
             live_redis_target = core_redis_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
             )
         case _:
             raise RuntimeError(
