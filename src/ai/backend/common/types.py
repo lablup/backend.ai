@@ -52,9 +52,6 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
 from redis.asyncio import Redis
 
-if TYPE_CHECKING:
-    from ai.backend.common.configs.redis import RedisConfig
-
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
@@ -152,6 +149,7 @@ __all__ = (
 
 
 if TYPE_CHECKING:
+    from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
 
     from .docker import ImageRef
