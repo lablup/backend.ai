@@ -124,7 +124,7 @@ class ScalingRule:
 
 
 @strawberry.type
-class Metadata:
+class ModelDeploymentMetadata:
     name: str
     status: DeploymentStatus
     tags: list[str]
@@ -133,7 +133,7 @@ class Metadata:
 
 
 @strawberry.type
-class NetworkAccess:
+class ModelDeploymentNetworkAccess:
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -151,8 +151,8 @@ class ResourceConfig:
 @strawberry.type
 class ModelDeployment(Node):
     id: NodeID
-    metadata: Metadata
-    network_access: NetworkAccess
+    metadata: ModelDeploymentMetadata
+    network_access: ModelDeploymentNetworkAccess
 
     revision: Optional[ModelRevision] = None
     revision_history: ModelRevisionConnection
@@ -232,13 +232,13 @@ class ResourceConfigInput:
 
 
 @strawberry.input
-class MetadataInput:
+class ModelDeploymentMetadataInput:
     name: str
     tags: Optional[list[str]] = None
 
 
 @strawberry.input
-class NetworkAccessInput:
+class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
 
@@ -250,8 +250,8 @@ class DeploymentStrategyInput:
 
 @strawberry.input
 class CreateModelDeploymentInput:
-    metadata: MetadataInput
-    network_access: NetworkAccessInput
+    metadata: ModelDeploymentMetadataInput
+    network_access: ModelDeploymentNetworkAccessInput
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
     deployment_strategy: DeploymentStrategyInput
@@ -340,14 +340,14 @@ ModelReplicaEdge = Edge[ModelReplica]
 # Mock Model Deployments
 mock_model_deployment_1 = ModelDeployment(
     id="dep-001",
-    metadata=Metadata(
+    metadata=ModelDeploymentMetadata(
         name="Llama 3.8B Instruct",
         status=DeploymentStatus.ACTIVE,
         tags=["production", "llm", "chat", "instruct"],
         created_at=datetime.now() - timedelta(days=30),
         updated_at=datetime.now() - timedelta(hours=2),
     ),
-    network_access=NetworkAccess(
+    network_access=ModelDeploymentNetworkAccess(
         endpoint_url="https://api.backend.ai/models/dep-001",
         preferred_domain_name="llama-3-8b.models.backend.ai",
         open_to_public=True,
@@ -406,14 +406,14 @@ mock_model_deployment_1 = ModelDeployment(
 
 mock_model_deployment_2 = ModelDeployment(
     id="dep-002",
-    metadata=Metadata(
+    metadata=ModelDeploymentMetadata(
         name="Mistral 7B v0.3",
         status=DeploymentStatus.ACTIVE,
         tags=["staging", "llm", "experimental"],
         created_at=datetime.now() - timedelta(days=20),
         updated_at=datetime.now() - timedelta(days=1),
     ),
-    network_access=NetworkAccess(
+    network_access=ModelDeploymentNetworkAccess(
         endpoint_url="https://api.backend.ai/models/dep-002",
         preferred_domain_name="mistral-7b.models.backend.ai",
         open_to_public=False,
@@ -465,14 +465,14 @@ mock_model_deployment_2 = ModelDeployment(
 
 mock_model_deployment_3 = ModelDeployment(
     id="dep-003",
-    metadata=Metadata(
+    metadata=ModelDeploymentMetadata(
         name="Gemma 2.9B",
         status=DeploymentStatus.INACTIVE,
         tags=["development", "llm", "testing"],
         created_at=datetime.now() - timedelta(days=15),
         updated_at=datetime.now() - timedelta(days=7),
     ),
-    network_access=NetworkAccess(
+    network_access=ModelDeploymentNetworkAccess(
         endpoint_url=None,
         preferred_domain_name=None,
         open_to_public=False,
