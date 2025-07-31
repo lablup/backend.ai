@@ -27,6 +27,9 @@ from ai.backend.manager.models.rbac_models.migration.vfolder import (
     map_vfolder_permission_data_to_scope,
 )
 
+PROJECT_RESOURCE_POLICY_NAME = "default"
+USER_RESOURCE_POLICY_NAME = "default"
+
 
 class TestAddVfolderScopePermissionsToRole:
     """Test add_vfolder_scope_permissions_to_role function."""
