@@ -10,14 +10,22 @@ import pytest
 import sqlalchemy as sa
 from alembic.config import Config
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import is_active as logging_active
 from ai.backend.manager.models.alembic import invoked_programmatically
 from ai.backend.manager.models.base import metadata, pgsql_connect_opts
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.migrate.vfolder import migrate_vfolder_data
+from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 
-ALEMBIC_CONFIG_PATH = Path("conf_alembic.ini")
+ALEMBIC_CONFIG_PATH = Path("alembic.ini")
 
 
 @pytest.fixture
@@ -63,11 +71,11 @@ async def db_engine_pre_migration(
     admin_db_url: str,
 ) -> AsyncIterator[Engine]:
     """
-    Create a database engine with schema migrated up to revision 643deb439458.
+    Create a database engine with schema migrated up to revision before vfolder RBAC migration.
     This is the state before the vfolder RBAC migration.
     """
     # First create the test database
-    admin_engine = sa.ext.asyncio.create_async_engine(
+    admin_engine = create_async_engine(
         admin_db_url, poolclass=NullPool, isolation_level="AUTOCOMMIT"
     )
 
@@ -81,7 +89,7 @@ async def db_engine_pre_migration(
         await conn.run_sync(drop_and_create_db)
 
     # Create engine for the test database
-    engine = sa.ext.asyncio.create_async_engine(
+    engine = create_async_engine(
         test_db_url,
         poolclass=NullPool,
         echo=False,
@@ -92,11 +100,11 @@ async def db_engine_pre_migration(
 
     def create_all(connection: Connection, engine: Engine) -> None:
         alembic_config.attributes["connection"] = connection
-        # Create extension in the same connection context
         metadata.create_all(engine, checkfirst=False)
-        target_revision = "643deb439458"  # The revision before vfolder RBAC migration
-        connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
-        connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{target_revision}')")
+        # REVISION_BEFORE_VFOLDER_RBAC = "643deb439458"  # The revision before vfolder RBAC migration
+        # target_revision = REVISION_BEFORE_VFOLDER_RBAC
+        # connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
+        # connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{target_revision}')")
 
     async with engine.connect() as dbconn:
         async with dbconn.begin():
@@ -105,33 +113,26 @@ async def db_engine_pre_migration(
         async with dbconn.begin():
             await dbconn.run_sync(create_all, engine=engine.sync_engine)
 
-    yield engine
+    try:
+        yield engine
+    finally:
+        # Cleanup: close connections and drop database
+        await engine.dispose()
 
-    # Cleanup: close connections and drop database
-    await engine.dispose()
-
-    def terminate(connection: Connection) -> None:
-        """Terminate all connections to the test database and drop it."""
-        alembic_config.attributes["connection"] = connection
-        connection.execute(
-            sa.text(
-                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                f"WHERE datname = '{test_db_name}' AND pid <> pg_backend_pid()"
+        def terminate(connection: Connection) -> None:
+            """Terminate all connections to the test database and drop it."""
+            alembic_config.attributes["connection"] = connection
+            connection.execute(
+                sa.text(
+                    f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    f"WHERE datname = '{test_db_name}' AND pid <> pg_backend_pid()"
+                )
             )
-        )
-        connection.execute(sa.text(f"DROP DATABASE IF EXISTS {test_db_name}"))
+            connection.execute(sa.text(f"DROP DATABASE IF EXISTS {test_db_name}"))
 
-    async with admin_engine.connect() as conn:
-        await conn.run_sync(terminate)
-    await admin_engine.dispose()
-
-
-@pytest.fixture
-async def db_connection_pre_migration(db_engine_pre_migration: Engine) -> AsyncIterator[Connection]:
-    """Provide a database connection for the pre-migration state."""
-    async with db_engine_pre_migration.connect() as conn:
-        async with conn.begin():
-            yield conn
+        async with admin_engine.connect() as conn:
+            await conn.run_sync(terminate)
+        await admin_engine.dispose()
 
 
 @dataclass
@@ -466,94 +467,96 @@ def permission_mapping() -> dict[str, str]:
 
 
 @pytest.fixture
-async def populated_vfolder_db(db_connection_pre_migration, vfolder_rbac_test_data):
+async def populated_vfolder_db(db_engine_pre_migration, vfolder_rbac_test_data):
     """Populate the database with vfolder test data."""
-    conn = db_connection_pre_migration
+    engine = db_engine_pre_migration
     data = vfolder_rbac_test_data
 
-    # Insert domains (required for foreign keys)
-    await conn.execute(
-        sa.text("""
-            INSERT INTO domains (name, description, is_active, allowed_vfolder_hosts, allowed_docker_registries, dotfiles)
-            VALUES ('default', 'Default domain', true, '{}', '{}', '')
-            ON CONFLICT (name) DO NOTHING
-        """)
-    )
+    async with engine.connect() as conn:
+        async with conn.begin():
+            # Insert domains (required for foreign keys)
+            await conn.execute(
+                sa.text("""
+                    INSERT INTO domains (name, description, is_active, allowed_vfolder_hosts, allowed_docker_registries, dotfiles)
+                    VALUES ('default', 'Default domain', true, '{}', '{}', '')
+                    ON CONFLICT (name) DO NOTHING
+                """)
+            )
 
-    # Insert user reesource policies
-    await conn.execute(
-        sa.text("""
-            INSERT INTO user_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_session_count_per_model_session, max_customized_image_count)
-            VALUES ('default', 100, 100, 100, 100)
-            ON CONFLICT (name) DO NOTHING
-        """)
-    )
+            # Insert user reesource policies
+            await conn.execute(
+                sa.text("""
+                    INSERT INTO user_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_session_count_per_model_session, max_customized_image_count)
+                    VALUES ('default', 100, 100, 100, 100)
+                    ON CONFLICT (name) DO NOTHING
+                """)
+            )
 
-    # Insert users
-    for user in data.users.values():
-        await conn.execute(
-            sa.text("""
-                INSERT INTO users (uuid, email, username, password, 
-                                 domain_name, role, status, resource_policy, sudo_session_enabled)
-                VALUES (:id, :email, :email, 'dummy_hash', 
-                        :domain_name, :role, 'active', 'default', false)
-            """),
-            {
-                "id": user.id,
-                "email": user.email,
-                "domain_name": user.domain_name,
-                "role": user.role,
-            },
-        )
+            # Insert users
+            for user in data.users.values():
+                await conn.execute(
+                    sa.text("""
+                        INSERT INTO users (uuid, email, username, password, 
+                                        domain_name, role, status, resource_policy, sudo_session_enabled)
+                        VALUES (:id, :email, :email, 'dummy_hash', 
+                                :domain_name, :role, 'active', 'default', false)
+                    """),
+                    {
+                        "id": user.id,
+                        "email": user.email,
+                        "domain_name": user.domain_name,
+                        "role": user.role,
+                    },
+                )
 
-    # Insert project resource policy
-    await conn.execute(
-        sa.text("""
-                INSERT INTO project_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_network_count)
-                VALUES ('default', 100, 100, 100)
-                ON CONFLICT (name) DO NOTHING
-            """)
-    )
+            # Insert project resource policy
+            await conn.execute(
+                sa.text("""
+                        INSERT INTO project_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_network_count)
+                        VALUES ('default', 100, 100, 100)
+                        ON CONFLICT (name) DO NOTHING
+                    """)
+            )
 
-    # Insert groups
-    for group in data.groups.values():
-        await conn.execute(
-            sa.text("""
-                INSERT INTO groups (id, name, is_active, domain_name, allowed_vfolder_hosts, dotfiles, resource_policy, type)
-                VALUES (:id, :name, true, :domain_name, '{}', '', 'default', 'general')
-            """),
-            {
-                "id": group.id,
-                "name": group.name,
-                "domain_name": group.domain_name,
-            },
-        )
+            # Insert groups
+            for group in data.groups.values():
+                await conn.execute(
+                    sa.text("""
+                        INSERT INTO groups (id, name, is_active, domain_name, allowed_vfolder_hosts, dotfiles, resource_policy, type)
+                        VALUES (:id, :name, true, :domain_name, '{}', '', 'default', 'general')
+                    """),
+                    {
+                        "id": group.id,
+                        "name": group.name,
+                        "domain_name": group.domain_name,
+                    },
+                )
 
-    # Insert vfolders
-    for vfolder in data.vfolders.values():
-        vf_data = vfolder.to_insert_dict()
-        await conn.execute(
-            sa.text("""
-                INSERT INTO vfolders (id, name, ownership_type, "user", "group", host, 
-                                    domain_name, quota_scope_id, status, usage_mode, 
-                                    permission, max_files, max_size, num_files, cur_size, cloneable)
-                VALUES (:id, :name, :ownership_type, :user, :group, :host, 
-                        :domain_name, :quota_scope_id, :status, :usage_mode, 
-                        :permission, :max_files, :max_size, :num_files, :cur_size, true)
-            """),
-            vf_data,
-        )
+            # Insert vfolders
+            for vfolder in data.vfolders.values():
+                vf_data = vfolder.to_insert_dict()
+                await conn.execute(
+                    sa.text("""
+                        INSERT INTO vfolders (id, name, ownership_type, "user", "group", host, 
+                                            domain_name, quota_scope_id, status, usage_mode, 
+                                            permission, max_files, max_size, num_files, cur_size, cloneable)
+                        VALUES (:id, :name, :ownership_type, :user, :group, :host, 
+                                :domain_name, :quota_scope_id, :status, :usage_mode, 
+                                :permission, :max_files, :max_size, :num_files, :cur_size, true)
+                    """),
+                    vf_data,
+                )
 
-    # Insert vfolder permissions
-    for perm in data.permissions:
-        perm_data = perm.to_insert_dict()
-        await conn.execute(
-            sa.text("""
-                INSERT INTO vfolder_permissions (id, vfolder, "user", permission)
-                VALUES (:id, :vfolder, :user, :permission)
-            """),
-            perm_data,
-        )
+            # Insert vfolder permissions
+            for perm in data.permissions:
+                perm_data = perm.to_insert_dict()
+                await conn.execute(
+                    sa.text("""
+                        INSERT INTO vfolder_permissions (id, vfolder, "user", permission)
+                        VALUES (:id, :vfolder, :user, :permission)
+                    """),
+                    perm_data,
+                )
 
     return data
 
@@ -563,34 +566,134 @@ class TestVFolderRBACMigrationWithAlembic:
 
     async def test_populate_vfolder_data(
         self,
-        db_connection_pre_migration: Connection,
+        db_engine_pre_migration: Engine,
         populated_vfolder_db: VFolderRBACTestData,
     ) -> None:
         """Test populating vfolder test data into database."""
-        conn = db_connection_pre_migration
+        engine = db_engine_pre_migration
         data = populated_vfolder_db
 
-        # Simple verification - just check counts
-        result = await conn.execute(sa.text("SELECT COUNT(*) FROM users"))
-        user_count = result.scalar()
-        assert user_count == len(data.users), (
-            f"Expected {len(data.users)} users, found {user_count}"
-        )
+        async with engine.connect() as conn:
+            # Simple verification - just check counts
+            result = await conn.execute(sa.text("SELECT COUNT(*) FROM users"))
+            user_count = result.scalar()
+            assert user_count == len(data.users), (
+                f"Expected {len(data.users)} users, found {user_count}"
+            )
 
-        result = await conn.execute(sa.text("SELECT COUNT(*) FROM groups"))
-        group_count = result.scalar()
-        assert group_count == len(data.groups), (
-            f"Expected {len(data.groups)} groups, found {group_count}"
-        )
+            result = await conn.execute(sa.text("SELECT COUNT(*) FROM groups"))
+            group_count = result.scalar()
+            assert group_count == len(data.groups), (
+                f"Expected {len(data.groups)} groups, found {group_count}"
+            )
 
-        result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolders"))
-        vfolder_count = result.scalar()
-        assert vfolder_count == len(data.vfolders), (
-            f"Expected {len(data.vfolders)} vfolders, found {vfolder_count}"
-        )
+            result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolders"))
+            vfolder_count = result.scalar()
+            assert vfolder_count == len(data.vfolders), (
+                f"Expected {len(data.vfolders)} vfolders, found {vfolder_count}"
+            )
 
-        result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolder_permissions"))
-        permission_count = result.scalar()
-        assert permission_count == len(data.permissions), (
-            f"Expected {len(data.permissions)} permissions, found {permission_count}"
-        )
+            result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolder_permissions"))
+            permission_count = result.scalar()
+            assert permission_count == len(data.permissions), (
+                f"Expected {len(data.permissions)} permissions, found {permission_count}"
+            )
+
+        async with engine.connect() as conn:
+            async with conn.begin():
+                await conn.run_sync(migrate_vfolder_data)
+            async_session_factory = sessionmaker(
+                bind=conn, class_=AsyncSession, expire_on_commit=False
+            )
+            session = async_session_factory()
+            async with session.begin():
+                # 1. Verify all vfolders are in association_scopes_entities
+                associations = await session.scalars(
+                    # sa.select(AssociationScopesEntitiesRow)
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.entity_type == "vfolder"
+                    )
+                )
+                association_rows = associations.all()
+
+                assert len(association_rows) == len(data.vfolders), (
+                    f"Expected {len(data.vfolders)} vfolder associations, found {len(association_rows)}"
+                )
+
+                # Create mapping for easy lookup
+                associations_by_vfolder = {row.entity_id: row for row in association_rows}
+
+                # Verify each vfolder's ownership mapping
+                for vfolder in data.vfolders.values():
+                    assoc = associations_by_vfolder.get(vfolder.id)
+                    assert assoc is not None, f"VFolder {vfolder.id} not found in associations"
+
+                    if vfolder.ownership_type == "user":
+                        assert assoc.scope_type == "user", (
+                            f"VFolder {vfolder.id} should have scope_type 'user'"
+                        )
+                        assert assoc.scope_id == vfolder.owner_id, (
+                            f"VFolder {vfolder.id} scope_id mismatch"
+                        )
+                    else:  # group
+                        assert assoc.scope_type == "project", (
+                            f"VFolder {vfolder.id} should have scope_type 'project'"
+                        )
+                        assert assoc.scope_id == vfolder.owner_id, (
+                            f"VFolder {vfolder.id} scope_id mismatch"
+                        )
+
+                # 2. Verify roles are created for each permission
+                roles = await session.scalars(
+                    sa.select(RoleRow).where(RoleRow.name.like("vfolder_granted_%"))
+                )
+                role_rows = roles.all()
+
+                # Should have one role per unique vfolder that has permissions
+                vfolders_with_permissions = {perm.vfolder_id for perm in data.permissions}
+                assert len(role_rows) == len(vfolders_with_permissions), (
+                    f"Expected {len(vfolders_with_permissions)} roles, found {len(role_rows)}"
+                )
+
+                # Create role mapping
+                roles_by_name = {role.name: role for role in role_rows}
+
+                # 3. Verify object permissions
+                object_perms = await session.scalars(
+                    sa.select(ObjectPermissionRow)
+                    .where(ObjectPermissionRow.entity_type == "vfolder")
+                    .options(selectinload(ObjectPermissionRow.role_row))
+                )
+                object_perm_rows = object_perms.all()
+
+                inserted_obj_perm_vfolder_ids: set[str] = {
+                    perm.vfolder_id for perm in data.permissions
+                }
+                row_ids = {op.entity_id for op in object_perm_rows}
+                assert len(row_ids) == len(inserted_obj_perm_vfolder_ids), (
+                    f"Expected {len(inserted_obj_perm_vfolder_ids)} object permissions, found {len(object_perm_rows)}"
+                )
+
+                # Verify each permission
+                for perm in data.permissions:
+                    expected_role_name = f"vfolder_granted_{perm.vfolder_id}"
+                    role = roles_by_name.get(expected_role_name)
+                    assert role is not None, f"Role {expected_role_name} not found"
+
+                    # Find corresponding object permission
+                    obj_perm = next(
+                        (
+                            op
+                            for op in object_perm_rows
+                            if op.entity_id == perm.vfolder_id and op.role_id == role.id
+                        ),
+                        None,
+                    )
+                    assert obj_perm is not None, (
+                        f"Object permission not found for vfolder {perm.vfolder_id} with role {role.id}"
+                    )
+
+                    # All permissions map to 'read' operation in migration
+                    assert obj_perm.operation == "read", (
+                        f"Expected operation 'read' for vfolder {perm.vfolder_id}, got {obj_perm.operation}"
+                    )
