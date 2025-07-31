@@ -18,7 +18,8 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceEndpoint,
     ServiceMetadata,
 )
-from ai.backend.common.types import RedisHelperConfig, RedisTarget
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import RedisHelperConfig, RedisTarget, ValkeyTarget
 
 
 @pytest.fixture
@@ -59,20 +60,13 @@ async def redis_conn(redis_container):
 @pytest.fixture
 async def redis_discovery(redis_container):
     # Create a proper RedisTarget for the service discovery
-    redis_target = RedisTarget(
-        addr=redis_container[1],
-        redis_helper_config=RedisHelperConfig(
-            socket_timeout=1.0,
-            socket_connect_timeout=1.0,
-            reconnect_poll_timeout=1.0,
-            max_connections=10,
-            connection_ready_timeout=1.0,
-        ),
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
     )
-
     discovery = await RedisServiceDiscovery.create(
         args=RedisServiceDiscoveryArgs(
-            redis_target=redis_target,
+            valkey_target=valkey_target,
         ),
     )
     try:
