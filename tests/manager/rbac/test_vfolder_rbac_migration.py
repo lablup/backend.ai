@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.pool import NullPool
 
-from ai.backend.common.types import HostPortPair, VFolderUsageMode
+from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.logging import is_active as logging_active
 from ai.backend.manager.data.user.types import UserRole, UserStatus
 from ai.backend.manager.models.alembic import invoked_programmatically
@@ -192,11 +192,21 @@ class TestVFolder:
             "domain_name": self.domain_name,
         }
 
+    @property
+    def quota_scope_id(self) -> QuotaScopeID:
+        """Get the quota scope ID for this vfolder."""
+        return QuotaScopeID(
+            QuotaScopeType.USER
+            if self.ownership_type == VFolderOwnershipType.USER
+            else QuotaScopeType.PROJECT,
+            uuid.UUID(self.owner_id),
+        )
+
     def to_insert_dict(self) -> dict[str, Any]:
         """Convert to dict for database insertion with all required fields."""
         base_dict = self.to_dict()
         base_dict.update({
-            "quota_scope_id": f"{self.ownership_type}:{self.owner_id}",
+            "quota_scope_id": self.quota_scope_id,
             "status": VFolderOperationStatus.READY,
             "usage_mode": VFolderUsageMode.GENERAL,
             "permission": VFolderPermission.READ_WRITE,
