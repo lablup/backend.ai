@@ -645,7 +645,7 @@ class TestVFolderRBACMigrationWithAlembic:
 
                 # 2. Verify roles are created for each permission
                 roles = await session.scalars(
-                    sa.select(RoleRow).where(RoleRow.name.like("vfolder_granted_%"))
+                    sa.select(RoleRow).where(RoleRow.name.like("vfolder_granted_%"))  # type: ignore[attr-defined]
                 )
                 role_rows = roles.all()
 
