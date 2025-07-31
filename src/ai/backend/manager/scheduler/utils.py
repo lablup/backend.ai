@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.types import (
@@ -10,6 +11,7 @@ from ai.backend.common.types import (
 from ..errors.common import GenericBadRequest
 
 if TYPE_CHECKING:
+    from ..models import AgentRow
     from ..models.session import SessionRow
 
 
@@ -50,3 +52,24 @@ def get_requested_architecture(sess_ctx: SessionRow) -> str:
             "Cannot assign multiple kernels with different architectures' single node session",
         )
     return requested_architectures.pop()
+
+
+def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
+    """
+    Get the number of resource slots that:
+    1) are requested but zero (unused),
+    2) are available in the given agent.
+
+    This is to prefer (or not) agents with additional unused slots,
+    depending on the selection strategy.
+    """
+    unused_slot_keys = set()
+    for k, v in requested_slots.items():
+        if v == Decimal(0):
+            unused_slot_keys.add(k)
+    num_extras = 0
+    for k, v in agent.available_slots.items():
+        if k in unused_slot_keys and v > Decimal(0):
+            num_extras += 1
+
+    return num_extras
