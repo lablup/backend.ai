@@ -19,6 +19,7 @@ from ai.backend.common.typed_validators import (
     CommaSeparatedStrList,
     HostPortPair,
 )
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class ServiceMode(enum.StrEnum):
@@ -876,7 +877,7 @@ class RedisConfig(BaseModel):
         """,
         examples=[None, "mymaster"],
         validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
+        serialization_alias="service_name",
     )
     password: Optional[str] = Field(
         default=None,
@@ -893,6 +894,21 @@ class RedisConfig(BaseModel):
         validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
         serialization_alias="redis_helper_config",
     )
+
+    @field_validator("sentinel", mode="before")
+    @classmethod
+    def _parse_sentinel(
+        cls, v: Optional[str | list[HostPortPairModel]]
+    ) -> Optional[list[HostPortPairModel]]:
+        if v is None or isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            entries: list[HostPortPairModel] = []
+            for part in v.split(","):
+                host, port = part.strip().split(":")
+                entries.append(HostPortPairModel(host=host, port=int(port)))
+            return entries
+        raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
 
 class SessionConfig(BaseModel):

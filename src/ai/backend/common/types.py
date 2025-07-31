@@ -1528,9 +1528,15 @@ class RedisProfileTarget:
             else:
                 addr_data = addr_data.split(":")
                 addr = HostPortPair(addr_data[0], int(addr_data[1]))
+
+        sentinel = data.get("sentinel")
+        if sentinel:
+            if isinstance(sentinel, list):
+                sentinel = [HostPortPair(s["host"], s["port"]) for s in sentinel]
+
         return cls(
             addr=addr,
-            sentinel=data.get("sentinel"),
+            sentinel=sentinel,
             service_name=data.get("service_name"),
             password=data.get("password"),
             redis_helper_config=data.get("redis_helper_config"),

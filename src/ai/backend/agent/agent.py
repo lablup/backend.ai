@@ -803,7 +803,7 @@ class AbstractAgent(
         self.container_lifecycle_queue = asyncio.Queue()
 
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.local_config.model_dump(by_alias=True)["redis"]
+            self.local_config.model_dump()["redis"]
         )
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
