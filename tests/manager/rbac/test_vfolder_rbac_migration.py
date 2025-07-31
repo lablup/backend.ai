@@ -14,18 +14,36 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.pool import NullPool
 
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.types import HostPortPair, VFolderUsageMode
 from ai.backend.logging import is_active as logging_active
+from ai.backend.manager.data.user.types import UserRole, UserStatus
 from ai.backend.manager.models.alembic import invoked_programmatically
 from ai.backend.manager.models.base import metadata, pgsql_connect_opts
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.migrate.vfolder import migrate_vfolder_data
 from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.vfolder import (
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    VFolderPermission,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 
 ALEMBIC_CONFIG_PATH = Path("alembic.ini")
+
+PROJECT_RESOURCE_POLICY_NAME = "default"
+USER_RESOURCE_POLICY_NAME = "default"
 
 
 @pytest.fixture
@@ -101,10 +119,6 @@ async def db_engine_pre_migration(
     def create_all(connection: Connection, engine: Engine) -> None:
         alembic_config.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
-        # REVISION_BEFORE_VFOLDER_RBAC = "643deb439458"  # The revision before vfolder RBAC migration
-        # target_revision = REVISION_BEFORE_VFOLDER_RBAC
-        # connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
-        # connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{target_revision}')")
 
     async with engine.connect() as dbconn:
         async with dbconn.begin():
@@ -143,7 +157,7 @@ class TestUser:
     name: str
     email: str
     domain_name: str = "default"
-    role: str = "user"
+    role: UserRole = UserRole.USER
 
 
 @dataclass
@@ -161,7 +175,7 @@ class TestVFolder:
 
     id: str
     name: str
-    ownership_type: str  # "user" or "group"
+    ownership_type: VFolderOwnershipType
     owner_id: str  # user uuid if ownership_type="user", group uuid if ownership_type="group"
     host: str = "test-host"
     domain_name: str = "default"
@@ -172,8 +186,8 @@ class TestVFolder:
             "id": self.id,
             "name": self.name,
             "ownership_type": self.ownership_type,
-            "user": self.owner_id if self.ownership_type == "user" else None,
-            "group": self.owner_id if self.ownership_type == "group" else None,
+            "user": self.owner_id if self.ownership_type == VFolderOwnershipType.USER else None,
+            "group": self.owner_id if self.ownership_type == VFolderOwnershipType.GROUP else None,
             "host": self.host,
             "domain_name": self.domain_name,
         }
@@ -183,9 +197,9 @@ class TestVFolder:
         base_dict = self.to_dict()
         base_dict.update({
             "quota_scope_id": f"{self.ownership_type}:{self.owner_id}",
-            "status": "ready",
-            "usage_mode": "general",
-            "permission": "rw",
+            "status": VFolderOperationStatus.READY,
+            "usage_mode": VFolderUsageMode.GENERAL,
+            "permission": VFolderPermission.READ_WRITE,
             "max_files": 1000,
             "max_size": 10240,  # MBytes
             "num_files": 0,
@@ -201,7 +215,7 @@ class TestVFolderPermission:
     id: str
     vfolder_id: str
     user_id: str
-    permission: str  # "ro", "rw", "wd"
+    permission: VFolderPermission
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for database insertion."""
@@ -263,44 +277,44 @@ class VFolderRBACTestData:
             "user_vfolder_private": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="user_vfolder_private",
-                ownership_type="user",
+                ownership_type=VFolderOwnershipType.USER,
                 owner_id=self.users["owner_user"].id,
             ),
             "user_vfolder_shared_ro": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="user_vfolder_shared_ro",
-                ownership_type="user",
+                ownership_type=VFolderOwnershipType.USER,
                 owner_id=self.users["owner_user"].id,
             ),
             "user_vfolder_shared_rw": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="user_vfolder_shared_rw",
-                ownership_type="user",
+                ownership_type=VFolderOwnershipType.USER,
                 owner_id=self.users["owner_user"].id,
             ),
             "user_vfolder_shared_multiple": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="user_vfolder_shared_multiple",
-                ownership_type="user",
+                ownership_type=VFolderOwnershipType.USER,
                 owner_id=self.users["member_user1"].id,
             ),
             # Group-owned vfolders
             "group_vfolder_private": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="group_vfolder_private",
-                ownership_type="group",
+                ownership_type=VFolderOwnershipType.GROUP,
                 owner_id=self.groups["project1"].id,
             ),
             "group_vfolder_shared_ro": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="group_vfolder_shared_ro",
-                ownership_type="group",
+                ownership_type=VFolderOwnershipType.GROUP,
                 owner_id=self.groups["project1"].id,
             ),
             "group_vfolder_shared_mixed": TestVFolder(
                 id=str(uuid.uuid4()),
                 name="group_vfolder_shared_mixed",
-                ownership_type="group",
+                ownership_type=VFolderOwnershipType.GROUP,
                 owner_id=self.groups["project2"].id,
             ),
         }
@@ -312,59 +326,59 @@ class VFolderRBACTestData:
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["user_vfolder_shared_ro"].id,
                 user_id=self.users["member_user1"].id,
-                permission="ro",
+                permission=VFolderPermission.READ_ONLY,
             ),
             # User vfolder shared with read-write permission
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["user_vfolder_shared_rw"].id,
                 user_id=self.users["member_user2"].id,
-                permission="rw",
+                permission=VFolderPermission.READ_WRITE,
             ),
             # User vfolder shared with multiple users with different permissions
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
                 user_id=self.users["owner_user"].id,
-                permission="ro",
+                permission=VFolderPermission.READ_ONLY,
             ),
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
                 user_id=self.users["member_user2"].id,
-                permission="rw",
+                permission=VFolderPermission.READ_WRITE,
             ),
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
                 user_id=self.users["external_user"].id,
-                permission="wd",
+                permission=VFolderPermission.RW_DELETE,
             ),
             # Group vfolder shared with external user (not in group)
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["group_vfolder_shared_ro"].id,
                 user_id=self.users["external_user"].id,
-                permission="ro",
+                permission=VFolderPermission.READ_ONLY,
             ),
             # Group vfolder shared with mixed permissions
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
                 user_id=self.users["member_user1"].id,
-                permission="ro",
+                permission=VFolderPermission.READ_ONLY,
             ),
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
                 user_id=self.users["member_user2"].id,
-                permission="rw",
+                permission=VFolderPermission.READ_WRITE,
             ),
             TestVFolderPermission(
                 id=str(uuid.uuid4()),
                 vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
                 user_id=self.users["external_user"].id,
-                permission="wd",
+                permission=VFolderPermission.RW_DELETE,
             ),
         ]
 
@@ -475,88 +489,80 @@ async def populated_vfolder_db(db_engine_pre_migration, vfolder_rbac_test_data):
     async with engine.connect() as conn:
         async with conn.begin():
             # Insert domains (required for foreign keys)
-            await conn.execute(
-                sa.text("""
-                    INSERT INTO domains (name, description, is_active, allowed_vfolder_hosts, allowed_docker_registries, dotfiles)
-                    VALUES ('default', 'Default domain', true, '{}', '{}', '')
-                    ON CONFLICT (name) DO NOTHING
-                """)
-            )
+            domain_names = {user.domain_name for user in data.users.values()}
+            domain_values = [
+                {
+                    "name": name,
+                    "is_active": True,
+                    "allowed_vfolder_hosts": {},
+                    "allowed_docker_registries": {},
+                    "dotfiles": b"",
+                }
+                for name in domain_names
+            ]
+            domain_insert = sa.insert(DomainRow).values(domain_values)
+            await conn.execute(domain_insert)
 
             # Insert user reesource policies
-            await conn.execute(
-                sa.text("""
-                    INSERT INTO user_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_session_count_per_model_session, max_customized_image_count)
-                    VALUES ('default', 100, 100, 100, 100)
-                    ON CONFLICT (name) DO NOTHING
-                """)
+            user_resource_policy_insert = sa.insert(UserResourcePolicyRow).values(
+                name=USER_RESOURCE_POLICY_NAME,
+                max_vfolder_count=100,
+                max_quota_scope_size=100,
+                max_session_count_per_model_session=100,
+                max_customized_image_count=100,
             )
+            await conn.execute(user_resource_policy_insert)
 
             # Insert users
-            for user in data.users.values():
-                await conn.execute(
-                    sa.text("""
-                        INSERT INTO users (uuid, email, username, password, 
-                                        domain_name, role, status, resource_policy, sudo_session_enabled)
-                        VALUES (:id, :email, :email, 'dummy_hash', 
-                                :domain_name, :role, 'active', 'default', false)
-                    """),
-                    {
-                        "id": user.id,
-                        "email": user.email,
-                        "domain_name": user.domain_name,
-                        "role": user.role,
-                    },
-                )
+            user_values = [
+                {
+                    "uuid": user.id,
+                    "email": user.email,
+                    "username": user.email,
+                    "password": "dummy_hash",
+                    "domain_name": user.domain_name,
+                    "role": user.role,
+                    "status": UserStatus.ACTIVE,
+                    "resource_policy": "default",
+                    "sudo_session_enabled": False,
+                }
+                for user in data.users.values()
+            ]
+            user_insert = sa.insert(UserRow).values(user_values)
+            await conn.execute(user_insert)
 
             # Insert project resource policy
-            await conn.execute(
-                sa.text("""
-                        INSERT INTO project_resource_policies (name, max_vfolder_count, max_quota_scope_size, max_network_count)
-                        VALUES ('default', 100, 100, 100)
-                        ON CONFLICT (name) DO NOTHING
-                    """)
+            project_resource_policy_insert = sa.insert(ProjectResourcePolicyRow).values(
+                name=PROJECT_RESOURCE_POLICY_NAME,
+                max_vfolder_count=100,
+                max_quota_scope_size=100,
+                max_network_count=100,
             )
+            await conn.execute(project_resource_policy_insert)
 
             # Insert groups
-            for group in data.groups.values():
-                await conn.execute(
-                    sa.text("""
-                        INSERT INTO groups (id, name, is_active, domain_name, allowed_vfolder_hosts, dotfiles, resource_policy, type)
-                        VALUES (:id, :name, true, :domain_name, '{}', '', 'default', 'general')
-                    """),
-                    {
-                        "id": group.id,
-                        "name": group.name,
-                        "domain_name": group.domain_name,
-                    },
-                )
+            project_values = [
+                {
+                    "id": project.id,
+                    "name": project.name,
+                    "is_active": True,
+                    "domain_name": project.domain_name,
+                    "allowed_vfolder_hosts": {},
+                    "dotfiles": b"",
+                    "resource_policy": PROJECT_RESOURCE_POLICY_NAME,
+                    "type": ProjectType.GENERAL,
+                }
+                for project in data.groups.values()
+            ]
+            await conn.execute(sa.insert(GroupRow).values(project_values))
 
             # Insert vfolders
-            for vfolder in data.vfolders.values():
-                vf_data = vfolder.to_insert_dict()
-                await conn.execute(
-                    sa.text("""
-                        INSERT INTO vfolders (id, name, ownership_type, "user", "group", host, 
-                                            domain_name, quota_scope_id, status, usage_mode, 
-                                            permission, max_files, max_size, num_files, cur_size, cloneable)
-                        VALUES (:id, :name, :ownership_type, :user, :group, :host, 
-                                :domain_name, :quota_scope_id, :status, :usage_mode, 
-                                :permission, :max_files, :max_size, :num_files, :cur_size, true)
-                    """),
-                    vf_data,
-                )
+            vfolder_values = [vfolder.to_insert_dict() for vfolder in data.vfolders.values()]
+            await conn.execute(sa.insert(VFolderRow).values(vfolder_values))
 
             # Insert vfolder permissions
-            for perm in data.permissions:
-                perm_data = perm.to_insert_dict()
-                await conn.execute(
-                    sa.text("""
-                        INSERT INTO vfolder_permissions (id, vfolder, "user", permission)
-                        VALUES (:id, :vfolder, :user, :permission)
-                    """),
-                    perm_data,
-                )
+            vfolder_permission_values = [perm.to_insert_dict() for perm in data.permissions]
+            await conn.execute(sa.insert(VFolderPermissionRow).values(vfolder_permission_values))
 
     return data
 
@@ -574,32 +580,7 @@ class TestVFolderRBACMigrationWithAlembic:
         data = populated_vfolder_db
 
         async with engine.connect() as conn:
-            # Simple verification - just check counts
-            result = await conn.execute(sa.text("SELECT COUNT(*) FROM users"))
-            user_count = result.scalar()
-            assert user_count == len(data.users), (
-                f"Expected {len(data.users)} users, found {user_count}"
-            )
-
-            result = await conn.execute(sa.text("SELECT COUNT(*) FROM groups"))
-            group_count = result.scalar()
-            assert group_count == len(data.groups), (
-                f"Expected {len(data.groups)} groups, found {group_count}"
-            )
-
-            result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolders"))
-            vfolder_count = result.scalar()
-            assert vfolder_count == len(data.vfolders), (
-                f"Expected {len(data.vfolders)} vfolders, found {vfolder_count}"
-            )
-
-            result = await conn.execute(sa.text("SELECT COUNT(*) FROM vfolder_permissions"))
-            permission_count = result.scalar()
-            assert permission_count == len(data.permissions), (
-                f"Expected {len(data.permissions)} permissions, found {permission_count}"
-            )
-
-        async with engine.connect() as conn:
+            # Run the migration to populate RBAC data
             async with conn.begin():
                 await conn.run_sync(migrate_vfolder_data)
             async_session_factory = sessionmaker(
@@ -609,7 +590,6 @@ class TestVFolderRBACMigrationWithAlembic:
             async with session.begin():
                 # 1. Verify all vfolders are in association_scopes_entities
                 associations = await session.scalars(
-                    # sa.select(AssociationScopesEntitiesRow)
                     sa.select(AssociationScopesEntitiesRow).where(
                         AssociationScopesEntitiesRow.entity_type == "vfolder"
                     )
