@@ -139,11 +139,10 @@ enum ClusterMode {
 }
 
 input CreateModelDeploymentInput {
-  name: String!
-  preferredDomainName: String = null
-  openToPublic: Boolean!
-  tags: [String!] = null
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
   clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
   deploymentStrategy: DeploymentStrategyInput!
   initialRevision: CreateModelRevisionInput!
 }
@@ -157,9 +156,7 @@ input CreateModelRevisionInput {
   name: String!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
-  modelVfolderConfig: ModelVFolderConfigInput!
-  mounts: [MountInput!] = null
-  resourceConfig: ResourceConfigInput!
+  modelMountConfig: ModelMountConfigInput!
 }
 
 type CreateModelRevisionPayload {
@@ -257,29 +254,19 @@ type ImportArtifactPayload {
 """A custom scalar for JSON strings using orjson"""
 scalar JSONString
 
-type MOJOServiceConfig {
-  config: JSONString!
-}
-
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String!
-  endpointUrl: String
-  preferredDomainName: String
-  status: DeploymentStatus!
-  openToPublic: Boolean!
-  tags: [String!]!
+  metadata: ModelDeploymentMetadata!
+  networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
   revisionHistory: ModelRevisionConnection!
-  scale: Scale!
-  replicaManagement: ReplicaManagement!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
   deploymentStrategy: DeploymentStrategy!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
   createdUser: UserNode!
-  resourceGroup: ScalingGroupNode!
-  accessTokens: [EndpointToken!]!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type ModelDeploymentConnection {
@@ -298,6 +285,43 @@ type ModelDeploymentEdge {
 
   """The item at the end of the edge"""
   node: ModelDeployment!
+}
+
+type ModelDeploymentMetadata {
+  name: String!
+  status: DeploymentStatus!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input ModelDeploymentMetadataInput {
+  name: String!
+  tags: [String!] = null
+}
+
+type ModelDeploymentNetworkAccess {
+  endpointUrl: String
+  preferredDomainName: String
+  openToPublic: Boolean!
+  accessTokens: [EndpointToken!]!
+}
+
+input ModelDeploymentNetworkAccessInput {
+  preferredDomainName: String = null
+  openToPublic: Boolean! = false
+}
+
+type ModelMountConfig {
+  vfolder: VirtualFolderNode!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+input ModelMountConfigInput {
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
 }
 
 type ModelReplica implements Node {
@@ -331,13 +355,9 @@ type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
-  clusterConfig: ClusterConfig!
-  resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
-  modelVfolderConfig: ModelVFolderConfig!
-  mounts: [Mount!]!
+  modelMountConfig: ModelMountConfig!
   image: ImageNode!
-  errorData: JSONString
   createdAt: DateTime!
 }
 
@@ -390,42 +410,6 @@ input ModelRuntimeConfigInput {
   environ: JSONString = null
 }
 
-type ModelVFolderConfig {
-  vfolder: VirtualFolderNode!
-  mountDestination: String!
-  definitionPath: String!
-}
-
-input ModelVFolderConfigInput {
-  vfolderId: ID!
-  mountDestination: String!
-  definitionPath: String!
-}
-
-type Mount {
-  vfolderId: ID!
-  destination: String!
-  type: MountType!
-  permission: MountPermission!
-}
-
-input MountInput {
-  vfolderId: ID!
-  destination: String!
-  type: MountType!
-  permission: MountPermission!
-}
-
-enum MountPermission {
-  READ_ONLY
-  READ_WRITE
-}
-
-enum MountType {
-  BIND
-  VOLUME
-}
-
 type Mutation {
   importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
@@ -435,10 +419,6 @@ type Mutation {
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
-}
-
-type NVIDIAServiceConfig {
-  config: JSONString!
 }
 
 """An object with a Globally Unique ID"""
@@ -516,7 +496,7 @@ type RawServiceConfig {
   extraCliParameters: String
 }
 
-type ReplicaManagement {
+type ReplicaState {
   desiredReplicaCount: Int!
   replicas: ModelReplicaConnection!
 }
@@ -537,9 +517,13 @@ type ResourceConfig {
 }
 
 input ResourceConfigInput {
-  resourceGroup: ScalingGroupNodeInput!
+  resourceGroup: ResourceGroupInput!
   resourceSlots: JSONString!
   resourceOpts: JSONString = null
+}
+
+input ResourceGroupInput {
+  name: String!
 }
 
 type RoutingNode implements Node {
@@ -551,28 +535,19 @@ type RoutingNode implements Node {
   status: String!
   trafficRatio: Float!
   createdAt: DateTime!
-  errorData: JSONString!
   liveStat: JSONString!
-}
-
-type SGLangServiceConfig {
-  config: JSONString!
-}
-
-type Scale {
-  autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
 extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
 }
 
-input ScalingGroupNodeInput {
-  name: String!
+type ScalingRule {
+  autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
 """Different service configurations for model runtime"""
-union ServiceConfig = vLLMServiceConfig | SGLangServiceConfig | NVIDIAServiceConfig | MOJOServiceConfig | RawServiceConfig
+union ServiceConfig = RawServiceConfig
 
 type SourceInfo {
   name: String
@@ -635,10 +610,4 @@ union _Entity = EndpointAutoScalingRuleNode | EndpointToken | ImageNode | Scalin
 
 type _Service {
   sdl: String!
-}
-
-type vLLMServiceConfig {
-  maxModelLength: Int!
-  parallelism: JSONString
-  extraCliParameters: String
 }

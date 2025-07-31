@@ -1103,11 +1103,10 @@ input CreateKeyPairResourcePolicyInput
 input CreateModelDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
-  name: String!
-  preferredDomainName: String = null
-  openToPublic: Boolean!
-  tags: [String!] = null
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
   clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
   deploymentStrategy: DeploymentStrategyInput!
   initialRevision: CreateModelRevisionInput!
 }
@@ -1125,9 +1124,7 @@ input CreateModelRevisionInput
   name: String!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
-  modelVfolderConfig: ModelVFolderConfigInput!
-  mounts: [MountInput!] = null
-  resourceConfig: ResourceConfigInput!
+  modelMountConfig: ModelMountConfigInput!
 }
 
 type CreateModelRevisionPayload
@@ -2450,22 +2447,16 @@ type ModelDeployment implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String!
-  endpointUrl: String
-  preferredDomainName: String
-  status: DeploymentStatus!
-  openToPublic: Boolean!
-  tags: [String!]!
+  metadata: ModelDeploymentMetadata!
+  networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
   revisionHistory: ModelRevisionConnection!
-  scale: Scale!
-  replicaManagement: ReplicaManagement!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
   deploymentStrategy: DeploymentStrategy!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
   createdUser: UserNode!
-  resourceGroup: ScalingGroupNode!
-  accessTokens: [EndpointToken!]!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type ModelDeploymentConnection
@@ -2488,6 +2479,55 @@ type ModelDeploymentEdge
 
   """The item at the end of the edge"""
   node: ModelDeployment!
+}
+
+type ModelDeploymentMetadata
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  status: DeploymentStatus!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input ModelDeploymentMetadataInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  tags: [String!] = null
+}
+
+type ModelDeploymentNetworkAccess
+  @join__type(graph: STRAWBERRY)
+{
+  endpointUrl: String
+  preferredDomainName: String
+  openToPublic: Boolean!
+  accessTokens: [EndpointToken!]!
+}
+
+input ModelDeploymentNetworkAccessInput
+  @join__type(graph: STRAWBERRY)
+{
+  preferredDomainName: String = null
+  openToPublic: Boolean! = false
+}
+
+type ModelMountConfig
+  @join__type(graph: STRAWBERRY)
+{
+  vfolder: VirtualFolderNode!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+input ModelMountConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
 }
 
 type ModelReplica implements Node
@@ -2531,13 +2571,9 @@ type ModelRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
-  clusterConfig: ClusterConfig!
-  resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
-  modelVfolderConfig: ModelVFolderConfig!
-  mounts: [Mount!]!
+  modelMountConfig: ModelMountConfig!
   image: ImageNode!
-  errorData: JSONString
   createdAt: DateTime!
 }
 
@@ -2602,22 +2638,6 @@ input ModelRuntimeConfigInput
   runtimeVariant: String!
   serviceConfig: JSONString = null
   environ: JSONString = null
-}
-
-type ModelVFolderConfig
-  @join__type(graph: STRAWBERRY)
-{
-  vfolder: VirtualFolderNode!
-  mountDestination: String!
-  definitionPath: String!
-}
-
-input ModelVFolderConfigInput
-  @join__type(graph: STRAWBERRY)
-{
-  vfolderId: ID!
-  mountDestination: String!
-  definitionPath: String!
 }
 
 type ModifyAgent
@@ -3116,44 +3136,6 @@ input ModifyUserResourcePolicyInput
   max_customized_image_count: Int
 }
 
-type MOJOServiceConfig
-  @join__type(graph: STRAWBERRY)
-{
-  config: JSONString!
-}
-
-type Mount
-  @join__type(graph: STRAWBERRY)
-{
-  vfolderId: ID!
-  destination: String!
-  type: MountType!
-  permission: MountPermission!
-}
-
-input MountInput
-  @join__type(graph: STRAWBERRY)
-{
-  vfolderId: ID!
-  destination: String!
-  type: MountType!
-  permission: MountPermission!
-}
-
-enum MountPermission
-  @join__type(graph: STRAWBERRY)
-{
-  READ_ONLY @join__enumValue(graph: STRAWBERRY)
-  READ_WRITE @join__enumValue(graph: STRAWBERRY)
-}
-
-enum MountType
-  @join__type(graph: STRAWBERRY)
-{
-  BIND @join__enumValue(graph: STRAWBERRY)
-  VOLUME @join__enumValue(graph: STRAWBERRY)
-}
-
 """All available GraphQL mutations."""
 type Mutation
   @join__type(graph: GRAPHENE)
@@ -3519,12 +3501,6 @@ interface Node
 {
   """The ID of the object"""
   id: ID!
-}
-
-type NVIDIAServiceConfig
-  @join__type(graph: STRAWBERRY)
-{
-  config: JSONString!
 }
 
 enum OrderDirection
@@ -4119,7 +4095,7 @@ type RawServiceConfig
   extraCliParameters: String
 }
 
-type ReplicaManagement
+type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
   desiredReplicaCount: Int!
@@ -4165,9 +4141,15 @@ type ResourceConfig
 input ResourceConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  resourceGroup: ScalingGroupNodeInput!
+  resourceGroup: ResourceGroupInput!
   resourceSlots: JSONString!
   resourceOpts: JSONString = null
+}
+
+input ResourceGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
 }
 
 type ResourceLimit
@@ -4238,7 +4220,6 @@ type RoutingNode implements Node
   status: String!
   trafficRatio: Float!
   createdAt: DateTime!
-  errorData: JSONString!
   liveStat: JSONString!
 }
 
@@ -4248,12 +4229,6 @@ type RuntimeVariantInfo
 {
   name: String
   human_readable_name: String
-}
-
-type Scale
-  @join__type(graph: STRAWBERRY)
-{
-  autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
 type ScalingGroup
@@ -4324,12 +4299,6 @@ type ScalingGroupNode implements Node
   use_host_network: Boolean @join__field(graph: GRAPHENE)
 }
 
-input ScalingGroupNodeInput
-  @join__type(graph: STRAWBERRY)
-{
-  name: String!
-}
-
 """Added in 24.12.0."""
 type ScalinGroupConnection
   @join__type(graph: GRAPHENE)
@@ -4357,6 +4326,12 @@ type ScalinGroupEdge
   cursor: String!
 }
 
+type ScalingRule
+  @join__type(graph: STRAWBERRY)
+{
+  autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
 """
 Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE_TYPE> should be one of [system, domain, project, user]. <SCOPE_ID> should be the ID value of the scope. e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`.
 """
@@ -4366,12 +4341,8 @@ scalar ScopeField
 """Different service configurations for model runtime"""
 union ServiceConfig
   @join__type(graph: STRAWBERRY)
-  @join__unionMember(graph: STRAWBERRY, member: "vLLMServiceConfig")
-  @join__unionMember(graph: STRAWBERRY, member: "SGLangServiceConfig")
-  @join__unionMember(graph: STRAWBERRY, member: "NVIDIAServiceConfig")
-  @join__unionMember(graph: STRAWBERRY, member: "MOJOServiceConfig")
   @join__unionMember(graph: STRAWBERRY, member: "RawServiceConfig")
- = vLLMServiceConfig | SGLangServiceConfig | NVIDIAServiceConfig | MOJOServiceConfig | RawServiceConfig
+ = RawServiceConfig
 
 """Added in 25.8.0."""
 type ServiceConfigConnection
@@ -4430,12 +4401,6 @@ type SetQuotaScope
   @join__type(graph: GRAPHENE)
 {
   quota_scope: QuotaScope
-}
-
-type SGLangServiceConfig
-  @join__type(graph: STRAWBERRY)
-{
-  config: JSONString!
 }
 
 type SourceInfo
@@ -4954,12 +4919,4 @@ type VirtualFolderPermissionList implements PaginatedList
 {
   items: [VirtualFolderPermission]!
   total_count: Int!
-}
-
-type vLLMServiceConfig
-  @join__type(graph: STRAWBERRY)
-{
-  maxModelLength: Int!
-  parallelism: JSONString
-  extraCliParameters: String
 }
