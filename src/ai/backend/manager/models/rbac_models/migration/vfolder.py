@@ -1,9 +1,18 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
+
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderPermissionRow, VFolderRow
+
+ENTITY_TYPE = "vfolder"
 
 
 @dataclass
@@ -11,12 +20,17 @@ class VFolderData:
     id: str
     user: Optional[str]
     group: Optional[str]
-    ownership_type: str  # e.g., "user", "group"
+    ownership_type: VFolderOwnershipType
 
-    def to_insert_val(self) -> str:
-        scope_type = "user" if self.ownership_type == "user" else "project"
-        scope_id = self.user if self.ownership_type == "user" else self.group
-        return f"('{scope_type}', '{scope_id}'::uuid, 'vfolder', '{self.id}'::uuid)"
+    def to_assoc_scope_entity_insert_dict(self) -> dict[str, Any]:
+        return {
+            "scope_type": "user" if self.ownership_type == VFolderOwnershipType.USER else "project",
+            "scope_id": self.user
+            if self.ownership_type == VFolderOwnershipType.USER
+            else self.group,
+            "entity_type": ENTITY_TYPE,
+            "entity_id": self.id,
+        }
 
 
 @dataclass
@@ -36,11 +50,11 @@ def _migrate_vfolder_data_to_association_scopes_entities(conn: Connection) -> No
     offset = 0
     page_size = 1000
     while True:
-        vfolder_query = f"""
-        SELECT v.id, v.user, v.group, v.ownership_type FROM vfolders v
-        LIMIT {page_size} OFFSET {offset};
-        """
-        result = conn.execute(sa.text(vfolder_query))
+        vfolder_query = (
+            sa.select(VFolderRow).offset(offset).limit(page_size).order_by(VFolderRow.id)
+        )
+        result = conn.execute(vfolder_query)
+        offset += page_size
         if result is None or result.rowcount == 0:
             break
 
@@ -51,20 +65,16 @@ def _migrate_vfolder_data_to_association_scopes_entities(conn: Connection) -> No
                     id=str(row["id"]),
                     user=str(row["user"]),
                     group=str(row["group"]),
-                    ownership_type=str(row["ownership_type"]),
+                    ownership_type=row["ownership_type"],
                 )
             )
         if not vfolder_list:
             break
 
-        values = ", ".join([vfolder.to_insert_val() for vfolder in vfolder_list])
-        insert_entity_query = f"""
-        INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id)
-        VALUES {values}
-        """
-        conn.execute(sa.text(insert_entity_query))
-
-        offset += page_size
+        association_values = [
+            vfolder.to_assoc_scope_entity_insert_dict() for vfolder in vfolder_list
+        ]
+        conn.execute(sa.insert(AssociationScopesEntitiesRow).values(association_values))
 
 
 def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> None:
@@ -74,14 +84,15 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
     inserted_role_names: set[str] = set()
     inserted_vfolder_obj_perms: set[str] = set()
     while True:
-        vfolder_permission_query = f"""
-        SELECT v.id, p.user, p.permission FROM vfolders v
-        JOIN vfolder_permissions p ON v.id = p.vfolder
-        ORDER BY v.id
-        LIMIT {page_size} OFFSET {offset};
-        """
+        query_vfolder_permission = (
+            sa.select(VFolderRow)
+            .join(VFolderPermissionRow, VFolderRow.id == VFolderPermissionRow.vfolder)
+            .offset(offset)
+            .limit(page_size)
+            .order_by(VFolderRow.id)
+        )
+        result = conn.execute(query_vfolder_permission)
         offset += page_size
-        result = conn.execute(sa.text(vfolder_permission_query))
         if result is None or result.rowcount == 0:
             break
 
@@ -100,20 +111,15 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
             continue
 
         role_names = {perm.to_role_name() for perm in vfolder_perm_list}
-        role_name_values = ", ".join([f"('{name}')" for name in role_names])
-        insert_role_query = f"""
-        INSERT INTO roles (name)
-        VALUES {role_name_values};
-        """
-        conn.execute(sa.text(insert_role_query))
+        role_name_values = [{"name": name} for name in role_names]
+        conn.execute(sa.insert(RoleRow).values(role_name_values))
         inserted_role_names.update(role_names)
 
         role_name_vfolder_id_map: dict[str, str] = {
             perm.to_role_name(): perm.vfolder_id for perm in vfolder_perm_list
         }
-        role_names_str = ", ".join([f"'{role_name}'" for role_name in role_name_vfolder_id_map])
-        role_id_query = f"""SELECT id, name FROM roles WHERE name IN ({role_names_str});"""
-        result = conn.execute(sa.text(role_id_query))
+        query_role = sa.select(RoleRow).where(RoleRow.name.in_(role_name_vfolder_id_map.keys()))  # type: ignore[attr-defined]
+        result = conn.execute(query_role)
 
         vfolder_id_role_id_map: dict[str, uuid.UUID] = {
             role_name_vfolder_id_map[row["name"]]: row["id"] for row in result
@@ -126,15 +132,16 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
             filtered_perm_list.append(perm)
         if not filtered_perm_list:
             continue
-        object_permission_values = ", ".join([
-            f"('{vfolder_id_role_id_map[perm.vfolder_id]}'::uuid, 'vfolder', '{perm.vfolder_id}'::uuid, 'read')"
+        object_permission_values = [
+            {
+                "role_id": vfolder_id_role_id_map[perm.vfolder_id],
+                "entity_type": ENTITY_TYPE,
+                "entity_id": perm.vfolder_id,
+                "operation": "read",
+            }
             for perm in filtered_perm_list
-        ])
-        insert_object_permission_query = f"""
-        INSERT INTO object_permissions (role_id, entity_type, entity_id, operation)
-        VALUES {object_permission_values};
-        """
-        conn.execute(sa.text(insert_object_permission_query))
+        ]
+        conn.execute(sa.insert(ObjectPermissionRow).values(object_permission_values))
 
 
 def migrate_vfolder_data(conn: Connection) -> None:
