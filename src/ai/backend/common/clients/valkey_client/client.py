@@ -42,7 +42,7 @@ class ValkeyStandaloneTarget:
     request_timeout: Optional[int] = None
 
     @classmethod
-    def from_redis_target(cls, valkey_target: ValkeyTarget) -> Self:
+    def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
         """
         Create a ValkeyConnectionConfig from a RedisTarget.
         """
@@ -446,7 +446,7 @@ def create_valkey_client(
     if valkey_target.sentinel:
         sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
         return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
-    standalone_target = ValkeyStandaloneTarget.from_redis_target(valkey_target)
+    standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
     return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
 
 
