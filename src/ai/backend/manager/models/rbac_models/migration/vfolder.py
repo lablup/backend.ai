@@ -111,8 +111,8 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
         role_name_vfolder_id_map: dict[str, str] = {
             perm.to_role_name(): perm.vfolder_id for perm in vfolder_perm_list
         }
-        role_names = ", ".join([f"'{role_name}'" for role_name in role_name_vfolder_id_map])
-        role_id_query = f"""SELECT id, name FROM roles WHERE name IN ({role_names});"""
+        role_names_str = ", ".join([f"'{role_name}'" for role_name in role_name_vfolder_id_map])
+        role_id_query = f"""SELECT id, name FROM roles WHERE name IN ({role_names_str});"""
         result = conn.execute(sa.text(role_id_query))
 
         vfolder_id_role_id_map: dict[str, uuid.UUID] = {
