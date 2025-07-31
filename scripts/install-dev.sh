@@ -805,7 +805,7 @@ setup_environment() {
   mkdir -p "$HALFSTACK_VOLUME_PATH"
   if [ $CONFIGURE_HA -eq 1 ]; then
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
-    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
+    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus-ha.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
 
