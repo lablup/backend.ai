@@ -819,7 +819,7 @@ class AbstractAgent(
             log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_client = await ValkeyStreamClient.create(
+        self.valkey_stream_client = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
@@ -987,7 +987,7 @@ class AbstractAgent(
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
         await self.event_dispatcher.close()
-        await self.redis_stream_client.close()
+        await self.valkey_stream_client.close()
         await self.valkey_stat_client.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
@@ -1133,7 +1133,7 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await self.redis_stream_client.enqueue_container_logs(
+                        await self.valkey_stream_client.enqueue_container_logs(
                             container_id,
                             stored_chunk,
                         )
@@ -1146,7 +1146,7 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await self.redis_stream_client.enqueue_container_logs(
+                await self.valkey_stream_client.enqueue_container_logs(
                     container_id,
                     chunk_buffer.getvalue(),
                 )
