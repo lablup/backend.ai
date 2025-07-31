@@ -58,29 +58,6 @@ class ResourceConfig:
     resource_opts: Optional[JSONString] = None
 
 
-# Service Config Union Types
-@strawberry.type
-class vLLMServiceConfig:
-    max_model_length: int
-    parallelism: Optional[JSONString] = None
-    extra_cli_parameters: Optional[str] = None
-
-
-@strawberry.type
-class SGLangServiceConfig:
-    config: JSONString
-
-
-@strawberry.type
-class NVIDIAServiceConfig:
-    config: JSONString
-
-
-@strawberry.type
-class MOJOServiceConfig:
-    config: JSONString
-
-
 @strawberry.type
 class RawServiceConfig:
     config: JSONString
@@ -88,11 +65,7 @@ class RawServiceConfig:
 
 
 ServiceConfig = Annotated[
-    vLLMServiceConfig
-    | SGLangServiceConfig
-    | NVIDIAServiceConfig
-    | MOJOServiceConfig
-    | RawServiceConfig,
+    RawServiceConfig,
     strawberry.union(
         "ServiceConfig", description="Different service configurations for model runtime"
     ),
@@ -119,7 +92,6 @@ class ModelRevision(relay.Node):
 
     image: Image
 
-    error_data: Optional[JSONString] = None
     created_at: datetime
 
 
@@ -166,10 +138,11 @@ mock_model_revision_1 = ModelRevision(
     ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
-        service_config=vLLMServiceConfig(
-            max_model_length=4096,
-            parallelism=cast(JSONString, '{"tensor_parallel_size": 1}'),
-            extra_cli_parameters="--enable-prefix-caching",
+        service_config=RawServiceConfig(
+            config=cast(
+                JSONString,
+                '{"max_model_length": 4096, "parallelism": {"tensor_parallel_size": 1}, "extra_cli_parameters": "--enable-prefix-caching"}',
+            ),
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
     ),
@@ -187,7 +160,6 @@ mock_model_revision_1 = ModelRevision(
         )
     ],
     image=Image(id=ID("img-vllm-001")),
-    error_data=None,
     created_at=datetime.now() - timedelta(days=10),
 )
 
@@ -208,10 +180,11 @@ mock_model_revision_2 = ModelRevision(
     ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
-        service_config=vLLMServiceConfig(
-            max_model_length=8192,
-            parallelism=cast(JSONString, '{"tensor_parallel_size": 2}'),
-            extra_cli_parameters="--enable-prefix-caching --enable-chunked-prefill",
+        service_config=RawServiceConfig(
+            config=cast(
+                JSONString,
+                '{"max_model_length": 4096, "parallelism": {"tensor_parallel_size": 1}, "extra_cli_parameters": "--enable-prefix-caching"}',
+            ),
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0,1"}'),
     ),
@@ -229,7 +202,6 @@ mock_model_revision_2 = ModelRevision(
         )
     ],
     image=Image(id=ID("img-vllm-002")),
-    error_data=None,
     created_at=datetime.now() - timedelta(days=5),
 )
 
@@ -250,10 +222,11 @@ mock_model_revision_3 = ModelRevision(
     ),
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
-        service_config=vLLMServiceConfig(
-            max_model_length=2048,
-            parallelism=cast(JSONString, '{"tensor_parallel_size": 1}'),
-            extra_cli_parameters="--disable-log-stats",
+        service_config=RawServiceConfig(
+            config=cast(
+                JSONString,
+                '{"max_model_length": 4096, "parallelism": {"tensor_parallel_size": 1}, "extra_cli_parameters": "--enable-prefix-caching"}',
+            ),
         ),
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "2"}'),
     ),
@@ -264,7 +237,6 @@ mock_model_revision_3 = ModelRevision(
     ),
     mounts=[],
     image=Image(id=ID("img-vllm-003")),
-    error_data=None,
     created_at=datetime.now() - timedelta(days=20),
 )
 
@@ -423,7 +395,6 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
         ),
         mounts=[],
         image=Image(id=ID("image-id")),
-        error_data=None,
         created_at=datetime.now(),
     )
     return CreateModelRevisionPayload(revision=revision)

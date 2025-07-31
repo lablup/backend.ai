@@ -250,7 +250,6 @@ mock_model_replica_1 = ModelReplica(
             status="ACTIVE",
             traffic_ratio=0.33,
             created_at=datetime.now() - timedelta(days=5),
-            error_data=cast(JSONString, '{"error": null}'),
             live_stat=cast(
                 JSONString, '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}'
             ),
@@ -272,7 +271,6 @@ mock_model_replica_2 = ModelReplica(
             status="ACTIVE",
             traffic_ratio=0.33,
             created_at=datetime.now() - timedelta(days=5),
-            error_data=cast(JSONString, '{"error": null}'),
             live_stat=cast(
                 JSONString, '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}'
             ),
@@ -294,9 +292,6 @@ mock_model_replica_3 = ModelReplica(
             status="INACTIVE",
             traffic_ratio=0.0,
             created_at=datetime.now() - timedelta(days=2),
-            error_data=cast(
-                JSONString, '{"error": "OOMKilled", "message": "Container exceeded memory limit"}'
-            ),
             live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
         )
     ],

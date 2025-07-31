@@ -19,7 +19,6 @@ class RoutingNode(Node):
     status: str
     traffic_ratio: float
     created_at: datetime
-    error_data: JSONString
     live_stat: JSONString
 
 
