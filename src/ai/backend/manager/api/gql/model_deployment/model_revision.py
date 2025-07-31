@@ -1,6 +1,8 @@
+import base64
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Annotated, Any, Optional, cast
+from uuid import uuid4
 
 import strawberry
 from strawberry import ID, Info, relay
@@ -78,8 +80,12 @@ class ModelRevisionOrder:
 
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Revisions
+def _generate_mock_global_id() -> str:
+    return base64.b64encode(f"default:{uuid4()}".encode("utf-8")).decode()
+
+
 mock_model_revision_1 = ModelRevision(
-    id="rev-001",
+    id=_generate_mock_global_id(),
     name="llama-3-8b-instruct-v1.0",
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
@@ -92,16 +98,16 @@ mock_model_revision_1 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(id=ID("vf-model-001")),
+        vfolder=VFolder(id=ID(_generate_mock_global_id())),
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    image=Image(id=ID("img-vllm-001")),
+    image=Image(id=ID(_generate_mock_global_id())),
     created_at=datetime.now() - timedelta(days=10),
 )
 
 mock_model_revision_2 = ModelRevision(
-    id="rev-002",
+    id=_generate_mock_global_id(),
     name="llama-3-8b-instruct-v1.1",
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
@@ -114,16 +120,16 @@ mock_model_revision_2 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0,1"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(id=ID("vf-model-002")),
+        vfolder=VFolder(id=ID(_generate_mock_global_id())),
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    image=Image(id=ID("img-vllm-002")),
+    image=Image(id=ID(_generate_mock_global_id())),
     created_at=datetime.now() - timedelta(days=5),
 )
 
 mock_model_revision_3 = ModelRevision(
-    id="rev-003",
+    id=_generate_mock_global_id(),
     name="mistral-7b-v0.3-initial",
     model_runtime_config=ModelRuntimeConfig(
         runtime_variant="vllm",
@@ -136,11 +142,11 @@ mock_model_revision_3 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "2"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(id=ID("vf-model-003")),
+        vfolder=VFolder(id=ID(_generate_mock_global_id())),
         mount_destination="/models",
         definition_path="models/mistral-7b/config.yaml",
     ),
-    image=Image(id=ID("img-vllm-003")),
+    image=Image(id=ID(_generate_mock_global_id())),
     created_at=datetime.now() - timedelta(days=20),
 )
 
@@ -237,7 +243,7 @@ async def revision(id: ID) -> Optional[ModelRevision]:
 async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelRevisionPayload:
     """Create a new model revision."""
     revision = ModelRevision(
-        id=ID(f"rev-new-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
+        id=_generate_mock_global_id(),
         name=input.name,
         model_runtime_config=ModelRuntimeConfig(
             runtime_variant=input.model_runtime_config.runtime_variant,
@@ -245,11 +251,11 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
             environ=None,
         ),
         model_mount_config=ModelMountConfig(
-            vfolder=VFolder(id=ID("vf-id")),
+            vfolder=VFolder(id=ID(_generate_mock_global_id())),
             mount_destination="/models",
             definition_path="model.yaml",
         ),
-        image=Image(id=ID("image-id")),
+        image=Image(id=ID(_generate_mock_global_id())),
         created_at=datetime.now(),
     )
     return CreateModelRevisionPayload(revision=revision)

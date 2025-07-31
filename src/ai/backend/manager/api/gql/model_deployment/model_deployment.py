@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import AsyncGenerator, Optional, cast
@@ -272,15 +273,19 @@ class DeleteModelDeploymentInput:
     id: ID
 
 
+def _generate_mock_global_id() -> str:
+    return base64.b64encode(f"default:{uuid4()}".encode("utf-8")).decode()
+
+
 # Mock Model Replicas
 mock_model_replica_1 = ModelReplica(
-    id="replica-001",
+    id=_generate_mock_global_id(),
     name="llama-3-8b-instruct-replica-01",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID("routing-001"),
+            id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
             endpoint="https://api.backend.ai/models/dep-001/routing/01",
             session=uuid4(),
@@ -295,13 +300,13 @@ mock_model_replica_1 = ModelReplica(
 )
 
 mock_model_replica_2 = ModelReplica(
-    id="replica-002",
+    id=_generate_mock_global_id(),
     name="llama-3-8b-instruct-replica-02",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID("routing-002"),
+            id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
             endpoint="https://api.backend.ai/models/dep-001/routing/02",
             session=uuid4(),
@@ -316,13 +321,13 @@ mock_model_replica_2 = ModelReplica(
 )
 
 mock_model_replica_3 = ModelReplica(
-    id="replica-003",
+    id=_generate_mock_global_id(),
     name="llama-3-8b-instruct-replica-03",
     status=ReplicaStatus.UNHEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID("routing-003"),
+            id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
             endpoint="https://api.backend.ai/models/dep-001/routing/03",
             session=uuid4(),
@@ -339,7 +344,7 @@ ModelReplicaEdge = Edge[ModelReplica]
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Deployments
 mock_model_deployment_1 = ModelDeployment(
-    id="dep-001",
+    id=_generate_mock_global_id(),
     metadata=ModelDeploymentMetadata(
         name="Llama 3.8B Instruct",
         status=DeploymentStatus.ACTIVE,
@@ -355,7 +360,7 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -380,8 +385,8 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     scaling_rule=ScalingRule(
         auto_scaling_rules=[
-            AutoScalingRule(id=ID("asr-cpu-001")),
-            AutoScalingRule(id=ID("asr-gpu-001")),
+            AutoScalingRule(id=ID(_generate_mock_global_id())),
+            AutoScalingRule(id=ID(_generate_mock_global_id())),
         ]
     ),
     replica_state=ReplicaState(
@@ -401,11 +406,11 @@ mock_model_deployment_1 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
-    created_user=User(id=ID("user-001")),
+    created_user=User(id=ID(_generate_mock_global_id())),
 )
 
 mock_model_deployment_2 = ModelDeployment(
-    id="dep-002",
+    id=_generate_mock_global_id(),
     metadata=ModelDeploymentMetadata(
         name="Mistral 7B v0.3",
         status=DeploymentStatus.ACTIVE,
@@ -421,7 +426,7 @@ mock_model_deployment_2 = ModelDeployment(
     ),
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -460,11 +465,11 @@ mock_model_deployment_2 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
-    created_user=User(id=ID("user-002")),
+    created_user=User(id=ID(_generate_mock_global_id())),
 )
 
 mock_model_deployment_3 = ModelDeployment(
-    id="dep-003",
+    id=_generate_mock_global_id(),
     metadata=ModelDeploymentMetadata(
         name="Gemma 2.9B",
         status=DeploymentStatus.INACTIVE,
@@ -480,7 +485,7 @@ mock_model_deployment_3 = ModelDeployment(
     ),
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID("rg-us-east-1")),
+        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -514,7 +519,7 @@ mock_model_deployment_3 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
-    created_user=User(id=ID("user-003")),
+    created_user=User(id=ID(_generate_mock_global_id())),
 )
 
 
