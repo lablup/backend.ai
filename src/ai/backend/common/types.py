@@ -1512,7 +1512,6 @@ class RedisTarget:
             if isinstance(self.sentinel, list):
                 sentinel_addrs = [str(s) for s in self.sentinel]
             else:
-                # TODO: 이거 문제 없는지 검증.
                 from ai.backend.common.typed_validators import CommaSeparatedStrList
 
                 adapter = TypeAdapter(CommaSeparatedStrList)
