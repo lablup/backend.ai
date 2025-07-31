@@ -3,7 +3,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Optional, ParamSpec, Self, TypeVar
+from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar
 
 import glide
 from glide import (
@@ -57,7 +57,7 @@ class ValkeyStandaloneTarget:
 
 @dataclass
 class ValkeySentinelTarget:
-    sentinel_addresses: list[str]
+    sentinel_addresses: Iterable[str]
     service_name: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
