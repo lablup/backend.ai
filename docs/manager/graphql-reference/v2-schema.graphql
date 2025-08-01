@@ -1,3 +1,9 @@
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key"]) {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -117,6 +123,46 @@ type CancelImportArtifactPayload {
   artifact: Artifact!
 }
 
+type ClusterConfig {
+  mode: ClusterMode!
+  size: Int!
+}
+
+input ClusterConfigInput {
+  mode: ClusterMode!
+  size: Int!
+}
+
+enum ClusterMode {
+  SINGLE_NODE
+  MULTI_NODE
+}
+
+input CreateModelDeploymentInput {
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  deploymentStrategy: DeploymentStrategyInput!
+  initialRevision: CreateModelRevisionInput!
+}
+
+type CreateModelDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
+input CreateModelRevisionInput {
+  deploymentId: ID!
+  name: String!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+}
+
+type CreateModelRevisionPayload {
+  revision: ModelRevision!
+}
+
 """Date with time (isoformat)"""
 scalar DateTime
 
@@ -128,6 +174,75 @@ type DeleteArtifactPayload {
   artifact: Artifact!
 }
 
+input DeleteModelDeploymentInput {
+  id: ID!
+}
+
+type DeleteModelDeploymentPayload {
+  deployment: ModelDeployment
+}
+
+input DeploymentFilter {
+  status: DeploymentStatus = null
+  openToPublic: Boolean = null
+  tags: [StringFilter!] = null
+  AND: DeploymentFilter = null
+  OR: DeploymentFilter = null
+  NOT: DeploymentFilter = null
+  DISTINCT: Boolean = null
+}
+
+input DeploymentOrderBy {
+  field: DeploymentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum DeploymentOrderField {
+  CREATED_AT
+  UPDATED_AT
+  NAME
+}
+
+enum DeploymentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type DeploymentStatusChangedPayload {
+  deployment: ModelDeployment!
+}
+
+type DeploymentStrategy {
+  type: DeploymentStrategyType!
+}
+
+input DeploymentStrategyInput {
+  type: DeploymentStrategyType!
+}
+
+enum DeploymentStrategyType {
+  ROLLING
+  BLUE_GREEN
+  CANARY
+}
+
+extend type EndpointAutoScalingRuleNode @key(fields: "id") {
+  id: ID! @external
+}
+
+extend type EndpointToken @key(fields: "token") {
+  token: String! @external
+}
+
+input ImageInput {
+  name: String!
+  architecture: String!
+}
+
+extend type ImageNode @key(fields: "id") {
+  id: ID! @external
+}
+
 input ImportArtifactInput {
   artifactId: ID!
 }
@@ -136,11 +251,174 @@ type ImportArtifactPayload {
   artifact: Artifact!
 }
 
+"""A custom scalar for JSON strings using orjson"""
+scalar JSONString
+
+type ModelDeployment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  metadata: ModelDeploymentMetadata!
+  networkAccess: ModelDeploymentNetworkAccess!
+  revision: ModelRevision
+  revisionHistory: ModelRevisionConnection!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
+  deploymentStrategy: DeploymentStrategy!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
+  createdUser: UserNode!
+}
+
+type ModelDeploymentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelDeploymentEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelDeploymentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelDeployment!
+}
+
+type ModelDeploymentMetadata {
+  name: String!
+  status: DeploymentStatus!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input ModelDeploymentMetadataInput {
+  name: String!
+  tags: [String!] = null
+}
+
+type ModelDeploymentNetworkAccess {
+  endpointUrl: String
+  preferredDomainName: String
+  openToPublic: Boolean!
+  accessTokens: [EndpointToken!]!
+}
+
+input ModelDeploymentNetworkAccessInput {
+  preferredDomainName: String = null
+  openToPublic: Boolean! = false
+}
+
+type ModelMountConfig {
+  vfolder: VirtualFolderNode!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+input ModelMountConfigInput {
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+type ModelReplica implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  status: ReplicaStatus!
+  revision: ModelRevision!
+  routings: [RoutingNode!]!
+}
+
+type ModelReplicaConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelReplicaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelReplicaEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelReplica!
+}
+
+type ModelRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  modelRuntimeConfig: ModelRuntimeConfig!
+  modelMountConfig: ModelMountConfig!
+  image: ImageNode!
+  createdAt: DateTime!
+}
+
+type ModelRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelRevision!
+}
+
+input ModelRevisionFilter {
+  name: StringFilter = null
+  deploymentId: ID = null
+  AND: ModelRevisionFilter = null
+  OR: ModelRevisionFilter = null
+  NOT: ModelRevisionFilter = null
+  DISTINCT: Boolean = null
+}
+
+input ModelRevisionOrder {
+  field: ModelRevisionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum ModelRevisionOrderField {
+  CREATED_AT
+  NAME
+}
+
+type ModelRuntimeConfig {
+  runtimeVariant: String!
+  serviceConfig: ServiceConfig
+  environ: JSONString
+}
+
+input ModelRuntimeConfigInput {
+  runtimeVariant: String!
+  serviceConfig: JSONString = null
+  environ: JSONString = null
+}
+
 type Mutation {
   importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
   cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
+  createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
+  updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
+  deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
+  createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -170,11 +448,106 @@ type PageInfo {
 }
 
 type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
   artifact(id: ID!): Artifact
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
   artifactGroup(id: ID!): ArtifactGroup
   artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
+  deployments(
+    filter: DeploymentFilter = null
+    orderBy: DeploymentOrderBy = null
+
+    """Returns the first n items from the list."""
+    first: Int = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    after: String = null
+
+    """Returns the items in the list that come before the specified cursor."""
+    before: String = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    last: Int = null
+  ): ModelDeploymentConnection!
+  deployment(id: ID!): ModelDeployment
+  revisions(
+    filter: ModelRevisionFilter = null
+    order: ModelRevisionOrder = null
+
+    """Returns the first n items from the list."""
+    first: Int = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    after: String = null
+
+    """Returns the items in the list that come before the specified cursor."""
+    before: String = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    last: Int = null
+  ): ModelRevisionConnection!
+  revision(id: ID!): ModelRevision
+  replica(id: ID!): ModelReplica
 }
+
+type RawServiceConfig {
+  config: JSONString!
+  extraCliParameters: String
+}
+
+type ReplicaState {
+  desiredReplicaCount: Int!
+  replicas: ModelReplicaConnection!
+}
+
+enum ReplicaStatus {
+  HEALTHY
+  UNHEALTHY
+}
+
+type ReplicaStatusChangedPayload {
+  replica: ModelReplica!
+}
+
+type ResourceConfig {
+  resourceGroup: ScalingGroupNode!
+  resourceSlots: JSONString!
+  resourceOpts: JSONString
+}
+
+input ResourceConfigInput {
+  resourceGroup: ResourceGroupInput!
+  resourceSlots: JSONString!
+  resourceOpts: JSONString = null
+}
+
+input ResourceGroupInput {
+  name: String!
+}
+
+type RoutingNode implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  routingId: UUID!
+  endpoint: String!
+  session: UUID!
+  status: String!
+  trafficRatio: Float!
+  createdAt: DateTime!
+  liveStat: JSONString!
+}
+
+extend type ScalingGroupNode @key(fields: "id") {
+  id: ID! @external
+}
+
+type ScalingRule {
+  autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
+"""Different service configurations for model runtime"""
+union ServiceConfig = RawServiceConfig
 
 type SourceInfo {
   name: String
@@ -197,7 +570,11 @@ input StringFilter {
 type Subscription {
   artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
   artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
+  deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
+  replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
 }
+
+scalar UUID
 
 input UpdateArtifactInput {
   artifactId: ID!
@@ -205,4 +582,32 @@ input UpdateArtifactInput {
 
 type UpdateArtifactPayload {
   artifact: Artifact!
+}
+
+input UpdateModelDeploymentInput {
+  id: ID!
+  openToPublic: Boolean = null
+  tags: [String!] = null
+  deploymentStrategy: DeploymentStrategyInput = null
+  activeRevisionId: ID = null
+}
+
+type UpdateModelDeploymentPayload {
+  deployment: ModelDeployment
+}
+
+extend type UserNode @key(fields: "id") {
+  id: ID! @external
+}
+
+extend type VirtualFolderNode @key(fields: "id") {
+  id: ID! @external
+}
+
+scalar _Any
+
+union _Entity = EndpointAutoScalingRuleNode | EndpointToken | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
+
+type _Service {
+  sdl: String!
 }

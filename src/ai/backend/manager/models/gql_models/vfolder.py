@@ -11,6 +11,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 import trafaret as t
@@ -81,6 +82,7 @@ class VFolderPermissionValueField(graphene.Scalar):
         return VFolderRBACPermission(value)
 
 
+@graphene_federation.key("id")
 class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
