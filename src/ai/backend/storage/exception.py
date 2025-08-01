@@ -198,3 +198,33 @@ class StorageBucketFileNotFoundError(web.HTTPNotFound):
             text=dump_json_str(payload),
             content_type="application/problem+json",
         )
+
+
+class HuggingFaceAPIError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/registries/huggingface/api-error",
+            "title": "HuggingFace API Error",
+        }
+        if msg is not None:
+            payload["title"] = f"HuggingFace API Error ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class HuggingFaceModelNotFoundError(web.HTTPNotFound):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/registries/huggingface/model-not-found",
+            "title": "HuggingFace Model Not Found",
+        }
+        if msg is not None:
+            payload["title"] = f"HuggingFace Model Not Found ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
