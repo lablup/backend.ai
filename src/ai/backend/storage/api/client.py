@@ -41,6 +41,8 @@ from .. import __version__
 from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
+from .v1.registries import create_app as create_registries_app
+from .v1.storages import create_app as create_storages_app
 
 if TYPE_CHECKING:
     from ..context import RootContext
@@ -460,4 +462,6 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
 
+    app.add_subapp("/v1/storages", create_storages_app(ctx))
+    app.add_subapp("/v1/registries", create_registries_app(ctx))
     return app
