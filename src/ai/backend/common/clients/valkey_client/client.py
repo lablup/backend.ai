@@ -198,7 +198,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             )
             return False
         except Exception as e:
-            log.warning(
+            log.debug(
                 "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
             )
             return True
@@ -378,7 +378,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return False
         except Exception as e:
-            log.warning(
+            log.debug(
                 "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
             )
             return True
