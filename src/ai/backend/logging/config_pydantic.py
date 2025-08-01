@@ -12,7 +12,6 @@ default_pkg_ns = {
     "": LogLevel.WARNING,
     "ai.backend": LogLevel.DEBUG,
     "tests": LogLevel.DEBUG,
-    "aiohttp": LogLevel.INFO,
 }
 
 

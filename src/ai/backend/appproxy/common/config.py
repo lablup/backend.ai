@@ -306,7 +306,7 @@ class LogstashProtocol(enum.StrEnum):
     UDP = "udp"
 
 
-default_pkg_ns = {"": "WARNING", "ai.backend": "DEBUG", "tests": "DEBUG", "aiohttp": "INFO"}
+default_pkg_ns = {"": "WARNING", "ai.backend": "DEBUG", "tests": "DEBUG"}
 
 
 class ConsoleLogConfig(BaseSchema):
