@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ByteSize,
     ConfigDict,
@@ -402,6 +403,7 @@ class LoggingConfig(BaseSchema):
         Field(
             description="Override default log level for specific scope of package",
             default=default_pkg_ns,
+            validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
         ),
     ]
     drivers: Annotated[
