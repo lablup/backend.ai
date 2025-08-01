@@ -2,7 +2,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import ByteSize, Field
+from pydantic import AliasChoices, ByteSize, Field
 
 from ai.backend.common.config import BaseConfigModel
 
@@ -122,4 +122,5 @@ class LoggingConfig(BaseConfigModel):
     pkg_ns: dict[str, LogLevel] = Field(
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
+        validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
     )
