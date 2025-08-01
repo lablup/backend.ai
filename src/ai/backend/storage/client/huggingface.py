@@ -3,8 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, model_info
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
@@ -39,7 +38,7 @@ class HuggingFaceClient:
 
     async def list_models(
         self, search: Optional[str] = None, sort: str = "downloads", limit: int = 10
-    ) -> List[HfModelInfo]:
+    ) -> list[HfModelInfo]:
         """List models from HuggingFace Hub.
 
         Args:
@@ -93,7 +92,7 @@ class HuggingFaceClient:
             log.error(f"Failed to get model info for {model_id}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to get model info for {model_id}: {str(e)}") from e
 
-    async def list_repo_files(self, model_id: str) -> List[str]:
+    async def list_repo_files(self, model_id: str) -> list[str]:
         """List files in a model repository.
 
         Args:
@@ -114,7 +113,7 @@ class HuggingFaceClient:
             log.error(f"Failed to list files for {model_id}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list files for {model_id}: {str(e)}") from e
 
-    async def get_paths_info(self, model_id: str, paths: List[str]):
+    async def get_paths_info(self, model_id: str, paths: list[str]):
         """Get information about specific paths in a repository.
 
         Args:
@@ -190,8 +189,6 @@ class HuggingFaceScanner:
         """
         try:
             log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
-
-            # Get model list using client
             models = await self._client.list_models(search=search, sort=sort, limit=limit)
 
             model_infos = []
@@ -200,7 +197,9 @@ class HuggingFaceScanner:
                     model_info = await self._get_model_details(model.id, model)
                     model_infos.append(model_info)
                 except Exception as e:
-                    log.warning(f"Failed to get details for model: model_id={model.id}, error={str(e)}")
+                    log.warning(
+                        f"Failed to get details for model: model_id={model.id}, error={str(e)}"
+                    )
                     continue
 
             log.info(f"Successfully scanned HuggingFace models: count={len(model_infos)}")
@@ -225,8 +224,6 @@ class HuggingFaceScanner:
         """
         try:
             log.info(f"Scanning specific HuggingFace model: model_id={model_id}")
-
-            # Get model information using client
             model = await self._client.get_model_info(model_id)
             result = await self._get_model_details(model_id, model)
 
@@ -251,46 +248,22 @@ class HuggingFaceScanner:
         Returns:
             Complete ModelInfo object with all metadata and file list
         """
-        # Get file list
         file_infos = await self._get_file_infos(model_id)
-
-        # Extract author
-        author = None
-        if model.author:
-            author = model.author
-        elif "/" in model_id:
-            author = model_id.split("/")[0]
-
-        # Format dates
-        created_at = ""
-        last_modified = ""
-        if model.created_at:
-            created_at = (
-                model.created_at.isoformat()
-                if isinstance(model.created_at, datetime)
-                else str(model.created_at)
-            )
-        if model.last_modified:
-            last_modified = (
-                model.last_modified.isoformat()
-                if isinstance(model.last_modified, datetime)
-                else str(model.last_modified)
-            )
 
         return ModelInfo(
             id=model_id,
             name=model_id.split("/")[-1],
-            author=author,
+            author=model.author,
             tags=model.tags or [],
             pipeline_tag=model.pipeline_tag,
             downloads=model.downloads or 0,
             likes=model.likes or 0,
-            created_at=created_at,
-            last_modified=last_modified,
+            created_at=model.created_at,
+            last_modified=model.last_modified,
             files=file_infos,
         )
 
-    async def _get_file_infos(self, model_id: str) -> List[FileInfo]:
+    async def _get_file_infos(self, model_id: str) -> list[FileInfo]:
         """Get model file information list as FileInfo objects.
 
         Args:

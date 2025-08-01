@@ -170,7 +170,7 @@ class HuggingFaceService:
             )
 
             log.debug(
-                f"Starting file upload: model_id={model_id}, file_path={file_info.path}, "
+                f"Starting file upload to {storage_name}: model_id={model_id}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
@@ -187,7 +187,7 @@ class HuggingFaceService:
 
             if upload_result.success:
                 log.info(
-                    f"Successfully uploaded file: model_id={model_id}, file_path={file_info.path}, "
+                    f"Successfully uploaded file to {storage_name}: model_id={model_id}, file_path={file_info.path}, "
                     f"storage_key={storage_key}"
                 )
                 return True
@@ -228,9 +228,12 @@ class HuggingFaceService:
                     log.warning(f"No files found in model: model_id={model_id}")
                     return
 
+                file_count = len(model_info.files)
+                reporter.total_progress = file_count
+                file_total_size = sum(file.size for file in model_info.files)
                 log.info(
-                    f"Found files to import: model_id={model_id}, file_count={len(model_info.files)}, "
-                    f"total_size_mb={sum(f.size for f in model_info.files) / (1024 * 1024)}"
+                    f"Found files to import: model_id={model_id}, file_count={file_count}, "
+                    f"total_size={file_total_size / (1024 * 1024)} MB"
                 )
 
                 # Step 2: Import all model files
@@ -256,6 +259,11 @@ class HuggingFaceService:
                             f"Failed to upload file: {str(e)}, model_id={model_id}, file_path={file_info.path}"
                         )
                         failed_uploads += 1
+                    finally:
+                        await reporter.update(
+                            1,
+                            message=f"Uploaded file: {file_info.path} to {storage_name} (bucket: {bucket_name})",
+                        )
 
                 # Step 3: Log final results
                 log.info(
@@ -292,15 +300,18 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
 
+        # TODO: Return success/failure result for batch import
         async def _import_models_batch(reporter: ProgressReporter) -> None:
-            log.info(
-                f"Starting batch model import: model_count={len(model_ids)}, "
-                f"storage_name={storage_name}, bucket_name={bucket_name}"
-            )
-
-            if not model_ids:
+            model_count = len(model_ids)
+            if not model_count:
                 log.warning("No models to import")
                 return
+            reporter.total_progress = model_count
+
+            log.info(
+                f"Starting batch model import: model_count={model_count}, "
+                f"(storage_name={storage_name}, bucket_name={bucket_name})"
+            )
 
             try:
                 successful_models = 0
@@ -309,13 +320,13 @@ class HuggingFaceService:
                 # Process each model sequentially to avoid overwhelming the system
                 # In a production system, this could be enhanced with parallel processing
                 # and proper job queue management
-                for i, model_id in enumerate(model_ids, 1):
+                for idx, model_id in enumerate(model_ids, 1):
                     try:
                         log.info(
-                            f"Processing model in batch: model_id={model_id}, progress={i}/{len(model_ids)}"
+                            f"Processing model in batch: model_id={model_id}, progress={idx}/{len(model_ids)}"
                         )
 
-                        # Import individual model
+                        # TODO: Batch import logic can be optimized further
                         await self.import_model(
                             model_id=model_id,
                             storage_name=storage_name,
@@ -324,22 +335,27 @@ class HuggingFaceService:
 
                         successful_models += 1
                         log.info(
-                            f"Successfully imported model in batch: model_id={model_id}, progress={i}/{len(model_ids)}"
+                            f"Successfully imported model in batch: model_id={model_id}, progress={idx}/{len(model_ids)}"
                         )
 
                     except HuggingFaceModelNotFoundError:
                         failed_models += 1
                         log.error(
-                            f"Model not found in batch import: model_id={model_id}, progress={i}/{len(model_ids)}"
+                            f"Model not found in batch import: model_id={model_id}, progress={idx}/{len(model_ids)}"
                         )
 
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={i}/{len(model_ids)}"
+                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{len(model_ids)}"
                         )
 
-                # Log final batch results
+                    finally:
+                        await reporter.update(
+                            1,
+                            message=f"Processed model: {model_id} (progress: {idx}/{len(model_ids)})",
+                        )
+
                 log.info(
                     f"Batch model import completed: total_models={len(model_ids)}, "
                     f"successful_models={successful_models}, failed_models={failed_models}"

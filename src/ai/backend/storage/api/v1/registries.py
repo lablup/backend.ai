@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Self, override
+from time import time
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from aiohttp import web
-from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import (
     APIResponse,
-    MiddlewareParam,
+    BodyParam,
     QueryParam,
     api_handler,
 )
@@ -50,16 +50,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class RequestIntoJsonCtx(MiddlewareParam):
-    json_: dict[str, Any]
-
-    @override
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        json = await request.json() if request.can_read_body else {}
-        return cls(json_=json)
-
-
 class RegistriesAPIHandler:
     _huggingface_service: HuggingFaceService
 
@@ -69,28 +59,26 @@ class RegistriesAPIHandler:
     @api_handler
     async def scan_huggingface(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceListModelsReq],
     ) -> APIResponse:
         """
         Scan HuggingFace registry and return metadata.
         """
+        print("scan_huggingface")
         # TODO: 이거 bgtask로 돌려야 함.
 
         # await log_client_api_entry(log, "scan_huggingface")
-        try:
-            body = request_ctx.json_
-            request_data = HuggingFaceListModelsReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
-        except Exception as e:
-            raise web.HTTPBadRequest(reason=f"Invalid JSON body: {str(e)}") from e
+        s_time = time()
 
         try:
             models = await self._huggingface_service.list_models(
-                limit=request_data.limit,
-                search=request_data.search,
-                sort=request_data.sort,
+                limit=body.parsed.limit,
+                search=body.parsed.search,
+                sort=body.parsed.sort,
             )
+
+            e_time = time()
+            print("HuggingFace scan completed in {:.2f} seconds", e_time - s_time)
 
             response = HuggingFaceScanResponse(
                 models=[
@@ -102,8 +90,10 @@ class RegistriesAPIHandler:
                         pipeline_tag=model.pipeline_tag,
                         downloads=model.downloads,
                         likes=model.likes,
-                        created_at=model.created_at,
-                        last_modified=model.last_modified,
+                        created_at=model.created_at.isoformat() if model.created_at else None,
+                        last_modified=model.last_modified.isoformat()
+                        if model.last_modified
+                        else None,
                         files=[
                             HuggingFaceFileData(
                                 path=file.path,
@@ -158,7 +148,7 @@ class RegistriesAPIHandler:
     @api_handler
     async def import_huggingface_model(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceImportModelReq],
     ) -> APIResponse:
         """
         Import a HuggingFace model to storage.
@@ -166,24 +156,18 @@ class RegistriesAPIHandler:
         # await log_client_api_entry(log, "import_huggingface_model")
 
         try:
-            body = request_ctx.json_
-            request_data = HuggingFaceImportModelReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
-
-        try:
-            job_id = await self._huggingface_service.import_model(
-                model_id=request_data.model_id,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
+            bgtask_id = await self._huggingface_service.import_model(
+                model_id=body.parsed.model_id,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
             )
 
             response = HuggingFaceImportResponse(
-                job_id=job_id,
+                job_id=bgtask_id,
                 status="started",
-                model_id=request_data.model_id,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
+                model_id=body.parsed.model_id,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
                 message="Import job started successfully",
             )
 
@@ -198,34 +182,27 @@ class RegistriesAPIHandler:
     @api_handler
     async def import_huggingface_models_batch(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceImportModelsBatchReq],
     ) -> APIResponse:
         """
         Import multiple HuggingFace models to storage in batch.
         """
         # await log_client_api_entry(log, "import_huggingface_models_batch")
 
-        # Parse request body
-        try:
-            body = request_ctx.json_
-            request_data = HuggingFaceImportModelsBatchReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
-
         try:
             job_id = await self._huggingface_service.import_models_batch(
-                model_ids=request_data.model_ids,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
+                model_ids=body.parsed.model_ids,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
             )
 
             response = HuggingFaceImportBatchResponse(
                 job_id=job_id,
                 status="started",
-                model_ids=request_data.model_ids,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
-                total_models=len(request_data.model_ids),
+                model_ids=body.parsed.model_ids,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
+                total_models=len(body.parsed.model_ids),
                 message="Batch import job started successfully",
             )
 
