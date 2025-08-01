@@ -15,6 +15,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -129,6 +130,7 @@ class RootContext:
     watcher: WatcherClient | None
     service_context: ServiceContext
     metric_registry: CommonMetricRegistry
+    background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
@@ -168,6 +170,10 @@ class RootContext:
             event_producer=self.event_producer,
         )
         self.metric_registry = metric_registry
+        self.background_task_manager = BackgroundTaskManager(
+            self.event_producer,
+            # TODO: Add `bgtask_observer`
+        )
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.
