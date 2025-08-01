@@ -387,7 +387,8 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
 
     config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
     if log_level != LogLevel.NOTSET:
-        config.override_key(raw_cfg, ("logging", "pkg_ns", "ai.backend"), log_level)
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

@@ -462,7 +462,6 @@ async def config_provider_ctx(
         overrides += [
             (("logging", "level"), log_level),
             (("logging", "pkg-ns", "ai.backend"), log_level),
-            (("logging", "pkg-ns", "aiohttp"), log_level),
         ]
 
     loaders.append(ConfigOverrider(overrides))
@@ -1447,9 +1446,9 @@ async def server_main_logwrapper(
 @click.pass_context
 def main(
     ctx: click.Context,
+    config_path: Optional[Path],
+    debug: bool,
     log_level: LogLevel,
-    config_path: Optional[Path] = None,
-    debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.
