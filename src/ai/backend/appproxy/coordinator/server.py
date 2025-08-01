@@ -1006,16 +1006,22 @@ async def server_main_logwrapper(
     ),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-coordinator service as a foreground process.
     """
+    log_level = LogLevel.DEBUG if debug else log_level
     cfg = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
