@@ -27,7 +27,7 @@ from ai.backend.common.events.dispatcher import (
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AGENTID_STORAGE
-from ai.backend.logging import BraceStyleAdapter, LocalLogger
+from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
@@ -326,7 +326,13 @@ async def check_and_upgrade(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
+    help="Set the logging verbosity level",
 )
 def main(
     outfile: str,
@@ -334,13 +340,15 @@ def main(
     dsn: str,
     report_path: Optional[Path],
     force_scan_folder_size: bool,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
     Print migration script to OUTFILE.
     Pass - as OUTFILE to print results to STDOUT.
     """
-    local_config = load_local_config(config_path, debug=debug)
+    log_level = LogLevel.DEBUG if debug else log_level
+    local_config = load_local_config(config_path, log_level=log_level)
     with LocalLogger(local_config.logging):
         asyncio.run(
             check_and_upgrade(
