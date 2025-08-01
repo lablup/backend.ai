@@ -124,4 +124,5 @@ class LoggingConfig(BaseConfigModel):
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
         validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
+        serialization_alias="pkg-ns",
     )
