@@ -10,9 +10,8 @@ from .types import LogFormat, LogLevel
 
 default_pkg_ns = {
     "": LogLevel.WARNING,
-    "ai.backend": LogLevel.DEBUG,
+    "ai.backend": LogLevel.INFO,
     "tests": LogLevel.DEBUG,
-    "aiohttp": LogLevel.INFO,
 }
 
 

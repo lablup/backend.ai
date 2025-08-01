@@ -1430,7 +1430,7 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Set the logging level to DEBUG",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
