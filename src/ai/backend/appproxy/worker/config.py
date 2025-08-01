@@ -12,6 +12,7 @@ from pydantic import AnyUrl, Field, FilePath, ValidationError
 from ai.backend.appproxy.common.exceptions import ConfigValidationError
 from ai.backend.common import config
 from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.logging import LogLevel
 
 from ..common.config import (
     BaseSchema,
@@ -380,14 +381,14 @@ class ServerConfig(BaseSchema):
     ]
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "app-proxy-worker")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

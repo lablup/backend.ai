@@ -10,9 +10,8 @@ from .types import LogFormat, LogLevel
 
 default_pkg_ns = {
     "": LogLevel.WARNING,
-    "ai.backend": LogLevel.DEBUG,
+    "ai.backend": LogLevel.INFO,
     "tests": LogLevel.DEBUG,
-    "aiohttp": LogLevel.INFO,
 }
 
 
@@ -124,4 +123,5 @@ class LoggingConfig(BaseConfigModel):
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
         validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
+        serialization_alias="pkg-ns",
     )
