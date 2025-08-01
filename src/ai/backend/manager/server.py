@@ -565,7 +565,7 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 def _make_registered_reporters(
     root_ctx: RootContext,
 ) -> dict[str, AbstractReporter]:
-    from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
+    from .reporters.smtp import SMTPReporter, SMTPSenderArgs
 
     reporters: dict[str, AbstractReporter] = {}
     smtp_configs = root_ctx.config_provider.config.reporter.smtp
@@ -609,11 +609,11 @@ def _make_action_reporters(
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-    from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
-    from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
-    from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
-    from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+    from .actions.monitors.audit_log import AuditLogMonitor
+    from .actions.monitors.prometheus import PrometheusMonitor
+    from .actions.monitors.reporter import ReporterMonitor
+    from .reporters.hub import ReporterHub, ReporterHubArgs
+    from .services.processors import ProcessorArgs, Processors, ServiceArgs
 
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
@@ -729,7 +729,7 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+    from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 
     root_ctx.event_dispatcher = EventDispatcher(
         root_ctx.message_queue,
@@ -809,8 +809,8 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.manager.repositories.image.repositories import RepositoryArgs
-    from ai.backend.manager.repositories.repositories import Repositories
+    from .repositories.image.repositories import RepositoryArgs
+    from .repositories.repositories import Repositories
 
     repositories = Repositories.create(
         args=RepositoryArgs(
@@ -826,7 +826,7 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.manager.plugin.network import NetworkPluginContext
+    from .plugin.network import NetworkPluginContext
 
     ctx = NetworkPluginContext(
         root_ctx.etcd,
@@ -965,9 +965,9 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.manager.service.base import ServicesContext
-    from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
-    from ai.backend.manager.service.container_registry.harbor import (
+    from .service.base import ServicesContext
+    from .service.container_registry.base import PerProjectRegistryQuotaRepository
+    from .service.container_registry.harbor import (
         PerProjectContainerRegistryQuotaClientPool,
         PerProjectContainerRegistryQuotaService,
     )
