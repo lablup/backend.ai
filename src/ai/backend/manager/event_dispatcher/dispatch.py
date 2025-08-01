@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
@@ -91,6 +95,8 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    valkey_container_log: ValkeyContainerLogClient
+    valkey_stat: ValkeyStatClient
     valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
     event_hub: EventHub
@@ -123,7 +129,11 @@ class Dispatchers:
         )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(
-            args.valkey_stream, args.agent_registry, args.db
+            args.valkey_container_log,
+            args.valkey_stat,
+            args.valkey_stream,
+            args.agent_registry,
+            args.db,
         )
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)

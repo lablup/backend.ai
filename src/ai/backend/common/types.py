@@ -1581,6 +1581,19 @@ class RedisProfileTarget:
             return self._override_targets[role]
         return self._base_target
 
+    @staticmethod
+    def _parse_addr(addr_data) -> HostPortPair:
+        match addr_data:
+            case HostPortPair(host=host, port=port):
+                return HostPortPair(host, port)
+            case {"host": host, "port": port}:
+                return HostPortPair(host, port)
+            case (host, port):
+                return HostPortPair(host, port)
+            case _:
+                addr_data_parts = addr_data.split(":")
+                return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         override_targets = None
@@ -1589,16 +1602,11 @@ class RedisProfileTarget:
                 target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
             }
 
-        addr = None
-        # TODO: Remove this match statement after pydantic migration done.
-        if addr_data := data.get("addr"):
-            if isinstance(addr_data, HostPortPair):
-                addr = HostPortPair(addr_data.host, addr_data.port)
-            elif isinstance(addr_data, Mapping):
-                addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
-                addr_data = addr_data.split(":")
-                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+            for key in override_targets.keys():
+                target = override_targets[key]
+                target.addr = RedisProfileTarget._parse_addr(target.addr)
+
+        addr = RedisProfileTarget._parse_addr(data.get("addr"))
 
         sentinel = data.get("sentinel")
         if sentinel:
