@@ -117,12 +117,12 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 from . import __version__
+from .api.context import RootContext
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
     from ai.backend.manager.reporters.base import AbstractReporter
 
-    from .api.context import RootContext
     from .api.types import (
         AppCreator,
         CleanupContext,
@@ -1125,7 +1125,8 @@ def build_root_app(
             )
         )
 
-    root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
+    root_ctx = RootContext()
+    root_ctx.metrics = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
             request_id_middleware,
