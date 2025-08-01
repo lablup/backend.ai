@@ -58,8 +58,6 @@ from ai.backend.logging.otel import OpenTelemetrySpec
 from . import __version__ as VERSION
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
-from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
-from .watcher import WatcherClient, main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -95,18 +93,16 @@ async def server_main_logwrapper(
             yield
 
 
-async def check_migration(ctx: RootContext) -> None:
-    from .migration import check_latest
-
-    await check_latest(ctx)
-
-
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
+    from .context import RootContext
+    from .migration import check_latest
+    from .watcher import WatcherClient
+
     local_config = cast(StorageProxyUnifiedConfig, _args[0])
     loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
@@ -206,7 +202,7 @@ async def server_main(
             m.console_locals["manager_api_app"] = ctx.manager_api_app
 
             if pidx == 0:
-                await check_migration(ctx)
+                await check_latest(ctx)
 
             client_ssl_ctx = None
             manager_ssl_ctx = None
@@ -345,6 +341,8 @@ async def _make_message_queue(
     local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
+    from .context import EVENT_DISPATCHER_CONSUMER_GROUP
+
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = local_config.storage_proxy.node_id
     args = RedisMQArgs(
@@ -400,8 +398,11 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
+    from .watcher import main_job
+
+    log_level = LogLevel.DEBUG if debug else log_level
     try:
-        local_config = load_local_config(config_path, debug=debug)
+        local_config = load_local_config(config_path, log_level=log_level)
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
