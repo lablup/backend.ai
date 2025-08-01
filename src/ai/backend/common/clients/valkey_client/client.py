@@ -22,11 +22,10 @@ from ai.backend.common.metrics.metric import (
     LayerMetricObserver,
     LayerType,
 )
+from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
 
-from ...types import HostPortPair, RedisTarget
-from ...validators import DelimiterSeperatedList
-from ...validators import HostPortPair as _HostPortPair
+from ...types import ValkeyTarget
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -38,57 +37,46 @@ Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
 @dataclass
 class ValkeyStandaloneTarget:
-    address: HostPortPair
+    address: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
 
     @classmethod
-    def from_redis_target(cls, redis_target: RedisTarget) -> Self:
+    def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
         """
         Create a ValkeyConnectionConfig from a RedisTarget.
         """
-        if not redis_target.addr:
+        if not valkey_target.addr:
             raise ValueError("RedisTarget must have an address for standalone mode")
         return cls(
-            address=redis_target.addr,
-            password=redis_target.password,
+            address=valkey_target.addr,
+            password=valkey_target.password,
             request_timeout=1_000,  # Default request timeout
         )
 
 
-def _sentinel_from_redis_target(
-    redis_target: RedisTarget,
-) -> Optional[Iterable[HostPortPair]]:
-    if isinstance(redis_target.sentinel, str):
-        return DelimiterSeperatedList(_HostPortPair).check_and_return(redis_target.sentinel)
-    elif isinstance(redis_target.sentinel, list):
-        return redis_target.sentinel
-    return None
-
-
 @dataclass
 class ValkeySentinelTarget:
-    sentinel_addresses: Iterable[HostPortPair]
+    sentinel_addresses: Iterable[str]
     service_name: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
 
     @classmethod
-    def from_redis_target(cls, redis_target: RedisTarget) -> Self:
+    def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
         """
-        Create a ValkeySentinelTarget from a RedisTarget.
+        Create a ValkeySentinelTarget from a ValkeyTarget.
         """
-        if not redis_target.service_name:
+        if not valkey_target.service_name:
             raise ValueError("RedisTarget must have service_name when using sentinel")
-        # Convert sentinel addresses to list format
-        sentinel_addresses = _sentinel_from_redis_target(redis_target)
-        if not sentinel_addresses:
+
+        if not valkey_target.sentinel:
             raise ValueError("RedisTarget sentinel configuration is invalid or empty")
 
         return cls(
-            sentinel_addresses=sentinel_addresses,
-            service_name=redis_target.service_name,
-            password=redis_target.password,
+            sentinel_addresses=valkey_target.sentinel,
+            service_name=valkey_target.service_name,
+            password=valkey_target.password,
             request_timeout=1_000,  # Default request timeout
         )
 
@@ -157,9 +145,9 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             self._valkey_client = None
 
     async def _create_valkey_client(self) -> None:
-        addresses = [
-            NodeAddress(host=str(self._target.address.host), port=self._target.address.port)
-        ]
+        target_host, target_port = addr_to_hostport_pair(self._target.address)
+        addresses = [NodeAddress(host=target_host, port=target_port)]
+
         credentials = (
             ServerCredentials(password=self._target.password) if self._target.password else None
         )
@@ -185,8 +173,8 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
         log.info(
             "Created ValkeyClient for standalone at {}:{} for database {}",
-            self._target.address.host,
-            self._target.address.port,
+            target_host,
+            target_port,
             self._human_readable_name,
         )
 
@@ -200,10 +188,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             await self._valkey_client.ping()
             return True
         except glide.ClosingError as e:
+            target_host, target_port = addr_to_hostport_pair(self._target.address)
             log.warning(
                 "Valkey client is closed for standalone at {}:{}, human readable name '{}': {}",
-                self._target.address.host,
-                self._target.address.port,
+                target_host,
+                target_port,
                 self._human_readable_name,
                 e,
             )
@@ -220,10 +209,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         If not, return False to trigger reconnection.
         """
         if not await self._ping():
+            target_host, target_port = addr_to_hostport_pair(self._target.address)
             log.warning(
                 "Connection to standalone server {}:{} is down, attempting to reconnect",
-                self._target.address.host,
-                self._target.address.port,
+                target_host,
+                target_port,
             )
             return False
         return True
@@ -234,10 +224,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
                 await asyncio.sleep(10.0)
                 if await self._check_connection():
                     continue
+                target_host, target_port = addr_to_hostport_pair(self._target.address)
                 log.info(
                     "Reconnecting to standalone server at {}:{}",
-                    self._target.address.host,
-                    self._target.address.port,
+                    target_host,
+                    target_port,
                 )
                 await self._reconnect()
 
@@ -274,8 +265,13 @@ class ValkeySentinelClient(AbstractValkeyClient):
         human_readable_name: str,
         pubsub_channels: Optional[set[str]] = None,
     ) -> None:
+        sentinel_addrs = []
+        for addr in target.sentinel_addresses:
+            host, port = addr_to_hostport_pair(addr)
+            sentinel_addrs.append((host, port))
+
         self._sentinel = Sentinel(
-            [(str(host), port) for host, port in target.sentinel_addresses],
+            sentinel_addrs,
             sentinel_kwargs={
                 "password": target.password,
             },
@@ -439,7 +435,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
 
 def create_valkey_client(
-    target: RedisTarget,
+    valkey_target: ValkeyTarget,
     db_id: int,
     human_readable_name: str,
     pubsub_channels: Optional[set[str]] = None,
@@ -447,10 +443,10 @@ def create_valkey_client(
     """
     Factory function to create a Valkey client based on the target type.
     """
-    if target.sentinel:
-        sentinel_target = ValkeySentinelTarget.from_redis_target(target)
+    if valkey_target.sentinel:
+        sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
         return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
-    standalone_target = ValkeyStandaloneTarget.from_redis_target(target)
+    standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
     return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
 
 

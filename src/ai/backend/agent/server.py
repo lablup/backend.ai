@@ -54,6 +54,7 @@ from ai.backend.agent.stats import StatModes
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -77,6 +78,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -111,7 +113,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     QueueSentinel,
-    RedisProfileTarget,
     ServiceDiscoveryType,
     SessionId,
     aobject,
@@ -501,7 +502,8 @@ class AgentRPCServer(aobject):
             addr = self._redis_config["addr"]
             redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
-        self.local_config = self.local_config.model_copy(update={"redis": redis_config_dict})
+        redis_config = RedisConfig.model_validate(redis_config_dict)
+        self.local_config.redis = redis_config
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
@@ -1354,10 +1356,12 @@ async def server_main(
             service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
         case ServiceDiscoveryType.REDIS:
             await agent.read_agent_config()
-            redis_profile_target = RedisProfileTarget.from_dict(agent._redis_config)
-            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            if not local_config.redis:
+                raise ConfigurationError({"server_main": "Redis runtime configuration is missing."})
+            valkey_profile_target = local_config.redis.to_valkey_profile_target()
+            live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
-                args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
             )
 
     sd_loop = ServiceDiscoveryLoop(

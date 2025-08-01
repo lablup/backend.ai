@@ -7,6 +7,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.message_queue.types import BroadcastMessage, MQMessage
 from ai.backend.common.redis_client import RedisConnection
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     RedisHelperConfig,
     RedisTarget,
@@ -28,8 +29,9 @@ def queue_args():
 
 @pytest.fixture
 async def redis_queue(redis_container, queue_args):
+    hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
-        addr=redis_container[1],
+        addr=hostport_pair.to_legacy(),
         redis_helper_config=RedisHelperConfig(
             socket_timeout=1.0,
             socket_connect_timeout=1.0,

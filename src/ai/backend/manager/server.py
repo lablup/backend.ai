@@ -94,7 +94,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
-    RedisProfileTarget,
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
@@ -531,28 +530,26 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
-    root_ctx.redis_profile_target = redis_profile_target
+    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
+    root_ctx.valkey_profile_target = valkey_profile_target
 
     root_ctx.valkey_live = await ValkeyLiveClient.create(
-        redis_profile_target.profile_target(RedisRole.LIVE),
+        valkey_profile_target.profile_target(RedisRole.LIVE),
         db_id=REDIS_LIVE_DB,
         human_readable_name="live",  # tracking live status of various entities
     )
     root_ctx.valkey_stat = await ValkeyStatClient.create(
-        redis_profile_target.profile_target(RedisRole.STATISTICS),
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="stat",  # temporary storage for stat snapshots
     )
     root_ctx.valkey_image = await ValkeyImageClient.create(
-        redis_profile_target.profile_target(RedisRole.IMAGE),
+        valkey_profile_target.profile_target(RedisRole.IMAGE),
         db_id=REDIS_IMAGE_DB,
         human_readable_name="image",  # per-agent image availability
     )
     root_ctx.valkey_stream = await ValkeyStreamClient.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
+        valkey_profile_target.profile_target(RedisRole.STREAM),
         human_readable_name="stream",
         db_id=REDIS_STREAM_DB,
     )
@@ -678,9 +675,9 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 ETCDServiceDiscoveryArgs(root_ctx.etcd)
             )
         case ServiceDiscoveryType.REDIS:
-            live_redis_target = root_ctx.redis_profile_target.profile_target(RedisRole.LIVE)
+            live_valkey_target = root_ctx.valkey_profile_target.profile_target(RedisRole.LIVE)
             root_ctx.service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
             )
 
     root_ctx.sd_loop = ServiceDiscoveryLoop(
@@ -760,9 +757,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
+    redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = root_ctx.config_provider.config.manager.id
     args = RedisMQArgs(
@@ -1065,9 +1060,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from ai.backend.common.lock import RedisLock
 
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
-            redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-                root_ctx.config_provider.config.redis.model_dump()
-            )
+            redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
             redis_lock = redis_helper.get_redis_object(
                 redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
                 name="lock",  # distributed locks

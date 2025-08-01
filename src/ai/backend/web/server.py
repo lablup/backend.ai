@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.auth.field import (
 )
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
@@ -706,14 +705,12 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
-    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config.session.redis.model_dump(by_alias=True)
-    )
-    redis_target = etcd_redis_config.profile_target(RedisRole.STATISTICS)
+    valkey_profile_target = config.session.redis.to_valkey_profile_target()
+    valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
 
     # Create ValkeySessionClient for session management
     valkey_session_client = await ValkeySessionClient.create(
-        redis_target=redis_target,
+        valkey_target=valkey_target,
         db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
         human_readable_name="web.session",
     )

@@ -142,7 +142,7 @@ from ai.backend.common.events.event_types.volume.broadcast import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.exception import VolumeMountFailed
+from ai.backend.common.exception import ConfigurationError, VolumeMountFailed
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -180,7 +180,6 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
-    RedisProfileTarget,
     RedisTarget,
     RuntimeVariant,
     Sentinel,
@@ -802,9 +801,12 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.local_config.model_dump(by_alias=True)["redis"]
-        )
+        if self.local_config.redis is None:
+            raise ConfigurationError({
+                "AbstractAgent.__ainit__": "Redis runtime configuration is not set."
+            })
+
+        redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
         self.event_producer = EventProducer(
@@ -817,13 +819,13 @@ class AbstractAgent(
             log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_client = await ValkeyStreamClient.create(
-            redis_profile_target.profile_target(RedisRole.STREAM),
+        self.valkey_stream_client = await ValkeyStreamClient.create(
+            redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
         )
         self.valkey_stat_client = await ValkeyStatClient.create(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
             human_readable_name="agent.stat",
             db_id=REDIS_STATISTICS_DB,
         )
@@ -985,7 +987,7 @@ class AbstractAgent(
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
         await self.event_dispatcher.close()
-        await self.redis_stream_client.close()
+        await self.valkey_stream_client.close()
         await self.valkey_stat_client.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
@@ -1131,7 +1133,7 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await self.redis_stream_client.enqueue_container_logs(
+                        await self.valkey_stream_client.enqueue_container_logs(
                             container_id,
                             stored_chunk,
                         )
@@ -1144,7 +1146,7 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await self.redis_stream_client.enqueue_container_logs(
+                await self.valkey_stream_client.enqueue_container_logs(
                     container_id,
                     chunk_buffer.getvalue(),
                 )
