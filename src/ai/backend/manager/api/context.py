@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.device_util.client import DeviceUtilizationReader
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -62,6 +64,8 @@ class RootContext(BaseContext):
     valkey_profile_target: ValkeyProfileTarget
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions
+    container_utilization_reader: ContainerUtilizationReader
+    device_utilization_reader: DeviceUtilizationReader
 
     webapp_plugin_ctx: WebappPluginContext
     idle_checker_host: IdleCheckerHost

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -45,6 +46,7 @@ def service_mock_args():
         "storage_manager": MagicMock(spec=StorageSessionManager),
         "config_provider": MagicMock(),
         "valkey_stat_client": MagicMock(spec=RedisConnectionInfo),
+        "container_utilization_reader": MagicMock(spec=ContainerUtilizationReader),
     }
 
 
@@ -54,7 +56,7 @@ def mock_action_monitor() -> ActionMonitor:
 
 
 @pytest.fixture
-def processors(
+async def processors(
     database_fixture, database_engine, service_mock_args, mock_action_monitor
 ) -> GroupProcessors:
     group_repository = GroupRepository(
@@ -73,6 +75,7 @@ def processors(
         config_provider=service_mock_args["config_provider"],
         valkey_stat_client=service_mock_args["valkey_stat_client"],
         group_repositories=group_repositories,
+        container_utilization_reader=service_mock_args["container_utilization_reader"],
     )
     return GroupProcessors(group_service, [mock_action_monitor])
 

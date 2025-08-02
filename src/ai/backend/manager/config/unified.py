@@ -1208,6 +1208,14 @@ class APIConfig(BaseModel):
         """,
         examples=[None, {"group_resource_visibility": True}],
     )
+    fetch_live_stat_from_redis: bool = Field(
+        default=True,
+        description="""
+        Fetch `live_stat` data from Redis.
+        Else, fetch `live_stat` from Prometheus data.
+        """,
+        validation_alias=AliasChoices("fetch-live-stat-from-redis", "fetch_live_stat_from_redis"),
+    )
 
 
 class DockerImageAutoPullPolicy(enum.StrEnum):

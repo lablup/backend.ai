@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.device_util.client import DeviceUtilizationReader
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
@@ -88,6 +90,9 @@ class ServiceArgs:
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
 
+    container_utilization_reader: ContainerUtilizationReader
+    device_utilization_reader: DeviceUtilizationReader
+
 
 @dataclass
 class Services:
@@ -127,6 +132,7 @@ class Services:
             args.config_provider,
             args.valkey_stat_client,
             repositories.group,
+            args.container_utilization_reader,
         )
         user_service = UserService(
             args.storage_manager,
@@ -189,7 +195,9 @@ class Services:
             repositories.resource_preset.repository,
         )
         utilization_metric_service = UtilizationMetricService(
-            args.config_provider, repositories.metric.repository
+            repositories.metric.repository,
+            args.container_utilization_reader,
+            args.device_utilization_reader,
         )
         model_serving_service = ModelServingService(
             agent_registry=args.agent_registry,
