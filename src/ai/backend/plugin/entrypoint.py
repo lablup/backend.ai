@@ -83,9 +83,16 @@ _default_glob_excluded_patterns = [
 _optimized_glob_search_patterns = {
     # These patterns only apply to scanning BUILD files in dev setups and pex distributions.
     # They do not affect standard package entrypoint searches.
+    # NOTE: most entrypoint declaration in BUILD files are in the package's top-level only!
     "backendai_cli_v10": ["ai/backend/*"],
-    "backendai_scheduler_v10": ["ai/backend/manager/scheduler/*"],
-    "backendai_agentselector_v10": ["ai/backend/manager/scheduler/agent_selector/*"],
+    "backendai_network_manager_v1": ["ai/backend/*"],
+    "backendai_event_dispatcher_v20": ["ai/backend/*"],
+    "backendai_stats_monitor_v20": ["ai/backend/*"],
+    "backendai_error_monitor_v20": ["ai/backend/*"],
+    "backendai_hook_v20": ["ai/backend/*"],
+    "backendai_webapp_v20": ["ai/backend/*"],
+    "backendai_scheduler_v10": ["ai/backend/manager"],
+    "backendai_agentselector_v10": ["ai/backend/manager"],
 }
 
 
