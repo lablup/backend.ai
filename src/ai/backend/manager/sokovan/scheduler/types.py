@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult, SessionTypes
 from ai.backend.manager.models.session import SessionStatus
 
 
@@ -122,8 +122,20 @@ class SessionWorkload:
     access_key: AccessKey
     # Resource requirements
     requested_slots: ResourceSlot
+    # User UUID for user resource limit checks
+    user_uuid: UUID
+    # Group ID for group resource limit checks
+    group_id: UUID
+    # Domain name for domain resource limit checks
+    domain_name: str
     # Priority level (higher value = higher priority)
     priority: int = 0
+    # Session type (INTERACTIVE, BATCH, INFERENCE)
+    session_type: SessionTypes = SessionTypes.INTERACTIVE
+    # Scheduled start time for batch sessions
+    starts_at: Optional[datetime] = None
+    # Whether this is a private session (SFTP)
+    is_private: bool = False
 
 
 @dataclass
