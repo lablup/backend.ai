@@ -78,6 +78,7 @@ _default_glob_excluded_patterns = [
     "ai/backend/runner",
     "ai/backend/kernel",
     "wheelhouse",
+    "tools",
 ]
 
 _optimized_glob_search_patterns = {
@@ -117,9 +118,11 @@ def _glob(
                     continue
                 # Until we meet the first suffix match, all subdirs are considered valid.
                 if match_patterns is None or not suffix_match:
+                    if match_patterns is not None:
+                        # After suffix match is found, inner dirs should be matched against the pattern.
+                        suffix_match = any(item.match(pattern) for pattern in match_patterns)
                     q.append((item, suffix_match))
                 elif any(item.match(pattern) for pattern in match_patterns):
-                    # After suffix match is found, inner dirs should be matched against the pattern.
                     q.append((item, True))
             else:
                 if item.name == filename:
