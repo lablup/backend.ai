@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from ai.backend.manager.sokovan.scheduler.allocators.allocator import (
-    AllocationSnapshot,
     ResourceAllocator,
 )
 from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
@@ -70,5 +69,4 @@ class Scheduler:
         :param workload: The session workload to be scheduled.
         """
         self._validator.validate(system_snapshot, workload)
-        allocation_snapshot = AllocationSnapshot()
-        self._allocator.allocate(workload, allocation_snapshot)
+        self._allocator.allocate(workload)

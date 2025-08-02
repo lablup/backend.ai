@@ -1,10 +1,18 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+)
 from ai.backend.manager.models.session import SessionStatus
 
 
@@ -113,6 +121,20 @@ class SystemSnapshot:
 
 
 @dataclass(frozen=True)
+class KernelWorkload:
+    """Represents a kernel workload within a session."""
+
+    # Unique identifier of the kernel
+    kernel_id: UUID
+    # Image name for the kernel
+    image: str
+    # Architecture required for the kernel
+    architecture: str
+    # Resource requirements for this kernel
+    requested_slots: ResourceSlot
+
+
+@dataclass(frozen=True)
 class SessionWorkload:
     """Represents a session workload for scheduling with minimal required fields."""
 
@@ -132,11 +154,48 @@ class SessionWorkload:
     priority: int = 0
     # Session type (INTERACTIVE, BATCH, INFERENCE)
     session_type: SessionTypes = SessionTypes.INTERACTIVE
+    # Cluster mode (SINGLE_NODE or MULTI_NODE)
+    cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE
     # Scheduled start time for batch sessions
     starts_at: Optional[datetime] = None
     # Whether this is a private session (SFTP)
     is_private: bool = False
+    # Kernels to be scheduled for this session
+    kernels: list[KernelWorkload] = field(default_factory=list)
 
 
 @dataclass
-class AllocationSnapshot: ...
+class KernelAllocation:
+    """Represents an allocation decision for a single kernel."""
+
+    # Unique identifier of the kernel
+    kernel_id: UUID
+    # Identifier of the agent where this kernel will be allocated
+    agent_id: AgentId
+    # Network address of the agent
+    agent_addr: str
+    # Scaling group that the agent belongs to
+    scaling_group: str
+    # Resource slots requested by this kernel
+    requested_slots: ResourceSlot
+    # Host ports allocated for this kernel (empty set if none)
+    allocated_host_ports: set[int] = field(default_factory=set)
+
+
+@dataclass
+class AllocationSnapshot:
+    """
+    Represents a complete allocation decision for a session.
+
+    Contains allocation information for all kernels in the session,
+    regardless of whether they are allocated to a single node or multiple nodes.
+    """
+
+    # Unique identifier of the session
+    session_id: SessionId
+    # Type of the session (INTERACTIVE, BATCH, INFERENCE)
+    session_type: SessionTypes
+    # Cluster mode of the session (SINGLE_NODE or MULTI_NODE)
+    cluster_mode: ClusterMode
+    # List of kernel allocations for this session
+    kernel_allocations: list[KernelAllocation]

@@ -34,10 +34,22 @@ class ResourceAllocator:
         self._updaters = updaters
         self._applier = applier
 
-    def allocate(self, workload: SessionWorkload, snapshot: AllocationSnapshot) -> None:
+    def allocate(self, workload: SessionWorkload) -> None:
         """
-        Perform allocation by updating the snapshot with all updaters and then applying the final allocation.
+        Perform allocation by creating a snapshot, updating it with all updaters,
+        and then applying the final allocation.
         """
+        # Create allocation snapshot internally
+        snapshot = AllocationSnapshot(
+            session_id=workload.session_id,
+            session_type=workload.session_type,
+            cluster_mode=workload.cluster_mode,
+            kernel_allocations=[],
+        )
+
+        # Update the snapshot with each updater
         for updater in self._updaters:
             updater.update(workload, snapshot)
+
+        # Apply the allocation
         self._applier.apply(snapshot)
