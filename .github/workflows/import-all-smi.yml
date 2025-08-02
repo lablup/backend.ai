@@ -42,7 +42,7 @@ jobs:
         run: |
           TAG="${{ steps.get-tag.outputs.tag }}"
           for ARCH in aarch64 x86_64; do
-            URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-${ARCH}-unknown-linux-musl.tar.gz"
+            URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}-musl.tar.gz"
             echo "Downloading from: $URL"
             curl -fL -o all-smi.tar.gz "$URL"
             tar -xzf all-smi.tar.gz
