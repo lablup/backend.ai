@@ -44,7 +44,7 @@ jobs:
           for ARCH in aarch64 x86_64; do
             URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-${ARCH}-unknown-linux-musl.tar.gz"
             echo "Downloading from: $URL"
-            curl -L -o all-smi.tar.gz "$URL"
+            curl -fL -o all-smi.tar.gz "$URL"
             tar -xzf all-smi.tar.gz
             if [ -f "all-smi" ]; then
               mv all-smi "all-smi.${ARCH}.bin"
