@@ -563,6 +563,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
 
         jail_path: Optional[Path]
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
