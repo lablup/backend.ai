@@ -80,22 +80,38 @@ _default_glob_excluded_patterns = [
     "wheelhouse",
 ]
 
+_optimized_glob_search_patterns = {
+    # These patterns only apply to scanning BUILD files in dev setups and pex distributions.
+    # They do not affect standard package entrypoint searches.
+    "backendai_cli_v10": ["ai/backend/*"],
+    "backendai_scheduler_v10": ["ai/backend/manager/scheduler/*"],
+    "backendai_agentselector_v10": ["ai/backend/manager/scheduler/agent_selector/*"],
+}
 
-def _glob(base_path: Path, filename: str, excluded_patterns: Iterable[str]) -> Iterator[Path]:
+
+def _glob(
+    base_path: Path,
+    filename: str,
+    excluded_patterns: Iterable[str],
+    match_patterns: Iterable[str] | None = None,
+) -> Iterator[Path]:
     q: collections.deque[Path] = collections.deque()
+    assert base_path.is_dir()
     q.append(base_path)
     while q:
         search_path = q.pop()
-        assert search_path.is_dir()
         for item in search_path.iterdir():
             if item.is_dir():
-                if search_path.name == "__pycache__":
+                if item.name == "__pycache__":
                     continue
-                if search_path.name.startswith("."):
+                if item.name.startswith("."):
                     continue
-                if any(search_path.match(pattern) for pattern in excluded_patterns):
+                if any(item.match(pattern) for pattern in excluded_patterns):
                     continue
-                q.append(item)
+                if match_patterns is None:
+                    q.append(item)
+                elif any(item.match(pattern) for pattern in match_patterns):
+                    q.append(item)
             else:
                 if item.name == filename:
                     yield item
@@ -108,7 +124,10 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     log.debug(
         "scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path
     )
-    for buildscript_path in _glob(ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns):
+    match_patterns = _optimized_glob_search_patterns.get(group_name, None)
+    for buildscript_path in _glob(
+        ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns, match_patterns
+    ):
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
     if os.environ.get("SCIE", None) is None:
@@ -120,7 +139,9 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
         else:
             src_path = build_root / "src"
             log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
-            for buildscript_path in _glob(src_path, "BUILD", _default_glob_excluded_patterns):
+            for buildscript_path in _glob(
+                src_path, "BUILD", _default_glob_excluded_patterns, match_patterns
+            ):
                 for entrypoint in extract_entrypoints_from_buildscript(
                     group_name, buildscript_path
                 ):
