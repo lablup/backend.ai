@@ -33,64 +33,55 @@ jobs:
             TAG="${{ github.event.inputs.tag }}"
           else
             # Get latest release tag
-            TAG=$(curl -s https://api.github.com/repos/inureyes/all-smi/releases/latest | jq -r .tag_name)
+            TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/inureyes/all-smi/releases/latest | jq -r .tag_name)
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Using tag: $TAG"
 
-      - name: Download all-smi binary
+      - name: Download all-smi binaries
         run: |
           TAG="${{ steps.get-tag.outputs.tag }}"
-          ARCH="${{ matrix.arch }}"
+          for ARCH in aarch64 x86_64; do
+            URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-${ARCH}-unknown-linux-musl.tar.gz"
+            echo "Downloading from: $URL"
+            curl -L -o all-smi.tar.gz "$URL"
+            tar -xzf all-smi.tar.gz
+            if [ -f "all-smi" ]; then
+              mv all-smi "all-smi.${ARCH}.bin"
+              chmod +x "all-smi.${ARCH}.bin"
+              echo "Binary extracted and renamed to all-smi.${ARCH}.bin"
+            else
+              echo "Error: all-smi binary not found in the archive for $ARCH"
+              exit 1
+            fi
+            rm -f all-smi.tar.gz
+          done
 
-          # Construct download URL
-          URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-${ARCH}-unknown-linux-musl.tar.gz"
-
-          echo "Downloading from: $URL"
-          curl -L -o all-smi.tar.gz "$URL"
-
-          # Extract the binary
-          tar -xzf all-smi.tar.gz
-
-          # The extracted binary should be named 'all-smi'
-          if [ -f "all-smi" ]; then
-            mv all-smi "all-smi.${ARCH}.bin"
-            chmod +x "all-smi.${ARCH}.bin"
-            echo "Binary extracted and renamed to all-smi.${ARCH}.bin"
-          else
-            echo "Error: all-smi binary not found in the archive"
-            exit 1
-          fi
-
-      - name: Move binary to target location
+      - name: Move binaries to target location
         run: |
-          ARCH="${{ matrix.arch }}"
           TARGET_DIR="src/ai/backend/runner"
-
-          # Ensure target directory exists
           mkdir -p "$TARGET_DIR"
-
-          # Move the binary
-          mv "all-smi.${ARCH}.bin" "$TARGET_DIR/"
-
-          echo "Binary moved to $TARGET_DIR/all-smi.${ARCH}.bin"
-          ls -la "$TARGET_DIR/all-smi.${ARCH}.bin"
+          for ARCH in aarch64 x86_64; do
+            mv "all-smi.${ARCH}.bin" "$TARGET_DIR/"
+            echo "Binary moved to $TARGET_DIR/all-smi.${ARCH}.bin"
+            ls -la "$TARGET_DIR/all-smi.${ARCH}.bin"
+          done
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: Update all-smi binary (${{ matrix.arch }}) to ${{ steps.get-tag.outputs.tag }}"
-          title: "Update all-smi binary (${{ matrix.arch }}) to ${{ steps.get-tag.outputs.tag }}"
+          commit-message: "chore: Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
+          title: "Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
           body: |
-            This PR updates the all-smi binary for ${{ matrix.arch }} architecture to version ${{ steps.get-tag.outputs.tag }}.
+            This PR updates the all-smi binaries for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
             Source: https://github.com/inureyes/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
 
             This update was triggered by:
             - Event: ${{ github.event_name }}
             ${{ github.event_name == 'repository_dispatch' && '- Automated trigger from all-smi repository release' || '- Manual workflow dispatch' }}
-          branch: update-all-smi-${{ matrix.arch }}-${{ steps.get-tag.outputs.tag }}
+          branch: update-all-smi-${{ steps.get-tag.outputs.tag }}
           delete-branch: true
 
   setup-webhook:
