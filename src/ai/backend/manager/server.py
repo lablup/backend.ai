@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     AsyncIterator,
@@ -99,9 +100,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
-from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
@@ -117,41 +115,19 @@ from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
-from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.reporters.base import AbstractReporter
-from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
-from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.service.base import ServicesContext
-from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
-from ai.backend.manager.service.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
-    PerProjectContainerRegistryQuotaService,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 from . import __version__
-from .agent_cache import AgentRPCCache
-from .api import ManagerStatus
 from .api.context import RootContext
-from .api.types import (
-    AppCreator,
-    CleanupContext,
-    WebRequestHandler,
-)
-from .errors.api import InvalidAPIParameters
-from .errors.common import (
-    GenericBadRequest,
-    InternalServerError,
-    MethodNotAllowed,
-    URLNotFound,
-)
-from .exceptions import InvalidArgument
-from .sweeper.kernel import stale_kernel_sweeper_ctx
-from .sweeper.session import stale_session_sweeper_ctx
 from .types import DistributedLockFactory, SMTPTriggerPolicy
+
+if TYPE_CHECKING:
+    from ai.backend.manager.reporters.base import AbstractReporter
+
+    from .api.types import (
+        AppCreator,
+        CleanupContext,
+        WebRequestHandler,
+    )
 
 VALID_VERSIONS: Final = frozenset([
     # 'v1.20160915',  # deprecated
@@ -288,6 +264,8 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 
 @web.middleware
 async def api_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
+    from .errors.common import GenericBadRequest, InternalServerError
+
     _handler = handler
     method_override = request.headers.get("X-Method-Override", None)
     if method_override:
@@ -353,6 +331,15 @@ def _debug_error_response(
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
+    from .errors.api import InvalidAPIParameters
+    from .errors.common import (
+        GenericBadRequest,
+        InternalServerError,
+        MethodNotAllowed,
+        URLNotFound,
+    )
+    from .exceptions import InvalidArgument
+
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
@@ -513,6 +500,8 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
 @actxmgr
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .api import ManagerStatus
+
     if root_ctx.pidx == 0:
         mgr_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
@@ -575,6 +564,8 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 def _make_registered_reporters(
     root_ctx: RootContext,
 ) -> dict[str, AbstractReporter]:
+    from .reporters.smtp import SMTPReporter, SMTPSenderArgs
+
     reporters: dict[str, AbstractReporter] = {}
     smtp_configs = root_ctx.config_provider.config.reporter.smtp
     for smtp_conf in smtp_configs:
@@ -617,6 +608,12 @@ def _make_action_reporters(
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .actions.monitors.audit_log import AuditLogMonitor
+    from .actions.monitors.prometheus import PrometheusMonitor
+    from .actions.monitors.reporter import ReporterMonitor
+    from .reporters.hub import ReporterHub, ReporterHubArgs
+    from .services.processors import ProcessorArgs, Processors, ServiceArgs
+
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
     reporter_hub = ReporterHub(
@@ -731,6 +728,8 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+
     root_ctx.event_dispatcher = EventDispatcher(
         root_ctx.message_queue,
         log_events=root_ctx.config_provider.config.debug.log_events,
@@ -809,6 +808,9 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .repositories.image.repositories import RepositoryArgs
+    from .repositories.repositories import Repositories
+
     repositories = Repositories.create(
         args=RepositoryArgs(
             db=root_ctx.db,
@@ -823,6 +825,8 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .plugin.network import NetworkPluginContext
+
     ctx = NetworkPluginContext(
         root_ctx.etcd,
         root_ctx.config_provider.config.model_dump(by_alias=True),
@@ -880,6 +884,7 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
+    from .agent_cache import AgentRPCCache
     from .registry import AgentRegistry
 
     manager_pkey, manager_skey = load_certificate(
@@ -959,6 +964,13 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .service.base import ServicesContext
+    from .service.container_registry.base import PerProjectRegistryQuotaRepository
+    from .service.container_registry.harbor import (
+        PerProjectContainerRegistryQuotaClientPool,
+        PerProjectContainerRegistryQuotaService,
+    )
+
     db = root_ctx.db
 
     per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
@@ -1091,6 +1103,9 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
+    from .sweeper.kernel import stale_kernel_sweeper_ctx
+    from .sweeper.session import stale_session_sweeper_ctx
+
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1109,7 +1124,8 @@ def build_root_app(
             )
         )
 
-    root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
+    root_ctx = RootContext()
+    root_ctx.metrics = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
             request_id_middleware,
