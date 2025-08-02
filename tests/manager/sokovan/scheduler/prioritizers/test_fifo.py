@@ -69,18 +69,27 @@ class TestFIFOSchedulingPrioritizer:
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                user_uuid=uuid.uuid4(),
+                group_id=uuid.uuid4(),
+                domain_name="default",
                 priority=0,
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),
                 requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
+                user_uuid=uuid.uuid4(),
+                group_id=uuid.uuid4(),
+                domain_name="default",
                 priority=0,
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user3"),
                 requested_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                user_uuid=uuid.uuid4(),
+                group_id=uuid.uuid4(),
+                domain_name="default",
                 priority=0,
             ),
         ]
@@ -130,12 +139,18 @@ class TestFIFOSchedulingPrioritizer:
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),  # User with more allocation
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                user_uuid=uuid.uuid4(),
+                group_id=uuid.uuid4(),
+                domain_name="default",
                 priority=0,
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),  # User with less allocation
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                user_uuid=uuid.uuid4(),
+                group_id=uuid.uuid4(),
+                domain_name="default",
                 priority=0,
             ),
         ]
