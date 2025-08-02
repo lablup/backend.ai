@@ -108,6 +108,12 @@ def _glob(
     q.append((base_path, False))
     while q:
         search_path, suffix_match = q.pop()
+
+        # Check if current directory matches any pattern and we should yield files from it
+        current_matches = False
+        if match_patterns is not None:
+            current_matches = any(search_path.match(pattern) for pattern in match_patterns)
+
         for item in search_path.iterdir():
             if item.is_dir():
                 if item.name == "__pycache__":
@@ -116,17 +122,37 @@ def _glob(
                     continue
                 if any(item.match(pattern) for pattern in excluded_patterns):
                     continue
-                # Until we meet the first suffix match, all subdirs are considered valid.
-                if match_patterns is None or not suffix_match:
-                    if match_patterns is not None:
-                        # After suffix match is found, inner dirs should be matched against the pattern.
-                        suffix_match = any(item.match(pattern) for pattern in match_patterns)
-                    q.append((item, suffix_match))
-                elif any(item.match(pattern) for pattern in match_patterns):
-                    q.append((item, True))
+
+                # Determine if we should queue this directory
+                should_queue = False
+                new_suffix_match = False
+
+                if match_patterns is None:
+                    # No patterns specified - queue all non-excluded directories
+                    should_queue = True
+                    new_suffix_match = False
+                elif not suffix_match:
+                    # Haven't found a matching directory yet - check if this one matches
+                    if any(item.match(pattern) for pattern in match_patterns):
+                        should_queue = True
+                        new_suffix_match = True
+                    else:
+                        # Keep searching - queue without suffix match
+                        should_queue = True
+                        new_suffix_match = False
+                else:
+                    # Already found a matching directory - only queue if this also matches
+                    if any(item.match(pattern) for pattern in match_patterns):
+                        should_queue = True
+                        new_suffix_match = True
+
+                if should_queue:
+                    q.append((item, new_suffix_match))
             else:
                 if item.name == filename:
-                    yield item
+                    # Yield file if no patterns or current directory matches
+                    if match_patterns is None or current_matches:
+                        yield item
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
