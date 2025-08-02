@@ -5,49 +5,103 @@ import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.prioritizers.drf import DRFSchedulingPrioritizer
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.types import (
+    ConcurrencySnapshot,
+    PendingSessionSnapshot,
+    ResourceOccupancySnapshot,
+    ResourcePolicySnapshot,
+    SessionDependencySnapshot,
+    SessionWorkload,
+    SystemSnapshot,
+)
 
 
 class TestDRFSchedulingPrioritizer:
     @pytest.fixture
-    def prioritizer(self):
+    def prioritizer(self) -> DRFSchedulingPrioritizer:
         return DRFSchedulingPrioritizer()
 
     @pytest.fixture
-    def empty_system_snapshot(self):
+    def empty_system_snapshot(self) -> SystemSnapshot:
         return SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            user_allocations={},
+            resource_occupancy=ResourceOccupancySnapshot(
+                by_keypair={},
+                by_user={},
+                by_group={},
+                by_domain={},
+            ),
+            resource_policy=ResourcePolicySnapshot(
+                keypair_policies={},
+                user_policies={},
+                group_limits={},
+                domain_limits={},
+            ),
+            concurrency=ConcurrencySnapshot(
+                sessions_by_keypair={},
+                sftp_sessions_by_keypair={},
+            ),
+            pending_sessions=PendingSessionSnapshot(
+                by_keypair={},
+            ),
+            session_dependencies=SessionDependencySnapshot(
+                by_session={},
+            ),
         )
 
     @pytest.fixture
-    def system_snapshot_with_allocations(self):
+    def system_snapshot_with_allocations(self) -> SystemSnapshot:
         return SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            user_allocations={
-                AccessKey("user1"): ResourceSlot(
-                    cpu=Decimal("20"), mem=Decimal("10")
-                ),  # dominant share: 20%
-                AccessKey("user2"): ResourceSlot(
-                    cpu=Decimal("10"), mem=Decimal("30")
-                ),  # dominant share: 30%
-                AccessKey("user3"): ResourceSlot(
-                    cpu=Decimal("5"), mem=Decimal("5")
-                ),  # dominant share: 5%
-            },
+            resource_occupancy=ResourceOccupancySnapshot(
+                by_keypair={
+                    AccessKey("user1"): ResourceSlot(
+                        cpu=Decimal("20"), mem=Decimal("10")
+                    ),  # dominant share: 20%
+                    AccessKey("user2"): ResourceSlot(
+                        cpu=Decimal("10"), mem=Decimal("30")
+                    ),  # dominant share: 30%
+                    AccessKey("user3"): ResourceSlot(
+                        cpu=Decimal("5"), mem=Decimal("5")
+                    ),  # dominant share: 5%
+                },
+                by_user={},
+                by_group={},
+                by_domain={},
+            ),
+            resource_policy=ResourcePolicySnapshot(
+                keypair_policies={},
+                user_policies={},
+                group_limits={},
+                domain_limits={},
+            ),
+            concurrency=ConcurrencySnapshot(
+                sessions_by_keypair={},
+                sftp_sessions_by_keypair={},
+            ),
+            pending_sessions=PendingSessionSnapshot(
+                by_keypair={},
+            ),
+            session_dependencies=SessionDependencySnapshot(
+                by_session={},
+            ),
         )
 
     @pytest.mark.asyncio
-    async def test_name(self, prioritizer):
+    async def test_name(self, prioritizer: DRFSchedulingPrioritizer) -> None:
         assert prioritizer.name == "DRF-scheduling-prioritizer"
 
     @pytest.mark.asyncio
-    async def test_empty_workload(self, prioritizer, empty_system_snapshot):
+    async def test_empty_workload(
+        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+    ) -> None:
         result = await prioritizer.prioritize(empty_system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_single_user_workloads(self, prioritizer, empty_system_snapshot):
+    async def test_single_user_workloads(
+        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+    ) -> None:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
@@ -72,8 +126,10 @@ class TestDRFSchedulingPrioritizer:
 
     @pytest.mark.asyncio
     async def test_multiple_users_different_dominant_shares(
-        self, prioritizer, system_snapshot_with_allocations
-    ):
+        self,
+        prioritizer: DRFSchedulingPrioritizer,
+        system_snapshot_with_allocations: SystemSnapshot,
+    ) -> None:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
@@ -104,7 +160,9 @@ class TestDRFSchedulingPrioritizer:
         assert result[2].access_key == AccessKey("user2")
 
     @pytest.mark.asyncio
-    async def test_multiple_users_same_dominant_share(self, prioritizer, empty_system_snapshot):
+    async def test_multiple_users_same_dominant_share(
+        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+    ) -> None:
         # All users have no existing allocations (0% dominant share)
         workloads = [
             SessionWorkload(
@@ -136,7 +194,11 @@ class TestDRFSchedulingPrioritizer:
         assert result[2] == workloads[2]
 
     @pytest.mark.asyncio
-    async def test_new_user_gets_priority(self, prioritizer, system_snapshot_with_allocations):
+    async def test_new_user_gets_priority(
+        self,
+        prioritizer: DRFSchedulingPrioritizer,
+        system_snapshot_with_allocations: SystemSnapshot,
+    ) -> None:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
@@ -160,15 +222,38 @@ class TestDRFSchedulingPrioritizer:
         assert result[1].access_key == AccessKey("user2")
 
     @pytest.mark.asyncio
-    async def test_dominant_share_calculation_with_zero_capacity(self, prioritizer):
+    async def test_dominant_share_calculation_with_zero_capacity(
+        self, prioritizer: DRFSchedulingPrioritizer
+    ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(
                 cpu=Decimal("100"), mem=Decimal("0")
             ),  # Zero memory capacity
-            user_allocations={
-                AccessKey("user1"): ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
-            },
+            resource_occupancy=ResourceOccupancySnapshot(
+                by_keypair={
+                    AccessKey("user1"): ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                },
+                by_user={},
+                by_group={},
+                by_domain={},
+            ),
+            resource_policy=ResourcePolicySnapshot(
+                keypair_policies={},
+                user_policies={},
+                group_limits={},
+                domain_limits={},
+            ),
+            concurrency=ConcurrencySnapshot(
+                sessions_by_keypair={},
+                sftp_sessions_by_keypair={},
+            ),
+            pending_sessions=PendingSessionSnapshot(
+                by_keypair={},
+            ),
+            session_dependencies=SessionDependencySnapshot(
+                by_session={},
+            ),
         )
 
         workloads = [

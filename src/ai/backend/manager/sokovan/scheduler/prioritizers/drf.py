@@ -41,7 +41,7 @@ class DRFSchedulingPrioritizer(SchedulingPrioritizer):
         user_dominant_shares: dict[AccessKey, Decimal] = defaultdict(lambda: Decimal(0))
 
         # Calculate dominant shares from existing allocations
-        for access_key, occupied_slots in system_snapshot.user_allocations.items():
+        for access_key, occupied_slots in system_snapshot.resource_occupancy.by_keypair.items():
             dominant_share = self._calculate_dominant_share(
                 occupied_slots, system_snapshot.total_capacity
             )
