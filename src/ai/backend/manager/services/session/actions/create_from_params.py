@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional, override
 import yarl
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 

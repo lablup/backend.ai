@@ -6,16 +6,14 @@ from typing import Awaitable, Callable, Generic, Optional
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.validators.validator import ActionValidator
+from ai.backend.manager.actions.validators.validator.base import ActionValidator
 
-from .action import (
-    BaseActionResultMeta,
-    BaseActionTriggerMeta,
-    ProcessResult,
+from ..action.base import (
     TAction,
     TActionResult,
 )
-from .monitors.monitor import ActionMonitor
+from ..monitors.monitor.base import ActionMonitor
+from ..types import ActionResultMeta, ActionResultTargetMeta, ActionTriggerMeta, ProcessResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -43,7 +41,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         error_code: Optional[ErrorCode] = None
 
         action_id = uuid.uuid4()
-        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        action_trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, action_trigger_meta)
@@ -72,9 +70,12 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             entity_id = action.entity_id()
             if entity_id is None and result is not None:
                 entity_id = result.entity_id()
-            meta = BaseActionResultMeta(
+            meta = ActionResultMeta(
                 action_id=action_id,
-                entity_id=entity_id,
+                target=ActionResultTargetMeta(
+                    entity_type=action.entity_type(),
+                    entity_ids=[entity_id] if entity_id else None,
+                ),
                 status=status,
                 description=description,
                 started_at=started_at,
