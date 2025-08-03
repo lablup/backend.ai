@@ -11,8 +11,9 @@ from ai.backend.manager.sokovan.scheduler.selectors.concentrated import Concentr
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     AgentSelector,
+    DesignatedAgentIncompatibleError,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -96,7 +97,7 @@ class TestAgentSelectionWithResources:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
@@ -159,7 +160,7 @@ class TestAgentSelectionWithResources:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
@@ -224,7 +225,7 @@ class TestAgentSelectionWithResources:
             required_architecture="x86_64",
         )
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements={uuid.uuid4(): resource_req},
         )
@@ -235,16 +236,17 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        selected_id = await selector.select_agent_for_resource_requirements(
-            agents,
-            resource_req,
-            criteria,
-            config,
-            designated_agent=AgentId("designated"),
-        )
+        with pytest.raises(DesignatedAgentIncompatibleError) as exc_info:
+            await selector.select_agent_for_resource_requirements(
+                agents,
+                resource_req,
+                criteria,
+                config,
+                designated_agent=AgentId("designated"),
+            )
 
-        # Should return None because designated agent lacks resources
-        assert selected_id is None
+        # Should raise error because designated agent lacks resources
+        assert "does not meet resource requirements" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_container_limit_with_resource_requirements(self):
@@ -279,7 +281,7 @@ class TestAgentSelectionWithResources:
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements={uuid.uuid4(): resource_req},
         )
@@ -333,7 +335,7 @@ class TestAgentSelectionWithResources:
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements={uuid.uuid4(): resource_req},
         )

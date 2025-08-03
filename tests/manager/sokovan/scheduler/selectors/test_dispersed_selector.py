@@ -9,7 +9,7 @@ from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionI
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -28,7 +28,7 @@ class TestDispersedAgentSelector:
     @pytest.fixture
     def basic_criteria(self):
         """Create basic selection criteria."""
-        return AgentSelectionCriteria2(
+        return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,

@@ -9,7 +9,7 @@ from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionI
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -28,7 +28,7 @@ class TestConcentratedAgentSelector:
     @pytest.fixture
     def basic_criteria(self):
         """Create basic selection criteria."""
-        return AgentSelectionCriteria2(
+        return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
@@ -160,7 +160,7 @@ class TestConcentratedAgentSelector:
     def test_endpoint_replica_spreading_for_inference(self, selector):
         """Test special behavior for inference sessions with endpoint replica spreading."""
         # Create inference session criteria
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INFERENCE,

@@ -12,7 +12,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSel
 from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     AgentSelector,
     ResourceRequirements,
     SessionMetadata,
@@ -27,7 +27,7 @@ class TestSelectorIntegration:
     @pytest.fixture
     def criteria(self):
         """Create standard selection criteria."""
-        return AgentSelectionCriteria2(
+        return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
@@ -267,7 +267,7 @@ class TestSelectorIntegration:
     def test_inference_session_spreading(self, config):
         """Test special behavior for inference sessions with endpoint replica spreading."""
         # Create criteria for inference session
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INFERENCE,

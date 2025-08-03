@@ -7,6 +7,7 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
 from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
+from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo, AgentSelector
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationSnapshot,
@@ -145,17 +146,17 @@ class Scheduler:
                         continue
 
                     resource_req = resource_requirements[0]
-                    selected_agent_id = (
-                        await self._agent_selector.select_agent_for_resource_requirements(
-                            agents_info,
-                            resource_req,
-                            criteria,
-                            selection_config,
-                            session_workload.designated_agent,
+                    try:
+                        selected_agent_id = (
+                            await self._agent_selector.select_agent_for_resource_requirements(
+                                agents_info,
+                                resource_req,
+                                criteria,
+                                selection_config,
+                                session_workload.designated_agent,
+                            )
                         )
-                    )
 
-                    if selected_agent_id:
                         # Find the selected agent info
                         selected_agent = next(
                             (agent for agent in agents_info if agent.agent_id == selected_agent_id),
@@ -173,6 +174,13 @@ class Scheduler:
                                         requested_slots=kernel.requested_slots,
                                     )
                                 )
+                    except AgentSelectionError as e:
+                        log.debug(
+                            "Agent selection failed for single-node session {}: {}",
+                            session_workload.session_id,
+                            e,
+                        )
+                        continue
                 else:
                     # For multi-node sessions, select agents for each kernel independently
                     # Number of resource requirements should match number of kernels
@@ -184,20 +192,20 @@ class Scheduler:
                         )
                         continue
 
-                    for i, (kernel, resource_req) in enumerate(
-                        zip(session_workload.kernels, resource_requirements)
-                    ):
-                        selected_agent_id = (
-                            await self._agent_selector.select_agent_for_resource_requirements(
-                                agents_info,
-                                resource_req,
-                                criteria,
-                                selection_config,
-                                session_workload.designated_agent if i == 0 else None,
+                    try:
+                        for i, (kernel, resource_req) in enumerate(
+                            zip(session_workload.kernels, resource_requirements)
+                        ):
+                            selected_agent_id = (
+                                await self._agent_selector.select_agent_for_resource_requirements(
+                                    agents_info,
+                                    resource_req,
+                                    criteria,
+                                    selection_config,
+                                    session_workload.designated_agent if i == 0 else None,
+                                )
                             )
-                        )
 
-                        if selected_agent_id:
                             # Find the selected agent info
                             selected_agent = next(
                                 (
@@ -217,6 +225,14 @@ class Scheduler:
                                         requested_slots=kernel.requested_slots,
                                     )
                                 )
+                    except AgentSelectionError as e:
+                        log.debug(
+                            "Agent selection failed for multi-node session {} kernel {}: {}",
+                            session_workload.session_id,
+                            kernel.kernel_id if "kernel" in locals() else "unknown",
+                            e,
+                        )
+                        continue
 
                 # Create allocation snapshot if we have kernel allocations
                 if kernel_allocations:

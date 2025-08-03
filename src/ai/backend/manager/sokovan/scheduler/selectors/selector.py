@@ -12,6 +12,14 @@ from uuid import UUID
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
 
+from .exceptions import (
+    AgentSelectionError,
+    DesignatedAgentIncompatibleError,
+    DesignatedAgentNotFoundError,
+    NoAvailableAgentError,
+    NoCompatibleAgentError,
+)
+
 
 @dataclass
 class AgentInfo:
@@ -95,6 +103,9 @@ class AgentSelectionCriteria:
         Raises:
             ValueError: If single-node session has kernels with different architectures.
         """
+        if not self.kernel_requirements:
+            raise ValueError("No kernel requirements specified for the session")
+
         if self.session_metadata.cluster_mode == ClusterMode.SINGLE_NODE:
             # Check architecture consistency for single-node
             architectures = {
@@ -111,7 +122,7 @@ class AgentSelectionCriteria:
                 total_slots = total_slots + kernel_req.requested_slots
 
             # Use the common architecture
-            architecture = next(iter(architectures)) if architectures else "x86_64"
+            architecture = list(architectures)[0]
             return [
                 ResourceRequirements(
                     requested_slots=total_slots, required_architecture=architecture
@@ -175,7 +186,7 @@ class AgentSelector:
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
         designated_agent: Optional[AgentId] = None,
-    ) -> Optional[AgentId]:
+    ) -> AgentId:
         """
         Select an agent for given resource requirements.
 
@@ -187,19 +198,33 @@ class AgentSelector:
             designated_agent: Manually designated agent (for superadmin)
 
         Returns:
-            The ID of the selected agent, or None if no suitable agent found
+            The ID of the selected agent
+
+        Raises:
+            NoAvailableAgentError: If no agents are available
+            DesignatedAgentNotFoundError: If designated agent is not found
+            DesignatedAgentIncompatibleError: If designated agent doesn't meet requirements
+            NoCompatibleAgentError: If no compatible agents are found
         """
         if not agents:
-            return None
+            raise NoAvailableAgentError(
+                f"No agents available in scaling group '{criteria.session_metadata.scaling_group}'"
+            )
+
         # Handle designated agent if specified
         if designated_agent:
             for agent in agents:
                 if agent.agent_id == designated_agent:
                     # Verify the designated agent meets all requirements
                     if not self._is_agent_compatible(agent, resource_req, config):
-                        return None
+                        raise DesignatedAgentIncompatibleError(
+                            f"Designated agent '{designated_agent}' does not meet resource requirements: "
+                            f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
+                        )
                     return designated_agent
-            return None
+            raise DesignatedAgentNotFoundError(
+                f"Designated agent '{designated_agent}' not found in available agents"
+            )
 
         # Filter agents by compatibility
         compatible_agents = [
@@ -207,12 +232,21 @@ class AgentSelector:
         ]
 
         if not compatible_agents:
-            return None
+            raise NoCompatibleAgentError(
+                f"No agents compatible with resource requirements: "
+                f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
+            )
 
         # For strategy selection, we need to pass the resource requirements
-        return self._strategy.select_agent_by_strategy(
+        selected = self._strategy.select_agent_by_strategy(
             compatible_agents, resource_req, criteria, config
         )
+
+        if selected is None:
+            # This shouldn't happen with properly implemented strategies, but just in case
+            raise AgentSelectionError("Strategy failed to select an agent from compatible agents")
+
+        return selected
 
     def _is_agent_compatible(
         self,

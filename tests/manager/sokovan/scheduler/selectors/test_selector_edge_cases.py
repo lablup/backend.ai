@@ -13,8 +13,9 @@ from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSel
 from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     AgentSelector,
+    NoAvailableAgentError,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -28,7 +29,7 @@ class TestSelectorEdgeCases:
     @pytest.fixture
     def criteria(self):
         """Create standard selection criteria."""
-        return AgentSelectionCriteria2(
+        return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
@@ -316,12 +317,14 @@ class TestSelectorEdgeCases:
 
         # Direct selector call would fail, but wrapper should handle
         selector = AgentSelector(ConcentratedAgentSelector(["cpu", "mem"]))
-        result = await selector.select_agent_for_resource_requirements(
-            agents, resource_req, criteria, config
-        )
 
-        # Should return None for empty agent list
-        assert result is None
+        with pytest.raises(NoAvailableAgentError) as exc_info:
+            await selector.select_agent_for_resource_requirements(
+                agents, resource_req, criteria, config
+            )
+
+        # Should raise error for empty agent list
+        assert "No agents available" in str(exc_info.value)
 
     def test_special_resource_names(self, criteria, config):
         """Test handling of special characters in resource names."""

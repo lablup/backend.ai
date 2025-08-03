@@ -7,7 +7,7 @@ import pytest
 
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -51,7 +51,7 @@ class TestResourceRequirements:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
@@ -95,7 +95,7 @@ class TestResourceRequirements:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
@@ -141,7 +141,7 @@ class TestResourceRequirements:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
@@ -177,18 +177,16 @@ class TestResourceRequirements:
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements={},  # Empty
         )
 
-        # Get resource requirements
-        resource_reqs = criteria.get_resource_requirements()
+        # Should raise ValueError for empty kernel requirements
+        with pytest.raises(ValueError) as exc_info:
+            criteria.get_resource_requirements()
 
-        # Should return single empty requirement with default architecture
-        assert len(resource_reqs) == 1
-        assert resource_reqs[0].requested_slots == ResourceSlot({})
-        assert resource_reqs[0].required_architecture == "x86_64"
+        assert "No kernel requirements specified" in str(exc_info.value)
 
     def test_single_node_gpu_aggregation(self):
         """Test GPU resource aggregation for single-node sessions."""
@@ -219,7 +217,7 @@ class TestResourceRequirements:
             ),
         }
 
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_reqs,
         )
