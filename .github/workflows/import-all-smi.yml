@@ -63,8 +63,12 @@ jobs:
             ls -la "$TARGET_DIR/all-smi.${ARCH}.bin"
           done
 
+      - name: Add news fragment
+        run: |
+          echo "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.txt
+
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.OCTODOG }}
           commit-message: "chore: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
