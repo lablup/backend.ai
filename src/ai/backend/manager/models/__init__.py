@@ -7,6 +7,7 @@ from . import domain as _domain
 from . import dotfile as _dotfile
 from . import endpoint as _endpoint
 from . import error_logs as _errorlogs
+from . import event_log as _eventlog
 from . import group as _group
 from . import health as _health
 from . import image as _image
@@ -59,6 +60,7 @@ __all__ = (
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_errorlogs.__all__,
+    *_eventlog.__all__,
     *_relay_agent.__all__,
     *_relay_kernel.__all__,
     *_relay_session.__all__,
@@ -73,6 +75,7 @@ from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .endpoint import *  # noqa
 from .error_logs import *  # noqa
+from .event_log import *  # noqa
 from .group import *  # noqa
 from .health import *  # noqa
 from .image import *  # noqa
