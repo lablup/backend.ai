@@ -69,7 +69,6 @@ jobs:
         if: |
           contains(toJSON(github.event.head_commit.message), 'skip:ci')
           || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-          || steps.check_stacked_pr.outputs.NON_TOP_BOTTOM == 'true'
         run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
       - name: Release
         id: release
