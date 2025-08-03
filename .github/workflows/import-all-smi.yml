@@ -73,7 +73,7 @@ jobs:
           token: ${{ secrets.OCTODOG }}
           commit-message: "chore: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
           title: "deps: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
-          author: "Lablup Octodog <octodog@lablup.com>"
+          author: "Lablup Octodog <mu001@lablup.com>"
           body: |
             This PR updates the all-smi binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
