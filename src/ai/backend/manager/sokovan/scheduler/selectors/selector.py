@@ -68,7 +68,7 @@ class ResourceRequirements:
 
 
 @dataclass
-class AgentSelectionCriteria2:
+class AgentSelectionCriteria:
     """Criteria for selecting an agent."""
 
     # Session metadata for the selection
@@ -134,7 +134,7 @@ class AbstractAgentSelector(ABC):
         self,
         agents: Sequence[AgentInfo],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria2,
+        criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
     ) -> Optional[AgentId]:
         """
@@ -168,62 +168,11 @@ class AgentSelector:
     def __init__(self, strategy: AbstractAgentSelector) -> None:
         self._strategy = strategy
 
-    async def select_agent_for_kernel(
-        self,
-        agents: Sequence[AgentInfo],
-        criteria: AgentSelectionCriteria2,
-        config: AgentSelectionConfig,
-        kernel_id: UUID,
-        designated_agent: Optional[AgentId] = None,
-    ) -> Optional[AgentId]:
-        """
-        Select an agent for a specific kernel based on the selection criteria.
-
-        Handles common logic before delegating to the strategy-specific implementation.
-
-        Args:
-            agents: Available agents to choose from
-            criteria: Selection requirements including session metadata and kernel requirements
-            config: Configuration for agent selection
-            kernel_id: ID of the kernel being scheduled
-            designated_agent: Manually designated agent (for superadmin)
-
-        Returns:
-            The ID of the selected agent, or None if no suitable agent found
-        """
-        # Get kernel requirements
-        kernel_req = criteria.kernel_requirements.get(kernel_id)
-        if not kernel_req:
-            return None
-
-        # Handle designated agent if specified
-        if designated_agent:
-            for agent in agents:
-                if agent.agent_id == designated_agent:
-                    # Verify the designated agent meets all requirements
-                    if not self._is_agent_compatible(agent, kernel_req, config):
-                        return None
-                    return designated_agent
-            return None
-
-        # Filter agents by compatibility
-        compatible_agents = [
-            agent for agent in agents if self._is_agent_compatible(agent, kernel_req, config)
-        ]
-
-        if not compatible_agents:
-            return None
-
-        # Delegate to strategy for selection
-        return self._strategy.select_agent_by_strategy(
-            compatible_agents, kernel_req, criteria, config
-        )
-
     async def select_agent_for_resource_requirements(
         self,
         agents: Sequence[AgentInfo],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria2,
+        criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
         designated_agent: Optional[AgentId] = None,
     ) -> Optional[AgentId]:

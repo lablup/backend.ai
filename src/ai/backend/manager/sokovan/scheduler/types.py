@@ -16,7 +16,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -180,7 +180,7 @@ class SessionWorkload:
         self,
         max_container_count: Optional[int],
         enforce_spreading: bool,
-    ) -> tuple[AgentSelectionCriteria2, AgentSelectionConfig]:
+    ) -> tuple[AgentSelectionCriteria, AgentSelectionConfig]:
         """
         Convert to new agent selection criteria and config for scheduling.
 
@@ -209,7 +209,7 @@ class SessionWorkload:
         }
 
         # Create selection criteria
-        criteria = AgentSelectionCriteria2(
+        criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_requirements,
             kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,

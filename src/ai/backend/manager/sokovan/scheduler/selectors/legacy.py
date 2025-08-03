@@ -14,7 +14,7 @@ from .selector import (
     AbstractAgentSelector,
     AgentInfo,
     AgentSelectionConfig,
-    AgentSelectionCriteria2,
+    AgentSelectionCriteria,
     ResourceRequirements,
 )
 from .utils import count_unutilized_capabilities, order_slots_by_priority
@@ -36,7 +36,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
         self,
         agents: Sequence[AgentInfo],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria2,
+        criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
     ) -> Optional[AgentId]:
         """
