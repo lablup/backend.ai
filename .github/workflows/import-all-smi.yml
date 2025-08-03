@@ -65,7 +65,7 @@ jobs:
 
       - name: Add news fragment
         run: |
-          echo "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.txt
+          echo "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v7
