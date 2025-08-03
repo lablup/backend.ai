@@ -76,7 +76,7 @@ def alembic_config(test_db_url: str) -> Config:
     config = Config(ALEMBIC_CONFIG_PATH)
     config.set_main_option("script_location", "src/ai/backend/manager/models/alembic")
     config.set_main_option("sqlalchemy.url", test_db_url)
-    logging_active.set(True)  # Why??
+    logging_active.set(True)
     return config
 
 
