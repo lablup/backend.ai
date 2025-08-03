@@ -4,7 +4,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import pytest
 import sqlalchemy as sa
@@ -491,7 +491,9 @@ def permission_mapping() -> dict[str, str]:
 
 
 @pytest.fixture
-async def populated_vfolder_db(db_engine_pre_migration, vfolder_rbac_test_data):
+async def populated_vfolder_db(
+    db_engine_pre_migration: Engine, vfolder_rbac_test_data: VFolderRBACTestData
+):
     """Populate the database with vfolder test data."""
     engine = db_engine_pre_migration
     data = vfolder_rbac_test_data
@@ -604,7 +606,7 @@ class TestVFolderRBACMigrationWithAlembic:
                         AssociationScopesEntitiesRow.entity_type == "vfolder"
                     )
                 )
-                association_rows = associations.all()
+                association_rows = cast(list[AssociationScopesEntitiesRow], associations.all())
 
                 assert len(association_rows) == len(data.vfolders), (
                     f"Expected {len(data.vfolders)} vfolder associations, found {len(association_rows)}"
@@ -637,7 +639,7 @@ class TestVFolderRBACMigrationWithAlembic:
                 roles = await session.scalars(
                     sa.select(RoleRow).where(RoleRow.name.like("vfolder_granted_%"))  # type: ignore[attr-defined]
                 )
-                role_rows = roles.all()
+                role_rows = cast(list[RoleRow], roles.all())
 
                 # Should have one role per unique vfolder that has permissions
                 vfolders_with_permissions = {perm.vfolder_id for perm in data.permissions}
@@ -654,7 +656,7 @@ class TestVFolderRBACMigrationWithAlembic:
                     .where(ObjectPermissionRow.entity_type == "vfolder")
                     .options(selectinload(ObjectPermissionRow.role_row))
                 )
-                object_perm_rows = object_perms.all()
+                object_perm_rows = cast(list[ObjectPermissionRow], object_perms.all())
 
                 inserted_obj_perm_vfolder_ids: set[str] = {
                     perm.vfolder_id for perm in data.permissions
