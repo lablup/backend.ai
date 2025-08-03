@@ -17,9 +17,6 @@ permissions:
 jobs:
   import-binary:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [aarch64, x86_64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -71,8 +68,8 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
-          title: "Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
+          commit-message: "chore: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
+          title: "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
           body: |
             This PR updates the all-smi binaries for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
