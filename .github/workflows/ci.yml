@@ -28,7 +28,9 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      skip: ${{ steps.check_skip.outputs.SKIP }}
+      skip: ${{ steps.check_skip.outputs.SKIP_CI }}
+      release: ${{ steps.release.outputs.IS_RELEASE }}
+      alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
       - name: Debug action trigger
         run: |
@@ -57,34 +59,33 @@ jobs:
           echo "  github.event.ref: ${{ github.event.ref }}"
           echo "---"
           echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
-      - name: Optimize CI
-        if: ${{ github.event_name == 'pull_request' }}
-        id: graphite-ci-action
-        uses: withgraphite/graphite-ci-action@main
-        with:
-          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
-      - name: Check if should skip the CI
-        id: check_skip
-        run: |
-          if [ "${{ steps.graphite-ci-action.outputs.skip }}" == "true" ]; then
-            echo "SKIP=true" >> $GITHUB_OUTPUT
-          else
-            echo "SKIP=false" >> $GITHUB_OUTPUT
-          fi
       - name: labeler
-        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'synchronize'
+        id: labeler
+        if: github.event_name == 'pull_request'
         uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
+      - name: Skip CI
+        id: check_skip
+        if: |
+          contains(toJSON(github.event.head_commit.message), 'skip:ci')
+          || contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
+      - name: Release
+        id: release
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+      - name: Alembic
+        id: alembic
+        if: |
+          contains(github.event.pull_request.labels.*.name, 'comp:manager')
+          || github.event_name == 'merge_group'
+        run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+
+
 
 
   lint:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -159,9 +160,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'comp:manager')
         || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
       )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
-      && needs.optimize-ci.outputs.skip == 'false'
+      && needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -214,13 +213,7 @@ jobs:
 
   typecheck:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -287,13 +280,7 @@ jobs:
 
   test:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
