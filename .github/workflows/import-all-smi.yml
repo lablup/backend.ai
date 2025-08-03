@@ -12,14 +12,10 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   import-binary:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [aarch64, x86_64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,21 +63,26 @@ jobs:
             ls -la "$TARGET_DIR/all-smi.${ARCH}.bin"
           done
 
+      - name: Add news fragment
+        run: |
+          echo "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
+
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
-          title: "Update all-smi binaries (aarch64, x86_64) to ${{ steps.get-tag.outputs.tag }}"
+          token: ${{ secrets.OCTODOG }}
+          commit-message: "chore: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
+          title: "deps: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
+          author: "Lablup Octodog <mu001@lablup.com>"
           body: |
-            This PR updates the all-smi binaries for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
+            This PR updates the all-smi binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
             Source: https://github.com/inureyes/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
 
             This update was triggered by:
             - Event: ${{ github.event_name }}
             ${{ github.event_name == 'repository_dispatch' && '- Automated trigger from all-smi repository release' || '- Manual workflow dispatch' }}
-          branch: update-all-smi-${{ steps.get-tag.outputs.tag }}
+          branch: deps/update-all-smi-${{ steps.get-tag.outputs.tag }}
           delete-branch: true
 
   setup-webhook:
