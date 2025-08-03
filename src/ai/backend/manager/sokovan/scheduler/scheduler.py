@@ -1,8 +1,9 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Optional, Protocol
 
+from ai.backend.common.types import ClusterMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
 from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
@@ -17,6 +18,14 @@ from ai.backend.manager.sokovan.scheduler.validators.validator import Scheduling
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+@dataclass
+class SchedulingConfig:
+    """Configuration needed for scheduling decisions."""
+
+    max_container_count_per_agent: Optional[int]
+    enforce_spreading_endpoint_replica: bool
+
+
 class SchedulerRepository(Protocol):
     """Protocol for repository to fetch system state for scheduling."""
 
@@ -26,6 +35,10 @@ class SchedulerRepository(Protocol):
 
     async def get_agents(self) -> Sequence[AgentInfo]:
         """Get a list of available agents."""
+        ...
+
+    async def get_scheduling_config(self, scaling_group: str) -> SchedulingConfig:
+        """Get scheduling configuration for a scaling group."""
         ...
 
 
@@ -84,13 +97,43 @@ class Scheduler:
 
         agents_info = await self._repository.get_agents()
         allocations: list[AllocationSnapshot] = []
+
+        # Get scheduling configuration once for all workloads
+        if not validates_workloads:
+            return
+        # Assuming all workloads in a batch are from the same scaling group
+        first_workload = validates_workloads[0]
+        config = await self._repository.get_scheduling_config(first_workload.scaling_group)
+
         for session_workload in validates_workloads:
             # TODO: Allocation Info should be received by the agent selector
             # current logic should be modified
             try:
-                allocation = self._agent_selector.select_agent(
-                    agents_info, session_workload.to_agent_selection_criteria()
+                # For single-node sessions, all kernels must have the same architecture
+                if not session_workload.kernels:
+                    log.warning(f"Session {session_workload.session_id} has no kernels")
+                    continue
+
+                architectures = {kernel.architecture for kernel in session_workload.kernels}
+                if (
+                    session_workload.cluster_mode == ClusterMode.SINGLE_NODE
+                    and len(architectures) > 1
+                ):
+                    log.error(
+                        f"Single-node session {session_workload.session_id} has kernels with "
+                        f"different architectures: {architectures}"
+                    )
+                    continue
+
+                architecture = next(iter(architectures))  # Use any architecture for now
+
+                criteria = session_workload.to_agent_selection_criteria(
+                    architecture=architecture,
+                    max_container_count=config.max_container_count_per_agent,
+                    enforce_spreading=config.enforce_spreading_endpoint_replica,
                 )
+
+                allocation = self._agent_selector.select_agent(agents_info, criteria)
                 if allocation is not None:
                     # TODO: AgentSelector Must return AllocationSnapshot instead of AgentId
                     allocations.append(allocation)  # type: ignore
@@ -102,4 +145,4 @@ class Scheduler:
                 )
 
         # Allocate resources for each validated workload
-        self._allocator.allocate(allocations)
+        await self._allocator.allocate(allocations)

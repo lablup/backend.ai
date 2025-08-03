@@ -20,7 +20,6 @@ def create_agent_info(
     occupied_slots: Optional[dict] = None,
     scaling_group: str = "default",
     container_count: int = 0,
-    kernel_count_at_endpoint: int = 0,
 ) -> AgentInfo:
     """Create an AgentInfo instance for testing."""
     if agent_id is None:
@@ -51,7 +50,6 @@ def create_agent_info(
         occupied_slots=ResourceSlot(occupied_slots),
         scaling_group=scaling_group,
         container_count=container_count,
-        kernel_count_at_endpoint=kernel_count_at_endpoint,
     )
 
 
@@ -61,6 +59,10 @@ def create_selection_criteria(
     scaling_group: str = "default",
     max_container_count: Optional[int] = None,
     designated_agent_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    session_type: Optional[str] = None,
+    enforce_spreading_endpoint_replica: bool = False,
+    kernel_counts_at_endpoint: Optional[dict[str, int]] = None,
 ) -> AgentSelectionCriteria:
     """Create an AgentSelectionCriteria instance for testing."""
     if requested_slots is None:
@@ -70,12 +72,20 @@ def create_selection_criteria(
             "cuda.shares": Decimal("0"),
         }
 
+    from ai.backend.common.types import SessionId, SessionTypes
+
     return AgentSelectionCriteria(
         requested_slots=ResourceSlot(requested_slots),
         required_architecture=architecture,
         scaling_group=scaling_group,
         max_container_count=max_container_count,
         designated_agent_id=AgentId(designated_agent_id) if designated_agent_id else None,
+        session_id=SessionId(session_id) if session_id else None,
+        session_type=SessionTypes(session_type) if session_type else None,
+        enforce_spreading_endpoint_replica=enforce_spreading_endpoint_replica,
+        kernel_counts_at_endpoint={AgentId(k): v for k, v in kernel_counts_at_endpoint.items()}
+        if kernel_counts_at_endpoint
+        else None,
     )
 
 

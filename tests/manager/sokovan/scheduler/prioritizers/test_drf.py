@@ -110,6 +110,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -119,6 +120,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
@@ -144,6 +146,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -153,6 +156,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -162,6 +166,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
@@ -187,6 +192,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -196,6 +202,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -205,6 +212,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
@@ -231,6 +239,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -240,6 +249,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
@@ -294,6 +304,7 @@ class TestDRFSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]

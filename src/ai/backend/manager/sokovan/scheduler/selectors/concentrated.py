@@ -8,7 +8,7 @@ resource utilization by concentrating workloads.
 import sys
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, SessionTypes
 
 from .selector import AbstractAgentSelector, AgentInfo, AgentSelectionCriteria
 from .utils import count_unutilized_capabilities, order_slots_by_priority
@@ -52,19 +52,29 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         )
 
         # Choose the agent with minimum resources (to concentrate workloads)
-        chosen_agent = min(
-            agents,
-            key=lambda agent: (
-                # First, consider kernel counts at endpoint for replica spreading
-                agent.kernel_count_at_endpoint,
-                # Then, prefer agents with fewer unutilized capabilities
-                count_unutilized_capabilities(agent, criteria.requested_slots),
-                # Finally, prefer agents with less available resources
-                *[
+        def agent_sort_key(agent: AgentInfo):
+            sort_key = []
+
+            # First, consider kernel counts at endpoint for replica spreading
+            if (
+                criteria.enforce_spreading_endpoint_replica
+                and criteria.kernel_counts_at_endpoint
+                and criteria.session_type == SessionTypes.INFERENCE
+            ):
+                kernel_count = criteria.kernel_counts_at_endpoint.get(agent.agent_id, 0)
+                sort_key.append(kernel_count)
+
+            # Then, prefer agents with fewer unutilized capabilities
+            sort_key.append(count_unutilized_capabilities(agent, criteria.requested_slots))
+
+            # Finally, prefer agents with less available resources
+            for key in resource_priorities:
+                sort_key.append(
                     (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
-                    for key in resource_priorities
-                ],
-            ),
-        )
+                )
+
+            return tuple(sort_key)
+
+        chosen_agent = min(agents, key=agent_sort_key)
 
         return chosen_agent.agent_id

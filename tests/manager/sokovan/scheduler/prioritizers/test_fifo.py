@@ -72,6 +72,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -81,6 +82,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -90,6 +92,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
@@ -142,6 +145,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -151,6 +155,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]

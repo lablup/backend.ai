@@ -151,6 +151,8 @@ class SessionWorkload:
     group_id: UUID
     # Domain name for domain resource limit checks
     domain_name: str
+    # Scaling group name
+    scaling_group: str
     # Priority level (higher value = higher priority)
     priority: int = 0
     # Session type (INTERACTIVE, BATCH, INFERENCE)
@@ -163,12 +165,36 @@ class SessionWorkload:
     is_private: bool = False
     # Kernels to be scheduled for this session
     kernels: list[KernelWorkload] = field(default_factory=list)
+    # Manually designated agent (for superadmin)
+    designated_agent: Optional[AgentId] = None
+    # Kernel counts at endpoint for each agent (for inference session spreading)
+    # Only populated for inference sessions with enforce_spreading_endpoint_replica
+    kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
-    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
-        """Convert to agent selection criteria for scheduling."""
-        raise NotImplementedError(
-            "This method should be implemented to convert session workload "
-            "to agent selection criteria."
+    def to_agent_selection_criteria(
+        self,
+        architecture: str,
+        max_container_count: Optional[int],
+        enforce_spreading: bool,
+    ) -> AgentSelectionCriteria:
+        """
+        Convert to agent selection criteria for scheduling.
+
+        Args:
+            architecture: Required architecture for the agent
+            max_container_count: Maximum containers per agent (from etcd config)
+            enforce_spreading: Whether to enforce endpoint replica spreading (from sgroup_opts)
+        """
+        return AgentSelectionCriteria(
+            requested_slots=self.requested_slots,
+            required_architecture=architecture,
+            scaling_group=self.scaling_group,
+            max_container_count=max_container_count,
+            designated_agent_id=self.designated_agent,
+            session_id=self.session_id,
+            session_type=self.session_type,
+            enforce_spreading_endpoint_replica=enforce_spreading,
+            kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,
         )
 
 

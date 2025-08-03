@@ -33,13 +33,11 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="busy-endpoint",
-                kernel_count_at_endpoint=5,
                 available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
                 occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             ),
             create_agent_info(
                 agent_id="free-endpoint",
-                kernel_count_at_endpoint=1,
                 available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
                 occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             ),
@@ -47,7 +45,11 @@ class TestConcentratedAgentSelector:
 
         strategy = ConcentratedAgentSelector(["cpu", "mem"])
         selector = AgentSelector(strategy)
-        criteria = create_selection_criteria()
+        criteria = create_selection_criteria(
+            session_type="INFERENCE",
+            enforce_spreading_endpoint_replica=True,
+            kernel_counts_at_endpoint={"busy-endpoint": 5, "free-endpoint": 1},
+        )
 
         result = await selector.select_agent(agents, criteria)
         # Should prefer agent with fewer kernels at endpoint
@@ -138,7 +140,6 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-a",
-                kernel_count_at_endpoint=2,
                 available_slots={
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
@@ -152,7 +153,6 @@ class TestConcentratedAgentSelector:
             ),
             create_agent_info(
                 agent_id="agent-b",
-                kernel_count_at_endpoint=2,
                 available_slots={
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
@@ -164,7 +164,6 @@ class TestConcentratedAgentSelector:
             ),
             create_agent_info(
                 agent_id="agent-c",
-                kernel_count_at_endpoint=1,
                 available_slots={
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
@@ -183,7 +182,10 @@ class TestConcentratedAgentSelector:
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
                 "cuda.shares": Decimal("0"),
-            }
+            },
+            session_type="INFERENCE",
+            enforce_spreading_endpoint_replica=True,
+            kernel_counts_at_endpoint={"agent-a": 2, "agent-b": 2, "agent-c": 1},
         )
 
         result = await selector.select_agent(agents, criteria)

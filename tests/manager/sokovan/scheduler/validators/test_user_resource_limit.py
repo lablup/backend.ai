@@ -1,11 +1,10 @@
 """Tests for user resource limit validator."""
 
-import uuid
 from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -25,36 +24,27 @@ from ai.backend.manager.sokovan.scheduler.validators import (
 
 class TestUserResourceLimitValidator:
     @pytest.fixture
-    def user_id(self) -> uuid.UUID:
-        return uuid.uuid4()
-
-    @pytest.fixture
     def validator(self) -> UserResourceLimitValidator:
         return UserResourceLimitValidator()
 
     def test_passes_when_under_limit(
-        self, validator: UserResourceLimitValidator, user_id: uuid.UUID
+        self,
+        validator: UserResourceLimitValidator,
+        user_specific_small_workload: SessionWorkload,
     ) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("2"), mem=Decimal("2")),
-            user_uuid=user_id,
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+        workload = user_specific_small_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
-                by_user={user_id: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
+                by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
                 by_group={},
                 by_domain={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    user_id: UserResourcePolicy(
+                    workload.user_uuid: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )
@@ -71,28 +61,23 @@ class TestUserResourceLimitValidator:
         validator.validate(snapshot, workload)
 
     def test_fails_when_exceeds_limit(
-        self, validator: UserResourceLimitValidator, user_id: uuid.UUID
+        self,
+        validator: UserResourceLimitValidator,
+        user_specific_medium_workload: SessionWorkload,
     ) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=user_id,
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+        workload = user_specific_medium_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
-                by_user={user_id: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
+                by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
                 by_group={},
                 by_domain={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    user_id: UserResourcePolicy(
+                    workload.user_uuid: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )
@@ -110,16 +95,11 @@ class TestUserResourceLimitValidator:
         assert "Your main-keypair resource quota is exceeded" in str(exc_info.value)
 
     def test_fails_when_no_policy(
-        self, validator: UserResourceLimitValidator, user_id: uuid.UUID
+        self,
+        validator: UserResourceLimitValidator,
+        user_specific_minimal_workload: SessionWorkload,
     ) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-            user_uuid=user_id,
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+        workload = user_specific_minimal_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
@@ -141,19 +121,14 @@ class TestUserResourceLimitValidator:
 
         with pytest.raises(UserResourcePolicyNotFound) as exc_info:
             validator.validate(snapshot, workload)
-        assert f"User has no resource policy (uid: {user_id})" in str(exc_info.value)
+        assert f"User has no resource policy (uid: {workload.user_uuid})" in str(exc_info.value)
 
     def test_passes_when_no_current_occupancy(
-        self, validator: UserResourceLimitValidator, user_id: uuid.UUID
+        self,
+        validator: UserResourceLimitValidator,
+        user_specific_medium_workload: SessionWorkload,
     ) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=user_id,
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+        workload = user_specific_medium_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
@@ -165,7 +140,7 @@ class TestUserResourceLimitValidator:
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    user_id: UserResourcePolicy(
+                    workload.user_uuid: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )

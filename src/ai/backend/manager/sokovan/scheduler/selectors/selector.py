@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
 
 
 @dataclass
@@ -30,8 +30,6 @@ class AgentInfo:
     scaling_group: str
     # Number of containers currently running on the agent
     container_count: int
-    # Number of kernels at the same endpoint (for endpoint replica spreading)
-    kernel_count_at_endpoint: int = 0
 
 
 @dataclass
@@ -48,6 +46,14 @@ class AgentSelectionCriteria:
     max_container_count: Optional[int] = None
     # Specific agent to use (for manual assignment by superadmin)
     designated_agent_id: Optional[AgentId] = None
+    # Session ID (needed for endpoint replica spreading in inference sessions)
+    session_id: Optional[SessionId] = None
+    # Session type (needed to determine if endpoint spreading applies)
+    session_type: Optional[SessionTypes] = None
+    # Whether to enforce endpoint replica spreading (from sgroup_opts)
+    enforce_spreading_endpoint_replica: bool = False
+    # Kernel counts at endpoint for each agent (for concentrated selector spreading)
+    kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
 
 class AbstractAgentSelector(ABC):
