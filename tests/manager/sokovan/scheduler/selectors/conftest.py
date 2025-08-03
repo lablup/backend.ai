@@ -51,7 +51,7 @@ def create_agent_info(
 
 
 @pytest.fixture
-def sample_agents():
+def sample_agents() -> list[AgentInfo]:
     """Create a list of sample agents for testing."""
     return [
         create_agent_info(
@@ -96,7 +96,7 @@ def sample_agents():
 
 
 @pytest.fixture
-def gpu_agents():
+def gpu_agents() -> list[AgentInfo]:
     """Create a list of GPU-enabled agents for testing."""
     return [
         create_agent_info(

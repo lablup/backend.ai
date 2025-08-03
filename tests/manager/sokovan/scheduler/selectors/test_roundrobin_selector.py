@@ -21,7 +21,7 @@ class TestRoundRobinAgentSelector:
     """Test round-robin agent selector behavior."""
 
     @pytest.fixture
-    def basic_criteria(self):
+    def basic_criteria(self) -> AgentSelectionCriteria:
         """Create basic selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -34,7 +34,7 @@ class TestRoundRobinAgentSelector:
         )
 
     @pytest.fixture
-    def basic_config(self):
+    def basic_config(self) -> AgentSelectionConfig:
         """Create basic selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -42,7 +42,7 @@ class TestRoundRobinAgentSelector:
         )
 
     @pytest.fixture
-    def resource_req(self):
+    def resource_req(self) -> ResourceRequirements:
         """Create basic resource requirements."""
         return ResourceRequirements(
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
@@ -64,20 +64,20 @@ class TestRoundRobinAgentSelector:
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-a")
+        assert selected.agent_id == AgentId("agent-a")
 
         # Update index manually (in real usage, caller tracks this)
         selector.next_index = 1
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-b")
+        assert selected.agent_id == AgentId("agent-b")
 
         selector.next_index = 2
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-c")
+        assert selected.agent_id == AgentId("agent-c")
 
     def test_index_wrapping(self, basic_criteria, basic_config, resource_req):
         """Test that index wraps around when exceeding agent count."""
@@ -92,14 +92,14 @@ class TestRoundRobinAgentSelector:
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-1")  # Wraps to index 0
+        assert selected.agent_id == AgentId("agent-1")  # Wraps to index 0
 
         # Test with index greater than agent count
         selector = RoundRobinAgentSelector(next_index=7)
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-2")  # 7 % 3 = 1
+        assert selected.agent_id == AgentId("agent-2")  # 7 % 3 = 1
 
     def test_consistent_ordering_by_agent_id(self, basic_criteria, basic_config, resource_req):
         """Test that agents are consistently ordered by ID."""
@@ -116,19 +116,19 @@ class TestRoundRobinAgentSelector:
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("alpha")
+        assert selected.agent_id == AgentId("alpha")
 
         selector.next_index = 1
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("beta")
+        assert selected.agent_id == AgentId("beta")
 
         selector.next_index = 2
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("zebra")
+        assert selected.agent_id == AgentId("zebra")
 
     def test_single_agent(self, basic_criteria, basic_config, resource_req):
         """Test round-robin with single agent."""
@@ -140,7 +140,7 @@ class TestRoundRobinAgentSelector:
             selected = selector.select_agent_by_strategy(
                 agents, resource_req, basic_criteria, basic_config
             )
-            assert selected == AgentId("lonely-agent")
+            assert selected.agent_id == AgentId("lonely-agent")
 
     def test_ignores_resource_availability(self, basic_criteria, basic_config, resource_req):
         """Test that round-robin ignores resource availability (just uses index)."""
@@ -163,7 +163,7 @@ class TestRoundRobinAgentSelector:
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-empty")
+        assert selected.agent_id == AgentId("agent-empty")
 
     def test_deterministic_selection(self, basic_criteria, basic_config, resource_req):
         """Test that selection is deterministic for same index and agents."""
@@ -181,7 +181,7 @@ class TestRoundRobinAgentSelector:
 
         # All selections should be identical
         assert all(r == results[0] for r in results)
-        assert results[0] == AgentId("agent-5")
+        assert results[0].agent_id == AgentId("agent-5")
 
     def test_handles_non_sequential_agent_ids(self, basic_criteria, basic_config, resource_req):
         """Test round-robin with non-sequential agent IDs."""
@@ -198,19 +198,19 @@ class TestRoundRobinAgentSelector:
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-100")
+        assert selected.agent_id == AgentId("agent-100")
 
         selector.next_index = 1
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-42")
+        assert selected.agent_id == AgentId("agent-42")
 
         selector.next_index = 2
         selected = selector.select_agent_by_strategy(
             agents, resource_req, basic_criteria, basic_config
         )
-        assert selected == AgentId("agent-5")
+        assert selected.agent_id == AgentId("agent-5")
 
     def test_fairness_over_multiple_selections(self, basic_criteria, basic_config, resource_req):
         """Test that round-robin provides fair distribution over time."""
@@ -226,7 +226,7 @@ class TestRoundRobinAgentSelector:
             selected = selector.select_agent_by_strategy(
                 agents, resource_req, basic_criteria, basic_config
             )
-            selection_count[selected] += 1
+            selection_count[selected.agent_id] += 1
 
         # Each agent should be selected exactly 10 times
         assert all(count == 10 for count in selection_count.values())

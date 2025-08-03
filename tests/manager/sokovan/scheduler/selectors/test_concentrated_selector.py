@@ -21,12 +21,12 @@ class TestConcentratedAgentSelector:
     """Test concentrated agent selector behavior."""
 
     @pytest.fixture
-    def selector(self):
+    def selector(self) -> ConcentratedAgentSelector:
         """Create a concentrated selector with default priority."""
         return ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
     @pytest.fixture
-    def basic_criteria(self):
+    def basic_criteria(self) -> AgentSelectionCriteria:
         """Create basic selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -39,7 +39,7 @@ class TestConcentratedAgentSelector:
         )
 
     @pytest.fixture
-    def basic_config(self):
+    def basic_config(self) -> AgentSelectionConfig:
         """Create basic selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -82,7 +82,7 @@ class TestConcentratedAgentSelector:
         )
 
         # Should select agent-low (least available resources)
-        assert selected == AgentId("agent-low")
+        assert selected.agent_id == AgentId("agent-low")
 
     def test_prefers_fewer_unutilized_capabilities(self, selector, basic_criteria, basic_config):
         """Test preference for agents with fewer unutilized resource types."""
@@ -123,7 +123,7 @@ class TestConcentratedAgentSelector:
         )
 
         # Should select agent-cpu-only (no unutilized GPU capability)
-        assert selected == AgentId("agent-cpu-only")
+        assert selected.agent_id == AgentId("agent-cpu-only")
 
     def test_respects_resource_priority_order(self, basic_criteria, basic_config):
         """Test that resource priorities are respected in order."""
@@ -158,7 +158,7 @@ class TestConcentratedAgentSelector:
         )
 
         # Should select low-mem-high-cpu (less memory available, which is higher priority)
-        assert selected == AgentId("low-mem-high-cpu")
+        assert selected.agent_id == AgentId("low-mem-high-cpu")
 
     def test_endpoint_replica_spreading_for_inference(self, selector):
         """Test special behavior for inference sessions with endpoint replica spreading."""
@@ -210,7 +210,7 @@ class TestConcentratedAgentSelector:
         selected = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should select agent-3 (fewest kernels at endpoint)
-        assert selected == AgentId("agent-3")
+        assert selected.agent_id == AgentId("agent-3")
 
     def test_tie_breaking_with_identical_resources(self, selector, basic_criteria, basic_config):
         """Test consistent tie-breaking when agents have identical resources."""
@@ -244,7 +244,7 @@ class TestConcentratedAgentSelector:
         )
 
         # Should consistently select the same agent (first in min comparison)
-        assert selected in [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
+        assert selected.agent_id in [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
 
         # Run multiple times to ensure consistency
         for _ in range(10):
@@ -303,7 +303,7 @@ class TestConcentratedAgentSelector:
         )
 
         # Should select gpu-busy (less available resources)
-        assert selected == AgentId("gpu-busy")
+        assert selected.agent_id == AgentId("gpu-busy")
 
     def test_custom_resource_priority(self, basic_criteria, basic_config):
         """Test with custom resource priorities including GPU."""
@@ -359,4 +359,4 @@ class TestConcentratedAgentSelector:
         )
 
         # Should select low-gpu (less GPU available, which is highest priority)
-        assert selected == AgentId("low-gpu")
+        assert selected.agent_id == AgentId("low-gpu")

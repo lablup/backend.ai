@@ -221,10 +221,18 @@ class KernelAllocation:
     agent_addr: str
     # Scaling group that the agent belongs to
     scaling_group: str
-    # Resource slots requested by this kernel
-    requested_slots: ResourceSlot
     # Host ports allocated for this kernel (empty set if none)
     allocated_host_ports: set[int] = field(default_factory=set)
+
+
+@dataclass
+class AgentAllocation:
+    """Represents resource allocation to a specific agent."""
+
+    # Identifier of the agent
+    agent_id: AgentId
+    # List of resource slots allocated to this agent
+    allocated_slots: list[ResourceSlot]
 
 
 @dataclass
@@ -241,3 +249,5 @@ class SessionAllocation:
     scaling_group: str
     # List of kernel allocations for this session
     kernel_allocations: list[KernelAllocation]
+    # List of agent allocations for this session
+    agent_allocations: list[AgentAllocation]

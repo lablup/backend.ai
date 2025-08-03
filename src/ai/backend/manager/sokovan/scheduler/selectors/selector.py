@@ -171,7 +171,7 @@ class AbstractAgentSelector(ABC):
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentInfo]:
         """
         Select an agent using the strategy with specific resource requirements.
 
@@ -185,7 +185,7 @@ class AbstractAgentSelector(ABC):
             config: Configuration for agent selection
 
         Returns:
-            The ID of the selected agent, or None if no suitable agent found
+            The selected agent info, or None if no suitable agent found
         """
         raise NotImplementedError
 
@@ -210,7 +210,7 @@ class AgentSelector:
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
         designated_agent: Optional[AgentId] = None,
-    ) -> AgentId:
+    ) -> AgentInfo:
         """
         Select an agent for given resource requirements.
 
@@ -222,7 +222,7 @@ class AgentSelector:
             designated_agent: Manually designated agent (for superadmin)
 
         Returns:
-            The ID of the selected agent
+            The selected agent info
 
         Raises:
             NoAvailableAgentError: If no agents are available
@@ -245,7 +245,7 @@ class AgentSelector:
                             f"Designated agent '{designated_agent}' does not meet resource requirements: "
                             f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
                         )
-                    return designated_agent
+                    return agent
             raise DesignatedAgentNotFoundError(
                 f"Designated agent '{designated_agent}' not found in available agents"
             )

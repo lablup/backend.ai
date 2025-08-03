@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
+from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
 from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
@@ -13,6 +14,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.types import (
+    AgentAllocation,
     KernelAllocation,
     SessionAllocation,
     SessionWorkload,
@@ -117,88 +119,114 @@ class Scheduler:
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
         for session_workload in validates_workloads:
-            try:
-                # Convert to new criteria format
-                criteria = session_workload.to_agent_selection_criteria()
-
-                # Get resource requirements based on cluster mode
-                resource_requirements = criteria.get_resource_requirements()
-                if not resource_requirements:
-                    log.debug(
-                        "No resource requirements found for session {}",
-                        session_workload.session_id,
-                    )
-                    continue
-
-                kernel_allocations: list[KernelAllocation] = []
-
-                try:
-                    # Process each resource requirement
-                    for i, resource_req in enumerate(resource_requirements):
-                        # Only apply designated agent to the first selection
-                        designated_agent = session_workload.designated_agent if i == 0 else None
-
-                        selected_agent_id = (
-                            await self._agent_selector.select_agent_for_resource_requirements(
-                                agents_info,
-                                resource_req,
-                                criteria,
-                                selection_config,
-                                designated_agent,
-                            )
-                        )
-
-                        # Find the selected agent info
-                        selected_agent = next(
-                            (agent for agent in agents_info if agent.agent_id == selected_agent_id),
-                            None,
-                        )
-
-                        if selected_agent:
-                            # Allocate all kernels in this requirement to the selected agent
-                            for kernel_id in resource_req.kernel_ids:
-                                # Find the kernel with matching ID
-                                kernel_match = None
-                                for k in session_workload.kernels:
-                                    if k.kernel_id == kernel_id:
-                                        kernel_match = k
-                                        break
-                                if kernel_match:
-                                    kernel_allocations.append(
-                                        KernelAllocation(
-                                            kernel_id=kernel_match.kernel_id,
-                                            agent_id=selected_agent_id,
-                                            agent_addr=selected_agent.agent_addr,
-                                            scaling_group=selected_agent.scaling_group,
-                                            requested_slots=kernel_match.requested_slots,
-                                        )
-                                    )
-
-                except AgentSelectionError as e:
-                    log.debug(
-                        "Agent selection failed for session {}: {}",
-                        session_workload.session_id,
-                        e,
-                    )
-                    continue
-
-                # Create session allocation if we have kernel allocations
-                if kernel_allocations:
-                    session_allocation = SessionAllocation(
-                        session_id=session_workload.session_id,
-                        session_type=session_workload.session_type,
-                        cluster_mode=session_workload.cluster_mode,
-                        scaling_group=scaling_group,
-                        kernel_allocations=kernel_allocations,
-                    )
-                    session_allocations.append(session_allocation)
-
-            except Exception as e:
-                log.debug(
-                    "Agent selection failed for workload {}: {}",
-                    session_workload.session_id,
-                    e,
-                )
+            session_allocation = await self._allocate_workload(
+                session_workload,
+                agents_info,
+                selection_config,
+                scaling_group,
+            )
+            if session_allocation:
+                session_allocations.append(session_allocation)
 
         # Allocate resources for each validated workload
         await self._allocator.allocate(session_allocations)
+
+    async def _allocate_workload(
+        self,
+        session_workload: SessionWorkload,
+        agents_info: Sequence[AgentInfo],
+        selection_config: AgentSelectionConfig,
+        scaling_group: str,
+    ) -> Optional[SessionAllocation]:
+        """
+        Allocate resources for a single session workload.
+
+        :param session_workload: The workload to allocate
+        :param agents_info: Available agents
+        :param selection_config: Agent selection configuration
+        :param scaling_group: The scaling group name
+        :return: SessionAllocation if successful, None otherwise
+        """
+        try:
+            # Convert to new criteria format
+            criteria = session_workload.to_agent_selection_criteria()
+
+            # Get resource requirements based on cluster mode
+            resource_requirements = criteria.get_resource_requirements()
+            if not resource_requirements:
+                log.debug(
+                    "No resource requirements found for session {}",
+                    session_workload.session_id,
+                )
+                return None
+
+            kernel_allocations: list[KernelAllocation] = []
+            # Track agent allocations: agent_id -> AgentAllocation
+            agent_allocation_map: dict[AgentId, AgentAllocation] = {}
+
+            try:
+                # Process each resource requirement
+                for resource_req in resource_requirements:
+                    # Only apply designated agent to the first selection
+                    selected_agent = (
+                        await self._agent_selector.select_agent_for_resource_requirements(
+                            agents_info,
+                            resource_req,
+                            criteria,
+                            selection_config,
+                            session_workload.designated_agent,
+                        )
+                    )
+
+                    # Track resource allocation for this agent
+                    if selected_agent.agent_id not in agent_allocation_map:
+                        agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
+                            agent_id=selected_agent.agent_id,
+                            allocated_slots=[],
+                        )
+                    agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
+                        resource_req.requested_slots
+                    )
+
+                    # Create kernel allocations
+                    for kernel_id in resource_req.kernel_ids:
+                        kernel_allocations.append(
+                            KernelAllocation(
+                                kernel_id=kernel_id,
+                                agent_id=selected_agent.agent_id,
+                                agent_addr=selected_agent.agent_addr,
+                                scaling_group=selected_agent.scaling_group,
+                            )
+                        )
+
+            except AgentSelectionError as e:
+                log.debug(
+                    "Agent selection failed for session {}: {}",
+                    session_workload.session_id,
+                    e,
+                )
+                return None
+
+            # Create session allocation if we have kernel allocations
+            if kernel_allocations:
+                # Get agent allocations from the map
+                agent_allocations = list(agent_allocation_map.values())
+
+                return SessionAllocation(
+                    session_id=session_workload.session_id,
+                    session_type=session_workload.session_type,
+                    cluster_mode=session_workload.cluster_mode,
+                    scaling_group=scaling_group,
+                    kernel_allocations=kernel_allocations,
+                    agent_allocations=agent_allocations,
+                )
+
+            return None
+
+        except Exception as e:
+            log.debug(
+                "Agent selection failed for workload {}: {}",
+                session_workload.session_id,
+                e,
+            )
+            return None

@@ -7,8 +7,6 @@ a simple round-robin index.
 
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId
-
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,
@@ -41,7 +39,7 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentInfo]:
         """
         Select an agent using round-robin.
 
@@ -53,4 +51,4 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         # Use modulo to wrap around
         selected_index = self.next_index % len(sorted_agents)
 
-        return sorted_agents[selected_index].agent_id
+        return sorted_agents[selected_index]

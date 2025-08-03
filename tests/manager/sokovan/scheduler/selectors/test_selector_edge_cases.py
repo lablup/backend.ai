@@ -27,7 +27,7 @@ class TestSelectorEdgeCases:
     """Test edge cases and error conditions for selectors."""
 
     @pytest.fixture
-    def criteria(self):
+    def criteria(self) -> AgentSelectionCriteria:
         """Create standard selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -40,7 +40,7 @@ class TestSelectorEdgeCases:
         )
 
     @pytest.fixture
-    def config(self):
+    def config(self) -> AgentSelectionConfig:
         """Create standard selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -80,7 +80,7 @@ class TestSelectorEdgeCases:
         for selector in selectors:
             result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
             assert result is not None
-            assert result in [AgentId("agent-1"), AgentId("agent-2")]
+            assert result.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
 
     def test_zero_resource_values(self, criteria, config):
         """Test handling of zero resource values in requests."""
@@ -106,7 +106,7 @@ class TestSelectorEdgeCases:
         result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should still select an agent
-        assert result == AgentId("agent-1")
+        assert result.agent_id == AgentId("agent-1")
 
     def test_missing_resource_types_in_request(self, criteria, config):
         """Test when requested resource type doesn't exist on any agent."""
@@ -189,9 +189,9 @@ class TestSelectorEdgeCases:
         )
 
         # Concentrated should pick normal (less available)
-        assert concentrated_choice == AgentId("normal")
+        assert concentrated_choice.agent_id == AgentId("normal")
         # Dispersed should pick huge (more available)
-        assert dispersed_choice == AgentId("huge")
+        assert dispersed_choice.agent_id == AgentId("huge")
 
     def test_decimal_precision_edge_cases(self, criteria, config):
         """Test handling of decimal precision edge cases."""
@@ -233,7 +233,7 @@ class TestSelectorEdgeCases:
         result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should handle decimal precision correctly
-        assert result in [AgentId("agent-1"), AgentId("agent-2")]
+        assert result.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
 
     def test_single_agent_all_strategies(self, criteria, config):
         """Test all strategies with only one agent available."""
@@ -259,7 +259,7 @@ class TestSelectorEdgeCases:
         # All should select the only agent
         for selector in selectors:
             result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
-            assert result == AgentId("lonely")
+            assert result.agent_id == AgentId("lonely")
 
     def test_all_agents_fully_occupied(self, criteria, config):
         """Test when all agents have zero available resources."""
@@ -283,7 +283,7 @@ class TestSelectorEdgeCases:
         result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should still return an agent (they're all equal)
-        assert result in [AgentId(f"full-{i}") for i in range(3)]
+        assert result.agent_id in [AgentId(f"full-{i}") for i in range(3)]
 
     def test_priority_with_nonexistent_resources(self, criteria, config):
         """Test resource priority list containing non-existent resource types."""
@@ -311,7 +311,7 @@ class TestSelectorEdgeCases:
         result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should ignore non-existent resources and use cpu/mem
-        assert result == AgentId("agent-1")  # Less available resources
+        assert result.agent_id == AgentId("agent-1")  # Less available resources
 
     @pytest.mark.asyncio
     async def test_empty_agent_list(self, criteria, config):
@@ -375,4 +375,4 @@ class TestSelectorEdgeCases:
         result = selector.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Should handle special resource names correctly
-        assert result == AgentId("special")
+        assert result.agent_id == AgentId("special")

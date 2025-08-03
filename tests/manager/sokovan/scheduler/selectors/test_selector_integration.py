@@ -25,7 +25,7 @@ class TestSelectorIntegration:
     """Integration tests comparing different selector strategies."""
 
     @pytest.fixture
-    def criteria(self):
+    def criteria(self) -> AgentSelectionCriteria:
         """Create standard selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -38,7 +38,7 @@ class TestSelectorIntegration:
         )
 
     @pytest.fixture
-    def config(self):
+    def config(self) -> AgentSelectionConfig:
         """Create standard selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -46,7 +46,7 @@ class TestSelectorIntegration:
         )
 
     @pytest.fixture
-    def resource_priority(self):
+    def resource_priority(self) -> list[str]:
         """Standard resource priority."""
         return ["cpu", "mem", "cuda.shares"]
 
@@ -95,10 +95,10 @@ class TestSelectorIntegration:
         )
 
         # Verify different strategies make appropriate choices
-        assert concentrated_choice == AgentId("agent-1")  # Least resources
-        assert dispersed_choice == AgentId("agent-3")  # Most resources
-        assert legacy_choice == AgentId("agent-3")  # Most resources (no unutilized)
-        assert roundrobin_choice == AgentId("agent-2")  # Index 1
+        assert concentrated_choice.agent_id == AgentId("agent-1")  # Least resources
+        assert dispersed_choice.agent_id == AgentId("agent-3")  # Most resources
+        assert legacy_choice.agent_id == AgentId("agent-3")  # Most resources (no unutilized)
+        assert roundrobin_choice.agent_id == AgentId("agent-2")  # Index 1
 
     def test_mixed_resource_types_comparison(self, criteria, config):
         """Test strategy differences with mixed resource types."""
@@ -168,11 +168,11 @@ class TestSelectorIntegration:
         legacy_choice = legacy.select_agent_by_strategy(agents, resource_req, criteria, config)
 
         # Concentrated prefers fewer unutilized capabilities
-        assert concentrated_choice == AgentId("cpu-generalist")
+        assert concentrated_choice.agent_id == AgentId("cpu-generalist")
         # Dispersed also prefers fewer unutilized capabilities when resources are equal
-        assert dispersed_choice == AgentId("cpu-generalist")
+        assert dispersed_choice.agent_id == AgentId("cpu-generalist")
         # Legacy also prefers fewer unutilized capabilities
-        assert legacy_choice == AgentId("cpu-generalist")
+        assert legacy_choice.agent_id == AgentId("cpu-generalist")
 
     @pytest.mark.asyncio
     async def test_with_agent_selector_wrapper(self, criteria, config, resource_priority):
@@ -211,8 +211,8 @@ class TestSelectorIntegration:
         )
 
         # Should make opposite choices
-        assert concentrated_result == AgentId("agent-b")  # Less available
-        assert dispersed_result == AgentId("agent-a")  # More available
+        assert concentrated_result.agent_id == AgentId("agent-b")  # Less available
+        assert dispersed_result.agent_id == AgentId("agent-a")  # More available
 
     def test_large_scale_performance(self, criteria, config, resource_priority):
         """Test selector performance with many agents."""
@@ -260,13 +260,15 @@ class TestSelectorIntegration:
         assert all(result is not None for result in results.values())
 
         # Concentrated should pick highly utilized agent
-        assert results["concentrated"] == AgentId("agent-015")  # Highest utilization (15/16)
+        assert results["concentrated"].agent_id == AgentId(
+            "agent-015"
+        )  # Highest utilization (15/16)
 
         # Dispersed should pick least utilized agent
-        assert results["dispersed"] == AgentId("agent-000")  # Lowest utilization (0/16)
+        assert results["dispersed"].agent_id == AgentId("agent-000")  # Lowest utilization (0/16)
 
         # Round-robin should pick based on index
-        assert results["roundrobin"] == AgentId("agent-042")  # Index 42
+        assert results["roundrobin"].agent_id == AgentId("agent-042")  # Index 42
 
     def test_inference_session_spreading(self, config):
         """Test special behavior for inference sessions with endpoint replica spreading."""
@@ -327,7 +329,11 @@ class TestSelectorIntegration:
         )
 
         # Concentrated should pick agent-3 (least kernels at endpoint)
-        assert concentrated_choice == AgentId("agent-3")
+        assert concentrated_choice.agent_id == AgentId("agent-3")
 
         # Dispersed ignores kernel counts, picks any (all have same resources)
-        assert dispersed_choice in [AgentId("agent-1"), AgentId("agent-2"), AgentId("agent-3")]
+        assert dispersed_choice.agent_id in [
+            AgentId("agent-1"),
+            AgentId("agent-2"),
+            AgentId("agent-3"),
+        ]

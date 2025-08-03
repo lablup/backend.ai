@@ -8,7 +8,7 @@ resource utilization by concentrating workloads.
 import sys
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId, SessionTypes
+from ai.backend.common.types import SessionTypes
 
 from .selector import (
     AbstractAgentSelector,
@@ -45,7 +45,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentInfo]:
         """
         Select an agent to concentrate workloads.
 
@@ -82,4 +82,4 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
 
         chosen_agent = min(agents, key=agent_sort_key)
 
-        return chosen_agent.agent_id
+        return chosen_agent

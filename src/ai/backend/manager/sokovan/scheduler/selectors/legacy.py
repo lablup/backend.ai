@@ -8,8 +8,6 @@ with fewer unutilized capabilities.
 import sys
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId
-
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,
@@ -38,7 +36,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentInfo]:
         """
         Select an agent based on resource priorities.
 
@@ -61,4 +59,4 @@ class LegacyAgentSelector(AbstractAgentSelector):
             ],
         )
 
-        return chosen_agent.agent_id
+        return chosen_agent

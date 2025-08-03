@@ -21,12 +21,12 @@ class TestLegacyAgentSelector:
     """Test legacy agent selector behavior."""
 
     @pytest.fixture
-    def selector(self):
+    def selector(self) -> LegacyAgentSelector:
         """Create a legacy selector with default priority."""
         return LegacyAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
     @pytest.fixture
-    def basic_criteria(self):
+    def basic_criteria(self) -> AgentSelectionCriteria:
         """Create basic selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -39,7 +39,7 @@ class TestLegacyAgentSelector:
         )
 
     @pytest.fixture
-    def basic_config(self):
+    def basic_config(self) -> AgentSelectionConfig:
         """Create basic selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -96,7 +96,7 @@ class TestLegacyAgentSelector:
         )
 
         # Should select agent-minimal (0 unutilized capabilities vs 2)
-        assert selected == AgentId("agent-minimal")
+        assert selected.agent_id == AgentId("agent-minimal")
 
     def test_breaks_ties_with_resource_availability(self, selector, basic_criteria, basic_config):
         """Test that ties in unutilized capabilities are broken by resource availability."""
@@ -129,7 +129,7 @@ class TestLegacyAgentSelector:
         )
 
         # Should select agent-high-resources (more available resources)
-        assert selected == AgentId("agent-high-resources")
+        assert selected.agent_id == AgentId("agent-high-resources")
 
     def test_respects_resource_priority_order(self, basic_criteria, basic_config):
         """Test that resource priorities are used for tie-breaking."""
@@ -165,7 +165,7 @@ class TestLegacyAgentSelector:
         )
 
         # Should select low-cpu-high-mem (more memory, which is higher priority)
-        assert selected == AgentId("low-cpu-high-mem")
+        assert selected.agent_id == AgentId("low-cpu-high-mem")
 
     def test_handles_partially_utilized_resources(self, selector, basic_criteria, basic_config):
         """Test selection when agents have partially utilized special resources."""
@@ -216,7 +216,7 @@ class TestLegacyAgentSelector:
         # Both have same unutilized capabilities (0 - all resources are requested)
         # Both have same available CPU and memory
         # They should be equivalent choices
-        assert selected in [AgentId("gpu-partially-used"), AgentId("gpu-unused")]
+        assert selected.agent_id in [AgentId("gpu-partially-used"), AgentId("gpu-unused")]
 
     def test_legacy_behavior_differs_from_concentrated_and_dispersed(
         self, basic_criteria, basic_config
@@ -277,11 +277,11 @@ class TestLegacyAgentSelector:
         )
 
         # Legacy should choose agent-general (fewer unutilized capabilities)
-        assert legacy_choice == AgentId("agent-general")
+        assert legacy_choice.agent_id == AgentId("agent-general")
         # Concentrated should choose agent-specialized (less available resources)
-        assert concentrated_choice == AgentId("agent-specialized")
+        assert concentrated_choice.agent_id == AgentId("agent-specialized")
         # Dispersed should choose agent-general (more available resources AND fewer unutilized)
-        assert dispersed_choice == AgentId("agent-general")
+        assert dispersed_choice.agent_id == AgentId("agent-general")
 
     def test_handles_custom_resource_types(self, basic_criteria, basic_config):
         """Test selection with custom resource types in priority."""
@@ -337,4 +337,4 @@ class TestLegacyAgentSelector:
         )
 
         # Should select custom-rich (more custom.accelerator, which is highest priority)
-        assert selected == AgentId("custom-rich")
+        assert selected.agent_id == AgentId("custom-rich")

@@ -21,12 +21,12 @@ class TestDispersedAgentSelector:
     """Test dispersed agent selector behavior."""
 
     @pytest.fixture
-    def selector(self):
+    def selector(self) -> DispersedAgentSelector:
         """Create a dispersed selector with default priority."""
         return DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
     @pytest.fixture
-    def basic_criteria(self):
+    def basic_criteria(self) -> AgentSelectionCriteria:
         """Create basic selection criteria."""
         return AgentSelectionCriteria(
             session_metadata=SessionMetadata(
@@ -39,7 +39,7 @@ class TestDispersedAgentSelector:
         )
 
     @pytest.fixture
-    def basic_config(self):
+    def basic_config(self) -> AgentSelectionConfig:
         """Create basic selection config."""
         return AgentSelectionConfig(
             max_container_count=None,
@@ -82,7 +82,7 @@ class TestDispersedAgentSelector:
         )
 
         # Should select agent-high (most available resources)
-        assert selected == AgentId("agent-high")
+        assert selected.agent_id == AgentId("agent-high")
 
     def test_prefers_fewer_unutilized_capabilities(self, selector, basic_criteria, basic_config):
         """Test preference for agents with fewer unutilized resource types."""
@@ -124,7 +124,7 @@ class TestDispersedAgentSelector:
 
         # Should select agent-cpu-only (no unutilized GPU capability)
         # even though both have same available CPU/mem
-        assert selected == AgentId("agent-cpu-only")
+        assert selected.agent_id == AgentId("agent-cpu-only")
 
     def test_respects_resource_priority_order(self, basic_criteria, basic_config):
         """Test that resource priorities are respected in order."""
@@ -159,7 +159,7 @@ class TestDispersedAgentSelector:
         )
 
         # Should select high-mem-low-cpu (more memory available, which is higher priority)
-        assert selected == AgentId("high-mem-low-cpu")
+        assert selected.agent_id == AgentId("high-mem-low-cpu")
 
     def test_handles_agents_with_no_available_slots(self, selector, basic_criteria, basic_config):
         """Test behavior when some agents have zero available resources."""
@@ -190,7 +190,7 @@ class TestDispersedAgentSelector:
         )
 
         # Should select agent-available
-        assert selected == AgentId("agent-available")
+        assert selected.agent_id == AgentId("agent-available")
 
     def test_tie_breaking_with_identical_resources(self, selector, basic_criteria, basic_config):
         """Test consistent tie-breaking when agents have identical resources."""
@@ -224,7 +224,7 @@ class TestDispersedAgentSelector:
         )
 
         # Should consistently select the same agent
-        assert selected in [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
+        assert selected.agent_id in [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
 
         # Run multiple times to ensure consistency
         for _ in range(10):
@@ -292,7 +292,7 @@ class TestDispersedAgentSelector:
         )
 
         # Should select cpu-agent (no unutilized capabilities and most resources)
-        assert selected == AgentId("cpu-agent")
+        assert selected.agent_id == AgentId("cpu-agent")
 
     def test_dispersed_opposite_of_concentrated(self, basic_criteria, basic_config):
         """Test that dispersed selector makes opposite choices from concentrated."""
@@ -331,6 +331,6 @@ class TestDispersedAgentSelector:
 
         # Dispersed should choose agent-2 (more available)
         # Concentrated should choose agent-1 (less available)
-        assert dispersed_choice == AgentId("agent-2")
-        assert concentrated_choice == AgentId("agent-1")
-        assert dispersed_choice != concentrated_choice
+        assert dispersed_choice.agent_id == AgentId("agent-2")
+        assert concentrated_choice.agent_id == AgentId("agent-1")
+        assert dispersed_choice.agent_id != concentrated_choice.agent_id

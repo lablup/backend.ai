@@ -8,8 +8,6 @@ workloads across the cluster.
 import sys
 from typing import Optional, Sequence
 
-from ai.backend.common.types import AgentId
-
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,
@@ -44,7 +42,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentInfo]:
         """
         Select an agent to disperse workloads.
 
@@ -69,4 +67,4 @@ class DispersedAgentSelector(AbstractAgentSelector):
             ],
         )
 
-        return chosen_agent.agent_id
+        return chosen_agent

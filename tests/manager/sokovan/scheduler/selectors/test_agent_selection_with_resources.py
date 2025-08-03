@@ -10,6 +10,7 @@ from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionI
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
@@ -25,7 +26,7 @@ class TestAgentSelectionWithResources:
     """Test agent selection using ResourceRequirements."""
 
     @pytest.fixture
-    def agents_with_varied_resources(self):
+    def agents_with_varied_resources(self) -> list[AgentInfo]:
         """Create agents with varied resource availability."""
         return [
             create_agent_info(
@@ -123,7 +124,7 @@ class TestAgentSelectionWithResources:
         # - agent-medium: 4 CPU, 8192 memory (insufficient)
         # - agent-high: 14 CPU, 28672 memory (sufficient)
 
-        selected_id = await selector.select_agent_for_resource_requirements(
+        selected_agent = await selector.select_agent_for_resource_requirements(
             agents_with_varied_resources,
             aggregated_req,
             criteria,
@@ -131,7 +132,7 @@ class TestAgentSelectionWithResources:
         )
 
         # Only agent-high has enough resources for aggregated requirements
-        assert selected_id == AgentId("agent-high")
+        assert selected_agent.agent_id == AgentId("agent-high")
 
     @pytest.mark.asyncio
     async def test_multi_node_selection_individual_resources(self, agents_with_varied_resources):
@@ -182,13 +183,13 @@ class TestAgentSelectionWithResources:
         # Select agent for each requirement
         selected_agents = []
         for req in resource_reqs:
-            selected_id = await selector.select_agent_for_resource_requirements(
+            selected_agent = await selector.select_agent_for_resource_requirements(
                 agents_with_varied_resources,
                 req,
                 criteria,
                 config,
             )
-            selected_agents.append(selected_id)
+            selected_agents.append(selected_agent.agent_id)
 
         # Both requirements can be satisfied by any agent
         # Dispersed selector should prefer agents with more available resources
@@ -305,7 +306,7 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        selected_id = await selector.select_agent_for_resource_requirements(
+        selected_agent = await selector.select_agent_for_resource_requirements(
             agents,
             resource_req,
             criteria,
@@ -313,7 +314,7 @@ class TestAgentSelectionWithResources:
         )
 
         # Should select "available" agent since "busy" is at container limit
-        assert selected_id == AgentId("available")
+        assert selected_agent.agent_id == AgentId("available")
 
     @pytest.mark.asyncio
     async def test_architecture_mismatch_with_resource_requirements(self):
@@ -361,7 +362,7 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        selected_id = await selector.select_agent_for_resource_requirements(
+        selected_agent = await selector.select_agent_for_resource_requirements(
             agents,
             resource_req,
             criteria,
@@ -369,4 +370,4 @@ class TestAgentSelectionWithResources:
         )
 
         # Should select ARM agent
-        assert selected_id == AgentId("arm")
+        assert selected_agent.agent_id == AgentId("arm")
