@@ -26,7 +26,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
-    async def select_agent_by_strategy(
+    def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,

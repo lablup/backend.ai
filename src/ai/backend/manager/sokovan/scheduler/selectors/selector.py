@@ -58,7 +58,7 @@ class AbstractAgentSelector(ABC):
     """
 
     @abstractmethod
-    async def select_agent_by_strategy(
+    def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
@@ -86,6 +86,8 @@ class AgentSelector:
     This class handles common concerns like designated agent selection,
     architecture filtering, resource availability checking, and container limit filtering.
     """
+
+    _strategy: AbstractAgentSelector
 
     def __init__(self, strategy: AbstractAgentSelector) -> None:
         self._strategy = strategy
@@ -126,7 +128,7 @@ class AgentSelector:
             return None
 
         # Delegate to strategy for selection
-        return await self._strategy.select_agent_by_strategy(compatible_agents, criteria)
+        return self._strategy.select_agent_by_strategy(compatible_agents, criteria)
 
     def _is_agent_compatible(self, agent: AgentInfo, criteria: AgentSelectionCriteria) -> bool:
         """Check if an agent is compatible with the selection criteria."""

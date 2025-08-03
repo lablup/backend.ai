@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelectionCriteria
 
 
 @dataclass(frozen=True)
@@ -162,6 +163,13 @@ class SessionWorkload:
     is_private: bool = False
     # Kernels to be scheduled for this session
     kernels: list[KernelWorkload] = field(default_factory=list)
+
+    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
+        """Convert to agent selection criteria for scheduling."""
+        raise NotImplementedError(
+            "This method should be implemented to convert session workload "
+            "to agent selection criteria."
+        )
 
 
 @dataclass

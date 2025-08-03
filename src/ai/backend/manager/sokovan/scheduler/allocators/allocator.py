@@ -1,55 +1,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from ai.backend.manager.sokovan.scheduler.types import AllocationSnapshot, SessionWorkload
+from ai.backend.manager.sokovan.scheduler.types import AllocationSnapshot
 
 
-class AllocationUpdater(ABC):
-    """
-    An abstract base class for allocation updaters.
-    Subclasses should implement the `update` method to apply specific update logic.
-    """
-
+class SchedulingAllocator(ABC):
     @abstractmethod
-    def update(self, workload: SessionWorkload, snapshot: AllocationSnapshot) -> None:
-        raise NotImplementedError("Subclasses should implement this method.")
-
-
-class AllocationApplier(ABC):
-    """
-    An abstract base class for allocation appliers.
-    Subclasses should implement the `apply` method to apply specific allocation logic.
-    """
-
-    @abstractmethod
-    def apply(self, snapshot: AllocationSnapshot) -> None:
-        raise NotImplementedError("Subclasses should implement this method.")
-
-
-class ResourceAllocator:
-    _updaters: Iterable[AllocationUpdater]
-    _applier: AllocationApplier
-
-    def __init__(self, updaters: Iterable[AllocationUpdater], applier: AllocationApplier) -> None:
-        self._updaters = updaters
-        self._applier = applier
-
-    def allocate(self, workload: SessionWorkload) -> None:
+    def allocate(self, allocation_snapshots: Iterable[AllocationSnapshot]) -> None:
         """
-        Perform allocation by creating a snapshot, updating it with all updaters,
-        and then applying the final allocation.
+        Allocate resources based on the provided allocation snapshots.
+        :param allocation_snapshots: Iterable of AllocationSnapshot objects
         """
-        # Create allocation snapshot internally
-        snapshot = AllocationSnapshot(
-            session_id=workload.session_id,
-            session_type=workload.session_type,
-            cluster_mode=workload.cluster_mode,
-            kernel_allocations=[],
-        )
-
-        # Update the snapshot with each updater
-        for updater in self._updaters:
-            updater.update(workload, snapshot)
-
-        # Apply the allocation
-        self._applier.apply(snapshot)
+        raise NotImplementedError("Subclasses must implement this method.")

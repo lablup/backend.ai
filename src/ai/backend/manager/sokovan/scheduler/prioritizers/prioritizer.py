@@ -16,7 +16,7 @@ class SchedulingPrioritizer(ABC):
 
     @abstractmethod
     async def prioritize(
-        self, system_snapshot: SystemSnapshot, workload: Sequence[SessionWorkload]
+        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
         Prioritize a collection of workloads based on specific criteria.

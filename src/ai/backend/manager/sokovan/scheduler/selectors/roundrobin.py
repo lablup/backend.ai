@@ -29,7 +29,7 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         """
         self.next_index = next_index
 
-    async def select_agent_by_strategy(
+    def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,

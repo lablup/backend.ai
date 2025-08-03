@@ -32,7 +32,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
-    async def select_agent_by_strategy(
+    def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
