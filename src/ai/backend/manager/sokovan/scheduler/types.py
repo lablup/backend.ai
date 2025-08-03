@@ -17,7 +17,7 @@ from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria2,
-    KernelRequirements,
+    ResourceRequirements,
     SessionMetadata,
 )
 
@@ -201,7 +201,7 @@ class SessionWorkload:
 
         # Create kernel requirements map
         kernel_requirements = {
-            kernel.kernel_id: KernelRequirements(
+            kernel.kernel_id: ResourceRequirements(
                 requested_slots=kernel.requested_slots,
                 required_architecture=kernel.architecture,
             )

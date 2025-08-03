@@ -58,12 +58,12 @@ class AgentSelectionConfig:
 
 
 @dataclass
-class KernelRequirements:
-    """Requirements for a kernel in the session."""
+class ResourceRequirements:
+    """Resource requirements for allocation."""
 
-    # Resource slots required by the kernel
+    # Resource slots required
     requested_slots: ResourceSlot
-    # Architecture required for the kernel
+    # Architecture required
     required_architecture: str
 
 
@@ -74,33 +74,52 @@ class AgentSelectionCriteria2:
     # Session metadata for the selection
     session_metadata: SessionMetadata
     # Kernel requirements for the session
-    # Mapping of kernel IDs to their requirements
-    kernel_requirements: Mapping[UUID, KernelRequirements]
+    # Mapping of kernel IDs to their resource requirements
+    kernel_requirements: Mapping[UUID, ResourceRequirements]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
     kernel_counts_at_endpoint: Optional[Mapping[AgentId, int]] = None
 
-    def required_resource_slots(self) -> Sequence[ResourceSlot]:
+    def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
-        Get all resource slots required by the session's kernels.
+        Get all resource requirements for the session's kernels.
 
         For single-node sessions, returns a sequence with one element containing
-        the sum of all kernel resource requirements.
+        the aggregated resource requirements for all kernels.
 
         For multi-node sessions, returns a sequence with each kernel's resource
         requirements separately.
 
         Returns:
-            A list of resource slots required by all kernels in the session.
+            A list of ResourceRequirements for the session.
+
+        Raises:
+            ValueError: If single-node session has kernels with different architectures.
         """
         if self.session_metadata.cluster_mode == ClusterMode.SINGLE_NODE:
+            # Check architecture consistency for single-node
+            architectures = {
+                kernel_req.required_architecture for kernel_req in self.kernel_requirements.values()
+            }
+            if len(architectures) > 1:
+                raise ValueError(
+                    f"Single-node session has kernels with different architectures: {architectures}"
+                )
+
             # Sum all requested slots for single-node sessions
             total_slots = ResourceSlot({})
             for kernel_req in self.kernel_requirements.values():
                 total_slots = total_slots + kernel_req.requested_slots
-            return [total_slots]
+
+            # Use the common architecture
+            architecture = next(iter(architectures)) if architectures else "x86_64"
+            return [
+                ResourceRequirements(
+                    requested_slots=total_slots, required_architecture=architecture
+                )
+            ]
         else:
             # Return individual kernel resources for multi-node sessions
-            return [kernel_req.requested_slots for kernel_req in self.kernel_requirements.values()]
+            return list(self.kernel_requirements.values())
 
 
 class AbstractAgentSelector(ABC):
@@ -114,21 +133,21 @@ class AbstractAgentSelector(ABC):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
+        resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria2,
         config: AgentSelectionConfig,
-        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent for a specific kernel using the strategy.
+        Select an agent using the strategy with specific resource requirements.
 
         This method should implement the core selection logic without
         handling designated agents or common filtering.
 
         Args:
             agents: Pre-filtered compatible agents
-            criteria: Selection requirements including session metadata and kernel requirements
+            resource_req: Resource requirements to satisfy
+            criteria: Selection criteria including session metadata
             config: Configuration for agent selection
-            kernel_id: ID of the kernel being scheduled
 
         Returns:
             The ID of the selected agent, or None if no suitable agent found
@@ -197,23 +216,69 @@ class AgentSelector:
 
         # Delegate to strategy for selection
         return self._strategy.select_agent_by_strategy(
-            compatible_agents, criteria, config, kernel_id
+            compatible_agents, kernel_req, criteria, config
+        )
+
+    async def select_agent_for_resource_requirements(
+        self,
+        agents: Sequence[AgentInfo],
+        resource_req: ResourceRequirements,
+        criteria: AgentSelectionCriteria2,
+        config: AgentSelectionConfig,
+        designated_agent: Optional[AgentId] = None,
+    ) -> Optional[AgentId]:
+        """
+        Select an agent for given resource requirements.
+
+        Args:
+            agents: Available agents to choose from
+            resource_req: Resource requirements to satisfy
+            criteria: Selection criteria (for metadata like session type)
+            config: Configuration for agent selection
+            designated_agent: Manually designated agent (for superadmin)
+
+        Returns:
+            The ID of the selected agent, or None if no suitable agent found
+        """
+        if not agents:
+            return None
+        # Handle designated agent if specified
+        if designated_agent:
+            for agent in agents:
+                if agent.agent_id == designated_agent:
+                    # Verify the designated agent meets all requirements
+                    if not self._is_agent_compatible(agent, resource_req, config):
+                        return None
+                    return designated_agent
+            return None
+
+        # Filter agents by compatibility
+        compatible_agents = [
+            agent for agent in agents if self._is_agent_compatible(agent, resource_req, config)
+        ]
+
+        if not compatible_agents:
+            return None
+
+        # For strategy selection, we need to pass the resource requirements
+        return self._strategy.select_agent_by_strategy(
+            compatible_agents, resource_req, criteria, config
         )
 
     def _is_agent_compatible(
         self,
         agent: AgentInfo,
-        kernel_req: KernelRequirements,
+        resource_req: ResourceRequirements,
         config: AgentSelectionConfig,
     ) -> bool:
-        """Check if an agent is compatible with the kernel requirements."""
+        """Check if an agent is compatible with the resource requirements."""
         # Check architecture compatibility
-        if agent.architecture != kernel_req.required_architecture:
+        if agent.architecture != resource_req.required_architecture:
             return False
 
         # Check resource availability
         available_slots = agent.available_slots - agent.occupied_slots
-        if not (available_slots >= kernel_req.requested_slots):
+        if not (available_slots >= resource_req.requested_slots):
             return False
 
         # Check container limit if specified

@@ -130,18 +130,29 @@ class Scheduler:
                     enforce_spreading=config.enforce_spreading_endpoint_replica,
                 )
 
-                # Select agents for each kernel
+                # Get resource requirements based on cluster mode
+                resource_requirements = criteria.get_resource_requirements()
                 kernel_allocations: list[KernelAllocation] = []
 
                 if session_workload.cluster_mode == ClusterMode.SINGLE_NODE:
                     # For single-node sessions, select one agent for all kernels
-                    first_kernel = session_workload.kernels[0]
-                    selected_agent_id = await self._agent_selector.select_agent_for_kernel(
-                        agents_info,
-                        criteria,
-                        selection_config,
-                        first_kernel.kernel_id,
-                        session_workload.designated_agent,
+                    # resource_requirements should have exactly one element for single-node
+                    if len(resource_requirements) != 1:
+                        log.error(
+                            f"Single-node session {session_workload.session_id} returned "
+                            f"{len(resource_requirements)} resource requirements instead of 1"
+                        )
+                        continue
+
+                    resource_req = resource_requirements[0]
+                    selected_agent_id = (
+                        await self._agent_selector.select_agent_for_resource_requirements(
+                            agents_info,
+                            resource_req,
+                            criteria,
+                            selection_config,
+                            session_workload.designated_agent,
+                        )
                     )
 
                     if selected_agent_id:
@@ -164,15 +175,26 @@ class Scheduler:
                                 )
                 else:
                     # For multi-node sessions, select agents for each kernel independently
-                    for kernel in session_workload.kernels:
-                        selected_agent_id = await self._agent_selector.select_agent_for_kernel(
-                            agents_info,
-                            criteria,
-                            selection_config,
-                            kernel.kernel_id,
-                            session_workload.designated_agent
-                            if kernel == session_workload.kernels[0]
-                            else None,
+                    # Number of resource requirements should match number of kernels
+                    if len(resource_requirements) != len(session_workload.kernels):
+                        log.error(
+                            f"Multi-node session {session_workload.session_id} returned "
+                            f"{len(resource_requirements)} resource requirements for "
+                            f"{len(session_workload.kernels)} kernels"
+                        )
+                        continue
+
+                    for i, (kernel, resource_req) in enumerate(
+                        zip(session_workload.kernels, resource_requirements)
+                    ):
+                        selected_agent_id = (
+                            await self._agent_selector.select_agent_for_resource_requirements(
+                                agents_info,
+                                resource_req,
+                                criteria,
+                                selection_config,
+                                session_workload.designated_agent if i == 0 else None,
+                            )
                         )
 
                         if selected_agent_id:

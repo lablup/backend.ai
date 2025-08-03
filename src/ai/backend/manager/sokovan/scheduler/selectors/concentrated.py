@@ -7,7 +7,6 @@ resource utilization by concentrating workloads.
 
 import sys
 from typing import Optional, Sequence
-from uuid import UUID
 
 from ai.backend.common.types import AgentId, SessionTypes
 
@@ -16,6 +15,7 @@ from .selector import (
     AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria2,
+    ResourceRequirements,
 )
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
@@ -42,26 +42,18 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
+        resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria2,
         config: AgentSelectionConfig,
-        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent to concentrate workloads for a specific kernel.
+        Select an agent to concentrate workloads.
 
         Assumes agents are already filtered for compatibility.
         """
-        if not agents:
-            return None
-
-        # Get kernel requirements
-        kernel_req = criteria.kernel_requirements.get(kernel_id)
-        if not kernel_req:
-            return None
-
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
-            kernel_req.requested_slots, self.agent_selection_resource_priority
+            resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
         # Choose the agent with minimum resources (to concentrate workloads)
@@ -78,7 +70,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
                 sort_key.append(kernel_count)
 
             # Then, prefer agents with fewer unutilized capabilities
-            sort_key.append(count_unutilized_capabilities(agent, kernel_req.requested_slots))
+            sort_key.append(count_unutilized_capabilities(agent, resource_req.requested_slots))
 
             # Finally, prefer agents with less available resources
             for key in resource_priorities:

@@ -7,7 +7,6 @@ workloads across the cluster.
 
 import sys
 from typing import Optional, Sequence
-from uuid import UUID
 
 from ai.backend.common.types import AgentId
 
@@ -16,6 +15,7 @@ from .selector import (
     AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria2,
+    ResourceRequirements,
 )
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
@@ -41,26 +41,18 @@ class DispersedAgentSelector(AbstractAgentSelector):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
+        resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria2,
         config: AgentSelectionConfig,
-        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent to disperse workloads for a specific kernel.
+        Select an agent to disperse workloads.
 
         Assumes agents are already filtered for compatibility.
         """
-        if not agents:
-            return None
-
-        # Get kernel requirements
-        kernel_req = criteria.kernel_requirements.get(kernel_id)
-        if not kernel_req:
-            return None
-
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
-            kernel_req.requested_slots, self.agent_selection_resource_priority
+            resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
         # Choose the agent with maximum available resources (to disperse workloads)
@@ -68,7 +60,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
             agents,
             key=lambda agent: [
                 # First, prefer agents with fewer unutilized capabilities
-                -count_unutilized_capabilities(agent, kernel_req.requested_slots),
+                -count_unutilized_capabilities(agent, resource_req.requested_slots),
                 # Then, prefer agents with more available resources
                 *[
                     (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
