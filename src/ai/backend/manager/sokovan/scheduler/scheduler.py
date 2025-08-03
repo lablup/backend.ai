@@ -10,6 +10,7 @@ from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import Schedu
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo, AgentSelector
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationSnapshot,
+    KernelAllocation,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -106,14 +107,12 @@ class Scheduler:
         config = await self._repository.get_scheduling_config(first_workload.scaling_group)
 
         for session_workload in validates_workloads:
-            # TODO: Allocation Info should be received by the agent selector
-            # current logic should be modified
             try:
-                # For single-node sessions, all kernels must have the same architecture
                 if not session_workload.kernels:
                     log.warning(f"Session {session_workload.session_id} has no kernels")
                     continue
 
+                # For single-node sessions, all kernels must have the same architecture
                 architectures = {kernel.architecture for kernel in session_workload.kernels}
                 if (
                     session_workload.cluster_mode == ClusterMode.SINGLE_NODE
@@ -125,18 +124,88 @@ class Scheduler:
                     )
                     continue
 
-                architecture = next(iter(architectures))  # Use any architecture for now
-
-                criteria = session_workload.to_agent_selection_criteria(
-                    architecture=architecture,
+                # Convert to new criteria format
+                criteria, selection_config = session_workload.to_agent_selection_criteria2(
                     max_container_count=config.max_container_count_per_agent,
                     enforce_spreading=config.enforce_spreading_endpoint_replica,
                 )
 
-                allocation = self._agent_selector.select_agent(agents_info, criteria)
-                if allocation is not None:
-                    # TODO: AgentSelector Must return AllocationSnapshot instead of AgentId
-                    allocations.append(allocation)  # type: ignore
+                # Select agents for each kernel
+                kernel_allocations: list[KernelAllocation] = []
+
+                if session_workload.cluster_mode == ClusterMode.SINGLE_NODE:
+                    # For single-node sessions, select one agent for all kernels
+                    first_kernel = session_workload.kernels[0]
+                    selected_agent_id = await self._agent_selector.select_agent_for_kernel(
+                        agents_info,
+                        criteria,
+                        selection_config,
+                        first_kernel.kernel_id,
+                        session_workload.designated_agent,
+                    )
+
+                    if selected_agent_id:
+                        # Find the selected agent info
+                        selected_agent = next(
+                            (agent for agent in agents_info if agent.agent_id == selected_agent_id),
+                            None,
+                        )
+                        if selected_agent:
+                            # Allocate all kernels to the same agent
+                            for kernel in session_workload.kernels:
+                                kernel_allocations.append(
+                                    KernelAllocation(
+                                        kernel_id=kernel.kernel_id,
+                                        agent_id=selected_agent_id,
+                                        agent_addr=selected_agent.agent_addr,
+                                        scaling_group=selected_agent.scaling_group,
+                                        requested_slots=kernel.requested_slots,
+                                    )
+                                )
+                else:
+                    # For multi-node sessions, select agents for each kernel independently
+                    for kernel in session_workload.kernels:
+                        selected_agent_id = await self._agent_selector.select_agent_for_kernel(
+                            agents_info,
+                            criteria,
+                            selection_config,
+                            kernel.kernel_id,
+                            session_workload.designated_agent
+                            if kernel == session_workload.kernels[0]
+                            else None,
+                        )
+
+                        if selected_agent_id:
+                            # Find the selected agent info
+                            selected_agent = next(
+                                (
+                                    agent
+                                    for agent in agents_info
+                                    if agent.agent_id == selected_agent_id
+                                ),
+                                None,
+                            )
+                            if selected_agent:
+                                kernel_allocations.append(
+                                    KernelAllocation(
+                                        kernel_id=kernel.kernel_id,
+                                        agent_id=selected_agent_id,
+                                        agent_addr=selected_agent.agent_addr,
+                                        scaling_group=selected_agent.scaling_group,
+                                        requested_slots=kernel.requested_slots,
+                                    )
+                                )
+
+                # Create allocation snapshot if we have kernel allocations
+                if kernel_allocations:
+                    allocation_snapshot = AllocationSnapshot(
+                        session_id=session_workload.session_id,
+                        session_type=session_workload.session_type,
+                        cluster_mode=session_workload.cluster_mode,
+                        kernel_allocations=kernel_allocations,
+                    )
+                    allocations.append(allocation_snapshot)
+
             except Exception as e:
                 log.debug(
                     "Agent selection failed for workload {}: {}",

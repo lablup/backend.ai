@@ -7,10 +7,16 @@ with fewer unutilized capabilities.
 
 import sys
 from typing import Optional, Sequence
+from uuid import UUID
 
 from ai.backend.common.types import AgentId
 
-from .selector import AbstractAgentSelector, AgentInfo, AgentSelectionCriteria
+from .selector import (
+    AbstractAgentSelector,
+    AgentInfo,
+    AgentSelectionConfig,
+    AgentSelectionCriteria2,
+)
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
 
@@ -29,26 +35,33 @@ class LegacyAgentSelector(AbstractAgentSelector):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
-        criteria: AgentSelectionCriteria,
+        criteria: AgentSelectionCriteria2,
+        config: AgentSelectionConfig,
+        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent based on resource priorities.
+        Select an agent based on resource priorities for a specific kernel.
 
         Assumes agents are already filtered for compatibility.
         """
         if not agents:
             return None
 
+        # Get kernel requirements
+        kernel_req = criteria.kernel_requirements.get(kernel_id)
+        if not kernel_req:
+            return None
+
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
-            criteria.requested_slots, self.agent_selection_resource_priority
+            kernel_req.requested_slots, self.agent_selection_resource_priority
         )
 
         # Choose the best agent
         chosen_agent = max(
             agents,
             key=lambda agent: [
-                -count_unutilized_capabilities(agent, criteria.requested_slots),
+                -count_unutilized_capabilities(agent, kernel_req.requested_slots),
                 *[
                     (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
                     for key in resource_priorities

@@ -6,10 +6,7 @@ from typing import Optional
 import pytest
 
 from ai.backend.common.types import AgentId, ResourceSlot
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
-    AgentInfo,
-    AgentSelectionCriteria,
-)
+from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 
 
 def create_agent_info(
@@ -50,42 +47,6 @@ def create_agent_info(
         occupied_slots=ResourceSlot(occupied_slots),
         scaling_group=scaling_group,
         container_count=container_count,
-    )
-
-
-def create_selection_criteria(
-    requested_slots: Optional[dict] = None,
-    architecture: str = "x86_64",
-    scaling_group: str = "default",
-    max_container_count: Optional[int] = None,
-    designated_agent_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    session_type: Optional[str] = None,
-    enforce_spreading_endpoint_replica: bool = False,
-    kernel_counts_at_endpoint: Optional[dict[str, int]] = None,
-) -> AgentSelectionCriteria:
-    """Create an AgentSelectionCriteria instance for testing."""
-    if requested_slots is None:
-        requested_slots = {
-            "cpu": Decimal("1.0"),
-            "mem": Decimal("1024"),  # 1GB
-            "cuda.shares": Decimal("0"),
-        }
-
-    from ai.backend.common.types import SessionId, SessionTypes
-
-    return AgentSelectionCriteria(
-        requested_slots=ResourceSlot(requested_slots),
-        required_architecture=architecture,
-        scaling_group=scaling_group,
-        max_container_count=max_container_count,
-        designated_agent_id=AgentId(designated_agent_id) if designated_agent_id else None,
-        session_id=SessionId(session_id) if session_id else None,
-        session_type=SessionTypes(session_type) if session_type else None,
-        enforce_spreading_endpoint_replica=enforce_spreading_endpoint_replica,
-        kernel_counts_at_endpoint={AgentId(k): v for k, v in kernel_counts_at_endpoint.items()}
-        if kernel_counts_at_endpoint
-        else None,
     )
 
 

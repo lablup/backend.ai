@@ -6,10 +6,16 @@ a simple round-robin index.
 """
 
 from typing import Optional, Sequence
+from uuid import UUID
 
 from ai.backend.common.types import AgentId
 
-from .selector import AbstractAgentSelector, AgentInfo, AgentSelectionCriteria
+from .selector import (
+    AbstractAgentSelector,
+    AgentInfo,
+    AgentSelectionConfig,
+    AgentSelectionCriteria2,
+)
 
 
 class RoundRobinAgentSelector(AbstractAgentSelector):
@@ -32,10 +38,12 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
-        criteria: AgentSelectionCriteria,
+        criteria: AgentSelectionCriteria2,
+        config: AgentSelectionConfig,
+        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent using round-robin with a simple index.
+        Select an agent using round-robin with a simple index for a specific kernel.
 
         The caller should track and update the index after successful allocation.
         """

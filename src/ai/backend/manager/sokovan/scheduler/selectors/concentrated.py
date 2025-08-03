@@ -7,10 +7,16 @@ resource utilization by concentrating workloads.
 
 import sys
 from typing import Optional, Sequence
+from uuid import UUID
 
 from ai.backend.common.types import AgentId, SessionTypes
 
-from .selector import AbstractAgentSelector, AgentInfo, AgentSelectionCriteria
+from .selector import (
+    AbstractAgentSelector,
+    AgentInfo,
+    AgentSelectionConfig,
+    AgentSelectionCriteria2,
+)
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
 
@@ -36,19 +42,26 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
     def select_agent_by_strategy(
         self,
         agents: Sequence[AgentInfo],
-        criteria: AgentSelectionCriteria,
+        criteria: AgentSelectionCriteria2,
+        config: AgentSelectionConfig,
+        kernel_id: UUID,
     ) -> Optional[AgentId]:
         """
-        Select an agent to concentrate workloads.
+        Select an agent to concentrate workloads for a specific kernel.
 
         Assumes agents are already filtered for compatibility.
         """
         if not agents:
             return None
 
+        # Get kernel requirements
+        kernel_req = criteria.kernel_requirements.get(kernel_id)
+        if not kernel_req:
+            return None
+
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
-            criteria.requested_slots, self.agent_selection_resource_priority
+            kernel_req.requested_slots, self.agent_selection_resource_priority
         )
 
         # Choose the agent with minimum resources (to concentrate workloads)
@@ -57,15 +70,15 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
 
             # First, consider kernel counts at endpoint for replica spreading
             if (
-                criteria.enforce_spreading_endpoint_replica
+                config.enforce_spreading_endpoint_replica
                 and criteria.kernel_counts_at_endpoint
-                and criteria.session_type == SessionTypes.INFERENCE
+                and criteria.session_metadata.session_type == SessionTypes.INFERENCE
             ):
                 kernel_count = criteria.kernel_counts_at_endpoint.get(agent.agent_id, 0)
                 sort_key.append(kernel_count)
 
             # Then, prefer agents with fewer unutilized capabilities
-            sort_key.append(count_unutilized_capabilities(agent, criteria.requested_slots))
+            sort_key.append(count_unutilized_capabilities(agent, kernel_req.requested_slots))
 
             # Finally, prefer agents with less available resources
             for key in resource_priorities:

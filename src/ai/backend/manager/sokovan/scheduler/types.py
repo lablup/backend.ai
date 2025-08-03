@@ -14,7 +14,12 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelectionCriteria
+from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+    AgentSelectionConfig,
+    AgentSelectionCriteria2,
+    KernelRequirements,
+    SessionMetadata,
+)
 
 
 @dataclass(frozen=True)
@@ -171,31 +176,52 @@ class SessionWorkload:
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
-    def to_agent_selection_criteria(
+    def to_agent_selection_criteria2(
         self,
-        architecture: str,
         max_container_count: Optional[int],
         enforce_spreading: bool,
-    ) -> AgentSelectionCriteria:
+    ) -> tuple[AgentSelectionCriteria2, AgentSelectionConfig]:
         """
-        Convert to agent selection criteria for scheduling.
+        Convert to new agent selection criteria and config for scheduling.
 
         Args:
-            architecture: Required architecture for the agent
             max_container_count: Maximum containers per agent (from etcd config)
             enforce_spreading: Whether to enforce endpoint replica spreading (from sgroup_opts)
+
+        Returns:
+            Tuple of (criteria, config) for agent selection
         """
-        return AgentSelectionCriteria(
-            requested_slots=self.requested_slots,
-            required_architecture=architecture,
-            scaling_group=self.scaling_group,
-            max_container_count=max_container_count,
-            designated_agent_id=self.designated_agent,
+        # Create session metadata
+        session_metadata = SessionMetadata(
             session_id=self.session_id,
             session_type=self.session_type,
-            enforce_spreading_endpoint_replica=enforce_spreading,
+            scaling_group=self.scaling_group,
+            cluster_mode=self.cluster_mode,
+        )
+
+        # Create kernel requirements map
+        kernel_requirements = {
+            kernel.kernel_id: KernelRequirements(
+                requested_slots=kernel.requested_slots,
+                required_architecture=kernel.architecture,
+            )
+            for kernel in self.kernels
+        }
+
+        # Create selection criteria
+        criteria = AgentSelectionCriteria2(
+            session_metadata=session_metadata,
+            kernel_requirements=kernel_requirements,
             kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,
         )
+
+        # Create selection config
+        config = AgentSelectionConfig(
+            max_container_count=max_container_count,
+            enforce_spreading_endpoint_replica=enforce_spreading,
+        )
+
+        return criteria, config
 
 
 @dataclass
