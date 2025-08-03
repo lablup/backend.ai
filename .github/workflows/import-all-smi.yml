@@ -82,7 +82,7 @@ jobs:
             This update was triggered by:
             - Event: ${{ github.event_name }}
             ${{ github.event_name == 'repository_dispatch' && '- Automated trigger from all-smi repository release' || '- Manual workflow dispatch' }}
-          branch: update-all-smi-${{ steps.get-tag.outputs.tag }}
+          branch: deps/update-all-smi-${{ steps.get-tag.outputs.tag }}
           delete-branch: true
 
   setup-webhook:
