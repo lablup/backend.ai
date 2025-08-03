@@ -67,6 +67,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -108,6 +109,7 @@ class TestConcentratedAgentSelector:
 
         # Request only CPU and memory (explicitly no GPU)
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -142,6 +144,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )
@@ -199,6 +202,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -229,6 +233,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -280,6 +285,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -335,6 +341,7 @@ class TestConcentratedAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("1"),
                 "mem": Decimal("2048"),

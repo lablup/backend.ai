@@ -47,6 +47,7 @@ class TestRoundRobinAgentSelector:
         return ResourceRequirements(
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
+            kernel_ids=[uuid.uuid4()],
         )
 
     def test_sequential_selection(self, basic_criteria, basic_config, resource_req):

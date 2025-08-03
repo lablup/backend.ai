@@ -64,6 +64,7 @@ class TestSelectorEdgeCases:
 
         # Empty resource request
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({}),  # No resources requested
             required_architecture="x86_64",
         )
@@ -92,6 +93,7 @@ class TestSelectorEdgeCases:
 
         # Request with zero values
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("0"),
                 "mem": Decimal("0"),
@@ -125,6 +127,7 @@ class TestSelectorEdgeCases:
 
         # Request TPU which no agent has
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -169,6 +172,7 @@ class TestSelectorEdgeCases:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -217,6 +221,7 @@ class TestSelectorEdgeCases:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("0.000000000000000000000001"),
                 "mem": Decimal("0.000000000000000000000001"),
@@ -239,6 +244,7 @@ class TestSelectorEdgeCases:
         agents = [agent]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -267,6 +273,7 @@ class TestSelectorEdgeCases:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -294,6 +301,7 @@ class TestSelectorEdgeCases:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -311,6 +319,7 @@ class TestSelectorEdgeCases:
         agents = []
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -347,6 +356,7 @@ class TestSelectorEdgeCases:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("1"),
                 "mem": Decimal("2048"),

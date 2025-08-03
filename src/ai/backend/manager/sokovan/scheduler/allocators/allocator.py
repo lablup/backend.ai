@@ -1,16 +1,16 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from ai.backend.manager.sokovan.scheduler.types import AllocationSnapshot
+from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
 
 class SchedulingAllocator(ABC):
     @abstractmethod
-    async def allocate(self, allocation_snapshots: Iterable[AllocationSnapshot]) -> None:
+    async def allocate(self, session_allocations: Iterable[SessionAllocation]) -> None:
         """
-        Allocate resources based on the provided allocation snapshots.
+        Allocate resources based on the provided session allocations.
 
         Args:
-            allocation_snapshots: Iterable of AllocationSnapshot objects
+            session_allocations: Iterable of SessionAllocation objects
         """
         raise NotImplementedError("Subclasses must implement this method.")

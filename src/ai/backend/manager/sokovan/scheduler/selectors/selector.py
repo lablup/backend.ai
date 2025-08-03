@@ -66,6 +66,16 @@ class AgentSelectionConfig:
 
 
 @dataclass
+class KernelResourceSpec:
+    """Resource specification for a single kernel."""
+
+    # Resource slots required
+    requested_slots: ResourceSlot
+    # Architecture required
+    required_architecture: str
+
+
+@dataclass
 class ResourceRequirements:
     """Resource requirements for allocation."""
 
@@ -73,6 +83,10 @@ class ResourceRequirements:
     requested_slots: ResourceSlot
     # Architecture required
     required_architecture: str
+    # Kernel IDs that these requirements are for
+    # For single-node, this includes all kernel IDs
+    # For multi-node, this includes only one kernel ID
+    kernel_ids: Sequence[UUID]
 
 
 @dataclass
@@ -82,23 +96,22 @@ class AgentSelectionCriteria:
     # Session metadata for the selection
     session_metadata: SessionMetadata
     # Kernel requirements for the session
-    # Mapping of kernel IDs to their resource requirements
-    kernel_requirements: Mapping[UUID, ResourceRequirements]
+    # Mapping of kernel IDs to their resource specifications
+    kernel_requirements: Mapping[UUID, KernelResourceSpec]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
     kernel_counts_at_endpoint: Optional[Mapping[AgentId, int]] = None
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
-        Get all resource requirements for the session's kernels.
+        Get resource requirements based on cluster mode.
 
-        For single-node sessions, returns a sequence with one element containing
-        the aggregated resource requirements for all kernels.
-
-        For multi-node sessions, returns a sequence with each kernel's resource
-        requirements separately.
+        For single-node sessions, returns a sequence with one aggregated requirement
+        that includes all kernel IDs.
+        For multi-node sessions, returns individual kernel requirements, each with
+        its corresponding kernel ID.
 
         Returns:
-            A list of ResourceRequirements for the session.
+            A sequence of ResourceRequirements.
 
         Raises:
             ValueError: If single-node session has kernels with different architectures.
@@ -123,14 +136,25 @@ class AgentSelectionCriteria:
 
             # Use the common architecture
             architecture = list(architectures)[0]
+            # Include all kernel IDs in the aggregated requirement
+            kernel_ids = list(self.kernel_requirements.keys())
             return [
                 ResourceRequirements(
-                    requested_slots=total_slots, required_architecture=architecture
+                    requested_slots=total_slots,
+                    required_architecture=architecture,
+                    kernel_ids=kernel_ids,
                 )
             ]
         else:
             # Return individual kernel resources for multi-node sessions
-            return list(self.kernel_requirements.values())
+            return [
+                ResourceRequirements(
+                    requested_slots=req.requested_slots,
+                    required_architecture=req.required_architecture,
+                    kernel_ids=[kernel_id],
+                )
+                for kernel_id, req in self.kernel_requirements.items()
+            ]
 
 
 class AbstractAgentSelector(ABC):

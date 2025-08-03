@@ -71,6 +71,7 @@ class TestSelectorIntegration:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -143,6 +144,7 @@ class TestSelectorIntegration:
 
         # Request only CPU/memory (explicitly no GPU/TPU)
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -191,6 +193,7 @@ class TestSelectorIntegration:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
             required_architecture="x86_64",
         )
@@ -235,6 +238,7 @@ class TestSelectorIntegration:
             )
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -306,6 +310,7 @@ class TestSelectorIntegration:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )

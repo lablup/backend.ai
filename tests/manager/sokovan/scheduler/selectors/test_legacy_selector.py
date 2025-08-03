@@ -81,6 +81,7 @@ class TestLegacyAgentSelector:
 
         # Request only CPU and memory (explicitly no GPU/TPU)
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -113,6 +114,7 @@ class TestLegacyAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -148,6 +150,7 @@ class TestLegacyAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )
@@ -197,6 +200,7 @@ class TestLegacyAgentSelector:
 
         # Request includes GPU
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -257,6 +261,7 @@ class TestLegacyAgentSelector:
 
         # Request only CPU and memory
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -314,6 +319,7 @@ class TestLegacyAgentSelector:
         ]
 
         resource_req = ResourceRequirements(
+            kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),

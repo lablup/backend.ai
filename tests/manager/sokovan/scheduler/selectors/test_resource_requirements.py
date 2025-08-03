@@ -8,7 +8,7 @@ import pytest
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionCriteria,
-    ResourceRequirements,
+    KernelResourceSpec,
     SessionMetadata,
 )
 
@@ -28,21 +28,21 @@ class TestResourceRequirements:
 
         # Create kernel requirements with same architecture
         kernel_reqs = {
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("1"),
                     "mem": Decimal("2048"),
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("3"),
                     "mem": Decimal("8192"),
@@ -64,6 +64,8 @@ class TestResourceRequirements:
 
         # Check aggregated values
         agg_req = resource_reqs[0]
+        # For single-node, kernel_ids should include all kernels
+        assert len(agg_req.kernel_ids) == 3
         assert agg_req.requested_slots["cpu"] == Decimal("6")  # 2+1+3
         assert agg_req.requested_slots["mem"] == Decimal("14336")  # 4096+2048+8192
         assert agg_req.required_architecture == "x86_64"
@@ -79,14 +81,14 @@ class TestResourceRequirements:
 
         # Create kernel requirements with different architectures
         kernel_reqs = {
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("1"),
                     "mem": Decimal("2048"),
@@ -118,21 +120,21 @@ class TestResourceRequirements:
         # Create kernel requirements
         kernel_ids = [uuid.uuid4() for _ in range(3)]
         kernel_reqs = {
-            kernel_ids[0]: ResourceRequirements(
+            kernel_ids[0]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
-            kernel_ids[1]: ResourceRequirements(
+            kernel_ids[1]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("1"),
                     "mem": Decimal("2048"),
                 }),
                 required_architecture="x86_64",
             ),
-            kernel_ids[2]: ResourceRequirements(
+            kernel_ids[2]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("3"),
                     "mem": Decimal("8192"),
@@ -152,21 +154,15 @@ class TestResourceRequirements:
         # Should return individual requirements
         assert len(resource_reqs) == 3
 
-        # Convert to list for easier checking
-        reqs_list = list(resource_reqs)
-
         # Verify each requirement matches original
-        for req in reqs_list:
+        for req in resource_reqs:
+            # Each multi-node requirement should have exactly one kernel ID
+            assert len(req.kernel_ids) == 1
+            kernel_id = req.kernel_ids[0]
             # Find matching kernel requirement
-            found = False
-            for kernel_req in kernel_reqs.values():
-                if (
-                    req.requested_slots == kernel_req.requested_slots
-                    and req.required_architecture == kernel_req.required_architecture
-                ):
-                    found = True
-                    break
-            assert found, f"Resource requirement {req} not found in kernel requirements"
+            original_req = kernel_reqs[kernel_id]
+            assert req.requested_slots == original_req.requested_slots
+            assert req.required_architecture == original_req.required_architecture
 
     def test_empty_kernel_requirements(self):
         """Test handling of empty kernel requirements."""
@@ -199,7 +195,7 @@ class TestResourceRequirements:
 
         # Create kernel requirements with GPU resources
         kernel_reqs = {
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("16384"),
@@ -207,7 +203,7 @@ class TestResourceRequirements:
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("8192"),
@@ -228,6 +224,7 @@ class TestResourceRequirements:
         # Check aggregated GPU resources
         assert len(resource_reqs) == 1
         agg_req = resource_reqs[0]
+        assert len(agg_req.kernel_ids) == 2
         assert agg_req.requested_slots["cpu"] == Decimal("6")
         assert agg_req.requested_slots["mem"] == Decimal("24576")
         assert agg_req.requested_slots["cuda.shares"] == Decimal("1.5")

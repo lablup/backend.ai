@@ -15,9 +15,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
-    AgentSelectionConfig,
     AgentSelectionCriteria,
-    ResourceRequirements,
+    KernelResourceSpec,
     SessionMetadata,
 )
 
@@ -176,20 +175,12 @@ class SessionWorkload:
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
-    def to_agent_selection_criteria2(
-        self,
-        max_container_count: Optional[int],
-        enforce_spreading: bool,
-    ) -> tuple[AgentSelectionCriteria, AgentSelectionConfig]:
+    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
         """
-        Convert to new agent selection criteria and config for scheduling.
-
-        Args:
-            max_container_count: Maximum containers per agent (from etcd config)
-            enforce_spreading: Whether to enforce endpoint replica spreading (from sgroup_opts)
+        Convert to new agent selection criteria for scheduling.
 
         Returns:
-            Tuple of (criteria, config) for agent selection
+            AgentSelectionCriteria for agent selection
         """
         # Create session metadata
         session_metadata = SessionMetadata(
@@ -201,7 +192,7 @@ class SessionWorkload:
 
         # Create kernel requirements map
         kernel_requirements = {
-            kernel.kernel_id: ResourceRequirements(
+            kernel.kernel_id: KernelResourceSpec(
                 requested_slots=kernel.requested_slots,
                 required_architecture=kernel.architecture,
             )
@@ -215,13 +206,7 @@ class SessionWorkload:
             kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,
         )
 
-        # Create selection config
-        config = AgentSelectionConfig(
-            max_container_count=max_container_count,
-            enforce_spreading_endpoint_replica=enforce_spreading,
-        )
-
-        return criteria, config
+        return criteria
 
 
 @dataclass
@@ -243,13 +228,8 @@ class KernelAllocation:
 
 
 @dataclass
-class AllocationSnapshot:
-    """
-    Represents a complete allocation decision for a session.
-
-    Contains allocation information for all kernels in the session,
-    regardless of whether they are allocated to a single node or multiple nodes.
-    """
+class SessionAllocation:
+    """Represents an allocation decision for a session with all its kernels."""
 
     # Unique identifier of the session
     session_id: SessionId
@@ -257,5 +237,7 @@ class AllocationSnapshot:
     session_type: SessionTypes
     # Cluster mode of the session (SINGLE_NODE or MULTI_NODE)
     cluster_mode: ClusterMode
+    # Scaling group that the session belongs to
+    scaling_group: str
     # List of kernel allocations for this session
     kernel_allocations: list[KernelAllocation]

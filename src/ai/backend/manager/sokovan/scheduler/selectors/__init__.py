@@ -13,6 +13,7 @@ from .selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
+    KernelResourceSpec,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "AgentSelectionConfig",
     "AgentSelectionCriteria",
     "AgentSelector",
+    "KernelResourceSpec",
     "ResourceRequirements",
     "SessionMetadata",
 ]

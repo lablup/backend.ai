@@ -14,7 +14,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
     DesignatedAgentIncompatibleError,
-    ResourceRequirements,
+    KernelResourceSpec,
     SessionMetadata,
 )
 
@@ -81,14 +81,14 @@ class TestAgentSelectionWithResources:
 
         # Create kernel requirements that need aggregation
         kernel_reqs = {
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
@@ -114,6 +114,7 @@ class TestAgentSelectionWithResources:
         # Get aggregated requirements
         resource_reqs = criteria.get_resource_requirements()
         assert len(resource_reqs) == 1
+        # For single-node, there's only one aggregated requirement
         aggregated_req = resource_reqs[0]
 
         # Total requested: 6 CPU, 12288 memory
@@ -144,14 +145,14 @@ class TestAgentSelectionWithResources:
 
         # Create kernels with different resource needs
         kernel_reqs = {
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("1"),
                     "mem": Decimal("2048"),
                 }),
                 required_architecture="x86_64",
             ),
-            uuid.uuid4(): ResourceRequirements(
+            uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
                     "cpu": Decimal("3"),
                     "mem": Decimal("6144"),
@@ -217,7 +218,8 @@ class TestAgentSelectionWithResources:
         )
 
         # Request more than designated agent has
-        resource_req = ResourceRequirements(
+        kernel_id = uuid.uuid4()
+        kernel_spec = KernelResourceSpec(
             requested_slots=ResourceSlot({
                 "cpu": Decimal("4"),
                 "mem": Decimal("8192"),
@@ -227,8 +229,12 @@ class TestAgentSelectionWithResources:
 
         criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
-            kernel_requirements={uuid.uuid4(): resource_req},
+            kernel_requirements={kernel_id: kernel_spec},
         )
+
+        # Get resource requirements
+        resource_reqs = criteria.get_resource_requirements()
+        resource_req = resource_reqs[0]
 
         config = AgentSelectionConfig(max_container_count=None)
 
@@ -266,7 +272,8 @@ class TestAgentSelectionWithResources:
             ),
         ]
 
-        resource_req = ResourceRequirements(
+        kernel_id = uuid.uuid4()
+        kernel_spec = KernelResourceSpec(
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -283,8 +290,12 @@ class TestAgentSelectionWithResources:
 
         criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
-            kernel_requirements={uuid.uuid4(): resource_req},
+            kernel_requirements={kernel_id: kernel_spec},
         )
+
+        # Get resource requirements
+        resource_reqs = criteria.get_resource_requirements()
+        resource_req = resource_reqs[0]
 
         config = AgentSelectionConfig(
             max_container_count=10,  # Set limit
@@ -320,7 +331,8 @@ class TestAgentSelectionWithResources:
             ),
         ]
 
-        resource_req = ResourceRequirements(
+        kernel_id = uuid.uuid4()
+        kernel_spec = KernelResourceSpec(
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -337,8 +349,12 @@ class TestAgentSelectionWithResources:
 
         criteria = AgentSelectionCriteria(
             session_metadata=session_metadata,
-            kernel_requirements={uuid.uuid4(): resource_req},
+            kernel_requirements={kernel_id: kernel_spec},
         )
+
+        # Get resource requirements
+        resource_reqs = criteria.get_resource_requirements()
+        resource_req = resource_reqs[0]
 
         config = AgentSelectionConfig(max_container_count=None)
 

@@ -8,7 +8,7 @@ to ensure transactional consistency.
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.sokovan.scheduler.types import AllocationSnapshot
+from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
 from .allocator import SchedulingAllocator
 
@@ -33,12 +33,12 @@ class RepositoryAllocator(SchedulingAllocator):
         """
         self.schedule_repository = schedule_repository
 
-    async def allocate(self, allocation_snapshots: Iterable[AllocationSnapshot]) -> None:
+    async def allocate(self, session_allocations: Iterable[SessionAllocation]) -> None:
         """
         Allocate resources by delegating to repository.
 
         Args:
-            allocation_snapshots: Allocation decisions to execute
+            session_allocations: Session allocation decisions to execute
         """
         # TODO: This method should be implemented in ScheduleRepository
-        await self.schedule_repository.allocate_sessions(allocation_snapshots)  # type: ignore[attr-defined]
+        await self.schedule_repository.allocate_sessions(session_allocations)  # type: ignore[attr-defined]
