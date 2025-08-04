@@ -24,7 +24,11 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.migrate.vfolder import migrate_vfolder_data
+from ai.backend.manager.models.rbac_models.migrate.vfolder import (
+    VFolderPermissionData,
+    migrate_vfolder_data,
+    permission_mapping,
+)
 from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -481,16 +485,6 @@ def test_scenarios(vfolder_rbac_test_data: VFolderRBACTestData) -> dict[str, Any
 
 
 @pytest.fixture
-def permission_mapping() -> dict[str, str]:
-    """Mapping of vfolder permissions to expected RBAC operations."""
-    return {
-        "ro": "read",  # Read-only maps to read operation
-        "rw": "read",  # Read-write also maps to read (write handled differently)
-        "wd": "read",  # Write-delete also maps to read
-    }
-
-
-@pytest.fixture
 async def populated_vfolder_db(
     db_engine_pre_migration: Engine, vfolder_rbac_test_data: VFolderRBACTestData
 ):
@@ -620,7 +614,7 @@ class TestVFolderRBACMigrationWithAlembic:
                     assoc = associations_by_vfolder.get(vfolder.id)
                     assert assoc is not None, f"VFolder {vfolder.id} not found in associations"
 
-                    if vfolder.ownership_type == "user":
+                    if vfolder.ownership_type == VFolderOwnershipType.USER:
                         assert assoc.scope_type == "user", (
                             f"VFolder {vfolder.id} should have scope_type 'user'"
                         )
@@ -634,10 +628,29 @@ class TestVFolderRBACMigrationWithAlembic:
                         assert assoc.scope_id == vfolder.owner_id, (
                             f"VFolder {vfolder.id} scope_id mismatch"
                         )
+                    match vfolder.ownership_type:
+                        case VFolderOwnershipType.USER:
+                            assert assoc.scope_type == "user", (
+                                f"VFolder {vfolder.id} should have scope_type 'user'"
+                            )
+                            assert assoc.scope_id == vfolder.owner_id, (
+                                f"VFolder {vfolder.id} scope_id mismatch"
+                            )
+                        case VFolderOwnershipType.GROUP:
+                            assert assoc.scope_type == "project", (
+                                f"VFolder {vfolder.id} should have scope_type 'project'"
+                            )
+                            assert assoc.scope_id == vfolder.owner_id, (
+                                f"VFolder {vfolder.id} scope_id mismatch"
+                            )
+                        case _:
+                            raise AssertionError(
+                                f"Unexpected ownership type {vfolder.ownership_type} for vfolder {vfolder.id}"
+                            )
 
                 # 2. Verify roles are created for each permission
                 roles = await session.scalars(
-                    sa.select(RoleRow).where(RoleRow.name.like("vfolder_granted_%"))  # type: ignore[attr-defined]
+                    sa.select(RoleRow).where(VFolderPermissionData.role_query_condition())
                 )
                 role_rows = cast(list[RoleRow], roles.all())
 
@@ -668,7 +681,10 @@ class TestVFolderRBACMigrationWithAlembic:
 
                 # Verify each permission
                 for perm in data.permissions:
-                    expected_role_name = f"vfolder_granted_{perm.vfolder_id}"
+                    perm_data = VFolderPermissionData(
+                        perm.vfolder_id, perm.user_id, perm.permission
+                    )
+                    expected_role_name = perm_data.to_role_name()
                     role = roles_by_name.get(expected_role_name)
                     assert role is not None, f"Role {expected_role_name} not found"
 
@@ -686,6 +702,7 @@ class TestVFolderRBACMigrationWithAlembic:
                     )
 
                     # All permissions map to 'read' operation in migration
-                    assert obj_perm.operation == "read", (
-                        f"Expected operation 'read' for vfolder {perm.vfolder_id}, got {obj_perm.operation}"
+                    expected_operation = permission_mapping()[perm.permission]
+                    assert obj_perm.operation == expected_operation, (
+                        f"Expected operation '{expected_operation}' for vfolder {perm.vfolder_id}, got '{obj_perm.operation}'"
                     )
