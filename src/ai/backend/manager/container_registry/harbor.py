@@ -114,9 +114,11 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
                     # we should favor `config` instead of `container_config` since `config` can contain additional datas
                     # set when commiting image via `--change` flag
-                    if _config_labels := data.get("config", {}).get("Labels"):
+                    if _config_labels := (data.get("config") or {}).get("Labels"):
                         labels = _config_labels
-                    elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+                    elif _container_config_labels := (data.get("container_config") or {}).get(
+                        "Labels"
+                    ):
                         labels = _container_config_labels
 
                     if not labels:
@@ -387,6 +389,74 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
 
     @override
+    async def _process_oci_manifest(
+        self,
+        tg: aiotools.TaskGroup,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+        image_info: Mapping[str, Any],
+    ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_MANIFEST})
+
+        if (reporter := progress_reporter.get()) is not None:
+            reporter.total_progress += 1
+
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                manifest_data = await resp.json()
+
+            config_digest = manifest_data["config"]["digest"]
+            size_bytes = (
+                sum(layer["size"] for layer in manifest_data["layers"])
+                + manifest_data["config"]["size"]
+            )
+
+            async with sess.get(
+                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                config_data = await read_json(resp)
+
+        labels = {}
+        if _config_labels := (config_data.get("config") or {}).get("Labels"):
+            labels = _config_labels
+        elif _container_config_labels := (config_data.get("container_config") or {}).get("Labels"):
+            labels = _container_config_labels
+
+        if not labels:
+            log.warning(
+                "The image {}:{} has no metadata labels -> treating as vanilla image",
+                image,
+                tag,
+            )
+            labels = {}
+
+        architecture = config_data.get("architecture")
+        if architecture:
+            architecture = arch_name_aliases.get(architecture, architecture)
+        else:
+            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+                architecture = "aarch64"
+            else:
+                architecture = "x86_64"
+
+        manifests = {
+            architecture: {
+                "size": size_bytes,
+                "labels": labels,
+                "digest": config_digest,
+            }
+        }
+        await self._read_manifest(image, tag, manifests)
+
+    @override
     async def _process_docker_v2_multiplatform_image(
         self,
         tg: aiotools.TaskGroup,
@@ -484,9 +554,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = json.loads(await resp.read())
             labels = {}
-            if _config_labels := data.get("config", {}).get("Labels"):
+            if _config_labels := (data.get("config") or {}).get("Labels"):
                 labels = _config_labels
-            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+            elif _container_config_labels := (data.get("container_config") or {}).get("Labels"):
                 labels = _container_config_labels
 
             if labels is None:
@@ -537,9 +607,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = json.loads(await resp.read())
             labels = {}
-            if _config_labels := data.get("config", {}).get("Labels"):
+            if _config_labels := (data.get("config") or {}).get("Labels"):
                 labels = _config_labels
-            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+            elif _container_config_labels := (data.get("container_config") or {}).get("Labels"):
                 labels = _container_config_labels
 
             if labels is None:
