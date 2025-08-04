@@ -100,6 +100,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.manager.actions.callbacks.group import CallbackGroup
+from ai.backend.manager.actions.callbacks.permission_controller import EntityCreateRBACCallback
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
@@ -606,6 +608,18 @@ def _make_action_reporters(
     return action_monitors
 
 
+def _make_action_callbacks(
+    root_ctx: RootContext,
+) -> CallbackGroup:
+    rbac_callback = EntityCreateRBACCallback(root_ctx.repositories.permission_controller)
+    return CallbackGroup(
+        create=[rbac_callback],
+        batch=[],
+        single_entity=[],
+        scope=[],
+    )
+
+
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
@@ -624,6 +638,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    callback_group = _make_action_callbacks(root_ctx)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -645,6 +660,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
+        action_callback=callback_group,
     )
     yield
 

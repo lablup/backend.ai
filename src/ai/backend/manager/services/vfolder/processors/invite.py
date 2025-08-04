@@ -1,7 +1,9 @@
 from typing import override
 
+from ai.backend.manager.actions.callbacks.group import CallbackGroup
 from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.actions.processor.base import ActionProcessor
+from ai.backend.manager.actions.processor.create import CreateActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from ..actions.invite import (
@@ -23,7 +25,7 @@ from ..services.invite import VFolderInviteService
 
 class VFolderInviteProcessors(AbstractProcessorPackage):
     invite_vfolder: ActionProcessor[InviteVFolderAction, InviteVFolderActionResult]
-    accept_invitation: ActionProcessor[AcceptInvitationAction, AcceptInvitationActionResult]
+    accept_invitation: CreateActionProcessor[AcceptInvitationAction, AcceptInvitationActionResult]
     reject_invitation: ActionProcessor[RejectInvitationAction, RejectInvitationActionResult]
     update_invitation: ActionProcessor[UpdateInvitationAction, UpdateInvitationActionResult]
     list_invitation: ActionProcessor[ListInvitationAction, ListInvitationActionResult]
@@ -31,9 +33,16 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         LeaveInvitedVFolderAction, LeaveInvitedVFolderActionResult
     ]
 
-    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]):
+    def __init__(
+        self,
+        service: VFolderInviteService,
+        action_monitors: list[ActionMonitor],
+        callbacks: CallbackGroup,
+    ) -> None:
         self.invite_vfolder = ActionProcessor(service.invite, action_monitors)
-        self.accept_invitation = ActionProcessor(service.accept_invitation, action_monitors)
+        self.accept_invitation = CreateActionProcessor(
+            service.accept_invitation, action_monitors, callbacks=callbacks.create
+        )
         self.reject_invitation = ActionProcessor(service.reject_invitation, action_monitors)
         self.update_invitation = ActionProcessor(service.update_invitation, action_monitors)
         self.list_invitation = ActionProcessor(service.list_invitation, action_monitors)

@@ -14,6 +14,9 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
 )
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -46,6 +49,7 @@ class Repositories:
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
+    permission_controller: PermissionControllerRepository
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -65,6 +69,7 @@ class Repositories:
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
+        permission_controller = PermissionControllerRepository(args)
 
         return cls(
             agent=agent_repositories,
@@ -83,4 +88,5 @@ class Repositories:
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
+            permission_controller=permission_controller,
         )

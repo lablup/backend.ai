@@ -8,6 +8,8 @@ from typing import (
 )
 
 from ai.backend.manager.actions.action.base import BaseAction, BaseActionResult
+from ai.backend.manager.actions.action.create import BaseCreateAction, BaseCreateActionResult
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 
 from ..types import VFolderInvitationInfo
@@ -51,12 +53,13 @@ class InviteVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class AcceptInvitationAction(VFolderInvitationAction):
+class AcceptInvitationAction(BaseCreateAction):
     invitation_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.invitation_id)
+    @classmethod
+    def entity_type(cls) -> str:
+        return "vfolder"
 
     @override
     @classmethod
@@ -65,12 +68,23 @@ class AcceptInvitationAction(VFolderInvitationAction):
 
 
 @dataclass
-class AcceptInvitationActionResult(BaseActionResult):
+class AcceptInvitationActionResult(BaseCreateActionResult):
     invitation_id: uuid.UUID
+    vfolder_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.invitation_id)
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type="user",
+            scope_id=str(self.vfolder_id),
+        )
+
+    @override
+    def entity_id(self) -> ObjectId:
+        return ObjectId(
+            entity_type="vfolder",
+            entity_id=str(self.vfolder_id),
+        )
 
 
 @dataclass
