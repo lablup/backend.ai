@@ -22,13 +22,13 @@ class LIFOSchedulingPrioritizer(SchedulingPrioritizer):
 
     @override
     async def prioritize(
-        self, system_snapshot: SystemSnapshot, workload: Sequence[SessionWorkload]
+        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
         Prioritize the workloads in LIFO order.
         :param workload: A sequence of SessionWorkload objects to prioritize.
         :return: A sequence of SessionWorkload objects in LIFO order.
         """
-        if not workload:
+        if not workloads:
             return []
-        return list(reversed(workload))  # Reverse the order to implement LIFO
+        return list(reversed(workloads))  # Reverse the order to implement LIFO

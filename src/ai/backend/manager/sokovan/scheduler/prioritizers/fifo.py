@@ -22,11 +22,11 @@ class FIFOSchedulingPrioritizer(SchedulingPrioritizer):
 
     @override
     async def prioritize(
-        self, system_snapshot: SystemSnapshot, workload: Sequence[SessionWorkload]
+        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
         Prioritize the workloads in FIFO order.
         :param workload: A sequence of SessionWorkload objects to prioritize.
         :return: A sequence of SessionWorkload objects in FIFO order.
         """
-        return workload  # Return the workloads in the order they were received
+        return workloads  # Return the workloads in the order they were received

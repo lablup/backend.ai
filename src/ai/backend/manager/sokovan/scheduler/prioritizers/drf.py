@@ -26,7 +26,7 @@ class DRFSchedulingPrioritizer(SchedulingPrioritizer):
 
     @override
     async def prioritize(
-        self, system_snapshot: SystemSnapshot, workload: Sequence[SessionWorkload]
+        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
         Prioritize the workloads based on Dominant Resource Fairness.
@@ -34,7 +34,7 @@ class DRFSchedulingPrioritizer(SchedulingPrioritizer):
         :param workload: A sequence of SessionWorkload objects to prioritize.
         :return: A sequence of SessionWorkload objects prioritized by DRF.
         """
-        if not workload:
+        if not workloads:
             return []
 
         # Calculate dominant share for each user
@@ -49,7 +49,7 @@ class DRFSchedulingPrioritizer(SchedulingPrioritizer):
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
         # For users with the same dominant share, maintain original order
-        sorted_workloads = sorted(workload, key=lambda w: user_dominant_shares[w.access_key])
+        sorted_workloads = sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
 
         return sorted_workloads
 

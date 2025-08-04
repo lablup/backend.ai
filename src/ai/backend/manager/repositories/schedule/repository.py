@@ -3,10 +3,11 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
-from typing import Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
@@ -61,10 +62,39 @@ from ai.backend.manager.scheduler.types import (
     SchedulingContext,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for schedule repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
+
+
+@dataclass
+class AllocationBatch:
+    """Batch of session allocations with pre-collected agent IDs for efficient processing."""
+
+    allocations: list["SessionAllocation"]
+    agent_ids: set[AgentId]
+
+
+@dataclass
+class PreFetchedRowMaps:
+    """Container for pre-fetched database rows used during allocation."""
+
+    agent_row_map: dict[AgentId, AgentRow]
+    session_row_map: dict[SessionId, SessionRow]
+    kernel_row_map: dict[uuid.UUID, KernelRow]
+
+
+@dataclass
+class KernelAgentInfo:
+    """Information about kernel agent assignment."""
+
+    agent_id: AgentId
+    agent_addr: str
+    scaling_group: str
 
 
 class ScheduleRepository:
@@ -939,3 +969,332 @@ class ScheduleRepository:
                 await registry.delete_appproxy_endpoint(session, endpoint)
             except Exception as e:
                 log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+
+    @repository_decorator()
+    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
+        """
+        Allocate resources for multiple sessions.
+        Uses a single database session for all allocations.
+        Pre-fetches all agent, session, and kernel data for efficient processing.
+        If a session allocation fails, the error is logged but processing continues.
+        Note: Failed allocations remain uncommitted while successful ones are committed.
+        """
+        async with self._db.begin_session() as db_session:
+            # Pre-fetch all necessary data
+            row_maps = await self._create_prefetched_row_maps(db_session, allocation_batch)
+
+            for allocation in allocation_batch.allocations:
+                try:
+                    await self._allocate_single_session(db_session, row_maps, allocation)
+                except Exception as e:
+                    log.error(
+                        "Failed to allocate session {}: {}",
+                        allocation.session_id,
+                        str(e),
+                        exc_info=True,
+                    )
+                    # Continue with next session allocation
+
+    async def _prefetch_agent_rows(
+        self, db_session: SASession, agent_ids: set[AgentId]
+    ) -> dict[AgentId, AgentRow]:
+        """
+        Pre-fetch all agent rows for the given agent IDs.
+        Returns a dictionary mapping agent_id to AgentRow.
+        """
+        if not agent_ids:
+            return {}
+
+        query = sa.select(AgentRow).where(AgentRow.id.in_(agent_ids))
+        result = await db_session.execute(query)
+        agents = result.scalars().all()
+
+        return {agent.id: agent for agent in agents}
+
+    async def _prefetch_session_rows(
+        self, db_session: SASession, session_ids: set[SessionId]
+    ) -> dict[SessionId, SessionRow]:
+        """
+        Pre-fetch all session rows for the given session IDs.
+        Returns a dictionary mapping session_id to SessionRow.
+        """
+        if not session_ids:
+            return {}
+
+        query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
+        result = await db_session.execute(query)
+        sessions = result.scalars().all()
+
+        return {session.id: session for session in sessions}
+
+    async def _prefetch_kernel_rows(
+        self, db_session: SASession, kernel_ids: set[uuid.UUID]
+    ) -> dict[uuid.UUID, KernelRow]:
+        """
+        Pre-fetch all kernel rows for the given kernel IDs.
+        Returns a dictionary mapping kernel_id to KernelRow.
+        """
+        if not kernel_ids:
+            return {}
+
+        query = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
+        result = await db_session.execute(query)
+        kernels = result.scalars().all()
+
+        return {kernel.id: kernel for kernel in kernels}
+
+    async def _create_prefetched_row_maps(
+        self, db_session: SASession, allocation_batch: AllocationBatch
+    ) -> PreFetchedRowMaps:
+        """
+        Create PreFetchedRowMaps by collecting and pre-fetching all necessary data.
+        """
+        # Collect all session and kernel IDs
+        session_ids: set[SessionId] = set()
+        kernel_ids: set[uuid.UUID] = set()
+
+        for allocation in allocation_batch.allocations:
+            session_ids.add(allocation.session_id)
+            for kernel_alloc in allocation.kernel_allocations:
+                kernel_ids.add(kernel_alloc.kernel_id)
+
+        # Pre-fetch all data in bulk
+        agent_row_map = await self._prefetch_agent_rows(db_session, allocation_batch.agent_ids)
+        session_row_map = await self._prefetch_session_rows(db_session, session_ids)
+        kernel_row_map = await self._prefetch_kernel_rows(db_session, kernel_ids)
+
+        return PreFetchedRowMaps(
+            agent_row_map=agent_row_map,
+            session_row_map=session_row_map,
+            kernel_row_map=kernel_row_map,
+        )
+
+    async def _get_agent_row(
+        self, db_session: SASession, agent_row_map: dict[AgentId, AgentRow], agent_id: AgentId
+    ) -> AgentRow:
+        """
+        Get agent row from pre-fetched map or fetch from database if not found.
+        """
+        if agent_id in agent_row_map:
+            return agent_row_map[agent_id]
+
+        # Fallback: fetch from database if not in pre-fetched data
+        query = sa.select(AgentRow).where(AgentRow.id == agent_id)
+        result = await db_session.execute(query)
+        agent_row = result.scalar_one_or_none()
+
+        if agent_row is None:
+            raise RuntimeError(f"Agent {agent_id} not found")
+
+        # Cache it for future use
+        agent_row_map[agent_id] = agent_row
+        return agent_row
+
+    async def _get_session_row(
+        self,
+        db_session: SASession,
+        session_row_map: dict[SessionId, SessionRow],
+        session_id: SessionId,
+    ) -> SessionRow:
+        """
+        Get session row from pre-fetched map or fetch from database if not found.
+        """
+        if session_id in session_row_map:
+            return session_row_map[session_id]
+
+        # Fallback: fetch from database if not in pre-fetched data
+        query = sa.select(SessionRow).where(SessionRow.id == session_id)
+        result = await db_session.execute(query)
+        session_row = result.scalar_one_or_none()
+
+        if session_row is None:
+            raise RuntimeError(f"Session {session_id} not found")
+
+        # Cache it for future use
+        session_row_map[session_id] = session_row
+        return session_row
+
+    async def _get_kernel_row(
+        self,
+        db_session: SASession,
+        kernel_row_map: dict[uuid.UUID, KernelRow],
+        kernel_id: uuid.UUID,
+    ) -> KernelRow:
+        """
+        Get kernel row from pre-fetched map or fetch from database if not found.
+        """
+        if kernel_id in kernel_row_map:
+            return kernel_row_map[kernel_id]
+
+        # Fallback: fetch from database if not in pre-fetched data
+        query = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        result = await db_session.execute(query)
+        kernel_row = result.scalar_one_or_none()
+
+        if kernel_row is None:
+            raise RuntimeError(f"Kernel {kernel_id} not found")
+
+        # Cache it for future use
+        kernel_row_map[kernel_id] = kernel_row
+        return kernel_row
+
+    async def _allocate_single_session(
+        self,
+        db_session: SASession,
+        row_maps: PreFetchedRowMaps,
+        allocation: "SessionAllocation",
+    ) -> None:
+        """
+        Allocate resources for a single session.
+        Raises exception if any agent resource allocation fails.
+        """
+        # 1. Validate that all agents can accommodate the requested resources
+        await self._validate_agent_resources(db_session, row_maps.agent_row_map, allocation)
+
+        # 2. Reserve resources on agents
+        await self._reserve_agent_resources(db_session, row_maps.agent_row_map, allocation)
+
+        # 3. Update kernel information with agent assignments
+        await self._update_kernels_with_agents(db_session, row_maps.kernel_row_map, allocation)
+
+        # 4. Update session information
+        await self._update_session_status(db_session, row_maps.session_row_map, allocation)
+
+    async def _validate_agent_resources(
+        self,
+        db_session: SASession,
+        agent_row_map: dict[AgentId, AgentRow],
+        allocation: "SessionAllocation",
+    ) -> None:
+        """
+        Validate that all agents have sufficient resources for the allocation.
+        Raises RuntimeError if any agent cannot accommodate the requested resources.
+        """
+        # Group allocations by agent to check resources efficiently
+        agent_resource_map: dict[AgentId, ResourceSlot] = {}
+
+        for agent_alloc in allocation.agent_allocations:
+            agent_id = agent_alloc.agent_id
+            for slot in agent_alloc.allocated_slots:
+                if agent_id not in agent_resource_map:
+                    agent_resource_map[agent_id] = ResourceSlot()
+                agent_resource_map[agent_id] += slot
+
+        # Check each agent's available resources using pre-fetched data
+        for agent_id, requested_slots in agent_resource_map.items():
+            agent_row = await self._get_agent_row(db_session, agent_row_map, agent_id)
+            available_slots = agent_row.available_slots
+            occupied_slots = agent_row.occupied_slots
+
+            # Check if agent has enough resources
+            for key, requested_amount in requested_slots.items():
+                available_amount = available_slots.get(key, Decimal("0"))
+                occupied_amount = occupied_slots.get(key, Decimal("0"))
+                remaining = available_amount - occupied_amount
+
+                if remaining < requested_amount:
+                    raise RuntimeError(
+                        f"Agent {agent_id} has insufficient resources for {key}: "
+                        f"requested={requested_amount}, remaining={remaining}"
+                    )
+
+    async def _reserve_agent_resources(
+        self,
+        db_session: SASession,
+        agent_row_map: dict[AgentId, AgentRow],
+        allocation: "SessionAllocation",
+    ) -> None:
+        """
+        Reserve resources on agents by updating their occupied_slots.
+        """
+        # Group allocations by agent for efficient updates
+        agent_updates: dict[AgentId, ResourceSlot] = {}
+
+        for agent_alloc in allocation.agent_allocations:
+            agent_id = agent_alloc.agent_id
+            for slot in agent_alloc.allocated_slots:
+                if agent_id not in agent_updates:
+                    agent_updates[agent_id] = ResourceSlot()
+                agent_updates[agent_id] += slot
+
+        # Update each agent's occupied slots
+        for agent_id, additional_slots in agent_updates.items():
+            # Get agent row from pre-fetched data or database
+            agent_row = await self._get_agent_row(db_session, agent_row_map, agent_id)
+            current_occupied = agent_row.occupied_slots
+
+            # Update with new occupied slots
+            new_occupied = current_occupied + additional_slots
+            update_query = (
+                sa.update(AgentRow)
+                .values(occupied_slots=new_occupied)
+                .where(AgentRow.id == agent_id)
+            )
+            await db_session.execute(update_query)
+
+    async def _update_kernels_with_agents(
+        self,
+        db_session: SASession,
+        kernel_row_map: dict[uuid.UUID, KernelRow],
+        allocation: "SessionAllocation",
+    ) -> None:
+        """
+        Update kernel information with their agent assignments.
+        """
+        now = datetime.now(tzutc())
+
+        # Create a mapping of kernel_id to agent info
+        kernel_agent_map: dict[uuid.UUID, KernelAgentInfo] = {}
+
+        for kernel_alloc in allocation.kernel_allocations:
+            kernel_agent_map[kernel_alloc.kernel_id] = KernelAgentInfo(
+                agent_id=kernel_alloc.agent_id,
+                agent_addr=kernel_alloc.agent_addr,
+                scaling_group=kernel_alloc.scaling_group,
+            )
+
+        # Update all kernels using pre-fetched data
+        for kernel_id, agent_info in kernel_agent_map.items():
+            kernel = await self._get_kernel_row(db_session, kernel_row_map, kernel_id)
+
+            kernel.set_status(
+                KernelStatus.SCHEDULED,
+                status_info="scheduled",
+                status_data={},
+                status_changed_at=now,
+            )
+            kernel.agent = agent_info.agent_id
+            kernel.agent_addr = agent_info.agent_addr
+            kernel.scaling_group = agent_info.scaling_group
+
+    async def _update_session_status(
+        self,
+        db_session: SASession,
+        session_row_map: dict[SessionId, SessionRow],
+        allocation: "SessionAllocation",
+    ) -> None:
+        """
+        Update session status and metadata.
+        """
+        now = datetime.now(tzutc())
+
+        # Collect unique agent IDs from kernel allocations
+        agent_ids = list({
+            kernel_alloc.agent_id
+            for kernel_alloc in allocation.kernel_allocations
+            if kernel_alloc.agent_id is not None
+        })
+
+        # Get session from pre-fetched data
+        session_row = await self._get_session_row(
+            db_session, session_row_map, allocation.session_id
+        )
+
+        session_row.set_status(
+            SessionStatus.SCHEDULED,
+            status_info="scheduled",
+            status_data={},
+            status_changed_at=now,
+        )
+        session_row.scaling_group_name = allocation.scaling_group
+        session_row.agent_ids = agent_ids

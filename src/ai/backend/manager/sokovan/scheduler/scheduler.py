@@ -88,6 +88,7 @@ class Scheduler:
         """
         # Fetch complete system snapshot from repository
         system_snapshot = await self._repository.get_system_snapshot()
+        config = await self._repository.get_scheduling_config(scaling_group)
         # Prioritize workloads with system context
         prioritized_workloads = await self._prioritizer.prioritize(system_snapshot, workloads)
 
@@ -110,9 +111,6 @@ class Scheduler:
         # Get scheduling configuration once for all workloads
         if not validates_workloads:
             return
-        # Assuming all workloads in a batch are from the same scaling group
-        first_workload = validates_workloads[0]
-        config = await self._repository.get_scheduling_config(first_workload.scaling_group)
         # Create selection config from scheduling config
         selection_config = AgentSelectionConfig(
             max_container_count=config.max_container_count_per_agent,
@@ -125,8 +123,9 @@ class Scheduler:
                 selection_config,
                 scaling_group,
             )
-            if session_allocation:
-                session_allocations.append(session_allocation)
+            if not session_allocation:
+                continue
+            session_allocations.append(session_allocation)
 
         # Allocate resources for each validated workload
         await self._allocator.allocate(session_allocations)
@@ -209,20 +208,19 @@ class Scheduler:
 
             # Create session allocation if we have kernel allocations
             if kernel_allocations:
-                # Get agent allocations from the map
-                agent_allocations = list(agent_allocation_map.values())
+                # If no agent allocations, we cannot proceed
+                return None
+            # Get agent allocations from the map
+            agent_allocations = list(agent_allocation_map.values())
 
-                return SessionAllocation(
-                    session_id=session_workload.session_id,
-                    session_type=session_workload.session_type,
-                    cluster_mode=session_workload.cluster_mode,
-                    scaling_group=scaling_group,
-                    kernel_allocations=kernel_allocations,
-                    agent_allocations=agent_allocations,
-                )
-
-            return None
-
+            return SessionAllocation(
+                session_id=session_workload.session_id,
+                session_type=session_workload.session_type,
+                cluster_mode=session_workload.cluster_mode,
+                scaling_group=scaling_group,
+                kernel_allocations=kernel_allocations,
+                agent_allocations=agent_allocations,
+            )
         except Exception as e:
             log.debug(
                 "Agent selection failed for workload {}: {}",
