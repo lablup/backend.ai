@@ -23,6 +23,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -34,6 +35,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -209,6 +211,7 @@ class ComputeSessionNode(graphene.ObjectType):
     domain_name = graphene.String()
     project_id = graphene.UUID()
     user_id = graphene.UUID()
+    owner = graphene.Field(UserNode, description="Added in 25.13.0.")
     access_key = graphene.String()
     permissions = graphene.List(
         SessionPermissionValueField,
@@ -315,6 +318,7 @@ class ComputeSessionNode(graphene.ObjectType):
             project_id=row.group_id,
             user_id=row.user_uuid,
             access_key=row.access_key,
+            owner=UserNode.from_row(ctx, row.user),
             # status
             status=row.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -359,6 +363,9 @@ class ComputeSessionNode(graphene.ObjectType):
         else:
             vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
 
+        if session_data.owner is None:
+            raise SessionWithInvalidStateError()
+
         result = cls(
             # identity
             id=session_data.id,  # auto-converted to Relay global ID
@@ -375,6 +382,7 @@ class ComputeSessionNode(graphene.ObjectType):
             project_id=session_data.group_id,
             user_id=session_data.user_uuid,
             access_key=session_data.access_key,
+            owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
             status=session_data.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -490,7 +498,11 @@ class ComputeSessionNode(graphene.ObjectType):
             query = sa.select(dependency_cte.c.id)
             session_ids = (await db_sess.execute(query)).scalars().all()
             # Get the session rows in the graph
-            query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
+            query = sa.select(SessionRow).where(
+                SessionRow.id.in_(session_ids).options(
+                    selectinload(SessionRow.user),
+                )
+            )
             session_rows = (await db_sess.execute(query)).scalars().all()
 
         # Convert into GraphQL node objects

@@ -10,6 +10,7 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions, find_dependent_sessions
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -37,6 +38,15 @@ class SessionRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    @repository_decorator()
+    async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionRow.user).where(SessionRow.id == session_id)
+            user = await db_sess.scalar(query)
+            if user is None:
+                raise SessionNotFound(f"Session with id {session_id} not found")
+            return UserData.from_row(user)
 
     @repository_decorator()
     async def get_session_validated(

@@ -1577,8 +1577,11 @@ class SessionService:
         )
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
+        session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
-        return ModifySessionActionResult(session_data=session_row.to_dataclass())
+        return ModifySessionActionResult(
+            session_data=session_row.to_dataclass(user=session_owner_data)
+        )
 
     async def check_and_transit_status(
         self, action: CheckAndTransitStatusAction
@@ -1610,10 +1613,11 @@ class SessionService:
         await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
             row.id for row, is_transited in session_rows if is_transited
         ])
+        session_owner_data = await self._session_repository.get_session_owner(session_id)
 
         result = {row.id: row.status.name for row, _ in session_rows}
         return CheckAndTransitStatusActionResult(
-            result=result, session_data=session_row.to_dataclass()
+            result=result, session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
     async def check_and_transit_status_multi(
