@@ -1383,7 +1383,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if labels is None:
                         continue
 
-                    kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
+                    kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         updated_images[repo_tag] = img_detail["Id"]
             for added_image in updated_images.keys() - self.images.keys():

@@ -428,69 +428,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
-    async def _process_oci_manifest(
-        self,
-        tg: aiotools.TaskGroup,
-        sess: aiohttp.ClientSession,
-        rqst_args: dict[str, Any],
-        image: str,
-        tag: str,
-        image_info: Mapping[str, Any],
-    ) -> None:
-        rqst_args = copy.deepcopy(rqst_args)
-        rqst_args["headers"] = rqst_args.get("headers", {})
-        rqst_args["headers"].update({
-            "Accept": self.MEDIA_TYPE_OCI_MANIFEST,
-        })
-
-        if (reporter := progress_reporter.get()) is not None:
-            reporter.total_progress += 1
-
-        async with concurrency_sema.get():
-            config_digest = image_info["config"]["digest"]
-            size_bytes = (
-                sum(layer["size"] for layer in image_info["layers"]) + image_info["config"]["size"]
-            )
-
-            async with sess.get(
-                self.registry_url / f"v2/{image}/blobs/{config_digest}",
-                **rqst_args,
-            ) as resp:
-                resp.raise_for_status()
-                config_data = await read_json(resp)
-
-        labels = {}
-        if _config_labels := (config_data.get("config") or {}).get("Labels"):
-            labels = _config_labels
-        elif _container_config_labels := (config_data.get("container_config") or {}).get("Labels"):
-            labels = _container_config_labels
-
-        if not labels:
-            log.warning(
-                "The image {}:{} has no metadata labels -> treating as vanilla image",
-                image,
-                tag,
-            )
-            labels = {}
-
-        architecture = config_data.get("architecture")
-        if architecture:
-            architecture = arch_name_aliases.get(architecture, architecture)
-        else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
-                architecture = "aarch64"
-            else:
-                architecture = "x86_64"
-
-        manifests = {
-            architecture: {
-                "size": size_bytes,
-                "labels": labels,
-                "digest": config_digest,
-            }
-        }
-        await self._read_manifest(image, tag, manifests)
-
     async def _process_docker_v2_multiplatform_image(
         self,
         tg: aiotools.TaskGroup,
