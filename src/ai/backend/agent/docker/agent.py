@@ -1573,10 +1573,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    img_config = img_detail.get("Config", {})
-                    if img_config is None:
-                        continue
-                    labels = img_config.get("Labels")
+                    labels = (img_detail.get("Config") or {}).get("Labels")
                     if labels is None:
                         continue
 
