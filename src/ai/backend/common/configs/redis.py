@@ -199,9 +199,9 @@ class RedisConfig(SingleRedisConfig):
         if self.sentinel:
             sentinel_addrs = [hp.to_legacy() for hp in self.sentinel]
 
-        ovrride_targets: Optional[dict[str, _RedisTarget]] = None
+        override_targets: Optional[dict[str, _RedisTarget]] = None
         if self.override_configs:
-            ovrride_targets = {k: v.to_redis_target() for k, v in self.override_configs.items()}
+            override_targets = {k: v.to_redis_target() for k, v in self.override_configs.items()}
 
         return RedisProfileTarget(
             addr=addr,
@@ -209,7 +209,7 @@ class RedisConfig(SingleRedisConfig):
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config.to_dict(),
-            override_targets=ovrride_targets,
+            override_targets=override_targets,
         )
 
     def to_valkey_profile_target(self) -> ValkeyProfileTarget:
@@ -221,14 +221,14 @@ class RedisConfig(SingleRedisConfig):
         sentinel_addrs = None
         if self.sentinel:
             sentinel_addrs = [hp.address for hp in self.sentinel]
-        ovrride_targets: Optional[dict[str, ValkeyTarget]] = None
+        override_targets: Optional[dict[str, ValkeyTarget]] = None
         if self.override_configs:
-            ovrride_targets = {k: v.to_valkey_target() for k, v in self.override_configs.items()}
+            override_targets = {k: v.to_valkey_target() for k, v in self.override_configs.items()}
 
         return ValkeyProfileTarget(
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
-            override_targets=ovrride_targets,
+            override_targets=override_targets,
         )
