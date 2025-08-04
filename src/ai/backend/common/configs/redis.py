@@ -4,7 +4,8 @@ from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_val
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
-from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget
+from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
+from ai.backend.common.types import RedisTarget as _RedisTarget
 
 
 class RedisHelperConfig(BaseModel):
@@ -130,6 +131,41 @@ class SingleRedisConfig(BaseModel):
             return None
         return ",".join(f"{hp.host}:{hp.port}" for hp in sentinel)
 
+    def to_redis_target(self) -> _RedisTarget:
+        """
+        Convert this Redis configuration to a Redis target.
+        This is used for serialization in the Backend.AI profile system.
+        """
+        addr = self.addr.to_legacy() if self.addr else None
+        sentinel_addrs = None
+        if self.sentinel:
+            sentinel_addrs = [hp.to_legacy() for hp in self.sentinel]
+
+        return _RedisTarget(
+            addr=addr,
+            sentinel=sentinel_addrs,
+            service_name=self.service_name,
+            password=self.password,
+            redis_helper_config=self.redis_helper_config.to_dict(),
+        )
+
+    def to_valkey_target(self) -> ValkeyTarget:
+        """
+        Convert this Redis configuration to a Valkey target.
+        This is used for serialization in the Backend.AI profile system.
+        """
+        addr = self.addr.address if self.addr else None
+        sentinel_addrs = None
+        if self.sentinel:
+            sentinel_addrs = [hp.address for hp in self.sentinel]
+
+        return ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel_addrs,
+            service_name=self.service_name,
+            password=self.password,
+        )
+
 
 class RedisConfig(SingleRedisConfig):
     override_configs: Optional[dict[str, SingleRedisConfig]] = Field(
@@ -163,12 +199,17 @@ class RedisConfig(SingleRedisConfig):
         if self.sentinel:
             sentinel_addrs = [hp.to_legacy() for hp in self.sentinel]
 
+        ovrride_targets: Optional[dict[str, _RedisTarget]] = None
+        if self.override_configs:
+            ovrride_targets = {k: v.to_redis_target() for k, v in self.override_configs.items()}
+
         return RedisProfileTarget(
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config.to_dict(),
+            override_targets=ovrride_targets,
         )
 
     def to_valkey_profile_target(self) -> ValkeyProfileTarget:
@@ -180,10 +221,14 @@ class RedisConfig(SingleRedisConfig):
         sentinel_addrs = None
         if self.sentinel:
             sentinel_addrs = [hp.address for hp in self.sentinel]
+        ovrride_targets: Optional[dict[str, ValkeyTarget]] = None
+        if self.override_configs:
+            ovrride_targets = {k: v.to_valkey_target() for k, v in self.override_configs.items()}
 
         return ValkeyProfileTarget(
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            override_targets=ovrride_targets,
         )
