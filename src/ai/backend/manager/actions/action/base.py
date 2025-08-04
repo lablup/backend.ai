@@ -5,8 +5,6 @@ from ..types import ActionSpec
 
 
 class BaseAction(ABC):
-    # TODO: Migrate to One of BaseSingleEntityAction, BaseMultiEntityAction, or BaseScopeAction
-
     @classmethod
     def spec(cls) -> ActionSpec:
         return ActionSpec(
