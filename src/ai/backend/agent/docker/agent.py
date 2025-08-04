@@ -1573,9 +1573,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    labels = img_detail.get("Config", {}).get("Labels")
+                    img_config = img_detail.get("Config", {})
+                    if img_config is None:
+                        continue
+                    labels = img_config.get("Labels")
                     if labels is None:
                         continue
+
                     kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         scanned_images[repo_tag] = img_detail["Id"]
