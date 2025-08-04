@@ -75,6 +75,7 @@ from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
 from .v1.storages import create_app as create_storages_app
+from .v1.registries import create_app as create_registries_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
@@ -1264,6 +1265,8 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
+
+    app.add_subapp("/v1/registries", create_registries_app(ctx))
     return app
 
 
