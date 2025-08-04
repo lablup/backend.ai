@@ -2,7 +2,7 @@ import itertools
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -18,6 +18,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -26,21 +27,28 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.models import (
     AgentRow,
     AgentStatus,
+    DomainRow,
     EndpointRow,
+    GroupRow,
     KernelRow,
     KernelStatistics,
     KernelStatus,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
     RoutingRow,
     ScalingGroupOpts,
     ScalingGroupRow,
+    SessionDependencyRow,
     SessionRow,
     SessionStatus,
+    UserRow,
     recalc_agent_resource_occupancy,
 )
 from ai.backend.manager.models.endpoint import (
@@ -48,9 +56,12 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointStatistics,
 )
-from ai.backend.manager.models.kernel import recalc_concurrency_used
+from ai.backend.manager.models.kernel import (
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    recalc_concurrency_used,
+)
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.session import _build_session_fetch_query
+from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES, _build_session_fetch_query
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -64,6 +75,21 @@ from ai.backend.manager.scheduler.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
+
+# Import types for SchedulerRepository implementation
+from ai.backend.manager.sokovan.scheduler.scheduler import SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.types import (
+    ConcurrencySnapshot,
+    KeyPairResourcePolicy,
+    PendingSessionInfo,
+    PendingSessionSnapshot,
+    ResourceOccupancySnapshot,
+    ResourcePolicySnapshot,
+    SessionDependencyInfo,
+    SessionDependencySnapshot,
+    UserResourcePolicy,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -100,10 +126,117 @@ class KernelAgentInfo:
 class ScheduleRepository:
     _db: ExtendedAsyncSAEngine
     _valkey_stat: ValkeyStatClient
+    _config_provider: ManagerConfigProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, valkey_stat: ValkeyStatClient) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        valkey_stat: ValkeyStatClient,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._db = db
         self._valkey_stat = valkey_stat
+        self._config_provider = config_provider
+
+    async def _get_keypair_occupancy(
+        self, db_sess: SASession, access_key: AccessKey
+    ) -> ResourceSlot:
+        """Calculate keypair occupancy from kernels."""
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+
+        query = (
+            sa.select(KernelRow.occupied_slots)
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.access_key == access_key)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+            )
+        )
+        zero = ResourceSlot()
+        key_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))], zero
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
+
+    async def _get_user_occupancy(self, db_sess: SASession, user_uuid: uuid.UUID) -> ResourceSlot:
+        """Calculate user occupancy from kernels."""
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+
+        query = sa.select(KernelRow.occupied_slots).where(
+            (KernelRow.user_uuid == user_uuid)
+            & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        )
+        zero = ResourceSlot()
+        user_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))], zero
+        )
+        # drop no-longer used slot types
+        user_occupied = ResourceSlot({
+            key: val for key, val in user_occupied.items() if key in known_slot_types
+        })
+        return user_occupied
+
+    async def _get_group_occupancy(self, db_sess: SASession, group_id: uuid.UUID) -> ResourceSlot:
+        """Calculate group occupancy from kernels."""
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+
+        query = (
+            sa.select(KernelRow.occupied_slots)
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.group_id == group_id)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+            )
+        )
+        zero = ResourceSlot()
+        group_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))],
+            zero,
+        )
+        # drop no-longer used slot types
+        drops = [k for k in group_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del group_occupied[k]
+        return group_occupied
+
+    async def _get_domain_occupancy(self, db_sess: SASession, domain_name: str) -> ResourceSlot:
+        """Calculate domain occupancy from kernels."""
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+
+        query = (
+            sa.select(KernelRow.occupied_slots)
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.domain_name == domain_name)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+            )
+        )
+        zero = ResourceSlot()
+        domain_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))],
+            zero,
+        )
+        # drop no-longer used slot types
+        drops = [k for k in domain_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del domain_occupied[k]
+        return domain_occupied
 
     async def _get_kernel_count_per_agent_at_endpoint(
         self,
@@ -1298,3 +1431,598 @@ class ScheduleRepository:
         )
         session_row.scaling_group_name = allocation.scaling_group
         session_row.agent_ids = agent_ids
+
+    async def _get_schedulable_agents(
+        self, db_sess: SASession, scaling_group: str
+    ) -> list[AgentRow]:
+        """Get schedulable agents in the scaling group."""
+        query = sa.select(AgentRow).where(
+            (AgentRow.status == AgentStatus.ALIVE)
+            & (AgentRow.scaling_group == scaling_group)
+            & (AgentRow.schedulable == sa.true())
+        )
+        result = await db_sess.execute(query)
+        return list(result.scalars().all())
+
+    async def _get_total_capacity(self, candidate_agents: list[AgentRow]) -> ResourceSlot:
+        """Get total capacity from candidate agents."""
+        return sum((ag.available_slots for ag in candidate_agents), ResourceSlot())
+
+    @repository_decorator()
+    async def get_agents(self, scaling_group: str) -> Sequence[AgentInfo]:
+        """Get all schedulable agents in the specified scaling group."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get schedulable agents for the scaling group
+            agent_rows = await self._get_schedulable_agents(db_sess, scaling_group)
+
+            # Convert AgentRow objects to AgentInfo objects
+            agents_info: list[AgentInfo] = []
+            for agent in agent_rows:
+                agents_info.append(
+                    AgentInfo(
+                        agent_id=agent.id,
+                        agent_addr=agent.addr,
+                        architecture=agent.architecture,
+                        available_slots=agent.available_slots,
+                        occupied_slots=agent.occupied_slots,
+                        scaling_group=agent.scaling_group,
+                        container_count=agent.container_count,
+                    )
+                )
+
+            return agents_info
+
+    @repository_decorator()
+    async def get_system_snapshot(self, scaling_group: str) -> SystemSnapshot:
+        """Get complete system snapshot for the specified scaling group."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get schedulable agents for total capacity calculation
+            agents = await self._get_schedulable_agents(db_sess, scaling_group)
+            total_capacity = await self._get_total_capacity(agents)
+
+            # Get resource occupancy for the scaling group
+            resource_occupancy = await self._get_resource_occupancy_snapshot(db_sess, scaling_group)
+
+            # Get resource policies for the scaling group
+            resource_policy = await self._get_resource_policy_snapshot(db_sess, scaling_group)
+
+            # Get concurrency information for access keys in this scaling group
+            access_keys = set(resource_policy.keypair_policies.keys())
+            concurrency = await self._get_concurrency_snapshot(access_keys)
+
+            # Get pending sessions for the scaling group
+            pending_sessions = await self._get_pending_session_snapshot(db_sess, scaling_group)
+
+            # Get session dependencies for the scaling group
+            session_dependencies = await self._get_session_dependency_snapshot(
+                db_sess, scaling_group
+            )
+
+            return SystemSnapshot(
+                total_capacity=total_capacity,
+                resource_occupancy=resource_occupancy,
+                resource_policy=resource_policy,
+                concurrency=concurrency,
+                pending_sessions=pending_sessions,
+                session_dependencies=session_dependencies,
+            )
+
+    async def _get_resource_occupancy_snapshot(
+        self, db_sess: SASession, scaling_group: str
+    ) -> ResourceOccupancySnapshot:
+        """Get resource occupancy snapshot by collecting kernel occupancy data in the scaling group."""
+        kernel_query = sa.select(
+            KernelRow.access_key,
+            KernelRow.user_uuid,
+            KernelRow.group_id,
+            KernelRow.domain_name,
+            KernelRow.occupied_slots,
+        ).where(
+            (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+            & (KernelRow.scaling_group == scaling_group)
+        )
+        kernel_rows = await db_sess.execute(kernel_query)
+
+        # Aggregate occupancy by different scopes
+        occupancy_by_keypair: dict[AccessKey, ResourceSlot] = {}
+        occupancy_by_user: dict[uuid.UUID, ResourceSlot] = {}
+        occupancy_by_group: dict[uuid.UUID, ResourceSlot] = {}
+        occupancy_by_domain: dict[str, ResourceSlot] = {}
+
+        for row in kernel_rows:
+            # Accumulate by keypair
+            if row.access_key not in occupancy_by_keypair:
+                occupancy_by_keypair[row.access_key] = ResourceSlot()
+            occupancy_by_keypair[row.access_key] += row.occupied_slots
+
+            # Accumulate by user
+            if row.user_uuid not in occupancy_by_user:
+                occupancy_by_user[row.user_uuid] = ResourceSlot()
+            occupancy_by_user[row.user_uuid] += row.occupied_slots
+
+            # Accumulate by group
+            if row.group_id not in occupancy_by_group:
+                occupancy_by_group[row.group_id] = ResourceSlot()
+            occupancy_by_group[row.group_id] += row.occupied_slots
+
+            # Accumulate by domain
+            if row.domain_name not in occupancy_by_domain:
+                occupancy_by_domain[row.domain_name] = ResourceSlot()
+            occupancy_by_domain[row.domain_name] += row.occupied_slots
+
+        return ResourceOccupancySnapshot(
+            by_keypair=occupancy_by_keypair,
+            by_user=occupancy_by_user,
+            by_group=occupancy_by_group,
+            by_domain=occupancy_by_domain,
+        )
+
+    async def _get_system_resource_occupancy_snapshot(
+        self, db_sess: SASession
+    ) -> ResourceOccupancySnapshot:
+        """Get resource occupancy snapshot system-wide."""
+        kernel_query = sa.select(
+            KernelRow.access_key,
+            KernelRow.user_uuid,
+            KernelRow.group_id,
+            KernelRow.domain_name,
+            KernelRow.occupied_slots,
+        ).where(
+            (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        )
+        kernel_rows = await db_sess.execute(kernel_query)
+
+        # Aggregate occupancy by different scopes
+        occupancy_by_keypair: dict[AccessKey, ResourceSlot] = {}
+        occupancy_by_user: dict[uuid.UUID, ResourceSlot] = {}
+        occupancy_by_group: dict[uuid.UUID, ResourceSlot] = {}
+        occupancy_by_domain: dict[str, ResourceSlot] = {}
+
+        for row in kernel_rows:
+            # Accumulate by keypair
+            if row.access_key not in occupancy_by_keypair:
+                occupancy_by_keypair[row.access_key] = ResourceSlot()
+            occupancy_by_keypair[row.access_key] += row.occupied_slots
+
+            # Accumulate by user
+            if row.user_uuid not in occupancy_by_user:
+                occupancy_by_user[row.user_uuid] = ResourceSlot()
+            occupancy_by_user[row.user_uuid] += row.occupied_slots
+
+            # Accumulate by group
+            if row.group_id not in occupancy_by_group:
+                occupancy_by_group[row.group_id] = ResourceSlot()
+            occupancy_by_group[row.group_id] += row.occupied_slots
+
+            # Accumulate by domain
+            if row.domain_name not in occupancy_by_domain:
+                occupancy_by_domain[row.domain_name] = ResourceSlot()
+            occupancy_by_domain[row.domain_name] += row.occupied_slots
+
+        return ResourceOccupancySnapshot(
+            by_keypair=occupancy_by_keypair,
+            by_user=occupancy_by_user,
+            by_group=occupancy_by_group,
+            by_domain=occupancy_by_domain,
+        )
+
+    async def _get_resource_policy_snapshot(
+        self, db_sess: SASession, scaling_group: str
+    ) -> ResourcePolicySnapshot:
+        """Get resource policy snapshot for sessions in the scaling group."""
+        # Get all sessions in the scaling group to find related keypairs and users
+        session_query = (
+            sa.select(
+                SessionRow.access_key,
+                SessionRow.user_uuid,
+                SessionRow.group_id,
+                SessionRow.domain_name,
+            )
+            .where(
+                (SessionRow.scaling_group_name == scaling_group)
+                & (
+                    SessionRow.status.in_([
+                        SessionStatus.PENDING,
+                        SessionStatus.SCHEDULED,
+                        SessionStatus.PREPARING,
+                        SessionStatus.RUNNING,
+                    ])
+                )
+            )
+            .distinct()
+        )
+
+        session_rows = await db_sess.execute(session_query)
+
+        access_keys = set()
+        user_uuids = set()
+        group_ids = set()
+        domain_names = set()
+
+        for row in session_rows:
+            access_keys.add(row.access_key)
+            user_uuids.add(row.user_uuid)
+            group_ids.add(row.group_id)
+            domain_names.add(row.domain_name)
+
+        # Fetch keypair resource policies
+        keypair_policies: dict[AccessKey, KeyPairResourcePolicy] = {}
+        if access_keys:
+            keypair_policy_query = (
+                sa.select(
+                    KeyPairRow.access_key,
+                    KeyPairResourcePolicyRow.name,
+                    KeyPairResourcePolicyRow.total_resource_slots,
+                    KeyPairResourcePolicyRow.max_concurrent_sessions,
+                    KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
+                    KeyPairResourcePolicyRow.max_pending_session_count,
+                    KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                )
+                .select_from(
+                    sa.join(
+                        KeyPairRow,
+                        KeyPairResourcePolicyRow,
+                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                    )
+                )
+                .where(KeyPairRow.access_key.in_(access_keys))
+            )
+            keypair_policy_rows = await db_sess.execute(keypair_policy_query)
+
+            for row in keypair_policy_rows:
+                keypair_policies[row.access_key] = KeyPairResourcePolicy(
+                    name=row.name,
+                    total_resource_slots=row.total_resource_slots,
+                    max_concurrent_sessions=row.max_concurrent_sessions,
+                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions,
+                    max_pending_session_count=row.max_pending_session_count,
+                    max_pending_session_resource_slots=row.max_pending_session_resource_slots,
+                )
+
+        # Fetch user resource policies (from main keypair)
+        user_policies: dict[uuid.UUID, UserResourcePolicy] = {}
+        if user_uuids:
+            user_policy_query = (
+                sa.select(
+                    UserRow.uuid,
+                    KeyPairResourcePolicyRow.name,
+                    KeyPairResourcePolicyRow.total_resource_slots,
+                )
+                .select_from(
+                    sa.join(
+                        UserRow,
+                        KeyPairRow,
+                        UserRow.main_access_key == KeyPairRow.access_key,
+                    ).join(
+                        KeyPairResourcePolicyRow,
+                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                    )
+                )
+                .where(UserRow.uuid.in_(user_uuids))
+            )
+            user_policy_rows = await db_sess.execute(user_policy_query)
+
+            for row in user_policy_rows:
+                user_policies[row.uuid] = UserResourcePolicy(
+                    name=row.name,
+                    total_resource_slots=row.total_resource_slots,
+                )
+
+        # Fetch group and domain limits
+        group_limits = {}
+        if group_ids:
+            group_limit_query = sa.select(GroupRow.id, GroupRow.total_resource_slots).where(
+                GroupRow.id.in_(group_ids)
+            )
+            group_limit_rows = await db_sess.execute(group_limit_query)
+            group_limits = {row.id: row.total_resource_slots for row in group_limit_rows}
+
+        domain_limits = {}
+        if domain_names:
+            domain_limit_query = sa.select(DomainRow.name, DomainRow.total_resource_slots).where(
+                DomainRow.name.in_(domain_names)
+            )
+            domain_limit_rows = await db_sess.execute(domain_limit_query)
+            domain_limits = {row.name: row.total_resource_slots for row in domain_limit_rows}
+
+        return ResourcePolicySnapshot(
+            keypair_policies=keypair_policies,
+            user_policies=user_policies,
+            group_limits=group_limits,
+            domain_limits=domain_limits,
+        )
+
+    async def _get_system_resource_policy_snapshot(
+        self, db_sess: SASession
+    ) -> ResourcePolicySnapshot:
+        """Get resource policy snapshot system-wide."""
+        # Get all active sessions to find related keypairs and users
+        session_query = (
+            sa.select(
+                SessionRow.access_key,
+                SessionRow.user_uuid,
+                SessionRow.group_id,
+                SessionRow.domain_name,
+            )
+            .where(
+                SessionRow.status.in_([
+                    SessionStatus.PENDING,
+                    SessionStatus.SCHEDULED,
+                    SessionStatus.PREPARING,
+                    SessionStatus.RUNNING,
+                ])
+            )
+            .distinct()
+        )
+
+        session_rows = await db_sess.execute(session_query)
+
+        access_keys = set()
+        user_uuids = set()
+        group_ids = set()
+        domain_names = set()
+
+        for row in session_rows:
+            access_keys.add(row.access_key)
+            user_uuids.add(row.user_uuid)
+            group_ids.add(row.group_id)
+            domain_names.add(row.domain_name)
+
+        # Fetch keypair resource policies
+        keypair_policies: dict[AccessKey, KeyPairResourcePolicy] = {}
+        if access_keys:
+            keypair_policy_query = (
+                sa.select(
+                    KeyPairRow.access_key,
+                    KeyPairResourcePolicyRow.name,
+                    KeyPairResourcePolicyRow.total_resource_slots,
+                    KeyPairResourcePolicyRow.max_concurrent_sessions,
+                    KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
+                    KeyPairResourcePolicyRow.max_pending_session_count,
+                    KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                )
+                .select_from(
+                    sa.join(
+                        KeyPairRow,
+                        KeyPairResourcePolicyRow,
+                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                    )
+                )
+                .where(KeyPairRow.access_key.in_(access_keys))
+            )
+            keypair_policy_rows = await db_sess.execute(keypair_policy_query)
+
+            for row in keypair_policy_rows:
+                keypair_policies[row.access_key] = KeyPairResourcePolicy(
+                    name=row.name,
+                    total_resource_slots=row.total_resource_slots,
+                    max_concurrent_sessions=row.max_concurrent_sessions,
+                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions,
+                    max_pending_session_count=row.max_pending_session_count,
+                    max_pending_session_resource_slots=row.max_pending_session_resource_slots,
+                )
+
+        # Fetch user resource policies (from main keypair)
+        user_policies: dict[uuid.UUID, UserResourcePolicy] = {}
+        if user_uuids:
+            user_policy_query = (
+                sa.select(
+                    UserRow.uuid,
+                    KeyPairResourcePolicyRow.name,
+                    KeyPairResourcePolicyRow.total_resource_slots,
+                )
+                .select_from(
+                    sa.join(
+                        UserRow,
+                        KeyPairRow,
+                        UserRow.main_access_key == KeyPairRow.access_key,
+                    ).join(
+                        KeyPairResourcePolicyRow,
+                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                    )
+                )
+                .where(UserRow.uuid.in_(user_uuids))
+            )
+            user_policy_rows = await db_sess.execute(user_policy_query)
+
+            for row in user_policy_rows:
+                user_policies[row.uuid] = UserResourcePolicy(
+                    name=row.name,
+                    total_resource_slots=row.total_resource_slots,
+                )
+
+        # Fetch group and domain limits
+        group_limits = {}
+        if group_ids:
+            group_limit_query = sa.select(GroupRow.id, GroupRow.total_resource_slots).where(
+                GroupRow.id.in_(group_ids)
+            )
+            group_limit_rows = await db_sess.execute(group_limit_query)
+            group_limits = {row.id: row.total_resource_slots for row in group_limit_rows}
+
+        domain_limits = {}
+        if domain_names:
+            domain_limit_query = sa.select(DomainRow.name, DomainRow.total_resource_slots).where(
+                DomainRow.name.in_(domain_names)
+            )
+            domain_limit_rows = await db_sess.execute(domain_limit_query)
+            domain_limits = {row.name: row.total_resource_slots for row in domain_limit_rows}
+
+        return ResourcePolicySnapshot(
+            keypair_policies=keypair_policies,
+            user_policies=user_policies,
+            group_limits=group_limits,
+            domain_limits=domain_limits,
+        )
+
+    async def _get_concurrency_snapshot(self, access_keys: set[AccessKey]) -> ConcurrencySnapshot:
+        """Get concurrency snapshot from Valkey/Redis."""
+        sessions_by_keypair: dict[AccessKey, int] = {}
+        sftp_sessions_by_keypair: dict[AccessKey, int] = {}
+
+        for ak in access_keys:
+            # Regular sessions
+            concurrency_used = await self._valkey_stat.get_keypair_concurrency_used(ak)
+            sessions_by_keypair[ak] = concurrency_used
+
+            # SFTP sessions - use _get_raw since there's no specific method
+            sftp_redis_key = f"keypair.sftp_concurrency_used.{ak}"
+            sftp_raw = await self._valkey_stat._get_raw(sftp_redis_key)
+            sftp_concurrency_used = int(sftp_raw.decode()) if sftp_raw else 0
+            sftp_sessions_by_keypair[ak] = sftp_concurrency_used
+
+        return ConcurrencySnapshot(
+            sessions_by_keypair=sessions_by_keypair,
+            sftp_sessions_by_keypair=sftp_sessions_by_keypair,
+        )
+
+    async def _get_pending_session_snapshot(
+        self, db_sess: SASession, scaling_group: str
+    ) -> PendingSessionSnapshot:
+        """Get pending session snapshot for the scaling group."""
+        pending_query = sa.select(
+            SessionRow.id,
+            SessionRow.access_key,
+            SessionRow.requested_slots,
+            SessionRow.created_at,
+        ).where(
+            (SessionRow.status == SessionStatus.PENDING)
+            & (SessionRow.scaling_group_name == scaling_group)
+        )
+        pending_rows = await db_sess.execute(pending_query)
+
+        pending_by_keypair: dict[AccessKey, list[PendingSessionInfo]] = {}
+        for row in pending_rows:
+            if row.access_key not in pending_by_keypair:
+                pending_by_keypair[row.access_key] = []
+            pending_by_keypair[row.access_key].append(
+                PendingSessionInfo(
+                    session_id=row.id,
+                    requested_slots=row.requested_slots,
+                    creation_time=row.created_at,
+                )
+            )
+
+        return PendingSessionSnapshot(by_keypair=pending_by_keypair)
+
+    async def _get_system_pending_session_snapshot(
+        self, db_sess: SASession
+    ) -> PendingSessionSnapshot:
+        """Get pending session snapshot system-wide."""
+        pending_query = sa.select(
+            SessionRow.id,
+            SessionRow.access_key,
+            SessionRow.requested_slots,
+            SessionRow.created_at,
+        ).where(SessionRow.status == SessionStatus.PENDING)
+        pending_rows = await db_sess.execute(pending_query)
+
+        pending_by_keypair: dict[AccessKey, list[PendingSessionInfo]] = {}
+        for row in pending_rows:
+            if row.access_key not in pending_by_keypair:
+                pending_by_keypair[row.access_key] = []
+            pending_by_keypair[row.access_key].append(
+                PendingSessionInfo(
+                    session_id=row.id,
+                    requested_slots=row.requested_slots,
+                    creation_time=row.created_at,
+                )
+            )
+
+        return PendingSessionSnapshot(by_keypair=pending_by_keypair)
+
+    async def _get_session_dependency_snapshot(
+        self, db_sess: SASession, scaling_group: str
+    ) -> SessionDependencySnapshot:
+        """Get session dependency snapshot for sessions in the scaling group."""
+        # Get sessions in the scaling group
+        session_ids_query = sa.select(SessionRow.id).where(
+            SessionRow.scaling_group_name == scaling_group
+        )
+        session_ids_result = await db_sess.execute(session_ids_query)
+        session_ids = [row.id for row in session_ids_result]
+
+        if not session_ids:
+            return SessionDependencySnapshot(by_session={})
+
+        dependency_query = (
+            sa.select(
+                SessionDependencyRow.session_id,
+                SessionDependencyRow.depends_on,
+                SessionRow.name,
+                SessionRow.status,
+                SessionRow.result,
+            )
+            .select_from(
+                sa.join(
+                    SessionDependencyRow,
+                    SessionRow,
+                    SessionDependencyRow.depends_on == SessionRow.id,
+                )
+            )
+            .where(SessionDependencyRow.session_id.in_(session_ids))
+        )
+        dependency_rows = await db_sess.execute(dependency_query)
+
+        dependencies_by_session: dict[SessionId, list[SessionDependencyInfo]] = {}
+        for row in dependency_rows:
+            if row.session_id not in dependencies_by_session:
+                dependencies_by_session[row.session_id] = []
+            dependencies_by_session[row.session_id].append(
+                SessionDependencyInfo(
+                    depends_on=row.depends_on,
+                    dependency_name=row.name,
+                    dependency_status=row.status,
+                    dependency_result=row.result,
+                )
+            )
+
+        return SessionDependencySnapshot(by_session=dependencies_by_session)
+
+    async def _get_system_session_dependency_snapshot(
+        self, db_sess: SASession
+    ) -> SessionDependencySnapshot:
+        """Get session dependency snapshot system-wide."""
+        # Get all sessions
+        session_ids_query = sa.select(SessionRow.id)
+        session_ids_result = await db_sess.execute(session_ids_query)
+        session_ids = [row.id for row in session_ids_result]
+
+        if not session_ids:
+            return SessionDependencySnapshot(by_session={})
+
+        dependency_query = (
+            sa.select(
+                SessionDependencyRow.session_id,
+                SessionDependencyRow.depends_on,
+                SessionRow.name,
+                SessionRow.status,
+                SessionRow.result,
+            )
+            .select_from(
+                sa.join(
+                    SessionDependencyRow,
+                    SessionRow,
+                    SessionDependencyRow.depends_on == SessionRow.id,
+                )
+            )
+            .where(SessionDependencyRow.session_id.in_(session_ids))
+        )
+        dependency_rows = await db_sess.execute(dependency_query)
+
+        dependencies_by_session: dict[SessionId, list[SessionDependencyInfo]] = {}
+        for row in dependency_rows:
+            if row.session_id not in dependencies_by_session:
+                dependencies_by_session[row.session_id] = []
+            dependencies_by_session[row.session_id].append(
+                SessionDependencyInfo(
+                    depends_on=row.depends_on,
+                    dependency_name=row.name,
+                    dependency_status=row.status,
+                    dependency_result=row.result,
+                )
+            )
+
+        return SessionDependencySnapshot(by_session=dependencies_by_session)

@@ -36,11 +36,11 @@ class SchedulingConfig:
 class SchedulerRepository(Protocol):
     """Protocol for repository to fetch system state for scheduling."""
 
-    async def get_system_snapshot(self) -> SystemSnapshot:
+    async def get_system_snapshot(self, scaling_group: str) -> SystemSnapshot:
         """Get complete system snapshot for scheduling decisions."""
         ...
 
-    async def get_agents(self) -> Sequence[AgentInfo]:
+    async def get_agents(self, scaling_group: str) -> Sequence[AgentInfo]:
         """Get a list of available agents."""
         ...
 
@@ -87,7 +87,7 @@ class Scheduler:
         :param workload: A sequence of SessionWorkload objects to be scheduled.
         """
         # Fetch complete system snapshot from repository
-        system_snapshot = await self._repository.get_system_snapshot()
+        system_snapshot = await self._repository.get_system_snapshot(scaling_group)
         config = await self._repository.get_scheduling_config(scaling_group)
         # Prioritize workloads with system context
         prioritized_workloads = await self._prioritizer.prioritize(system_snapshot, workloads)
@@ -105,7 +105,7 @@ class Scheduler:
                     e,
                 )
 
-        agents_info = await self._repository.get_agents()
+        agents_info = await self._repository.get_agents(scaling_group)
         session_allocations: list[SessionAllocation] = []
 
         # Get scheduling configuration once for all workloads
