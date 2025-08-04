@@ -2,40 +2,38 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Self, override
-from uuid import UUID
+from typing import TYPE_CHECKING, Self
 
 from aiohttp import web
-from pydantic import ValidationError
+from click import UUID
+from pydantic import ConfigDict
 
+from ai.backend.common import redis_helper
 from ai.backend.common.api_handlers import (
     APIResponse,
+    BodyParam,
     MiddlewareParam,
     QueryParam,
     api_handler,
 )
-from ai.backend.common.data.storage.registries.types import (
-    HuggingFaceFileData,
-    HuggingFaceModelInfo,
-)
+from ai.backend.common.bgtask.bgtask import BgTaskInfo
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.dto.storage.request import (
-    GetScanJobStatusReq,
     HuggingFaceImportModelReq,
     HuggingFaceImportModelsBatchReq,
-    HuggingFaceListModelsReq,
+    HuggingFaceImportTaskStatusReq,
+    HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
+    BgTaskProgress,
     HuggingFaceImportBatchResponse,
     HuggingFaceImportResponse,
     HuggingFaceScanJobStatusResponse,
     HuggingFaceScanResponse,
 )
+from ai.backend.common.json import load_json
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.client.huggingface import (
-    HuggingFaceClient,
-    HuggingFaceClientArgs,
-    HuggingFaceScanner,
-)
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
@@ -50,74 +48,45 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class RequestIntoJsonCtx(MiddlewareParam):
-    json_: dict[str, Any]
+class RedisStreamConnectionCtx(MiddlewareParam):
+    redis_stream_conn: RedisConnectionInfo
 
-    @override
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
-        json = await request.json() if request.can_read_body else {}
-        return cls(json_=json)
+        ctx: RootContext = request.app["ctx"]
+        return cls(
+            redis_stream_conn=ctx.redis_stream_conn,
+        )
 
 
-class RegistriesAPIHandler:
+class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
 
     def __init__(self, huggingface_service: HuggingFaceService) -> None:
         self._huggingface_service = huggingface_service
 
     @api_handler
-    async def scan_huggingface(
+    async def scan(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceScanModelsReq],
     ) -> APIResponse:
         """
         Scan HuggingFace registry and return metadata.
         """
-        # TODO: 이거 bgtask로 돌려야 함.
-
-        # await log_client_api_entry(log, "scan_huggingface")
-        try:
-            body = request_ctx.json_
-            request_data = HuggingFaceListModelsReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
-        except Exception as e:
-            raise web.HTTPBadRequest(reason=f"Invalid JSON body: {str(e)}") from e
+        await log_client_api_entry(log, "scan_huggingface", body.parsed)
 
         try:
-            models = await self._huggingface_service.list_models(
-                limit=request_data.limit,
-                search=request_data.search,
-                sort=request_data.sort,
+            models = await self._huggingface_service.scan_models(
+                registry_name=body.parsed.registry_name,
+                limit=body.parsed.limit,
+                search=body.parsed.search,
+                sort=body.parsed.order,
             )
 
             response = HuggingFaceScanResponse(
-                models=[
-                    HuggingFaceModelInfo(
-                        id=model.id,
-                        name=model.name,
-                        author=model.author,
-                        tags=model.tags,
-                        pipeline_tag=model.pipeline_tag,
-                        downloads=model.downloads,
-                        likes=model.likes,
-                        created_at=model.created_at,
-                        last_modified=model.last_modified,
-                        files=[
-                            HuggingFaceFileData(
-                                path=file.path,
-                                size=file.size,
-                                type=file.type,
-                                download_url=file.download_url,
-                                error=file.error,
-                            )
-                            for file in model.files
-                        ],
-                    )
-                    for model in models
-                ],
-                total_count=len(models),
+                models=models,
             )
 
             return APIResponse.build(
@@ -129,25 +98,37 @@ class RegistriesAPIHandler:
             raise web.HTTPInternalServerError(reason=f"Scan failed: {str(e)}") from e
 
     @api_handler
-    async def get_scan_job_status(
+    async def get_import_job_status(
         self,
-        query: QueryParam[GetScanJobStatusReq],
+        query: QueryParam[HuggingFaceImportTaskStatusReq],
+        redis_stream_conn_ctx: RedisStreamConnectionCtx,
     ) -> APIResponse:
         """
         Get HuggingFace scan job status.
         """
-        job_id = query.parsed.job_id
-        if not job_id:
-            raise web.HTTPBadRequest(reason="Missing job_id in query parameters")
+        task_id = query.parsed.task_id
+        redis_stream_conn = redis_stream_conn_ctx.redis_stream_conn
 
-        await log_client_api_entry(log, "get_scan_job_status", job_id)
+        await log_client_api_entry(log, "get_scan_job_status", query.parsed)
 
-        # TODO: Implement job status tracking
+        raw_task_status = await redis_helper.execute(
+            redis_stream_conn, lambda r: r.get(f"bgtask.{task_id}")
+        )
+
+        task_status: BgTaskInfo
+        if raw_task_status is None:
+            task_status = BgTaskInfo.finished(BgtaskStatus.DONE, msg="Task already finished")
+        else:
+            task_status = load_json(raw_task_status)
+
         response = HuggingFaceScanJobStatusResponse(
-            job_id=UUID(job_id),
-            status="completed",
-            progress=100,
-            message="Scan completed successfully",
+            task_id=UUID(task_id),
+            status=task_status.status,
+            progress=BgTaskProgress(
+                current=int(task_status.current),
+                total=int(task_status.total),
+            ),
+            message=task_status.msg,
         )
 
         return APIResponse.build(
@@ -156,35 +137,25 @@ class RegistriesAPIHandler:
         )
 
     @api_handler
-    async def import_huggingface_model(
+    async def import_model(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceImportModelReq],
     ) -> APIResponse:
         """
         Import a HuggingFace model to storage.
         """
-        # await log_client_api_entry(log, "import_huggingface_model")
+        await log_client_api_entry(log, "import_huggingface_model", body.parsed)
 
         try:
-            body = request_ctx.json_
-            request_data = HuggingFaceImportModelReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
-
-        try:
-            job_id = await self._huggingface_service.import_model(
-                model_id=request_data.model_id,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
+            bgtask_id = await self._huggingface_service.import_model(
+                registry_name=body.parsed.registry_name,
+                model_id=body.parsed.model_id,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
             )
 
             response = HuggingFaceImportResponse(
-                job_id=job_id,
-                status="started",
-                model_id=request_data.model_id,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
-                message="Import job started successfully",
+                task_id=bgtask_id,
             )
 
             return APIResponse.build(
@@ -196,37 +167,25 @@ class RegistriesAPIHandler:
             raise web.HTTPInternalServerError(reason=f"Import failed: {str(e)}") from e
 
     @api_handler
-    async def import_huggingface_models_batch(
+    async def import_models_batch(
         self,
-        request_ctx: RequestIntoJsonCtx,
+        body: BodyParam[HuggingFaceImportModelsBatchReq],
     ) -> APIResponse:
         """
         Import multiple HuggingFace models to storage in batch.
         """
-        # await log_client_api_entry(log, "import_huggingface_models_batch")
-
-        # Parse request body
-        try:
-            body = request_ctx.json_
-            request_data = HuggingFaceImportModelsBatchReq.model_validate(body)
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Invalid request data: {str(e)}") from e
+        await log_client_api_entry(log, "import_huggingface_models_batch", body.parsed)
 
         try:
-            job_id = await self._huggingface_service.import_models_batch(
-                model_ids=request_data.model_ids,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
+            task_id = await self._huggingface_service.import_models_batch(
+                registry_name=body.parsed.registry_name,
+                model_ids=body.parsed.model_ids,
+                storage_name=body.parsed.storage_name,
+                bucket_name=body.parsed.bucket_name,
             )
 
             response = HuggingFaceImportBatchResponse(
-                job_id=job_id,
-                status="started",
-                model_ids=request_data.model_ids,
-                storage_name=request_data.storage_name,
-                bucket_name=request_data.bucket_name,
-                total_models=len(request_data.model_ids),
-                message="Batch import job started successfully",
+                task_id=task_id,
             )
 
             return APIResponse.build(
@@ -243,25 +202,31 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries"
 
-    # TODO: Must be refactored.
     storage_service = StoragesService(ctx.local_config.storages)
-    huggingface_client = HuggingFaceClient(HuggingFaceClientArgs(token=None))
-    scanner = HuggingFaceScanner(huggingface_client)
+
+    huggingface_registry_configs = dict(
+        (r.name, r.config)
+        for r in ctx.local_config.registries
+        if r.config.registry_type == "huggingface"
+    )
+
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
-            scanner=scanner,
             background_task_manager=ctx.background_task_manager,
             storage_service=storage_service,
+            registry_configs=huggingface_registry_configs,
         )
     )
-    api_handler = RegistriesAPIHandler(huggingface_service=huggingface_service)
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
 
     # HuggingFace registry endpoints
-    app.router.add_route("POST", "/huggingface/scan", api_handler.scan_huggingface)
-    app.router.add_route("GET", "/huggingface/scan/{job_id}", api_handler.get_scan_job_status)
-    app.router.add_route("POST", "/huggingface/import", api_handler.import_huggingface_model)
+    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan)
     app.router.add_route(
-        "POST", "/huggingface/import-batch", api_handler.import_huggingface_models_batch
+        "GET", "/huggingface/import/{task_id}", huggingface_api_handler.get_import_job_status
+    )
+    app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_model)
+    app.router.add_route(
+        "POST", "/huggingface/import-batch", huggingface_api_handler.import_models_batch
     )
 
     return app

@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
@@ -611,6 +611,51 @@ class ObjectStorageConfig(BaseModel):
     )
 
 
+class HuggingfaceConfig(BaseModel):
+    registry_type: Literal["huggingface"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="""
+        HuggingFace API token for authentication.
+        Required for accessing private models or performing write operations.
+        """,
+    )
+    endpoint: Optional[str] = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for HuggingFace API.
+        If not provided, defaults to the official HuggingFace API endpoint.
+        Useful for connecting to self-hosted HuggingFace instances.
+        """,
+        examples=["https://huggingface.co"],
+    )
+
+
+RegistrySpecificConfig = Union[HuggingfaceConfig]
+
+
+class ArtifactRegistryConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the artifact registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["huggingface"],
+    )
+    config: RegistrySpecificConfig = Field(
+        discriminator="registry_type",
+        description="""
+        Configuration for the artifact registry.
+        """,
+    )
+
+
 class StorageProxyUnifiedConfig(BaseModel):
     storage_proxy: StorageProxyConfig = Field(
         description="""
@@ -674,6 +719,13 @@ class StorageProxyUnifiedConfig(BaseModel):
         description="""
         Etcd configuration settings.
         Used for distributed coordination.
+        """,
+    )
+    registries: list[ArtifactRegistryConfig] = Field(
+        default_factory=list,
+        description="""
+        Configuration for external registries.
+        Defines how to connect and interact with external model registries.
         """,
     )
 

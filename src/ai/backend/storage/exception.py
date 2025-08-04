@@ -200,6 +200,21 @@ class StorageBucketFileNotFoundError(web.HTTPNotFound):
         )
 
 
+class RegistryNotFoundError(web.HTTPNotFound):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/registries/registry-not-found",
+            "title": "Registry Not Found",
+        }
+        if msg is not None:
+            payload["title"] = f"Registry Not Found ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
 class HuggingFaceAPIError(web.HTTPInternalServerError):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
