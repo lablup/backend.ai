@@ -149,7 +149,8 @@ class RedisConfig(SingleRedisConfig):
                 }
             },
         ],
-        alias="override-configs",
+        validation_alias=AliasChoices("override_configs", "override-configs"),
+        serialization_alias="override-configs",
     )
 
     def to_redis_profile_target(self) -> RedisProfileTarget:
