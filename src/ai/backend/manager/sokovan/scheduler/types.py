@@ -251,3 +251,11 @@ class SessionAllocation:
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session
     agent_allocations: list[AgentAllocation]
+
+
+@dataclass
+class AllocationBatch:
+    """Batch of session allocations with pre-collected agent IDs for efficient processing."""
+
+    allocations: list[SessionAllocation]
+    agent_ids: set[AgentId]

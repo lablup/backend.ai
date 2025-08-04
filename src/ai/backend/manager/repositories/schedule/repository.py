@@ -57,6 +57,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointStatistics,
 )
 from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     recalc_concurrency_used,
 )
@@ -80,6 +81,7 @@ if TYPE_CHECKING:
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig, SystemSnapshot
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
+    AllocationBatch,
     ConcurrencySnapshot,
     KeyPairResourcePolicy,
     PendingSessionInfo,
@@ -95,14 +97,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for schedule repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDULE)
-
-
-@dataclass
-class AllocationBatch:
-    """Batch of session allocations with pre-collected agent IDs for efficient processing."""
-
-    allocations: list["SessionAllocation"]
-    agent_ids: set[AgentId]
 
 
 @dataclass
@@ -1455,6 +1449,21 @@ class ScheduleRepository:
             # Get schedulable agents for the scaling group
             agent_rows = await self._get_schedulable_agents(db_sess, scaling_group)
 
+            # Get container counts for each agent
+            agent_ids = [agent.id for agent in agent_rows]
+            container_counts = {}
+            if agent_ids:
+                query = (
+                    sa.select(KernelRow.agent, sa.func.count(KernelRow.id))
+                    .where(
+                        KernelRow.agent.in_(agent_ids),
+                        KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                    )
+                    .group_by(KernelRow.agent)
+                )
+                result = await db_sess.execute(query)
+                container_counts = dict(result.fetchall())
+
             # Convert AgentRow objects to AgentInfo objects
             agents_info: list[AgentInfo] = []
             for agent in agent_rows:
@@ -1466,7 +1475,7 @@ class ScheduleRepository:
                         available_slots=agent.available_slots,
                         occupied_slots=agent.occupied_slots,
                         scaling_group=agent.scaling_group,
-                        container_count=agent.container_count,
+                        container_count=container_counts.get(agent.id, 0),
                     )
                 )
 

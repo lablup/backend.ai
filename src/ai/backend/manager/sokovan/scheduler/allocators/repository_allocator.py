@@ -8,8 +8,8 @@ to ensure transactional consistency.
 from collections.abc import Iterable
 
 from ai.backend.common.types import AgentId
-from ai.backend.manager.repositories.schedule.repository import AllocationBatch, ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.sokovan.scheduler.types import AllocationBatch, SessionAllocation
 
 from .allocator import SchedulingAllocator
 

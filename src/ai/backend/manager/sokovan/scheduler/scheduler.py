@@ -1,12 +1,14 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import TYPE_CHECKING, Optional, Protocol
 
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
 from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
 from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentInfo,
@@ -54,7 +56,7 @@ class SchedulerArgs:
     validator: SchedulingValidator
     prioritizer: SchedulingPrioritizer
     agent_selector: AgentSelector
-    allocator: SchedulingAllocator
+    allocator: "SchedulingAllocator"
     repository: SchedulerRepository
 
 
@@ -62,7 +64,7 @@ class Scheduler:
     _validator: SchedulingValidator
     _prioritizer: SchedulingPrioritizer
     _agent_selector: AgentSelector
-    _allocator: SchedulingAllocator
+    _allocator: "SchedulingAllocator"
     _repository: SchedulerRepository
 
     def __init__(self, args: SchedulerArgs) -> None:
