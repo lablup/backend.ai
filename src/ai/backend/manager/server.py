@@ -100,8 +100,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.manager.actions.callbacks.group import CallbackGroup
-from ai.backend.manager.actions.callbacks.permission_controller import EntityCreateRBACCallback
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
@@ -123,6 +121,7 @@ from .api.context import RootContext
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
+    from ai.backend.manager.actions.callbacks.group import CallbackGroup
     from ai.backend.manager.reporters.base import AbstractReporter
 
     from .api.types import (
@@ -611,6 +610,9 @@ def _make_action_reporters(
 def _make_action_callbacks(
     root_ctx: RootContext,
 ) -> CallbackGroup:
+    from ai.backend.manager.actions.callbacks.group import CallbackGroup
+    from ai.backend.manager.actions.callbacks.permission_controller import EntityCreateRBACCallback
+
     rbac_callback = EntityCreateRBACCallback(root_ctx.repositories.permission_controller)
     return CallbackGroup(
         create=[rbac_callback],
