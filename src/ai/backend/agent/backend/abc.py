@@ -84,33 +84,6 @@ class AbstractBackend(ABC):
         """
         raise NotImplementedError
 
-    # No need to implement this method
-    # Should rather implement those methods in the backend:
-    # - yield_temp_container()
-    # - get_container_log()
-    # And implement this method in the agent:
-    # - get_distro_from_container_log()
-    # @abstractmethod
-    # async def resolve_image_distro(self, image: ImageConfig) -> str:
-    #     """
-    #     Resolve the image distribution for the given image configuration.
-    #     This method should return the distribution name as a string.
-    #     """
-    #     raise NotImplementedError
-
-    # No need to implement this method
-    # Should rather implement those methods in the backend:
-    # - get_managed_images()
-    # Implement it in the agent:
-    # -
-    # @abstractmethod
-    # async def scan_images(self) -> ScanImagesResult:
-    #     """
-    #     Scan the available kernel images/templates and update ``self.images``.
-    #     This is called periodically to keep the image list up-to-date and allow
-    #     manual image addition and deletions by admins.
-    #     """
-
     @abstractmethod
     async def get_managed_images(self) -> tuple[ImageRef]:
         raise NotImplementedError

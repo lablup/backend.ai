@@ -68,7 +68,7 @@ class ImageMetadataProvisioner(Provisioner[ImageMetadataSpec, ImageMetadataResul
                 kernel_features,
             )
 
-        _, _, image_id = spec.digest.partition(":")
+        image_id = self._get_image_id(spec)
         cached_distro = await self._get_cached_distro(image_id)
         if cached_distro is not None:
             return ImageMetadataResult(
@@ -103,6 +103,13 @@ class ImageMetadataProvisioner(Provisioner[ImageMetadataSpec, ImageMetadataResul
         Extracts the distro from the provided labels.
         """
         return spec.labels.get(LabelName.BASE_DISTRO)
+
+    def _get_image_id(self, spec: ImageMetadataSpec) -> str:
+        """
+        Extracts the image ID from the digest.
+        """
+        _, _, image_id = spec.digest.partition(":")
+        return image_id
 
     async def _get_cached_distro(self, image_id: str) -> Optional[str]:
         """
