@@ -10,9 +10,30 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderOwnershipType,
+    VFolderPermission,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 
 ENTITY_TYPE = "vfolder"
+ROLE_NAME_PREFIX = "vfolder_granted_"
+OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE = "read"
+
+
+def permission_mapping() -> dict[VFolderPermission, str]:
+    """
+    Mapping of vfolder permissions to expected RBAC operations.
+    All VFolder permissions map to the same default operation value
+    because `VFolderPermission` should be used only for mount permissions, not for RBAC operations.
+    """
+    return {
+        VFolderPermission.OWNER_PERM: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
+        VFolderPermission.READ_ONLY: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
+        VFolderPermission.READ_WRITE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
+        VFolderPermission.RW_DELETE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
+    }
 
 
 @dataclass
@@ -37,13 +58,18 @@ class VFolderData:
 class VFolderPermissionData:
     vfolder_id: str
     user_id: str
-    permission: str
+    permission: VFolderPermission
 
     def __hash__(self):
         return hash((self.vfolder_id, self.user_id, self.permission))
 
     def to_role_name(self) -> str:
-        return f"vfolder_granted_{self.vfolder_id}"
+        return f"{ROLE_NAME_PREFIX}{self.vfolder_id}"
+
+    @classmethod
+    def role_query_condition(cls) -> sa.sql.expression.BinaryExpression:
+        like = f"{ROLE_NAME_PREFIX}%"
+        return RoleRow.name.like(like)  # type: ignore[attr-defined]
 
 
 def _migrate_vfolder_data_to_association_scopes_entities(conn: Connection) -> None:
@@ -101,7 +127,7 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
             perm_data = VFolderPermissionData(
                 vfolder_id=str(row["id"]),
                 user_id=str(row["user"]),
-                permission=str(row["permission"]),
+                permission=row["permission"],
             )
             if perm_data in inserted_permissions:
                 continue
@@ -137,7 +163,7 @@ def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> 
                 "role_id": vfolder_id_role_id_map[perm.vfolder_id],
                 "entity_type": ENTITY_TYPE,
                 "entity_id": perm.vfolder_id,
-                "operation": "read",
+                "operation": permission_mapping()[perm.permission],
             }
             for perm in filtered_perm_list
         ]
