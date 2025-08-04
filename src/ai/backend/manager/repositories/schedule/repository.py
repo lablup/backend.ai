@@ -77,7 +77,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
 # Import types for SchedulerRepository implementation
-from ai.backend.manager.sokovan.scheduler.scheduler import SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig, SystemSnapshot
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
@@ -1471,6 +1471,25 @@ class ScheduleRepository:
                 )
 
             return agents_info
+
+    @repository_decorator()
+    async def get_scheduling_config(self, scaling_group: str) -> SchedulingConfig:
+        """Get scheduling configuration for a scaling group."""
+        # Get scaling group options
+        _, sgroup_opts = await self.get_scaling_group_info(scaling_group)
+
+        # Get max container count from etcd
+        max_container_count: Optional[int] = None
+        raw_value = await self._config_provider.legacy_etcd_config_loader.get_raw(
+            "config/agent/max-container-count"
+        )
+        if raw_value is not None:
+            max_container_count = int(raw_value)
+
+        return SchedulingConfig(
+            max_container_count_per_agent=max_container_count,
+            enforce_spreading_endpoint_replica=sgroup_opts.enforce_spreading_endpoint_replica,
+        )
 
     @repository_decorator()
     async def get_system_snapshot(self, scaling_group: str) -> SystemSnapshot:
