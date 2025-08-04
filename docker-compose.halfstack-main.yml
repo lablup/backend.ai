@@ -171,10 +171,10 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./src/ai/backend/manager/api/gql/supergraph.graphql:/etc/router/supergraph.graphql
+      - ./docs/manager/graphql-reference:/etc/schemas
     command:
       - "--supergraph"
-      - "/etc/router/supergraph.graphql"
+      - "/etc/schemas/supergraph.graphql"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
