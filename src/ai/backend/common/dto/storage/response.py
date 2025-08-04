@@ -1,12 +1,10 @@
 import uuid
 from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from ai.backend.common.data.storage.registries.types import (
-    HuggingFaceFileData,
-    HuggingFaceModelInfo,
-)
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo
 
 from ...api_handlers import BaseResponseModel
 from .field import VFolderMetaField, VolumeMetaField
@@ -81,35 +79,50 @@ class S3PresignedUploadData(BaseResponseModel):
 class HuggingFaceListModelsResponse(BaseResponseModel):
     """Response for listing HuggingFace models."""
 
-    models: list[HuggingFaceModelInfo] = Field(
+    models: list[ModelInfo] = Field(
         default_factory=list,
-        description="List of HuggingFace models with metadata",
+        description="""
+        List of HuggingFace models with metadata.
+        Each model includes comprehensive information about the model and its files.
+        """,
     )
     total_count: int = Field(
         default=0,
-        description="Total number of models returned",
+        description="""
+        Total number of models returned in this response.
+        May be less than the requested limit if fewer models are available.
+        """,
+        examples=[10, 50, 0],
     )
 
 
 class HuggingFaceGetModelResponse(BaseResponseModel):
     """Response for getting specific HuggingFace model details."""
 
-    model: HuggingFaceModelInfo = Field(
-        ...,
-        description="Detailed information about the HuggingFace model",
+    model: ModelInfo = Field(
+        description="""
+        Detailed information about the HuggingFace model.
+        Includes all metadata, file listings, and download information.
+        """,
     )
 
 
 class HuggingFaceListFilesResponse(BaseResponseModel):
     """Response for listing files in a HuggingFace model."""
 
-    files: list[HuggingFaceFileData] = Field(
+    files: list[FileInfo] = Field(
         default_factory=list,
-        description="List of files in the HuggingFace model repository",
+        description="""
+        List of files in the HuggingFace model repository.
+        Includes all model files, configuration files, and documentation.
+        """,
     )
     model_id: str = Field(
-        ...,
-        description="HuggingFace model ID that the files belong to",
+        description="""
+        HuggingFace model ID that the files belong to.
+        Used to identify which model these files are associated with.
+        """,
+        examples=["microsoft/DialoGPT-medium", "openai/gpt-2"],
     )
 
 
@@ -117,125 +130,109 @@ class HuggingFaceGetDownloadUrlResponse(BaseResponseModel):
     """Response for getting download URL of a specific file."""
 
     download_url: str = Field(
-        ...,
-        description="Direct HTTP URL for downloading the file",
+        description="""
+        Direct HTTP URL for downloading the file.
+        This URL can be used to download the file directly from HuggingFace Hub.
+        """,
+        examples=["https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"],
     )
     model_id: str = Field(
-        ...,
-        description="HuggingFace model ID containing the file",
+        description="""
+        HuggingFace model ID containing the file.
+        Identifies the model repository that contains this file.
+        """,
+        examples=["microsoft/DialoGPT-medium", "openai/gpt-2"],
     )
     filename: str = Field(
-        ...,
-        description="Name of the file",
+        description="""
+        Name of the file within the model repository.
+        Relative path from the repository root to the file.
+        """,
+        examples=["config.json", "pytorch_model.bin", "tokenizer/vocab.txt"],
     )
 
 
 class HuggingFaceScanResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 
-    models: list[HuggingFaceModelInfo] = Field(
+    models: list[ModelInfo] = Field(
         default_factory=list,
-        description="List of scanned HuggingFace models",
+        description="""
+        List of HuggingFace models scanned and retrieved.
+        Each model includes comprehensive metadata and file information.
+        """,
     )
-    total_count: int = Field(
+
+
+class BgTaskProgress(BaseModel):
+    current: int = Field(
         default=0,
-        description="Total number of models scanned",
+        description="Current progress of the scan operation, expressed as a percentage.",
+        examples=[0, 50, 100],
     )
-    # TODO: Optional 제거.
-    job_id: Optional[uuid.UUID] = Field(
-        default=None,
-        description="Job ID for tracking scan progress",
+    total: int = Field(
+        default=0,
+        description="Total number of items to be scanned, used to calculate progress.",
+        examples=[100, 200, 0],
     )
 
 
 class HuggingFaceScanJobStatusResponse(BaseResponseModel):
     """Response for HuggingFace scan job status."""
 
-    job_id: uuid.UUID = Field(
-        ...,
-        description="Unique identifier for the scan job",
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the scan job.
+        Used to track and query the status of the scan operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
-    status: str = Field(
-        ...,
-        description="Current status of the job (pending, running, completed, failed)",
+    status: BgtaskStatus = Field(
+        description="""
+        Current status of the job.
+        Possible values: pending, running, completed, failed.
+        """,
+        examples=[status.value for status in BgtaskStatus],
     )
-    progress: int = Field(
-        default=0,
-        ge=0,
-        le=100,
-        description="Progress percentage (0-100)",
+    progress: BgTaskProgress = Field(
+        description="""
+        Indicates how much of the scan operation has been completed.
+        """,
+        examples=[{"current": 50, "total": 100}, {"current": 100, "total": 100}],
     )
     message: str = Field(
         default="",
-        description="Status message or error description",
-    )
-    started_at: Optional[str] = Field(
-        default=None,
-        description="ISO timestamp when the job started",
-    )
-    completed_at: Optional[str] = Field(
-        default=None,
-        description="ISO timestamp when the job completed",
+        description="""
+        Status message or error description.
+        Provides additional information about the current job status.
+        """,
+        examples=[
+            "Scanning in progress",
+            "Scan completed successfully",
+            "Error: Model not found",
+        ],
     )
 
 
 class HuggingFaceImportResponse(BaseResponseModel):
     """Response for HuggingFace model import operation."""
 
-    job_id: uuid.UUID = Field(
-        ...,
-        description="Unique identifier for the import job",
-    )
-    status: str = Field(
-        ...,
-        description="Current status of the import job (started, running, completed, failed)",
-    )
-    model_id: str = Field(
-        ...,
-        description="HuggingFace model ID being imported",
-    )
-    storage_name: str = Field(
-        ...,
-        description="Target storage name",
-    )
-    bucket_name: str = Field(
-        ...,
-        description="Target bucket name",
-    )
-    message: str = Field(
-        default="Import job started successfully",
-        description="Status message",
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the import job.
+        Used to track the progress of the model import operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
 
 
 class HuggingFaceImportBatchResponse(BaseResponseModel):
     """Response for HuggingFace batch model import operation."""
 
-    job_id: uuid.UUID = Field(
-        ...,
-        description="Unique identifier for the batch import job",
-    )
-    status: str = Field(
-        ...,
-        description="Current status of the batch import job (started, running, completed, failed)",
-    )
-    model_ids: list[str] = Field(
-        ...,
-        description="List of HuggingFace model IDs being imported",
-    )
-    storage_name: str = Field(
-        ...,
-        description="Target storage name",
-    )
-    bucket_name: str = Field(
-        ...,
-        description="Target bucket name",
-    )
-    total_models: int = Field(
-        ...,
-        description="Total number of models to import",
-    )
-    message: str = Field(
-        default="Batch import job started successfully",
-        description="Status message",
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the batch import task.
+        Used to track the progress of the batch model import operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
