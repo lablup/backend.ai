@@ -478,3 +478,16 @@ class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/session-invalid-state"
+    error_title = "Session with Invalid State"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.MISMATCH,
+        )
