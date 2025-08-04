@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from ai.backend.common.data.storage.registries.types import ModelData
 

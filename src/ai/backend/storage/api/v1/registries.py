@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
+from ai.backend.common import redis_helper
 from ai.backend.common.api_handlers import (
     APIResponse,
     BodyParam,
@@ -19,6 +20,8 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
 )
+from ai.backend.common.json import load_json
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
