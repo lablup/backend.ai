@@ -118,10 +118,15 @@ class Scheduler:
             max_container_count=config.max_container_count_per_agent,
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
+
+        # Create a mutable copy of agents_info to track state changes during this scheduling session
+        # This ensures concurrent scheduling sessions don't interfere with each other
+        mutable_agents = list(agents_info)
+
         for session_workload in validates_workloads:
             session_allocation = await self._allocate_workload(
                 session_workload,
-                agents_info,
+                mutable_agents,
                 selection_config,
                 scaling_group,
             )
@@ -143,7 +148,7 @@ class Scheduler:
         Allocate resources for a single session workload.
 
         :param session_workload: The workload to allocate
-        :param agents_info: Available agents
+        :param agents_info: Available agents (will be modified with updated states)
         :param selection_config: Agent selection configuration
         :param scaling_group: The scaling group name
         :return: SessionAllocation if successful, None otherwise
@@ -179,6 +184,12 @@ class Scheduler:
                         )
                     )
 
+                    # Update the selected agent's state immediately for next selection
+                    selected_agent.occupied_slots = (
+                        selected_agent.occupied_slots + resource_req.requested_slots
+                    )
+                    selected_agent.container_count += len(resource_req.kernel_ids)
+
                     # Track resource allocation for this agent
                     if selected_agent.agent_id not in agent_allocation_map:
                         agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
@@ -208,10 +219,7 @@ class Scheduler:
                 )
                 return None
 
-            # Create session allocation if we have kernel allocations
-            if kernel_allocations:
-                # If no agent allocations, we cannot proceed
-                return None
+            # Create session allocation
             # Get agent allocations from the map
             agent_allocations = list(agent_allocation_map.values())
 
@@ -225,7 +233,7 @@ class Scheduler:
             )
         except Exception as e:
             log.debug(
-                "Agent selection failed for workload {}: {}",
+                "Allocation failed for workload {}: {}",
                 session_workload.session_id,
                 e,
             )
