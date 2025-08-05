@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -52,6 +53,12 @@ class ObjectStorageRow(Base):
         sa.ARRAY(sa.String),
         nullable=False,
         index=True,
+    )
+
+    association_artifacts_storages_rows = relationship(
+        "AssociationArtifactsStorageRow",
+        back_populates="object_storage_row",
+        primaryjoin="ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)",
     )
 
     def __str__(self) -> str:

@@ -29,6 +29,7 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
+from .object_storage import create_object_storage
 
 
 @strawberry.type
@@ -54,6 +55,7 @@ class Mutation:
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
     create_model_revision = create_model_revision
+    create_object_storage = create_object_storage
 
 
 @strawberry.type
