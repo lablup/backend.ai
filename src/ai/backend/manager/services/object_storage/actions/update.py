@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -9,11 +10,12 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class UpdateObjectStorageAction(ModelServiceAction):
+    id: uuid.UUID
     modifier: ObjectStorageModifier
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.id)
 
     @override
     @classmethod

@@ -49,20 +49,23 @@ class ObjectStorageRepository:
             return object_storage_row.to_dataclass()
 
     @repository_decorator()
-    async def update(self, modifier: ObjectStorageModifier) -> ObjectStorageData:
+    async def update(
+        self, storage_id: uuid.UUID, modifier: ObjectStorageModifier
+    ) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
             data = modifier.fields_to_update()
-            update_query = (
+            update_stmt = (
                 sa.update(ObjectStorageRow)
-                .values(data)
-                .where(ObjectStorageRow.name == modifier.name)
-                .returning(ObjectStorageRow)
+                .where(ObjectStorageRow.id == storage_id)
+                .values(**data)
+                .returning(*sa.select(ObjectStorageRow).selected_columns)
             )
-            result = await db_session.execute(update_query)
-            row: ObjectStorageRow = result.first()
+            stmt = sa.select(ObjectStorageRow).from_statement(update_stmt)
+            row: ObjectStorageRow = (await db_session.execute(stmt)).scalars().one()
+
             return row.to_dataclass()
 
     @repository_decorator()
