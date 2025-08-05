@@ -1,5 +1,7 @@
 from . import acl as _acl
 from . import agent as _agent
+from . import artifact as _artifact
+from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
 from . import audit_log as _auditlog
 from . import container_registry as _container_registry
@@ -14,6 +16,7 @@ from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
 from . import network as _network
+from . import object_storage as _object_storage
 from . import rbac as _rbac
 from . import rbac_models as _rbac_models
 from . import resource_policy as _rpolicy
@@ -24,6 +27,7 @@ from . import scaling_group as _sgroup
 from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
+from . import storage_object as _storage_object
 from . import user as _user
 from . import vfolder as _vfolder
 from .base import metadata
@@ -36,6 +40,8 @@ __all__ = (
     *_acl.__all__,
     *_auditlog.__all__,
     *_agent.__all__,
+    *_artifact.__all__,
+    *_association_artifacts_storages.__all__,
     *_association_container_registries_groups.__all__,
     *_container_registry.__all__,
     *_domain.__all__,
@@ -46,6 +52,8 @@ __all__ = (
     *_kernel.__all__,
     *_keypair.__all__,
     *_network.__all__,
+    *_object_storage.__all__,
+    *_storage_object.__all__,
     *_user.__all__,
     *_vfolder.__all__,
     *_dotfile.__all__,
@@ -68,7 +76,9 @@ __all__ = (
 
 from .acl import *  # noqa
 from .audit_log import *  # noqa
+from .artifact import *  # noqa
 from .agent import *  # noqa
+from .association_artifacts_storages import *  # noqa
 from .association_container_registries_groups import *  # noqa
 from .container_registry import *  # noqa
 from .domain import *  # noqa
@@ -82,6 +92,8 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
+from .object_storage import *  # noqa
+from .storage_object import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
