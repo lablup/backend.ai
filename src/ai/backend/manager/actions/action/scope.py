@@ -15,7 +15,7 @@ class BaseScopedAction(BaseAction, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def target_scope_id(self) -> str:
+    def scope_id(self) -> str:
         """Return the ID of the scope this action operates on."""
         raise NotImplementedError
 
@@ -24,14 +24,12 @@ class BaseScopedAction(BaseAction, ABC):
             entity_type=self.entity_type(),
             operation_type=self.operation_type(),
             scope_type=self.scope_type(),
-            scope_id=self.target_scope_id(),
+            scope_id=self.scope_id(),
         )
 
 
 class BaseScopedActionResult(ABC):
-    @abstractmethod
-    def scope_id(self) -> str:
-        raise NotImplementedError
+    pass
 
 
 TBaseScopedAction = TypeVar("TBaseScopedAction", bound=BaseScopedAction)

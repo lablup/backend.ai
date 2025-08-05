@@ -77,7 +77,7 @@ class ScopedActionProcessor(Generic[TBaseScopedAction, TBaseScopedActionResult])
                 action_id=action_id,
                 target=ActionResultTargetMeta(
                     entity_type=action.entity_type(),
-                    scope=ScopeId(action.scope_type(), action.target_scope_id()),
+                    scope=ScopeId(action.scope_type(), action.scope_id()),
                 ),
                 status=status,
                 description=description,

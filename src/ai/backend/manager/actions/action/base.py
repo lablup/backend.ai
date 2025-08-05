@@ -30,6 +30,8 @@ class BaseAction(ABC):
         """
         Return the ID of the entity this action operates on.
         Returns None to avoid overriding in subclasses that do not require an entity ID.
+        This returns `None` by default because subclasses may not always need to specify an entity ID.
+        So this method will be deprecated in the future.
         """
         return None
 
