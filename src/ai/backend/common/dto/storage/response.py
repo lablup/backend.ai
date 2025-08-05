@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo
+from ai.backend.common.data.storage.registries.types import ModelInfo
 
 from ...api_handlers import BaseResponseModel
 from .field import VFolderMetaField, VolumeMetaField
@@ -74,82 +74,6 @@ class S3PresignedUploadData(BaseResponseModel):
 
 
 # HuggingFace API Response Models
-
-
-class HuggingFaceListModelsResponse(BaseResponseModel):
-    """Response for listing HuggingFace models."""
-
-    models: list[ModelInfo] = Field(
-        default_factory=list,
-        description="""
-        List of HuggingFace models with metadata.
-        Each model includes comprehensive information about the model and its files.
-        """,
-    )
-    total_count: int = Field(
-        default=0,
-        description="""
-        Total number of models returned in this response.
-        May be less than the requested limit if fewer models are available.
-        """,
-        examples=[10, 50, 0],
-    )
-
-
-class HuggingFaceGetModelResponse(BaseResponseModel):
-    """Response for getting specific HuggingFace model details."""
-
-    model: ModelInfo = Field(
-        description="""
-        Detailed information about the HuggingFace model.
-        Includes all metadata, file listings, and download information.
-        """,
-    )
-
-
-class HuggingFaceListFilesResponse(BaseResponseModel):
-    """Response for listing files in a HuggingFace model."""
-
-    files: list[FileInfo] = Field(
-        default_factory=list,
-        description="""
-        List of files in the HuggingFace model repository.
-        Includes all model files, configuration files, and documentation.
-        """,
-    )
-    model_id: str = Field(
-        description="""
-        HuggingFace model ID that the files belong to.
-        Used to identify which model these files are associated with.
-        """,
-        examples=["microsoft/DialoGPT-medium", "openai/gpt-2"],
-    )
-
-
-class HuggingFaceGetDownloadUrlResponse(BaseResponseModel):
-    """Response for getting download URL of a specific file."""
-
-    download_url: str = Field(
-        description="""
-        Direct HTTP URL for downloading the file.
-        This URL can be used to download the file directly from HuggingFace Hub.
-        """,
-        examples=["https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"],
-    )
-    model_id: str = Field(
-        description="""
-        HuggingFace model ID containing the file.
-        Identifies the model repository that contains this file.
-        """,
-        examples=["microsoft/DialoGPT-medium", "openai/gpt-2"],
-    )
-    filename: str = Field(
-        description="""
-        Name of the file within the model repository.
-        Relative path from the repository root to the file.
-        """,
-        examples=["config.json", "pytorch_model.bin", "tokenizer/vocab.txt"],
-    )
 
 
 class HuggingFaceScanResponse(BaseResponseModel):
