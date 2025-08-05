@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import Field
 
 from ...api_handlers import BaseRequestModel
+from ...data.storage.registries.types import ModelTarget
 from ...types import QuotaConfig, VFolderID
 
 
@@ -164,7 +165,7 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         default=10,
         ge=1,
         description="""
-        Maximum number of models to retrieve (1-100).
+        Maximum number of models to retrieve.
         Controls the number of models returned in a single request.
         """,
         examples=[10, 50, 100],
@@ -185,24 +186,28 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         """,
         examples=["downloads", "likes", "created", "modified"],
     )
+    # TODO: Add direction field if needed
 
 
 class HuggingFaceImportModelReq(BaseRequestModel):
     """Request for importing a HuggingFace model to storage."""
 
+    model: ModelTarget = Field(
+        description="""
+        Target model to import from HuggingFace.
+        Contains the model ID and optional revision to specify which version to import.
+        """,
+        examples=[
+            {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+            {"model_id": "openai/gpt-2", "revision": "v1.0"},
+        ],
+    )
     registry_name: str = Field(
         description="""
         Name of the HuggingFace registry to import from.
         This should match the configured registry name in the system.
         """,
         examples=["huggingface", "my-huggingface-registry"],
-    )
-    model_id: str = Field(
-        description="""
-        HuggingFace model ID to import.
-        The model will be downloaded from HuggingFace Hub and stored in the specified storage.
-        """,
-        examples=["microsoft/DialoGPT-medium", "openai/gpt-2", "bert-base-uncased"],
     )
     storage_name: str = Field(
         description="""
@@ -223,20 +228,24 @@ class HuggingFaceImportModelReq(BaseRequestModel):
 class HuggingFaceImportModelsBatchReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
+    models: list[ModelTarget] = Field(
+        description="""
+        List of models to import from HuggingFace.
+        Each model must specify the model ID and optional revision.
+        """,
+        examples=[
+            [
+                {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+                {"model_id": "openai/gpt-2", "revision": "v1.0"},
+            ]
+        ],
+    )
     registry_name: str = Field(
         description="""
         Name of the HuggingFace registry to import from.
         This should match the configured registry name in the system.
         """,
         examples=["huggingface", "my-huggingface-registry"],
-    )
-    model_ids: list[str] = Field(
-        min_length=1,
-        description="""
-        List of HuggingFace model IDs to import in batch.
-        All models will be processed sequentially and imported to the same storage location.
-        """,
-        examples=[["microsoft/DialoGPT-medium", "openai/gpt-2"], ["bert-base-uncased"]],
     )
     storage_name: str = Field(
         description="""

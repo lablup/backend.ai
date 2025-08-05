@@ -7,6 +7,7 @@ import pytest
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
+from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.storage.client.huggingface import (
     HuggingFaceClient,
     HuggingFaceClientArgs,
@@ -109,7 +110,7 @@ class TestHuggingFaceClient:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_client.scan_models()
+            await hf_client.scan_models(limit=10)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -122,11 +123,13 @@ class TestHuggingFaceClient:
         """Test successful single model scanning."""
         mock_model_info.return_value = mock_hf_model_info
 
-        model = await hf_client.scan_model("microsoft/DialoGPT-medium")
+        model = await hf_client.scan_model(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
         assert model.id == "microsoft/DialoGPT-medium"
         assert model.author == "microsoft"
-        mock_model_info.assert_called_once_with("microsoft/DialoGPT-medium", token="test_token")
+        mock_model_info.assert_called_once_with(
+            "microsoft/DialoGPT-medium", revision="main", token="test_token"
+        )
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -137,7 +140,7 @@ class TestHuggingFaceClient:
         mock_model_info.side_effect = Exception("Model not found")
 
         with pytest.raises(HuggingFaceModelNotFoundError):
-            await hf_client.scan_model("nonexistent/model")
+            await hf_client.scan_model(ModelTarget(model_id="nonexistent/model"))
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -148,7 +151,7 @@ class TestHuggingFaceClient:
         mock_model_info.side_effect = Exception("Network error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_client.scan_model("microsoft/DialoGPT-medium")
+            await hf_client.scan_model(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
@@ -158,14 +161,16 @@ class TestHuggingFaceClient:
         """Test successful file path listing."""
         mock_list_repo_files.return_value = ["config.json", "pytorch_model.bin", "tokenizer.json"]
 
-        filepaths = await hf_client.list_model_filepaths("microsoft/DialoGPT-medium")
+        filepaths = await hf_client.list_model_filepaths(
+            ModelTarget(model_id="microsoft/DialoGPT-medium")
+        )
 
         assert len(filepaths) == 3
         assert "config.json" in filepaths
         assert "pytorch_model.bin" in filepaths
         assert "tokenizer.json" in filepaths
         mock_list_repo_files.assert_called_once_with(
-            "microsoft/DialoGPT-medium", token="test_token"
+            "microsoft/DialoGPT-medium", revision="main", token="test_token"
         )
 
     @pytest.mark.asyncio
@@ -177,7 +182,7 @@ class TestHuggingFaceClient:
         mock_list_repo_files.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_client.list_model_filepaths("microsoft/DialoGPT-medium")
+            await hf_client.list_model_filepaths(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
     @pytest.mark.asyncio
     async def test_list_model_files_info_success(
@@ -188,14 +193,17 @@ class TestHuggingFaceClient:
             mock_get_paths_info.return_value = [mock_repo_file, mock_repo_folder]
 
             files_info = await hf_client.list_model_files_info(
-                "microsoft/DialoGPT-medium", ["config.json", "tokenizer"]
+                ModelTarget(model_id="microsoft/DialoGPT-medium"), ["config.json", "tokenizer"]
             )
 
             assert len(files_info) == 2
             assert files_info[0].path == "config.json"
             assert files_info[1].path == "tokenizer"
             mock_get_paths_info.assert_called_once_with(
-                "microsoft/DialoGPT-medium", paths=["config.json", "tokenizer"], repo_type="model"
+                "microsoft/DialoGPT-medium",
+                paths=["config.json", "tokenizer"],
+                revision="main",
+                repo_type="model",
             )
 
     @pytest.mark.asyncio
@@ -205,7 +213,9 @@ class TestHuggingFaceClient:
             mock_get_paths_info.side_effect = Exception("API Error")
 
             with pytest.raises(HuggingFaceAPIError):
-                await hf_client.list_model_files_info("microsoft/DialoGPT-medium", ["config.json"])
+                await hf_client.list_model_files_info(
+                    ModelTarget(model_id="microsoft/DialoGPT-medium"), ["config.json"]
+                )
 
     def test_get_download_url_success(self, hf_client: HuggingFaceClient) -> None:
         """Test download URL generation."""
@@ -214,13 +224,15 @@ class TestHuggingFaceClient:
                 "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
             )
 
-            url = hf_client.get_download_url("microsoft/DialoGPT-medium", "config.json")
+            url = hf_client.get_download_url(
+                ModelTarget(model_id="microsoft/DialoGPT-medium"), "config.json"
+            )
 
             assert (
                 url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
             )
             mock_hf_hub_url.assert_called_once_with(
-                repo_id="microsoft/DialoGPT-medium", filename="config.json"
+                repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
             )
 
     def test_get_download_url_fallback(self, hf_client: HuggingFaceClient) -> None:
@@ -228,7 +240,9 @@ class TestHuggingFaceClient:
         with patch("ai.backend.storage.client.huggingface.hf_hub_url") as mock_hf_hub_url:
             mock_hf_hub_url.side_effect = Exception("Error")
 
-            url = hf_client.get_download_url("microsoft/DialoGPT-medium", "config.json")
+            url = hf_client.get_download_url(
+                ModelTarget(model_id="microsoft/DialoGPT-medium"), "config.json"
+            )
 
             assert (
                 url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
@@ -300,7 +314,7 @@ class TestHuggingFaceScanner:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_scanner.scan_models()
+            await hf_scanner.scan_models(limit=10)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -313,14 +327,16 @@ class TestHuggingFaceScanner:
         """Test successful single model scanning."""
         mock_model_info.return_value = mock_hf_model_info
 
-        model_info = await hf_scanner.scan_model("microsoft/DialoGPT-medium")
+        model_info = await hf_scanner.scan_model(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
         assert model_info.id == "microsoft/DialoGPT-medium"
         assert model_info.name == "DialoGPT-medium"
         assert model_info.author == "microsoft"
         assert model_info.tags == ["pytorch", "text-generation"]
 
-        mock_model_info.assert_called_once_with("microsoft/DialoGPT-medium", token="test_token")
+        mock_model_info.assert_called_once_with(
+            "microsoft/DialoGPT-medium", revision="main", token="test_token"
+        )
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -331,7 +347,7 @@ class TestHuggingFaceScanner:
         mock_model_info.side_effect = Exception("not found")
 
         with pytest.raises(HuggingFaceModelNotFoundError):
-            await hf_scanner.scan_model("nonexistent/model")
+            await hf_scanner.scan_model(ModelTarget(model_id="nonexistent/model"))
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -342,7 +358,7 @@ class TestHuggingFaceScanner:
         mock_model_info.side_effect = Exception("Network error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_scanner.scan_model("microsoft/DialoGPT-medium")
+            await hf_scanner.scan_model(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
     def test_get_download_url(
@@ -353,11 +369,13 @@ class TestHuggingFaceScanner:
             "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         )
 
-        url = hf_scanner.get_download_url("microsoft/DialoGPT-medium", "config.json")
+        url = hf_scanner.get_download_url(
+            ModelTarget(model_id="microsoft/DialoGPT-medium"), "config.json"
+        )
 
         assert url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         mock_hf_hub_url.assert_called_once_with(
-            repo_id="microsoft/DialoGPT-medium", filename="config.json"
+            repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
         )
 
     @pytest.mark.asyncio
@@ -383,7 +401,9 @@ class TestHuggingFaceScanner:
         with patch.object(hf_scanner._client._api, "get_paths_info") as mock_get_paths_info:
             mock_get_paths_info.return_value = [mock_repo_file, mock_repo_folder]
 
-            file_infos = await hf_scanner.list_model_files_info("microsoft/DialoGPT-medium")
+            file_infos = await hf_scanner.list_model_files_info(
+                ModelTarget(model_id="microsoft/DialoGPT-medium")
+            )
 
             assert len(file_infos) == 2
 
@@ -434,7 +454,9 @@ class TestHuggingFaceScanner:
         with patch.object(hf_scanner._client._api, "get_paths_info") as mock_get_paths_info:
             mock_get_paths_info.return_value = [mock_good_file, mock_bad_file]
 
-            file_infos = await hf_scanner.list_model_files_info("microsoft/DialoGPT-medium")
+            file_infos = await hf_scanner.list_model_files_info(
+                ModelTarget(model_id="microsoft/DialoGPT-medium")
+            )
 
             # Should get the good file, bad file should be skipped due to error
             assert len(file_infos) == 1
@@ -448,7 +470,9 @@ class TestHuggingFaceScanner:
         """Test model files info listing with API error."""
         mock_list_repo_files.side_effect = Exception("API Error")
 
-        file_infos = await hf_scanner.list_model_files_info("microsoft/DialoGPT-medium")
+        file_infos = await hf_scanner.list_model_files_info(
+            ModelTarget(model_id="microsoft/DialoGPT-medium")
+        )
 
         # Should return empty list on error
         assert file_infos == []

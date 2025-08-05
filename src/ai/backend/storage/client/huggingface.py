@@ -9,7 +9,7 @@ from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, mod
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo
+from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError, HuggingFaceModelNotFoundError
 
@@ -40,7 +40,7 @@ class HuggingFaceClient:
         self._api = HfApi(token=args.token, endpoint=args.endpoint)
 
     async def scan_models(
-        self, search: Optional[str] = None, sort: str = "downloads", limit: int = 10
+        self, limit: int, search: Optional[str] = None, sort: str = "downloads"
     ) -> list[HfModelInfo]:
         """List models from HuggingFace Hub.
 
@@ -71,11 +71,11 @@ class HuggingFaceClient:
             log.error(f"Failed to list models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list models: {str(e)}") from e
 
-    async def scan_model(self, model_id: str) -> HfModelInfo:
+    async def scan_model(self, model: ModelTarget) -> HfModelInfo:
         """Get detailed information about a specific model.
 
         Args:
-            model_id: HuggingFace model ID
+            model: HuggingFace model to scan
 
         Returns:
             HfModelInfo object with model metadata
@@ -84,22 +84,28 @@ class HuggingFaceClient:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
+        model_id = model.model_id
+        revision = model.revision
         try:
-            model = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: model_info(model_id, token=self._token)
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: model_info(model_id, revision=revision, token=self._token)
             )
-            return model
+            return result
         except Exception as e:
+            log.error(f"Failed to get model info for {model_id}@{revision}: {str(e)}")
             if "not found" in str(e).lower():
-                raise HuggingFaceModelNotFoundError(f"Model not found: {model_id}") from e
-            log.error(f"Failed to get model info for {model_id}: {str(e)}")
-            raise HuggingFaceAPIError(f"Failed to get model info for {model_id}: {str(e)}") from e
+                raise HuggingFaceModelNotFoundError(
+                    f"Model not found: {model_id}@{revision}"
+                ) from e
+            raise HuggingFaceAPIError(
+                f"Failed to get model info for {model_id}@{revision}: {str(e)}"
+            ) from e
 
-    async def list_model_filepaths(self, model_id: str) -> list[str]:
+    async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
 
         Args:
-            model_id: HuggingFace model ID
+            model: HuggingFace model
 
         Returns:
             List of file paths
@@ -107,22 +113,26 @@ class HuggingFaceClient:
         Raises:
             HuggingFaceAPIError: If API call fails
         """
+        model_id = model.model_id
+        revision = model.revision
         try:
-            files = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: list_repo_files(model_id, token=self._token)
+            filepaths = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
             )
-            return files
+            return filepaths
         except Exception as e:
-            log.error(f"Failed to list files for {model_id}: {str(e)}")
-            raise HuggingFaceAPIError(f"Failed to list files for {model_id}: {str(e)}") from e
+            log.error(f"Failed to list files for {model_id}@{revision}: {str(e)}")
+            raise HuggingFaceAPIError(
+                f"Failed to list files for {model_id}@{revision}: {str(e)}"
+            ) from e
 
     async def list_model_files_info(
-        self, model_id: str, paths: list[str]
+        self, model: ModelTarget, paths: list[str]
     ) -> list[RepoFile | RepoFolder]:
         """Get information about specific paths in a repository.
 
         Args:
-            model_id: HuggingFace model ID
+            model: HuggingFace model to scan
             paths: List of file paths to get info for
 
         Returns:
@@ -131,31 +141,38 @@ class HuggingFaceClient:
         Raises:
             HuggingFaceAPIError: If API call fails
         """
+        model_id = model.model_id
+        revision = model.revision
+
         try:
             info = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self._api.get_paths_info(model_id, paths=paths, repo_type="model"),
+                lambda: self._api.get_paths_info(
+                    model_id, paths=paths, revision=revision, repo_type="model"
+                ),
             )
             return info
         except Exception as e:
-            log.error(f"Failed to get paths info for {model_id} ({paths}): {str(e)}")
-            raise HuggingFaceAPIError(f'Failed to get paths info for "{model_id}": {str(e)}') from e
+            log.error(f"Failed to get paths info for {model_id}@{revision} ({paths}): {str(e)}")
+            raise HuggingFaceAPIError(
+                f'Failed to get paths info for "{model_id}@{revision}": {str(e)}'
+            ) from e
 
-    def get_download_url(self, model_id: str, filename: str) -> str:
+    def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
 
         Args:
-            model_id: HuggingFace model ID
+            model: HuggingFace model
             filename: File name
 
         Returns:
             Download URL
         """
         try:
-            return hf_hub_url(repo_id=model_id, filename=filename)
+            return hf_hub_url(repo_id=model.model_id, filename=filename, revision=model.revision)
         except Exception:
             # Fallback URL
-            return f"https://huggingface.co/{model_id}/resolve/main/{filename}"
+            return f"https://huggingface.co/{model.model_id}/resolve/{model.revision}/{filename}"
 
 
 @dataclass
@@ -178,7 +195,7 @@ class HuggingFaceScanner:
 
     async def scan_models(
         self,
-        limit: int = 10,
+        limit: int,
         search: Optional[str] = None,
         sort: str = "downloads",
     ) -> list[ModelInfo]:
@@ -225,11 +242,11 @@ class HuggingFaceScanner:
             log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
 
-    async def scan_model(self, model_id: str) -> ModelInfo:
+    async def scan_model(self, model: ModelTarget) -> ModelInfo:
         """Scan a specific model by ID.
 
         Args:
-            model_id: HuggingFace model ID (e.g., "microsoft/DialoGPT-medium")
+            model: HuggingFace model to scan
 
         Returns:
             ModelInfo object with model metadata and files
@@ -238,54 +255,65 @@ class HuggingFaceScanner:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
+        model_id = model.model_id
+        revision = model.revision
+
         try:
-            log.info(f"Scanning specific HuggingFace model: model_id={model_id}")
-            model = await self._client.scan_model(model_id)
+            log.info(f"Scanning specific HuggingFace model: model_id={model_id}@{revision}")
+            model_info = await self._client.scan_model(model)
 
             result = ModelInfo(
                 id=model_id,
                 name=model_id.split("/")[-1],
-                author=model.author,
-                tags=model.tags or [],
-                created_at=model.created_at,
-                last_modified=model.last_modified,
+                author=model_info.author,
+                revision=revision,
+                tags=model_info.tags or [],
+                created_at=model_info.created_at,
+                last_modified=model_info.last_modified,
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model: model_id={model_id}",
+                f"Successfully scanned HuggingFace model: model_id={model_id}@{revision}",
             )
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace model {model_id}: {str(e)}")
+            log.error(f"Failed to scan HuggingFace model {model_id}@{revision}: {str(e)}")
             if "not found" in str(e).lower():
-                raise HuggingFaceModelNotFoundError(f"Model not found: {model_id}") from e
-            raise HuggingFaceAPIError(f"Failed to scan model {model_id}: {str(e)}") from e
+                raise HuggingFaceModelNotFoundError(
+                    f"Model not found: {model_id}@{revision}"
+                ) from e
+            raise HuggingFaceAPIError(
+                f"Failed to scan model {model_id}@{revision}: {str(e)}"
+            ) from e
 
-    def get_download_url(self, model_id: str, filename: str) -> str:
+    def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
 
         Args:
-            model_id: HuggingFace model ID
+            model: HuggingFace model
             filename: File name
 
         Returns:
             Download URL
         """
-        return self._client.get_download_url(model_id, filename)
+        return self._client.get_download_url(model, filename)
 
-    async def list_model_files_info(self, model_id: str) -> list[FileInfo]:
+    async def list_model_files_info(self, model: ModelTarget) -> list[FileInfo]:
         """Get model file information list as FileInfo objects.
 
         Args:
-            model_id: Model ID
+            model: HuggingFace model
 
         Returns:
             List of FileInfo objects
         """
+        model_id = model.model_id
+        revision = model.revision
+
         try:
-            filepaths = await self._client.list_model_filepaths(model_id)
-            model_files = await self._client.list_model_files_info(model_id, filepaths)
+            filepaths = await self._client.list_model_filepaths(model)
+            model_files = await self._client.list_model_files_info(model, filepaths)
             file_infos = []
 
             for file in model_files:
@@ -296,14 +324,14 @@ class HuggingFaceScanner:
                                 path=file.path,
                                 size=file.size,
                                 type="file",
-                                download_url=self._client.get_download_url(model_id, file.path),
+                                download_url=self._client.get_download_url(model, file.path),
                             )
                         case RepoFolder():
                             file_obj = FileInfo(
                                 path=file.path,
                                 size=0,
                                 type="directory",
-                                download_url=self._client.get_download_url(model_id, file.path),
+                                download_url=self._client.get_download_url(model, file.path),
                             )
                         case _:
                             log.error(f"Unknown file type for {file}, skipping...")
@@ -313,11 +341,11 @@ class HuggingFaceScanner:
                 except Exception as e:
                     path = getattr(file, "path", "unknown")
                     log.error(
-                        f"Error processing file {path} info for model {model_id}. Details: {str(e)}"
+                        f"Error processing file {path} info for model {model_id}@{revision}. Details: {str(e)}"
                     )
 
             return file_infos
 
         except Exception as e:
-            log.error(f"Error getting file list for {model_id}: {str(e)}")
+            log.error(f"Error getting file list for {model_id}@{revision}: {str(e)}")
             return []

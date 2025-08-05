@@ -75,7 +75,7 @@ class HuggingFaceRegistryAPIHandler:
         """
         Scan HuggingFace registry and return metadata.
         """
-        await log_client_api_entry(log, "scan_huggingface", body.parsed)
+        await log_client_api_entry(log, "scan", body.parsed)
 
         try:
             models = await self._huggingface_service.scan_models(
@@ -109,7 +109,7 @@ class HuggingFaceRegistryAPIHandler:
         task_id = query.parsed.task_id
         redis_stream_conn = redis_stream_conn_ctx.redis_stream_conn
 
-        await log_client_api_entry(log, "get_scan_job_status", query.parsed)
+        await log_client_api_entry(log, "get_import_job_status", query.parsed)
 
         raw_task_status = await redis_helper.execute(
             redis_stream_conn, lambda r: r.get(f"bgtask.{task_id}")
@@ -144,12 +144,12 @@ class HuggingFaceRegistryAPIHandler:
         """
         Import a HuggingFace model to storage.
         """
-        await log_client_api_entry(log, "import_huggingface_model", body.parsed)
+        await log_client_api_entry(log, "import_model", body.parsed)
 
         try:
             bgtask_id = await self._huggingface_service.import_model(
                 registry_name=body.parsed.registry_name,
-                model_id=body.parsed.model_id,
+                model=body.parsed.model,
                 storage_name=body.parsed.storage_name,
                 bucket_name=body.parsed.bucket_name,
             )
@@ -174,12 +174,12 @@ class HuggingFaceRegistryAPIHandler:
         """
         Import multiple HuggingFace models to storage in batch.
         """
-        await log_client_api_entry(log, "import_huggingface_models_batch", body.parsed)
+        await log_client_api_entry(log, "import_models_batch", body.parsed)
 
         try:
             task_id = await self._huggingface_service.import_models_batch(
                 registry_name=body.parsed.registry_name,
-                model_ids=body.parsed.model_ids,
+                models=body.parsed.models,
                 storage_name=body.parsed.storage_name,
                 bucket_name=body.parsed.bucket_name,
             )
