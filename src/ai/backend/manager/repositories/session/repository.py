@@ -25,7 +25,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
 )
 from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.utils import query_userinfo
 
@@ -42,7 +42,11 @@ class SessionRepository:
     @repository_decorator()
     async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionRow.user).where(SessionRow.id == session_id)
+            query = (
+                sa.select(UserRow)
+                .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
+                .where(SessionRow.id == session_id)
+            )
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")

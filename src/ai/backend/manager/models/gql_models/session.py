@@ -498,8 +498,10 @@ class ComputeSessionNode(graphene.ObjectType):
             query = sa.select(dependency_cte.c.id)
             session_ids = (await db_sess.execute(query)).scalars().all()
             # Get the session rows in the graph
-            query = sa.select(SessionRow).where(
-                SessionRow.id.in_(session_ids).options(
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+                .options(
                     selectinload(SessionRow.user),
                 )
             )
