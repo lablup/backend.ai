@@ -258,7 +258,6 @@ extend type ImageNode @key(fields: "id") {
 
 input ImportArtifactInput {
   artifactId: ID!
-  storageName: String!
 }
 
 type ImportArtifactPayload {
