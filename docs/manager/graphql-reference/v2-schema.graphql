@@ -543,6 +543,7 @@ type Queries {
   ): ModelRevisionConnection!
   revision(id: ID!): ModelRevision
   replica(id: ID!): ModelReplica
+  objectStorage(id: ID!): ObjectStorage
   objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null): ObjectStorageConnection!
 }
 
