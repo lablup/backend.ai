@@ -9,9 +9,8 @@ from .base import BaseAction
 
 
 class BaseScopedAction(BaseAction, ABC):
-    @classmethod
     @abstractmethod
-    def scope_type(cls) -> str:
+    def scope_type(self) -> str:
         raise NotImplementedError
 
     @abstractmethod

@@ -259,7 +259,11 @@ class Processors(AbstractProcessorPackage):
     auth: AuthProcessors
 
     @classmethod
-    def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
+    def create(
+        cls,
+        args: ProcessorArgs,
+        action_monitors: list[ActionMonitor],
+    ) -> Self:
         services = Services.create(args.service_args)
         agent_processors = AgentProcessors(services.agent, action_monitors)
         domain_processors = DomainProcessors(services.domain, action_monitors)

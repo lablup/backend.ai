@@ -1,15 +1,117 @@
+from __future__ import annotations
+
 import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional, override
 
-from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
-from ai.backend.manager.models.vfolder import (
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderPermission,
+from ai.backend.common.dto.manager.field import (
+    VFolderOperationStatusField,
+    VFolderOwnershipTypeField,
+    VFolderPermissionField,
 )
+from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
+
+
+class VFolderPermission(enum.StrEnum):
+    # TODO: Replace this class with VFolderRBACPermission
+    # Or rename this class to VFolderMountPermission
+    """
+    Permissions for a virtual folder given to a specific access key.
+    RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
+    """
+
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
+    RW_DELETE = "wd"
+    OWNER_PERM = "wd"  # resolved as RW_DELETE
+
+    def to_field(self) -> VFolderPermissionField:
+        return VFolderPermissionField(self)
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderPermission]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "RO" | "READ_ONLY":
+                return cls.READ_ONLY
+            case "RW" | "READ_WRITE":
+                return cls.READ_WRITE
+            case "RW_DELETE":
+                return cls.RW_DELETE
+            case "WD" | "OWNER_PERM":
+                return cls.OWNER_PERM
+        return None
+
+
+class VFolderOperationStatus(enum.StrEnum):
+    """
+    Introduce virtual folder current status for storage-proxy operations.
+    """
+
+    READY = "ready"
+    PERFORMING = "performing"
+    CLONING = "cloning"
+    MOUNTED = "mounted"
+    ERROR = "error"
+
+    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
+    DELETE_ERROR = "delete-error"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "READY":
+                return cls.READY
+            case "PERFORMING":
+                return cls.PERFORMING
+            case "CLONING":
+                return cls.CLONING
+            case "MOUNTED":
+                return cls.MOUNTED
+            case "ERROR":
+                return cls.ERROR
+            case "DELETE_PENDING" | "DELETE-PENDING":
+                return cls.DELETE_PENDING
+            case "DELETE_ONGOING" | "DELETE-ONGOING":
+                return cls.DELETE_ONGOING
+            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
+                return cls.DELETE_COMPLETE
+            case "DELETE_ERROR" | "DELETE-ERROR":
+                return cls.DELETE_ERROR
+        return None
+
+    def is_deletable(self, force: bool = False) -> bool:
+        if force:
+            return self in {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.DELETE_PENDING,
+                VFolderOperationStatus.DELETE_ONGOING,
+                VFolderOperationStatus.DELETE_ERROR,
+            }
+        else:
+            return self == VFolderOperationStatus.DELETE_PENDING
+
+    def to_field(self) -> VFolderOperationStatusField:
+        return VFolderOperationStatusField(self)
+
+
+class VFolderOwnershipType(CIStrEnum):
+    """
+    Ownership type of virtual folder.
+    """
+
+    USER = "user"
+    GROUP = "group"
+
+    def to_field(self) -> VFolderOwnershipTypeField:
+        return VFolderOwnershipTypeField(self)
 
 
 @dataclass

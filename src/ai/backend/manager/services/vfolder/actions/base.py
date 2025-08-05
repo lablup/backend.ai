@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.action.base import BaseAction, BaseActionResult
+from ai.backend.manager.actions.action.scope import BaseScopedAction, BaseScopedActionResult
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
@@ -30,7 +31,7 @@ class VFolderAction(BaseAction):
 
 
 @dataclass
-class CreateVFolderAction(VFolderAction):
+class CreateVFolderAction(BaseScopedAction):
     name: str
 
     keypair_resource_policy: Mapping[str, Any]
@@ -48,8 +49,18 @@ class CreateVFolderAction(VFolderAction):
     user_role: UserRole
     creator_email: str
 
-    def entity_id(self) -> Optional[str]:
-        return None
+    @override
+    def scope_type(self) -> str:
+        return "user" if self.group_id_or_name is None else "project"
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.user_uuid if self.group_id_or_name is None else self.group_id_or_name)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "vfolder"
 
     @override
     @classmethod
@@ -58,7 +69,7 @@ class CreateVFolderAction(VFolderAction):
 
 
 @dataclass
-class CreateVFolderActionResult(BaseActionResult):
+class CreateVFolderActionResult(BaseScopedActionResult):
     id: uuid.UUID
     name: str
     quota_scope_id: QuotaScopeID
@@ -72,9 +83,6 @@ class CreateVFolderActionResult(BaseActionResult):
     group_uuid: Optional[uuid.UUID]
     cloneable: bool
     status: VFolderOperationStatus
-
-    def entity_id(self) -> Optional[str]:
-        return str(self.id)
 
 
 @dataclass

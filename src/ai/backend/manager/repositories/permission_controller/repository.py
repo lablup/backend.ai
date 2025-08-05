@@ -23,6 +23,10 @@ from ai.backend.manager.data.permission.role import (
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
+from ai.backend.manager.data.permission.scope_entity_mapping import (
+    ScopeEntityMappingCreateInput,
+    ScopeEntityMappingData,
+)
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
@@ -32,10 +36,12 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
+from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from ...models.rbac_models.object_permission import ObjectPermissionRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
+from ..types import RepositoryArgs
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
@@ -44,8 +50,8 @@ repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISS
 class PermissionControllerRepository:
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
+    def __init__(self, args: RepositoryArgs) -> None:
+        self._db = args.db
 
     @repository_decorator()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
@@ -78,6 +84,21 @@ class PermissionControllerRepository:
                 db_session.add(object_permission_row)  # type: ignore[arg-type]
             await db_session.commit()
         return role_row.to_data()
+
+    @repository_decorator()
+    async def register_entity_to_scope(
+        self, data: ScopeEntityMappingCreateInput
+    ) -> ScopeEntityMappingData:
+        async with self._db.begin_session() as db_session:
+            row = AssociationScopesEntitiesRow(
+                scope_type=data.scope_id.scope_type,
+                scope_id=data.scope_id.scope_id,
+                entity_type=data.entity_id.entity_type,
+                entity_id=data.entity_id.entity_id,
+            )
+            db_session.add(row)  # type: ignore[arg-type]
+            await db_session.flush()
+        return row.to_data()
 
     async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> Optional[RoleRow]:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
