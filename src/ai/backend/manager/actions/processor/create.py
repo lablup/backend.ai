@@ -5,7 +5,7 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.callbacks.callback.create import EntityCreateActionCallback
+from ai.backend.manager.actions.callbacks.callback.create import CreateActionCallback
 from ai.backend.manager.actions.types import (
     ActionResultMeta,
     ActionResultTargetMeta,
@@ -27,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class CreateActionProcessor(Generic[TBaseCreateAction, TBaseCreateActionResult]):
     _monitors: list[ActionMonitor]
     _validators: list[CreateActionValidator]
-    _callbacks: list[EntityCreateActionCallback]
+    _callbacks: list[CreateActionCallback]
     _func: Callable[[TBaseCreateAction], Awaitable[TBaseCreateActionResult]]
 
     def __init__(
@@ -35,7 +35,7 @@ class CreateActionProcessor(Generic[TBaseCreateAction, TBaseCreateActionResult])
         func: Callable[[TBaseCreateAction], Awaitable[TBaseCreateActionResult]],
         monitors: Optional[list[ActionMonitor]] = None,
         validators: Optional[list[CreateActionValidator]] = None,
-        callbacks: Optional[list[EntityCreateActionCallback]] = None,
+        callbacks: Optional[list[CreateActionCallback]] = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []

@@ -611,9 +611,9 @@ def _make_action_callbacks(
     root_ctx: RootContext,
 ) -> CallbackGroup:
     from ai.backend.manager.actions.callbacks.group import CallbackGroup
-    from ai.backend.manager.actions.callbacks.permission_controller import EntityCreateRBACCallback
+    from ai.backend.manager.actions.callbacks.permission_controller import CreateRBACCallback
 
-    rbac_callback = EntityCreateRBACCallback(root_ctx.repositories.permission_controller)
+    rbac_callback = CreateRBACCallback(root_ctx.repositories.permission_controller)
     return CallbackGroup(
         create=[rbac_callback],
         batch=[],

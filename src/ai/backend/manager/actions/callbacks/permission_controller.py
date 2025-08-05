@@ -4,10 +4,10 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
-from .callback.create import EntityCreateActionCallback
+from .callback.create import CreateActionCallback
 
 
-class EntityCreateRBACCallback(EntityCreateActionCallback):
+class CreateRBACCallback(CreateActionCallback):
     def __init__(self, repository: PermissionControllerRepository) -> None:
         self._repository = repository
 
