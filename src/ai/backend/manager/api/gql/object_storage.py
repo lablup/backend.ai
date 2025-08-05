@@ -3,7 +3,7 @@ from typing import Optional, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
@@ -11,6 +11,7 @@ from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifie
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.types import OptionalState
 
@@ -18,6 +19,7 @@ from ai.backend.manager.types import OptionalState
 @strawberry.type
 class ObjectStorage(Node):
     id: NodeID[str]
+    name: str
     access_key: str
     secret_key: str
     endpoint: str
@@ -25,15 +27,54 @@ class ObjectStorage(Node):
     buckets: list[str]
 
     @classmethod
-    def from_dataclass(cls, image_data: ObjectStorageData) -> Self:
+    def from_dataclass(cls, data: ObjectStorageData) -> Self:
         return cls(
-            id=ID(str(image_data.id)),  # TODO: Make this correct
-            access_key=image_data.access_key,
-            secret_key=image_data.secret_key,
-            endpoint=image_data.endpoint,
-            region=image_data.region,
-            buckets=image_data.buckets,
+            id=ID(str(data.id)),
+            name=data.name,
+            access_key=data.access_key,
+            secret_key=data.secret_key,
+            endpoint=data.endpoint,
+            region=data.region,
+            buckets=data.buckets,
         )
+
+
+ObjectStorageEdge = Edge[ObjectStorage]
+
+
+@strawberry.type
+class ObjectStorageConnection(Connection[ObjectStorage]):
+    @strawberry.field
+    def count(self) -> int:
+        return len(self.edges)
+
+
+@strawberry.field
+async def object_storages(
+    info: Info[StrawberryGQLContext],
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+) -> ObjectStorageConnection:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.list_.wait_for_complete(
+        ListObjectStorageAction()
+    )
+
+    nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
+    edges = [ObjectStorageEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
+
+    return ObjectStorageConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
 
 
 @strawberry.input
