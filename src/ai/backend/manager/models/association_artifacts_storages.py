@@ -43,7 +43,7 @@ class AssociationArtifactsStorageRow(Base):
         back_populates="association_artifacts_storages_rows",
         primaryjoin="ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id)",
     )
-    storage_row = relationship(
+    object_storage_row = relationship(
         "ObjectStorageRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin="ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)",

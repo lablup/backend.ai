@@ -41,11 +41,12 @@ class ObjectStorageRepository:
         Create a new object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            object_storage_row = ObjectStorageRow.from_input(creator.fields_to_store())
+            object_storage_data = creator.fields_to_store()
+            object_storage_row = ObjectStorageRow(**object_storage_data)
             db_session.add(object_storage_row)
             await db_session.flush()
             await db_session.refresh(object_storage_row)
-            return object_storage_row.to_data()
+            return object_storage_row.to_dataclass()
 
     @repository_decorator()
     async def update(self, modifier: ObjectStorageModifier) -> ObjectStorageData:
