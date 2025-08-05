@@ -21,6 +21,7 @@ from .types import StrawberryGQLContext
 class ObjectStorage(Node):
     id: NodeID[str]
     name: str
+    host: str
     access_key: str
     secret_key: str
     endpoint: str
@@ -32,6 +33,7 @@ class ObjectStorage(Node):
         return cls(
             id=ID(str(data.id)),
             name=data.name,
+            host=data.host,
             access_key=data.access_key,
             secret_key=data.secret_key,
             endpoint=data.endpoint,
@@ -92,6 +94,7 @@ async def object_storages(
 @strawberry.input
 class CreateObjectStorageInput:
     name: str
+    host: str
     access_key: str
     secret_key: str
     endpoint: str
@@ -101,6 +104,7 @@ class CreateObjectStorageInput:
     def to_creator(self) -> ObjectStorageCreator:
         return ObjectStorageCreator(
             name=self.name,
+            host=self.host,
             access_key=self.access_key,
             secret_key=self.secret_key,
             endpoint=self.endpoint,
@@ -113,6 +117,7 @@ class CreateObjectStorageInput:
 class UpdateObjectStorageInput:
     id: ID
     name: Optional[str] = UNSET
+    host: Optional[str] = UNSET
     access_key: Optional[str] = UNSET
     secret_key: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
@@ -122,6 +127,7 @@ class UpdateObjectStorageInput:
     def to_modifier(self) -> ObjectStorageModifier:
         return ObjectStorageModifier(
             name=OptionalState[str].from_graphql(self.name),
+            host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),
             endpoint=OptionalState[str].from_graphql(self.endpoint),

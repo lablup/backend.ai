@@ -1,7 +1,7 @@
 import strawberry
 from strawberry.schema.config import StrawberryConfig
 
-from .artifact_registry import (
+from .artifact import (
     artifact,
     artifact_group,
     artifact_groups,

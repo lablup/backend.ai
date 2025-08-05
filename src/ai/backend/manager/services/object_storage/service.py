@@ -64,6 +64,7 @@ class ObjectStorageService:
         storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
         return GetObjectStorageActionResult(result=storage_data)
 
+    # TODO: Add filtering logic
     async def list(self, action: ListObjectStorageAction) -> ListObjectStorageActionResult:
         """
         List all object storages.

@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -8,9 +9,13 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class ImportArtifactAction(ArtifactAction):
+    artifact_id: uuid.UUID
+    storage_name: str
+    bucket_name: str
+
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.artifact_id)
 
     @override
     @classmethod
