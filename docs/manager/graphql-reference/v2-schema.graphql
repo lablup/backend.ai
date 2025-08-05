@@ -195,6 +195,14 @@ type DeleteModelDeploymentPayload {
   deployment: ModelDeployment
 }
 
+input DeleteObjectStorageInput {
+  id: ID!
+}
+
+type DeleteObjectStoragePayload {
+  id: ID!
+}
+
 input DeploymentFilter {
   status: DeploymentStatus = null
   openToPublic: Boolean = null
@@ -433,6 +441,8 @@ type Mutation {
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -618,6 +628,20 @@ input UpdateModelDeploymentInput {
 
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment
+}
+
+input UpdateObjectStorageInput {
+  id: ID!
+  name: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
+  region: String
+  buckets: [String!]
+}
+
+type UpdateObjectStoragePayload {
+  objectStorage: ObjectStorage!
 }
 
 extend type UserNode @key(fields: "id") {
