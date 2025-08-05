@@ -4,6 +4,7 @@ import enum
 import logging
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -42,6 +43,12 @@ class ArtifactRow(Base):
         server_default=sa.func.now(),
         nullable=False,
         index=True,
+    )
+
+    association_artifacts_storages_rows = relationship(
+        "AssociationArtifactsStorageRow",
+        back_populates="artifact_row",
+        primaryjoin="ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id)",
     )
 
     def __str__(self) -> str:
