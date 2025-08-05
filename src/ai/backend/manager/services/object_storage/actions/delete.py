@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
 @dataclass
-class DeleteObjectStorageAction(ModelServiceAction):
+class DeleteObjectStorageAction(ObjectStorageAction):
     storage_id: uuid.UUID
 
     @override
