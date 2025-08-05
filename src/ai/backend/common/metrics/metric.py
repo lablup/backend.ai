@@ -416,6 +416,7 @@ class LayerType(enum.StrEnum):
     USER = "user"
     USER_RESOURCE_POLICY = "user_resource_policy"
     VFOLDER = "vfolder"
+    OBJECT_STORAGE = "object_storage"
     PERMISSION_CONTROL = "permission_control"
 
     # Valkey client layers

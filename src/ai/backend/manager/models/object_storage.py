@@ -5,6 +5,7 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
 
 from .base import (
     Base,
@@ -21,6 +22,7 @@ class ObjectStorageRow(Base):
     This model is used to store the details of object storage services
     such as access keys, endpoints, and associated buckets.
     """
+
     __tablename__ = "object_storages"
 
     id = IDColumn("id")
@@ -48,7 +50,7 @@ class ObjectStorageRow(Base):
     buckets = sa.Column(
         "buckets",
         sa.ARRAY(sa.String),
-        nullable=True,
+        nullable=False,
         index=True,
     )
 
@@ -65,3 +67,13 @@ class ObjectStorageRow(Base):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def to_dataclass(self) -> ObjectStorageData:
+        return ObjectStorageData(
+            id=self.id,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            endpoint=self.endpoint,
+            region=self.region,
+            buckets=self.buckets,
+        )
