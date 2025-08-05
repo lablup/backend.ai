@@ -1580,7 +1580,7 @@ class SessionService:
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
         return ModifySessionActionResult(
-            session_data=session_row.to_dataclass(user=session_owner_data)
+            session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
     async def check_and_transit_status(
