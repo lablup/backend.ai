@@ -32,6 +32,7 @@ from .model_deployment.model_revision import (
 from .object_storage import (
     create_object_storage,
     delete_object_storage,
+    object_storage,
     object_storages,
     update_object_storage,
 )
@@ -48,6 +49,7 @@ class Queries:
     revisions = revisions
     revision = revision
     replica = replica
+    object_storage = object_storage
     object_storages = object_storages
 
 

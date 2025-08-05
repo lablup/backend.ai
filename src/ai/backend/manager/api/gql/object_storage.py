@@ -11,6 +11,7 @@ from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifie
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.types import OptionalState
@@ -50,6 +51,15 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
 
 
 @strawberry.field
+async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ObjectStorage]:
+    processors = info.context.processors
+    action_result = await processors.object_storage.get.wait_for_complete(
+        GetObjectStorageAction(storage_id=uuid.UUID(id))
+    )
+    return ObjectStorage.from_dataclass(action_result.result)
+
+
+@strawberry.field
 async def object_storages(
     info: Info[StrawberryGQLContext],
     before: Optional[str] = None,
@@ -57,6 +67,8 @@ async def object_storages(
     first: Optional[int] = None,
     last: Optional[int] = None,
 ) -> ObjectStorageConnection:
+    # TODO: Support pagination with before, after, first, last
+    # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
 
     action_result = await processors.object_storage.list_.wait_for_complete(
