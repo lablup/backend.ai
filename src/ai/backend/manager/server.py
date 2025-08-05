@@ -808,8 +808,8 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .repositories.image.repositories import RepositoryArgs
     from .repositories.repositories import Repositories
+    from .repositories.types import RepositoryArgs
 
     repositories = Repositories.create(
         args=RepositoryArgs(
