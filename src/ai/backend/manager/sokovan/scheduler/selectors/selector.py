@@ -234,6 +234,16 @@ class AgentSelector:
             raise NoAvailableAgentError(
                 f"No agents available in scaling group '{criteria.session_metadata.scaling_group}'"
             )
+        # Filter agents by compatibility
+        compatible_agents = [
+            agent for agent in agents if self._is_agent_compatible(agent, resource_req, config)
+        ]
+
+        if not compatible_agents:
+            raise NoCompatibleAgentError(
+                f"No agents compatible with resource requirements: "
+                f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
+            )
 
         # Handle designated agent if specified
         if designated_agent:
@@ -248,17 +258,6 @@ class AgentSelector:
                     return agent
             raise DesignatedAgentNotFoundError(
                 f"Designated agent '{designated_agent}' not found in available agents"
-            )
-
-        # Filter agents by compatibility
-        compatible_agents = [
-            agent for agent in agents if self._is_agent_compatible(agent, resource_req, config)
-        ]
-
-        if not compatible_agents:
-            raise NoCompatibleAgentError(
-                f"No agents compatible with resource requirements: "
-                f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
             )
 
         # For strategy selection, we need to pass the resource requirements

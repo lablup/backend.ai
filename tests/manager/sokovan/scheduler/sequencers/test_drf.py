@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.prioritizers.drf import DRFSchedulingPrioritizer
+from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -16,10 +16,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
 )
 
 
-class TestDRFSchedulingPrioritizer:
+class TestDRFSequencer:
     @pytest.fixture
-    def prioritizer(self) -> DRFSchedulingPrioritizer:
-        return DRFSchedulingPrioritizer()
+    def sequencer(self) -> DRFSequencer:
+        return DRFSequencer()
 
     @pytest.fixture
     def empty_system_snapshot(self) -> SystemSnapshot:
@@ -88,19 +88,19 @@ class TestDRFSchedulingPrioritizer:
         )
 
     @pytest.mark.asyncio
-    async def test_name(self, prioritizer: DRFSchedulingPrioritizer) -> None:
-        assert prioritizer.name == "DRF-scheduling-prioritizer"
+    async def test_name(self, sequencer: DRFSequencer) -> None:
+        assert sequencer.name == "DRF-scheduling-sequencer"
 
     @pytest.mark.asyncio
     async def test_empty_workload(
-        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
-        result = await prioritizer.prioritize(empty_system_snapshot, [])
+        result = await sequencer.sequence(empty_system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
     async def test_single_user_workloads(
-        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -125,7 +125,7 @@ class TestDRFSchedulingPrioritizer:
             ),
         ]
 
-        result = await prioritizer.prioritize(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(empty_system_snapshot, workloads)
 
         # With no existing allocations, order should be preserved
         assert len(result) == 2
@@ -135,7 +135,7 @@ class TestDRFSchedulingPrioritizer:
     @pytest.mark.asyncio
     async def test_multiple_users_different_dominant_shares(
         self,
-        prioritizer: DRFSchedulingPrioritizer,
+        sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
         workloads = [
@@ -171,7 +171,7 @@ class TestDRFSchedulingPrioritizer:
             ),
         ]
 
-        result = await prioritizer.prioritize(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(system_snapshot_with_allocations, workloads)
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
         assert len(result) == 3
@@ -181,7 +181,7 @@ class TestDRFSchedulingPrioritizer:
 
     @pytest.mark.asyncio
     async def test_multiple_users_same_dominant_share(
-        self, prioritizer: DRFSchedulingPrioritizer, empty_system_snapshot: SystemSnapshot
+        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         # All users have no existing allocations (0% dominant share)
         workloads = [
@@ -217,7 +217,7 @@ class TestDRFSchedulingPrioritizer:
             ),
         ]
 
-        result = await prioritizer.prioritize(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(empty_system_snapshot, workloads)
 
         # With same dominant share, order should be preserved
         assert len(result) == 3
@@ -228,7 +228,7 @@ class TestDRFSchedulingPrioritizer:
     @pytest.mark.asyncio
     async def test_new_user_gets_priority(
         self,
-        prioritizer: DRFSchedulingPrioritizer,
+        sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
         workloads = [
@@ -254,7 +254,7 @@ class TestDRFSchedulingPrioritizer:
             ),
         ]
 
-        result = await prioritizer.prioritize(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(system_snapshot_with_allocations, workloads)
 
         # New user with 0% dominant share should get priority
         assert len(result) == 2
@@ -263,7 +263,7 @@ class TestDRFSchedulingPrioritizer:
 
     @pytest.mark.asyncio
     async def test_dominant_share_calculation_with_zero_capacity(
-        self, prioritizer: DRFSchedulingPrioritizer
+        self, sequencer: DRFSequencer
     ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
@@ -310,5 +310,5 @@ class TestDRFSchedulingPrioritizer:
         ]
 
         # Should not crash when dividing by zero capacity
-        result = await prioritizer.prioritize(system_snapshot, workloads)
+        result = await sequencer.sequence(system_snapshot, workloads)
         assert len(result) == 1

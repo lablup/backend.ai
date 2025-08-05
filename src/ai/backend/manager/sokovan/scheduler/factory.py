@@ -2,21 +2,24 @@
 
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.adapter import ScheduleRepositoryAdapter
 from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
-from ai.backend.manager.sokovan.scheduler.prioritizers.fifo import FIFOSchedulingPrioritizer
 from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
 )
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.validators.concurrency import ConcurrencyValidator
+from ai.backend.manager.sokovan.scheduler.validators.dependencies import DependenciesValidator
 from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
+from ai.backend.manager.types import DistributedLockFactory
 
 
 def create_default_scheduler(
-    repository: ScheduleRepository, config_provider: ManagerConfigProvider
+    repository: ScheduleRepository,
+    config_provider: ManagerConfigProvider,
+    lock_factory: DistributedLockFactory,
 ) -> Scheduler:
     """
     Create a scheduler with default components.
@@ -28,13 +31,14 @@ def create_default_scheduler(
     Returns:
         A configured Scheduler instance
     """
-    # Wrap the repository with the adapter
-    scheduler_repo = ScheduleRepositoryAdapter(repository)
     # Create default validator with concurrency rules
-    validator = SchedulingValidator([ConcurrencyValidator()])
+    validator = SchedulingValidator([
+        ConcurrencyValidator(),
+        DependenciesValidator(),
+    ])
 
-    # Create default prioritizer (FIFO)
-    prioritizer = FIFOSchedulingPrioritizer()
+    # Create default sequencer (FIFO)
+    sequencer = FIFOSequencer()
 
     # Get resource priority from config
     resource_priority = config_provider.config.manager.agent_selection_resource_priority
@@ -48,11 +52,12 @@ def create_default_scheduler(
     # Create scheduler args
     args = SchedulerArgs(
         validator=validator,
-        prioritizer=prioritizer,
+        sequencer=sequencer,
         agent_selector=agent_selector,
         allocator=allocator,
-        repository=scheduler_repo,
+        repository=repository,
         config_provider=config_provider,
+        lock_factory=lock_factory,
     )
 
     return Scheduler(args)

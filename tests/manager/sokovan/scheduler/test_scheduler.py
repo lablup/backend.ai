@@ -15,10 +15,10 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
-    SchedulerRepository,
     SchedulingConfig,
 )
 from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
@@ -117,7 +117,7 @@ class TestSchedulerAllocation:
     @pytest.fixture
     def mock_repository(self):
         """Create a mock repository."""
-        repo = MagicMock(spec=SchedulerRepository)
+        repo = MagicMock(spec=ScheduleRepository)
         repo.get_scheduling_config = AsyncMock(
             return_value=SchedulingConfig(
                 max_container_count_per_agent=100,
@@ -196,7 +196,7 @@ class TestSchedulerAllocation:
         """Create a scheduler instance with mocked dependencies."""
         args = SchedulerArgs(
             validator=MagicMock(),
-            prioritizer=MagicMock(),
+            sequencer=MagicMock(),
             agent_selector=mock_agent_selector_with_verification,
             allocator=MagicMock(),
             repository=mock_repository,

@@ -1,12 +1,24 @@
 import logging
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol
+from datetime import timedelta
+from typing import TYPE_CHECKING, Optional
 
 from ai.backend.common.types import AgentId, AgentSelectionStrategy
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.sokovan.scheduler.prioritizers.prioritizer import SchedulingPrioritizer
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
+from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
+from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
+from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
+from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
+from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
+from ai.backend.manager.sokovan.scheduler.sequencers.lifo import LIFOSequencer
+from ai.backend.manager.sokovan.scheduler.sequencers.sequencer import WorkloadSequencer
+from ai.backend.manager.types import DistributedLockFactory
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
@@ -21,7 +33,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KernelAllocation,
     SessionAllocation,
     SessionWorkload,
-    SystemSnapshot,
 )
 from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
 
@@ -42,137 +53,72 @@ class ScalingGroupInfo:
 
     scheduler_name: str
     agent_selection_strategy: AgentSelectionStrategy
-
-
-class SchedulerRepository(Protocol):
-    """Protocol for repository to fetch system state for scheduling."""
-
-    async def get_system_snapshot(self, scaling_group: str) -> SystemSnapshot:
-        """Get complete system snapshot for scheduling decisions."""
-        ...
-
-    async def get_agents(self, scaling_group: str) -> Sequence[AgentInfo]:
-        """Get a list of available agents."""
-        ...
-
-    async def get_scheduling_config(self, scaling_group: str) -> SchedulingConfig:
-        """Get scheduling configuration for a scaling group."""
-        ...
-
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """Get list of scaling groups with pending sessions."""
-        ...
-
-    async def get_pending_sessions(self, scaling_group: str) -> Sequence[SessionWorkload]:
-        """Get pending sessions for a scaling group as workloads."""
-        ...
-
-    async def get_scaling_group_info(self, scaling_group: str) -> ScalingGroupInfo:
-        """Get scaling group configuration including scheduler name and agent selection strategy."""
-        ...
+    pending_timeout: timedelta
 
 
 @dataclass
 class SchedulerArgs:
     validator: SchedulingValidator
-    prioritizer: SchedulingPrioritizer
+    sequencer: WorkloadSequencer
     agent_selector: AgentSelector
     allocator: "SchedulingAllocator"
-    repository: SchedulerRepository
+    repository: ScheduleRepository
     config_provider: ManagerConfigProvider
+    lock_factory: DistributedLockFactory
 
 
 class Scheduler:
     _validator: SchedulingValidator
-    _default_prioritizer: SchedulingPrioritizer
+    _default_sequencer: WorkloadSequencer
     _default_agent_selector: AgentSelector
     _allocator: "SchedulingAllocator"
-    _repository: SchedulerRepository
+    _repository: ScheduleRepository
     _config_provider: ManagerConfigProvider
-    _prioritizer_pool: dict[str, SchedulingPrioritizer]
-    _agent_selector_pool: dict[str, AgentSelector]
+    _lock_factory: DistributedLockFactory
+    _sequencer_pool: Mapping[str, WorkloadSequencer]
+    _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
 
     def __init__(self, args: SchedulerArgs) -> None:
         self._validator = args.validator
-        self._default_prioritizer = args.prioritizer
+        self._default_sequencer = args.sequencer
         self._default_agent_selector = args.agent_selector
         self._allocator = args.allocator
         self._repository = args.repository
         self._config_provider = args.config_provider
-        self._prioritizer_pool = {}
-        self._agent_selector_pool = {}
+        self._lock_factory = args.lock_factory
+        self._sequencer_pool = self._make_sequencer_pool()
+        self._agent_selector_pool = self._make_agent_selector_pool(
+            args.config_provider.config.manager.agent_selection_resource_priority
+        )
 
-    def _get_prioritizer(self, scheduler_name: str) -> SchedulingPrioritizer:
-        """Get prioritizer from pool or create new one."""
-        if scheduler_name not in self._prioritizer_pool:
-            # Import here to avoid circular imports
-            if scheduler_name == "fifo":
-                from ai.backend.manager.sokovan.scheduler.prioritizers.fifo import (
-                    FIFOSchedulingPrioritizer,
-                )
+    @classmethod
+    def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
+        """Initialize the sequencer pool with default sequencers."""
+        pool: dict[str, WorkloadSequencer] = defaultdict(DRFSequencer)
+        pool["fifo"] = FIFOSequencer()
+        pool["lifo"] = LIFOSequencer()
+        pool["drf"] = DRFSequencer()
+        return pool
 
-                self._prioritizer_pool[scheduler_name] = FIFOSchedulingPrioritizer()
-            elif scheduler_name == "lifo":
-                from ai.backend.manager.sokovan.scheduler.prioritizers.lifo import (
-                    LIFOSchedulingPrioritizer,
-                )
-
-                self._prioritizer_pool[scheduler_name] = LIFOSchedulingPrioritizer()
-            elif scheduler_name == "drf":
-                from ai.backend.manager.sokovan.scheduler.prioritizers.drf import (
-                    DRFSchedulingPrioritizer,
-                )
-
-                self._prioritizer_pool[scheduler_name] = DRFSchedulingPrioritizer()
-            else:
-                # Fallback to default
-                self._prioritizer_pool[scheduler_name] = self._default_prioritizer
-        return self._prioritizer_pool[scheduler_name]
-
-    def _get_agent_selector(self, strategy: AgentSelectionStrategy) -> AgentSelector:
-        """Get agent selector from pool or create new one."""
-        strategy_name = strategy.value
-        if strategy_name not in self._agent_selector_pool:
-            # Get resource priority from config
-            resource_priority = (
-                self._config_provider.config.manager.agent_selection_resource_priority
-            )
-
-            # Import here to avoid circular imports
-            if strategy == AgentSelectionStrategy.CONCENTRATED:
-                from ai.backend.manager.sokovan.scheduler.selectors.concentrated import (
-                    ConcentratedAgentSelector,
-                )
-
-                self._agent_selector_pool[strategy_name] = AgentSelector(
-                    ConcentratedAgentSelector(resource_priority)
-                )
-            elif strategy == AgentSelectionStrategy.DISPERSED:
-                from ai.backend.manager.sokovan.scheduler.selectors.dispersed import (
-                    DispersedAgentSelector,
-                )
-
-                self._agent_selector_pool[strategy_name] = AgentSelector(
-                    DispersedAgentSelector(resource_priority)
-                )
-            elif strategy == AgentSelectionStrategy.ROUNDROBIN:
-                from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import (
-                    RoundRobinAgentSelector,
-                )
-
-                self._agent_selector_pool[strategy_name] = AgentSelector(RoundRobinAgentSelector())
-            elif strategy == AgentSelectionStrategy.LEGACY:
-                from ai.backend.manager.sokovan.scheduler.selectors.legacy import (
-                    LegacyAgentSelector,
-                )
-
-                self._agent_selector_pool[strategy_name] = AgentSelector(
-                    LegacyAgentSelector(resource_priority)
-                )
-            else:
-                # Fallback to default
-                self._agent_selector_pool[strategy_name] = self._default_agent_selector
-        return self._agent_selector_pool[strategy_name]
+    @classmethod
+    def _make_agent_selector_pool(
+        cls, agent_selection_resource_priority: list[str]
+    ) -> Mapping[AgentSelectionStrategy, AgentSelector]:
+        """Initialize the agent selector pool with default selectors."""
+        pool: dict[AgentSelectionStrategy, AgentSelector] = defaultdict(
+            lambda: AgentSelector(ConcentratedAgentSelector(agent_selection_resource_priority))
+        )
+        pool[AgentSelectionStrategy.CONCENTRATED] = AgentSelector(
+            ConcentratedAgentSelector(agent_selection_resource_priority)
+        )
+        pool[AgentSelectionStrategy.DISPERSED] = AgentSelector(
+            DispersedAgentSelector(agent_selection_resource_priority)
+        )
+        pool[AgentSelectionStrategy.ROUNDROBIN] = AgentSelector(RoundRobinAgentSelector())
+        pool[AgentSelectionStrategy.LEGACY] = AgentSelector(
+            LegacyAgentSelector(agent_selection_resource_priority)
+        )
+        return pool
 
     async def schedule_all_scaling_groups(self) -> bool:
         """
@@ -182,41 +128,57 @@ class Scheduler:
             bool: True if any sessions were scheduled, False otherwise.
         """
         sessions_scheduled = False
+        lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
 
-        # Get all schedulable scaling groups from repository
-        scaling_groups = await self._repository.get_schedulable_scaling_groups()
+        # Acquire distributed lock before scheduling
+        async with self._lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
+            # Get all schedulable scaling groups from repository
+            scaling_groups = await self._repository.get_schedulable_scaling_groups()
+            for scaling_group in scaling_groups:
+                try:
+                    # Get scaling group specific configuration first
+                    sg_info = await self._repository.get_scaling_group_info_for_sokovan(
+                        scaling_group
+                    )
+                    # Get pending sessions for this scaling group as workloads
+                    workloads = await self._repository.get_pending_sessions(
+                        scaling_group, sg_info.pending_timeout
+                    )
+                    if not workloads:
+                        log.info(
+                            "No pending sessions for scaling group {}. Skipping scheduling.",
+                            scaling_group,
+                        )
+                        continue
 
-        for scaling_group in scaling_groups:
-            try:
-                # Get pending sessions for this scaling group as workloads
-                workloads = await self._repository.get_pending_sessions(scaling_group)
-
-                if not workloads:
+                    # Schedule the workloads for this scaling group
+                    num_scheduled = await self._schedule_queued_sessions(
+                        scaling_group, workloads, sg_info
+                    )
+                    if num_scheduled > 0:
+                        log.info(
+                            "Scheduled {} sessions for scaling group {}",
+                            num_scheduled,
+                            scaling_group,
+                        )
+                        sessions_scheduled = True
+                except Exception as e:
+                    log.error(
+                        "Failed to schedule sessions for scaling group {}: {}",
+                        scaling_group,
+                        str(e),
+                        exc_info=True,
+                    )
+                    # Continue with other scaling groups even if one fails
                     continue
 
-                # Schedule the workloads for this scaling group
-                num_scheduled = await self._schedule_queued_sessions(scaling_group, workloads)
-
-                if num_scheduled > 0:
-                    sessions_scheduled = True
-
-            except Exception as e:
-                log.error(
-                    "Failed to schedule sessions for scaling group {}: {}",
-                    scaling_group,
-                    str(e),
-                    exc_info=True,
-                )
-                # Continue with other scaling groups even if one fails
-                continue
-
-        return sessions_scheduled
+            return sessions_scheduled
 
     async def _schedule_queued_sessions(
-        self, scaling_group: str, workloads: Sequence[SessionWorkload]
+        self, scaling_group: str, workloads: Sequence[SessionWorkload], sg_info: ScalingGroupInfo
     ) -> int:
         """
-        Schedule all queued sessions by prioritizing them and applying the scheduling policy.
+        Schedule all queued sessions by sequencing them and applying the scheduling policy.
 
         :param scaling_group: The scaling group to schedule for
         :param workloads: A sequence of SessionWorkload objects to be scheduled
@@ -225,49 +187,39 @@ class Scheduler:
         # Fetch complete system snapshot from repository
         system_snapshot = await self._repository.get_system_snapshot(scaling_group)
         config = await self._repository.get_scheduling_config(scaling_group)
-
-        # Get scaling group specific configuration
-        sg_info = await self._repository.get_scaling_group_info(scaling_group)
-
-        # Get appropriate prioritizer for this scaling group
-        prioritizer = self._get_prioritizer(sg_info.scheduler_name)
-
-        # Prioritize workloads with system context
-        prioritized_workloads = await prioritizer.prioritize(system_snapshot, workloads)
-
-        validates_workloads: list[SessionWorkload] = []
-        for session_workload in prioritized_workloads:
-            try:
-                # Validate each workload against the current system state
-                self._validator.validate(system_snapshot, session_workload)
-                validates_workloads.append(session_workload)
-            except Exception as e:
-                log.debug(
-                    "Validation failed for workload {}: {}",
-                    session_workload.session_id,
-                    e,
-                )
-
-        agents_info = await self._repository.get_agents(scaling_group)
-        session_allocations: list[SessionAllocation] = []
-
-        # Get scheduling configuration once for all workloads
-        if not validates_workloads:
-            return 0
-        # Create selection config from scheduling config
         selection_config = AgentSelectionConfig(
             max_container_count=config.max_container_count_per_agent,
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
+        validated_workloads: list[SessionWorkload] = []
+        for session_workload in workloads:
+            try:
+                # Validate each workload against the current system state
+                self._validator.validate(system_snapshot, session_workload)
+                validated_workloads.append(session_workload)
+            except Exception as e:
+                log.info(
+                    "Validation failed for workload {}: {}",
+                    session_workload.session_id,
+                    e,
+                )
+        # Get scheduling configuration once for all workloads
+        if not validated_workloads:
+            log.info(
+                "No valid workloads to schedule for scaling group {}. Skipping scheduling.",
+                scaling_group,
+            )
+            return 0
 
-        # Create a mutable copy of agents_info to track state changes during this scheduling session
-        # This ensures concurrent scheduling sessions don't interfere with each other
-        mutable_agents = list(agents_info)
+        # Sequence workloads with system context
+        sequencer = self._sequencer_pool[sg_info.scheduler_name]
+        sequenced_workloads = await sequencer.sequence(system_snapshot, validated_workloads)
 
+        mutable_agents = await self._repository.get_agents(scaling_group)
+        session_allocations: list[SessionAllocation] = []
         # Get appropriate agent selector for this scaling group
-        agent_selector = self._get_agent_selector(sg_info.agent_selection_strategy)
-
-        for session_workload in validates_workloads:
+        agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
+        for session_workload in sequenced_workloads:
             session_allocation = await self._allocate_workload(
                 session_workload,
                 mutable_agents,
@@ -278,9 +230,13 @@ class Scheduler:
             if not session_allocation:
                 continue
             session_allocations.append(session_allocation)
-
         # Allocate resources for each validated workload
         if session_allocations:
+            log.info(
+                "Allocating resources for {} session allocations in scaling group {}",
+                len(session_allocations),
+                scaling_group,
+            )
             await self._allocator.allocate(session_allocations)
 
         return len(session_allocations)

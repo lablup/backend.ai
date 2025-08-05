@@ -42,8 +42,9 @@ from ai.backend.manager.models import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig, SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.types import SystemSnapshot
 
 
 @pytest.fixture

@@ -78,11 +78,15 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
 # Import types for SchedulerRepository implementation
-from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig, SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.scheduler import (
+    ScalingGroupInfo,
+    SchedulingConfig,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     ConcurrencySnapshot,
+    KernelWorkload,
     KeyPairResourcePolicy,
     PendingSessionInfo,
     PendingSessionSnapshot,
@@ -90,6 +94,8 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ResourcePolicySnapshot,
     SessionDependencyInfo,
     SessionDependencySnapshot,
+    SessionWorkload,
+    SystemSnapshot,
     UserResourcePolicy,
 )
 
@@ -447,11 +453,7 @@ class ScheduleRepository:
     async def _get_schedulable_session_with_kernels_and_agents(
         self, session: SASession, session_id: SessionId
     ) -> Optional[SessionRow]:
-        eager_loading_op = (
-            selectinload(SessionRow.kernels).options(
-                selectinload(KernelRow.agent_row).noload("*"),
-            ),
-        )
+        eager_loading_op = (selectinload(SessionRow.kernels),)
         return await SessionRow.get_session_by_id(
             session, session_id, eager_loading_op=eager_loading_op
         )
@@ -2054,3 +2056,70 @@ class ScheduleRepository:
             )
 
         return SessionDependencySnapshot(by_session=dependencies_by_session)
+
+    @repository_decorator()
+    async def get_pending_sessions(
+        self, scaling_group: str, pending_timeout: timedelta
+    ) -> Sequence[SessionWorkload]:
+        """Get pending sessions for a scaling group as workloads."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get pending sessions
+            _, pending_sessions, _ = await self._list_managed_sessions(
+                db_sess, scaling_group, pending_timeout
+            )
+
+            # Convert to SessionWorkload objects
+            workloads: list[SessionWorkload] = []
+            for session in pending_sessions:
+                # Get session info with kernels
+                eager_session = await self._get_schedulable_session_with_kernels_and_agents(
+                    db_sess, session.id
+                )
+                if not eager_session:
+                    continue
+
+                # Get user info
+                user_uuid = eager_session.user_uuid
+
+                # Create kernel workloads
+                kernel_workloads = [
+                    KernelWorkload(
+                        kernel_id=kernel.id,
+                        image=kernel.image,
+                        architecture=kernel.architecture,
+                        requested_slots=kernel.requested_slots,
+                    )
+                    for kernel in eager_session.kernels
+                ]
+
+                workload = SessionWorkload(
+                    session_id=eager_session.id,
+                    requested_slots=eager_session.requested_slots,
+                    session_type=eager_session.session_type,
+                    cluster_mode=eager_session.cluster_mode,
+                    access_key=eager_session.access_key,
+                    user_uuid=user_uuid,
+                    group_id=eager_session.group_id,
+                    domain_name=eager_session.domain_name,
+                    scaling_group=scaling_group,
+                    priority=eager_session.priority,
+                    starts_at=eager_session.starts_at,
+                    is_private=eager_session.is_private,
+                    kernels=kernel_workloads,
+                    designated_agent=eager_session.kernels[0].agent
+                    if eager_session.kernels
+                    else None,
+                )
+                workloads.append(workload)
+
+            return workloads
+
+    @repository_decorator()
+    async def get_scaling_group_info_for_sokovan(self, scaling_group: str) -> ScalingGroupInfo:
+        """Get scaling group configuration including scheduler name and agent selection strategy for Sokovan."""
+        scheduler, scheduler_opts = await self.get_scaling_group_info(scaling_group)
+        return ScalingGroupInfo(
+            scheduler_name=scheduler,
+            agent_selection_strategy=scheduler_opts.agent_selection_strategy,
+            pending_timeout=scheduler_opts.pending_timeout,
+        )
