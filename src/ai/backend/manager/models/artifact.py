@@ -30,6 +30,7 @@ class ArtifactRow(Base):
     This model is used to track the metadata of artifacts,
     including their type, name, and creation timestamp.
     """
+
     __tablename__ = "artifacts"
 
     id = IDColumn("id")
