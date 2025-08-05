@@ -28,6 +28,7 @@ class ObjectStorageRow(Base):
 
     id = IDColumn("id")
     name = sa.Column("name", sa.String, index=True, unique=True, nullable=False)
+    host = sa.Column("host", sa.String, index=True, nullable=False)
     access_key = sa.Column(
         "access_key",
         sa.String,
@@ -79,6 +80,7 @@ class ObjectStorageRow(Base):
         return ObjectStorageData(
             id=self.id,
             name=self.name,
+            host=self.host,
             access_key=self.access_key,
             secret_key=self.secret_key,
             endpoint=self.endpoint,

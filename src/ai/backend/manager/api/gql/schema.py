@@ -2,7 +2,7 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .artifact_registry import (
+from .artifact import (
     artifact,
     artifact_group,
     artifact_groups,

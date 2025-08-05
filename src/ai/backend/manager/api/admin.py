@@ -239,12 +239,10 @@ class V2APIHandler:
                 text="Unauthorized: User identity is required for GraphQL v2 API."
             )
 
-        storage_manager = storage_manager_ctx.storage_manager
         processors = action_processor_ctx.processors
 
         strawberry_ctx = StrawberryGQLContext(
             user=user,
-            storage_manager=storage_manager,
             processors=processors,
         )
 
