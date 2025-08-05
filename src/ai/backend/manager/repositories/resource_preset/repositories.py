@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass
