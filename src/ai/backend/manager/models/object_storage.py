@@ -78,6 +78,7 @@ class ObjectStorageRow(Base):
     def to_dataclass(self) -> ObjectStorageData:
         return ObjectStorageData(
             id=self.id,
+            name=self.name,
             access_key=self.access_key,
             secret_key=self.secret_key,
             endpoint=self.endpoint,

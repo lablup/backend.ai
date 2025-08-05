@@ -29,7 +29,12 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
-from .object_storage import create_object_storage, delete_object_storage, update_object_storage
+from .object_storage import (
+    create_object_storage,
+    delete_object_storage,
+    object_storages,
+    update_object_storage,
+)
 
 
 @strawberry.type
@@ -43,6 +48,7 @@ class Queries:
     revisions = revisions
     revision = revision
     replica = replica
+    object_storages = object_storages
 
 
 @strawberry.type
