@@ -24,6 +24,8 @@ from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.services.processors import Processors
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -163,6 +165,40 @@ class GQLInspectionConfigCtx(MiddlewareParam):
         )
 
 
+class StorageManagerCtx(MiddlewareParam):
+    storage_manager: StorageSessionManager = Field(
+        ..., description="Storage session manager for handling storage operations."
+    )
+
+    # Allow strawberry.Schema to be used as a type
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+
+        return cls(
+            storage_manager=root_ctx.storage_manager,
+        )
+
+
+class ActionProcessorCtx(MiddlewareParam):
+    processors: Processors = Field(
+        ..., description="Processors for handling actions in the service."
+    )
+
+    # Allow strawberry.Schema to be used as a type
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+
+        return cls(
+            processors=root_ctx.processors,
+        )
+
+
 class V2APIHandler:
     @auth_required_for_method
     @api_handler
@@ -170,6 +206,8 @@ class V2APIHandler:
         self,
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
+        storage_manager_ctx: StorageManagerCtx,
+        action_processor_ctx: ActionProcessorCtx,
     ) -> APIResponse:
         rules = []
 
@@ -201,8 +239,13 @@ class V2APIHandler:
                 text="Unauthorized: User identity is required for GraphQL v2 API."
             )
 
+        storage_manager = storage_manager_ctx.storage_manager
+        processors = action_processor_ctx.processors
+
         strawberry_ctx = StrawberryGQLContext(
             user=user,
+            storage_manager=storage_manager,
+            processors=processors,
         )
 
         query, variables, operation_name = (

@@ -402,6 +402,7 @@ class LayerType(enum.StrEnum):
     # Repository layers
     AGENT = "agent"
     AUTH = "auth"
+    ARTIFACT = "artifact"
     CONTAINER_REGISTRY = "container_registry"
     DOMAIN = "domain"
     GROUP = "group"
