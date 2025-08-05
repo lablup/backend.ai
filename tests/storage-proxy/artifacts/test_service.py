@@ -9,7 +9,7 @@ import pytest
 from aiohttp import ClientError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo
+from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
 from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
@@ -153,7 +153,7 @@ class TestHuggingFaceService:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service.scan_models(registry_name="test_registry")
+            await hf_service.scan_models(registry_name="test_registry", limit=10)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -170,9 +170,8 @@ class TestHuggingFaceService:
         mock_hf_model.last_modified = datetime(2023, 6, 15)
         mock_model_info.return_value = mock_hf_model
 
-        model = await hf_service.scan_model(
-            registry_name="test_registry", model_id="microsoft/DialoGPT-medium"
-        )
+        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
+        model = await hf_service.scan_model(registry_name="test_registry", model=model_target)
 
         assert model.id == "microsoft/DialoGPT-medium"
         assert model.name == "DialoGPT-medium"
@@ -190,7 +189,8 @@ class TestHuggingFaceService:
         mock_model_info.side_effect = Exception("not found")
 
         with pytest.raises(HuggingFaceModelNotFoundError):
-            await hf_service.scan_model(registry_name="test_registry", model_id="nonexistent/model")
+            model_target = ModelTarget(model_id="nonexistent/model")
+            await hf_service.scan_model(registry_name="test_registry", model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -201,9 +201,8 @@ class TestHuggingFaceService:
         mock_model_info.side_effect = Exception("Network error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service.scan_model(
-                registry_name="test_registry", model_id="microsoft/DialoGPT-medium"
-            )
+            model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
+            await hf_service.scan_model(registry_name="test_registry", model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
@@ -232,8 +231,9 @@ class TestHuggingFaceService:
                     "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
                 )
 
+                model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
                 files = await hf_service.list_model_files(
-                    registry_name="test_registry", model_id="microsoft/DialoGPT-medium"
+                    registry_name="test_registry", model=model_target
                 )
 
                 assert len(files) == 1
@@ -249,9 +249,8 @@ class TestHuggingFaceService:
         """Test model files listing with API error."""
         mock_list_repo_files.side_effect = Exception("API Error")
 
-        files = await hf_service.list_model_files(
-            registry_name="test_registry", model_id="microsoft/DialoGPT-medium"
-        )
+        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
+        files = await hf_service.list_model_files(registry_name="test_registry", model=model_target)
 
         # Should return empty list on error
         assert files == []
@@ -266,9 +265,10 @@ class TestHuggingFaceService:
             "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         )
 
+        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
         url = await hf_service.get_download_url(
             registry_name="test_registry",
-            model_id="microsoft/DialoGPT-medium",
+            model=model_target,
             filename="config.json",
         )
 
@@ -285,9 +285,10 @@ class TestHuggingFaceService:
         expected_task_id = uuid.uuid4()
         mock_background_task_manager.start.return_value = expected_task_id
 
+        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
         task_id = await hf_service.import_model(
             registry_name="test_registry",
-            model_id="microsoft/DialoGPT-medium",
+            model=model_target,
             storage_name="test_storage",
             bucket_name="test_bucket",
         )
@@ -303,9 +304,13 @@ class TestHuggingFaceService:
         expected_task_id = uuid.uuid4()
         mock_background_task_manager.start.return_value = expected_task_id
 
+        models = [
+            ModelTarget(model_id="microsoft/DialoGPT-medium"),
+            ModelTarget(model_id="microsoft/DialoGPT-small"),
+        ]
         task_id = await hf_service.import_models_batch(
             registry_name="test_registry",
-            model_ids=["microsoft/DialoGPT-medium", "microsoft/DialoGPT-small"],
+            models=models,
             storage_name="test_storage",
             bucket_name="test_bucket",
         )
@@ -394,6 +399,7 @@ class TestHuggingFaceService:
             result = await hf_service._upload_model_file(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
+                revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )
@@ -421,6 +427,7 @@ class TestHuggingFaceService:
             result = await hf_service._upload_model_file(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
+                revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )
@@ -446,6 +453,7 @@ class TestHuggingFaceService:
             await service._upload_model_file(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
+                revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )
@@ -467,6 +475,7 @@ class TestHuggingFaceService:
             result = await hf_service._upload_model_file(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
+                revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )

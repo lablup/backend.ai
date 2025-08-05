@@ -4,6 +4,24 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class ModelTarget(BaseModel):
+    model_id: str = Field(
+        description="""
+        HuggingFace model ID to import.
+        The model will be downloaded from HuggingFace Hub and stored in the specified storage.
+        """,
+        examples=["microsoft/DialoGPT-medium", "openai/gpt-2", "bert-base-uncased"],
+    )
+    revision: str = Field(
+        default="main",
+        description="""
+        Specific revision (branch or tag) of the model to import.
+        Defaults to 'main' if not specified.
+        """,
+        examples=["main", "v1.0", "latest"],
+    )
+
+
 class FileInfo(BaseModel):
     """
     Model file information.
@@ -67,6 +85,14 @@ class ModelInfo(BaseModel):
         Extracted from the model ID or provided by the HuggingFace Hub API.
         """,
         examples=["microsoft", "openai", None],
+    )
+    revision: str = Field(
+        default="main",
+        description="""
+        Git revision (branch, tag, or commit hash) of the model.
+        Specifies which version of the model to use.
+        """,
+        examples=["main", "v1.0", "7b2f134a", "dev"],
     )
     tags: list[str] = Field(
         default_factory=list,
