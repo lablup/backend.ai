@@ -5,16 +5,16 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
-from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
-from ai.backend.manager.types import OptionalState
+from ...data.object_storage.creator import ObjectStorageCreator
+from ...data.object_storage.modifier import ObjectStorageModifier
+from ...data.object_storage.types import ObjectStorageData
+from ...services.object_storage.actions.create import CreateObjectStorageAction
+from ...services.object_storage.actions.delete import DeleteObjectStorageAction
+from ...services.object_storage.actions.get import GetObjectStorageAction
+from ...services.object_storage.actions.list import ListObjectStorageAction
+from ...services.object_storage.actions.update import UpdateObjectStorageAction
+from ...types import OptionalState
+from .types import StrawberryGQLContext
 
 
 @strawberry.type
