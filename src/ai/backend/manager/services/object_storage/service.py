@@ -28,7 +28,7 @@ class ObjectStorageService:
         """
         Create a new object storage.
         """
-        log.info("Creating object storage with data: {}", action.creator)
+        log.info("Creating object storage with data: {}", action.creator.fields_to_store())
         storage_data = await self._object_storage_repository.create(action.creator)
         return CreateObjectStorageActionResult(result=storage_data)
 
@@ -36,8 +36,8 @@ class ObjectStorageService:
         """
         Update an existing object storage.
         """
-        log.info("Updating object storage with data: {}", action.modifier)
-        storage_data = await self._object_storage_repository.update(action.modifier)
+        log.info("Updating object storage with data: {}", action.modifier.fields_to_update())
+        storage_data = await self._object_storage_repository.update(action.id, action.modifier)
         return UpdateObjectStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteObjectStorageAction) -> DeleteObjectStorageActionResult:
