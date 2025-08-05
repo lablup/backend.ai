@@ -10,6 +10,10 @@ from ai.backend.manager.services.object_storage.actions.delete import (
     DeleteObjectStorageAction,
     DeleteObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.get import (
+    GetObjectStorageAction,
+    GetObjectStorageActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
@@ -51,6 +55,14 @@ class ObjectStorageService:
         log.info("Deleting object storage with id: {}", action.storage_id)
         storage_data = await self._object_storage_repository.delete(action.storage_id)
         return DeleteObjectStorageActionResult(deleted_storage_id=storage_data)
+
+    async def get(self, action: GetObjectStorageAction) -> GetObjectStorageActionResult:
+        """
+        Get an existing object storage by ID.
+        """
+        log.info("Getting object storage with id: {}", action.storage_id)
+        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+        return GetObjectStorageActionResult(result=storage_data)
 
     async def list(self, action: ListObjectStorageAction) -> ListObjectStorageActionResult:
         """

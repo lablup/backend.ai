@@ -36,6 +36,19 @@ class ObjectStorageRepository:
             return row.to_data()
 
     @repository_decorator()
+    async def get_by_id(self, storage_id: uuid.UUID) -> ObjectStorageData:
+        """
+        Get an existing object storage configuration from the database by ID.
+        """
+        async with self._db.begin_session() as db_session:
+            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
+            result = await db_session.execute(query)
+            row: ObjectStorageRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Object storage with ID {storage_id} not found.")
+            return row.to_dataclass()
+
+    @repository_decorator()
     async def create(self, creator: ObjectStorageCreator) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
