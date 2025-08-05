@@ -121,7 +121,6 @@ from .api.context import RootContext
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
-    from ai.backend.manager.actions.callbacks.group import CallbackGroup
     from ai.backend.manager.reporters.base import AbstractReporter
 
     from .api.types import (
@@ -607,21 +606,6 @@ def _make_action_reporters(
     return action_monitors
 
 
-def _make_action_callbacks(
-    root_ctx: RootContext,
-) -> CallbackGroup:
-    from ai.backend.manager.actions.callbacks.group import CallbackGroup
-    from ai.backend.manager.actions.callbacks.permission_controller import CreateRBACCallback
-
-    rbac_callback = CreateRBACCallback(root_ctx.repositories.permission_controller)
-    return CallbackGroup(
-        create=[rbac_callback],
-        batch=[],
-        single_entity=[],
-        scope=[],
-    )
-
-
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
@@ -640,7 +624,6 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
-    callback_group = _make_action_callbacks(root_ctx)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -662,7 +645,6 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
-        action_callback=callback_group,
     )
     yield
 

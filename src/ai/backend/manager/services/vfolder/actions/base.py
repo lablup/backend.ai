@@ -10,8 +10,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.action.base import BaseAction, BaseActionResult
-from ai.backend.manager.actions.action.create import BaseCreateAction, BaseCreateActionResult
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.actions.action.scope import BaseScopedAction, BaseScopedActionResult
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
@@ -32,7 +31,7 @@ class VFolderAction(BaseAction):
 
 
 @dataclass
-class CreateVFolderAction(BaseCreateAction):
+class CreateVFolderAction(BaseScopedAction):
     name: str
 
     keypair_resource_policy: Mapping[str, Any]
@@ -51,6 +50,14 @@ class CreateVFolderAction(BaseCreateAction):
     creator_email: str
 
     @override
+    def scope_type(self) -> str:
+        return "user" if self.group_id_or_name is None else "project"
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.user_uuid if self.group_id_or_name is None else self.group_id_or_name)
+
+    @override
     @classmethod
     def entity_type(cls) -> str:
         return "vfolder"
@@ -62,7 +69,7 @@ class CreateVFolderAction(BaseCreateAction):
 
 
 @dataclass
-class CreateVFolderActionResult(BaseCreateActionResult):
+class CreateVFolderActionResult(BaseScopedActionResult):
     id: uuid.UUID
     name: str
     quota_scope_id: QuotaScopeID
@@ -76,25 +83,6 @@ class CreateVFolderActionResult(BaseCreateActionResult):
     group_uuid: Optional[uuid.UUID]
     cloneable: bool
     status: VFolderOperationStatus
-
-    @override
-    def scope_id(self) -> ScopeId:
-        match self.ownership_type:
-            case VFolderOwnershipType.USER:
-                scope_type = "user"
-            case VFolderOwnershipType.GROUP:
-                scope_type = "project"
-        return ScopeId(
-            scope_type=scope_type,
-            scope_id=str(self.id),
-        )
-
-    @override
-    def entity_id(self) -> ObjectId:
-        return ObjectId(
-            entity_type="vfolder",
-            entity_id=str(self.id),
-        )
 
 
 @dataclass

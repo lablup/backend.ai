@@ -150,7 +150,6 @@ class VFolderInviteService:
 
         return AcceptInvitationActionResult(
             action.invitation_id,
-            vfolder_data.id,
         )
 
     async def reject_invitation(

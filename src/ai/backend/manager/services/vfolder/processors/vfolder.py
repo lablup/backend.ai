@@ -1,9 +1,8 @@
 from typing import override
 
-from ai.backend.manager.actions.callbacks.group import CallbackGroup
 from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.actions.processor.base import ActionProcessor
-from ai.backend.manager.actions.processor.create import CreateActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopedActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from ..actions.base import (
@@ -32,7 +31,7 @@ from ..services.vfolder import VFolderService
 
 
 class VFolderProcessors(AbstractProcessorPackage):
-    create_vfolder: CreateActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
+    create_vfolder: ScopedActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: ActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ActionProcessor[ListVFolderAction, ListVFolderActionResult]
     update_vfolder_attribute: ActionProcessor[
@@ -53,13 +52,8 @@ class VFolderProcessors(AbstractProcessorPackage):
         self,
         service: VFolderService,
         action_monitors: list[ActionMonitor],
-        action_callback: CallbackGroup,
     ) -> None:
-        self.create_vfolder = CreateActionProcessor(
-            service.create,
-            action_monitors,
-            callbacks=action_callback.create,
-        )
+        self.create_vfolder = ScopedActionProcessor(service.create, action_monitors)
         self.get_vfolder = ActionProcessor(service.get, action_monitors)
         self.list_vfolder = ActionProcessor(service.list, action_monitors)
         self.update_vfolder_attribute = ActionProcessor(service.update_attribute, action_monitors)

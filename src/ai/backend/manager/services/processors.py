@@ -10,7 +10,6 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.manager.actions.callbacks.group import CallbackGroup
 from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -264,7 +263,6 @@ class Processors(AbstractProcessorPackage):
         cls,
         args: ProcessorArgs,
         action_monitors: list[ActionMonitor],
-        action_callback: CallbackGroup,
     ) -> Self:
         services = Services.create(args.service_args)
         agent_processors = AgentProcessors(services.agent, action_monitors)
@@ -275,10 +273,10 @@ class Processors(AbstractProcessorPackage):
         container_registry_processors = ContainerRegistryProcessors(
             services.container_registry, action_monitors
         )
-        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors, action_callback)
+        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors)
         vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
         vfolder_invite_processors = VFolderInviteProcessors(
-            services.vfolder_invite, action_monitors, action_callback
+            services.vfolder_invite, action_monitors
         )
         session_processors = SessionProcessors(services.session, action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
