@@ -165,6 +165,7 @@ type CreateModelRevisionPayload {
 
 input CreateObjectStorageInput {
   name: String!
+  host: String!
   accessKey: String!
   secretKey: String!
   endpoint: String!
@@ -267,6 +268,7 @@ extend type ImageNode @key(fields: "id") {
 input ImportArtifactInput {
   artifactId: ID!
   storageName: String!
+  bucketName: String!
 }
 
 type ImportArtifactPayload {
@@ -456,6 +458,7 @@ type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
+  host: String!
   accessKey: String!
   secretKey: String!
   endpoint: String!
@@ -655,6 +658,7 @@ type UpdateModelDeploymentPayload {
 input UpdateObjectStorageInput {
   id: ID!
   name: String
+  host: String
   accessKey: String
   secretKey: String
   endpoint: String

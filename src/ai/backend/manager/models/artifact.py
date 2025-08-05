@@ -19,9 +19,9 @@ __all__ = ("ArtifactRow",)
 
 
 class ArtifactType(enum.StrEnum):
-    MODEL = "model"
-    PACKAGE = "package"
-    IMAGE = "image"
+    MODEL = "MODEL"
+    PACKAGE = "PACKAGE"
+    IMAGE = "IMAGE"
 
 
 class ArtifactRow(Base):
@@ -44,6 +44,18 @@ class ArtifactRow(Base):
         nullable=False,
         index=True,
     )
+    updated_at = sa.Column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+        nullable=False,
+        index=True,
+    )
+    size = sa.Column("size", sa.BigInteger, nullable=False, default=0)
+    source = sa.Column("source", sa.String, nullable=True)
+    registry = sa.Column("registry", sa.String, nullable=True)
+    description = sa.Column("description", sa.String, nullable=True)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -57,7 +69,12 @@ class ArtifactRow(Base):
             f"id={self.id}, "
             f"type={self.type}, "
             f"name={self.name}, "
-            f"created_at={self.created_at.isoformat()})"
+            f"created_at={self.created_at.isoformat()}, "
+            f"updated_at={self.updated_at.isoformat()}, "
+            f"size={self.size}, "
+            f"source={self.source}, "
+            f"registry={self.registry}, "
+            f"description={self.description})"
         )
 
     def __repr__(self) -> str:
