@@ -6,6 +6,18 @@ from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
+from ai.backend.common.dto.storage.request import (
+    HuggingFaceImportModelReq,
+    HuggingFaceImportModelsBatchReq,
+    HuggingFaceImportTaskStatusReq,
+    HuggingFaceScanModelsReq,
+)
+from ai.backend.common.dto.storage.response import (
+    HuggingFaceImportBatchResponse,
+    HuggingFaceImportResponse,
+    HuggingFaceScanJobStatusResponse,
+    HuggingFaceScanResponse,
+)
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
@@ -630,3 +642,62 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
             },
         )
+
+    @client_decorator()
+    async def scan_huggingface_hub(
+        self,
+        req: HuggingFaceScanModelsReq,
+    ) -> HuggingFaceScanResponse:
+        """
+        Scan HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            "v1/registries/huggingface/scan",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceScanResponse.model_validate(resp)
+
+    @client_decorator()
+    async def import_huggingface_model(
+        self,
+        req: HuggingFaceImportModelReq,
+    ) -> HuggingFaceImportResponse:
+        """
+        Import a HuggingFace model into the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/import",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceImportResponse.model_validate(resp)
+
+    @client_decorator()
+    async def import_huggingface_models(
+        self,
+        req: HuggingFaceImportModelsBatchReq,
+    ) -> HuggingFaceImportBatchResponse:
+        """
+        Import multiple HuggingFace models into the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/import-batch",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceImportBatchResponse.model_validate(resp)
+
+    @client_decorator()
+    async def get_huggingface_import_job_status(
+        self,
+        req: HuggingFaceImportTaskStatusReq,
+    ) -> HuggingFaceScanJobStatusResponse:
+        """
+        Get the status of a HuggingFace import job.
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/registries/huggingface/import/{req.task_id}",
+        )
+        return HuggingFaceScanJobStatusResponse.model_validate(resp)
