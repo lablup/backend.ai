@@ -25,6 +25,9 @@ from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -206,81 +209,103 @@ class VfolderRepository:
         Create a new VFolder with the given parameters.
         Returns the created VFolderData.
         """
-        async with self._db.begin_session() as session:
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
+        match params.ownership_type:
+            case VFolderOwnershipType.USER:
+                scope_type = "user"
+                scope_id = str(params.user)
+            case VFolderOwnershipType.GROUP:
+                scope_type = "project"
+                scope_id = str(params.group)
 
-            query = sa.insert(VFolderRow, insert_values)
-            result = await session.execute(query)
-            assert result.rowcount == 1
+        async with self._db.begin_session() as db_session:
+            vfolder_row = VFolderRow(
+                id=params.id.hex,
+                name=params.name,
+                domain_name=params.domain_name,
+                quota_scope_id=params.quota_scope_id,
+                usage_mode=params.usage_mode,
+                permission=params.permission,
+                last_used=None,
+                host=params.host,
+                creator=params.creator,
+                ownership_type=params.ownership_type,
+                user=params.user,
+                group=params.group,
+                unmanaged_path=params.unmanaged_path,
+                cloneable=params.cloneable,
+                status=params.status,
+            )
+            db_session.add(vfolder_row)
+            await db_session.flush()
 
-            # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
-            return self._vfolder_row_to_data(created_vfolder)
+            db_session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    entity_type="vfolder",
+                    entity_id=str(vfolder_row.id),
+                )
+            )
+        return vfolder_row.to_data()
 
     @repository_decorator()
     async def create_vfolder_with_permission(
-        self, params: VFolderCreateParams, create_owner_permission: bool = False
+        self, params: VFolderCreateParams, create_owner_permission: bool = True
     ) -> VFolderData:
         """
         Create a new VFolder with the given parameters and optionally create owner permission.
         Returns the created VFolderData.
         """
-        async with self._db.begin_session() as session:
-            # Create the VFolder
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
+        match params.ownership_type:
+            case VFolderOwnershipType.USER:
+                scope_type = "user"
+                scope_id = str(params.user)
+            case VFolderOwnershipType.GROUP:
+                scope_type = "project"
+                scope_id = str(params.group)
 
-            query = sa.insert(VFolderRow, insert_values)
-            result = await session.execute(query)
-            assert result.rowcount == 1
+        async with self._db.begin_session() as db_session:
+            vfolder_row = VFolderRow(
+                id=params.id.hex,
+                name=params.name,
+                domain_name=params.domain_name,
+                quota_scope_id=params.quota_scope_id,
+                usage_mode=params.usage_mode,
+                permission=params.permission,
+                last_used=None,
+                host=params.host,
+                creator=params.creator,
+                ownership_type=params.ownership_type,
+                user=params.user,
+                group=params.group,
+                unmanaged_path=params.unmanaged_path,
+                cloneable=params.cloneable,
+                status=params.status,
+            )
+            db_session.add(vfolder_row)
+            await db_session.flush()
+
+            db_session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    entity_type="vfolder",
+                    entity_id=str(vfolder_row.id),
+                )
+            )
 
             # Create owner permission if requested
             if create_owner_permission and params.user:
-                permission_insert = sa.insert(VFolderPermissionRow).values({
-                    "user": params.user,
-                    "vfolder": params.id.hex,
-                    "permission": VFolderPermission.OWNER_PERM,
-                })
-                await session.execute(permission_insert)
+                db_session.add(
+                    AssociationScopesEntitiesRow(
+                        scope_type="user",
+                        scope_id=str(params.user),
+                        entity_type="vfolder",
+                        entity_id=str(vfolder_row.id),
+                    )
+                )
 
-            # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
-            return self._vfolder_row_to_data(created_vfolder)
+        return vfolder_row.to_data()
 
     @repository_decorator()
     async def update_vfolder_attribute(
