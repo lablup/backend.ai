@@ -12,7 +12,10 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.migrate.user import (
     ROLE_NAME_PREFIX,
+    ProjectData,
     UserData,
+    map_role_to_project,
+    project_row_to_rbac_migration_data,
     user_row_to_rbac_migration_data,
 )
 from ai.backend.manager.models.user import UserRole
@@ -22,7 +25,15 @@ from ai.backend.manager.models.user import UserRole
 class MockUserGroupAssociation:
     """Mock user-group association."""
 
-    group_id: uuid.UUID
+    user_id: uuid.UUID
+
+
+@dataclass
+class MockGroupRow:
+    """Mock GroupRow for testing."""
+
+    id: uuid.UUID
+    users: list[MockUserGroupAssociation]
 
 
 @dataclass
@@ -33,20 +44,17 @@ class MockUserRow:
     username: str
     domain_name: str
     role: UserRole
-    groups: list[MockUserGroupAssociation]
 
 
 @pytest.fixture
 def mock_regular_user():
     """Create a mock regular user."""
     user_id = uuid.uuid4()
-    group_id = uuid.uuid4()
     return MockUserRow(
         uuid=user_id,
         username="testuser",
         domain_name="default",
         role=UserRole.USER,
-        groups=[MockUserGroupAssociation(group_id=group_id)],
     )
 
 
@@ -54,56 +62,66 @@ def mock_regular_user():
 def mock_admin_user():
     """Create a mock admin user."""
     user_id = uuid.uuid4()
-    group1_id = uuid.uuid4()
-    group2_id = uuid.uuid4()
     return MockUserRow(
         uuid=user_id,
         username="adminuser",
         domain_name="default",
         role=UserRole.ADMIN,
-        groups=[
-            MockUserGroupAssociation(group_id=group1_id),
-            MockUserGroupAssociation(group_id=group2_id),
+    )
+
+
+@pytest.fixture
+def mock_project():
+    """Create a mock project with users."""
+    project_id = uuid.uuid4()
+    user1_id = uuid.uuid4()
+    user2_id = uuid.uuid4()
+    return MockGroupRow(
+        id=project_id,
+        users=[
+            MockUserGroupAssociation(user_id=user1_id),
+            MockUserGroupAssociation(user_id=user2_id),
         ],
     )
 
 
 @pytest.fixture
-def mock_user_no_groups():
-    """Create a mock user with no groups."""
-    user_id = uuid.uuid4()
-    return MockUserRow(
-        uuid=user_id,
-        username="nogroups",
-        domain_name="testing",
-        role=UserRole.USER,
-        groups=[],
+def mock_empty_project():
+    """Create a mock project with no users."""
+    project_id = uuid.uuid4()
+    return MockGroupRow(
+        id=project_id,
+        users=[],
     )
 
 
 class TestUserDataClass:
     """Test UserData class methods."""
 
-    def test_from_user_row(self, mock_regular_user):
+    def test_from_row(self, mock_regular_user):
         """Test creating UserData from UserRow."""
-        user_data = UserData.from_user_row(mock_regular_user)
+        user_data = UserData.from_row(mock_regular_user)
 
         assert user_data.id == mock_regular_user.uuid
         assert user_data.username == mock_regular_user.username
         assert user_data.domain == mock_regular_user.domain_name
         assert user_data.role == mock_regular_user.role
-        assert len(user_data.registered_projects) == 1
-        assert user_data.registered_projects[0].id == mock_regular_user.groups[0].group_id
 
-    def test_to_role_create_input_basic(self, mock_regular_user):
-        """Test converting UserData to role create input."""
-        user_data = UserData.from_user_row(mock_regular_user)
-        result = user_data.to_role_create_input()
+    def test_role_name_property(self, mock_regular_user):
+        """Test role_name property."""
+        user_data = UserData.from_row(mock_regular_user)
+        expected_name = f"{ROLE_NAME_PREFIX}user_{mock_regular_user.username}"
+        assert user_data.role_name == expected_name
+
+    def test_to_rbac_input_data(self, mock_regular_user):
+        """Test converting UserData to RBAC input data."""
+        user_data = UserData.from_row(mock_regular_user)
+        result = user_data.to_rbac_input_data()
 
         # Check role creation
         assert len(result.roles) == 1
         role = result.roles[0]
-        assert role.name == f"{ROLE_NAME_PREFIX}{mock_regular_user.username}"
+        assert role.name == user_data.role_name
 
         # Check user-role association
         assert len(result.user_roles) == 1
@@ -111,51 +129,27 @@ class TestUserDataClass:
         assert user_role.user_id == mock_regular_user.uuid
         assert user_role.role_id == role.id
 
-        # Check basic user permissions (7 base permissions + 1 project permission)
-        assert len(result.scope_permissions) == 8
-
-        # Check association scopes entities (1 for project)
-        assert len(result.association_scopes_entities) == 1
-        assoc = result.association_scopes_entities[0]
-        assert assoc.scope_id.scope_type == ScopeType.PROJECT
-        assert assoc.scope_id.scope_id == str(mock_regular_user.groups[0].group_id)
-        assert assoc.object_id.entity_type == EntityType.USER
-        assert assoc.object_id.entity_id == str(mock_regular_user.uuid)
-
-    def test_to_role_create_input_multiple_projects(self, mock_admin_user):
-        """Test converting UserData with multiple projects."""
-        user_data = UserData.from_user_row(mock_admin_user)
-        result = user_data.to_role_create_input()
-
-        # Check scope permissions (7 base + 2 project permissions)
-        assert len(result.scope_permissions) == 9
-
-        # Check association scopes entities (2 for projects)
-        assert len(result.association_scopes_entities) == 2
-        project_ids = {assoc.scope_id.scope_id for assoc in result.association_scopes_entities}
-        expected_ids = {str(g.group_id) for g in mock_admin_user.groups}
-        assert project_ids == expected_ids
-
-    def test_to_role_create_input_no_projects(self, mock_user_no_groups):
-        """Test converting UserData with no projects."""
-        user_data = UserData.from_user_row(mock_user_no_groups)
-        result = user_data.to_role_create_input()
-
-        # Check scope permissions (only 7 base permissions)
+        # Check scope permissions (7 user permissions)
         assert len(result.scope_permissions) == 7
 
-        # Check no association scopes entities
-        assert len(result.association_scopes_entities) == 0
+        # Check no association scopes entities for user
+        assert (
+            result.association_scopes_entities is None
+            or len(result.association_scopes_entities) == 0
+        )
 
     def test_scope_permissions_structure(self, mock_regular_user):
         """Test the structure of generated scope permissions."""
-        user_data = UserData.from_user_row(mock_regular_user)
-        result = user_data.to_role_create_input()
+        user_data = UserData.from_row(mock_regular_user)
+        result = user_data.to_rbac_input_data()
 
-        # Extract user-scoped permissions
-        user_permissions = [p for p in result.scope_permissions if p.scope_type == ScopeType.USER]
+        # All permissions should be user-scoped
+        for perm in result.scope_permissions:
+            assert perm.scope_type == ScopeType.USER
+            assert perm.scope_id == str(mock_regular_user.uuid)
+            assert perm.entity_type == EntityType.USER
 
-        # Should have all 7 operations for user entity
+        # Should have all 7 operations
         expected_operations = {
             OperationType.READ,
             OperationType.UPDATE,
@@ -165,105 +159,226 @@ class TestUserDataClass:
             OperationType.GRANT_UPDATE,
             OperationType.GRANT_SOFT_DELETE,
         }
-        actual_operations = {p.operation for p in user_permissions}
+        actual_operations = {p.operation for p in result.scope_permissions}
         assert actual_operations == expected_operations
 
-        # All should target the same user
-        for perm in user_permissions:
-            assert perm.scope_id == str(mock_regular_user.uuid)
-            assert perm.entity_type == EntityType.USER
+
+class TestProjectDataClass:
+    """Test ProjectData class methods."""
+
+    def test_from_row(self, mock_project):
+        """Test creating ProjectData from GroupRow."""
+        project_data = ProjectData.from_row(mock_project)
+        assert project_data.id == mock_project.id
+
+    def test_role_name_property(self, mock_project):
+        """Test role_name property."""
+        project_data = ProjectData.from_row(mock_project)
+        expected_name = f"{ROLE_NAME_PREFIX}project_{str(mock_project.id)[:8]}"
+        assert project_data.role_name == expected_name
+
+    def test_to_rbac_input_data(self, mock_project):
+        """Test converting ProjectData to RBAC input data."""
+        project_data = ProjectData.from_row(mock_project)
+        result = project_data.to_rbac_input_data()
+
+        # Check role creation
+        assert len(result.roles) == 1
+        role = result.roles[0]
+        assert role.name == project_data.role_name
+
+        # Check no user-role associations (handled separately)
+        assert result.user_roles is None or len(result.user_roles) == 0
+
+        # Check scope permissions (1 project permission)
+        assert len(result.scope_permissions) == 1
+        perm = result.scope_permissions[0]
+        assert perm.scope_type == ScopeType.PROJECT
+        assert perm.scope_id == str(mock_project.id)
+        assert perm.entity_type == EntityType.USER
+        assert perm.operation == OperationType.READ
+
+        # Check no association scopes entities
+        assert (
+            result.association_scopes_entities is None
+            or len(result.association_scopes_entities) == 0
+        )
 
 
-class TestUserConversion:
-    """Test user conversion function."""
+class TestConversionFunctions:
+    """Test conversion functions."""
 
     def test_user_row_to_rbac_migration_data(self, mock_regular_user):
         """Test converting UserRow to RBAC migration data."""
         result = user_row_to_rbac_migration_data(mock_regular_user)
 
         assert len(result.roles) == 1
-        assert result.roles[0].name == f"{ROLE_NAME_PREFIX}{mock_regular_user.username}"
+        assert result.roles[0].name == f"{ROLE_NAME_PREFIX}user_{mock_regular_user.username}"
         assert len(result.user_roles) == 1
-        assert len(result.scope_permissions) == 8  # 7 base + 1 project
-        assert len(result.association_scopes_entities) == 1
+        assert len(result.scope_permissions) == 7
+
+    def test_project_row_to_rbac_migration_data(self, mock_project):
+        """Test converting GroupRow to RBAC migration data."""
+        result = project_row_to_rbac_migration_data(mock_project)
+
+        assert len(result.roles) == 1
+        assert result.roles[0].name.startswith(f"{ROLE_NAME_PREFIX}project_")
+        assert len(result.scope_permissions) == 1
+
+
+class TestRoleProjectMapping:
+    """Test role to project mapping function."""
+
+    def test_map_role_to_project_with_users(self, mock_project):
+        """Test mapping role to project with users."""
+        role_id = uuid.uuid4()
+        result = map_role_to_project(role_id, mock_project)
+
+        # Check user-role associations
+        assert len(result.user_roles) == len(mock_project.users)
+        for i, user_role in enumerate(result.user_roles):
+            assert user_role.user_id == mock_project.users[i].user_id
+            assert user_role.role_id == role_id
+
+        # Check association scopes entities
+        assert len(result.association_scopes_entities) == len(mock_project.users)
+        for i, assoc in enumerate(result.association_scopes_entities):
+            assert assoc.scope_id.scope_type == ScopeType.PROJECT
+            assert assoc.scope_id.scope_id == str(mock_project.id)
+            assert assoc.object_id.entity_type == EntityType.USER
+            assert assoc.object_id.entity_id == str(mock_project.users[i].user_id)
+
+        # Check no roles or permissions in mapping result
+        assert result.roles is None or len(result.roles) == 0
+        assert result.scope_permissions is None or len(result.scope_permissions) == 0
+
+    def test_map_role_to_project_empty(self, mock_empty_project):
+        """Test mapping role to empty project."""
+        role_id = uuid.uuid4()
+        result = map_role_to_project(role_id, mock_empty_project)
+
+        # Should have empty lists
+        assert len(result.user_roles) == 0
+        assert len(result.association_scopes_entities) == 0
 
 
 class TestComplexScenarios:
     """Test complex migration scenarios."""
 
     @pytest.fixture
-    def test_users(self):
-        """Create multiple test users."""
-        users = []
+    def test_data(self):
+        """Create comprehensive test data."""
+        users = [
+            MockUserRow(
+                uuid=uuid.uuid4(),
+                username="user1",
+                domain_name="default",
+                role=UserRole.USER,
+            ),
+            MockUserRow(
+                uuid=uuid.uuid4(),
+                username="admin1",
+                domain_name="default",
+                role=UserRole.ADMIN,
+            ),
+            MockUserRow(
+                uuid=uuid.uuid4(),
+                username="superadmin",
+                domain_name="testing",
+                role=UserRole.SUPERADMIN,
+            ),
+        ]
 
-        # User with multiple projects
-        user1 = MockUserRow(
-            uuid=uuid.uuid4(),
-            username="multiproject",
-            domain_name="default",
-            role=UserRole.USER,
-            groups=[
-                MockUserGroupAssociation(group_id=uuid.uuid4()),
-                MockUserGroupAssociation(group_id=uuid.uuid4()),
-                MockUserGroupAssociation(group_id=uuid.uuid4()),
-            ],
-        )
-        users.append(user1)
+        projects = [
+            MockGroupRow(
+                id=uuid.uuid4(),
+                users=[
+                    MockUserGroupAssociation(user_id=users[0].uuid),
+                    MockUserGroupAssociation(user_id=users[1].uuid),
+                ],
+            ),
+            MockGroupRow(
+                id=uuid.uuid4(),
+                users=[
+                    MockUserGroupAssociation(user_id=users[0].uuid),
+                    MockUserGroupAssociation(user_id=users[2].uuid),
+                ],
+            ),
+        ]
 
-        # Admin user
-        user2 = MockUserRow(
-            uuid=uuid.uuid4(),
-            username="superadmin",
-            domain_name="default",
-            role=UserRole.SUPERADMIN,
-            groups=[MockUserGroupAssociation(group_id=uuid.uuid4())],
-        )
-        users.append(user2)
+        return {"users": users, "projects": projects}
 
-        # User with special characters in username
-        user3 = MockUserRow(
-            uuid=uuid.uuid4(),
-            username="user.with-special_chars",
-            domain_name="testing",
-            role=UserRole.USER,
-            groups=[],
-        )
-        users.append(user3)
-
-        return users
-
-    def test_multiple_users_different_roles(self, test_users):
-        """Test converting multiple users with different roles."""
+    def test_multiple_users_conversion(self, test_data):
+        """Test converting multiple users."""
         results = []
-        for user in test_users:
+        for user in test_data["users"]:
             result = user_row_to_rbac_migration_data(user)
             results.append(result)
 
         # Check each user gets unique role
         role_names = {r.roles[0].name for r in results}
-        assert len(role_names) == len(test_users)
+        assert len(role_names) == len(test_data["users"])
 
-        # Check role names are properly formatted
-        for user, result in zip(test_users, results):
-            assert result.roles[0].name == f"{ROLE_NAME_PREFIX}{user.username}"
+        # Verify all have proper permissions
+        for result in results:
+            assert len(result.scope_permissions) == 7
+            assert len(result.user_roles) == 1
 
-    def test_project_associations_consistency(self, test_users):
-        """Test that project associations are consistent."""
-        user_with_projects = test_users[0]  # multiproject user
-        result = user_row_to_rbac_migration_data(user_with_projects)
+    def test_multiple_projects_conversion(self, test_data):
+        """Test converting multiple projects."""
+        project_results = []
+        role_ids = []
 
-        # Count project-scoped permissions
-        project_permissions = [
-            p for p in result.scope_permissions if p.scope_type == ScopeType.PROJECT
-        ]
+        # Convert projects
+        for project in test_data["projects"]:
+            result = project_row_to_rbac_migration_data(project)
+            project_results.append(result)
+            role_ids.append(result.roles[0].id)
 
-        # Should have one READ permission per project
-        assert len(project_permissions) == len(user_with_projects.groups)
+        # Map users to projects
+        mapping_results = []
+        for i, project in enumerate(test_data["projects"]):
+            mapping = map_role_to_project(role_ids[i], project)
+            mapping_results.append(mapping)
 
-        # All permissions should be READ operations
-        for perm in project_permissions:
-            assert perm.operation == OperationType.READ
-            assert perm.entity_type == EntityType.USER
+        # Verify project conversions
+        for result in project_results:
+            assert len(result.roles) == 1
+            assert len(result.scope_permissions) == 1
+
+        # Verify mappings
+        for i, mapping in enumerate(mapping_results):
+            expected_user_count = len(test_data["projects"][i].users)
+            assert len(mapping.user_roles) == expected_user_count
+            assert len(mapping.association_scopes_entities) == expected_user_count
+
+    def test_user_in_multiple_projects(self, test_data):
+        """Test handling users in multiple projects."""
+        # User 0 is in both projects
+        user = test_data["users"][0]
+
+        # Create project roles and mappings
+        mappings = []
+        for project in test_data["projects"]:
+            # Create project role
+            project_result = project_row_to_rbac_migration_data(project)
+            role_id = project_result.roles[0].id
+            assert role_id is not None  # Type guard
+
+            # Map users to project
+            mapping = map_role_to_project(role_id, project)
+            mappings.append(mapping)
+
+        # Count how many times user appears in mappings
+        user_role_count = sum(
+            1
+            for mapping in mappings
+            for user_role in mapping.user_roles
+            if user_role.user_id == user.uuid
+        )
+
+        # User should appear in both project mappings
+        assert user_role_count == 2
 
     def test_constants(self):
         """Test module constants."""
