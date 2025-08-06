@@ -236,4 +236,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    pass
+    conn = op.get_bind()
+    # Remove all data from the new RBAC tables
+    conn.execute(sa.delete(AssociationScopesEntitiesRow))
+    conn.execute(sa.delete(ScopePermissionRow))
+    conn.execute(sa.delete(UserRoleRow))
+    conn.execute(sa.delete(RoleRow))
