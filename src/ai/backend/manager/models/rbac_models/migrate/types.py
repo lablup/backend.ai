@@ -25,14 +25,22 @@ class PermissionCreateInputGroup:
         self.association_scopes_entities.extend(other.association_scopes_entities)
 
     def to_role_insert_data(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "name": role.name,
-                "status": role.status,
-                "description": role.description,
-            }
-            for role in self.roles
-        ]
+        def to_dict(input: RoleCreateInput) -> dict[str, Any]:
+            if input.id is not None:
+                return {
+                    "id": input.id,
+                    "name": input.name,
+                    "status": input.status,
+                    "description": input.description,
+                }
+            else:
+                return {
+                    "name": input.name,
+                    "status": input.status,
+                    "description": input.description,
+                }
+
+        return [to_dict(role) for role in self.roles]
 
     def to_user_role_insert_data(self) -> list[dict[str, Any]]:
         return [
