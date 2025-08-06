@@ -5,7 +5,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
 
 from aiohttp import web
-from aiohttp.web_request import FileField
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import (
@@ -113,15 +112,17 @@ class StoragesAPIHandler:
 
         storages_service = StoragesService(config_ctx.storages)
 
-        # Read the file data as a stream
-        field = await file_reader.next()
+        file_part = await file_reader.next()
+        while file_part and not getattr(file_part, "filename", None):
+            await file_part.release()
+            file_part = await file_reader.next()
 
-        if not isinstance(field, FileField):
-            raise web.HTTPBadRequest(reason="Expected file field")
+        if file_part is None:
+            raise web.HTTPBadRequest(reason='No file part found (expected field "file")')
 
         async def data_stream():
             while True:
-                chunk = await field.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
+                chunk = await file_part.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
                 if not chunk:
                     break
                 yield chunk

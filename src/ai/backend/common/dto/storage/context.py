@@ -16,4 +16,8 @@ class MultipartUploadCtx(MiddlewareParam):
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
+        ctype_header = request.headers.get("Content-Type", "")
+        if not ctype_header.startswith("multipart/form-data"):
+            raise web.HTTPUnsupportedMediaType(reason="multipart/form-data required")
+
         return cls(file_reader=await request.multipart())
