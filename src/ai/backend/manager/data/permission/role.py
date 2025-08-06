@@ -5,8 +5,8 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
-from .object_permission import ObjectPermissionData
-from .scope_permission import ScopePermissionData, ScopePermissionDataWithEntity
+from .id import ScopeId
+from .scope_permission import ScopePermissionData
 from .status import RoleStatus
 
 
@@ -17,7 +17,6 @@ class RoleCreateInput:
     description: Optional[str] = None
 
     scope_permissions: list[ScopePermissionData] = field(default_factory=list)
-    object_permissions: list[ObjectPermissionData] = field(default_factory=list)
 
 
 @dataclass
@@ -46,22 +45,9 @@ class RoleDeleteInput:
 class RoleData:
     id: uuid.UUID
     name: str
+    scope_id: ScopeId
+    operation: str
     status: RoleStatus
-    created_at: datetime
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
-
-
-@dataclass
-class RoleDataWithPermissions:
-    id: uuid.UUID
-    name: str
-    status: RoleStatus
-
-    scope_permissions: list[ScopePermissionDataWithEntity]
-    object_permissions: list[ObjectPermissionData]
-
     created_at: datetime
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime]

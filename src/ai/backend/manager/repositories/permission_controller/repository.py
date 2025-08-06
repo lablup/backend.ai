@@ -13,7 +13,6 @@ from ai.backend.manager.data.permission.role import (
     PermissionCheckInput,
     RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
     RoleDeleteInput,
     RoleUpdateInput,
     UserRoleAssignmentInput,
@@ -107,7 +106,7 @@ class PermissionControllerRepository:
             return result.to_data()
 
     @repository_decorator()
-    async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleDataWithPermissions]:
+    async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleData]:
         async with self._db.begin_readonly_session() as db_session:
             query = (
                 sa.select(RoleRow)
@@ -126,7 +125,7 @@ class PermissionControllerRepository:
             )
             result = await db_session.scalars(query)
             result = cast(list[RoleRow], result)
-            return [role.to_data_with_permissions() for role in result]
+            return [role.to_data() for role in result]
 
     @repository_decorator()
     async def check_permission(self, data: PermissionCheckInput) -> bool:
@@ -136,6 +135,8 @@ class PermissionControllerRepository:
             entity_id=data.target_entity_id,
         )
         for role in roles:
+            if data.operation != role.operation:
+                continue
             for scope_perm in role.scope_permissions:
                 if scope_perm.operation != data.operation:
                     continue
@@ -146,10 +147,5 @@ class PermissionControllerRepository:
                     )
                     if obj_id == target_object_id:
                         return True
-            for object_perm in role.object_permissions:
-                if object_perm.operation != data.operation:
-                    continue
-                if object_perm.object_id == target_object_id:
-                    return True
 
         return False
