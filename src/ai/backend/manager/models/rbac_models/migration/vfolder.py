@@ -80,32 +80,13 @@ class ScopeData:
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.vfolder import (
-    VFolderOwnershipType,
-    VFolderPermission,
-    VFolderPermissionRow,
-    VFolderRow,
-)
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+
+from .types import PermissionCreateInputGroup
 
 ENTITY_TYPE = "vfolder"
 ROLE_NAME_PREFIX = "vfolder_granted_"
 OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE = "read"
-
-
-def permission_mapping() -> dict[VFolderPermission, str]:
-    """
-    Mapping of vfolder permissions to expected RBAC operations.
-    All VFolder permissions map to the same default operation value
-    because `VFolderPermission` should be used only for mount permissions, not for RBAC operations.
-    """
-    return {
-        VFolderPermission.OWNER_PERM: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.READ_ONLY: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.READ_WRITE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.RW_DELETE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-    }
 
 
 @dataclass
