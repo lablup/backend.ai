@@ -131,15 +131,21 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBack
                 keys = self.redis_keys
                 self.redis_keys = {}
 
-            async def mset_then_set_expiry(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
-                ttl = get_default_redis_key_ttl()
-                pipe.mset(cast(MSetType, keys))
-                for key in keys:
-                    pipe.expire(key, ttl)
-                return pipe
+            BATCH_SIZE = 100
+            key_items = list(keys.items())
+            ttl = get_default_redis_key_ttl()
 
-            await redis_helper.execute(self.root_context.redis_live, mset_then_set_expiry)
+            for i in range(0, len(key_items), BATCH_SIZE):
+                batch = dict(key_items[i : i + BATCH_SIZE])
+
+                async def _mset_then_set_expiry(r: Redis) -> Pipeline:
+                    pipe = r.pipeline(transaction=False)
+                    pipe.mset(cast(MSetType, batch))
+                    for key in batch:
+                        pipe.expire(key, ttl)
+                    return pipe
+
+                await redis_helper.execute(self.root_context.redis_live, _mset_then_set_expiry)
 
             log.debug("Wrote {} keys", len(keys))
         except Exception:
