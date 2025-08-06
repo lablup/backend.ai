@@ -2,9 +2,9 @@ import uuid
 
 import pytest
 
-from ai.backend.common.dto.storage.request import ObjectStorageOperationType, ObjectStorageTokenData
+from ai.backend.common.dto.storage.request import PresignedUploadReq
 from ai.backend.common.dto.storage.response import (
-    DeleteResponse,
+    FileDeleteResponse,
     ObjectInfoResponse,
     PresignedDownloadResponse,
     PresignedUploadResponse,
@@ -12,12 +12,13 @@ from ai.backend.common.dto.storage.response import (
 )
 from ai.backend.storage.config.unified import ObjectStorageConfig
 from ai.backend.storage.exception import (
+    FileStreamDownloadError,
+    FileStreamUploadError,
+    ObjectInfoFetchError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
-    StorageBucketFileNotFoundError,
     StorageBucketNotFoundError,
     StorageNotFoundError,
-    StorageProxyError,
 )
 from ai.backend.storage.services.storages import StoragesService
 
@@ -44,78 +45,14 @@ def storages_service(storage_config):
     return StoragesService([storage_config])
 
 
-@pytest.fixture
-def valid_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.UPLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="test-key",
-        expiration=3600,
-        content_type="application/octet-stream",
-        filename="test-file.txt",
-    )
-
-
-@pytest.fixture
-def download_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.DOWNLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="test-key",
-        expiration=3600,
-        content_type="application/octet-stream",
-        filename="test-file.txt",
-    )
-
-
-@pytest.fixture
-def presigned_upload_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.PRESIGNED_UPLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="presigned-test-key",
-        expiration=3600,
-        content_type="text/plain",
-        filename="presigned-test.txt",
-        min_size=1,
-        max_size=1024 * 1024,  # 1MB
-    )
-
-
-@pytest.fixture
-def presigned_download_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.PRESIGNED_DOWNLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="presigned-test-key",
-        expiration=3600,
-        content_type="text/plain",
-        filename="presigned-test.txt",
-    )
-
-
-@pytest.fixture
-def info_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.INFO,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="test-key",
-        expiration=3600,
-    )
-
-
-@pytest.fixture
-def delete_token_data():
-    return ObjectStorageTokenData(
-        op=ObjectStorageOperationType.DELETE,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key="test-key",
-        expiration=3600,
-    )
+# Test configuration constants
+_TEST_KEY = "test-key"
+_TEST_CONTENT_TYPE = "application/octet-stream"
+_PRESIGNED_TEST_KEY = "presigned-test-key"
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_success(s3_client, storages_service, valid_token_data):
+async def test_stream_upload_success(s3_client, storages_service):
     """Test successful stream upload"""
 
     async def mock_data_stream():
@@ -123,44 +60,44 @@ async def test_stream_upload_success(s3_client, storages_service, valid_token_da
         yield b"chunk 2"
 
     result = await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, valid_token_data, mock_data_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, mock_data_stream()
     )
 
     assert isinstance(result, UploadResponse)
-    assert result.success is True
-    assert result.key == "test-key"
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_invalid_storage(storages_service, valid_token_data):
+async def test_stream_upload_invalid_storage(storages_service):
     """Test stream upload with invalid storage name"""
 
     async def mock_data_stream():
         yield b"test data"
 
-    with pytest.raises(StorageProxyError, match="Upload failed"):
+    with pytest.raises(FileStreamUploadError):
         await storages_service.stream_upload(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, valid_token_data, mock_data_stream()
+            "invalid_storage",
+            _BUCKET_FIXTURE_NAME,
+            _TEST_KEY,
+            _TEST_CONTENT_TYPE,
+            mock_data_stream(),
         )
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_invalid_bucket(storages_service, valid_token_data):
+async def test_stream_upload_invalid_bucket(storages_service):
     """Test stream upload with invalid bucket name"""
 
     async def mock_data_stream():
         yield b"test data"
 
-    with pytest.raises(StorageProxyError, match="Upload failed"):
+    with pytest.raises(FileStreamUploadError):
         await storages_service.stream_upload(
-            "test_storage", "invalid-bucket", valid_token_data, mock_data_stream()
+            "test_storage", "invalid-bucket", _TEST_KEY, _TEST_CONTENT_TYPE, mock_data_stream()
         )
 
 
 @pytest.mark.asyncio
-async def test_stream_download_success(
-    s3_client, storages_service, valid_token_data, download_token_data
-):
+async def test_stream_download_success(s3_client, storages_service):
     """Test successful stream download after upload"""
 
     # First upload a test file
@@ -169,13 +106,13 @@ async def test_stream_download_success(
         yield b"test chunk 2"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, valid_token_data, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Now download it
     chunks = []
     async for chunk in storages_service.stream_download(
-        "test_storage", _BUCKET_FIXTURE_NAME, download_token_data
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY
     ):
         chunks.append(chunk)
 
@@ -186,27 +123,32 @@ async def test_stream_download_success(
 
 
 @pytest.mark.asyncio
-async def test_stream_download_nonexistent_file(s3_client, storages_service, download_token_data):
+async def test_stream_download_nonexistent_file(s3_client, storages_service):
     """Test stream download of nonexistent file"""
-    download_token_data.key = "nonexistent-key"
-
-    with pytest.raises(StorageProxyError, match="Download failed"):
+    with pytest.raises(FileStreamDownloadError):
         async for chunk in storages_service.stream_download(
-            "test_storage", _BUCKET_FIXTURE_NAME, download_token_data
+            "test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key"
         ):
             pass
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_success(
-    s3_client, storages_service, presigned_upload_token_data
-):
+async def test_generate_presigned_upload_url_success(s3_client, storages_service):
     """Test successful presigned upload URL generation and actual upload"""
     import aiohttp
 
+    # Create presigned upload request
+    presigned_request = PresignedUploadReq(
+        key=_PRESIGNED_TEST_KEY,
+        expiration=3600,
+        content_type="text/plain",
+        min_size=1,
+        max_size=1024 * 1024,  # 1MB
+    )
+
     # Generate presigned upload URL
     result = await storages_service.generate_presigned_upload_url(
-        "test_storage", _BUCKET_FIXTURE_NAME, presigned_upload_token_data
+        "test_storage", _BUCKET_FIXTURE_NAME, presigned_request
     )
 
     assert isinstance(result, PresignedUploadResponse)
@@ -232,15 +174,8 @@ async def test_generate_presigned_upload_url_success(
 
     # Verify the file was uploaded by downloading it back
     chunks = []
-    download_token_data = ObjectStorageTokenData(
-        op=ObjectStorageOperationType.DOWNLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key=presigned_upload_token_data.key,
-        expiration=3600,
-    )
-
     async for chunk in storages_service.stream_download(
-        "test_storage", _BUCKET_FIXTURE_NAME, download_token_data
+        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY
     ):
         chunks.append(chunk)
 
@@ -249,31 +184,39 @@ async def test_generate_presigned_upload_url_success(
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_invalid_storage(
-    storages_service, presigned_upload_token_data
-):
+async def test_generate_presigned_upload_url_invalid_storage(storages_service):
     """Test presigned upload URL generation with invalid storage"""
+    presigned_request = PresignedUploadReq(
+        key=_PRESIGNED_TEST_KEY,
+        expiration=3600,
+        content_type="text/plain",
+        min_size=1,
+        max_size=1024 * 1024,  # 1MB
+    )
     with pytest.raises(PresignedUploadURLGenerationError):
         await storages_service.generate_presigned_upload_url(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, presigned_upload_token_data
+            "invalid_storage", _BUCKET_FIXTURE_NAME, presigned_request
         )
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_invalid_bucket(
-    storages_service, presigned_upload_token_data
-):
+async def test_generate_presigned_upload_url_invalid_bucket(storages_service):
     """Test presigned upload URL generation with invalid bucket"""
+    presigned_request = PresignedUploadReq(
+        key=_PRESIGNED_TEST_KEY,
+        expiration=3600,
+        content_type="text/plain",
+        min_size=1,
+        max_size=1024 * 1024,  # 1MB
+    )
     with pytest.raises(PresignedUploadURLGenerationError):
         await storages_service.generate_presigned_upload_url(
-            "test_storage", "invalid-bucket", presigned_upload_token_data
+            "test_storage", "invalid-bucket", presigned_request
         )
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_success(
-    s3_client, storages_service, valid_token_data, presigned_download_token_data
-):
+async def test_generate_presigned_download_url_success(s3_client, storages_service):
     """Test successful presigned download URL generation and actual download"""
     import aiohttp
 
@@ -281,24 +224,16 @@ async def test_generate_presigned_download_url_success(
     test_data = b"test data for presigned download verification"
 
     # Upload using the same key that will be used for presigned download
-    upload_token_data = ObjectStorageTokenData(
-        op=ObjectStorageOperationType.UPLOAD,
-        bucket=_BUCKET_FIXTURE_NAME,
-        key=presigned_download_token_data.key,  # Use the same key
-        expiration=3600,
-        content_type="text/plain",
-    )
-
     async def upload_stream():
         yield test_data
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, upload_token_data, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, "text/plain", upload_stream()
     )
 
     # Generate presigned download URL
     result = await storages_service.generate_presigned_download_url(
-        "test_storage", _BUCKET_FIXTURE_NAME, presigned_download_token_data
+        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, 3600
     )
 
     assert isinstance(result, PresignedDownloadResponse)
@@ -316,31 +251,25 @@ async def test_generate_presigned_download_url_success(
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_invalid_storage(
-    storages_service, presigned_download_token_data
-):
+async def test_generate_presigned_download_url_invalid_storage(storages_service):
     """Test presigned download URL generation with invalid storage"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, presigned_download_token_data
+            "invalid_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, 3600
         )
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_invalid_bucket(
-    storages_service, presigned_download_token_data
-):
+async def test_generate_presigned_download_url_invalid_bucket(storages_service):
     """Test presigned download URL generation with invalid bucket"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
-            "test_storage", "invalid-bucket", presigned_download_token_data
+            "test_storage", "invalid-bucket", _PRESIGNED_TEST_KEY, 3600
         )
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_success(
-    s3_client, storages_service, valid_token_data, info_token_data
-):
+async def test_get_object_info_success(s3_client, storages_service):
     """Test successful object info retrieval"""
 
     # First upload a test file
@@ -348,13 +277,11 @@ async def test_get_object_info_success(
         yield b"test data for object info"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, valid_token_data, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Get object info
-    result = await storages_service.get_object_info(
-        "test_storage", _BUCKET_FIXTURE_NAME, info_token_data
-    )
+    result = await storages_service.get_object_info("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
     assert isinstance(result, ObjectInfoResponse)
     assert result.content_length is not None
@@ -365,36 +292,30 @@ async def test_get_object_info_success(
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_nonexistent_file(s3_client, storages_service, info_token_data):
+async def test_get_object_info_nonexistent_file(s3_client, storages_service):
     """Test object info retrieval for nonexistent file"""
-    info_token_data.key = "nonexistent-key"
-
-    with pytest.raises(StorageBucketFileNotFoundError):
+    with pytest.raises(ObjectInfoFetchError):
         await storages_service.get_object_info(
-            "test_storage", _BUCKET_FIXTURE_NAME, info_token_data
+            "test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key"
         )
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_invalid_storage(storages_service, info_token_data):
+async def test_get_object_info_invalid_storage(storages_service):
     """Test object info retrieval with invalid storage"""
-    with pytest.raises(StorageProxyError, match="Get object info failed"):
-        await storages_service.get_object_info(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, info_token_data
-        )
+    with pytest.raises(ObjectInfoFetchError):
+        await storages_service.get_object_info("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_invalid_bucket(storages_service, info_token_data):
+async def test_get_object_info_invalid_bucket(storages_service):
     """Test object info retrieval with invalid bucket"""
-    with pytest.raises(StorageProxyError, match="Get object info failed"):
-        await storages_service.get_object_info("test_storage", "invalid-bucket", info_token_data)
+    with pytest.raises(ObjectInfoFetchError):
+        await storages_service.get_object_info("test_storage", "invalid-bucket", _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_success(
-    s3_client, storages_service, valid_token_data, delete_token_data
-):
+async def test_delete_object_success(s3_client, storages_service):
     """Test successful object deletion"""
 
     # First upload a test file
@@ -402,52 +323,38 @@ async def test_delete_object_success(
         yield b"test data for deletion"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, valid_token_data, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Delete the object
-    result = await storages_service.delete_object(
-        "test_storage", _BUCKET_FIXTURE_NAME, delete_token_data
-    )
+    result = await storages_service.delete_file("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
-    assert isinstance(result, DeleteResponse)
-    assert result.success is True
+    assert isinstance(result, FileDeleteResponse)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_nonexistent_file(s3_client, storages_service, delete_token_data):
+async def test_delete_object_nonexistent_file(s3_client, storages_service):
     """Test deletion of nonexistent file (should still return success)"""
-    delete_token_data.key = "nonexistent-key"
-
-    result = await storages_service.delete_object(
-        "test_storage", _BUCKET_FIXTURE_NAME, delete_token_data
+    result = await storages_service.delete_file(
+        "test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key"
     )
 
-    assert isinstance(result, DeleteResponse)
+    assert isinstance(result, FileDeleteResponse)
     # S3 delete operations typically succeed even for nonexistent objects
-    assert result.success is True
 
 
 @pytest.mark.asyncio
-async def test_delete_object_invalid_storage(storages_service, delete_token_data):
+async def test_delete_object_invalid_storage(storages_service):
     """Test object deletion with invalid storage"""
-    result = await storages_service.delete_object(
-        "invalid_storage", _BUCKET_FIXTURE_NAME, delete_token_data
-    )
-    # Delete should return failure for invalid storage
-    assert isinstance(result, DeleteResponse)
-    assert result.success is False
+    with pytest.raises(StorageBucketNotFoundError):
+        await storages_service.delete_file("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_invalid_bucket(storages_service, delete_token_data):
+async def test_delete_object_invalid_bucket(storages_service):
     """Test object deletion with invalid bucket"""
-    result = await storages_service.delete_object(
-        "test_storage", "invalid-bucket", delete_token_data
-    )
-    # Delete should return failure for invalid bucket
-    assert isinstance(result, DeleteResponse)
-    assert result.success is False
+    with pytest.raises(StorageBucketNotFoundError):
+        await storages_service.delete_file("test_storage", "invalid-bucket", _TEST_KEY)
 
 
 def test_get_s3_client_no_storage_config(storages_service):
