@@ -62,7 +62,7 @@ async def get_presigned_upload_url(
     """Get presigned upload URL from storage API."""
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/files/presigned/upload",
+            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
             params={"token": token},
         ) as response:
             if response.status != 200:
@@ -90,7 +90,7 @@ async def get_presigned_download_url(
     """Get presigned download URL from storage API."""
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/files/presigned/download",
+            f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
             params={"token": token},
         ) as response:
             if response.status != 200:

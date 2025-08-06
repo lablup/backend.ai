@@ -12,7 +12,7 @@ from ai.backend.common.api_handlers import (
     APIStreamResponse,
     BaseRequestModel,
     MiddlewareParam,
-    QueryParam,
+    PathParam,
     api_handler,
     stream_api_handler,
 )
@@ -21,7 +21,7 @@ from ai.backend.common.dto.storage.request import (
     DeleteFileReq,
     DownloadFileReq,
     GetFileMetaReq,
-    ObjectStorageAPIQueryParams,
+    ObjectStorageAPIPathParams,
     PresignedDownloadReq,
     PresignedUploadReq,
     UploadFileReq,
@@ -92,7 +92,7 @@ class StoragesAPIHandler:
     @api_handler
     async def upload_file(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[UploadFileReq],
         multipart_ctx: MultipartUploadCtx,
         config_ctx: StoragesConfigCtx,
@@ -106,8 +106,8 @@ class StoragesAPIHandler:
         content_length = req.content_length
         filepath = req.key
         file_reader = multipart_ctx.file_reader
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "upload_file", req)
 
@@ -140,7 +140,7 @@ class StoragesAPIHandler:
     @stream_api_handler
     async def download_file(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[DownloadFileReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIStreamResponse:
@@ -150,8 +150,8 @@ class StoragesAPIHandler:
         """
         req = request_ctx.data
         filepath = req.key
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
         storages_service = StoragesService(config_ctx.storages)
@@ -168,7 +168,7 @@ class StoragesAPIHandler:
     @api_handler
     async def presigned_upload_url(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[PresignedUploadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -177,8 +177,8 @@ class StoragesAPIHandler:
         Allows clients to upload files without going through the proxy server.
         """
         req = request_ctx.data
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
         storages_service = StoragesService(config_ctx.storages)
@@ -194,7 +194,7 @@ class StoragesAPIHandler:
     @api_handler
     async def presigned_download_url(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[PresignedDownloadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -204,8 +204,8 @@ class StoragesAPIHandler:
         """
         req = request_ctx.data
         filepath = req.key
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
         storages_service = StoragesService(config_ctx.storages)
@@ -221,7 +221,7 @@ class StoragesAPIHandler:
     @api_handler
     async def get_file_meta(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[GetFileMetaReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -231,8 +231,8 @@ class StoragesAPIHandler:
         """
         req = request_ctx.data
         filepath = req.key
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "get_file_meta", req)
 
@@ -247,7 +247,7 @@ class StoragesAPIHandler:
     @api_handler
     async def delete_file(
         self,
-        query: QueryParam[ObjectStorageAPIQueryParams],
+        path: PathParam[ObjectStorageAPIPathParams],
         request_ctx: RequestValidationCtx[DeleteFileReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -257,8 +257,8 @@ class StoragesAPIHandler:
         """
         req = request_ctx.data
         filepath = req.key
-        storage_name = query.parsed.storage_name
-        bucket_name = query.parsed.bucket_name
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_file", req)
         storages_service = StoragesService(config_ctx.storages)

@@ -26,7 +26,7 @@ class CloneVFolderReq(BaseRequestModel):
     )
 
 
-class ObjectStorageAPIQueryParams(BaseRequestModel):
+class ObjectStorageAPIPathParams(BaseRequestModel):
     storage_name: str = Field(
         description="The name of the storage configuration to use for the operation."
     )

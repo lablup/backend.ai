@@ -41,7 +41,7 @@ class StoragesService:
         Initialize the StoragesService.
 
         Args:
-            storage_configs: List of storage configurations from context
+            storage_configs: List of storage configurations
         """
         self._storage_configs = {config.name: config for config in storage_configs}
 
