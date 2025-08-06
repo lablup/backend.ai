@@ -69,7 +69,7 @@ class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
             auth = request.headers.get("Authorization", "")
             scheme, _, token = auth.partition(" ")
             if scheme.lower() != "bearer" or not token:
-                raise web.HTTPUnauthorized(reason="JWT token is missing")
+                raise web.HTTPUnauthorized(reason="JWT token is missing")
 
             try:
                 decrypted_data = jwt.decode(token, secret, algorithms=["HS256"])
@@ -81,7 +81,7 @@ class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
             ReqModel = cls._resolve_req_type()
             return cls(data=ReqModel.model_validate(decrypted_data))
         except ValidationError as e:
-            raise web.HTTPBadRequest(reason="Invalid S3 token data") from e
+            raise web.HTTPBadRequest(reason=f"Request data is invalid: {str(e)}") from e
 
     @classmethod
     def _resolve_req_type(cls) -> Type[TReq]:
