@@ -80,6 +80,36 @@ class InvalidAPIParameters(web.HTTPBadRequest):
         )
 
 
+class FileStreamUploadError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/file-stream-upload-failed",
+            "title": "Failed to upload file stream",
+        }
+        if msg is not None:
+            payload["title"] = f"Failed to upload file stream ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class FileStreamDownloadError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/file-stream-download-failed",
+            "title": "Failed to download file stream",
+        }
+        if msg is not None:
+            payload["title"] = f"Failed to download file stream ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
 class PresignedUploadURLGenerationError(web.HTTPInternalServerError):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
@@ -103,6 +133,21 @@ class PresignedDownloadURLGenerationError(web.HTTPInternalServerError):
         }
         if msg is not None:
             payload["title"] = f"Failed to generate presigned download URL ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class ObjectInfoFetchError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/object-info-fetch-failed",
+            "title": "Failed to fetch object info",
+        }
+        if msg is not None:
+            payload["title"] = f"Failed to fetch object info ({msg})"
             payload["data"] = msg
         super().__init__(
             text=dump_json_str(payload),

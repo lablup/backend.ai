@@ -1,4 +1,3 @@
-import enum
 from typing import Optional
 
 from pydantic import Field
@@ -27,30 +26,45 @@ class CloneVFolderReq(BaseRequestModel):
     )
 
 
-class ObjectStorageOperationType(enum.StrEnum):
-    """Enumeration of supported object storage operations."""
-
-    UPLOAD = "upload"
-    DOWNLOAD = "download"
-    INFO = "info"
-    DELETE = "delete"
-    PRESIGNED_UPLOAD = "presigned_upload"
-    PRESIGNED_DOWNLOAD = "presigned_download"
+class ObjectStorageAPIQueryParams(BaseRequestModel):
+    storage_name: str = Field(
+        description="The name of the storage configuration to use for the operation."
+    )
+    bucket_name: str = Field(description="The name of the S3 bucket to operate on.")
 
 
-class ObjectStorageTokenData(BaseRequestModel):
+class UploadFileReq(BaseRequestModel):
     """
-    JWT token data for authenticated object storage operations.
-
-    This token contains all the necessary information to perform
-    secure operations on object storage systems like S3.
+    Data model for file upload requests to object storage.
+    This is used to specify the target bucket and key for the file upload.
     """
 
-    op: ObjectStorageOperationType = Field(description="The type of storage operation to perform")
-    bucket: str = Field(description="The name of the storage bucket to operate on")
-    key: str = Field(description="The object key (path) within the bucket")
+    key: str = Field(description="The object key (path) within the bucket to upload the file to.")
+    content_type: Optional[str] = Field(
+        default=None, description="MIME type of the file being uploaded."
+    )
+
+
+class DownloadFileReq(BaseRequestModel):
+    """
+    Data model for file download requests from object storage.
+    """
+
+    key: str = Field(description="The object key (path) within the bucket to upload the file to.")
+
+
+class PresignedUploadReq(BaseRequestModel):
+    """
+    Data model for generating presigned upload URLs for object storage operations.
+    This is used to specify the target bucket, key, and optional parameters for the presigned
+    """
+
+    key: str = Field(description="The object key (path) within the bucket to upload the file to.")
+    content_type: Optional[str] = Field(
+        default=None, description="MIME type of the file being uploaded."
+    )
     expiration: Optional[int] = Field(
-        default=None, gt=0, le=604800, description="Token expiration time in seconds (max 7 days)"
+        default=None, gt=0, description="Token expiration time in seconds"
     )
     content_type: Optional[str] = Field(
         default=None, description="MIME type of the object for upload operations"
@@ -61,6 +75,33 @@ class ObjectStorageTokenData(BaseRequestModel):
     max_size: Optional[int] = Field(
         default=None, gt=0, description="Maximum allowed size in bytes for upload operations"
     )
-    filename: Optional[str] = Field(
-        default=None, description="Original filename for download operations"
+
+
+class PresignedDownloadReq(BaseRequestModel):
+    """
+    Data model for generating presigned download URLs for object storage operations.
+    """
+
+    key: str = Field(
+        description="The object key (path) within the bucket to download the file from."
     )
+
+
+class GetFileMetaReq(BaseRequestModel):
+    """
+    Data model for retrieving metadata of a file in object storage.
+    This is used to specify the target bucket and key for the file metadata retrieval.
+    """
+
+    key: str = Field(
+        description="The object key (path) within the bucket to retrieve metadata for."
+    )
+
+
+class DeleteFileReq(BaseRequestModel):
+    """
+    Data model for deleting a file in object storage.
+    This is used to specify the target bucket and key for the file deletion.
+    """
+
+    key: str = Field(description="The object key (path) within the bucket to delete the file from.")

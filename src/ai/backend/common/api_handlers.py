@@ -2,7 +2,9 @@ import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import AsyncIterable, Mapping
+from dataclasses import dataclass, field
+from http import HTTPStatus
 from inspect import Signature
 from typing import (
     Any,
@@ -452,5 +454,67 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
         return _parse_response(response)
+
+    return wrapped
+
+
+@dataclass
+class APIStreamResponse:
+    body: AsyncIterable[bytes]
+    status: int = HTTPStatus.OK
+    headers: Mapping[str, str] = field(default_factory=dict)
+
+
+def _ensure_bytes(chunk: Any) -> bytes:
+    if isinstance(chunk, (bytes, bytearray, memoryview)):
+        return bytes(chunk)
+    if isinstance(chunk, str):
+        return chunk.encode("utf-8")
+    return bytes(chunk)
+
+
+def stream_api_handler(handler: Any) -> ParsedRequestHandler:
+    """
+    This decorator processes HTTP request parameters using Pydantic models and returns a streaming response.
+    NOTICE: API handler methods must be instance methods. If handlers are not instance methods, it may not work as expected.
+    """
+
+    original_signature = inspect.signature(handler, eval_str=True)
+    sanitized_signature = original_signature.replace(
+        parameters=list(original_signature.parameters.values())[1:]
+    )
+    signature_parser_map = _register_parameter_parser(
+        sanitized_signature, handler_name=str(handler)
+    )
+
+    @functools.wraps(handler)
+    async def wrapped(first_arg: Any, request: web.Request) -> web.StreamResponse:
+        kwargs: dict[str, _ParamType] = {}
+        for name, param_instance_or_class in signature_parser_map.items():
+            param_instance = await _serialize_parameter(request, param_instance_or_class)
+            kwargs[name] = param_instance
+
+        result: APIStreamResponse = await handler(first_arg, **kwargs)
+
+        body = result.body
+        status = result.status
+        resp = web.StreamResponse(status=status, headers=result.headers)
+
+        body_iter = body.__aiter__()
+        # Send first chunk, and check if it raises an exception
+        try:
+            first = await body_iter.__anext__()
+            await resp.prepare(request)
+            await resp.write(_ensure_bytes(first))
+        except Exception as e:
+            raise web.HTTPInternalServerError(
+                reason=f"Failed to send first chunk from stream: {repr(e)}"
+            ) from e
+
+        async for chunk in body_iter:
+            await resp.write(_ensure_bytes(chunk))
+
+        await resp.write_eof()
+        return resp
 
     return wrapped

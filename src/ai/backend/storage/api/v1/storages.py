@@ -2,19 +2,31 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Self, override
+from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
 
 from aiohttp import web
 from aiohttp.web_request import FileField
-from pydantic import ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import (
     APIResponse,
+    APIStreamResponse,
+    BaseRequestModel,
     MiddlewareParam,
+    QueryParam,
     api_handler,
+    stream_api_handler,
 )
 from ai.backend.common.dto.storage.context import MultipartUploadCtx
-from ai.backend.common.dto.storage.request import ObjectStorageOperationType, ObjectStorageTokenData
+from ai.backend.common.dto.storage.request import (
+    DeleteFileReq,
+    DownloadFileReq,
+    GetFileMetaReq,
+    ObjectStorageAPIQueryParams,
+    PresignedDownloadReq,
+    PresignedUploadReq,
+    UploadFileReq,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
@@ -26,33 +38,30 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_CHUNKS = 8192  # Default chunk size for streaming uploads
+_DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
 class StoragesConfigCtx(MiddlewareParam):
     storages: list[ObjectStorageConfig]
-    storage_name: str
-    bucket_name: str
 
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         ctx: RootContext = request.app["ctx"]
-        storage_name = request.match_info.get("storage_name")
-        bucket_name = request.match_info.get("bucket_name")
 
-        if not storage_name:
-            raise web.HTTPBadRequest(reason="Missing storage_name in URL path")
-        if not bucket_name:
-            raise web.HTTPBadRequest(reason="Missing bucket_name in URL path")
-
-        return cls(
-            storages=ctx.local_config.storages, storage_name=storage_name, bucket_name=bucket_name
-        )
+        return cls(storages=ctx.local_config.storages)
 
 
-class TokenValidationCtx(MiddlewareParam):
-    token: ObjectStorageTokenData
+TReq = TypeVar("TReq", bound=BaseRequestModel)
+
+
+class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
+    data: TReq
+
+    @classmethod
+    def _resolve_req_type(cls) -> Type[TReq]:
+        meta = cls.__pydantic_generic_metadata__
+        return meta["args"][0]
 
     @override
     @classmethod
@@ -74,37 +83,18 @@ class TokenValidationCtx(MiddlewareParam):
             except jwt.PyJWTError as e:
                 raise web.HTTPUnauthorized(reason=f"Invalid JWT token: {str(e)}") from e
 
-            return cls(token=ObjectStorageTokenData.model_validate(token_data))
+            ReqModel = cls._resolve_req_type()
+            return cls(data=ReqModel.model_validate(token_data))
         except ValidationError as e:
             raise web.HTTPBadRequest(reason="Invalid S3 token data") from e
-
-
-class PrepareStreamingResponseCtx(MiddlewareParam):
-    stream_response: web.StreamResponse = Field(
-        ..., description="Prepared streaming response for file download"
-    )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @override
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        stream_response = web.StreamResponse(
-            status=HTTPStatus.OK,
-            headers={
-                "Content-Type": "application/octet-stream",
-            },
-        )
-
-        await stream_response.prepare(request)
-        return cls(stream_response=stream_response)
 
 
 class StoragesAPIHandler:
     @api_handler
     async def upload_file(
         self,
-        token_ctx: TokenValidationCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[UploadFileReq],
         multipart_ctx: MultipartUploadCtx,
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -112,13 +102,14 @@ class StoragesAPIHandler:
         Upload a file to the specified S3 bucket using streaming.
         Reads multipart file data in chunks to minimize memory usage.
         """
-        token_data = token_ctx.token
+        req = request_ctx.data
+        content_type = req.content_type
+        filepath = req.key
         file_reader = multipart_ctx.file_reader
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "upload_file", token_data)
-
-        if token_data.op != ObjectStorageOperationType.UPLOAD:
-            raise web.HTTPBadRequest(reason="Invalid token operation for upload")
+        await log_client_api_entry(log, "upload_file", req)
 
         storages_service = StoragesService(config_ctx.storages)
 
@@ -130,14 +121,13 @@ class StoragesAPIHandler:
 
         async def data_stream():
             while True:
-                chunk = await field.read_chunk(_DEFAULT_CHUNKS)
+                chunk = await field.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
                 if not chunk:
                     break
                 yield chunk
 
-        # Upload the stream using service
         response = await storages_service.stream_upload(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data, data_stream()
+            storage_name, bucket_name, filepath, content_type, data_stream()
         )
 
         return APIResponse.build(
@@ -145,56 +135,52 @@ class StoragesAPIHandler:
             response_model=response,
         )
 
-    @api_handler
+    @stream_api_handler
     async def download_file(
         self,
-        token_ctx: TokenValidationCtx,
-        stream_response_ctx: PrepareStreamingResponseCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[DownloadFileReq],
         config_ctx: StoragesConfigCtx,
-    ) -> APIResponse:
+    ) -> APIStreamResponse:
         """
         Download a file from the specified S3 bucket using streaming.
         Streams file content directly to the client without loading into memory.
         """
-        token_data = token_ctx.token
-        stream_response = stream_response_ctx.stream_response
+        req = request_ctx.data
+        filepath = req.key
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "download_file", token_data)
-
-        if token_data.op != ObjectStorageOperationType.DOWNLOAD:
-            raise web.HTTPBadRequest(reason="Invalid token operation for download")
-
+        await log_client_api_entry(log, "download_file", req)
         storages_service = StoragesService(config_ctx.storages)
+        download_stream = storages_service.stream_download(storage_name, bucket_name, filepath)
 
-        # Stream the file content
-        async for chunk in storages_service.stream_download(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data
-        ):
-            await stream_response.write(chunk)
-
-        return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)
+        return APIStreamResponse(
+            body=download_stream,
+            headers={
+                "Content-Type": "application/octet-stream",
+            },
+        )
 
     @api_handler
     async def presigned_upload_url(
         self,
-        token_ctx: TokenValidationCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[PresignedUploadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for uploading files directly to S3.
         Allows clients to upload files without going through the proxy server.
         """
-        token_data = token_ctx.token
+        req = request_ctx.data
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "presigned_upload_url", token_data)
-
-        if token_data.op != ObjectStorageOperationType.PRESIGNED_UPLOAD:
-            raise web.HTTPBadRequest(reason="Invalid token operation for presigned upload")
-
+        await log_client_api_entry(log, "presigned_upload_url", req)
         storages_service = StoragesService(config_ctx.storages)
-
         response = await storages_service.generate_presigned_upload_url(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data
+            storage_name, bucket_name, req
         )
 
         return APIResponse.build(
@@ -205,24 +191,23 @@ class StoragesAPIHandler:
     @api_handler
     async def presigned_download_url(
         self,
-        token_ctx: TokenValidationCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[PresignedDownloadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for downloading files directly from S3.
         Allows clients to download files without going through the proxy server.
         """
-        token_data = token_ctx.token
+        req = request_ctx.data
+        filepath = req.key
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "presigned_download_url", token_data)
-
-        if token_data.op != ObjectStorageOperationType.PRESIGNED_DOWNLOAD:
-            raise web.HTTPBadRequest(reason="Invalid token operation for presigned download")
-
+        await log_client_api_entry(log, "presigned_download_url", req)
         storages_service = StoragesService(config_ctx.storages)
-
         response = await storages_service.generate_presigned_download_url(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data
+            storage_name, bucket_name, filepath
         )
 
         return APIResponse.build(
@@ -231,27 +216,25 @@ class StoragesAPIHandler:
         )
 
     @api_handler
-    async def get_file_info(
+    async def get_file_meta(
         self,
-        token_ctx: TokenValidationCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[GetFileMetaReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Get metadata information about a file in S3.
         Returns file size, content type, last modified date, and ETag.
         """
-        token_data = token_ctx.token
+        req = request_ctx.data
+        filepath = req.key
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "get_file_info", token_data)
-
-        if token_data.op != ObjectStorageOperationType.INFO:
-            raise web.HTTPBadRequest(reason="Invalid token operation for info")
+        await log_client_api_entry(log, "get_file_meta", req)
 
         storages_service = StoragesService(config_ctx.storages)
-
-        response = await storages_service.get_object_info(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data
-        )
+        response = await storages_service.get_object_info(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -261,25 +244,22 @@ class StoragesAPIHandler:
     @api_handler
     async def delete_file(
         self,
-        token_ctx: TokenValidationCtx,
+        query: QueryParam[ObjectStorageAPIQueryParams],
+        request_ctx: RequestValidationCtx[DeleteFileReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Delete a file from the specified S3 bucket.
         Permanently removes the object from storage.
         """
-        token_data = token_ctx.token
+        req = request_ctx.data
+        filepath = req.key
+        storage_name = query.parsed.storage_name
+        bucket_name = query.parsed.bucket_name
 
-        await log_client_api_entry(log, "delete_file", token_data)
-
-        if token_data.op != ObjectStorageOperationType.DELETE:
-            raise web.HTTPBadRequest(reason="Invalid token operation for delete")
-
+        await log_client_api_entry(log, "delete_file", req)
         storages_service = StoragesService(config_ctx.storages)
-
-        response = await storages_service.delete_object(
-            config_ctx.storage_name, config_ctx.bucket_name, token_data
-        )
+        response = await storages_service.delete_file(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -292,27 +272,28 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages"
 
+    # TODO: Add bucket creation and deletion endpoints when working Manager integration
     api_handler = StoragesAPIHandler()
     app.router.add_route(
-        "GET", "/s3/{storage_name}/buckets/{bucket_name}/files", api_handler.get_file_info
+        "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/meta", api_handler.get_file_meta
     )
     app.router.add_route(
-        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/files", api_handler.delete_file
+        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/file", api_handler.delete_file
     )
     app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/files/upload", api_handler.upload_file
+        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/upload", api_handler.upload_file
     )
     app.router.add_route(
-        "GET", "/s3/{storage_name}/buckets/{bucket_name}/files/download", api_handler.download_file
+        "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/download", api_handler.download_file
     )
     app.router.add_route(
         "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/files/presigned/upload",
+        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
         api_handler.presigned_upload_url,
     )
     app.router.add_route(
         "GET",
-        "/s3/{storage_name}/buckets/{bucket_name}/files/presigned/download",
+        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
         api_handler.presigned_download_url,
     )
 

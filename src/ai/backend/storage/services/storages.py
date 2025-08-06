@@ -1,11 +1,9 @@
 import logging
-from typing import AsyncIterable, AsyncIterator
+from typing import AsyncIterable, AsyncIterator, Optional
 
-from botocore.exceptions import ClientError
-
-from ai.backend.common.dto.storage.request import ObjectStorageTokenData
+from ai.backend.common.dto.storage.request import PresignedUploadReq
 from ai.backend.common.dto.storage.response import (
-    DeleteResponse,
+    FileDeleteResponse,
     ObjectInfoResponse,
     PresignedDownloadResponse,
     PresignedUploadResponse,
@@ -16,17 +14,19 @@ from ai.backend.storage.config.unified import ObjectStorageConfig
 
 from ..client.s3 import S3Client
 from ..exception import (
+    FileStreamDownloadError,
+    FileStreamUploadError,
+    ObjectInfoFetchError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
     StorageBucketFileNotFoundError,
     StorageBucketNotFoundError,
     StorageNotFoundError,
-    StorageProxyError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_TOKEN_DURATION = 1800  # Default token expiration time in seconds
+_DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
 
 
 class StoragesService:
@@ -45,21 +45,191 @@ class StoragesService:
         """
         self._storage_configs = {config.name: config for config in storage_configs}
 
-    def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
+    async def stream_upload(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        filepath: str,
+        content_type: Optional[str],
+        data_stream: AsyncIterable[bytes],
+    ) -> UploadResponse:
         """
-        Get S3 client for the specified storage and bucket.
+        Upload a file to S3 using streaming.
 
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
+            filepath: Path to the file to upload
+            content_type: Content type of the file
+            data_stream: Async iterator of file data chunks
 
         Returns:
-            S3Client instance configured for the bucket
-
-        Raises:
-            StorageNotFoundError: If no storage configuration found
-            StorageBucketNotFoundError: If bucket not found in storage config
+            UploadResponse
         """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            await s3_client.upload_stream(
+                data_stream,
+                filepath,
+                content_type=content_type,
+            )
+
+            return UploadResponse()
+        except Exception as e:
+            log.error(f"Stream upload failed: {e}")
+            raise FileStreamUploadError("Upload failed") from e
+
+    async def stream_download(
+        self, storage_name: str, bucket_name: str, filepath: str
+    ) -> AsyncIterator[bytes]:
+        """
+        Download a file from S3 using streaming.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path to the file to download
+
+        Yields:
+            bytes: Chunks of file data
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+
+            async for chunk in s3_client.download_stream(filepath):
+                yield chunk
+
+        except Exception as e:
+            log.error(f"Stream download failed: {e}")
+            raise FileStreamDownloadError("Download failed") from e
+
+    # TODO: Replace `request` with proper options
+    async def generate_presigned_upload_url(
+        self, storage_name: str, bucket_name: str, request: PresignedUploadReq
+    ) -> PresignedUploadResponse:
+        """
+        Generate presigned upload URL.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            request: PresignedUploadReq containing key, content_type, expiration, min_size, max_size
+
+        Returns:
+            PresignedUploadResponse with URL and fields
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+
+            presigned_data = await s3_client.generate_presigned_upload_url(
+                request.key,
+                expiration=request.expiration or _DEFAULT_EXPIRATION,
+                content_type=request.content_type,
+                content_length_range=(request.min_size, request.max_size)
+                if request.min_size and request.max_size
+                else None,
+            )
+
+            if presigned_data is None:
+                raise PresignedUploadURLGenerationError()
+
+            return PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
+
+        except Exception as e:
+            log.error(f"Presigned upload URL generation failed: {e}")
+            raise PresignedUploadURLGenerationError() from e
+
+    async def generate_presigned_download_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        filepath: str,
+        expiration: int = _DEFAULT_EXPIRATION,
+    ) -> PresignedDownloadResponse:
+        """
+        Generate presigned download URL.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path to the file to download
+            expiration: Expiration time in seconds (default: 1800)
+
+        Returns:
+            PresignedDownloadResponse with URL
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+
+            presigned_url = await s3_client.generate_presigned_download_url(
+                filepath,
+                expiration=expiration,
+            )
+
+            if presigned_url is None:
+                raise PresignedDownloadURLGenerationError()
+
+            return PresignedDownloadResponse(url=presigned_url)
+
+        except Exception as e:
+            log.error(f"Presigned download URL generation failed: {e}")
+            raise PresignedDownloadURLGenerationError() from e
+
+    async def get_object_info(
+        self, storage_name: str, bucket_name: str, filepath: str
+    ) -> ObjectInfoResponse:
+        """
+        Get object information.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path to the file to download
+
+        Returns:
+            ObjectInfoResponse with object metadata
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            object_info = await s3_client.get_object_meta(filepath)
+
+            if object_info is None:
+                raise StorageBucketFileNotFoundError()
+
+            return ObjectInfoResponse(
+                content_length=object_info.content_length,
+                content_type=object_info.content_type,
+                last_modified=object_info.last_modified,
+                etag=object_info.etag,
+            )
+
+        except Exception as e:
+            raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
+
+    async def delete_file(
+        self, storage_name: str, bucket_name: str, filepath: str
+    ) -> FileDeleteResponse:
+        """
+        Delete file (object).
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path of the file to delete
+
+        Returns:
+            DeleteResponse with success status
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            await s3_client.delete_object(filepath)
+            return FileDeleteResponse()
+
+        except Exception as e:
+            log.error(f"Delete object failed: {e}")
+            raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
+
+    def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
         storage_config = self._storage_configs.get(storage_name)
         if not storage_config:
             raise StorageNotFoundError(
@@ -78,208 +248,3 @@ class StoragesService:
             aws_access_key_id=storage_config.access_key,
             aws_secret_access_key=storage_config.secret_key,
         )
-
-    async def stream_upload(
-        self,
-        storage_name: str,
-        bucket_name: str,
-        token_data: ObjectStorageTokenData,
-        data_stream: AsyncIterable[bytes],
-    ) -> UploadResponse:
-        """
-        Upload a file to S3 using streaming.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-            data_stream: Async iterator of file data chunks
-
-        Returns:
-            UploadResponse with success status and key
-
-        Raises:
-            StorageProxyError: If upload fails
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-
-            # Upload the stream
-            await s3_client.upload_stream(
-                data_stream,
-                token_data.key,
-                content_type=token_data.content_type,
-            )
-
-            # If we reach here, upload was successful
-            return UploadResponse(success=True, key=token_data.key)
-
-        except Exception as e:
-            log.error(f"Stream upload failed: {e}")
-            raise StorageProxyError("Upload failed") from e
-
-    async def stream_download(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
-    ) -> AsyncIterator[bytes]:
-        """
-        Download a file from S3 using streaming.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-
-        Yields:
-            bytes: Chunks of file data
-
-        Raises:
-            StorageProxyError: If download fails
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-
-            # Download the stream
-            async for chunk in s3_client.download_stream(token_data.key):
-                yield chunk
-
-        except Exception as e:
-            log.error(f"Stream download failed: {e}")
-            raise StorageProxyError("Download failed") from e
-
-    async def generate_presigned_upload_url(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
-    ) -> PresignedUploadResponse:
-        """
-        Generate presigned upload URL.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-
-        Returns:
-            PresignedUploadResponse with URL and fields
-
-        Raises:
-            PresignedUploadURLGenerationError: If URL generation fails
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-
-            presigned_data = await s3_client.generate_presigned_upload_url(
-                token_data.key,
-                expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-                content_type=token_data.content_type,
-                content_length_range=(token_data.min_size, token_data.max_size)
-                if token_data.min_size and token_data.max_size
-                else None,
-            )
-
-            if presigned_data is None:
-                raise PresignedUploadURLGenerationError()
-
-            return PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
-
-        except Exception as e:
-            log.error(f"Presigned upload URL generation failed: {e}")
-            raise PresignedUploadURLGenerationError() from e
-
-    async def generate_presigned_download_url(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
-    ) -> PresignedDownloadResponse:
-        """
-        Generate presigned download URL.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-
-        Returns:
-            PresignedDownloadResponse with URL
-
-        Raises:
-            PresignedDownloadURLGenerationError: If URL generation fails
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-
-            presigned_url = await s3_client.generate_presigned_download_url(
-                token_data.key,
-                expiration=token_data.expiration or _DEFAULT_TOKEN_DURATION,
-            )
-
-            if presigned_url is None:
-                raise PresignedDownloadURLGenerationError()
-
-            return PresignedDownloadResponse(url=presigned_url)
-
-        except Exception as e:
-            log.error(f"Presigned download URL generation failed: {e}")
-            raise PresignedDownloadURLGenerationError() from e
-
-    async def get_object_info(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
-    ) -> ObjectInfoResponse:
-        """
-        Get object information.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-
-        Returns:
-            ObjectInfoResponse with object metadata
-
-        Raises:
-            StorageObjectNotFoundError: If object not found
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-            object_info = await s3_client.get_object_info(token_data.key)
-
-            if object_info is None:
-                raise StorageBucketFileNotFoundError()
-
-            return ObjectInfoResponse(
-                content_length=object_info.content_length,
-                content_type=object_info.content_type,
-                last_modified=object_info.last_modified,
-                etag=object_info.etag,
-            )
-
-        except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "")
-            if error_code == "404" or error_code == "NoSuchKey":
-                raise StorageBucketFileNotFoundError() from e
-            else:
-                log.error(f"S3 client error in get_object_info: {e}")
-                raise StorageProxyError(f"Failed to get object info: {str(e)}") from e
-
-        except Exception as e:
-            log.error(f"Get object info failed: {e}")
-            raise StorageProxyError(f"Get object info failed: {str(e)}") from e
-
-    async def delete_object(
-        self, storage_name: str, bucket_name: str, token_data: ObjectStorageTokenData
-    ) -> DeleteResponse:
-        """
-        Delete object.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            token_data: Validated object storage token data
-
-        Returns:
-            DeleteResponse with success status
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-            await s3_client.delete_object(token_data.key)
-            return DeleteResponse(success=True)
-
-        except Exception as e:
-            log.error(f"Delete object failed: {e}")
-            return DeleteResponse(success=False)

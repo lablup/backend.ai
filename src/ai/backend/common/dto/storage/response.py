@@ -37,59 +37,32 @@ class VFolderMetadataResponse(BaseResponseModel):
 
 # S3 Storage API Response Models
 class UploadResponse(BaseResponseModel):
-    """Response for file upload operations."""
-
-    success: bool
-    key: str
-
-
-class ErrorResponse(BaseResponseModel):
-    """Generic error response."""
-
-    error: str
+    pass
 
 
 class PresignedUploadResponse(BaseResponseModel):
-    """Response containing presigned upload URL and form fields."""
-
     url: str
     fields: dict[str, str]
 
 
 class PresignedDownloadResponse(BaseResponseModel):
-    """Response containing presigned download URL."""
-
     url: str
 
 
 class ObjectInfoResponse(BaseResponseModel):
-    """Response containing S3 object metadata."""
-
-    content_length: Optional[int] = None
-    content_type: Optional[str] = None
-    last_modified: Optional[str] = None
-    etag: Optional[str] = None
+    content_length: Optional[int]
+    content_type: Optional[str]
+    last_modified: Optional[str]
+    etag: Optional[str]
 
 
-class DeleteResponse(BaseResponseModel):
-    """Response for object deletion operations."""
-
-    success: bool
+class FileDeleteResponse(BaseResponseModel):
+    pass
 
 
-class S3ObjectInfo(BaseResponseModel):
-    """Pydantic model for S3 object metadata information."""
-
-    content_length: Optional[int] = None
-    content_type: Optional[str] = None
-    last_modified: Optional[str] = None
-    etag: Optional[str] = None
-    metadata: dict[str, str] = {}
-
-
-class S3PresignedUploadData(BaseResponseModel):
-    """Pydantic model for S3 presigned upload URL data."""
-
-    url: str
-    fields: dict[str, str]
-    key: str
+class FileMetaResponse(BaseResponseModel):
+    content_length: Optional[int]
+    content_type: Optional[str]
+    last_modified: Optional[str]
+    etag: Optional[str]
+    metadata: dict[str, str]

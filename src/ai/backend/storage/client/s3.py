@@ -3,11 +3,12 @@ from collections.abc import AsyncIterable
 from typing import AsyncIterator, Optional
 
 import aioboto3
-from botocore.exceptions import ClientError, NoCredentialsError
 
-from ai.backend.common.dto.storage.response import S3ObjectInfo, S3PresignedUploadData
+from ai.backend.common.dto.storage.response import FileMetaResponse, PresignedUploadResponse
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE = 8192  # Default chunk size for streaming downloads
 
 
 class S3Client:
@@ -37,18 +38,14 @@ class S3Client:
         Args:
             bucket_name: Name of the bucket to create.
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                await s3_client.create_bucket(Bucket=bucket_name)
-                logger.info(f"Bucket {bucket_name} created successfully.")
-        except ClientError as e:
-            logger.error(f"Failed to create bucket {bucket_name}: {e}")
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            await s3_client.create_bucket(Bucket=bucket_name)
 
     async def delete_bucket(self, bucket_name: str) -> None:
         """
@@ -57,18 +54,14 @@ class S3Client:
         Args:
             bucket_name: Name of the bucket to delete.
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                await s3_client.delete_bucket(Bucket=bucket_name)
-                logger.info(f"Bucket {bucket_name} deleted successfully.")
-        except ClientError as e:
-            logger.error(f"Failed to delete bucket {bucket_name}: {e}")
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            await s3_client.delete_bucket(Bucket=bucket_name)
 
     async def upload_stream(
         self,
@@ -85,53 +78,38 @@ class S3Client:
             s3_key: The S3 object key (destination path in bucket)
             content_type: MIME type of the file (optional)
             content_length: Total content length if known (optional)
-
-        Returns:
-            bool: True if successful, False otherwise
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                # For streaming upload, we need to use put_object with data
-                data_chunks = []
-                async for chunk in data_stream:
-                    data_chunks.append(chunk)
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            # For streaming upload, we need to use put_object with data
+            data_chunks = []
+            async for chunk in data_stream:
+                data_chunks.append(chunk)
 
-                data = b"".join(data_chunks)
+            data = b"".join(data_chunks)
 
-                put_object_args = {
-                    "Bucket": self.bucket_name,
-                    "Key": s3_key,
-                    "Body": data,
-                }
+            put_object_args = {
+                "Bucket": self.bucket_name,
+                "Key": s3_key,
+                "Body": data,
+            }
 
-                if content_type:
-                    put_object_args["ContentType"] = content_type
-                if content_length:
-                    put_object_args["ContentLength"] = str(content_length)
+            if content_type:
+                put_object_args["ContentType"] = content_type
+            if content_length:
+                put_object_args["ContentLength"] = str(content_length)
 
-                await s3_client.put_object(**put_object_args)
-                logger.info(f"Successfully uploaded stream to s3://{self.bucket_name}/{s3_key}")
-
-        except NoCredentialsError:
-            logger.error("AWS credentials not found")
-            raise
-        except ClientError as e:
-            logger.error(f"Failed to upload stream to S3: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error during upload: {e}")
-            raise
+            await s3_client.put_object(**put_object_args)
 
     async def download_stream(
         self,
         s3_key: str,
-        chunk_size: int = 8192,
+        chunk_size: int = _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE,
     ) -> AsyncIterator[bytes]:
         """
         Download and stream S3 object content as bytes chunks.
@@ -144,111 +122,85 @@ class S3Client:
         Yields:
             bytes: Chunks of file content
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                response = await s3_client.get_object(
-                    Bucket=self.bucket_name,
-                    Key=s3_key,
-                )
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            response = await s3_client.get_object(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+            )
 
-                body = response["Body"]
-                try:
-                    while True:
-                        chunk = await body.read(chunk_size)
-                        if not chunk:
-                            break
-                        yield chunk
-                finally:
-                    body.close()
-
-                logger.info(f"Successfully streamed s3://{self.bucket_name}/{s3_key}")
-
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                logger.error(f"S3 object not found: s3://{self.bucket_name}/{s3_key}")
-            else:
-                logger.error(f"Failed to stream file from S3: {e}")
-            raise
-        except NoCredentialsError:
-            logger.error("AWS credentials not found")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error during streaming: {e}")
-            raise
+            body = response["Body"]
+            try:
+                while True:
+                    chunk = await body.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                body.close()
 
     async def generate_presigned_upload_url(
         self,
         s3_key: str,
-        expiration: int = 3600,
+        expiration: int,
         content_type: Optional[str] = None,
         content_length_range: Optional[tuple[int, int]] = None,
-    ) -> S3PresignedUploadData:
+    ) -> PresignedUploadResponse:
         """
         Generate a presigned URL for client-side upload to S3.
 
         Args:
             s3_key: The S3 object key for upload
-            expiration: URL expiration time in seconds (default: 1 hour)
+            expiration: URL expiration time in seconds
             content_type: Required content type for the upload (optional)
             content_length_range: Tuple of (min, max) content length in bytes (optional)
 
         Returns:
-            S3PresignedUploadData: Presigned URL data or None if failed
+            PresignedUploadResponse: Presigned URL data
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                conditions: list = []
-                fields = {}
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            conditions: list = []
+            fields = {}
 
-                if content_type:
-                    conditions.append({"Content-Type": content_type})
-                    fields["Content-Type"] = content_type
+            if content_type:
+                conditions.append({"Content-Type": content_type})
+                fields["Content-Type"] = content_type
 
-                if content_length_range:
-                    conditions.append([
-                        "content-length-range",
-                        content_length_range[0],
-                        content_length_range[1],
-                    ])
+            if content_length_range:
+                conditions.append([
+                    "content-length-range",
+                    content_length_range[0],
+                    content_length_range[1],
+                ])
 
-                response = await s3_client.generate_presigned_post(
-                    Bucket=self.bucket_name,
-                    Key=s3_key,
-                    Fields=fields,
-                    Conditions=conditions,
-                    ExpiresIn=expiration,
-                )
+            response = await s3_client.generate_presigned_post(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+                Fields=fields,
+                Conditions=conditions,
+                ExpiresIn=expiration,
+            )
 
-                logger.info(f"Generated presigned upload URL for s3://{self.bucket_name}/{s3_key}")
-                return S3PresignedUploadData(
-                    url=response["url"],
-                    fields=response["fields"],
-                    key=s3_key,
-                )
-
-        except ClientError as e:
-            logger.error(f"Failed to generate presigned upload URL: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error generating presigned upload URL: {e}")
-            raise
+            return PresignedUploadResponse(
+                url=response["url"],
+                fields=response["fields"],
+            )
 
     async def generate_presigned_download_url(
         self,
         s3_key: str,
-        expiration: int = 3600,
+        expiration: int,
         response_content_disposition: Optional[str] = None,
         response_content_type: Optional[str] = None,
     ) -> str:
@@ -262,45 +214,34 @@ class S3Client:
             response_content_type: Override Content-Type header (optional)
 
         Returns:
-            str: Presigned download URL or None if failed
+            str: Presigned download URL
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                params = {
-                    "Bucket": self.bucket_name,
-                    "Key": s3_key,
-                }
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            params = {
+                "Bucket": self.bucket_name,
+                "Key": s3_key,
+            }
 
-                if response_content_disposition:
-                    params["ResponseContentDisposition"] = response_content_disposition
-                if response_content_type:
-                    params["ResponseContentType"] = response_content_type
+            if response_content_disposition:
+                params["ResponseContentDisposition"] = response_content_disposition
+            if response_content_type:
+                params["ResponseContentType"] = response_content_type
 
-                url = await s3_client.generate_presigned_url(
-                    "get_object",
-                    Params=params,
-                    ExpiresIn=expiration,
-                )
+            url = await s3_client.generate_presigned_url(
+                "get_object",
+                Params=params,
+                ExpiresIn=expiration,
+            )
 
-                logger.info(
-                    f"Generated presigned download URL for s3://{self.bucket_name}/{s3_key}"
-                )
-                return url
+            return url
 
-        except ClientError as e:
-            logger.error(f"Failed to generate presigned download URL: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error generating presigned download URL: {e}")
-            raise
-
-    async def get_object_info(self, s3_key: str) -> S3ObjectInfo:
+    async def get_object_meta(self, s3_key: str) -> FileMetaResponse:
         """
         Get metadata information about an S3 object.
 
@@ -308,40 +249,27 @@ class S3Client:
             s3_key: The S3 object key
 
         Returns:
-            S3ObjectInfo: Object metadata or None if object doesn't exist
+            FileMetaResponse: Object metadata
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                response = await s3_client.head_object(
-                    Bucket=self.bucket_name,
-                    Key=s3_key,
-                )
-                last_modified = response.get("LastModified")
-                return S3ObjectInfo(
-                    content_length=response.get("ContentLength"),
-                    content_type=response.get("ContentType"),
-                    last_modified=last_modified.isoformat() if last_modified else None,
-                    etag=response.get("ETag"),
-                    metadata=response.get("Metadata", {}),
-                )
-
-        except ClientError as e:
-            error_code = e.response["Error"]["Code"]
-            if error_code in ("NoSuchKey", "404", "NotFound"):
-                logger.debug(f"S3 object not found: s3://{self.bucket_name}/{s3_key}")
-                raise
-            else:
-                logger.error(f"Failed to get object info from S3: {e}")
-                raise
-        except Exception as e:
-            logger.error(f"Unexpected error getting object info: {e}")
-            raise
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            response = await s3_client.head_object(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+            )
+            last_modified = response.get("LastModified")
+            return FileMetaResponse(
+                content_length=response.get("ContentLength"),
+                content_type=response.get("ContentType"),
+                last_modified=last_modified.isoformat() if last_modified else None,
+                etag=response.get("ETag"),
+                metadata=response.get("Metadata", {}),
+            )
 
     async def delete_object(self, s3_key: str) -> None:
         """
@@ -349,26 +277,15 @@ class S3Client:
 
         Args:
             s3_key: The S3 object key to delete
-
-        Returns:
-            bool: True if successful, False otherwise
         """
-        try:
-            async with self.session.client(
-                "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region_name,
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-            ) as s3_client:
-                await s3_client.delete_object(
-                    Bucket=self.bucket_name,
-                    Key=s3_key,
-                )
-                logger.info(f"Successfully deleted s3://{self.bucket_name}/{s3_key}")
-        except ClientError as e:
-            logger.error(f"Failed to delete object from S3: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error during deletion: {e}")
-            raise
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            await s3_client.delete_object(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+            )
