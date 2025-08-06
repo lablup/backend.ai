@@ -7,6 +7,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 from .scope_permission import ScopePermissionData, ScopePermissionDataWithEntity
 from .status import RoleStatus
+from .types import EntityType
 
 
 @dataclass
@@ -69,7 +70,7 @@ class RoleDataWithPermissions:
 class PermissionCheckInput:
     user_id: uuid.UUID
     operation: str
-    target_entity_type: str
+    target_entity_type: EntityType
     target_entity_id: str
 
 
