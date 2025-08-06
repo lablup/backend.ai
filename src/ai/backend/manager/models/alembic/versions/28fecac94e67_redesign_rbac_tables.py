@@ -20,11 +20,6 @@ depends_on = None
 
 def upgrade() -> None:
     op.drop_table("object_permissions")
-    op.drop_table("scope_permissions")
-
-    op.add_column("roles", sa.Column("operation", sa.String(length=32), nullable=False))
-    op.add_column("roles", sa.Column("scope_type", sa.String(length=32), nullable=False))
-    op.add_column("roles", sa.Column("scope_id", sa.String(length=64), nullable=False))
 
 
 def downgrade() -> None:
@@ -44,23 +39,3 @@ def downgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_object_permissions")),
     )
-    op.create_table(
-        "scope_permissions",
-        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
-        sa.Column("status", sa.String(length=64), nullable=False, server_default="active"),
-        sa.Column("role_id", GUID(), nullable=False),
-        sa.Column("entity_type", sa.String(length=32), nullable=False),
-        sa.Column("operation", sa.String(length=32), nullable=False),
-        sa.Column("scope_type", sa.String(length=32), nullable=False),
-        sa.Column("scope_id", sa.String(length=64), nullable=False),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_scope_permissions")),
-    )
-    op.drop_column("roles", "scope_id")
-    op.drop_column("roles", "scope_type")
-    op.drop_column("roles", "operation")

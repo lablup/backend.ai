@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from sqlalchemy.orm import (
+    relationship,
+)
 
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -11,6 +15,9 @@ from ..base import (
     Base,
     IDColumn,
 )
+
+if TYPE_CHECKING:
+    from .scope_permission import ScopePermissionRow
 
 
 class AssociationScopesEntitiesRow(Base):
@@ -45,6 +52,12 @@ class AssociationScopesEntitiesRow(Base):
         sa.DateTime(timezone=True),
         nullable=False,
         server_default=sa.func.now(),
+    )
+
+    scope_permission_row: ScopePermissionRow = relationship(
+        "ScopePermissionRow",
+        back_populates="mapped_entity_rows",
+        primaryjoin="ScopePermissionRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
     )
 
     def object_id(self) -> ObjectId:

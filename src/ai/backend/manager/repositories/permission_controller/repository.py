@@ -3,6 +3,7 @@ from typing import Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.permission.id import (
@@ -27,6 +28,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...models.rbac_models.role import RoleRow
+from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
 
 # Layer-specific decorator for user repository
@@ -49,6 +51,18 @@ class PermissionControllerRepository:
         async with self._db.begin_session() as db_session:
             role_row = RoleRow.from_input(data)
             db_session.add(role_row)  # type: ignore[arg-type]
+            await db_session.flush()
+            role_id = role_row.id
+            for scope_permission in data.scope_permissions:
+                scope_permission_row = ScopePermissionRow(
+                    role_id=role_id,
+                    entity_type=scope_permission.entity_type,
+                    operation=scope_permission.operation,
+                    scope_type=scope_permission.scope_id.scope_type,
+                    scope_id=scope_permission.scope_id.scope_id,
+                )
+                db_session.add(scope_permission_row)  # type: ignore[arg-type]
+            await db_session.commit()
         return role_row.to_data()
 
     async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> Optional[RoleRow]:
@@ -103,6 +117,11 @@ class PermissionControllerRepository:
                         RoleRow.status == RoleStatus.ACTIVE,
                         UserRoleRow.user_id == user_id,
                     )
+                )
+                .options(
+                    selectinload(RoleRow.scope_permission_rows).options(
+                        selectinload(ScopePermissionRow.mapped_entity_rows)
+                    ),
                 )
             )
             result = await db_session.scalars(query)
