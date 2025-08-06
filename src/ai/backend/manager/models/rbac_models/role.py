@@ -13,13 +13,12 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import (
     RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
 )
 from ai.backend.manager.data.permission.status import (
-    PermissionStatus,
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import RoleSource
@@ -129,6 +128,9 @@ class RoleRow(Base):
     def from_input(cls, data: RoleCreateInput) -> Self:
         return cls(
             name=data.name,
+            operation=data.operation,
+            scope_type=data.scope_id.scope_type,
+            scope_id=data.scope_id.scope_id,
             status=data.status,
             description=data.description,
         )
