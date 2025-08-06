@@ -60,7 +60,12 @@ async def test_stream_upload_success(s3_client, storages_service):
         yield b"chunk 2"
 
     result = await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, mock_data_stream()
+        "test_storage",
+        _BUCKET_FIXTURE_NAME,
+        _TEST_KEY,
+        _TEST_CONTENT_TYPE,
+        None,
+        mock_data_stream(),
     )
 
     assert isinstance(result, UploadResponse)
@@ -79,6 +84,7 @@ async def test_stream_upload_invalid_storage(storages_service):
             _BUCKET_FIXTURE_NAME,
             _TEST_KEY,
             _TEST_CONTENT_TYPE,
+            None,
             mock_data_stream(),
         )
 
@@ -92,7 +98,12 @@ async def test_stream_upload_invalid_bucket(storages_service):
 
     with pytest.raises(FileStreamUploadError):
         await storages_service.stream_upload(
-            "test_storage", "invalid-bucket", _TEST_KEY, _TEST_CONTENT_TYPE, mock_data_stream()
+            "test_storage",
+            "invalid-bucket",
+            _TEST_KEY,
+            _TEST_CONTENT_TYPE,
+            None,
+            mock_data_stream(),
         )
 
 
@@ -106,7 +117,7 @@ async def test_stream_download_success(s3_client, storages_service):
         yield b"test chunk 2"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
     )
 
     # Now download it
@@ -228,7 +239,12 @@ async def test_generate_presigned_download_url_success(s3_client, storages_servi
         yield test_data
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, "text/plain", upload_stream()
+        "test_storage",
+        _BUCKET_FIXTURE_NAME,
+        _PRESIGNED_TEST_KEY,
+        "text/plain",
+        None,
+        upload_stream(),
     )
 
     # Generate presigned download URL
@@ -277,7 +293,7 @@ async def test_get_object_info_success(s3_client, storages_service):
         yield b"test data for object info"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
     )
 
     # Get object info
@@ -323,7 +339,7 @@ async def test_delete_object_success(s3_client, storages_service):
         yield b"test data for deletion"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
     )
 
     # Delete the object

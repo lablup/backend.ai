@@ -69,9 +69,6 @@ class PresignedUploadReq(BaseRequestModel):
     expiration: Optional[int] = Field(
         default=None, gt=0, description="Token expiration time in seconds"
     )
-    content_type: Optional[str] = Field(
-        default=None, description="MIME type of the object for upload operations"
-    )
     min_size: Optional[int] = Field(
         default=None, ge=0, description="Minimum allowed size in bytes for upload operations"
     )

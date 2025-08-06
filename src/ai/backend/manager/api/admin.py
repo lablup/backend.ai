@@ -152,7 +152,7 @@ class GQLInspectionConfigCtx(MiddlewareParam):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         root_ctx: RootContext = request.app["_root.context"]
         app_ctx: PrivateContext = request.app["admin.context"]
 
