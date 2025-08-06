@@ -113,16 +113,15 @@ class Scheduler:
         )
         return pool
 
-    async def schedule_all_scaling_groups(self) -> bool:
+    async def schedule_all_scaling_groups(self) -> int:
         """
         Schedule sessions for all scaling groups.
 
         Returns:
-            bool: True if any sessions were scheduled, False otherwise.
+            int: The number of sessions successfully scheduled.
         """
-        sessions_scheduled = False
         lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-
+        total_scheduled_count = 0
         # Acquire distributed lock before scheduling
         async with self._lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
             async with self._operation_metrics.measure_operation("schedule_all_scaling_groups"):
@@ -130,33 +129,19 @@ class Scheduler:
                 scaling_groups = await self._repository.get_schedulable_scaling_groups()
                 for scaling_group in scaling_groups:
                     try:
-                        # Get scaling group specific configuration first
-                        sg_info = await self._repository.get_scaling_group_info_for_sokovan(
-                            scaling_group
-                        )
-                        # Get pending sessions for this scaling group as workloads
-                        workloads = await self._repository.get_pending_sessions(
-                            scaling_group, sg_info.pending_timeout
-                        )
-                        if not workloads:
+                        log.info("Scheduling sessions for scaling group: {}", scaling_group)
+                        # Schedule sessions for this scaling group
+                        async with self._operation_metrics.measure_operation(
+                            "schedule_scaling_group",
+                        ):
+                            scheduled_count = await self._schedule_scaling_group(scaling_group)
+                        total_scheduled_count += scheduled_count
+                        if scheduled_count > 0:
                             log.info(
-                                "No pending sessions for scaling group {}. Skipping scheduling.",
+                                "Scheduled {} sessions for scaling group: {}",
+                                scheduled_count,
                                 scaling_group,
                             )
-                            continue
-
-                        # Schedule the workloads for this scaling group
-                        num_scheduled = await self._schedule_queued_sessions(
-                            scaling_group, workloads, sg_info
-                        )
-                        if num_scheduled > 0:
-                            log.info(
-                                "Scheduled {} sessions for scaling group {}",
-                                num_scheduled,
-                                scaling_group,
-                            )
-                            sessions_scheduled = True
-
                     except Exception as e:
                         log.error(
                             "Failed to schedule sessions for scaling group {}: {}",
@@ -167,7 +152,33 @@ class Scheduler:
                         # Continue with other scaling groups even if one fails
                         continue
 
-                return sessions_scheduled
+                return total_scheduled_count
+
+    async def _schedule_scaling_group(self, scaling_group: str) -> int:
+        """
+        Schedule sessions for a specific scaling group.
+        Args:
+            scaling_group: The scaling group to schedule for.
+        Returns:
+            int: The number of sessions successfully scheduled.
+        """
+        # Get scaling group specific configuration first
+        # TODO: 아래 두개의 메소드는 합쳐져야 함
+        # 내부적으로 private method를 db_session을 사용하여 호출하도록 변경
+        sg_info = await self._repository.get_scaling_group_info_for_sokovan(scaling_group)
+        # Get pending sessions for this scaling group as workloads
+        workloads = await self._repository.get_pending_sessions(
+            scaling_group, sg_info.pending_timeout
+        )
+        if not workloads:
+            log.info(
+                "No pending sessions for scaling group {}. Skipping scheduling.",
+                scaling_group,
+            )
+            return 0
+
+        # Schedule the workloads for this scaling group
+        return await self._schedule_queued_sessions(scaling_group, workloads, sg_info)
 
     async def _schedule_queued_sessions(
         self, scaling_group: str, workloads: Sequence[SessionWorkload], sg_info: ScalingGroupInfo
@@ -182,12 +193,16 @@ class Scheduler:
         # No need to record queued sessions here, they are recorded during scheduling phases
 
         # Fetch complete system snapshot from repository
-        system_snapshot = await self._repository.get_system_snapshot(scaling_group)
-        config = await self._repository.get_scheduling_config(scaling_group)
-        selection_config = AgentSelectionConfig(
-            max_container_count=config.max_container_count_per_agent,
-            enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
-        )
+        async with self._phase_metrics.measure_phase(scaling_group, "system_snapshot"):
+            # Get the current system snapshot and scheduling configuration
+            # TODO: 2개 요청을 합쳐서 하나의 public method로 변경
+            # 다만 2개 동작이 다르니 private method로 변경하여 db_session을 사용하도록 함
+            system_snapshot = await self._repository.get_system_snapshot(scaling_group)
+            config = await self._repository.get_scheduling_config(scaling_group)
+            selection_config = AgentSelectionConfig(
+                max_container_count=config.max_container_count_per_agent,
+                enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
+            )
 
         # Validation phase with timing
         async with self._phase_metrics.measure_phase(scaling_group, "validation"):
@@ -224,25 +239,26 @@ class Scheduler:
         session_allocations: list[SessionAllocation] = []
         # Get appropriate agent selector for this scaling group
         agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
-        for session_workload in sequenced_workloads:
-            session_allocation = await self._allocate_workload(
-                session_workload,
-                mutable_agents,
-                selection_config,
-                scaling_group,
-                agent_selector,
-            )
-            if not session_allocation:
-                continue
-            session_allocations.append(session_allocation)
-        # Allocate resources for each validated workload
-        if session_allocations:
-            log.info(
-                "Allocating resources for {} session allocations in scaling group {}",
-                len(session_allocations),
-                scaling_group,
-            )
-            await self._allocator.allocate(session_allocations)
+        async with self._phase_metrics.measure_phase(scaling_group, "allocation"):
+            for session_workload in sequenced_workloads:
+                session_allocation = await self._allocate_workload(
+                    session_workload,
+                    mutable_agents,
+                    selection_config,
+                    scaling_group,
+                    agent_selector,
+                )
+                if not session_allocation:
+                    continue
+                session_allocations.append(session_allocation)
+            # Allocate resources for each validated workload
+            if session_allocations:
+                log.info(
+                    "Allocating resources for {} session allocations in scaling group {}",
+                    len(session_allocations),
+                    scaling_group,
+                )
+                await self._allocator.allocate(session_allocations)
 
         # Allocation metrics are recorded in _allocate_workload
 
@@ -265,93 +281,90 @@ class Scheduler:
         :param scaling_group: The scaling group name
         :return: SessionAllocation if successful, None otherwise
         """
-        async with self._phase_metrics.measure_phase(scaling_group, "allocation"):
-            try:
-                # Convert to new criteria format
-                criteria = session_workload.to_agent_selection_criteria()
+        try:
+            # Convert to new criteria format
+            criteria = session_workload.to_agent_selection_criteria()
 
-                # Get resource requirements based on cluster mode
-                resource_requirements = criteria.get_resource_requirements()
-                if not resource_requirements:
-                    log.debug(
-                        "No resource requirements found for session {}",
-                        session_workload.session_id,
-                    )
-                    return None
-
-                kernel_allocations: list[KernelAllocation] = []
-                # Track agent allocations: agent_id -> AgentAllocation
-                agent_allocation_map: dict[AgentId, AgentAllocation] = {}
-
-                try:
-                    # Process each resource requirement
-                    for resource_req in resource_requirements:
-                        # Agent selection is part of allocation phase
-
-                        # Only apply designated agent to the first selection
-                        selected_agent = (
-                            await agent_selector.select_agent_for_resource_requirements(
-                                agents_info,
-                                resource_req,
-                                criteria,
-                                selection_config,
-                                session_workload.designated_agent,
-                            )
-                        )
-
-                        # Update the selected agent's state immediately for next selection
-                        selected_agent.occupied_slots = (
-                            selected_agent.occupied_slots + resource_req.requested_slots
-                        )
-                        selected_agent.container_count += len(resource_req.kernel_ids)
-
-                        # Track resource allocation for this agent
-                        if selected_agent.agent_id not in agent_allocation_map:
-                            agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
-                                agent_id=selected_agent.agent_id,
-                                allocated_slots=[],
-                            )
-                        agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
-                            resource_req.requested_slots
-                        )
-
-                        # Create kernel allocations
-                        for kernel_id in resource_req.kernel_ids:
-                            kernel_allocations.append(
-                                KernelAllocation(
-                                    kernel_id=kernel_id,
-                                    agent_id=selected_agent.agent_id,
-                                    agent_addr=selected_agent.agent_addr,
-                                    scaling_group=selected_agent.scaling_group,
-                                )
-                            )
-
-                except AgentSelectionError as e:
-                    log.debug(
-                        "Agent selection failed for session {}: {}",
-                        session_workload.session_id,
-                        e,
-                    )
-                    # Allocation failure is already recorded by context manager
-                    return None
-
-                # Create session allocation
-                # Get agent allocations from the map
-                agent_allocations = list(agent_allocation_map.values())
-
-                return SessionAllocation(
-                    session_id=session_workload.session_id,
-                    session_type=session_workload.session_type,
-                    cluster_mode=session_workload.cluster_mode,
-                    scaling_group=scaling_group,
-                    kernel_allocations=kernel_allocations,
-                    agent_allocations=agent_allocations,
-                )
-            except Exception as e:
+            # Get resource requirements based on cluster mode
+            resource_requirements = criteria.get_resource_requirements()
+            if not resource_requirements:
                 log.debug(
-                    "Allocation failed for workload {}: {}",
+                    "No resource requirements found for session {}",
+                    session_workload.session_id,
+                )
+                return None
+
+            kernel_allocations: list[KernelAllocation] = []
+            # Track agent allocations: agent_id -> AgentAllocation
+            agent_allocation_map: dict[AgentId, AgentAllocation] = {}
+
+            try:
+                # Process each resource requirement
+                for resource_req in resource_requirements:
+                    # Agent selection is part of allocation phase
+
+                    # Only apply designated agent to the first selection
+                    selected_agent = await agent_selector.select_agent_for_resource_requirements(
+                        agents_info,
+                        resource_req,
+                        criteria,
+                        selection_config,
+                        session_workload.designated_agent,
+                    )
+
+                    # Update the selected agent's state immediately for next selection
+                    selected_agent.occupied_slots = (
+                        selected_agent.occupied_slots + resource_req.requested_slots
+                    )
+                    selected_agent.container_count += len(resource_req.kernel_ids)
+
+                    # Track resource allocation for this agent
+                    if selected_agent.agent_id not in agent_allocation_map:
+                        agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
+                            agent_id=selected_agent.agent_id,
+                            allocated_slots=[],
+                        )
+                    agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
+                        resource_req.requested_slots
+                    )
+
+                    # Create kernel allocations
+                    for kernel_id in resource_req.kernel_ids:
+                        kernel_allocations.append(
+                            KernelAllocation(
+                                kernel_id=kernel_id,
+                                agent_id=selected_agent.agent_id,
+                                agent_addr=selected_agent.agent_addr,
+                                scaling_group=selected_agent.scaling_group,
+                            )
+                        )
+
+            except AgentSelectionError as e:
+                log.debug(
+                    "Agent selection failed for session {}: {}",
                     session_workload.session_id,
                     e,
                 )
                 # Allocation failure is already recorded by context manager
                 return None
+
+            # Create session allocation
+            # Get agent allocations from the map
+            agent_allocations = list(agent_allocation_map.values())
+
+            return SessionAllocation(
+                session_id=session_workload.session_id,
+                session_type=session_workload.session_type,
+                cluster_mode=session_workload.cluster_mode,
+                scaling_group=scaling_group,
+                kernel_allocations=kernel_allocations,
+                agent_allocations=agent_allocations,
+            )
+        except Exception as e:
+            log.debug(
+                "Allocation failed for workload {}: {}",
+                session_workload.session_id,
+                e,
+            )
+            # Allocation failure is already recorded by context manager
+            return None
