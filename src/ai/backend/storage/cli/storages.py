@@ -26,7 +26,6 @@ def cli() -> None:
 
 
 def _make_encrypted_payload(
-    bucket: str,
     key: str,
     secret: str,
     expiration: Optional[int] = None,
@@ -34,7 +33,6 @@ def _make_encrypted_payload(
     filename: Optional[str] = None,
 ) -> str:
     payload = {
-        "bucket": bucket,
         "key": key,
         "iat": int(time.time()),
         # TODO: Move constant to common
@@ -234,7 +232,6 @@ def upload(
         click.echo(f"Uploading {file_path} to {bucket}/{key}...")
 
         payload = _make_encrypted_payload(
-            bucket=bucket,
             key=key,
             secret=secret,
             expiration=expiration,
@@ -324,7 +321,6 @@ def download(
         click.echo(f"Downloading {storage_name}/{bucket}/{key} to {output_path}...")
 
         payload = _make_encrypted_payload(
-            bucket=bucket,
             key=key,
             secret=secret,
             expiration=expiration,
@@ -399,7 +395,6 @@ def info(
         click.echo(f"Getting info for {bucket}/{key}...")
 
         payload = _make_encrypted_payload(
-            bucket=bucket,
             key=key,
             secret=secret,
             expiration=expiration,
