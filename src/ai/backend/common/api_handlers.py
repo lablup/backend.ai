@@ -4,7 +4,6 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterable, Mapping
 from dataclasses import dataclass, field
-from http import HTTPStatus
 from inspect import Signature
 from typing import (
     Any,
@@ -461,16 +460,8 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
 @dataclass
 class APIStreamResponse:
     body: AsyncIterable[bytes]
-    status: int = HTTPStatus.OK
+    status: int
     headers: Mapping[str, str] = field(default_factory=dict)
-
-
-def _ensure_bytes(chunk: Any) -> bytes:
-    if isinstance(chunk, (bytes, bytearray, memoryview)):
-        return bytes(chunk)
-    if isinstance(chunk, str):
-        return chunk.encode("utf-8")
-    return bytes(chunk)
 
 
 def stream_api_handler(handler: Any) -> ParsedRequestHandler:
@@ -503,16 +494,16 @@ def stream_api_handler(handler: Any) -> ParsedRequestHandler:
         body_iter = body.__aiter__()
         # Send first chunk, and check if it raises an exception
         try:
-            first = await body_iter.__anext__()
+            first_chunk = await body_iter.__anext__()
             await resp.prepare(request)
-            await resp.write(_ensure_bytes(first))
+            await resp.write(first_chunk)
         except Exception as e:
             raise web.HTTPInternalServerError(
                 reason=f"Failed to send first chunk from stream: {repr(e)}"
             ) from e
 
         async for chunk in body_iter:
-            await resp.write(_ensure_bytes(chunk))
+            await resp.write(chunk)
 
         await resp.write_eof()
         return resp

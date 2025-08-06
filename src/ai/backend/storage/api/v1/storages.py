@@ -159,6 +159,7 @@ class StoragesAPIHandler:
 
         return APIStreamResponse(
             body=download_stream,
+            status=HTTPStatus.OK,
             headers={
                 "Content-Type": "application/octet-stream",
             },
