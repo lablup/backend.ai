@@ -25,7 +25,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
-    BgTaskProgress,
+    BgTaskProgressData,
     HuggingFaceImportBatchResponse,
     HuggingFaceImportResponse,
     HuggingFaceScanJobStatusResponse,
@@ -124,7 +124,7 @@ class HuggingFaceRegistryAPIHandler:
         response = HuggingFaceScanJobStatusResponse(
             task_id=UUID(task_id),
             status=task_status.status,
-            progress=BgTaskProgress(
+            progress=BgTaskProgressData(
                 current=int(task_status.current),
                 total=int(task_status.total),
             ),
