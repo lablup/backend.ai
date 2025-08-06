@@ -9,7 +9,10 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesData,
+)
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     ScopeType,
@@ -70,3 +73,16 @@ class AssociationScopesEntitiesRow(Base):
         Convert the association to a tuple of ScopeId and ObjectId.
         """
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
+
+    def to_data(self) -> AssociationScopesEntitiesData:
+        """
+        Convert the association to a data object.
+        """
+        return AssociationScopesEntitiesData(
+            id=self.id,
+            scope_id=ScopeId(
+                scope_type=self.scope_type,
+                scope_id=self.scope_id,
+            ),
+            object_id=self.object_id(),
+        )

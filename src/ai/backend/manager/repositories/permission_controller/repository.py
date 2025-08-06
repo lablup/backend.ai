@@ -146,10 +146,5 @@ class PermissionControllerRepository:
                     )
                     if obj_id == target_object_id:
                         return True
-            for object_perm in role.object_permissions:
-                if object_perm.operation != data.operation:
-                    continue
-                if object_perm.object_id == target_object_id:
-                    return True
 
         return False
