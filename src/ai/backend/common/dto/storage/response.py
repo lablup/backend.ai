@@ -65,14 +65,6 @@ class ObjectMetaResponse(BaseResponseModel):
     metadata: dict[str, str]
 
 
-class S3PresignedUploadData(BaseResponseModel):
-    """Pydantic model for S3 presigned upload URL data."""
-
-    url: str
-    fields: dict[str, str]
-    key: str
-
-
 # HuggingFace API Response Models
 
 
