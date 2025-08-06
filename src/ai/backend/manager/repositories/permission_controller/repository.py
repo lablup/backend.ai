@@ -13,6 +13,7 @@ from ai.backend.manager.data.permission.role import (
     PermissionCheckInput,
     RoleCreateInput,
     RoleData,
+    RoleDataWithPermissions,
     RoleDeleteInput,
     RoleUpdateInput,
     UserRoleAssignmentInput,
@@ -106,7 +107,7 @@ class PermissionControllerRepository:
             return result.to_data()
 
     @repository_decorator()
-    async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleData]:
+    async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleDataWithPermissions]:
         async with self._db.begin_readonly_session() as db_session:
             query = (
                 sa.select(RoleRow)
