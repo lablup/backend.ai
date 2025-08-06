@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import time
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
 
+import jwt
 from aiohttp import web
 from pydantic import ValidationError
 
@@ -37,6 +39,9 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+_JWT_MAX_TTL = 300
+_JWT_LEEWAY = 30
+
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
@@ -60,8 +65,6 @@ class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
-        import jwt
-
         ctx: RootContext = request.app["ctx"]
         secret = ctx.local_config.storage_proxy.secret
 
@@ -72,11 +75,27 @@ class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
                 raise web.HTTPUnauthorized(reason="JWT token is missing")
 
             try:
-                decrypted_data = jwt.decode(token, secret, algorithms=["HS256"])
+                decrypted_data = jwt.decode(
+                    token,
+                    secret,
+                    algorithms=["HS256"],
+                    options={"require": ["exp"]},
+                    leeway=_JWT_LEEWAY,
+                )
             except jwt.ExpiredSignatureError as e:
                 raise web.HTTPUnauthorized(reason=f"Expired JWT token: {str(e)}") from e
             except jwt.PyJWTError as e:
                 raise web.HTTPUnauthorized(reason=f"Invalid JWT token: {str(e)}") from e
+
+            now = int(time.time())
+            if decrypted_data["exp"] - now > _JWT_MAX_TTL:
+                raise web.HTTPUnauthorized(reason="Token TTL too long")
+            iat = decrypted_data.get("iat")
+            if iat is not None:
+                if iat > now + _JWT_LEEWAY:
+                    raise web.HTTPUnauthorized(reason="Token issued in the future")
+                if now - iat > _JWT_MAX_TTL:
+                    raise web.HTTPUnauthorized(reason="Token too old")
 
             ReqModel = cls._resolve_req_type()
             return cls(data=ReqModel.model_validate(decrypted_data))
