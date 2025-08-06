@@ -50,6 +50,11 @@ class StorageConfigsCtx(MiddlewareParam):
         # TODO: Inject storages config from DB
         return cls(storage_configs=[])
 
+    @classmethod
+    def _resolve_req_type(cls) -> Type[TReq]:
+        meta = cls.__pydantic_generic_metadata__
+        return meta["args"][0]
+
 
 class StorageAPIHandler:
     @api_handler
