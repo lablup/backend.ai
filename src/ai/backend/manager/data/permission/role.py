@@ -49,8 +49,6 @@ class RoleDeleteInput:
 class RoleData:
     id: uuid.UUID
     name: str
-    scope_id: ScopeId
-    operation: str
     status: RoleStatus
     created_at: datetime
     updated_at: Optional[datetime]
