@@ -13,13 +13,12 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import (
     RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
 )
 from ai.backend.manager.data.permission.status import (
-    PermissionStatus,
     RoleStatus,
 )
 
@@ -79,6 +78,11 @@ class RoleRow(Base):
         return RoleData(
             id=self.id,
             name=self.name,
+            scope_id=ScopeId(
+                scope_type=self.scope_type,
+                scope_id=self.scope_id,
+            ),
+            operation=self.operation,
             status=self.status,
             created_at=self.created_at,
             updated_at=self.updated_at,
@@ -86,6 +90,7 @@ class RoleRow(Base):
             description=self.description,
         )
 
+<<<<<<< HEAD
     def to_data_with_permissions(
         self, active_permission_only: bool = True
     ) -> RoleDataWithPermissions:
@@ -115,10 +120,15 @@ class RoleRow(Base):
             description=self.description,
         )
 
+=======
+>>>>>>> b2125ea9c (feat: Update RBAC data types)
     @classmethod
     def from_input(cls, data: RoleCreateInput) -> Self:
         return cls(
             name=data.name,
+            operation=data.operation,
+            scope_type=data.scope_id.scope_type,
+            scope_id=data.scope_id.scope_id,
             status=data.status,
             description=data.description,
         )
