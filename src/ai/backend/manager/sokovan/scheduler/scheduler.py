@@ -2,7 +2,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import TYPE_CHECKING, Optional
 
 from ai.backend.common.types import AgentId, AgentSelectionStrategy
@@ -13,51 +12,37 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
-from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
-from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.sequencers.lifo import LIFOSequencer
-from ai.backend.manager.sokovan.scheduler.sequencers.sequencer import WorkloadSequencer
 from ai.backend.manager.types import DistributedLockFactory
 
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.allocators.allocator import SchedulingAllocator
-from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from .selectors.concentrated import ConcentratedAgentSelector
+from .selectors.dispersed import DispersedAgentSelector
+from .selectors.exceptions import AgentSelectionError
+from .selectors.legacy import LegacyAgentSelector
+from .selectors.roundrobin import RoundRobinAgentSelector
+from .selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
     AgentSelector,
 )
-from ai.backend.manager.sokovan.scheduler.types import (
+from .sequencers.drf import DRFSequencer
+from .sequencers.fifo import FIFOSequencer
+from .sequencers.lifo import LIFOSequencer
+from .sequencers.sequencer import WorkloadSequencer
+from .types import (
     AgentAllocation,
     KernelAllocation,
+    ScalingGroupInfo,
     SessionAllocation,
     SessionWorkload,
 )
-from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
+from .validators.validator import SchedulingValidator
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+
+    from .allocators.allocator import SchedulingAllocator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class SchedulingConfig:
-    """Configuration needed for scheduling decisions."""
-
-    max_container_count_per_agent: Optional[int]
-    enforce_spreading_endpoint_replica: bool
-
-
-@dataclass
-class ScalingGroupInfo:
-    """Scaling group configuration for scheduling."""
-
-    scheduler_name: str
-    agent_selection_strategy: AgentSelectionStrategy
-    pending_timeout: timedelta
 
 
 @dataclass
@@ -66,7 +51,7 @@ class SchedulerArgs:
     sequencer: WorkloadSequencer
     agent_selector: AgentSelector
     allocator: "SchedulingAllocator"
-    repository: ScheduleRepository
+    repository: "ScheduleRepository"
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
 
@@ -76,7 +61,7 @@ class Scheduler:
     _default_sequencer: WorkloadSequencer
     _default_agent_selector: AgentSelector
     _allocator: "SchedulingAllocator"
-    _repository: ScheduleRepository
+    _repository: "ScheduleRepository"
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
     _sequencer_pool: Mapping[str, WorkloadSequencer]

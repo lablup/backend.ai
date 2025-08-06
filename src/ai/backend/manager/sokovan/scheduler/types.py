@@ -1,12 +1,13 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     ResourceSlot,
     SessionId,
@@ -259,3 +260,20 @@ class AllocationBatch:
 
     allocations: list[SessionAllocation]
     agent_ids: set[AgentId]
+
+
+@dataclass
+class SchedulingConfig:
+    """Configuration needed for scheduling decisions."""
+
+    max_container_count_per_agent: Optional[int]
+    enforce_spreading_endpoint_replica: bool
+
+
+@dataclass
+class ScalingGroupInfo:
+    """Scaling group configuration for scheduling."""
+
+    scheduler_name: str
+    agent_selection_strategy: AgentSelectionStrategy
+    pending_timeout: timedelta

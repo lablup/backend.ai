@@ -77,11 +77,6 @@ from ai.backend.manager.scheduler.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
-# Import types for SchedulerRepository implementation
-from ai.backend.manager.sokovan.scheduler.scheduler import (
-    ScalingGroupInfo,
-    SchedulingConfig,
-)
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
@@ -92,6 +87,8 @@ from ai.backend.manager.sokovan.scheduler.types import (
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
+    ScalingGroupInfo,
+    SchedulingConfig,
     SessionDependencyInfo,
     SessionDependencySnapshot,
     SessionWorkload,
