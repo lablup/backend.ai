@@ -132,7 +132,7 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBack
                 self.redis_keys = {}
 
             async def mset_then_set_expiry(r: Redis) -> Pipeline:
-                pipe = r.pipeline()
+                pipe = r.pipeline(transaction=False)
                 ttl = get_default_redis_key_ttl()
                 pipe.mset(cast(MSetType, keys))
                 for key in keys:
