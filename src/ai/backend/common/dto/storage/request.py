@@ -43,6 +43,9 @@ class UploadFileReq(BaseRequestModel):
     content_type: Optional[str] = Field(
         default=None, description="MIME type of the file being uploaded."
     )
+    content_length: Optional[int] = Field(
+        default=None, ge=0, description="Total content length of the file being uploaded."
+    )
 
 
 class DownloadFileReq(BaseRequestModel):

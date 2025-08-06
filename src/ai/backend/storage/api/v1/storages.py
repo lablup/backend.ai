@@ -103,6 +103,7 @@ class StoragesAPIHandler:
         """
         req = request_ctx.data
         content_type = req.content_type
+        content_length = req.content_length
         filepath = req.key
         file_reader = multipart_ctx.file_reader
         storage_name = query.parsed.storage_name
@@ -128,7 +129,7 @@ class StoragesAPIHandler:
                 yield chunk
 
         response = await storages_service.stream_upload(
-            storage_name, bucket_name, filepath, content_type, data_stream()
+            storage_name, bucket_name, filepath, content_type, content_length, data_stream()
         )
 
         return APIResponse.build(

@@ -51,6 +51,7 @@ class StoragesService:
         bucket_name: str,
         filepath: str,
         content_type: Optional[str],
+        content_length: Optional[int],
         data_stream: AsyncIterable[bytes],
     ) -> UploadResponse:
         """
@@ -72,6 +73,7 @@ class StoragesService:
                 data_stream,
                 filepath,
                 content_type=content_type,
+                content_length=content_length,
             )
 
             return UploadResponse()
