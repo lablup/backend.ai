@@ -1,30 +1,35 @@
 """migrate user data to roles
 
-Revision ID: b30e2fd772cb
+Revision ID: a4d56e86d9ee
 Revises: 28fecac94e67
-Create Date: 2025-08-06 21:03:17.496742
+Create Date: 2025-08-06 21:28:29.354670
 
 """
 
 import enum
 import uuid
+from collections.abc import Collection
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Session, foreign, registry, relationship, selectinload
 
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
 from ai.backend.manager.models.rbac_models.migrate.types import PermissionCreateInputGroup
 from ai.backend.manager.models.rbac_models.migrate.user import (
-    UserData,
+    map_role_to_project,
+    project_row_to_rbac_migration_data,
+    user_row_to_rbac_migration_data,
 )
 
 # revision identifiers, used by Alembic.
-revision = "4a60160ba8e0"
+revision = "a4d56e86d9ee"
 down_revision = "28fecac94e67"
 branch_labels = None
 depends_on = None
+
 
 mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
@@ -47,6 +52,12 @@ class GroupRow(Base):
 
     id: uuid.UUID = IDColumn()
 
+    users = relationship("AssocGroupUserRow")
+    scope_permissions: "list[ScopePermissionRow]" = relationship(
+        "ScopePermissionRow",
+        primaryjoin=lambda: GroupRow.id == sa.cast(foreign(ScopePermissionRow.scope_id), UUID),
+    )
+
 
 class AssocGroupUserRow(Base):
     __tablename__ = "association_groups_users"
@@ -54,7 +65,12 @@ class AssocGroupUserRow(Base):
 
     id: uuid.UUID = IDColumn()
     user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
-    group_id: uuid.UUID = sa.Column("group_id", GUID, nullable=False)
+    group_id: uuid.UUID = sa.Column(
+        "group_id",
+        GUID,
+        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
 
 
 class UserRow(Base):
@@ -65,8 +81,6 @@ class UserRow(Base):
     username = sa.Column("username", sa.String(length=64), unique=True)
     domain_name = sa.Column("domain_name", sa.String(length=64), index=True)
     role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
-
-    groups = relationship("AssocGroupUserRow", back_populates="user")
 
 
 class UserRoleRow(Base):
@@ -130,30 +144,95 @@ class AssociationScopesEntitiesRow(Base):
     )
 
 
-def upgrade() -> None:
-    conn = op.get_bind()
+def _insert_if_data_exists(db_session: Session, row_type, data: Collection) -> None:
+    if data:
+        db_session.execute(sa.insert(row_type), data)
 
+
+def _insert_from_create_input_group(
+    db_session: Session, input_group: PermissionCreateInputGroup
+) -> None:
+    _insert_if_data_exists(db_session, RoleRow, input_group.to_role_insert_data())
+    _insert_if_data_exists(db_session, UserRoleRow, input_group.to_user_role_insert_data())
+    _insert_if_data_exists(
+        db_session, ScopePermissionRow, input_group.to_scope_permission_insert_data()
+    )
+    _insert_if_data_exists(
+        db_session,
+        AssociationScopesEntitiesRow,
+        input_group.to_association_scopes_entities_insert_data(),
+    )
+
+
+def _migrate_project_data(db_session: Session) -> None:
+    offset = 0
+    page_size = 1000
+    while True:
+        project_query = sa.select(GroupRow).offset(offset).limit(page_size).order_by(GroupRow.id)
+        rows = db_session.scalars(project_query).all()
+        rows = cast(list[GroupRow], rows)
+        offset += page_size
+        if not rows:
+            break
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = project_row_to_rbac_migration_data(row)
+            input_group.merge(data)
+        _insert_from_create_input_group(db_session, input_group)
+
+
+def _migrate_user_data(db_session: Session) -> None:
     offset = 0
     page_size = 1000
     while True:
         user_query = sa.select(UserRow).offset(offset).limit(page_size).order_by(UserRow.uuid)
-        user_rows = conn.scalars(user_query).all()
-        user_rows = cast(list[UserRow], user_rows)
+        rows = db_session.scalars(user_query).all()
+        rows = cast(list[UserRow], rows)
         offset += page_size
-        if not user_rows:
+        if not rows:
             break
-        input = PermissionCreateInputGroup()
-        for row in user_rows:
-            data = UserData.from_user_row(row)
-            input_data = data.to_role_create_input()
-            input.merge(input_data)
-        conn.execute(sa.insert(RoleRow), input.to_role_insert_data())
-        conn.execute(sa.insert(UserRoleRow), input.to_user_role_insert_data())
-        conn.execute(sa.insert(ScopePermissionRow), input.to_scope_permission_insert_data())
-        conn.execute(
-            sa.insert(AssociationScopesEntitiesRow),
-            input.to_association_scopes_entities_insert_data(),
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = user_row_to_rbac_migration_data(row)
+            input_group.merge(data)
+        _insert_from_create_input_group(db_session, input_group)
+
+
+def _migrate_project_user_mapping_data(db_session: Session) -> None:
+    offset = 0
+    page_size = 1000
+    while True:
+        query = (
+            sa.select(GroupRow)
+            .options(
+                selectinload(GroupRow.users),
+                selectinload(GroupRow.scope_permissions),
+            )
+            .offset(offset)
+            .limit(page_size)
+            .order_by(GroupRow.id)
         )
+        rows = db_session.scalars(query).all()
+        rows = cast(list[GroupRow], rows)
+        offset += page_size
+        if not rows:
+            break
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            role_ids: set[uuid.UUID] = {permission.role_id for permission in row.scope_permissions}
+            for role_id in role_ids:
+                data = map_role_to_project(role_id, row)
+                input_group.merge(data)
+        _insert_from_create_input_group(db_session, input_group)
+
+
+def upgrade() -> None:
+    conn = op.get_bind()
+
+    with Session(bind=conn) as db_session:
+        _migrate_project_data(db_session)
+        _migrate_user_data(db_session)
+        _migrate_project_user_mapping_data(db_session)
 
 
 def downgrade() -> None:
