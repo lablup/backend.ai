@@ -1,9 +1,10 @@
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.data.bgtask.types import BgTaskProgressData
 from ai.backend.common.data.storage.registries.types import ModelInfo
 
 from ...api_handlers import BaseResponseModel
@@ -80,19 +81,6 @@ class HuggingFaceScanResponse(BaseResponseModel):
     )
 
 
-class BgTaskProgress(BaseModel):
-    current: int = Field(
-        default=0,
-        description="Current progress of the scan operation, expressed as a percentage.",
-        examples=[0, 50, 100],
-    )
-    total: int = Field(
-        default=0,
-        description="Total number of items to be scanned, used to calculate progress.",
-        examples=[100, 200, 0],
-    )
-
-
 class HuggingFaceScanJobStatusResponse(BaseResponseModel):
     """Response for HuggingFace scan job status."""
 
@@ -110,22 +98,19 @@ class HuggingFaceScanJobStatusResponse(BaseResponseModel):
         """,
         examples=[status.value for status in BgtaskStatus],
     )
-    progress: BgTaskProgress = Field(
+    progress: BgTaskProgressData = Field(
         description="""
         Indicates how much of the scan operation has been completed.
         """,
         examples=[{"current": 50, "total": 100}, {"current": 100, "total": 100}],
     )
     message: str = Field(
-        default="",
         description="""
         Status message or error description.
         Provides additional information about the current job status.
         """,
         examples=[
             "Scanning in progress",
-            "Scan completed successfully",
-            "Error: Model not found",
         ],
     )
 
