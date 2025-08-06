@@ -80,9 +80,21 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.redis_client import RedisConnection
-from ai.backend.common.types import AgentId, RedisProfileTarget
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
+from ai.backend.common.types import AgentId, RedisProfileTarget, ServiceDiscoveryType
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.utils import BraceStyleAdapter as LoggingBraceStyleAdapter
 
 from . import __version__
 from .config import ServerConfig
@@ -483,6 +495,55 @@ async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterato
     await timer
 
 
+@actxmgr
+async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    sd_type = root_ctx.local_config.service_discovery.type
+    service_discovery: ServiceDiscovery
+    match sd_type:
+        case ServiceDiscoveryType.REDIS:
+            redis_profile_target = RedisProfileTarget.from_dict(
+                root_ctx.local_config.redis.to_dict()
+            )
+            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            service_discovery = await RedisServiceDiscovery.create(
+                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+            )
+        case _:
+            raise RuntimeError(f"Unsupported service discovery type: {sd_type}")
+
+    # Determine announce addresses
+    announce_addr = root_ctx.local_config.proxy_worker.announce_addr
+    sd_loop = ServiceDiscoveryLoop(
+        sd_type,
+        service_discovery,
+        ServiceMetadata(
+            display_name=f"appproxy-worker-{root_ctx.local_config.proxy_worker.authority}",
+            service_group="appproxy-worker",
+            version=__version__,
+            endpoint=ServiceEndpoint(
+                address=announce_addr.host,
+                port=announce_addr.port,
+                protocol="http",
+                # It can be separated into an internal-purpose port later.
+                prometheus_address=str(announce_addr),
+            ),
+        ),
+    )
+
+    if root_ctx.local_config.otel.enabled:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=root_ctx.local_config.otel.log_level,
+            endpoint=root_ctx.local_config.otel.endpoint,
+        )
+        LoggingBraceStyleAdapter.apply_otel(otel_spec)
+    yield
+    sd_loop.close()
+
+
 async def metrics(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     root_ctx: RootContext = request.app["_root.context"]
@@ -650,6 +711,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
@@ -660,6 +722,7 @@ def build_root_app(
                 event_dispatcher_ctx,
                 event_dispatcher_lifecycle_ctx,
                 event_handler_ctx,
+                service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
@@ -824,16 +887,22 @@ async def server_main_logwrapper(
     ),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-worker service as a foreground process.
     """
+    log_level = LogLevel.DEBUG if debug else log_level
     cfg = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:

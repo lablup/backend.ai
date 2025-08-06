@@ -805,7 +805,7 @@ setup_environment() {
   mkdir -p "$HALFSTACK_VOLUME_PATH"
   if [ $CONFIGURE_HA -eq 1 ]; then
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
-    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
+    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus-ha.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
 
@@ -817,12 +817,12 @@ setup_environment() {
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace "s/${REDIS_MASTER_PORT}/9500/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SLAVE1_PORT}/9501/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SLAVE2_PORT}/9502/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL1_PORT}/9503/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL2_PORT}/9504/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL3_PORT}/9505/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_MASTER_PORT}/${REDIS_MASTER_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_PORT}/${REDIS_SLAVE1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_PORT}/${REDIS_SLAVE2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL1_PORT}/${REDIS_SENTINEL1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL2_PORT}/${REDIS_SENTINEL2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL3_PORT}/${REDIS_SENTINEL3_PORT}/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -1051,8 +1051,8 @@ configure_backendai() {
   # TODO: populate fixtures
 
   show_info "Setting up databases... (app-proxy)"
-  _psql_core="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
-  _psql_appproxy="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
+  _psql_core="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
+  _psql_appproxy="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
   $_psql_core -c "\
     DO \$\$
     BEGIN

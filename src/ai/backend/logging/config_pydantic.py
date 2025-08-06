@@ -2,7 +2,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import ByteSize, Field
+from pydantic import AliasChoices, ByteSize, Field
 
 from ai.backend.common.config import BaseConfigModel
 
@@ -10,9 +10,8 @@ from .types import LogFormat, LogLevel
 
 default_pkg_ns = {
     "": LogLevel.WARNING,
-    "ai.backend": LogLevel.DEBUG,
+    "ai.backend": LogLevel.INFO,
     "tests": LogLevel.DEBUG,
-    "aiohttp": LogLevel.INFO,
 }
 
 
@@ -123,4 +122,6 @@ class LoggingConfig(BaseConfigModel):
     pkg_ns: dict[str, LogLevel] = Field(
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
+        validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
+        serialization_alias="pkg-ns",
     )

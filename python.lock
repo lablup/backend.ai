@@ -48,6 +48,7 @@
 //     "dataclasses-json~=0.5.7",
 //     "etcd-client-py~=0.4.1",
 //     "faker~=24.7.1",
+//     "graphene-federation~=3.2.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
 //     "hiredis>=3.0.0",
@@ -92,6 +93,7 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.5",
 //     "setuptools~=80.0.0",
+//     "strawberry-graphql~=0.278.0",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
@@ -1093,36 +1095,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "bbf7a8d374b513975c305883ae40e623cc261dbdc25ea86ae435647cae837a15",
-              "url": "https://files.pythonhosted.org/packages/78/b6/c717416e67b1bef84be9c05f2686d353544eda2af5b43af06996a43f6481/boto3-1.39.12-py3-none-any.whl"
+              "hash": "82c6868cad18c3bd4170915e9525f9af5f83e9779c528417f8863629558fc2d0",
+              "url": "https://files.pythonhosted.org/packages/93/9a/01ea17a58a27b7f4a7a6f6e2f4d4191b9e92362b77b6d58689f2d7eccb99/boto3-1.39.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1a715cb40ea9df6b666148b243b5b9adbfa5be50d28e2f660330c0581d94b639",
-              "url": "https://files.pythonhosted.org/packages/a2/f6/9021213a36aefc43dc300c89882a52d348f3a7a344fefda145f1b741d0a5/boto3-1.39.12.tar.gz"
+              "hash": "fabb16360a93b449d5241006485bcc761c26694e75ac01009f4459f114acc06e",
+              "url": "https://files.pythonhosted.org/packages/66/8f/acc7d434730e0c931ece4b46c983bf5afb7ae63abb545b535f0eda538476/boto3-1.39.14.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.40.0,>=1.39.12",
+            "botocore<1.40.0,>=1.39.14",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.14.0,>=0.13.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.12"
+          "version": "1.39.14"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "60bfa0f1e0eb03997e22254e2e6a0e3f7e02b8f845253a4bb235d9240d195c72",
-              "url": "https://files.pythonhosted.org/packages/c8/af/3b82594c5fa26464b548da35a6affe27a44993f65c4149ed8cf8a5df8387/botocore-1.39.12-py3-none-any.whl"
+              "hash": "4ed551c77194167b7e8063f33059bc2f9b2ead0ed4ee33dc7857273648ed4349",
+              "url": "https://files.pythonhosted.org/packages/08/c0/6b8200686c1f9ea44ab0daab0223b04799d60ccf882b9d7f770fbb40571e/botocore-1.39.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d20b53a196af32ff153cbdbef3cb89e6a9065dc5e90ce23d009e03364601a266",
-              "url": "https://files.pythonhosted.org/packages/16/de/136cb340bc7edc2709e0b4f1b422a101f1756982d774384c5cfb0eb27987/botocore-1.39.12.tar.gz"
+              "hash": "7fc44d4ad13b524e5d8a6296785776ef5898ac026ff74df9b35313831d507926",
+              "url": "https://files.pythonhosted.org/packages/cc/ca/8994676a67f0a9d39a0844124f196c4dedc2fbca370c839f61246c1fea6d/botocore-1.39.14.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -1134,7 +1136,7 @@
             "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.12"
+          "version": "1.39.14"
         },
         {
           "artifacts": [
@@ -2062,6 +2064,55 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "61bb005dde580ae4d3be213e1911f7374534a0ad269e09d62fa5599de38b191e",
+              "url": "https://files.pythonhosted.org/packages/d9/0a/99588fb235e2f6de47155dce5b24114d69c2a3e976622512d0dcb18f0c2f/graphene_directives-0.4.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a9a3acc424bd1a59bd16d479f4ce09605eed3cc98fe06f50bb53f0e1facf99fd",
+              "url": "https://files.pythonhosted.org/packages/f7/d1/cd3863516e1e07f194a44a6822074bac94e7ddacd67ac0b2a79a1eab9784/graphene_directives-0.4.7.tar.gz"
+            }
+          ],
+          "project_name": "graphene-directives",
+          "requires_dists": [
+            "graphene>=3"
+          ],
+          "requires_python": "<4,>=3.9",
+          "version": "0.4.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "513b57425fc4ded32cec0acafa5d82170b7f7ed8da1e0c1e538e2b531879a21e",
+              "url": "https://files.pythonhosted.org/packages/37/37/2ef3c1cedf3dc7f7b5dba7bce70d3265427ca538682a15a1737c70c238e4/graphene_federation-3.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fbe9036684036a3c6e92a9f7a9dde98674f09894dee0c418301c62cc4c838ce6",
+              "url": "https://files.pythonhosted.org/packages/db/8e/70b903cdfccad416ba851d7fb092faac29ac72a6e5456336f11f79d9d298/graphene-federation-3.2.0.tar.gz"
+            }
+          ],
+          "project_name": "graphene-federation",
+          "requires_dists": [
+            "black==23.12.1; extra == \"dev\"",
+            "flake8==4.0.1; extra == \"dev\"",
+            "graphene-directives>=0.4.6",
+            "graphene>=3.1",
+            "graphql-core>=3.1",
+            "mypy==0.961; extra == \"dev\"",
+            "pytest-cov; extra == \"dev\"",
+            "pytest-cov; extra == \"test\"",
+            "pytest==7.1.2; extra == \"dev\"",
+            "pytest==7.1.2; extra == \"test\""
+          ],
+          "requires_python": null,
+          "version": "3.2.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "78b016718c161a6fb20a7d97bbf107f331cd1afe53e45566c59f776ed7f0b45f",
               "url": "https://files.pythonhosted.org/packages/ae/4f/7297663840621022bc73c22d7d9d80dbc78b4db6297f764b545cd5dd462d/graphql_core-3.2.6-py3-none-any.whl"
             },
@@ -2184,56 +2235,56 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "686231cdd03a8a8055f798b2b54b19428cdf18fa1549bee92249b43607c42668",
-              "url": "https://files.pythonhosted.org/packages/1f/29/efbd4ac837c23bc48e34bbaf32bd429f0dc9ad7f80721cdb4622144c118c/grpcio-1.73.1-cp313-cp313-musllinux_1_1_x86_64.whl"
+              "hash": "3b03d8f2a07f0fea8c8f74deb59f8352b770e3900d143b3d1475effcb08eec20",
+              "url": "https://files.pythonhosted.org/packages/84/35/9f6b2503c1fd86d068b46818bbd7329db26a87cdd8c01e0d1a9abea1104c/grpcio-1.74.0-cp313-cp313-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b310824ab5092cf74750ebd8a8a8981c1810cb2b363210e70d06ef37ad80d4f9",
-              "url": "https://files.pythonhosted.org/packages/37/bf/4ca20d1acbefabcaba633ab17f4244cbbe8eca877df01517207bd6655914/grpcio-1.73.1-cp313-cp313-linux_armv7l.whl"
+              "hash": "f6ec94f0e50eb8fa1744a731088b966427575e40c2944a980049798b127a687e",
+              "url": "https://files.pythonhosted.org/packages/0d/c6/3d2c14d87771a421205bdca991467cfe473ee4c6a1231c1ede5248c62ab8/grpcio-1.74.0-cp313-cp313-manylinux_2_17_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ad1d958c31cc91ab050bd8a91355480b8e0683e21176522bacea225ce51163f2",
-              "url": "https://files.pythonhosted.org/packages/55/f4/59edf5af68d684d0f4f7ad9462a418ac517201c238551529098c9aa28cb0/grpcio-1.73.1-cp313-cp313-musllinux_1_1_aarch64.whl"
+              "hash": "80d1f4fbb35b0742d3e3d3bb654b7381cd5f015f8497279a1e9c21ba623e01b1",
+              "url": "https://files.pythonhosted.org/packages/38/b4/35feb8f7cab7239c5b94bd2db71abb3d6adb5f335ad8f131abb6060840b6/grpcio-1.74.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "1c0bf15f629b1497436596b1cbddddfa3234273490229ca29561209778ebe182",
-              "url": "https://files.pythonhosted.org/packages/70/3b/14e43158d3b81a38251b1d231dfb45a9b492d872102a919fbf7ba4ac20cd/grpcio-1.73.1-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "e1ea6176d7dfd5b941ea01c2ec34de9531ba494d541fe2057c904e601879f249",
+              "url": "https://files.pythonhosted.org/packages/3f/ca/4fdc7bf59bf6994aa45cbd4ef1055cd65e2884de6113dbd49f75498ddb08/grpcio-1.74.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8f5a6df3fba31a3485096ac85b2e34b9666ffb0590df0cd044f58694e6a1f6b5",
-              "url": "https://files.pythonhosted.org/packages/75/ed/45c345f284abec5d4f6d77cbca9c52c39b554397eb7de7d2fcf440bcd049/grpcio-1.73.1-cp313-cp313-macosx_11_0_universal2.whl"
+              "hash": "c14e803037e572c177ba54a3e090d6eb12efd795d49327c5ee2b3bddb836bf01",
+              "url": "https://files.pythonhosted.org/packages/94/0e/33731a03f63740d7743dced423846c831d8e6da808fcd02821a4416df7fa/grpcio-1.74.0-cp313-cp313-macosx_11_0_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7fce2cd1c0c1116cf3850564ebfc3264fba75d3c74a7414373f1238ea365ef87",
-              "url": "https://files.pythonhosted.org/packages/79/e8/b43b851537da2e2f03fa8be1aef207e5cbfb1a2e014fbb6b40d24c177cd3/grpcio-1.73.1.tar.gz"
+              "hash": "0f87bddd6e27fc776aacf7ebfec367b6d49cad0455123951e4488ea99d9b9b8f",
+              "url": "https://files.pythonhosted.org/packages/a6/0e/bac93147b9a164f759497bc6913e74af1cb632c733c7af62c0336782bd38/grpcio-1.74.0-cp313-cp313-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "052e28fe9c41357da42250a91926a3e2f74c046575c070b69659467ca5aa976b",
-              "url": "https://files.pythonhosted.org/packages/a4/75/bff2c2728018f546d812b755455014bc718f8cdcbf5c84f1f6e5494443a8/grpcio-1.73.1-cp313-cp313-manylinux_2_17_aarch64.whl"
+              "hash": "566b9395b90cc3d0d0c6404bc8572c7c18786ede549cdb540ae27b58afe0fb91",
+              "url": "https://files.pythonhosted.org/packages/c5/83/5a354c8aaff58594eef7fffebae41a0f8995a6258bbc6809b800c33d4c13/grpcio-1.74.0-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f43ffb3bd415c57224c7427bfb9e6c46a0b6e998754bfa0d00f408e1873dcbb5",
-              "url": "https://files.pythonhosted.org/packages/e4/a8/700d034d5d0786a5ba14bfa9ce974ed4c976936c2748c2bd87aa50f69b36/grpcio-1.73.1-cp313-cp313-musllinux_1_1_i686.whl"
+              "hash": "2bc2d7d8d184e2362b53905cb1708c84cb16354771c04b490485fa07ce3a1d89",
+              "url": "https://files.pythonhosted.org/packages/d4/d8/1004a5f468715221450e66b051c839c2ce9a985aa3ee427422061fcbb6aa/grpcio-1.74.0-cp313-cp313-linux_armv7l.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0ab860d5bfa788c5a021fba264802e2593688cd965d1374d31d2b1a34cacd854",
-              "url": "https://files.pythonhosted.org/packages/e5/3f/81d9650ca40b54338336fd360f36773be8cb6c07c036e751d8996eb96598/grpcio-1.73.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "64229c1e9cea079420527fa8ac45d80fc1e8d3f94deaa35643c381fa8d98f362",
+              "url": "https://files.pythonhosted.org/packages/fd/48/2869e5b2c1922583686f7ae674937986807c2f676d08be70d0a541316270/grpcio-1.74.0-cp313-cp313-musllinux_1_1_aarch64.whl"
             }
           ],
           "project_name": "grpcio",
           "requires_dists": [
-            "grpcio-tools>=1.73.1; extra == \"protobuf\""
+            "grpcio-tools>=1.74.0; extra == \"protobuf\""
           ],
           "requires_python": ">=3.9",
-          "version": "1.73.1"
+          "version": "1.74.0"
         },
         {
           "artifacts": [
@@ -5374,6 +5425,61 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2815faee18156c079d91ac0092a34d18bbc67434b65ea7d34c1f97259e486f3b",
+              "url": "https://files.pythonhosted.org/packages/14/a0/7a7cbf69ed45621ea0060fdcb9f5e6206d582086d9d96e147ee29fa8c1db/strawberry_graphql-0.278.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e3fee9cd107b5b8ca69dd534c1dca6f82e4a9cf44cf46a4d338f42938896521a",
+              "url": "https://files.pythonhosted.org/packages/fe/fc/111bc073f6db82599e9df3f102bc3e73fc503203d8c6f3ff21ac0c1f4469/strawberry_graphql-0.278.0.tar.gz"
+            }
+          ],
+          "project_name": "strawberry-graphql",
+          "requires_dists": [
+            "Django>=3.2; extra == \"django\"",
+            "aiohttp<4,>=3.7.4.post0; extra == \"aiohttp\"",
+            "asgiref<4.0,>=3.2; extra == \"channels\"",
+            "asgiref<4.0,>=3.2; extra == \"django\"",
+            "chalice<2.0,>=1.22; extra == \"chalice\"",
+            "channels>=3.0.5; extra == \"channels\"",
+            "fastapi>=0.65.2; extra == \"fastapi\"",
+            "flask>=1.1; extra == \"flask\"",
+            "graphql-core<3.4.0,>=3.2.0",
+            "libcst; extra == \"cli\"",
+            "libcst; extra == \"debug\"",
+            "libcst; extra == \"debug-server\"",
+            "litestar>=2; python_version ~= \"3.10\" and extra == \"litestar\"",
+            "opentelemetry-api<2; extra == \"opentelemetry\"",
+            "opentelemetry-sdk<2; extra == \"opentelemetry\"",
+            "packaging>=23",
+            "pydantic>1.6.1; extra == \"pydantic\"",
+            "pygments<3.0,>=2.3; extra == \"cli\"",
+            "pygments<3.0,>=2.3; extra == \"debug-server\"",
+            "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
+            "python-dateutil<3.0,>=2.7",
+            "python-multipart>=0.0.7; extra == \"asgi\"",
+            "python-multipart>=0.0.7; extra == \"debug-server\"",
+            "python-multipart>=0.0.7; extra == \"fastapi\"",
+            "quart>=0.19.3; extra == \"quart\"",
+            "rich>=12.0.0; extra == \"cli\"",
+            "rich>=12.0.0; extra == \"debug\"",
+            "rich>=12.0.0; extra == \"debug-server\"",
+            "sanic>=20.12.2; extra == \"sanic\"",
+            "starlette>=0.18.0; extra == \"asgi\"",
+            "starlette>=0.18.0; extra == \"debug-server\"",
+            "typer>=0.7.0; extra == \"cli\"",
+            "typer>=0.7.0; extra == \"debug-server\"",
+            "typing-extensions>=4.5.0",
+            "uvicorn>=0.11.6; extra == \"debug-server\"",
+            "websockets<16,>=15.0.1; extra == \"debug-server\""
+          ],
+          "requires_python": "<4.0,>=3.9",
+          "version": "0.278.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "0ba055423dbaa164b9e456abe7920c5e8ed33fcc16f6d1b2f2d152c8e1e8b4fc",
               "url": "https://files.pythonhosted.org/packages/92/4e/e5a13fdb3e6f81ce11893523ff289870c87c8f1f289a7369fb0e9840c3bb/tabulate-0.8.10-py3-none-any.whl"
             },
@@ -6548,6 +6654,7 @@
     "dataclasses-json~=0.5.7",
     "etcd-client-py~=0.4.1",
     "faker~=24.7.1",
+    "graphene-federation~=3.2.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
     "hiredis>=3.0.0",
@@ -6592,6 +6699,7 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.5",
     "setuptools~=80.0.0",
+    "strawberry-graphql~=0.278.0",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",

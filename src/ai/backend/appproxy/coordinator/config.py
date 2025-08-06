@@ -24,6 +24,8 @@ from ai.backend.appproxy.common.config import (
 from ai.backend.appproxy.common.exceptions import ConfigValidationError
 from ai.backend.appproxy.common.types import EventLoopType
 from ai.backend.common import config
+from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.logging import LogLevel
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 
@@ -68,6 +70,50 @@ class EtcdConfig(BaseSchema):
 
 class TraefikConfig(BaseSchema):
     etcd: EtcdConfig
+
+
+class OTELConfig(BaseSchema):
+    enabled: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Whether to enable OpenTelemetry for tracing or logging. "
+                "When enabled, traces or log will be collected and sent to the configured OTLP endpoint."
+            ),
+            examples=[True, False],
+        ),
+    ]
+    log_level: Annotated[
+        str,
+        Field(
+            default="INFO",
+            description="Log level for OpenTelemetry logging.",
+            examples=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        ),
+    ]
+    endpoint: Annotated[
+        str,
+        Field(
+            default="http://localhost:4317",
+            description=(
+                "OTLP (OpenTelemetry Protocol) endpoint for exporting telemetry data. "
+                "Should include the host and port of the OTLP receiver."
+            ),
+            examples=["http://localhost:4317", "http://otel-collector:4317"],
+        ),
+    ]
+
+
+class ServiceDiscoveryConfig(BaseSchema):
+    type: Annotated[
+        ServiceDiscoveryType,
+        Field(
+            default=ServiceDiscoveryType.REDIS,
+            description="Type of service discovery to use.",
+            examples=[item.value for item in ServiceDiscoveryType],
+        ),
+    ]
 
 
 class ProxyCoordinatorConfig(BaseSchema):
@@ -219,6 +265,14 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
+    announce_addr: Annotated[
+        HostPortPair,
+        Field(
+            default_factory=lambda: HostPortPair(host="127.0.0.1", port=10200),
+            description=("Manually set the announced address for service discovery. "),
+        ),
+    ]
+
 
 class ServerConfig(BaseSchema):
     db: DBConfig
@@ -231,21 +285,33 @@ class ServerConfig(BaseSchema):
         ),
     ] = None
     proxy_coordinator: ProxyCoordinatorConfig
-    profiling: ProfilingConfig = Field(default=ProfilingConfig())
+    profiling: Annotated[ProfilingConfig, Field(default_factory=lambda: ProfilingConfig())]
     secrets: SecretConfig
     permit_hash: PermitHashConfig
     logging: LoggingConfig
     debug: DebugConfig
+    otel: Annotated[
+        OTELConfig,
+        Field(
+            default_factory=lambda: OTELConfig(
+                enabled=False, log_level="INFO", endpoint="http://localhost:4317"
+            )
+        ),
+    ]
+    service_discovery: Annotated[
+        ServiceDiscoveryConfig,
+        Field(default_factory=lambda: ServiceDiscoveryConfig(type=ServiceDiscoveryType.REDIS)),
+    ]
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "app-proxy-coordinator")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

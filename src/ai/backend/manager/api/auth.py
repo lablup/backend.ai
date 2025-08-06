@@ -538,25 +538,26 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         request.update(auth_result)
 
     with ExitStack() as stack:
-        user_id = request.get("user", {}).get("uuid")
-        if user_id is not None:
-            stack.enter_context(
-                with_user(
-                    UserData(
-                        user_id=user_id,
-                        is_authorized=request.get("is_authorized", False),
-                        is_admin=request.get("is_admin", False),
-                        is_superadmin=request.get("is_superadmin", False),
-                        role=request["user"]["role"],
-                        domain_name=request["user"]["domain_name"],
+        if user := request.get("user"):
+            user_id = user.get("uuid")
+            if user_id is not None:
+                stack.enter_context(
+                    with_user(
+                        UserData(
+                            user_id=user_id,
+                            is_authorized=request.get("is_authorized", False),
+                            is_admin=request.get("is_admin", False),
+                            is_superadmin=request.get("is_superadmin", False),
+                            role=request["user"]["role"],
+                            domain_name=request["user"]["domain_name"],
+                        )
                     )
                 )
-            )
-            stack.enter_context(
-                with_log_context_fields({
-                    "user_id": str(user_id),
-                })
-            )
+                stack.enter_context(
+                    with_log_context_fields({
+                        "user_id": str(user_id),
+                    })
+                )
         # No matter if authenticated or not, pass-through to the handler.
         # (if it's required, `auth_required` decorator will handle the situation.)
         return await handler(request)
@@ -567,6 +568,18 @@ def auth_required(handler):
     async def wrapped(request, *args, **kwargs):
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
+    return wrapped
+
+
+def auth_required_for_method(method):
+    @functools.wraps(method)
+    async def wrapped(self, request, *args, **kwargs):
+        if request.get("is_authorized", False):
+            return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)

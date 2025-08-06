@@ -21,8 +21,8 @@ from setproctitle import setproctitle
 
 from ai.backend.common.config import (
     ConfigurationError,
-    redis_config_iv,
 )
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
@@ -49,7 +49,7 @@ from ai.backend.common.types import (
     AGENTID_STORAGE,
     RedisProfileTarget,
     ServiceDiscoveryType,
-    safe_print_redis_target,
+    safe_print_redis_config,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -58,8 +58,6 @@ from ai.backend.logging.otel import OpenTelemetrySpec
 from . import __version__ as VERSION
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
-from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
-from .watcher import WatcherClient, main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -95,18 +93,16 @@ async def server_main_logwrapper(
             yield
 
 
-async def check_migration(ctx: RootContext) -> None:
-    from .migration import check_latest
-
-    await check_latest(ctx)
-
-
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
+    from .context import RootContext
+    from .migration import check_latest
+    from .watcher import WatcherClient
+
     local_config = cast(StorageProxyUnifiedConfig, _args[0])
     loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
@@ -136,18 +132,17 @@ async def server_main(
     try:
         etcd = make_etcd(local_config)
         try:
-            redis_config = redis_config_iv.check(
-                await etcd.get_prefix("config/redis"),
-            )
+            raw_redis_config = await etcd.get_prefix("config/redis")
+            redis_config = RedisConfig.model_validate(raw_redis_config)
             log.info(
                 "PID: {0} - configured redis_config: {1}",
                 pidx,
-                safe_print_redis_target(redis_config),
+                safe_print_redis_config(redis_config),
             )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+        redis_profile_target = redis_config.to_redis_profile_target()
         mq = await _make_message_queue(
             local_config,
             redis_profile_target,
@@ -160,7 +155,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
             pidx,
-            safe_print_redis_target(redis_config),
+            safe_print_redis_config(redis_config),
         )
         event_dispatcher = EventDispatcher(
             mq,
@@ -170,7 +165,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
             pidx,
-            safe_print_redis_target(redis_config),
+            safe_print_redis_config(redis_config),
         )
         if local_config.storage_proxy.use_watcher:
             if not _is_root():
@@ -207,7 +202,7 @@ async def server_main(
             m.console_locals["manager_api_app"] = ctx.manager_api_app
 
             if pidx == 0:
-                await check_migration(ctx)
+                await check_latest(ctx)
 
             client_ssl_ctx = None
             manager_ssl_ctx = None
@@ -293,9 +288,10 @@ async def server_main(
                 case ServiceDiscoveryType.ETCD:
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
-                    live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+                    valkey_profile_target = redis_config.to_valkey_profile_target()
+                    live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
                     service_discovery = await RedisServiceDiscovery.create(
-                        args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                        args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
                     )
 
             sd_loop = ServiceDiscoveryLoop(
@@ -345,6 +341,8 @@ async def _make_message_queue(
     local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
+    from .context import EVENT_DISPATCHER_CONSUMER_GROUP
+
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = local_config.storage_proxy.node_id
     args = RedisMQArgs(
@@ -384,7 +382,7 @@ async def _make_message_queue(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Set the logging level to DEBUG",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
@@ -400,8 +398,11 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
+    from .watcher import main_job
+
+    log_level = LogLevel.DEBUG if debug else log_level
     try:
-        local_config = load_local_config(config_path, debug=debug)
+        local_config = load_local_config(config_path, log_level=log_level)
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",

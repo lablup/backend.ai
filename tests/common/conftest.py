@@ -20,7 +20,8 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import RedisTarget, ValkeyTarget
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -93,16 +94,12 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_live(redis_container):  # noqa: F811
-    redis_target = RedisTarget(
-        addr=redis_container[1],
-        redis_helper_config={
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
     )
     client = await ValkeyLiveClient.create(
-        redis_target,
+        valkey_target,
         human_readable_name="test.live",
         db_id=REDIS_LIVE_DB,
     )
@@ -114,16 +111,12 @@ async def test_valkey_live(redis_container):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_stream(redis_container):  # noqa: F811
-    redis_target = RedisTarget(
-        addr=redis_container[1],
-        redis_helper_config={
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
     )
     client = await ValkeyStreamClient.create(
-        redis_target,
+        valkey_target,
         human_readable_name="event_producer.stream",
         db_id=REDIS_STREAM_DB,
         pubsub_channels=["test-broadcast"],
@@ -133,16 +126,12 @@ async def test_valkey_stream(redis_container):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_stat(redis_container):  # noqa: F811
-    redis_target = RedisTarget(
-        addr=redis_container[1],
-        redis_helper_config={
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
     )
     client = await ValkeyStatClient.create(
-        redis_target,
+        valkey_target,
         human_readable_name="test.stat",
         db_id=REDIS_STATISTICS_DB,
     )
@@ -154,16 +143,12 @@ async def test_valkey_stat(redis_container):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_rate_limit(redis_container):  # noqa: F811
-    redis_target = RedisTarget(
-        addr=redis_container[1],
-        redis_helper_config={
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
     )
     client = await ValkeyRateLimitClient.create(
-        redis_target,
+        valkey_target,
         human_readable_name="test.rate_limit",
         db_id=REDIS_RATE_LIMIT_DB,
     )
@@ -175,8 +160,9 @@ async def test_valkey_rate_limit(redis_container):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
+    hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
-        addr=redis_container[1],
+        addr=hostport_pair.to_legacy(),
         redis_helper_config={
             "socket_timeout": 5.0,
             "socket_connect_timeout": 2.0,
