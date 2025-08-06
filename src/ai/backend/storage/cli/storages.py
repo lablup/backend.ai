@@ -61,9 +61,10 @@ async def get_presigned_upload_url(
 ) -> PresignedUploadData:
     """Get presigned upload URL from storage API."""
     async with aiohttp.ClientSession() as session:
+        headers = {"Authorization": f"Bearer {token}"}
         async with session.post(
             f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
-            params={"token": token},
+            headers=headers,
         ) as response:
             if response.status != 200:
                 # Parse API error responses for user-friendly messages
@@ -89,9 +90,10 @@ async def get_presigned_download_url(
 ) -> dict:
     """Get presigned download URL from storage API."""
     async with aiohttp.ClientSession() as session:
+        headers = {"Authorization": f"Bearer {token}"}
         async with session.get(
             f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
-            params={"token": token},
+            headers=headers,
         ) as response:
             if response.status != 200:
                 # Parse API error responses for user-friendly messages

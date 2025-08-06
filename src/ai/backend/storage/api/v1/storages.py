@@ -57,35 +57,36 @@ TReq = TypeVar("TReq", bound=BaseRequestModel)
 class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
     data: TReq
 
-    @classmethod
-    def _resolve_req_type(cls) -> Type[TReq]:
-        meta = cls.__pydantic_generic_metadata__
-        return meta["args"][0]
-
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         import jwt
 
-        try:
-            ctx: RootContext = request.app["ctx"]
-            secret = ctx.local_config.storage_proxy.secret
-            raw_params = dict(request.query)
-            if "token" not in raw_params:
-                raise web.HTTPBadRequest(reason="Missing 'token' query parameter")
+        ctx: RootContext = request.app["ctx"]
+        secret = ctx.local_config.storage_proxy.secret
 
-            token = raw_params["token"]
-            if not isinstance(token, str):
-                raise web.HTTPBadRequest(reason="'token' must be a string")
+        try:
+            auth = request.headers.get("Authorization", "")
+            scheme, _, token = auth.partition(" ")
+            if scheme.lower() != "bearer" or not token:
+                raise web.HTTPUnauthorized(reason="JWT token is missing")
+
             try:
-                token_data = jwt.decode(token, secret, algorithms=["HS256"])
+                decrypted_data = jwt.decode(token, secret, algorithms=["HS256"])
+            except jwt.ExpiredSignatureError as e:
+                raise web.HTTPUnauthorized(reason=f"Expired JWT token: {str(e)}") from e
             except jwt.PyJWTError as e:
                 raise web.HTTPUnauthorized(reason=f"Invalid JWT token: {str(e)}") from e
 
             ReqModel = cls._resolve_req_type()
-            return cls(data=ReqModel.model_validate(token_data))
+            return cls(data=ReqModel.model_validate(decrypted_data))
         except ValidationError as e:
             raise web.HTTPBadRequest(reason="Invalid S3 token data") from e
+
+    @classmethod
+    def _resolve_req_type(cls) -> Type[TReq]:
+        meta = cls.__pydantic_generic_metadata__
+        return meta["args"][0]
 
 
 class StoragesAPIHandler:
