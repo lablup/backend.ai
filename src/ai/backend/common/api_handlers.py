@@ -187,6 +187,13 @@ class APIResponse:
         return self._status_code
 
 
+@dataclass
+class APIStreamResponse:
+    body: AsyncIterable[bytes]
+    status: int
+    headers: Mapping[str, str] = field(default_factory=dict)
+
+
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
 _ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
@@ -254,6 +261,11 @@ HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
 BaseHandler: TypeAlias = Callable[..., HandlerReturn]
 ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
+
+StreamHandlerReturn: TypeAlias = (
+    Awaitable[APIStreamResponse] | Coroutine[Any, Any, APIStreamResponse]
+)
+StreamBaseHandler: TypeAlias = Callable[..., StreamHandlerReturn]
 
 
 async def _parse_and_execute_handler(
@@ -457,14 +469,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     return wrapped
 
 
-@dataclass
-class APIStreamResponse:
-    body: AsyncIterable[bytes]
-    status: int
-    headers: Mapping[str, str] = field(default_factory=dict)
-
-
-def stream_api_handler(handler: Any) -> ParsedRequestHandler:
+def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
     """
     This decorator processes HTTP request parameters using Pydantic models and returns a streaming response.
     NOTICE: API handler methods must be instance methods. If handlers are not instance methods, it may not work as expected.
