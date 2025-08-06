@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Self, override
+from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
 
 from aiohttp import web
 
@@ -40,8 +40,6 @@ _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 class StoragesConfigCtx(MiddlewareParam):
     storages: list[ObjectStorageConfig]
-    storage_name: str
-    bucket_name: str
 
 class StorageConfigsCtx(MiddlewareParam):
     storage_configs: list[ObjectStorageConfig]
