@@ -25,8 +25,7 @@ def cli() -> None:
     pass
 
 
-def create_jwt_token(
-    operation: str,
+def _make_encrypted_payload(
     bucket: str,
     key: str,
     secret: str,
@@ -34,13 +33,12 @@ def create_jwt_token(
     content_type: Optional[str] = None,
     filename: Optional[str] = None,
 ) -> str:
-    """Create JWT token for storage operations."""
     payload = {
-        "op": operation,
         "bucket": bucket,
         "key": key,
         "iat": int(time.time()),
-        "exp": int(time.time()) + (expiration or 3600),
+        # TODO: Move constant to common
+        "exp": int(time.time()) + (expiration or 300),
     }
 
     if content_type:
@@ -210,14 +208,10 @@ async def download_file_from_presigned_url(
     help="Local file path to upload",
 )
 @click.option(
-    "--content-type",
-    help="Content type of the file (auto-detected if not provided)",
-)
-@click.option(
     "--expiration",
     type=int,
-    default=3600,
-    help="Token expiration time in seconds (default: 3600)",
+    default=300,
+    help="Token expiration time in seconds (default: 300)",
 )
 @click.pass_obj
 def upload(
@@ -228,7 +222,6 @@ def upload(
     bucket: str,
     key: str,
     file_path: Path,
-    content_type: Optional[str],
     expiration: int,
 ) -> None:
     """
@@ -240,34 +233,19 @@ def upload(
     async def _upload():
         click.echo(f"Uploading {file_path} to {bucket}/{key}...")
 
-        # Auto-detect content type if not provided
-        if not content_type:
-            import mimetypes
-
-            detected_type, _ = mimetypes.guess_type(str(file_path))
-            content_type_to_use = detected_type or "application/octet-stream"
-        else:
-            content_type_to_use = content_type
-
-        # Create JWT token for presigned upload
-        token = create_jwt_token(
-            operation="presigned_upload",
+        payload = _make_encrypted_payload(
             bucket=bucket,
             key=key,
             secret=secret,
             expiration=expiration,
-            content_type=content_type_to_use,
         )
 
         try:
-            # Get presigned upload URL
             presigned_data = await get_presigned_upload_url(
-                storage_url, storage_name, bucket, token
+                storage_url, storage_name, bucket, payload
             )
 
-            # Upload file
             await upload_file_to_presigned_url(presigned_data, file_path)
-
             click.echo(f"✅ Successfully uploaded {file_path.name} to {bucket}/{key}")
 
         except Exception as e:
@@ -315,8 +293,8 @@ def upload(
 @click.option(
     "--expiration",
     type=int,
-    default=3600,
-    help="Token expiration time in seconds (default: 3600)",
+    default=300,
+    help="Token expiration time in seconds",
 )
 @click.pass_obj
 def download(
@@ -345,9 +323,7 @@ def download(
 
         click.echo(f"Downloading {storage_name}/{bucket}/{key} to {output_path}...")
 
-        # Create JWT token for presigned download
-        token = create_jwt_token(
-            operation="presigned_download",
+        payload = _make_encrypted_payload(
             bucket=bucket,
             key=key,
             secret=secret,
@@ -356,15 +332,12 @@ def download(
         )
 
         try:
-            # Get presigned download URL
             presigned_data = await get_presigned_download_url(
-                storage_url, storage_name, bucket, token
+                storage_url, storage_name, bucket, payload
             )
             presigned_url = presigned_data["url"]
 
-            # Download file
             await download_file_from_presigned_url(presigned_url, output_path)
-
             click.echo(f"✅ Successfully downloaded {storage_name}/{bucket}/{key} to {output_path}")
 
         except Exception as e:
@@ -403,8 +376,8 @@ def download(
 @click.option(
     "--expiration",
     type=int,
-    default=3600,
-    help="Token expiration time in seconds (default: 3600)",
+    default=300,
+    help="Token expiration time in seconds (default: 300)",
 )
 @click.pass_obj
 def info(
@@ -425,9 +398,7 @@ def info(
     async def _info():
         click.echo(f"Getting info for {bucket}/{key}...")
 
-        # Create JWT token for info operation
-        token = create_jwt_token(
-            operation="info",
+        payload = _make_encrypted_payload(
             bucket=bucket,
             key=key,
             secret=secret,
@@ -438,7 +409,7 @@ def info(
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{storage_url}/v1/storages/s3/{storage_name}/buckets/{bucket}/files",
-                    params={"token": token},
+                    params={"token": payload},
                 ) as response:
                     if response.status != 200:
                         # Parse API error responses for user-friendly messages
