@@ -7,8 +7,7 @@ class OperationType(enum.StrEnum):
     UPDATE = "update"
     SOFT_DELETE = "soft-delete"
     HARD_DELETE = "hard-delete"
-    GRANT_ALL = "grant:all"  # Allow user to grant all permissions
-    GRANT_CREATE = "grant:create"
+    GRANT_ALL = "grant:all"  # Allow user to grant all permissions, including grant of grant
     GRANT_READ = "grant:read"
     GRANT_UPDATE = "grant:update"
     GRANT_SOFT_DELETE = "grant:soft-delete"
