@@ -126,7 +126,7 @@ class PermissionControllerRepository:
             )
             result = await db_session.scalars(query)
             result = cast(list[RoleRow], result)
-            return [role.to_data() for role in result]
+            return [role.to_data_with_permissions() for role in result]
 
     @repository_decorator()
     async def check_permission(self, data: PermissionCheckInput) -> bool:
@@ -136,8 +136,6 @@ class PermissionControllerRepository:
             entity_id=data.target_entity_id,
         )
         for role in roles:
-            if data.operation != role.operation:
-                continue
             for scope_perm in role.scope_permissions:
                 if scope_perm.operation != data.operation:
                     continue
