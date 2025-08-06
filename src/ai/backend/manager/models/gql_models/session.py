@@ -66,9 +66,10 @@ from ..gql_relay import (
 from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ..rbac import ScopeType
+from ..rbac import ScopeType, SystemScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
+from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..session import (
     DEFAULT_SESSION_ORDERING,
     SESSION_PRIORITY_MAX,
@@ -90,6 +91,8 @@ from ..types import (
     load_related_field,
 )
 from ..user import UserRole, UserRow
+from ..vfolder import VFolderRow
+from ..vfolder import get_permission_ctx as get_vfolder_permission_ctx
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
@@ -420,6 +423,28 @@ class ComputeSessionNode(graphene.ObjectType):
         result = cast(list[list[VirtualFolderNode]], await loader.load_many(_folder_ids))
 
         vf_nodes = cast(list[VirtualFolderNode], list(more_itertools.flatten(result)))
+
+        # Calculate permissions for each node
+        if vf_nodes:
+            async with ctx.db.connect() as db_conn:
+                user = ctx.user
+                client_ctx = ClientContext(ctx.db, user["domain_name"], user["uuid"], user["role"])
+                permission_ctx = await get_vfolder_permission_ctx(
+                    db_conn, client_ctx, SystemScope(), VFolderRBACPermission.READ_ATTRIBUTE
+                )
+
+                # Load VFolderRow for each node to calculate permissions
+                query = sa.select(VFolderRow).where(VFolderRow.id.in_(_folder_ids))
+                async with ctx.db.begin_readonly_session(db_conn) as db_session:
+                    vfolder_rows = {row.id: row for row in await db_session.scalars(query)}
+
+                # Update permissions for each node
+                for node in vf_nodes:
+                    if node.row_id in vfolder_rows:
+                        node.permissions = await permission_ctx.calculate_final_permission(
+                            vfolder_rows[node.row_id]
+                        )
+
         return ConnectionResolverResult(vf_nodes, None, None, None, total_count=len(vf_nodes))
 
     async def resolve_kernel_nodes(
