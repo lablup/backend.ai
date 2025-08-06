@@ -1,708 +1,203 @@
-"""Test for vfolder RBAC migration with isolated database."""
+"""Test for vfolder RBAC migration module."""
 
-import secrets
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, AsyncIterator, cast
 
 import pytest
-import sqlalchemy as sa
-from alembic.config import Config
-from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import selectinload, sessionmaker
-from sqlalchemy.pool import NullPool
 
-from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.logging import is_active as logging_active
-from ai.backend.manager.data.user.types import UserRole, UserStatus
-from ai.backend.manager.models.alembic import invoked_programmatically
-from ai.backend.manager.models.base import metadata, pgsql_connect_opts
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
+from ai.backend.manager.models.rbac_models.migrate.types import PermissionCreateInputGroup
 from ai.backend.manager.models.rbac_models.migrate.vfolder import (
-    VFolderPermissionData,
-    migrate_vfolder_data,
-    permission_mapping,
+    ENTITY_TYPE,
+    vfolder_permission_row_to_rbac_row,
+    vfolder_row_to_rbac_row,
 )
-from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import (
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
-)
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.vfolder import (
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderPermission,
-    VFolderPermissionRow,
-    VFolderRow,
-)
-
-ALEMBIC_CONFIG_PATH = Path("alembic.ini")
-
-PROJECT_RESOURCE_POLICY_NAME = "default"
-USER_RESOURCE_POLICY_NAME = "default"
-
-
-@pytest.fixture
-def test_db_name() -> str:
-    """Generate a unique database name for testing."""
-    return f"test_vfolder_rbac_{secrets.token_hex(8)}"
-
-
-@pytest.fixture
-def test_db_url(postgres_container: tuple[str, HostPortPair], test_db_name: str) -> str:
-    """Create a database URL for the test database."""
-    _, host_port = postgres_container
-    db_user = "postgres"
-    db_password = "develove"
-    return f"postgresql+asyncpg://{db_user}:{db_password}@{host_port.host}:{host_port.port}/{test_db_name}"
-
-
-@pytest.fixture
-def admin_db_url(postgres_container: tuple[str, HostPortPair]) -> str:
-    """Create a database URL for the admin database."""
-    _, host_port = postgres_container
-    db_user = "postgres"
-    db_password = "develove"
-    return f"postgresql+asyncpg://{db_user}:{db_password}@{host_port.host}:{host_port.port}/testing"
-
-
-@pytest.fixture
-def alembic_config(test_db_url: str) -> Config:
-    """Create Alembic configuration for testing."""
-    config = Config(ALEMBIC_CONFIG_PATH)
-    config.set_main_option("script_location", "src/ai/backend/manager/models/alembic")
-    config.set_main_option("sqlalchemy.url", test_db_url)
-    logging_active.set(True)
-    return config
-
-
-@pytest.fixture
-async def db_engine_pre_migration(
-    postgres_container: tuple[str, HostPortPair],
-    test_db_name: str,
-    alembic_config: Config,
-    test_db_url: str,
-    admin_db_url: str,
-) -> AsyncIterator[Engine]:
-    """
-    Create a database engine with schema migrated up to revision before vfolder RBAC migration.
-    This is the state before the vfolder RBAC migration.
-    """
-    # First create the test database
-    admin_engine = create_async_engine(
-        admin_db_url, poolclass=NullPool, isolation_level="AUTOCOMMIT"
-    )
-
-    def drop_and_create_db(connection: Connection) -> None:
-        """Drop the test database if it exists and create a new one."""
-        alembic_config.attributes["connection"] = connection
-        connection.execute(sa.text(f'DROP DATABASE IF EXISTS "{test_db_name}";'))
-        connection.execute(sa.text(f'CREATE DATABASE "{test_db_name}"'))
-
-    async with admin_engine.connect() as conn:
-        await conn.run_sync(drop_and_create_db)
-
-    # Create engine for the test database
-    engine = create_async_engine(
-        test_db_url,
-        poolclass=NullPool,
-        echo=False,
-        connect_args=pgsql_connect_opts,
-    )
-
-    invoked_programmatically.set(True)
-
-    def create_all(connection: Connection, engine: Engine) -> None:
-        alembic_config.attributes["connection"] = connection
-        metadata.create_all(engine, checkfirst=False)
-
-    async with engine.connect() as dbconn:
-        async with dbconn.begin():
-            await dbconn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
-            await dbconn.commit()
-        async with dbconn.begin():
-            await dbconn.run_sync(create_all, engine=engine.sync_engine)
-
-    try:
-        yield engine
-    finally:
-        # Cleanup: close connections and drop database
-        await engine.dispose()
-
-        def terminate(connection: Connection) -> None:
-            """Terminate all connections to the test database and drop it."""
-            alembic_config.attributes["connection"] = connection
-            connection.execute(
-                sa.text(
-                    f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    f"WHERE datname = '{test_db_name}' AND pid <> pg_backend_pid()"
-                )
-            )
-            connection.execute(sa.text(f"DROP DATABASE IF EXISTS {test_db_name}"))
-
-        async with admin_engine.connect() as conn:
-            await conn.run_sync(terminate)
-        await admin_engine.dispose()
+from ai.backend.manager.models.vfolder import VFolderOwnershipType
 
 
 @dataclass
-class TestUser:
-    """Test user data."""
+class MockVFolderRow:
+    """Mock VFolderRow for testing."""
 
-    id: str
-    name: str
-    email: str
-    domain_name: str = "default"
-    role: UserRole = UserRole.USER
-
-
-@dataclass
-class TestGroup:
-    """Test group (project) data."""
-
-    id: str
-    name: str
-    domain_name: str = "default"
-
-
-@dataclass
-class TestVFolder:
-    """Test vfolder data."""
-
-    id: str
-    name: str
+    id: uuid.UUID
     ownership_type: VFolderOwnershipType
-    owner_id: str  # user uuid if ownership_type="user", group uuid if ownership_type="group"
-    host: str = "test-host"
-    domain_name: str = "default"
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for database insertion."""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "ownership_type": self.ownership_type,
-            "user": self.owner_id if self.ownership_type == VFolderOwnershipType.USER else None,
-            "group": self.owner_id if self.ownership_type == VFolderOwnershipType.GROUP else None,
-            "host": self.host,
-            "domain_name": self.domain_name,
-        }
-
-    @property
-    def quota_scope_id(self) -> QuotaScopeID:
-        """Get the quota scope ID for this vfolder."""
-        return QuotaScopeID(
-            QuotaScopeType.USER
-            if self.ownership_type == VFolderOwnershipType.USER
-            else QuotaScopeType.PROJECT,
-            uuid.UUID(self.owner_id),
-        )
-
-    def to_insert_dict(self) -> dict[str, Any]:
-        """Convert to dict for database insertion with all required fields."""
-        base_dict = self.to_dict()
-        base_dict.update({
-            "quota_scope_id": self.quota_scope_id,
-            "status": VFolderOperationStatus.READY,
-            "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderPermission.READ_WRITE,
-            "max_files": 1000,
-            "max_size": 10240,  # MBytes
-            "num_files": 0,
-            "cur_size": 0,
-        })
-        return base_dict
+    user: uuid.UUID | None = None
+    group: uuid.UUID | None = None
 
 
 @dataclass
-class TestVFolderPermission:
-    """Test vfolder permission data."""
+class MockVFolderPermissionRow:
+    """Mock VFolderPermissionRow for testing."""
 
-    id: str
-    vfolder_id: str
-    user_id: str
-    permission: VFolderPermission
+    vfolder: uuid.UUID
+    user: uuid.UUID
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for database insertion."""
-        return {
-            "id": self.id,
-            "vfolder": self.vfolder_id,
-            "user": self.user_id,
-            "permission": self.permission,
+
+@pytest.fixture
+def mock_user_vfolder():
+    """Create a mock user-owned vfolder."""
+    user_id = uuid.uuid4()
+    vfolder_id = uuid.uuid4()
+    return MockVFolderRow(
+        id=vfolder_id,
+        ownership_type=VFolderOwnershipType.USER,
+        user=user_id,
+        group=None,
+    )
+
+
+@pytest.fixture
+def mock_project_vfolder():
+    """Create a mock project-owned vfolder."""
+    project_id = uuid.uuid4()
+    vfolder_id = uuid.uuid4()
+    return MockVFolderRow(
+        id=vfolder_id,
+        ownership_type=VFolderOwnershipType.GROUP,
+        user=None,
+        group=project_id,
+    )
+
+
+@pytest.fixture
+def mock_vfolder_permission():
+    """Create a mock vfolder permission."""
+    return MockVFolderPermissionRow(
+        vfolder=uuid.uuid4(),
+        user=uuid.uuid4(),
+    )
+
+
+class TestVFolderConversion:
+    """Test vfolder conversion functions."""
+
+    def test_user_vfolder_to_rbac_row(self, mock_user_vfolder):
+        """Test converting user-owned vfolder to RBAC row."""
+        result = vfolder_row_to_rbac_row(mock_user_vfolder)
+
+        assert len(result.association_scopes_entities) == 1
+        assoc = result.association_scopes_entities[0]
+
+        assert assoc.scope_id.scope_type == "user"
+        assert assoc.scope_id.scope_id == str(mock_user_vfolder.user)
+        assert assoc.object_id.entity_type == ENTITY_TYPE
+        assert assoc.object_id.entity_id == str(mock_user_vfolder.id)
+
+    def test_project_vfolder_to_rbac_row(self, mock_project_vfolder):
+        """Test converting project-owned vfolder to RBAC row."""
+        result = vfolder_row_to_rbac_row(mock_project_vfolder)
+
+        assert len(result.association_scopes_entities) == 1
+        assoc = result.association_scopes_entities[0]
+
+        assert assoc.scope_id.scope_type == "project"
+        assert assoc.scope_id.scope_id == str(mock_project_vfolder.group)
+        assert assoc.object_id.entity_type == ENTITY_TYPE
+        assert assoc.object_id.entity_id == str(mock_project_vfolder.id)
+
+    def test_vfolder_permission_to_rbac_row(self, mock_vfolder_permission):
+        """Test converting vfolder permission to RBAC row."""
+        result = vfolder_permission_row_to_rbac_row(mock_vfolder_permission)
+
+        assert len(result.association_scopes_entities) == 1
+        assoc = result.association_scopes_entities[0]
+
+        assert assoc.scope_id.scope_type == "user"
+        assert assoc.scope_id.scope_id == str(mock_vfolder_permission.user)
+        assert assoc.object_id.entity_type == ENTITY_TYPE
+        assert assoc.object_id.entity_id == str(mock_vfolder_permission.vfolder)
+
+
+class TestComplexScenarios:
+    """Test complex migration scenarios."""
+
+    @pytest.fixture
+    def test_data(self):
+        """Create comprehensive test data."""
+        users = {
+            "owner": uuid.uuid4(),
+            "member1": uuid.uuid4(),
+            "member2": uuid.uuid4(),
         }
 
-    def to_insert_dict(self) -> dict[str, Any]:
-        """Alias for to_dict for consistency."""
-        return self.to_dict()
-
-
-class VFolderRBACTestData:
-    """Comprehensive test data for vfolder RBAC migration."""
-
-    def __init__(self):
-        # Create test users
-        self.users = {
-            "owner_user": TestUser(
-                id=str(uuid.uuid4()),
-                name="owner_user",
-                email="owner@example.com",
-            ),
-            "member_user1": TestUser(
-                id=str(uuid.uuid4()),
-                name="member_user1",
-                email="member1@example.com",
-            ),
-            "member_user2": TestUser(
-                id=str(uuid.uuid4()),
-                name="member_user2",
-                email="member2@example.com",
-            ),
-            "external_user": TestUser(
-                id=str(uuid.uuid4()),
-                name="external_user",
-                email="external@example.com",
-            ),
+        projects = {
+            "project1": uuid.uuid4(),
+            "project2": uuid.uuid4(),
         }
 
-        # Create test groups
-        self.groups = {
-            "project1": TestGroup(
-                id=str(uuid.uuid4()),
-                name="project1",
-            ),
-            "project2": TestGroup(
-                id=str(uuid.uuid4()),
-                name="project2",
-            ),
-        }
-
-        # Create test vfolders with various ownership scenarios
-        self.vfolders = {
-            # User-owned vfolders
-            "user_vfolder_private": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="user_vfolder_private",
+        vfolders = {
+            "user_vfolder": MockVFolderRow(
+                id=uuid.uuid4(),
                 ownership_type=VFolderOwnershipType.USER,
-                owner_id=self.users["owner_user"].id,
+                user=users["owner"],
             ),
-            "user_vfolder_shared_ro": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="user_vfolder_shared_ro",
-                ownership_type=VFolderOwnershipType.USER,
-                owner_id=self.users["owner_user"].id,
-            ),
-            "user_vfolder_shared_rw": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="user_vfolder_shared_rw",
-                ownership_type=VFolderOwnershipType.USER,
-                owner_id=self.users["owner_user"].id,
-            ),
-            "user_vfolder_shared_multiple": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="user_vfolder_shared_multiple",
-                ownership_type=VFolderOwnershipType.USER,
-                owner_id=self.users["member_user1"].id,
-            ),
-            # Group-owned vfolders
-            "group_vfolder_private": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="group_vfolder_private",
+            "project_vfolder": MockVFolderRow(
+                id=uuid.uuid4(),
                 ownership_type=VFolderOwnershipType.GROUP,
-                owner_id=self.groups["project1"].id,
-            ),
-            "group_vfolder_shared_ro": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="group_vfolder_shared_ro",
-                ownership_type=VFolderOwnershipType.GROUP,
-                owner_id=self.groups["project1"].id,
-            ),
-            "group_vfolder_shared_mixed": TestVFolder(
-                id=str(uuid.uuid4()),
-                name="group_vfolder_shared_mixed",
-                ownership_type=VFolderOwnershipType.GROUP,
-                owner_id=self.groups["project2"].id,
+                group=projects["project1"],
             ),
         }
 
-        # Create test permissions (vfolder invitations)
-        self.permissions = [
-            # User vfolder shared with read-only permission
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["user_vfolder_shared_ro"].id,
-                user_id=self.users["member_user1"].id,
-                permission=VFolderPermission.READ_ONLY,
+        permissions = [
+            MockVFolderPermissionRow(
+                vfolder=vfolders["user_vfolder"].id,
+                user=users["member1"],
             ),
-            # User vfolder shared with read-write permission
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["user_vfolder_shared_rw"].id,
-                user_id=self.users["member_user2"].id,
-                permission=VFolderPermission.READ_WRITE,
+            MockVFolderPermissionRow(
+                vfolder=vfolders["user_vfolder"].id,
+                user=users["member2"],
             ),
-            # User vfolder shared with multiple users with different permissions
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
-                user_id=self.users["owner_user"].id,
-                permission=VFolderPermission.READ_ONLY,
-            ),
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
-                user_id=self.users["member_user2"].id,
-                permission=VFolderPermission.READ_WRITE,
-            ),
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["user_vfolder_shared_multiple"].id,
-                user_id=self.users["external_user"].id,
-                permission=VFolderPermission.RW_DELETE,
-            ),
-            # Group vfolder shared with external user (not in group)
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["group_vfolder_shared_ro"].id,
-                user_id=self.users["external_user"].id,
-                permission=VFolderPermission.READ_ONLY,
-            ),
-            # Group vfolder shared with mixed permissions
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
-                user_id=self.users["member_user1"].id,
-                permission=VFolderPermission.READ_ONLY,
-            ),
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
-                user_id=self.users["member_user2"].id,
-                permission=VFolderPermission.READ_WRITE,
-            ),
-            TestVFolderPermission(
-                id=str(uuid.uuid4()),
-                vfolder_id=self.vfolders["group_vfolder_shared_mixed"].id,
-                user_id=self.users["external_user"].id,
-                permission=VFolderPermission.RW_DELETE,
+            MockVFolderPermissionRow(
+                vfolder=vfolders["project_vfolder"].id,
+                user=users["member1"],
             ),
         ]
 
-    def get_vfolder_list(self) -> list[dict[str, Any]]:
-        """Get all vfolders as list of dicts."""
-        return [vf.to_dict() for vf in self.vfolders.values()]
+        return {
+            "users": users,
+            "projects": projects,
+            "vfolders": vfolders,
+            "permissions": permissions,
+        }
 
-    def get_vfolder_insert_list(self) -> list[dict[str, Any]]:
-        """Get all vfolders as list of dicts for database insertion."""
-        return [vf.to_insert_dict() for vf in self.vfolders.values()]
+    def test_multiple_permissions_same_vfolder(self, test_data):
+        """Test handling multiple permissions for the same vfolder."""
+        vfolder: MockVFolderRow = test_data["vfolders"]["user_vfolder"]
+        permissions: list[MockVFolderPermissionRow] = [
+            p for p in test_data["permissions"] if p.vfolder == vfolder.id
+        ]
 
-    def get_permission_list(self) -> list[dict[str, Any]]:
-        """Get all permissions as list of dicts."""
-        return [perm.to_dict() for perm in self.permissions]
+        # Convert vfolder
+        vfolder_result = vfolder_row_to_rbac_row(vfolder)
+        assert len(vfolder_result.association_scopes_entities) == 1
 
-    def get_permission_insert_list(self) -> list[dict[str, Any]]:
-        """Get all permissions as list of dicts for database insertion."""
-        return [perm.to_insert_dict() for perm in self.permissions]
+        # Convert permissions
+        permission_results: list[PermissionCreateInputGroup] = []
+        for perm in permissions:
+            result = vfolder_permission_row_to_rbac_row(perm)
+            permission_results.append(result)
 
-    def get_vfolders_by_ownership(self, ownership_type: str) -> list[TestVFolder]:
-        """Get vfolders filtered by ownership type."""
-        return [vf for vf in self.vfolders.values() if vf.ownership_type == ownership_type]
+        # Verify each permission creates separate association
+        assert len(permission_results) == 2
+        for permission, permission_result in zip(permissions, permission_results):
+            assert len(permission_result.association_scopes_entities) == 1
+            assoc = permission_result.association_scopes_entities[0]
+            assert assoc.scope_id.scope_type == "user"
+            assert assoc.scope_id.scope_id == str(permission.user)
+            assert assoc.object_id.entity_id == str(vfolder.id)
 
-    def get_permissions_by_vfolder(self, vfolder_id: str) -> list[TestVFolderPermission]:
-        """Get permissions for a specific vfolder."""
-        return [perm for perm in self.permissions if perm.vfolder_id == vfolder_id]
+    def test_mixed_ownership_types(self, test_data):
+        """Test handling vfolders with different ownership types."""
+        user_vfolder: MockVFolderRow = test_data["vfolders"]["user_vfolder"]
+        project_vfolder: MockVFolderRow = test_data["vfolders"]["project_vfolder"]
 
-    def get_permissions_by_user(self, user_id: str) -> list[TestVFolderPermission]:
-        """Get permissions granted to a specific user."""
-        return [perm for perm in self.permissions if perm.user_id == user_id]
+        # Convert user-owned vfolder
+        user_result = vfolder_row_to_rbac_row(user_vfolder)
+        user_assoc = user_result.association_scopes_entities[0]
+        assert user_assoc.scope_id.scope_type == "user"
+        assert user_assoc.scope_id.scope_id == str(user_vfolder.user)
 
-
-@pytest.fixture
-def vfolder_rbac_test_data() -> VFolderRBACTestData:
-    """Provide comprehensive test data for vfolder RBAC migration."""
-    return VFolderRBACTestData()
-
-
-@pytest.fixture
-def test_scenarios(vfolder_rbac_test_data: VFolderRBACTestData) -> dict[str, Any]:
-    """Provide specific test scenarios based on the test data."""
-    data = vfolder_rbac_test_data
-
-    return {
-        "user_owned_private": {
-            "description": "User-owned vfolder with no additional permissions",
-            "vfolder": data.vfolders["user_vfolder_private"],
-            "permissions": [],
-            "expected_scope": ("user", data.users["owner_user"].id),
-        },
-        "user_owned_shared_single": {
-            "description": "User-owned vfolder shared with one user (read-only)",
-            "vfolder": data.vfolders["user_vfolder_shared_ro"],
-            "permissions": data.get_permissions_by_vfolder(
-                data.vfolders["user_vfolder_shared_ro"].id
-            ),
-            "expected_scope": ("user", data.users["owner_user"].id),
-        },
-        "user_owned_shared_multiple": {
-            "description": "User-owned vfolder shared with multiple users with different permissions",
-            "vfolder": data.vfolders["user_vfolder_shared_multiple"],
-            "permissions": data.get_permissions_by_vfolder(
-                data.vfolders["user_vfolder_shared_multiple"].id
-            ),
-            "expected_scope": ("user", data.users["member_user1"].id),
-        },
-        "group_owned_private": {
-            "description": "Group-owned vfolder with no additional permissions",
-            "vfolder": data.vfolders["group_vfolder_private"],
-            "permissions": [],
-            "expected_scope": ("project", data.groups["project1"].id),
-        },
-        "group_owned_shared_external": {
-            "description": "Group-owned vfolder shared with external user",
-            "vfolder": data.vfolders["group_vfolder_shared_ro"],
-            "permissions": data.get_permissions_by_vfolder(
-                data.vfolders["group_vfolder_shared_ro"].id
-            ),
-            "expected_scope": ("project", data.groups["project1"].id),
-        },
-        "group_owned_shared_mixed": {
-            "description": "Group-owned vfolder with mixed permission levels",
-            "vfolder": data.vfolders["group_vfolder_shared_mixed"],
-            "permissions": data.get_permissions_by_vfolder(
-                data.vfolders["group_vfolder_shared_mixed"].id
-            ),
-            "expected_scope": ("project", data.groups["project2"].id),
-        },
-    }
-
-
-@pytest.fixture
-async def populated_vfolder_db(
-    db_engine_pre_migration: Engine, vfolder_rbac_test_data: VFolderRBACTestData
-):
-    """Populate the database with vfolder test data."""
-    engine = db_engine_pre_migration
-    data = vfolder_rbac_test_data
-
-    async with engine.connect() as conn:
-        async with conn.begin():
-            # Insert domains (required for foreign keys)
-            domain_names = {user.domain_name for user in data.users.values()}
-            domain_values = [
-                {
-                    "name": name,
-                    "is_active": True,
-                    "allowed_vfolder_hosts": {},
-                    "allowed_docker_registries": {},
-                    "dotfiles": b"",
-                }
-                for name in domain_names
-            ]
-            domain_insert = sa.insert(DomainRow).values(domain_values)
-            await conn.execute(domain_insert)
-
-            # Insert user reesource policies
-            user_resource_policy_insert = sa.insert(UserResourcePolicyRow).values(
-                name=USER_RESOURCE_POLICY_NAME,
-                max_vfolder_count=100,
-                max_quota_scope_size=100,
-                max_session_count_per_model_session=100,
-                max_customized_image_count=100,
-            )
-            await conn.execute(user_resource_policy_insert)
-
-            # Insert users
-            user_values = [
-                {
-                    "uuid": user.id,
-                    "email": user.email,
-                    "username": user.email,
-                    "password": "dummy_hash",
-                    "domain_name": user.domain_name,
-                    "role": user.role,
-                    "status": UserStatus.ACTIVE,
-                    "resource_policy": "default",
-                    "sudo_session_enabled": False,
-                }
-                for user in data.users.values()
-            ]
-            user_insert = sa.insert(UserRow).values(user_values)
-            await conn.execute(user_insert)
-
-            # Insert project resource policy
-            project_resource_policy_insert = sa.insert(ProjectResourcePolicyRow).values(
-                name=PROJECT_RESOURCE_POLICY_NAME,
-                max_vfolder_count=100,
-                max_quota_scope_size=100,
-                max_network_count=100,
-            )
-            await conn.execute(project_resource_policy_insert)
-
-            # Insert groups
-            project_values = [
-                {
-                    "id": project.id,
-                    "name": project.name,
-                    "is_active": True,
-                    "domain_name": project.domain_name,
-                    "allowed_vfolder_hosts": {},
-                    "dotfiles": b"",
-                    "resource_policy": PROJECT_RESOURCE_POLICY_NAME,
-                    "type": ProjectType.GENERAL,
-                }
-                for project in data.groups.values()
-            ]
-            await conn.execute(sa.insert(GroupRow).values(project_values))
-
-            # Insert vfolders
-            vfolder_values = [vfolder.to_insert_dict() for vfolder in data.vfolders.values()]
-            await conn.execute(sa.insert(VFolderRow).values(vfolder_values))
-
-            # Insert vfolder permissions
-            vfolder_permission_values = [perm.to_insert_dict() for perm in data.permissions]
-            await conn.execute(sa.insert(VFolderPermissionRow).values(vfolder_permission_values))
-
-    return data
-
-
-class TestVFolderRBACMigrationWithAlembic:
-    """Test vfolder RBAC migration using actual Alembic migrations."""
-
-    async def test_populate_vfolder_data(
-        self,
-        db_engine_pre_migration: Engine,
-        populated_vfolder_db: VFolderRBACTestData,
-    ) -> None:
-        """Test populating vfolder test data into database."""
-        engine = db_engine_pre_migration
-        data = populated_vfolder_db
-
-        async with engine.connect() as conn:
-            # Run the migration to populate RBAC data
-            async with conn.begin():
-                await conn.run_sync(migrate_vfolder_data)
-            async_session_factory = sessionmaker(
-                bind=conn, class_=AsyncSession, expire_on_commit=False
-            )
-            session = async_session_factory()
-            async with session.begin():
-                # 1. Verify all vfolders are in association_scopes_entities
-                associations = await session.scalars(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.entity_type == "vfolder"
-                    )
-                )
-                association_rows = cast(list[AssociationScopesEntitiesRow], associations.all())
-
-                assert len(association_rows) == len(data.vfolders), (
-                    f"Expected {len(data.vfolders)} vfolder associations, found {len(association_rows)}"
-                )
-
-                # Create mapping for easy lookup
-                associations_by_vfolder = {row.entity_id: row for row in association_rows}
-
-                # Verify each vfolder's ownership mapping
-                for vfolder in data.vfolders.values():
-                    assoc = associations_by_vfolder.get(vfolder.id)
-                    assert assoc is not None, f"VFolder {vfolder.id} not found in associations"
-
-                    if vfolder.ownership_type == VFolderOwnershipType.USER:
-                        assert assoc.scope_type == "user", (
-                            f"VFolder {vfolder.id} should have scope_type 'user'"
-                        )
-                        assert assoc.scope_id == vfolder.owner_id, (
-                            f"VFolder {vfolder.id} scope_id mismatch"
-                        )
-                    else:  # group
-                        assert assoc.scope_type == "project", (
-                            f"VFolder {vfolder.id} should have scope_type 'project'"
-                        )
-                        assert assoc.scope_id == vfolder.owner_id, (
-                            f"VFolder {vfolder.id} scope_id mismatch"
-                        )
-                    match vfolder.ownership_type:
-                        case VFolderOwnershipType.USER:
-                            assert assoc.scope_type == "user", (
-                                f"VFolder {vfolder.id} should have scope_type 'user'"
-                            )
-                            assert assoc.scope_id == vfolder.owner_id, (
-                                f"VFolder {vfolder.id} scope_id mismatch"
-                            )
-                        case VFolderOwnershipType.GROUP:
-                            assert assoc.scope_type == "project", (
-                                f"VFolder {vfolder.id} should have scope_type 'project'"
-                            )
-                            assert assoc.scope_id == vfolder.owner_id, (
-                                f"VFolder {vfolder.id} scope_id mismatch"
-                            )
-                        case _:
-                            raise AssertionError(
-                                f"Unexpected ownership type {vfolder.ownership_type} for vfolder {vfolder.id}"
-                            )
-
-                # 2. Verify roles are created for each permission
-                roles = await session.scalars(
-                    sa.select(RoleRow).where(VFolderPermissionData.role_query_condition())
-                )
-                role_rows = cast(list[RoleRow], roles.all())
-
-                # Should have one role per unique vfolder that has permissions
-                vfolders_with_permissions = {perm.vfolder_id for perm in data.permissions}
-                assert len(role_rows) == len(vfolders_with_permissions), (
-                    f"Expected {len(vfolders_with_permissions)} roles, found {len(role_rows)}"
-                )
-
-                # Create role mapping
-                roles_by_name = {role.name: role for role in role_rows}
-
-                # 3. Verify object permissions
-                object_perms = await session.scalars(
-                    sa.select(ObjectPermissionRow)
-                    .where(ObjectPermissionRow.entity_type == "vfolder")
-                    .options(selectinload(ObjectPermissionRow.role_row))
-                )
-                object_perm_rows = cast(list[ObjectPermissionRow], object_perms.all())
-
-                inserted_obj_perm_vfolder_ids: set[str] = {
-                    perm.vfolder_id for perm in data.permissions
-                }
-                row_ids = {op.entity_id for op in object_perm_rows}
-                assert len(row_ids) == len(inserted_obj_perm_vfolder_ids), (
-                    f"Expected {len(inserted_obj_perm_vfolder_ids)} object permissions, found {len(object_perm_rows)}"
-                )
-
-                # Verify each permission
-                for perm in data.permissions:
-                    perm_data = VFolderPermissionData(
-                        perm.vfolder_id, perm.user_id, perm.permission
-                    )
-                    expected_role_name = perm_data.to_role_name()
-                    role = roles_by_name.get(expected_role_name)
-                    assert role is not None, f"Role {expected_role_name} not found"
-
-                    # Find corresponding object permission
-                    obj_perm = next(
-                        (
-                            op
-                            for op in object_perm_rows
-                            if op.entity_id == perm.vfolder_id and op.role_id == role.id
-                        ),
-                        None,
-                    )
-                    assert obj_perm is not None, (
-                        f"Object permission not found for vfolder {perm.vfolder_id} with role {role.id}"
-                    )
-
-                    # All permissions map to 'read' operation in migration
-                    expected_operation = permission_mapping()[perm.permission]
-                    assert obj_perm.operation == expected_operation, (
-                        f"Expected operation '{expected_operation}' for vfolder {perm.vfolder_id}, got '{obj_perm.operation}'"
-                    )
+        # Convert project-owned vfolder
+        project_result = vfolder_row_to_rbac_row(project_vfolder)
+        project_assoc = project_result.association_scopes_entities[0]
+        assert project_assoc.scope_id.scope_type == "project"
+        assert project_assoc.scope_id.scope_id == str(project_vfolder.group)

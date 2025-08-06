@@ -1,175 +1,115 @@
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Self, cast, override
 
-import sqlalchemy as sa
-from sqlalchemy.engine import Connection
-
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesCreateInput,
 )
-from ai.backend.manager.models.rbac_models.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
-    VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
 )
+
+from .types import PermissionCreateInputGroup
 
 ENTITY_TYPE = "vfolder"
 ROLE_NAME_PREFIX = "vfolder_granted_"
 OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE = "read"
 
 
-def permission_mapping() -> dict[VFolderPermission, str]:
-    """
-    Mapping of vfolder permissions to expected RBAC operations.
-    All VFolder permissions map to the same default operation value
-    because `VFolderPermission` should be used only for mount permissions, not for RBAC operations.
-    """
-    return {
-        VFolderPermission.OWNER_PERM: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.READ_ONLY: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.READ_WRITE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-        VFolderPermission.RW_DELETE: OBJECT_PERMISSION_DEFAULT_OPERATION_VALUE,
-    }
+class VFolderData(ABC):
+    @abstractmethod
+    def to_association_scopes_entities_create_input(self) -> AssociationScopesEntitiesCreateInput:
+        """
+        Convert the VFolderData instance to an AssociationScopesEntitiesCreateInput.
+        This method should be implemented by subclasses to provide the necessary conversion.
+        """
+        raise NotImplementedError
 
 
 @dataclass
-class VFolderData:
-    id: str
-    user: Optional[str]
-    group: Optional[str]
-    ownership_type: VFolderOwnershipType
+class UserVFolderData(VFolderData):
+    id: uuid.UUID
+    user_id: uuid.UUID
 
-    def to_assoc_scope_entity_insert_dict(self) -> dict[str, Any]:
-        return {
-            "scope_type": "user" if self.ownership_type == VFolderOwnershipType.USER else "project",
-            "scope_id": self.user
-            if self.ownership_type == VFolderOwnershipType.USER
-            else self.group,
-            "entity_type": ENTITY_TYPE,
-            "entity_id": self.id,
-        }
+    @override
+    def to_association_scopes_entities_create_input(self) -> AssociationScopesEntitiesCreateInput:
+        return AssociationScopesEntitiesCreateInput(
+            scope_id=ScopeId(
+                scope_type="user",
+                scope_id=str(self.user_id),
+            ),
+            object_id=ObjectId(entity_type=ENTITY_TYPE, entity_id=str(self.id)),
+        )
 
 
 @dataclass
-class VFolderPermissionData:
-    vfolder_id: str
-    user_id: str
-    permission: VFolderPermission
+class ProjectVFolderData(VFolderData):
+    id: uuid.UUID
+    project_id: uuid.UUID
 
-    def __hash__(self):
-        return hash((self.vfolder_id, self.user_id, self.permission))
+    @override
+    def to_association_scopes_entities_create_input(self) -> AssociationScopesEntitiesCreateInput:
+        return AssociationScopesEntitiesCreateInput(
+            scope_id=ScopeId(
+                scope_type="project",
+                scope_id=str(self.project_id),
+            ),
+            object_id=ObjectId(entity_type=ENTITY_TYPE, entity_id=str(self.id)),
+        )
 
-    def to_role_name(self) -> str:
-        return f"{ROLE_NAME_PREFIX}{self.vfolder_id}"
+
+@dataclass
+class VFolderPermissionData(VFolderData):
+    vfolder_id: uuid.UUID
+    user_id: uuid.UUID
 
     @classmethod
-    def role_query_condition(cls) -> sa.sql.expression.BinaryExpression:
-        like = f"{ROLE_NAME_PREFIX}%"
-        return RoleRow.name.like(like)  # type: ignore[attr-defined]
-
-
-def _migrate_vfolder_data_to_association_scopes_entities(conn: Connection) -> None:
-    offset = 0
-    page_size = 1000
-    while True:
-        vfolder_query = (
-            sa.select(VFolderRow).offset(offset).limit(page_size).order_by(VFolderRow.id)
+    def from_row(cls, row: VFolderPermissionRow) -> Self:
+        return cls(
+            vfolder_id=row.vfolder,
+            user_id=row.user,
         )
-        result = conn.execute(vfolder_query)
-        offset += page_size
-        if result is None or result.rowcount == 0:
-            break
 
-        vfolder_list: list[VFolderData] = []
-        for row in result:
-            vfolder_list.append(
-                VFolderData(
-                    id=str(row["id"]),
-                    user=str(row["user"]),
-                    group=str(row["group"]),
-                    ownership_type=row["ownership_type"],
-                )
-            )
-        if not vfolder_list:
-            break
-
-        association_values = [
-            vfolder.to_assoc_scope_entity_insert_dict() for vfolder in vfolder_list
-        ]
-        conn.execute(sa.insert(AssociationScopesEntitiesRow).values(association_values))
-
-
-def _migrate_vfolder_permission_data_to_object_permissions(conn: Connection) -> None:
-    offset = 0
-    page_size = 1000
-    inserted_permissions: set[VFolderPermissionData] = set()
-    inserted_role_names: set[str] = set()
-    inserted_vfolder_obj_perms: set[str] = set()
-    while True:
-        query_vfolder_permission = (
-            sa.select(VFolderRow)
-            .join(VFolderPermissionRow, VFolderRow.id == VFolderPermissionRow.vfolder)
-            .offset(offset)
-            .limit(page_size)
-            .order_by(VFolderRow.id)
+    @override
+    def to_association_scopes_entities_create_input(self) -> AssociationScopesEntitiesCreateInput:
+        return AssociationScopesEntitiesCreateInput(
+            scope_id=ScopeId(
+                scope_type="user",
+                scope_id=str(self.user_id),
+            ),
+            object_id=ObjectId(entity_type=ENTITY_TYPE, entity_id=str(self.vfolder_id)),
         )
-        result = conn.execute(query_vfolder_permission)
-        offset += page_size
-        if result is None or result.rowcount == 0:
-            break
 
-        vfolder_perm_list: list[VFolderPermissionData] = []
-        for row in result:
-            perm_data = VFolderPermissionData(
-                vfolder_id=str(row["id"]),
-                user_id=str(row["user"]),
-                permission=row["permission"],
+
+def vfolder_row_to_rbac_row(vfolder: VFolderRow) -> PermissionCreateInputGroup:
+    ownership_type = cast(VFolderOwnershipType, vfolder.ownership_type)
+    data: UserVFolderData | ProjectVFolderData
+    match ownership_type:
+        case VFolderOwnershipType.USER:
+            data = UserVFolderData(
+                id=vfolder.id,
+                user_id=vfolder.user,
             )
-            if perm_data in inserted_permissions:
-                continue
-            inserted_permissions.add(perm_data)
-            vfolder_perm_list.append(perm_data)
-        if not vfolder_perm_list:
-            continue
-
-        role_names = {perm.to_role_name() for perm in vfolder_perm_list}
-        role_name_values = [{"name": name} for name in role_names]
-        conn.execute(sa.insert(RoleRow).values(role_name_values))
-        inserted_role_names.update(role_names)
-
-        role_name_vfolder_id_map: dict[str, str] = {
-            perm.to_role_name(): perm.vfolder_id for perm in vfolder_perm_list
-        }
-        query_role = sa.select(RoleRow).where(RoleRow.name.in_(role_name_vfolder_id_map.keys()))  # type: ignore[attr-defined]
-        result = conn.execute(query_role)
-
-        vfolder_id_role_id_map: dict[str, uuid.UUID] = {
-            role_name_vfolder_id_map[row["name"]]: row["id"] for row in result
-        }
-        filtered_perm_list: list[VFolderPermissionData] = []
-        for perm in vfolder_perm_list:
-            if perm.vfolder_id in inserted_vfolder_obj_perms:
-                continue
-            inserted_vfolder_obj_perms.add(perm.vfolder_id)
-            filtered_perm_list.append(perm)
-        if not filtered_perm_list:
-            continue
-        object_permission_values = [
-            {
-                "role_id": vfolder_id_role_id_map[perm.vfolder_id],
-                "entity_type": ENTITY_TYPE,
-                "entity_id": perm.vfolder_id,
-                "operation": permission_mapping()[perm.permission],
-            }
-            for perm in filtered_perm_list
-        ]
-        conn.execute(sa.insert(ObjectPermissionRow).values(object_permission_values))
+        case VFolderOwnershipType.GROUP:
+            data = ProjectVFolderData(
+                id=vfolder.id,
+                project_id=vfolder.group,
+            )
+    association_inputs = [data.to_association_scopes_entities_create_input()]
+    return PermissionCreateInputGroup(
+        association_scopes_entities=association_inputs,
+    )
 
 
-def migrate_vfolder_data(conn: Connection) -> None:
-    _migrate_vfolder_data_to_association_scopes_entities(conn)
-    _migrate_vfolder_permission_data_to_object_permissions(conn)
+def vfolder_permission_row_to_rbac_row(
+    vfolder_permission: VFolderPermissionRow,
+) -> PermissionCreateInputGroup:
+    data = VFolderPermissionData.from_row(vfolder_permission)
+    association_inputs = [data.to_association_scopes_entities_create_input()]
+    return PermissionCreateInputGroup(
+        association_scopes_entities=association_inputs,
+    )
