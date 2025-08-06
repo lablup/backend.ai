@@ -3,11 +3,12 @@ import logging
 import os
 import time
 import uuid
-from typing import Generic, Mapping, TypeAlias, Union, cast
+from typing import TYPE_CHECKING, Generic, Mapping, TypeAlias, Union, cast
 
 import aiotools
 from aiohttp import web
 
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
 from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
@@ -26,6 +27,10 @@ from ...types import (
     TCircuitKey,
 )
 from .abc import AbstractFrontend
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
+    from redis.asyncio.client import Pipeline
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -126,9 +131,15 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBack
                 keys = self.redis_keys
                 self.redis_keys = {}
 
-            await redis_helper.execute(
-                self.root_context.redis_live, lambda r: r.mset(cast(MSetType, keys))
-            )
+            async def mset_then_set_expiry(r: Redis) -> Pipeline:
+                pipe = r.pipeline()
+                ttl = get_default_redis_key_ttl()
+                pipe.mset(cast(MSetType, keys))
+                for key in keys:
+                    pipe.expire(key, ttl)
+                return pipe
+
+            await redis_helper.execute(self.root_context.redis_live, mset_then_set_expiry)
 
             log.debug("Wrote {} keys", len(keys))
         except Exception:
