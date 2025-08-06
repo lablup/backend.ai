@@ -19,7 +19,6 @@ from ai.backend.manager.repositories.schedule.repository import ScheduleReposito
 from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
-    SchedulingConfig,
 )
 from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
@@ -28,6 +27,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import (
 )
 from ai.backend.manager.sokovan.scheduler.types import (
     KernelWorkload,
+    SchedulingConfig,
     SessionWorkload,
 )
 
@@ -200,6 +200,8 @@ class TestSchedulerAllocation:
             agent_selector=mock_agent_selector_with_verification,
             allocator=MagicMock(),
             repository=mock_repository,
+            config_provider=MagicMock(),
+            lock_factory=MagicMock(),
         )
         return Scheduler(args)
 
@@ -229,7 +231,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Verify result
         assert result is not None
@@ -262,12 +266,14 @@ class TestSchedulerAllocation:
         assert agents[0].container_count == 5  # 2 + 3
 
         # Verify selector was called once (aggregated for single-node)
-        assert scheduler._agent_selector.select_agent_for_resource_requirements.call_count == 1
+        assert (
+            scheduler._default_agent_selector.select_agent_for_resource_requirements.call_count == 1
+        )
 
         # Check call_history if it was populated
-        if scheduler._agent_selector.call_history:
-            assert len(scheduler._agent_selector.call_history) == 1
-            call = scheduler._agent_selector.call_history[0]
+        if scheduler._default_agent_selector.call_history:
+            assert len(scheduler._default_agent_selector.call_history) == 1
+            call = scheduler._default_agent_selector.call_history[0]
             assert call["requested_slots"] == ResourceSlot({
                 "cpu": Decimal("3"),
                 "mem": Decimal("3072"),
@@ -299,7 +305,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Verify result
         assert result is not None
@@ -356,16 +364,20 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # First two kernels should succeed, third should fail
         assert result is None  # Allocation failed due to insufficient resources
 
         # Verify selector was called 3 times
-        assert scheduler._agent_selector.select_agent_for_resource_requirements.call_count == 3
+        assert (
+            scheduler._default_agent_selector.select_agent_for_resource_requirements.call_count == 3
+        )
 
         # Verify selector call history
-        call_history = scheduler._agent_selector.call_history
+        call_history = scheduler._default_agent_selector.call_history
         if not call_history:
             # If call_history wasn't populated due to the exception handling,
             # we can still verify the mock was called the right number of times
@@ -411,12 +423,14 @@ class TestSchedulerAllocation:
                     return agent
             raise AgentSelectionError("Designated agent not found")
 
-        scheduler._agent_selector.select_agent_for_resource_requirements.side_effect = (
+        scheduler._default_agent_selector.select_agent_for_resource_requirements.side_effect = (
             return_designated
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Verify designated agent was selected
         assert result is not None
@@ -424,7 +438,7 @@ class TestSchedulerAllocation:
 
         # Verify designated_agent was passed to selector
         selector_calls = (
-            scheduler._agent_selector.select_agent_for_resource_requirements.call_args_list
+            scheduler._default_agent_selector.select_agent_for_resource_requirements.call_args_list
         )
         assert len(selector_calls) == 1
         assert selector_calls[0][0][4] == designated_agent  # 5th argument
@@ -443,13 +457,15 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Should return None
         assert result is None
 
         # Selector should not be called
-        assert not scheduler._agent_selector.select_agent_for_resource_requirements.called
+        assert not scheduler._default_agent_selector.select_agent_for_resource_requirements.called
 
     async def test_agent_selection_error(self, scheduler):
         """Test handling of agent selection errors."""
@@ -466,7 +482,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Should return None due to AgentSelectionError
         assert result is None
@@ -491,7 +509,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # Verify all kernels allocated to the same agent
         assert result is not None
@@ -535,7 +555,11 @@ class TestSchedulerAllocation:
 
         # Execute allocation for session 1
         result1 = await scheduler._allocate_workload(
-            workload, agents_session1, selection_config, "default"
+            workload,
+            agents_session1,
+            selection_config,
+            "default",
+            scheduler._default_agent_selector,
         )
 
         assert result1 is not None
@@ -565,7 +589,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._allocate_workload(workload, agents, selection_config, "default")
+        result = await scheduler._allocate_workload(
+            workload, agents, selection_config, "default", scheduler._default_agent_selector
+        )
 
         # With empty kernels, get_resource_requirements returns empty list
         # So the method should return None (not enter the allocation logic)

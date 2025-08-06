@@ -31,14 +31,16 @@ from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AgentAllocation,
     KernelAllocation,
-    ScalingGroupInfo,
     SessionAllocation,
     SessionWorkload,
 )
 from .validators.validator import SchedulingValidator
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+    from ai.backend.manager.repositories.schedule.repository import (
+        ScheduleRepository,
+        SchedulingContextData,
+    )
 
     from .allocators.allocator import SchedulingAllocator
 
@@ -162,47 +164,42 @@ class Scheduler:
         Returns:
             int: The number of sessions successfully scheduled.
         """
-        # Get scaling group specific configuration first
-        # TODO: 아래 두개의 메소드는 합쳐져야 함
-        # 내부적으로 private method를 db_session을 사용하여 호출하도록 변경
-        sg_info = await self._repository.get_scaling_group_info_for_sokovan(scaling_group)
-        # Get pending sessions for this scaling group as workloads
-        workloads = await self._repository.get_pending_sessions(
-            scaling_group, sg_info.pending_timeout
-        )
-        if not workloads:
+        # Single optimized call to get all scheduling context data
+        # This consolidates: get_scaling_group_info_for_sokovan, get_pending_sessions,
+        # get_system_snapshot, and get_scheduling_config into ONE DB session
+        context = await self._repository.get_scheduling_context_data(scaling_group)
+
+        if context is None:
             log.info(
                 "No pending sessions for scaling group {}. Skipping scheduling.",
                 scaling_group,
             )
             return 0
 
-        # Schedule the workloads for this scaling group
-        return await self._schedule_queued_sessions(scaling_group, workloads, sg_info)
+        # Schedule using the context data - no more DB calls needed
+        return await self._schedule_queued_sessions_with_context(scaling_group, context)
 
-    async def _schedule_queued_sessions(
-        self, scaling_group: str, workloads: Sequence[SessionWorkload], sg_info: ScalingGroupInfo
+    async def _schedule_queued_sessions_with_context(
+        self, scaling_group: str, context: "SchedulingContextData"
     ) -> int:
         """
-        Schedule all queued sessions by sequencing them and applying the scheduling policy.
+        Schedule all queued sessions using pre-fetched context data.
+        No database calls are made in this method - all data comes from context.
 
         :param scaling_group: The scaling group to schedule for
-        :param workloads: A sequence of SessionWorkload objects to be scheduled
+        :param context: Pre-fetched context containing all necessary data
         :return: The number of sessions successfully scheduled
         """
-        # No need to record queued sessions here, they are recorded during scheduling phases
+        # Use data from context instead of making DB calls
+        workloads = context.pending_sessions
+        sg_info = context.scaling_group_info
+        system_snapshot = context.system_snapshot
+        config = context.scheduling_config
 
-        # Fetch complete system snapshot from repository
-        async with self._phase_metrics.measure_phase(scaling_group, "system_snapshot"):
-            # Get the current system snapshot and scheduling configuration
-            # TODO: 2개 요청을 합쳐서 하나의 public method로 변경
-            # 다만 2개 동작이 다르니 private method로 변경하여 db_session을 사용하도록 함
-            system_snapshot = await self._repository.get_system_snapshot(scaling_group)
-            config = await self._repository.get_scheduling_config(scaling_group)
-            selection_config = AgentSelectionConfig(
-                max_container_count=config.max_container_count_per_agent,
-                enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
-            )
+        selection_config = AgentSelectionConfig(
+            max_container_count=config.max_container_count_per_agent,
+            enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
+        )
 
         # Validation phase with timing
         async with self._phase_metrics.measure_phase(scaling_group, "validation"):
@@ -218,9 +215,7 @@ class Scheduler:
                         session_workload.session_id,
                         e,
                     )
-                    # Validation failure is already recorded by context manager
 
-        # Get scheduling configuration once for all workloads
         if not validated_workloads:
             log.info(
                 "No valid workloads to schedule for scaling group {}. Skipping scheduling.",
@@ -235,10 +230,13 @@ class Scheduler:
             sequencer = self._sequencer_pool[sg_info.scheduler_name]
             sequenced_workloads = await sequencer.sequence(system_snapshot, validated_workloads)
 
-        mutable_agents = await self._repository.get_agents(scaling_group)
+        # Use agents from context
+        mutable_agents = list(context.agents)  # Create mutable copy
         session_allocations: list[SessionAllocation] = []
+
         # Get appropriate agent selector for this scaling group
         agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
+
         async with self._phase_metrics.measure_phase(scaling_group, "allocation"):
             for session_workload in sequenced_workloads:
                 session_allocation = await self._allocate_workload(
@@ -251,6 +249,7 @@ class Scheduler:
                 if not session_allocation:
                     continue
                 session_allocations.append(session_allocation)
+
             # Allocate resources for each validated workload
             if session_allocations:
                 log.info(
@@ -259,8 +258,6 @@ class Scheduler:
                     scaling_group,
                 )
                 await self._allocator.allocate(session_allocations)
-
-        # Allocation metrics are recorded in _allocate_workload
 
         return len(session_allocations)
 
