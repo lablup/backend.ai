@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...data.permission.id import (
     ObjectId,
@@ -25,11 +27,10 @@ from ...data.permission.status import (
 from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ...errors.common import ObjectNotFound
+from ...models.rbac_models.object_permission import ObjectPermissionRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
-from ...models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
@@ -62,6 +63,14 @@ class PermissionControllerRepository:
                     scope_id=scope_permission.scope_id.scope_id,
                 )
                 db_session.add(scope_permission_row)  # type: ignore[arg-type]
+            for object_permission in data.object_permissions:
+                object_permission_row = ObjectPermissionRow(
+                    role_id=role_id,
+                    entity_type=object_permission.object_id.entity_type,
+                    entity_id=object_permission.object_id.entity_id,
+                    operation=object_permission.operation,
+                )
+                db_session.add(object_permission_row)  # type: ignore[arg-type]
             await db_session.commit()
         return role_row.to_data()
 
@@ -122,6 +131,7 @@ class PermissionControllerRepository:
                     selectinload(RoleRow.scope_permission_rows).options(
                         selectinload(ScopePermissionRow.mapped_entity_rows)
                     ),
+                    selectinload(RoleRow.object_permission_rows),
                 )
             )
             result = await db_session.scalars(query)
@@ -146,5 +156,10 @@ class PermissionControllerRepository:
                     )
                     if obj_id == target_object_id:
                         return True
+            for object_perm in role.object_permissions:
+                if object_perm.operation != data.operation:
+                    continue
+                if object_perm.object_id == target_object_id:
+                    return True
 
         return False

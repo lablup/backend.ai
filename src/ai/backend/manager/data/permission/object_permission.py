@@ -4,51 +4,36 @@ from datetime import datetime
 
 from ai.backend.manager.types import OptionalState
 
-from .id import ObjectId, ScopeId
+from .id import ObjectId
 from .status import PermissionStatus
 
 
 @dataclass
-class ScopePermissionCreateInput:
+class ObjectPermissionCreateInput:
     role_id: uuid.UUID
     entity_type: str
+    entity_id: str
     operation: str
-    scope_type: str
-    scope_id: str
     status: PermissionStatus = PermissionStatus.ACTIVE
 
 
 @dataclass
-class ScopePermissionUpdater:
+class ObjectPermissionUpdater:
     id: uuid.UUID
     status: OptionalState[PermissionStatus]
 
 
 @dataclass
-class ScopePermissionDeleteInput:
+class ObjectPermissionDeleteInput:
     id: uuid.UUID
     _status: PermissionStatus = PermissionStatus.DELETED
 
 
 @dataclass
-class ScopePermissionData:
+class ObjectPermissionData:
     id: uuid.UUID
     status: PermissionStatus
     role_id: uuid.UUID
-    entity_type: str
+    object_id: ObjectId
     operation: str
-    scope_id: ScopeId
     created_at: datetime
-
-
-@dataclass
-class ScopePermissionDataWithEntity:
-    id: uuid.UUID
-    status: PermissionStatus
-    role_id: uuid.UUID
-    entity_type: str
-    operation: str
-    scope_id: ScopeId
-    created_at: datetime
-
-    mapped_entities: list[ObjectId]

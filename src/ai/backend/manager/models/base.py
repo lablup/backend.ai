@@ -220,11 +220,9 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(
-        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts
-    ) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
         self._opts = opts
-        super().__init__(length=length, **opts)
+        super().__init__(length=64, **opts)
         self._use_name = use_name
         self._enum_cls = enum_cls
 
