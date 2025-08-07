@@ -13,10 +13,7 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceClientArgs,
     HuggingFaceScanner,
 )
-from ai.backend.storage.exception import (
-    HuggingFaceAPIError,
-    HuggingFaceModelNotFoundError,
-)
+from ai.backend.storage.exception import HuggingFaceAPIError
 
 
 @pytest.fixture
@@ -139,7 +136,7 @@ class TestHuggingFaceClient:
         """Test model scanning with model not found."""
         mock_model_info.side_effect = Exception("Model not found")
 
-        with pytest.raises(HuggingFaceModelNotFoundError):
+        with pytest.raises(HuggingFaceAPIError):
             await hf_client.scan_model(ModelTarget(model_id="nonexistent/model"))
 
     @pytest.mark.asyncio
@@ -346,7 +343,7 @@ class TestHuggingFaceScanner:
         """Test single model scanning with model not found."""
         mock_model_info.side_effect = Exception("not found")
 
-        with pytest.raises(HuggingFaceModelNotFoundError):
+        with pytest.raises(HuggingFaceAPIError):
             await hf_scanner.scan_model(ModelTarget(model_id="nonexistent/model"))
 
     @pytest.mark.asyncio

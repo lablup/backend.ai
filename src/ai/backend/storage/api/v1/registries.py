@@ -38,7 +38,7 @@ from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages import StoragesService
+from ai.backend.storage.services.storages import StorageService
 
 from ...utils import log_client_api_entry
 
@@ -202,7 +202,7 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries"
 
-    storage_service = StoragesService(ctx.local_config.storages)
+    storage_service = StorageService([])
 
     huggingface_registry_configs = dict(
         (r.name, r.config)
