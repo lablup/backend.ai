@@ -8,7 +8,7 @@ from typing import (
 )
 
 from ai.backend.common.types import ResultSet
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 
 from ..types import FileInfo
 from .base import VFolderAction

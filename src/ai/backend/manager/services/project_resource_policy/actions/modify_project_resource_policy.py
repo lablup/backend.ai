@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.actions.base import (
     ProjectResourcePolicyAction,

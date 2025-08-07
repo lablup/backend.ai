@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 from ai.backend.manager.services.permission_contoller.types import RoleData
 
