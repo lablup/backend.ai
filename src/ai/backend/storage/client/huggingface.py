@@ -11,7 +11,7 @@ from huggingface_hub.hf_api import RepoFile, RepoFolder
 
 from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import HuggingFaceAPIError, HuggingFaceModelNotFoundError
+from ai.backend.storage.exception import HuggingFaceAPIError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -51,9 +51,6 @@ class HuggingFaceClient:
 
         Returns:
             List of HfModelInfo objects
-
-        Raises:
-            HuggingFaceAPIError: If API call fails
         """
         try:
             models = await asyncio.get_event_loop().run_in_executor(
@@ -79,10 +76,6 @@ class HuggingFaceClient:
 
         Returns:
             HfModelInfo object with model metadata
-
-        Raises:
-            HuggingFaceModelNotFoundError: If model is not found
-            HuggingFaceAPIError: If API call fails
         """
         model_id = model.model_id
         revision = model.revision
@@ -93,10 +86,6 @@ class HuggingFaceClient:
             return result
         except Exception as e:
             log.error(f"Failed to get model info for {model_id}@{revision}: {str(e)}")
-            if "not found" in str(e).lower():
-                raise HuggingFaceModelNotFoundError(
-                    f"Model not found: {model_id}@{revision}"
-                ) from e
             raise HuggingFaceAPIError(
                 f"Failed to get model info for {model_id}@{revision}: {str(e)}"
             ) from e
@@ -109,9 +98,6 @@ class HuggingFaceClient:
 
         Returns:
             List of file paths
-
-        Raises:
-            HuggingFaceAPIError: If API call fails
         """
         model_id = model.model_id
         revision = model.revision
@@ -137,9 +123,6 @@ class HuggingFaceClient:
 
         Returns:
             Path information from HfApi
-
-        Raises:
-            HuggingFaceAPIError: If API call fails
         """
         model_id = model.model_id
         revision = model.revision
@@ -208,9 +191,6 @@ class HuggingFaceScanner:
 
         Returns:
             List of ModelInfo objects containing model metadata
-
-        Raises:
-            HuggingFaceAPIError: If API call fails
         """
         try:
             log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
@@ -250,10 +230,6 @@ class HuggingFaceScanner:
 
         Returns:
             ModelInfo object with model metadata and files
-
-        Raises:
-            HuggingFaceModelNotFoundError: If model is not found
-            HuggingFaceAPIError: If API call fails
         """
         model_id = model.model_id
         revision = model.revision
@@ -279,10 +255,6 @@ class HuggingFaceScanner:
 
         except Exception as e:
             log.error(f"Failed to scan HuggingFace model {model_id}@{revision}: {str(e)}")
-            if "not found" in str(e).lower():
-                raise HuggingFaceModelNotFoundError(
-                    f"Model not found: {model_id}@{revision}"
-                ) from e
             raise HuggingFaceAPIError(
                 f"Failed to scan model {model_id}@{revision}: {str(e)}"
             ) from e
@@ -343,9 +315,12 @@ class HuggingFaceScanner:
                     log.error(
                         f"Error processing file {path} info for model {model_id}@{revision}. Details: {str(e)}"
                     )
+                    continue
 
             return file_infos
 
         except Exception as e:
-            log.error(f"Error getting file list for {model_id}@{revision}: {str(e)}")
-            return []
+            log.error(f"Failed to list files for model {model_id}@{revision}: {str(e)}")
+            raise HuggingFaceAPIError(
+                f"Failed to list files for model {model_id}@{revision}: {str(e)}"
+            ) from e
