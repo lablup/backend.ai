@@ -156,6 +156,32 @@ class UserNode(graphene.ObjectType):
         )
 
     @classmethod
+    def from_dataclass(cls, ctx: GraphQueryContext, user_data: UserData) -> Self:
+        return cls(
+            id=user_data.id,
+            username=user_data.username,
+            email=user_data.email,
+            need_password_change=user_data.need_password_change,
+            full_name=user_data.full_name,
+            description=user_data.description,
+            is_active=user_data.is_active,
+            status=user_data.status,
+            status_info=user_data.status_info,
+            created_at=user_data.created_at,
+            modified_at=user_data.modified_at,
+            domain_name=user_data.domain_name,
+            role=user_data.role,
+            resource_policy=user_data.resource_policy,
+            allowed_client_ip=user_data.allowed_client_ip,
+            totp_activated=user_data.totp_activated,
+            totp_activated_at=user_data.totp_activated_at,
+            sudo_session_enabled=user_data.sudo_session_enabled,
+            container_uid=user_data.container_uid,
+            container_main_gid=user_data.container_main_gid,
+            container_gids=user_data.container_gids,
+        )
+
+    @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
         graph_ctx: GraphQueryContext = info.context
 

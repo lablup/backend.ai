@@ -17,6 +17,20 @@ from ai.backend.common.types import (
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionRow, SessionStatus
+from ai.backend.manager.models.user import UserRow
+
+USER_ROW_FIXTURE = UserRow(
+    uuid=uuid4(),
+    username=f"test_user_{uuid4()}",
+    email=f"test-{uuid4()}@example.com",
+    password="test_password",
+    need_password_change=False,
+    full_name="Test User",
+    description="Test user for fixtures",
+    status="active",
+    resource_policy="default",
+    sudo_session_enabled=True,
+)
 
 SESSION_ROW_FIXTURE = SessionRow(
     id=SessionId(uuid4()),
@@ -57,6 +71,7 @@ SESSION_ROW_FIXTURE = SessionRow(
     last_stat=None,
     network_type=NetworkType.VOLATILE,
     network_id=None,
+    user=USER_ROW_FIXTURE,
 )
 
 KERNEL_ROW_FIXTURE = KernelRow(
@@ -133,6 +148,7 @@ SESSION_FIXTURE_DICT = dataclasses.asdict(
 )
 
 del SESSION_FIXTURE_DICT["service_ports"]
+del SESSION_FIXTURE_DICT["owner"]
 
 # Add status_history for testing
 SESSION_FIXTURE_DICT["status_history"] = {
@@ -166,6 +182,8 @@ PENDING_SESSION_FIXTURE_DICT = dataclasses.asdict(
         status=PENDING_SESSION_FIXTURE_DATA.status.value,  # type: ignore
     )
 )
+
+del PENDING_SESSION_FIXTURE_DICT["owner"]
 
 # Additional fixtures for complex database operations
 IMAGE_FIXTURE_DATA = {
@@ -356,6 +374,7 @@ KERNEL_FIXTURE_DICT2 = dataclasses.asdict(
 )
 
 del SESSION_FIXTURE_DICT2["service_ports"]
+del SESSION_FIXTURE_DICT2["owner"]
 
 SESSION_FIXTURE_DICT2["status_history"] = {
     "history": [
