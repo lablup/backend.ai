@@ -20,6 +20,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -48,6 +50,8 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -109,6 +113,8 @@ class Services:
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
+    object_storage: ObjectStorageService
+    artifact: ArtifactService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -209,6 +215,13 @@ class Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
         )
+        object_storage_service = ObjectStorageService(
+            object_storage_repository=repositories.object_storage.repository,
+        )
+        artifact_service = ArtifactService(
+            artifact_repository=repositories.artifact.repository,
+            storage_manager=args.storage_manager,
+        )
 
         return cls(
             agent=agent_service,
@@ -229,6 +242,8 @@ class Services:
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
+            object_storage=object_storage_service,
+            artifact=artifact_service,
         )
 
 
@@ -257,6 +272,8 @@ class Processors(AbstractProcessorPackage):
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
+    object_storage: ObjectStorageProcessors
+    artifact: ArtifactProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -295,6 +312,10 @@ class Processors(AbstractProcessorPackage):
             services.utilization_metric, action_monitors
         )
         auth = AuthProcessors(services.auth, action_monitors)
+        object_storage_processors = ObjectStorageProcessors(
+            services.object_storage, action_monitors
+        )
+        artifact_processors = ArtifactProcessors(services.artifact, action_monitors)
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -314,6 +335,8 @@ class Processors(AbstractProcessorPackage):
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
             auth=auth,
+            object_storage=object_storage_processors,
+            artifact=artifact_processors,
         )
 
     @override
@@ -336,4 +359,7 @@ class Processors(AbstractProcessorPackage):
             *self.utilization_metric.supported_actions(),
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
+            *self.auth.supported_actions(),
+            *self.object_storage.supported_actions(),
+            *self.artifact.supported_actions(),
         ]

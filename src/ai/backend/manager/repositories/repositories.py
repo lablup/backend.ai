@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
+from ai.backend.manager.repositories.artifact.repositories import ArtifactRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -14,6 +15,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
 )
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -46,6 +48,8 @@ class Repositories:
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
+    object_storage: ObjectStorageRepositories
+    artifact: ArtifactRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -65,6 +69,8 @@ class Repositories:
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
+        object_storage_repositories = ObjectStorageRepositories.create(args)
+        artifact_repositories = ArtifactRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -83,4 +89,6 @@ class Repositories:
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
+            object_storage=object_storage_repositories,
+            artifact=artifact_repositories,
         )

@@ -1,7 +1,7 @@
 import strawberry
 from strawberry.schema.config import StrawberryConfig
 
-from .artifact_registry import (
+from .artifact import (
     artifact,
     artifact_group,
     artifact_groups,
@@ -12,6 +12,10 @@ from .artifact_registry import (
     delete_artifact,
     import_artifact,
     update_artifact,
+)
+from .association_artifacts_storages import (
+    associate_artifact_with_storage,
+    disassociate_artifact_with_storage,
 )
 from .model_deployment.model_deployment import (
     create_model_deployment,
@@ -28,6 +32,13 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
+from .object_storage import (
+    create_object_storage,
+    delete_object_storage,
+    object_storage,
+    object_storages,
+    update_object_storage,
+)
 
 
 @strawberry.type
@@ -41,6 +52,8 @@ class Query:
     revisions = revisions
     revision = revision
     replica = replica
+    object_storage = object_storage
+    object_storages = object_storages
 
 
 @strawberry.type
@@ -53,6 +66,11 @@ class Mutation:
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
     create_model_revision = create_model_revision
+    create_object_storage = create_object_storage
+    update_object_storage = update_object_storage
+    delete_object_storage = delete_object_storage
+    associate_artifact_with_storage = associate_artifact_with_storage
+    disassociate_artifact_with_storage = disassociate_artifact_with_storage
 
 
 @strawberry.type

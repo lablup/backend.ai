@@ -117,6 +117,22 @@ enum ArtifactType {
   IMAGE
 }
 
+input AssociateArtifactWithStorageInput {
+  artifactId: ID!
+  storageId: ID!
+}
+
+type AssociateArtifactWithStoragePayload {
+  association: AssociationArtifactsStorages!
+}
+
+type AssociationArtifactsStorages implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  artifactId: ID!
+  storageId: ID!
+}
+
 scalar ByteSize
 
 type CancelImportArtifactPayload {
@@ -163,6 +179,20 @@ type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
 
+input CreateObjectStorageInput {
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  buckets: [String!]!
+}
+
+type CreateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
 """Date with time (isoformat)"""
 scalar DateTime
 
@@ -180,6 +210,14 @@ input DeleteModelDeploymentInput {
 
 type DeleteModelDeploymentPayload {
   deployment: ModelDeployment
+}
+
+input DeleteObjectStorageInput {
+  id: ID!
+}
+
+type DeleteObjectStoragePayload {
+  id: ID!
 }
 
 input DeploymentFilter {
@@ -226,6 +264,15 @@ enum DeploymentStrategyType {
   CANARY
 }
 
+input DisassociateArtifactWithStorageInput {
+  artifactId: ID!
+  storageId: ID!
+}
+
+type DisassociateArtifactWithStoragePayload {
+  association: AssociationArtifactsStorages!
+}
+
 extend type EndpointAutoScalingRuleNode @key(fields: "id") {
   id: ID! @external
 }
@@ -245,6 +292,8 @@ extend type ImageNode @key(fields: "id") {
 
 input ImportArtifactInput {
   artifactId: ID!
+  storageName: String!
+  bucketName: String!
 }
 
 type ImportArtifactPayload {
@@ -419,12 +468,47 @@ type Mutation {
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
+  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+  associateArtifactWithStorage(input: AssociateArtifactWithStorageInput!): AssociateArtifactWithStoragePayload!
+  disassociateArtifactWithStorage(input: DisassociateArtifactWithStorageInput!): DisassociateArtifactWithStoragePayload!
 }
 
 """An object with a Globally Unique ID"""
 interface Node {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+type ObjectStorage implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  buckets: [String!]!
+}
+
+type ObjectStorageConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorage!
 }
 
 enum OrderDirection {
@@ -489,6 +573,8 @@ type Query {
   ): ModelRevisionConnection!
   revision(id: ID!): ModelRevision
   replica(id: ID!): ModelReplica
+  objectStorage(id: ID!): ObjectStorage
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null): ObjectStorageConnection!
 }
 
 type RawServiceConfig {
@@ -594,6 +680,21 @@ input UpdateModelDeploymentInput {
 
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment
+}
+
+input UpdateObjectStorageInput {
+  id: ID!
+  name: String
+  host: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
+  region: String
+  buckets: [String!]
+}
+
+type UpdateObjectStoragePayload {
+  objectStorage: ObjectStorage!
 }
 
 extend type UserNode @key(fields: "id") {
