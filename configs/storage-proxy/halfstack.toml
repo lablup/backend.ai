@@ -106,11 +106,3 @@ path = "vfolder/local/volume1"
 enabled = true
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
-
-[[storages]]
-name = "minio-storage"
-bucket = "enter_bucket_name"
-endpoint = "http://minio.example.com:9000"
-region = "us-east-1"
-access-key = "<minio-access-key>"
-secret-key = "<minio-secret-key>"
