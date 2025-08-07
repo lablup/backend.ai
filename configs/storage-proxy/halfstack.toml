@@ -106,3 +106,9 @@ path = "vfolder/local/volume1"
 enabled = true
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
+
+[[registries]]
+name = "huggingface-hub"
+[registries.config]
+type = "huggingface"
+endpoint = "https://huggingface.co"
