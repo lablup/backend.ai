@@ -37,6 +37,10 @@ class ArtifactRow(Base):
     id = IDColumn("id")
     type = sa.Column("type", sa.Enum(ArtifactType), index=True, nullable=False)
     name = sa.Column("name", sa.String, index=True, nullable=False)
+    size = sa.Column("size", sa.BigInteger, nullable=False, default=0)
+    source = sa.Column("source", sa.String, nullable=True)
+    registry = sa.Column("registry", sa.String, nullable=True)
+    description = sa.Column("description", sa.String, nullable=True)
     created_at = sa.Column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -52,10 +56,6 @@ class ArtifactRow(Base):
         nullable=False,
         index=True,
     )
-    size = sa.Column("size", sa.BigInteger, nullable=False, default=0)
-    source = sa.Column("source", sa.String, nullable=True)
-    registry = sa.Column("registry", sa.String, nullable=True)
-    description = sa.Column("description", sa.String, nullable=True)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -69,12 +69,12 @@ class ArtifactRow(Base):
             f"id={self.id}, "
             f"type={self.type}, "
             f"name={self.name}, "
-            f"created_at={self.created_at.isoformat()}, "
-            f"updated_at={self.updated_at.isoformat()}, "
             f"size={self.size}, "
             f"source={self.source}, "
             f"registry={self.registry}, "
-            f"description={self.description})"
+            f"description={self.description}, "
+            f"created_at={self.created_at.isoformat()}, "
+            f"updated_at={self.updated_at.isoformat()})"
         )
 
     def __repr__(self) -> str:
