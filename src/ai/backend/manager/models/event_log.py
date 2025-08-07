@@ -10,6 +10,8 @@ from .base import (
     StrEnumType,
 )
 
+__all__ = ("EventLogRow",)
+
 
 class EventLogRow(Base):
     __tablename__ = "event_logs"

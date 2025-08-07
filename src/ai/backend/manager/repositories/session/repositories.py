@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

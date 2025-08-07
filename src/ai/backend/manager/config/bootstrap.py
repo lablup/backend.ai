@@ -90,7 +90,6 @@ class BootstrapConfig(BaseModel):
             overrides += [
                 (("logging", "level"), log_level),
                 (("logging", "pkg-ns", "ai.backend"), log_level),
-                (("logging", "pkg-ns", "aiohttp"), log_level),
             ]
 
         file_loader = TomlConfigLoader(config_path, "manager")

@@ -1,12 +1,19 @@
 require:db-migration:
 - changed-files:
   - any-glob-to-any-file:
-    - 'src/ai/backend/manager/models/alembic/versions/*.py'
+    - 'src/ai/backend/manager/**/alembic/versions/*.py'
+    - 'src/ai/backend/account_manager/**/alembic/versions/*.py'
+    - 'src/ai/backend/appproxy/**/alembic/versions/*.py'
 
 area:docs:
 - changed-files:
   - any-glob-to-any-file:
     - 'docs/**/*'
+
+comp:app-proxy:
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/appproxy/**/*.py'
 
 comp:storage-proxy:
 - changed-files:

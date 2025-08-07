@@ -80,7 +80,7 @@ class RedisQueue(AbstractMessageQueue):
     @classmethod
     async def create(cls, redis_target: RedisTarget, args: RedisMQArgs) -> Self:
         client = await ValkeyStreamClient.create(
-            redis_target,
+            redis_target.to_valkey_target(),
             human_readable_name="event_producer.stream",
             db_id=args.db,
             pubsub_channels=args.subscribe_channels,
@@ -228,7 +228,7 @@ class RedisQueue(AbstractMessageQueue):
     async def _read_messages_loop(self, stream_key: str) -> None:
         log.info("Starting read messages loop for stream {}", stream_key)
         client = await ValkeyStreamClient.create(
-            self._redis_target,
+            self._redis_target.to_valkey_target(),
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
         )

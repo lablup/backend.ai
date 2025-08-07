@@ -299,7 +299,6 @@ def load(config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTS
     if log_level != LogLevel.NOTSET:
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

@@ -14,7 +14,6 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    Sequence,
     Union,
     cast,
 )
@@ -28,10 +27,10 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
+from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import HostPortPair as _HostPortPair
-from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
+from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget, ValkeyTarget
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -270,31 +269,26 @@ def get_redis_object(
 
 
 async def create_valkey_client(
-    redis_target: RedisTarget,
+    valkey_target: ValkeyTarget,
     *,
     name: str,
     db: int = 0,
     pubsub_channels: Optional[set[str]] = None,
 ) -> GlideClient:
     addresses: list[NodeAddress] = []
-    if redis_target.addr:
-        addresses.append(
-            NodeAddress(host=str(redis_target.addr.host), port=int(redis_target.addr.port))
-        )
-    sentinel_addresses: Sequence[_HostPortPair] = []
-    if isinstance(redis_target.sentinel, str):
-        sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
-            redis_target.sentinel
-        )
-    elif isinstance(redis_target.sentinel, list):
-        sentinel_addresses = redis_target.sentinel
-    if sentinel_addresses:
+    if valkey_target.addr:
+        host, port = addr_to_hostport_pair(valkey_target.addr)
+        addresses.append(NodeAddress(host=str(host), port=int(port)))
+
+    if sentinel_addresses := valkey_target.sentinel:
         for address in sentinel_addresses:
-            addresses.append(NodeAddress(host=str(address.host), port=int(address.port)))
+            host, port = addr_to_hostport_pair(address)
+            addresses.append(NodeAddress(host=str(host), port=int(port)))
+
     credentials: Optional[ServerCredentials] = None
-    if redis_target.password:
+    if valkey_target.password:
         credentials = ServerCredentials(
-            password=redis_target.password,
+            password=valkey_target.password,
         )
     pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
     if pubsub_channels is not None:

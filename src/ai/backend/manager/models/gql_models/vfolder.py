@@ -8,9 +8,11 @@ from typing import (
     Any,
     Optional,
     Self,
+    cast,
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 import trafaret as t
@@ -81,6 +83,7 @@ class VFolderPermissionValueField(graphene.Scalar):
         return VFolderRBACPermission(value)
 
 
+@graphene_federation.key("id")
 class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -258,6 +261,9 @@ class VirtualFolderNode(graphene.ObjectType):
             query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
+                vfolder_row = cast(Optional[VFolderRow], vfolder_row)
+        if vfolder_row is None:
+            return None
         return cls.from_row(
             graph_ctx,
             vfolder_row,

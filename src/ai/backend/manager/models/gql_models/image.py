@@ -17,6 +17,7 @@ from typing import (
 from uuid import UUID
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -425,6 +426,7 @@ class ImagePermissionValueField(graphene.Scalar):
         return ImagePermission(value)
 
 
+@graphene_federation.key("id")
 class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

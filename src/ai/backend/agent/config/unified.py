@@ -21,6 +21,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -938,6 +939,14 @@ class AgentUnifiedConfig(BaseModel):
         Plugins configuration.
         This field is injected at runtime based on etcd configuration.
         It is not intended to be set in the configuration file.
+        """),
+    )
+    redis: Optional[RedisConfig] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Redis configuration.
+        This field is injected at runtime based on etcd configuration.
+        It is not intended to be set in the other way.
         """),
     )
 

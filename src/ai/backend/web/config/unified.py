@@ -14,10 +14,10 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
-    HostPortPair,
 )
 
 
@@ -847,51 +847,13 @@ class RedisHelperConfig(BaseModel):
     )
 
 
-class RedisConfig(BaseModel):
-    addr: Optional[HostPortPair] = Field(
-        default=None,
-        description="""
-        Redis server address.
-        """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
-    )
+class WebServerRedisConfig(RedisConfig):
     db: int = Field(
         default=0,
         description="""
         Redis database number.
         """,
         examples=[0, 1],
-    )
-    sentinel: Optional[list[HostPortPair]] = Field(
-        default=None,
-        description="""
-        Redis sentinel addresses.
-        """,
-        examples=[None, [{"host": "127.0.0.1", "port": 26379}]],
-    )
-    service_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis service name for sentinel.
-        """,
-        examples=[None, "mymaster"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis password.
-        """,
-        examples=[None, "password"],
-    )
-    redis_helper_config: RedisHelperConfig = Field(
-        default_factory=RedisHelperConfig,
-        description="""
-        Redis helper configuration.
-        """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis_helper_config",
     )
 
 

@@ -415,24 +415,25 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
     type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.INFO,
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Path,
+    config_path: Optional[Path],
+    debug: bool,
     log_level: LogLevel,
-    debug: bool = False,
 ) -> None:
     """
     Start the account-manager service as a foreground process.
     """
+    log_level = LogLevel.DEBUG if debug else log_level
     cfg = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:

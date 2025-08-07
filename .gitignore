@@ -105,6 +105,7 @@ pyrightconfig.json
 
 # Local configurations
 /account-manager*.toml
+/app-proxy*.toml
 /manager*.toml
 /agent*.toml
 /storage-proxy*.toml
@@ -116,7 +117,7 @@ pyrightconfig.json
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
-/alembic-accountmgr.ini
+/alembic-*.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh

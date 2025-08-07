@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

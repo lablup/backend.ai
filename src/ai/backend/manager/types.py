@@ -42,10 +42,10 @@ class SessionGetter(Protocol):
 
 
 class Sentinel(enum.Enum):
-    token = 0
+    TOKEN = 0
 
 
-_SENTINEL = Sentinel.token
+_SENTINEL = Sentinel.TOKEN
 
 
 @attr.define(slots=True)

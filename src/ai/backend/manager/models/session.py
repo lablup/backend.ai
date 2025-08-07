@@ -68,6 +68,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -930,7 +931,7 @@ class SessionRow(Base):
         instance.id = session_data.id
         return instance
 
-    def to_dataclass(self) -> SessionData:
+    def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -971,6 +972,7 @@ class SessionRow(Base):
             network_type=self.network_type,
             network_id=self.network_id,
             service_ports=self.main_kernel.service_ports,
+            owner=owner if owner is not None else None,
         )
 
     @property

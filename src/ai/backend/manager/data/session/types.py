@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.network import NetworkType
 
 if TYPE_CHECKING:
@@ -57,6 +58,7 @@ class SessionData:
     last_stat: Optional[dict[str, Any]] = field(compare=False)
     network_type: Optional[NetworkType]
     network_id: Optional[str]
+    owner: Optional[UserData] = field(compare=False)
 
     # Loaded from relationship
     service_ports: Optional[str]

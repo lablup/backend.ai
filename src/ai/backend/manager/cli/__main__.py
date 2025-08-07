@@ -20,8 +20,6 @@ from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-from ai.backend.manager.models import error_logs
-from ai.backend.manager.models.utils import vacuum_db
 
 from .context import CLIContext, redis_ctx
 
@@ -244,8 +242,8 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
-    from ai.backend.manager.models import SessionRow, kernels
-    from ai.backend.manager.models.utils import connect_database
+    from ai.backend.manager.models import SessionRow, error_logs, kernels
+    from ai.backend.manager.models.utils import connect_database, vacuum_db
 
     today = datetime.now()
     duration = TimeDuration()

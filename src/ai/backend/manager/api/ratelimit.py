@@ -9,7 +9,6 @@ from aiotools import apartial
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import RateLimitExceeded
@@ -65,12 +64,10 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
-    redis_target = redis_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
+    valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
     app_ctx.valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-        redis_target=redis_target,
+        valkey_target=valkey_target,
         db_id=REDIS_RATE_LIMIT_DB,
         human_readable_name="ratelimit",
     )
