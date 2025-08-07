@@ -3,6 +3,10 @@ python_requirements(
     name="reqs-pytest",
     source="pytest-requirements.txt",
     resolve="pytest",
+    module_mapping={
+        "pytest-mock": ["pytest_mock"],
+        "pydantic": ["pydantic", "pydantic_core"],
+    },
 )
 python_requirements(
     name="reqs-ruff",
