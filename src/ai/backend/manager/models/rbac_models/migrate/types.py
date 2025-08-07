@@ -8,6 +8,16 @@ from ai.backend.manager.data.permission.role import RoleCreateInput
 from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
 from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
 
+ROLE_NAME_PREFIX = "role_"
+ADMIN_ROLE_NAME_SUFFIX = "_admin"
+
+
+def is_admin_role(role_name: str) -> bool:
+    """
+    Check if the role name indicates an admin role.
+    """
+    return role_name.endswith(ADMIN_ROLE_NAME_SUFFIX)
+
 
 @dataclass
 class PermissionCreateInputGroup:
