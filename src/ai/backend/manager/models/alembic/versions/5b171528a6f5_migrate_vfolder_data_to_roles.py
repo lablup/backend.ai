@@ -1,8 +1,8 @@
-"""migrate vfolder data to rbac table
+"""migrate vfolder data to roles
 
-Revision ID: 4a60160ba8e0
+Revision ID: 5b171528a6f5
 Revises: a4d56e86d9ee
-Create Date: 2025-07-30 14:44:14.346887
+Create Date: 2025-08-07 23:53:34.718192
 
 """
 
@@ -35,10 +35,11 @@ from ai.backend.manager.models.rbac_models.migrate.vfolder import (
 )
 
 # revision identifiers, used by Alembic.
-revision = "4a60160ba8e0"
+revision = "5b171528a6f5"
 down_revision = "a4d56e86d9ee"
 branch_labels = None
 depends_on = None
+
 
 mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()
