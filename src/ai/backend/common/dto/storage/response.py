@@ -36,31 +36,24 @@ class VFolderMetadataResponse(BaseResponseModel):
 
 
 # S3 Storage API Response Models
-class UploadResponse(BaseResponseModel):
+class UploadObjectResponse(BaseResponseModel):
     pass
 
 
-class PresignedUploadResponse(BaseResponseModel):
+class PresignedUploadObjectResponse(BaseResponseModel):
     url: str
     fields: dict[str, str]
 
 
-class PresignedDownloadResponse(BaseResponseModel):
+class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
 
 
-class ObjectInfoResponse(BaseResponseModel):
-    content_length: Optional[int]
-    content_type: Optional[str]
-    last_modified: Optional[str]
-    etag: Optional[str]
-
-
-class FileDeleteResponse(BaseResponseModel):
+class DeleteObjectResponse(BaseResponseModel):
     pass
 
 
-class FileMetaResponse(BaseResponseModel):
+class ObjectMetaResponse(BaseResponseModel):
     content_length: Optional[int]
     content_type: Optional[str]
     last_modified: Optional[str]

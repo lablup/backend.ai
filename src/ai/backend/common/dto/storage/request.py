@@ -33,7 +33,7 @@ class ObjectStorageAPIPathParams(BaseRequestModel):
     bucket_name: str = Field(description="The name of the S3 bucket to operate on.")
 
 
-class UploadFileReq(BaseRequestModel):
+class UploadObjectReq(BaseRequestModel):
     """
     Data model for file upload requests to object storage.
     This is used to specify the target bucket and key for the file upload.
@@ -48,7 +48,7 @@ class UploadFileReq(BaseRequestModel):
     )
 
 
-class DownloadFileReq(BaseRequestModel):
+class DownloadObjectReq(BaseRequestModel):
     """
     Data model for file download requests from object storage.
     """
@@ -56,7 +56,7 @@ class DownloadFileReq(BaseRequestModel):
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
 
 
-class PresignedUploadReq(BaseRequestModel):
+class PresignedUploadObjectReq(BaseRequestModel):
     """
     Data model for generating presigned upload URLs for object storage operations.
     This is used to specify the target bucket, key, and optional parameters for the presigned
@@ -77,7 +77,7 @@ class PresignedUploadReq(BaseRequestModel):
     )
 
 
-class PresignedDownloadReq(BaseRequestModel):
+class PresignedDownloadObjectReq(BaseRequestModel):
     """
     Data model for generating presigned download URLs for object storage operations.
     """
@@ -87,7 +87,7 @@ class PresignedDownloadReq(BaseRequestModel):
     )
 
 
-class GetFileMetaReq(BaseRequestModel):
+class GetObjectMetaReq(BaseRequestModel):
     """
     Data model for retrieving metadata of a file in object storage.
     This is used to specify the target bucket and key for the file metadata retrieval.
@@ -98,7 +98,7 @@ class GetFileMetaReq(BaseRequestModel):
     )
 
 
-class DeleteFileReq(BaseRequestModel):
+class DeleteObjectReq(BaseRequestModel):
     """
     Data model for deleting a file in object storage.
     This is used to specify the target bucket and key for the file deletion.

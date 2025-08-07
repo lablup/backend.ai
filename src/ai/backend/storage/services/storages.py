@@ -1,13 +1,13 @@
 import logging
 from typing import AsyncIterable, AsyncIterator, Optional
 
-from ai.backend.common.dto.storage.request import PresignedUploadReq
+from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
-    FileDeleteResponse,
-    ObjectInfoResponse,
-    PresignedDownloadResponse,
-    PresignedUploadResponse,
-    UploadResponse,
+    DeleteObjectResponse,
+    ObjectMetaResponse,
+    PresignedDownloadObjectResponse,
+    PresignedUploadObjectResponse,
+    UploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
@@ -53,7 +53,7 @@ class StoragesService:
         content_type: Optional[str],
         content_length: Optional[int],
         data_stream: AsyncIterable[bytes],
-    ) -> UploadResponse:
+    ) -> UploadObjectResponse:
         """
         Upload a file to S3 using streaming.
 
@@ -66,7 +66,7 @@ class StoragesService:
             data_stream: Async iterator of file data chunks
 
         Returns:
-            UploadResponse
+            UploadObjectResponse
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
@@ -77,7 +77,7 @@ class StoragesService:
                 content_length=content_length,
             )
 
-            return UploadResponse()
+            return UploadObjectResponse()
         except Exception as e:
             log.error(f"Stream upload failed: {e}")
             raise FileStreamUploadError("Upload failed") from e
@@ -108,8 +108,8 @@ class StoragesService:
 
     # TODO: Replace `request` with proper options
     async def generate_presigned_upload_url(
-        self, storage_name: str, bucket_name: str, request: PresignedUploadReq
-    ) -> PresignedUploadResponse:
+        self, storage_name: str, bucket_name: str, request: PresignedUploadObjectReq
+    ) -> PresignedUploadObjectResponse:
         """
         Generate presigned upload URL.
 
@@ -119,7 +119,7 @@ class StoragesService:
             request: PresignedUploadReq containing key, content_type, expiration, min_size, max_size
 
         Returns:
-            PresignedUploadResponse with URL and fields
+            PresignedUploadObjectResponse with URL and fields
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
@@ -136,7 +136,9 @@ class StoragesService:
             if presigned_data is None:
                 raise PresignedUploadURLGenerationError()
 
-            return PresignedUploadResponse(url=presigned_data.url, fields=presigned_data.fields)
+            return PresignedUploadObjectResponse(
+                url=presigned_data.url, fields=presigned_data.fields
+            )
 
         except Exception as e:
             log.error(f"Presigned upload URL generation failed: {e}")
@@ -148,7 +150,7 @@ class StoragesService:
         bucket_name: str,
         filepath: str,
         expiration: int = _DEFAULT_EXPIRATION,
-    ) -> PresignedDownloadResponse:
+    ) -> PresignedDownloadObjectResponse:
         """
         Generate presigned download URL.
 
@@ -172,7 +174,7 @@ class StoragesService:
             if presigned_url is None:
                 raise PresignedDownloadURLGenerationError()
 
-            return PresignedDownloadResponse(url=presigned_url)
+            return PresignedDownloadObjectResponse(url=presigned_url)
 
         except Exception as e:
             log.error(f"Presigned download URL generation failed: {e}")
@@ -180,7 +182,7 @@ class StoragesService:
 
     async def get_object_info(
         self, storage_name: str, bucket_name: str, filepath: str
-    ) -> ObjectInfoResponse:
+    ) -> ObjectMetaResponse:
         """
         Get object information.
 
@@ -190,7 +192,7 @@ class StoragesService:
             filepath: Path to the file to download
 
         Returns:
-            ObjectInfoResponse with object metadata
+            ObjectMetaResponse with object metadata
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
@@ -199,11 +201,12 @@ class StoragesService:
             if object_info is None:
                 raise StorageBucketFileNotFoundError()
 
-            return ObjectInfoResponse(
+            return ObjectMetaResponse(
                 content_length=object_info.content_length,
                 content_type=object_info.content_type,
                 last_modified=object_info.last_modified,
                 etag=object_info.etag,
+                metadata=object_info.metadata,
             )
 
         except Exception as e:
@@ -211,7 +214,7 @@ class StoragesService:
 
     async def delete_file(
         self, storage_name: str, bucket_name: str, filepath: str
-    ) -> FileDeleteResponse:
+    ) -> DeleteObjectResponse:
         """
         Delete file (object).
 
@@ -226,7 +229,7 @@ class StoragesService:
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
             await s3_client.delete_object(filepath)
-            return FileDeleteResponse()
+            return DeleteObjectResponse()
 
         except Exception as e:
             log.error(f"Delete object failed: {e}")

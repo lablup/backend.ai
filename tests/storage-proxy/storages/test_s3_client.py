@@ -1,7 +1,6 @@
 import pytest
 from botocore.exceptions import ClientError
 
-from ai.backend.common.dto.storage.response import FileMetaResponse, PresignedUploadResponse
 from ai.backend.storage.client.s3 import S3Client
 
 
@@ -64,7 +63,6 @@ async def test_generate_presigned_upload_url_success(s3_client: S3Client):
     )
 
     assert result is not None
-    assert isinstance(result, PresignedUploadResponse)
     assert result.url is not None
     assert result.fields is not None
     assert isinstance(result.fields, dict)
@@ -90,7 +88,6 @@ async def test_generate_presigned_download_url_success(s3_client: S3Client):
     )
 
     assert result is not None
-    assert isinstance(result, str)
     # Verify URL contains MinIO endpoint and key
     assert "127.0.0.1" in result or "localhost" in result
     assert "presigned_download.txt" in result
@@ -111,7 +108,6 @@ async def test_get_object_info_success(s3_client: S3Client):
     result = await s3_client.get_object_meta("test/info.txt")
 
     assert result is not None
-    assert isinstance(result, FileMetaResponse)
     assert result.content_length == len(test_data)
     assert result.content_type == "text/plain"
     assert result.etag is not None

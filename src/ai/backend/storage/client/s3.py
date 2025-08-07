@@ -4,7 +4,7 @@ from typing import AsyncIterator, Optional
 
 import aioboto3
 
-from ai.backend.common.dto.storage.response import FileMetaResponse, PresignedUploadResponse
+from ai.backend.common.dto.storage.response import ObjectMetaResponse, PresignedUploadObjectResponse
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class S3Client:
         expiration: int,
         content_type: Optional[str] = None,
         content_length_range: Optional[tuple[int, int]] = None,
-    ) -> PresignedUploadResponse:
+    ) -> PresignedUploadObjectResponse:
         """
         Generate a presigned URL for client-side upload to S3.
 
@@ -161,7 +161,7 @@ class S3Client:
             content_length_range: Tuple of (min, max) content length in bytes (optional)
 
         Returns:
-            PresignedUploadResponse: Presigned URL data
+            PresignedUploadObjectResponse: Presigned URL data
         """
         async with self.session.client(
             "s3",
@@ -192,7 +192,7 @@ class S3Client:
                 ExpiresIn=expiration,
             )
 
-            return PresignedUploadResponse(
+            return PresignedUploadObjectResponse(
                 url=response["url"],
                 fields=response["fields"],
             )
@@ -241,7 +241,7 @@ class S3Client:
 
             return url
 
-    async def get_object_meta(self, s3_key: str) -> FileMetaResponse:
+    async def get_object_meta(self, s3_key: str) -> ObjectMetaResponse:
         """
         Get metadata information about an S3 object.
 
@@ -249,7 +249,7 @@ class S3Client:
             s3_key: The S3 object key
 
         Returns:
-            FileMetaResponse: Object metadata
+            ObjectMetaResponse: Object metadata
         """
         async with self.session.client(
             "s3",
@@ -263,7 +263,7 @@ class S3Client:
                 Key=s3_key,
             )
             last_modified = response.get("LastModified")
-            return FileMetaResponse(
+            return ObjectMetaResponse(
                 content_length=response.get("ContentLength"),
                 content_type=response.get("ContentType"),
                 last_modified=last_modified.isoformat() if last_modified else None,

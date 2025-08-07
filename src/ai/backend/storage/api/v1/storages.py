@@ -17,13 +17,13 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.dto.storage.context import MultipartUploadCtx
 from ai.backend.common.dto.storage.request import (
-    DeleteFileReq,
-    DownloadFileReq,
-    GetFileMetaReq,
+    DeleteObjectReq,
+    DownloadObjectReq,
+    GetObjectMetaReq,
     ObjectStorageAPIPathParams,
-    PresignedDownloadReq,
-    PresignedUploadReq,
-    UploadFileReq,
+    PresignedDownloadObjectReq,
+    PresignedUploadObjectReq,
+    UploadObjectReq,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
@@ -55,7 +55,7 @@ class StoragesAPIHandler:
     async def upload_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[UploadFileReq],
+        body: BodyParam[UploadObjectReq],
         multipart_ctx: MultipartUploadCtx,
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -103,7 +103,7 @@ class StoragesAPIHandler:
     async def download_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[DownloadFileReq],
+        body: BodyParam[DownloadObjectReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIStreamResponse:
         """
@@ -131,7 +131,7 @@ class StoragesAPIHandler:
     async def presigned_upload_url(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[PresignedUploadReq],
+        body: BodyParam[PresignedUploadObjectReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
@@ -157,7 +157,7 @@ class StoragesAPIHandler:
     async def presigned_download_url(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[PresignedDownloadReq],
+        body: BodyParam[PresignedDownloadObjectReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
@@ -184,7 +184,7 @@ class StoragesAPIHandler:
     async def get_file_meta(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[GetFileMetaReq],
+        body: BodyParam[GetObjectMetaReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
@@ -210,7 +210,7 @@ class StoragesAPIHandler:
     async def delete_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[DeleteFileReq],
+        body: BodyParam[DeleteObjectReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
