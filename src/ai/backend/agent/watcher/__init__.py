@@ -25,7 +25,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
-from . import __version__ as VERSION
+__version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -418,7 +418,7 @@ def main(
 
     setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
     with logger:
-        log.info("Backend.AI Agent Watcher {0}", VERSION)
+        log.info("Backend.AI Agent Watcher {0}", __version__)
         log.info("runtime: {0}", utils.env_info())
 
         log_config = logging.getLogger("ai.backend.agent.config")
@@ -431,7 +431,3 @@ def main(
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
         log.info("exit.")
-
-
-if __name__ == "__main__":
-    main()
