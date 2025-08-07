@@ -67,12 +67,18 @@ class ScheduleEventHandler:
     async def handle_do_start_session(
         self, context: None, agent_id: str, ev: DoStartSessionEvent
     ) -> None:
-        await self._scheduler_dispatcher.start(ev.event_name())
+        if self._use_sokovan:
+            await self._sokovan_orchestrator.handle_start_session_event()
+        else:
+            await self._scheduler_dispatcher.start(ev.event_name())
 
     async def handle_do_check_precond(
         self, context: None, agent_id: str, ev: DoCheckPrecondEvent
     ) -> None:
-        await self._scheduler_dispatcher.check_precond(ev.event_name())
+        if self._use_sokovan:
+            await self._sokovan_orchestrator.handle_check_precond_event()
+        else:
+            await self._scheduler_dispatcher.check_precond(ev.event_name())
 
     async def handle_do_scale(self, context: None, agent_id: str, ev: DoScaleEvent) -> None:
         await self._scheduler_dispatcher.scale_services(ev.event_name())

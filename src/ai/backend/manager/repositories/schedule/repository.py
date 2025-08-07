@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Optional, cast
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -2293,3 +2293,232 @@ class ScheduleRepository:
         if raw_value is not None:
             raw_data.max_container_count = int(raw_value)
         return self._transform_to_scheduling_context(raw_data)
+
+    @repository_decorator()
+    async def get_scheduled_sessions_for_precond(self) -> list[SessionRow]:
+        """
+        Get SCHEDULED sessions with minimal data needed for precondition checks.
+        This includes image information for checking/pulling images.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            sessions = await db_sess.scalars(
+                sa.select(SessionRow)
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        selectinload(KernelRow.image_row),
+                        noload(KernelRow.agent_row),
+                    ),
+                    noload(SessionRow.access_key_row),
+                    noload(SessionRow.group),
+                    noload(SessionRow.domain),
+                    noload(SessionRow.user),
+                )
+                .where(SessionRow.status == SessionStatus.SCHEDULED)
+            )
+            return sessions.all()
+
+    @repository_decorator()
+    async def transit_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
+        """
+        Transit sessions from SCHEDULED to PREPARING status.
+        This is called after precondition checks are initiated.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            current_time = datetime.now(timezone.utc)
+
+            # Update session status
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .values(
+                    status=SessionStatus.PREPARING,
+                    status_info="Pulling images and preparing environment",
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.PREPARING.name: current_time.isoformat()},
+                    ),
+                )
+                .where(
+                    (SessionRow.id.in_(session_ids))
+                    & (SessionRow.status == SessionStatus.SCHEDULED)
+                )
+            )
+
+            # Update kernel status
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.PREPARING,
+                    status_info="Pulling images and preparing environment",
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.PREPARING.name: current_time.isoformat()},
+                    ),
+                )
+                .where(
+                    (KernelRow.session_id.in_(session_ids))
+                    & (KernelRow.status == KernelStatus.SCHEDULED)
+                )
+            )
+
+            await db_sess.commit()
+
+    @repository_decorator()
+    async def mark_sessions_and_kernels_creating_sokovan(self) -> list[SessionRow]:
+        """
+        Get PREPARED sessions and mark them as CREATING.
+        This is similar to mark_sessions_and_kernels_creating but optimized for Sokovan.
+
+        Returns:
+            List of SessionRow objects that were transitioned to CREATING status
+        """
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(timezone.utc)
+
+            # Get PREPARED sessions with necessary data
+            sessions = await db_sess.scalars(
+                sa.select(SessionRow)
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        selectinload(KernelRow.image_row),
+                        selectinload(KernelRow.agent_row),
+                    ),
+                    selectinload(SessionRow.access_key_row),
+                    selectinload(SessionRow.scaling_group),
+                )
+                .where(SessionRow.status == SessionStatus.PREPARED)
+            )
+            session_rows = list(sessions.all())
+
+            # Mark sessions and kernels as CREATING
+            for row in session_rows:
+                for kernel_row in row.kernels:
+                    _kernel_row = cast(KernelRow, kernel_row)
+                    _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
+                row.set_status(SessionStatus.CREATING, status_changed_at=now)
+
+            await db_sess.commit()
+            return session_rows
+
+    @repository_decorator()
+    async def get_sessions_to_terminate(self) -> list[SessionRow]:
+        """
+        Get sessions that need to be terminated.
+        This includes sessions with TERMINATING status or sessions that should be terminated
+        for other reasons (e.g., timeout, user request).
+
+        Returns:
+            List of SessionRow objects that should be terminated
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get sessions with TERMINATING status
+            sessions = await db_sess.scalars(
+                sa.select(SessionRow)
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                            KernelRow.container_id,
+                            KernelRow.status,
+                        )
+                    ),
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.status,
+                        SessionRow.access_key,
+                        SessionRow.session_type,
+                        SessionRow.creation_id,
+                    ),
+                )
+                .where(SessionRow.status == SessionStatus.TERMINATING)
+            )
+            return sessions.all()
+
+    @repository_decorator()
+    async def mark_session_terminating(
+        self,
+        session_id: SessionId,
+        reason: Optional[str] = None,
+    ) -> bool:
+        """
+        Mark a session as TERMINATING.
+        This is the first step in the session destruction process.
+
+        Args:
+            session_id: The session ID to mark for termination
+            reason: Optional reason for termination
+
+        Returns:
+            True if the session was successfully marked, False otherwise
+        """
+        async with self._db.begin_session() as db_sess:
+            current_time = datetime.now(timezone.utc)
+
+            # Check if session exists and is in a terminable state
+            session = await db_sess.scalar(
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(load_only(SessionRow.status))
+            )
+
+            if not session:
+                log.warning("Session {} not found for termination", session_id)
+                return False
+
+            # Only certain statuses can transition to TERMINATING
+            terminable_statuses = [
+                SessionStatus.PENDING,
+                SessionStatus.SCHEDULED,
+                SessionStatus.PREPARING,
+                SessionStatus.CREATING,
+                SessionStatus.RUNNING,
+                SessionStatus.RESTARTING,
+                SessionStatus.ERROR,
+            ]
+
+            if session.status not in terminable_statuses:
+                log.debug(
+                    "Session {} in status {} cannot be terminated",
+                    session_id,
+                    session.status,
+                )
+                return False
+
+            # Update session status to TERMINATING
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .values(
+                    status=SessionStatus.TERMINATING,
+                    status_info=reason or "User requested termination",
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.TERMINATING.name: current_time.isoformat()},
+                    ),
+                )
+                .where(SessionRow.id == session_id)
+            )
+
+            # Update kernel statuses to TERMINATING
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.TERMINATING,
+                    status_info=reason or "User requested termination",
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.TERMINATING.name: current_time.isoformat()},
+                    ),
+                )
+                .where(KernelRow.session_id == session_id)
+            )
+
+            await db_sess.commit()
+            return True
