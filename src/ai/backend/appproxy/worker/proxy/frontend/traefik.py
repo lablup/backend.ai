@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import uuid
-from typing import TYPE_CHECKING, Generic, Mapping, TypeAlias, Union, cast
+from typing import TYPE_CHECKING, Generic, Mapping, TypeAlias, Union
 
 import aiotools
 from aiohttp import web
@@ -30,7 +30,6 @@ from .abc import AbstractFrontend
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -131,21 +130,18 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBack
                 keys = self.redis_keys
                 self.redis_keys = {}
 
-            BATCH_SIZE = 100
+            BATCH_SIZE = 1000
             key_items = list(keys.items())
             ttl = get_default_redis_key_ttl()
 
             for i in range(0, len(key_items), BATCH_SIZE):
                 batch = dict(key_items[i : i + BATCH_SIZE])
 
-                async def _mset_then_set_expiry(r: Redis) -> Pipeline:
-                    pipe = r.pipeline(transaction=False)
-                    pipe.mset(cast(MSetType, batch))
-                    for key in batch:
-                        pipe.expire(key, ttl)
-                    return pipe
+                async def _batch_set_expiry(r: Redis) -> None:
+                    for k, v in batch.items():
+                        await r.set(k, v, ex=ttl)
 
-                await redis_helper.execute(self.root_context.redis_live, _mset_then_set_expiry)
+                await redis_helper.execute(self.root_context.redis_live, _batch_set_expiry)
 
             log.debug("Wrote {} keys", len(keys))
         except Exception:
