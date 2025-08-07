@@ -497,12 +497,9 @@ def generate_example_json(
         raise UnsupportedTypeError(str(schema))
 
 
-DEFAULT_REDIS_TTL_SECONDS = 2 * 24 * 60 * 60  # 2 days in seconds
-
-
 def get_default_redis_key_ttl() -> int:
     """
     Returns the default TTL for Redis keys.
     This is used to set the expiration time for keys in Redis.
     """
-    return DEFAULT_REDIS_TTL_SECONDS
+    return 2 * 24 * 60 * 60  # 2 days in seconds
