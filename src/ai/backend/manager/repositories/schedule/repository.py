@@ -205,7 +205,7 @@ class RawSchedulingData:
     """Raw data fetched from database for scheduling operations."""
 
     scaling_group_row: ScalingGroupRow
-    pending_sessions: list[SessionRow]
+    pending_sessions: list[PendingSessionData]
     # Only populated if pending sessions exist:
     agents: Optional[list[AgentRow]] = None
     snapshot_data: Optional[SnapshotDatabaseData] = None
@@ -1885,24 +1885,17 @@ class ScheduleRepository:
         Fetch all raw data needed for scheduling.
         ALL database queries happen in _fetch_all_scheduling_database_data.
         """
-        # Single method that executes ALL database queries
         all_data = await self._fetch_all_scheduling_database_data(db_sess, scaling_group)
-
         if all_data is None:
             return None
-
-        # Early exit if no pending sessions
         if not all_data.pending_sessions:
             return RawSchedulingData(
                 scaling_group_row=all_data.scaling_group_row, pending_sessions=[]
             )
 
-        # Convert PendingSessionData to SessionRow format for compatibility
-        session_rows = self._convert_pending_data_to_session_rows(all_data.pending_sessions)
-
         return RawSchedulingData(
             scaling_group_row=all_data.scaling_group_row,
-            pending_sessions=session_rows,
+            pending_sessions=all_data.pending_sessions,
             agents=all_data.agents,
             snapshot_data=all_data.snapshot_data,
             max_container_count=None,  # Will be set from etcd later
@@ -2115,47 +2108,6 @@ class ScheduleRepository:
 
         return list(sessions_map.values())
 
-    def _convert_pending_data_to_session_rows(
-        self, pending_sessions: list[PendingSessionData]
-    ) -> list[SessionRow]:
-        """
-        Convert PendingSessionData to SessionRow format for compatibility.
-        Creates minimal SessionRow objects with only the fields needed.
-        """
-        session_rows = []
-        for data in pending_sessions:
-            # Create a minimal SessionRow object
-            # Note: We're creating a detached object, not querying from DB
-            session = SessionRow(
-                id=data.id,
-                access_key=data.access_key,
-                requested_slots=data.requested_slots,
-                user_uuid=data.user_uuid,
-                group_id=data.group_id,
-                domain_name=data.domain_name,
-                scaling_group_name=data.scaling_group_name,
-                priority=data.priority,
-                session_type=data.session_type,
-                cluster_mode=data.cluster_mode,
-                starts_at=data.starts_at,
-            )
-
-            # Convert kernel data to minimal KernelRow objects
-            session.kernels = [
-                KernelRow(
-                    id=kernel.id,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
-                    requested_slots=kernel.requested_slots,
-                    agent=kernel.agent,
-                )
-                for kernel in data.kernels
-            ]
-
-            session_rows.append(session)
-
-        return session_rows
-
     def _transform_to_scheduling_context(
         self, raw_data: RawSchedulingData
     ) -> SchedulingContextData:
@@ -2196,8 +2148,10 @@ class ScheduleRepository:
             pending_timeout=scaling_group_row.scheduler_opts.pending_timeout,
         )
 
-    def _transform_sessions_to_workloads(self, sessions: list[SessionRow]) -> list[SessionWorkload]:
-        """Transform session rows to workload objects."""
+    def _transform_sessions_to_workloads(
+        self, sessions: list[PendingSessionData]
+    ) -> list[SessionWorkload]:
+        """Transform pending session data to workload objects."""
         workloads: list[SessionWorkload] = []
         for session in sessions:
             # Create kernel workloads
@@ -2328,25 +2282,14 @@ class ScheduleRepository:
         - get_system_snapshot (only if pending sessions exist)
         - get_scheduling_config
         """
-        # Phase 1: Fetch all raw data within DB session
         async with self._db.begin_readonly_session() as db_sess:
             raw_data = await self._fetch_raw_scheduling_data(db_sess, scaling_group)
 
-        # DB connection closed here
-
-        # Early exit if no scaling group or no pending sessions
         if raw_data is None or not raw_data.pending_sessions:
             return None
-
-        # Phase 2: Fetch etcd config (not a DB operation)
         raw_value = await self._config_provider.legacy_etcd_config_loader.get_raw(
             "config/agent/max-container-count"
         )
         if raw_value is not None:
             raw_data.max_container_count = int(raw_value)
-
-        # Phase 3: Get concurrency data from Redis if needed (not DB)
-        # This will be done in the scheduler if needed, not here
-
-        # Phase 4: Transform raw data to domain objects (no DB connection)
         return self._transform_to_scheduling_context(raw_data)

@@ -30,10 +30,10 @@ class SokovanOrchestrator:
         try:
             # Delegate to scheduler which handles locking internally
             # Returns True if any sessions were scheduled
-            sessions_scheduled = await self._scheduler.schedule_all_scaling_groups()
+            scheduled_session_count = await self._scheduler.schedule_all_scaling_groups()
 
             # Trigger check precondition event only if sessions were actually scheduled
-            if sessions_scheduled:
+            if scheduled_session_count > 0:
                 await self._event_producer.anycast_event(DoCheckPrecondEvent())
 
         except Exception as e:

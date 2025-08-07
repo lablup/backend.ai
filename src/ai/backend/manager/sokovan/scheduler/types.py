@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
@@ -61,14 +61,14 @@ class SessionDependencyInfo:
     dependency_result: SessionResult
 
 
-@dataclass(frozen=True)
+@dataclass
 class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
-    by_keypair: Mapping[AccessKey, ResourceSlot]
-    by_user: Mapping[UUID, ResourceSlot]
-    by_group: Mapping[UUID, ResourceSlot]
-    by_domain: Mapping[str, ResourceSlot]
+    by_keypair: MutableMapping[AccessKey, ResourceSlot]
+    by_user: MutableMapping[UUID, ResourceSlot]
+    by_group: MutableMapping[UUID, ResourceSlot]
+    by_domain: MutableMapping[str, ResourceSlot]
 
 
 @dataclass(frozen=True)
@@ -81,29 +81,29 @@ class ResourcePolicySnapshot:
     domain_limits: Mapping[str, ResourceSlot]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ConcurrencySnapshot:
     """Snapshot of concurrent session counts."""
 
-    sessions_by_keypair: Mapping[AccessKey, int]
-    sftp_sessions_by_keypair: Mapping[AccessKey, int]
+    sessions_by_keypair: MutableMapping[AccessKey, int]
+    sftp_sessions_by_keypair: MutableMapping[AccessKey, int]
 
 
-@dataclass(frozen=True)
+@dataclass
 class PendingSessionSnapshot:
     """Snapshot of pending sessions."""
 
-    by_keypair: Mapping[AccessKey, list[PendingSessionInfo]]
+    by_keypair: MutableMapping[AccessKey, list[PendingSessionInfo]]
 
 
-@dataclass(frozen=True)
+@dataclass
 class SessionDependencySnapshot:
     """Snapshot of session dependencies."""
 
     by_session: Mapping[SessionId, list[SessionDependencyInfo]]
 
 
-@dataclass(frozen=True)
+@dataclass
 class SystemSnapshot:
     """Represents a complete snapshot of the system's state for scheduling decisions."""
 

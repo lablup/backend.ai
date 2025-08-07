@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from ai.backend.common.types import AgentId, AgentSelectionStrategy
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
@@ -33,6 +33,7 @@ from .types import (
     KernelAllocation,
     SessionAllocation,
     SessionWorkload,
+    SystemSnapshot,
 )
 from .validators.validator import SchedulingValidator
 
@@ -131,10 +132,10 @@ class Scheduler:
                 scaling_groups = await self._repository.get_schedulable_scaling_groups()
                 for scaling_group in scaling_groups:
                     try:
-                        log.info("Scheduling sessions for scaling group: {}", scaling_group)
+                        log.trace("Scheduling sessions for scaling group: {}", scaling_group)
                         # Schedule sessions for this scaling group
                         async with self._operation_metrics.measure_operation(
-                            "schedule_scaling_group",
+                            f"schedule_scaling_group_{scaling_group}"
                         ):
                             scheduled_count = await self._schedule_scaling_group(scaling_group)
                         total_scheduled_count += scheduled_count
@@ -170,7 +171,7 @@ class Scheduler:
         context = await self._repository.get_scheduling_context_data(scaling_group)
 
         if context is None:
-            log.info(
+            log.trace(
                 "No pending sessions for scaling group {}. Skipping scheduling.",
                 scaling_group,
             )
@@ -201,34 +202,19 @@ class Scheduler:
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
 
-        # Validation phase with timing
-        async with self._phase_metrics.measure_phase(scaling_group, "validation"):
-            validated_workloads: list[SessionWorkload] = []
-            for session_workload in workloads:
-                try:
-                    # Validate each workload against the current system state
-                    self._validator.validate(system_snapshot, session_workload)
-                    validated_workloads.append(session_workload)
-                except Exception as e:
-                    log.info(
-                        "Validation failed for workload {}: {}",
-                        session_workload.session_id,
-                        e,
-                    )
-
-        if not validated_workloads:
-            log.info(
-                "No valid workloads to schedule for scaling group {}. Skipping scheduling.",
-                scaling_group,
-            )
-            return 0
-
-        # Sequence workloads with system context
+        # Sequence workloads with system context first
         async with self._phase_metrics.measure_phase(
             scaling_group, f"sequencing_{sg_info.scheduler_name}"
         ):
             sequencer = self._sequencer_pool[sg_info.scheduler_name]
-            sequenced_workloads = await sequencer.sequence(system_snapshot, validated_workloads)
+            sequenced_workloads = await sequencer.sequence(system_snapshot, workloads)
+
+        if not sequenced_workloads:
+            log.info(
+                "No workloads to schedule for scaling group {}. Skipping scheduling.",
+                scaling_group,
+            )
+            return 0
 
         # Use agents from context
         mutable_agents = list(context.agents)  # Create mutable copy
@@ -237,8 +223,22 @@ class Scheduler:
         # Get appropriate agent selector for this scaling group
         agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
 
+        # Create a mutable copy of system snapshot for progressive updates
+        mutable_snapshot = system_snapshot  # This will be updated after each allocation
+
         async with self._phase_metrics.measure_phase(scaling_group, "allocation"):
             for session_workload in sequenced_workloads:
+                # Validate with the current (possibly updated) snapshot
+                try:
+                    self._validator.validate(mutable_snapshot, session_workload)
+                except Exception as e:
+                    log.info(
+                        "Validation failed for workload {}: {}",
+                        session_workload.session_id,
+                        e,
+                    )
+                    continue
+
                 session_allocation = await self._allocate_workload(
                     session_workload,
                     mutable_agents,
@@ -248,7 +248,11 @@ class Scheduler:
                 )
                 if not session_allocation:
                     continue
+
                 session_allocations.append(session_allocation)
+
+                # Update the snapshot to reflect this allocation
+                self._update_system_snapshot(mutable_snapshot, session_workload, allocated=True)
 
             # Allocate resources for each validated workload
             if session_allocations:
@@ -260,6 +264,63 @@ class Scheduler:
                 await self._allocator.allocate(session_allocations)
 
         return len(session_allocations)
+
+    def _update_system_snapshot(
+        self,
+        snapshot: SystemSnapshot,
+        workload: SessionWorkload,
+        allocated: bool = True,
+    ) -> None:
+        """
+        Update the system snapshot after a session allocation.
+        This ensures the next validation uses up-to-date information.
+
+        :param snapshot: The system snapshot to update (modified in-place)
+        :param workload: The session workload that was allocated
+        :param allocated: Whether the session was successfully allocated
+        """
+        if not allocated:
+            # If allocation failed, no state change needed
+            return
+
+        # 1. Update resource occupancy - add the session's requested slots
+        # Update keypair occupancy
+        current_keypair = snapshot.resource_occupancy.by_keypair.get(
+            workload.access_key, ResourceSlot()
+        )
+        snapshot.resource_occupancy.by_keypair[workload.access_key] = (
+            current_keypair + workload.requested_slots
+        )
+
+        # Update user occupancy
+        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, ResourceSlot())
+        snapshot.resource_occupancy.by_user[workload.user_uuid] = (
+            current_user + workload.requested_slots
+        )
+
+        # Update group occupancy
+        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, ResourceSlot())
+        snapshot.resource_occupancy.by_group[workload.group_id] = (
+            current_group + workload.requested_slots
+        )
+
+        # Update domain occupancy
+        current_domain = snapshot.resource_occupancy.by_domain.get(
+            workload.domain_name, ResourceSlot()
+        )
+        snapshot.resource_occupancy.by_domain[workload.domain_name] = (
+            current_domain + workload.requested_slots
+        )
+
+        # 2. Update concurrency counts
+        if workload.is_private:
+            # Increment SFTP session count
+            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(workload.access_key, 0)
+            snapshot.concurrency.sftp_sessions_by_keypair[workload.access_key] = current_sftp + 1
+        else:
+            # Increment regular session count
+            current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.access_key, 0)
+            snapshot.concurrency.sessions_by_keypair[workload.access_key] = current_sessions + 1
 
     async def _allocate_workload(
         self,
