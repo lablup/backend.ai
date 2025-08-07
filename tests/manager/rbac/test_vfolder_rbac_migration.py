@@ -128,8 +128,35 @@ class TestMapVfolderEntityToScope:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
+class TestMapUserVFolderToUserScope:
+    """Test map_user_vfolder_to_user_scope function."""
+
+    def test_basic_mapping(self, role_id, user_vfolder_data):
+        """Test basic user vfolder mapping."""
+        result = map_user_vfolder_to_user_scope(role_id, user_vfolder_data)
+
+        # Check scope permissions - should have all operations
+        assert len(result.scope_permissions) == len(OperationType)
+
+        for perm in result.scope_permissions:
+            assert perm.role_id == role_id
+            assert perm.scope_type == ScopeType.USER
+            assert perm.scope_id == str(user_vfolder_data.user_id)
+            assert perm.entity_type == EntityType.VFOLDER
+            assert perm.operation in [str(op) for op in OperationType]
+
+        # Check all operations are present
+        operations = {perm.operation for perm in result.scope_permissions}
+        expected_operations = {str(op) for op in OperationType}
+        assert operations == expected_operations
+
+        # Check association scopes entities
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
+        assert assoc.scope_id.scope_type == ScopeType.USER
+        assert assoc.scope_id.scope_id == str(user_vfolder_data.user_id)
+        assert assoc.object_id.entity_type == EntityType.VFOLDER
+        assert assoc.object_id.entity_id == str(user_vfolder_data.id)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.USER
         assert assoc.scope_id.scope_id == str(user_id)
@@ -151,8 +178,43 @@ class TestMapVfolderEntityToScope:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
+        # Each result should have the same scope but different object
+        for i, result in enumerate(results):
+            assert len(result.scope_permissions) == len(OperationType)
+            assert result.association_scopes_entities[0].scope_id.scope_id == str(user_id)
+            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
+
+
+class TestMapProjectVFolderToProjectScope:
+    """Test map_project_vfolder_to_project_scope function."""
+
+    def test_admin_role_mapping(self, role_id, project_vfolder_data):
+        """Test project vfolder mapping with admin role."""
+        result = map_project_vfolder_to_project_scope(
+            role_id, project_vfolder_data, is_admin_role=True
+        )
+
+        # Admin should have all operations
+        assert len(result.scope_permissions) == len(OperationType)
+
+        for perm in result.scope_permissions:
+            assert perm.role_id == role_id
+            assert perm.scope_type == ScopeType.PROJECT
+            assert perm.scope_id == str(project_vfolder_data.project_id)
+            assert perm.entity_type == EntityType.VFOLDER
+
+        # Check all operations are present
+        operations = {perm.operation for perm in result.scope_permissions}
+        expected_operations = {str(op) for op in OperationType}
+        assert operations == expected_operations
+
+        # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
+        assert assoc.scope_id.scope_type == ScopeType.PROJECT
+        assert assoc.scope_id.scope_id == str(project_vfolder_data.project_id)
+        assert assoc.object_id.entity_type == EntityType.VFOLDER
+        assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.PROJECT
         assert assoc.scope_id.scope_id == str(group_id)
@@ -194,8 +256,19 @@ class TestMapVfolderPermissionDataToScope:
 
         result = map_vfolder_permission_data_to_scope(vfolder_permission)
 
+        assert perm.role_id == role_id
+        assert perm.scope_type == ScopeType.PROJECT
+        assert perm.scope_id == str(project_vfolder_data.project_id)
+        assert perm.entity_type == EntityType.VFOLDER
+        assert perm.operation == OperationType.READ
+
+        # Check association (same as admin)
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
+        assert assoc.scope_id.scope_type == ScopeType.PROJECT
+        assert assoc.scope_id.scope_id == str(project_vfolder_data.project_id)
+        assert assoc.object_id.entity_type == EntityType.VFOLDER
+        assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.USER
         assert assoc.scope_id.scope_id == str(user_id)

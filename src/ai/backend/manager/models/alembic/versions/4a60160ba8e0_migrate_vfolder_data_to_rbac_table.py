@@ -1,36 +1,54 @@
 """migrate vfolder data to rbac table
 
 Revision ID: 4a60160ba8e0
-Revises: 28fecac94e67
+Revises: a4d56e86d9ee
 Create Date: 2025-07-30 14:44:14.346887
 
 """
 
 import enum
 import uuid
+from collections.abc import Collection
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Connection
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import registry
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
 from ai.backend.manager.models.rbac_models.migrate.types import PermissionCreateInputGroup
 from ai.backend.manager.models.rbac_models.migrate.vfolder import (
-    vfolder_permission_row_to_rbac_row,
-    vfolder_row_to_rbac_row,
+    ProjectVFolderData,
+    UserVFolderData,
+    VFolderPermissionData,
+    map_project_vfolder_to_project_scope,
+    map_user_vfolder_to_user_scope,
+    map_vfolder_permission_to_user_scope,
 )
 
 # revision identifiers, used by Alembic.
 revision = "4a60160ba8e0"
-down_revision = "28fecac94e67"
+down_revision = "a4d56e86d9ee"
 branch_labels = None
 depends_on = None
 
 mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+
+
+class UserRole(enum.StrEnum):
+    """
+    User's role.
+    """
+
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+    MONITOR = "monitor"
 
 
 class VFolderOwnershipType(enum.StrEnum):
@@ -56,44 +74,46 @@ class VFolderPermission(enum.StrEnum):
     OWNER_PERM = "wd"  # resolved as RW_DELETE
 
 
-class VFolderPermissionRow(Base):
-    __tablename__ = "vfolder_permissions"
-    __table_args__ = {"extend_existing": True}
-    IDColumn()
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE)
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    )
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
-
-    vfolder_row = relationship("VFolderRow", back_populates="permission_rows")
-
-
 class VFolderRow(Base):
     __tablename__ = "vfolders"
     __table_args__ = {"extend_existing": True}
-    IDColumn("id")
-    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True)
-    sa.Column(
+    id = IDColumn("id")
+    name = sa.Column(
+        "name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True
+    )
+    ownership_type = sa.Column(
         "ownership_type",
         EnumValueType(VFolderOwnershipType),
         default=VFolderOwnershipType.USER,
         nullable=False,
         index=True,
     )
-    sa.Column("user", GUID, nullable=True)  # owner if user vfolder
-    sa.Column("group", GUID, nullable=True)  # owner if project vfolder
+    user = sa.Column("user", GUID, nullable=True)  # owner if user vfolder
+    group = sa.Column("group", GUID, nullable=True)  # owner if project vfolder
 
 
-class RoleRow(Base):
-    __tablename__ = "roles"
+class VFolderPermissionRow(Base):
+    __tablename__ = "vfolder_permissions"
     __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = IDColumn()
-    name: str = sa.Column("name", sa.String(64), nullable=False)
-    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
+    id = IDColumn()
+    permission = sa.Column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    vfolder = sa.Column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user = sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
+
+
+class UserRow(Base):
+    __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
+
+    uuid = IDColumn("uuid")
+    role: UserRole = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
 
 
 class UserRoleRow(Base):
@@ -102,6 +122,14 @@ class UserRoleRow(Base):
     id: uuid.UUID = IDColumn()
     user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
+
+
+class RoleRow(Base):
+    __tablename__ = "roles"
+    __table_args__ = {"extend_existing": True}
+    id: uuid.UUID = IDColumn()
+    name: str = sa.Column("name", sa.String(64), nullable=False)
+    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
 
 
 class ScopePermissionRow(Base):
@@ -149,62 +177,133 @@ class AssociationScopesEntitiesRow(Base):
     )
 
 
-def _migrate_vfolder_rows(conn: Connection) -> None:
+def _insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
+    if data:
+        db_conn.execute(sa.insert(row_type), data)
+
+
+def _insert_from_create_input_group(
+    db_conn: Connection, input_group: PermissionCreateInputGroup
+) -> None:
+    _insert_if_data_exists(db_conn, RoleRow, input_group.to_role_insert_data())
+    _insert_if_data_exists(db_conn, UserRoleRow, input_group.to_user_role_insert_data())
+    _insert_if_data_exists(
+        db_conn, ScopePermissionRow, input_group.to_scope_permission_insert_data()
+    )
+    _insert_if_data_exists(
+        db_conn,
+        AssociationScopesEntitiesRow,
+        input_group.to_association_scopes_entities_insert_data(),
+    )
+
+
+def _migrate_user_vfolder_rows(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
+    j = sa.join(
+        VFolderRow,
+        ScopePermissionRow,
+        VFolderRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+    )
     while True:
-        vfolder_query = (
-            sa.select(VFolderRow).offset(offset).limit(page_size).order_by(VFolderRow.id)
+        query = (
+            sa.select(VFolderRow.id, VFolderRow.user, ScopePermissionRow.role_id)
+            .select_from(j)
+            .where(VFolderRow.user.is_not(sa.null()))
+            .offset(offset)
+            .limit(page_size)
+            .order_by(VFolderRow.id)
         )
-        vfolder_rows = conn.scalars(vfolder_query).all()
-        vfolder_rows = cast(list[VFolderRow], vfolder_rows)
+        rows = db_conn.execute(query).all()
+        rows = cast(list[Row], rows)
         offset += page_size
-        if vfolder_rows is None or len(vfolder_rows) == 0:
+        if not rows:
             break
-        input = PermissionCreateInputGroup()
-        for vfolder_row in vfolder_rows:
-            input_data = vfolder_row_to_rbac_row(vfolder_row)
-            input.merge(input_data)
-        conn.execute(sa.insert(RoleRow), input.to_role_insert_data())
-        conn.execute(sa.insert(UserRoleRow), input.to_user_role_insert_data())
-        conn.execute(sa.insert(ScopePermissionRow), input.to_scope_permission_insert_data())
-        conn.execute(
-            sa.insert(AssociationScopesEntitiesRow),
-            input.to_association_scopes_entities_insert_data(),
-        )
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = UserVFolderData(row.id, row.user)
+            input_data = map_user_vfolder_to_user_scope(row.role_id, data)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
 
 
-def _migrate_vfolder_permission_rows(conn: Connection) -> None:
+def _migrate_project_vfolder_rows(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
+    j = (
+        sa.join(
+            VFolderRow,
+            ScopePermissionRow,
+            VFolderRow.group == sa.cast(ScopePermissionRow.scope_id, UUID),
+        )
+        .join(RoleRow, ScopePermissionRow.role_id == RoleRow.id)
+        .join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+        .join(UserRow, UserRoleRow.user_id == UserRow.uuid)
+    )
     while True:
-        vfolder_permission_query = (
-            sa.select(VFolderPermissionRow)
+        query = (
+            sa.select(
+                VFolderRow.id,
+                VFolderRow.group,
+                ScopePermissionRow.role_id,
+                UserRow.role.label("user_role"),  # type: ignore[attr-defined]
+            )
+            .select_from(j)
+            .where(VFolderRow.group.is_not(sa.null()))
+            .offset(offset)
+            .limit(page_size)
+            .order_by(VFolderRow.id)
+        )
+        rows = db_conn.execute(query).all()
+        rows = cast(list[Row], rows)
+        offset += page_size
+        if not rows:
+            break
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = ProjectVFolderData(row.id, row.group)
+            user_role = cast(UserRole, row.user_role)
+            is_admin = user_role in (UserRole.SUPERADMIN, UserRole.ADMIN)
+            input_data = map_project_vfolder_to_project_scope(row.role_id, data, is_admin)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
+
+
+def _migrate_vfolder_permission_rows(db_conn: Connection) -> None:
+    offset = 0
+    page_size = 1000
+    j = sa.join(
+        VFolderPermissionRow,
+        ScopePermissionRow,
+        VFolderPermissionRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+    )
+    while True:
+        query = (
+            sa.select(
+                VFolderPermissionRow.vfolder, VFolderPermissionRow.user, ScopePermissionRow.role_id
+            )
+            .select_from(j)
             .offset(offset)
             .limit(page_size)
             .order_by(VFolderPermissionRow.id)
         )
-        vfolder_permission_rows = conn.scalars(vfolder_permission_query).all()
-        vfolder_permission_rows = cast(list[VFolderPermissionRow], vfolder_permission_rows)
+        rows = db_conn.execute(query).all()
+        rows = cast(list[Row], rows)
         offset += page_size
-        if vfolder_permission_rows is None or len(vfolder_permission_rows) == 0:
+        if not rows:
             break
-        input = PermissionCreateInputGroup()
-        for vfolder_permission_row in vfolder_permission_rows:
-            input_data = vfolder_permission_row_to_rbac_row(vfolder_permission_row)
-            input.merge(input_data)
-        conn.execute(sa.insert(RoleRow), input.to_role_insert_data())
-        conn.execute(sa.insert(UserRoleRow), input.to_user_role_insert_data())
-        conn.execute(sa.insert(ScopePermissionRow), input.to_scope_permission_insert_data())
-        conn.execute(
-            sa.insert(AssociationScopesEntitiesRow),
-            input.to_association_scopes_entities_insert_data(),
-        )
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = VFolderPermissionData(row.vfolder, row.user)
+            input_data = map_vfolder_permission_to_user_scope(row.role_id, data)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
 
 
 def upgrade() -> None:
     conn = op.get_bind()
-    _migrate_vfolder_rows(conn)
+    _migrate_user_vfolder_rows(conn)
+    _migrate_project_vfolder_rows(conn)
     _migrate_vfolder_permission_rows(conn)
 
 
