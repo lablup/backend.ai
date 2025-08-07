@@ -136,6 +136,7 @@ class StoragesService:
             if presigned_data is None:
                 raise PresignedUploadURLGenerationError()
 
+            # TODO: Separate PresignedUploadObjectResponse dto class
             return PresignedUploadObjectResponse(
                 url=presigned_data.url, fields=presigned_data.fields
             )

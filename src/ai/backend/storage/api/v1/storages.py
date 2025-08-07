@@ -39,24 +39,24 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
-class StoragesConfigCtx(MiddlewareParam):
-    storages: list[ObjectStorageConfig]
+class StorageConfigsCtx(MiddlewareParam):
+    storage_configs: list[ObjectStorageConfig]
 
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         # TODO: Inject storages config from DB
-        return cls(storages=[])
+        return cls(storage_configs=[])
 
 
-class StoragesAPIHandler:
+class StorageAPIHandler:
     @api_handler
     async def upload_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[UploadObjectReq],
         multipart_ctx: MultipartUploadCtx,
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIResponse:
         """
         Upload a file to the specified S3 bucket using streaming.
@@ -72,7 +72,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "upload_file", req)
 
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
 
         file_part = await file_reader.next()
         while file_part and not getattr(file_part, "filename", None):
@@ -103,7 +103,7 @@ class StoragesAPIHandler:
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[DownloadObjectReq],
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIStreamResponse:
         """
         Download a file from the specified S3 bucket using streaming.
@@ -115,7 +115,7 @@ class StoragesAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
         download_stream = storages_service.stream_download(storage_name, bucket_name, filepath)
 
         return APIStreamResponse(
@@ -131,7 +131,7 @@ class StoragesAPIHandler:
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[PresignedUploadObjectReq],
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for uploading files directly to S3.
@@ -142,7 +142,7 @@ class StoragesAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
         response = await storages_service.generate_presigned_upload_url(
             storage_name, bucket_name, req
         )
@@ -157,7 +157,7 @@ class StoragesAPIHandler:
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[PresignedDownloadObjectReq],
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for downloading files directly from S3.
@@ -169,7 +169,7 @@ class StoragesAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
         response = await storages_service.generate_presigned_download_url(
             storage_name, bucket_name, filepath
         )
@@ -184,7 +184,7 @@ class StoragesAPIHandler:
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[GetObjectMetaReq],
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIResponse:
         """
         Get metadata information about a file in S3.
@@ -197,7 +197,7 @@ class StoragesAPIHandler:
 
         await log_client_api_entry(log, "get_file_meta", req)
 
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
         response = await storages_service.get_object_info(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
@@ -210,7 +210,7 @@ class StoragesAPIHandler:
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[DeleteObjectReq],
-        config_ctx: StoragesConfigCtx,
+        config_ctx: StorageConfigsCtx,
     ) -> APIResponse:
         """
         Delete a file from the specified S3 bucket.
@@ -222,7 +222,7 @@ class StoragesAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_file", req)
-        storages_service = StoragesService(config_ctx.storages)
+        storages_service = StoragesService(config_ctx.storage_configs)
         response = await storages_service.delete_file(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
@@ -237,7 +237,7 @@ def create_app(ctx: RootContext) -> web.Application:
     app["prefix"] = "v1/storages"
 
     # TODO: Add bucket creation and deletion endpoints when working Manager integration
-    api_handler = StoragesAPIHandler()
+    api_handler = StorageAPIHandler()
     app.router.add_route(
         "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/meta", api_handler.get_file_meta
     )
