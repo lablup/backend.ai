@@ -6,14 +6,12 @@ to ensure transactional consistency.
 """
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
 
-from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
+from ai.backend.common.types import AgentId
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.sokovan.scheduler.types import AllocationBatch, SessionAllocation
 
 from .allocator import SchedulingAllocator
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 
 
 class RepositoryAllocator(SchedulingAllocator):
@@ -24,14 +22,16 @@ class RepositoryAllocator(SchedulingAllocator):
     by delegating to a single repository method.
     """
 
-    def __init__(self, schedule_repository: "ScheduleRepository") -> None:
+    _repository: ScheduleRepository
+
+    def __init__(self, schedule_repository: ScheduleRepository) -> None:
         """
         Initialize the allocator with schedule repository.
 
         Args:
             schedule_repository: Repository that handles actual allocation
         """
-        self.schedule_repository = schedule_repository
+        self._repository = schedule_repository
 
     async def allocate(self, session_allocations: Iterable[SessionAllocation]) -> None:
         """
@@ -40,5 +40,20 @@ class RepositoryAllocator(SchedulingAllocator):
         Args:
             session_allocations: Session allocation decisions to execute
         """
-        # TODO: This method should be implemented in ScheduleRepository
-        await self.schedule_repository.allocate_sessions(session_allocations)  # type: ignore[attr-defined]
+        # Convert to list if needed for multiple iterations
+        allocations_list = list(session_allocations)
+
+        # Collect all unique agent IDs from the allocations
+        agent_ids: set[AgentId] = set()
+        for allocation in allocations_list:
+            for kernel_allocation in allocation.kernel_allocations:
+                agent_ids.add(kernel_allocation.agent_id)
+
+        # Create allocation batch with collected agent IDs
+        allocation_batch = AllocationBatch(
+            allocations=allocations_list,
+            agent_ids=agent_ids,
+        )
+
+        # Delegate to repository for atomic allocation
+        await self._repository.allocate_sessions(allocation_batch)

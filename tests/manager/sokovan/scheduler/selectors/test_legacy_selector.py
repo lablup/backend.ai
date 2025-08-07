@@ -10,6 +10,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSel
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
+    AgentStateTracker,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -91,14 +92,22 @@ class TestLegacyAgentSelector:
             required_architecture="x86_64",
         )
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select agent-minimal (0 unutilized capabilities vs 2)
-        assert selected.agent_id == AgentId("agent-minimal")
+        assert selected.original_agent.agent_id == AgentId("agent-minimal")
 
-    def test_breaks_ties_with_resource_availability(self, selector, basic_criteria, basic_config):
+    def test_breaks_ties_with_resource_availability(
+        self,
+        selector: LegacyAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test that ties in unutilized capabilities are broken by resource availability."""
         agents = [
             create_agent_info(
@@ -124,14 +133,19 @@ class TestLegacyAgentSelector:
         # agent-low-resources: 2 CPU, 4096 memory
         # agent-high-resources: 12 CPU, 24576 memory
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select agent-high-resources (more available resources)
-        assert selected.agent_id == AgentId("agent-high-resources")
+        assert selected.original_agent.agent_id == AgentId("agent-high-resources")
 
-    def test_respects_resource_priority_order(self, basic_criteria, basic_config):
+    def test_respects_resource_priority_order(
+        self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
+    ) -> None:
         """Test that resource priorities are used for tie-breaking."""
         # Create selector with memory prioritized over CPU
         selector = LegacyAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
@@ -160,14 +174,22 @@ class TestLegacyAgentSelector:
         # high-cpu-low-mem: 14 CPU, 2048 memory
         # low-cpu-high-mem: 2 CPU, 12288 memory
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select low-cpu-high-mem (more memory, which is higher priority)
-        assert selected.agent_id == AgentId("low-cpu-high-mem")
+        assert selected.original_agent.agent_id == AgentId("low-cpu-high-mem")
 
-    def test_handles_partially_utilized_resources(self, selector, basic_criteria, basic_config):
+    def test_handles_partially_utilized_resources(
+        self,
+        selector: LegacyAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test selection when agents have partially utilized special resources."""
         agents = [
             create_agent_info(
@@ -209,14 +231,20 @@ class TestLegacyAgentSelector:
             required_architecture="x86_64",
         )
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Both have same unutilized capabilities (0 - all resources are requested)
         # Both have same available CPU and memory
         # They should be equivalent choices
-        assert selected.agent_id in [AgentId("gpu-partially-used"), AgentId("gpu-unused")]
+        assert selected.original_agent.agent_id in [
+            AgentId("gpu-partially-used"),
+            AgentId("gpu-unused"),
+        ]
 
     def test_legacy_behavior_differs_from_concentrated_and_dispersed(
         self, basic_criteria, basic_config
@@ -266,24 +294,29 @@ class TestLegacyAgentSelector:
             required_architecture="x86_64",
         )
 
-        legacy_choice = legacy.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        legacy_choice = legacy.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
-        concentrated_choice = concentrated.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        concentrated_choice = concentrated.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
-        dispersed_choice = dispersed.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        dispersed_choice = dispersed.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Legacy should choose agent-general (fewer unutilized capabilities)
-        assert legacy_choice.agent_id == AgentId("agent-general")
+        assert legacy_choice.original_agent.agent_id == AgentId("agent-general")
         # Concentrated should choose agent-specialized (less available resources)
-        assert concentrated_choice.agent_id == AgentId("agent-specialized")
+        assert concentrated_choice.original_agent.agent_id == AgentId("agent-specialized")
         # Dispersed should choose agent-general (more available resources AND fewer unutilized)
-        assert dispersed_choice.agent_id == AgentId("agent-general")
+        assert dispersed_choice.original_agent.agent_id == AgentId("agent-general")
 
-    def test_handles_custom_resource_types(self, basic_criteria, basic_config):
+    def test_handles_custom_resource_types(
+        self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
+    ) -> None:
         """Test selection with custom resource types in priority."""
         selector = LegacyAgentSelector(
             agent_selection_resource_priority=["custom.accelerator", "cpu", "mem"]
@@ -332,9 +365,12 @@ class TestLegacyAgentSelector:
         # custom-rich: 4 CPU, 8192 memory, 8 custom.accelerator
         # custom-poor: 12 CPU, 24576 memory, 1 custom.accelerator
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select custom-rich (more custom.accelerator, which is highest priority)
-        assert selected.agent_id == AgentId("custom-rich")
+        assert selected.original_agent.agent_id == AgentId("custom-rich")

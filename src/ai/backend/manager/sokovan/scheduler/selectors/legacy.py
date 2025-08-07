@@ -6,13 +6,14 @@ with fewer unutilized capabilities.
 """
 
 import sys
-from typing import Optional, Sequence
+from decimal import Decimal
+from typing import Sequence, Union
 
 from .selector import (
     AbstractAgentSelector,
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
+    AgentStateTracker,
     ResourceRequirements,
 )
 from .utils import count_unutilized_capabilities, order_slots_by_priority
@@ -30,33 +31,36 @@ class LegacyAgentSelector(AbstractAgentSelector):
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
-    def select_agent_by_strategy(
+    def select_tracker_by_strategy(
         self,
-        agents: Sequence[AgentInfo],
+        trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentInfo]:
+    ) -> AgentStateTracker:
         """
-        Select an agent based on resource priorities.
+        Select an agent tracker based on resource priorities.
 
-        Assumes agents are already filtered for compatibility.
+        Assumes trackers are already filtered for compatibility.
         """
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
             resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
-        # Choose the best agent
-        chosen_agent = max(
-            agents,
-            key=lambda agent: [
-                -count_unutilized_capabilities(agent, resource_req.requested_slots),
+        # Choose the best tracker
+        def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
+            occupied_slots, _ = tracker.get_current_state()
+            return [
+                -count_unutilized_capabilities(
+                    tracker.original_agent, resource_req.requested_slots
+                ),
                 *[
-                    (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
+                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
                     for key in resource_priorities
                 ],
-            ],
-        )
+            ]
 
-        return chosen_agent
+        chosen_tracker = max(trackers, key=tracker_sort_key)
+
+        return chosen_tracker
