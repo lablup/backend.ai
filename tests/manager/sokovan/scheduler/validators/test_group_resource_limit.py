@@ -40,6 +40,7 @@ class TestGroupResourceLimitValidator:
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
+            scaling_group="default",
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -73,6 +74,7 @@ class TestGroupResourceLimitValidator:
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
+            scaling_group="default",
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -107,6 +109,7 @@ class TestGroupResourceLimitValidator:
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
+            scaling_group="default",
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -140,6 +143,7 @@ class TestGroupResourceLimitValidator:
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
+            scaling_group="default",
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),

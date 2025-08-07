@@ -1,10 +1,6 @@
-from datetime import datetime, timedelta
-from uuid import uuid4
-
 import pytest
-from dateutil.tz import tzutc
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -33,82 +29,50 @@ def create_empty_snapshot() -> SystemSnapshot:
 
 
 class TestReservedBatchSessionValidator:
-    def test_non_batch_session_passes(self) -> None:
+    def test_non_batch_session_passes(self, basic_session_workload: SessionWorkload) -> None:
         """Non-batch sessions should always pass validation."""
         validator = ReservedBatchSessionValidator()
         snapshot = create_empty_snapshot()
 
-        # Interactive session
-        workload = SessionWorkload(
-            session_id=SessionId(uuid4()),
-            access_key=AccessKey("test-key"),
-            requested_slots=ResourceSlot({"cpu": 1, "memory": 1}),
-            user_uuid=uuid4(),
-            group_id=uuid4(),
-            domain_name="default",
-            session_type=SessionTypes.INTERACTIVE,
-        )
+        # Interactive session (basic_session_workload is already INTERACTIVE)
+        workload = basic_session_workload
 
         # Should not raise
         validator.validate(snapshot, workload)
 
-    def test_batch_session_without_start_time_passes(self) -> None:
+    def test_batch_session_without_start_time_passes(
+        self, batch_session_workload: SessionWorkload
+    ) -> None:
         """Batch sessions without a scheduled start time should pass."""
         validator = ReservedBatchSessionValidator()
         snapshot = create_empty_snapshot()
 
-        workload = SessionWorkload(
-            session_id=SessionId(uuid4()),
-            access_key=AccessKey("test-key"),
-            requested_slots=ResourceSlot({"cpu": 1, "memory": 1}),
-            user_uuid=uuid4(),
-            group_id=uuid4(),
-            domain_name="default",
-            session_type=SessionTypes.BATCH,
-            starts_at=None,
-        )
+        # batch_session_workload already has starts_at=None
+        workload = batch_session_workload
 
         # Should not raise
         validator.validate(snapshot, workload)
 
-    def test_batch_session_after_start_time_passes(self) -> None:
+    def test_batch_session_after_start_time_passes(
+        self, batch_session_past_start_time: SessionWorkload
+    ) -> None:
         """Batch sessions after their scheduled start time should pass."""
         validator = ReservedBatchSessionValidator()
         snapshot = create_empty_snapshot()
 
-        # Set start time to 1 hour ago
-        past_time = datetime.now(tzutc()) - timedelta(hours=1)
-        workload = SessionWorkload(
-            session_id=SessionId(uuid4()),
-            access_key=AccessKey("test-key"),
-            requested_slots=ResourceSlot({"cpu": 1, "memory": 1}),
-            user_uuid=uuid4(),
-            group_id=uuid4(),
-            domain_name="default",
-            session_type=SessionTypes.BATCH,
-            starts_at=past_time,
-        )
+        workload = batch_session_past_start_time
 
         # Should not raise
         validator.validate(snapshot, workload)
 
-    def test_batch_session_before_start_time_fails(self) -> None:
+    def test_batch_session_before_start_time_fails(
+        self, batch_session_future_start_time: SessionWorkload
+    ) -> None:
         """Batch sessions before their scheduled start time should fail."""
         validator = ReservedBatchSessionValidator()
         snapshot = create_empty_snapshot()
 
-        # Set start time to 1 hour in the future
-        future_time = datetime.now(tzutc()) + timedelta(hours=1)
-        workload = SessionWorkload(
-            session_id=SessionId(uuid4()),
-            access_key=AccessKey("test-key"),
-            requested_slots=ResourceSlot({"cpu": 1, "memory": 1}),
-            user_uuid=uuid4(),
-            group_id=uuid4(),
-            domain_name="default",
-            session_type=SessionTypes.BATCH,
-            starts_at=future_time,
-        )
+        workload = batch_session_future_start_time
 
         with pytest.raises(SchedulingValidationError, match="Before start time"):
             validator.validate(snapshot, workload)

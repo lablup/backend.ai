@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -74,6 +75,7 @@ class RootContext(BaseContext):
     registry: AgentRegistry
     agent_cache: AgentRPCCache
     scheduler_dispatcher: SchedulerDispatcher
+    sokovan_orchestrator: SokovanOrchestrator
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

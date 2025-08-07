@@ -744,6 +744,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         DispatcherArgs(
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
+            root_ctx.sokovan_orchestrator,
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
@@ -931,6 +932,26 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     yield
     await root_ctx.scheduler_dispatcher.close()
+
+
+@actxmgr
+async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.sokovan import SokovanOrchestrator
+
+    # Create scheduler with default components
+    scheduler = create_default_scheduler(
+        root_ctx.repositories.schedule.repository,
+        root_ctx.config_provider,
+        root_ctx.distributed_lock_factory,
+    )
+
+    # Create sokovan orchestrator
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        scheduler=scheduler,
+        event_producer=root_ctx.event_producer,
+    )
+    yield
 
 
 @actxmgr
@@ -1175,6 +1196,7 @@ def build_root_app(
             idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
+            sokovan_orchestrator_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
