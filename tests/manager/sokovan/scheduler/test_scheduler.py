@@ -2,8 +2,8 @@
 
 import uuid
 from decimal import Decimal
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Optional, cast
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -23,7 +23,11 @@ from ai.backend.manager.sokovan.scheduler.scheduler import (
 from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentInfo,
+    AgentSelection,
     AgentSelectionConfig,
+    AgentSelectionCriteria,
+    AgentSelector,
+    ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import (
     KernelWorkload,
@@ -127,16 +131,16 @@ class TestSchedulerAllocation:
         return repo
 
     @pytest.fixture
-    def mock_agent_selector_with_verification(self) -> MagicMock:
+    def mock_agent_selector_with_verification(self) -> Mock:
         """Create a mock agent selector that tracks call history."""
-        selector = MagicMock()
+        selector = MagicMock(spec=AgentSelector)
         call_history = []
 
         async def select_agent_side_effect(
             agents: list[AgentInfo],
-            resource_req: Any,
-            criteria: Any,
-            config: Any,
+            resource_req: ResourceRequirements,
+            criteria: AgentSelectionCriteria,
+            config: AgentSelectionConfig,
             designated_agent: Optional[AgentId],
         ) -> AgentInfo:
             try:
@@ -194,10 +198,10 @@ class TestSchedulerAllocation:
         # Mock the batch selection method
         async def select_agents_for_batch_side_effect(
             agents: list[AgentInfo],
-            criteria: Any,
-            config: Any,
+            criteria: AgentSelectionCriteria,
+            config: AgentSelectionConfig,
             designated_agent: Optional[AgentId] = None,
-        ) -> list[Any]:
+        ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
             from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelection
@@ -230,7 +234,7 @@ class TestSchedulerAllocation:
 
     @pytest.fixture
     def scheduler(
-        self, mock_repository: MagicMock, mock_agent_selector_with_verification: MagicMock
+        self, mock_repository: MagicMock, mock_agent_selector_with_verification: Mock
     ) -> Scheduler:
         """Create a scheduler instance with mocked dependencies."""
         args = SchedulerArgs(
@@ -305,14 +309,14 @@ class TestSchedulerAllocation:
         assert agents[0].container_count == 5  # 2 + 3
 
         # Verify selector was called once (aggregated for single-node)
-        assert (
-            scheduler._default_agent_selector.select_agents_for_batch_requirements.call_count == 1
-        )
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
         # Check call_history if it was populated
-        if scheduler._default_agent_selector.call_history:
-            assert len(scheduler._default_agent_selector.call_history) == 1
-            call = scheduler._default_agent_selector.call_history[0]
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        if mock_selector.call_history:
+            assert len(mock_selector.call_history) == 1
+            call = mock_selector.call_history[0]
             assert call["requested_slots"] == ResourceSlot({
                 "cpu": Decimal("3"),
                 "mem": Decimal("3072"),
@@ -411,12 +415,12 @@ class TestSchedulerAllocation:
             )
 
         # Verify selector was called once with 3 resource requirements
-        assert (
-            scheduler._default_agent_selector.select_agents_for_batch_requirements.call_count == 1
-        )
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
         # Verify selector call history
-        call_history = scheduler._default_agent_selector.call_history
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        call_history = mock_selector.call_history
         if not call_history:
             # If call_history wasn't populated due to the exception handling,
             # we can still verify the mock was called the right number of times
@@ -458,10 +462,10 @@ class TestSchedulerAllocation:
         # Mock to return the designated agent
         async def return_designated_batch(
             agents: list[AgentInfo],
-            criteria: Any,
-            config: Any,
+            criteria: AgentSelectionCriteria,
+            config: AgentSelectionConfig,
             designated_agent: Optional[AgentId],
-        ) -> list[Any]:
+        ) -> list[AgentSelection]:
             from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelection
 
             resource_requirements = criteria.get_resource_requirements()
@@ -480,9 +484,8 @@ class TestSchedulerAllocation:
                     raise AgentSelectionError("Designated agent not found")
             return selections
 
-        scheduler._default_agent_selector.select_agents_for_batch_requirements.side_effect = (
-            return_designated_batch
-        )
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        mock_selector.select_agents_for_batch_requirements.side_effect = return_designated_batch
 
         # Execute allocation
         result = await scheduler._allocate_workload(
@@ -494,9 +497,8 @@ class TestSchedulerAllocation:
         assert result.kernel_allocations[0].agent_id == designated_agent
 
         # Verify designated_agent was passed to selector
-        selector_calls = (
-            scheduler._default_agent_selector.select_agents_for_batch_requirements.call_args_list
-        )
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        selector_calls = mock_selector.select_agents_for_batch_requirements.call_args_list
         assert len(selector_calls) == 1
         assert (
             selector_calls[0][0][3] == designated_agent
@@ -526,9 +528,8 @@ class TestSchedulerAllocation:
         assert len(result.agent_allocations) == 0
 
         # Should return empty list for empty kernels
-        assert (
-            scheduler._default_agent_selector.select_agents_for_batch_requirements.call_count == 1
-        )
+        mock_selector = cast(Mock, scheduler._default_agent_selector)
+        assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
     async def test_agent_selection_error(self, scheduler: Scheduler):
         """Test handling of agent selection errors."""
