@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import logging
-import time
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
+from typing import TYPE_CHECKING, Self, override
 
-import jwt
 from aiohttp import web
 
 from ai.backend.common.api_handlers import (
@@ -37,9 +35,6 @@ if TYPE_CHECKING:
     from ...context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_JWT_MAX_TTL = 300
-_JWT_LEEWAY = 30
 
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
