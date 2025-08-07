@@ -9,7 +9,7 @@ Create Date: 2025-07-30 14:44:14.346887
 import enum
 import uuid
 from collections.abc import Collection
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from alembic import op
@@ -20,14 +20,18 @@ from sqlalchemy.orm import registry
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
-from ai.backend.manager.models.rbac_models.migrate.types import PermissionCreateInputGroup
+from ai.backend.manager.models.rbac_models.migrate.types import (
+    PermissionCreateInputGroup,
+    is_admin_role,
+)
 from ai.backend.manager.models.rbac_models.migrate.vfolder import (
     ProjectVFolderData,
     UserVFolderData,
     VFolderPermissionData,
-    map_project_vfolder_to_project_scope,
-    map_user_vfolder_to_user_scope,
-    map_vfolder_permission_to_user_scope,
+    map_project_vfolder_to_project_admin_role,
+    map_project_vfolder_to_project_user_role,
+    map_user_vfolder_to_user_role,
+    map_vfolder_permission_data_to_user_role,
 )
 
 # revision identifiers, used by Alembic.
@@ -37,7 +41,23 @@ branch_labels = None
 depends_on = None
 
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+Base: Any = mapper_registry.generate_base()
+
+
+class ScopeType(enum.StrEnum):
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
+
+
+class EntityType(enum.StrEnum):
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
+
+    VFOLDER = "vfolder"
+    IMAGE = "image"
+    SESSION = "session"
 
 
 class UserRole(enum.StrEnum):
@@ -197,105 +217,136 @@ def _insert_from_create_input_group(
     )
 
 
+def _query_user_vfolder_row_with_user_role(
+    db_conn: Connection, offset: int, page_size: int
+) -> list[Row]:
+    """
+    Query to get user vfolder rows with associated role ID.
+    Assumes that all users have ONLY ONE role.
+    """
+    query = (
+        sa.select(VFolderRow.id, VFolderRow.user, ScopePermissionRow.role_id)
+        .select_from(
+            sa.join(
+                VFolderRow,
+                ScopePermissionRow,
+                VFolderRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+            )
+        )
+        .where(VFolderRow.user.is_not(sa.null()))
+        .offset(offset)
+        .limit(page_size)
+        .order_by(VFolderRow.id)
+    )
+    return db_conn.execute(query).all()
+
+
 def _migrate_user_vfolder_rows(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
-    j = sa.join(
-        VFolderRow,
-        ScopePermissionRow,
-        VFolderRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
-    )
     while True:
-        query = (
-            sa.select(VFolderRow.id, VFolderRow.user, ScopePermissionRow.role_id)
-            .select_from(j)
-            .where(VFolderRow.user.is_not(sa.null()))
-            .offset(offset)
-            .limit(page_size)
-            .order_by(VFolderRow.id)
-        )
-        rows = db_conn.execute(query).all()
-        rows = cast(list[Row], rows)
+        rows = _query_user_vfolder_row_with_user_role(db_conn, offset, page_size)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
             data = UserVFolderData(row.id, row.user)
-            input_data = map_user_vfolder_to_user_scope(row.role_id, data)
+            input_data = map_user_vfolder_to_user_role(row.role_id, data)
             input_group.merge(input_data)
         _insert_from_create_input_group(db_conn, input_group)
 
 
+def _query_project_vfolder_with_project_role(
+    db_conn: Connection, offset: int, page_size: int
+) -> list[Row]:
+    """
+    Query to get project vfolder rows with associated role ID.
+    """
+    query = (
+        sa.select(
+            VFolderRow.id,
+            VFolderRow.group,
+            ScopePermissionRow.role_id,
+            RoleRow.name.label("role_name"),
+        )
+        .select_from(
+            sa.join(
+                VFolderRow,
+                ScopePermissionRow,
+                VFolderRow.group == sa.cast(ScopePermissionRow.scope_id, UUID),
+            ).join(RoleRow, ScopePermissionRow.role_id == RoleRow.id)
+        )
+        .where(VFolderRow.group.is_not(sa.null()))
+        .offset(offset)
+        .limit(page_size)
+        .order_by(VFolderRow.id)
+    )
+    return db_conn.execute(query).all()
+
+
 def _migrate_project_vfolder_rows(db_conn: Connection) -> None:
+    """
+    Migrate project vfolder rows to RBAC table.
+    Assumes that all projects have ONLY ONE admin role whose name ends with ADMIN_ROLE_NAME_SUFFIX.
+    """
     offset = 0
     page_size = 1000
-    j = (
-        sa.join(
-            VFolderRow,
-            ScopePermissionRow,
-            VFolderRow.group == sa.cast(ScopePermissionRow.scope_id, UUID),
-        )
-        .join(RoleRow, ScopePermissionRow.role_id == RoleRow.id)
-        .join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-        .join(UserRow, UserRoleRow.user_id == UserRow.uuid)
-    )
+
     while True:
-        query = (
-            sa.select(
-                VFolderRow.id,
-                VFolderRow.group,
-                ScopePermissionRow.role_id,
-                UserRow.role.label("user_role"),  # type: ignore[attr-defined]
-            )
-            .select_from(j)
-            .where(VFolderRow.group.is_not(sa.null()))
-            .offset(offset)
-            .limit(page_size)
-            .order_by(VFolderRow.id)
-        )
-        rows = db_conn.execute(query).all()
-        rows = cast(list[Row], rows)
+        rows = _query_project_vfolder_with_project_role(db_conn, offset, page_size)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
             data = ProjectVFolderData(row.id, row.group)
-            user_role = cast(UserRole, row.user_role)
-            is_admin = user_role in (UserRole.SUPERADMIN, UserRole.ADMIN)
-            input_data = map_project_vfolder_to_project_scope(row.role_id, data, is_admin)
+            if is_admin_role(row.role_name):
+                input_data = map_project_vfolder_to_project_admin_role(row.role_id, data)
+            else:
+                input_data = map_project_vfolder_to_project_user_role(row.role_id, data)
             input_group.merge(input_data)
         _insert_from_create_input_group(db_conn, input_group)
+
+
+def _query_vfolder_permission_with_user_role(
+    db_conn: Connection, offset: int, page_size: int
+) -> list[Row]:
+    """
+    Query to get vfolder permission rows with associated role ID.
+    Assumes that all users have ONLY ONE role.
+    """
+    query = (
+        sa.select(
+            VFolderPermissionRow.vfolder, VFolderPermissionRow.user, ScopePermissionRow.role_id
+        )
+        .select_from(
+            sa.join(
+                VFolderPermissionRow,
+                ScopePermissionRow,
+                VFolderPermissionRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+            )
+        )
+        .offset(offset)
+        .limit(page_size)
+        .order_by(VFolderPermissionRow.id)
+    )
+    return db_conn.execute(query).all()
 
 
 def _migrate_vfolder_permission_rows(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
-    j = sa.join(
-        VFolderPermissionRow,
-        ScopePermissionRow,
-        VFolderPermissionRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
-    )
+
     while True:
-        query = (
-            sa.select(
-                VFolderPermissionRow.vfolder, VFolderPermissionRow.user, ScopePermissionRow.role_id
-            )
-            .select_from(j)
-            .offset(offset)
-            .limit(page_size)
-            .order_by(VFolderPermissionRow.id)
-        )
-        rows = db_conn.execute(query).all()
-        rows = cast(list[Row], rows)
+        rows = _query_vfolder_permission_with_user_role(db_conn, offset, page_size)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
             data = VFolderPermissionData(row.vfolder, row.user)
-            input_data = map_vfolder_permission_to_user_scope(row.role_id, data)
+            input_data = map_vfolder_permission_data_to_user_role(row.role_id, data)
             input_group.merge(input_data)
         _insert_from_create_input_group(db_conn, input_group)
 

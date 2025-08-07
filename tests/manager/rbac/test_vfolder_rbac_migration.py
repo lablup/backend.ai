@@ -128,12 +128,12 @@ class TestMapVfolderEntityToScope:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
-class TestMapUserVFolderToUserScope:
-    """Test map_user_vfolder_to_user_scope function."""
+class TestMapUserVFolderToUserRole:
+    """Test map_user_vfolder_to_user_role function."""
 
     def test_basic_mapping(self, role_id, user_vfolder_data):
         """Test basic user vfolder mapping."""
-        result = map_user_vfolder_to_user_scope(role_id, user_vfolder_data)
+        result = map_user_vfolder_to_user_role(role_id, user_vfolder_data)
 
         # Check scope permissions - should have all operations
         assert len(result.scope_permissions) == len(OperationType)
@@ -185,14 +185,12 @@ class TestMapUserVFolderToUserScope:
             assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
 
 
-class TestMapProjectVFolderToProjectScope:
-    """Test map_project_vfolder_to_project_scope function."""
+class TestMapProjectVFolderToProjectAdminRole:
+    """Test map_project_vfolder_to_project_admin_role function."""
 
     def test_admin_role_mapping(self, role_id, project_vfolder_data):
         """Test project vfolder mapping with admin role."""
-        result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder_data, is_admin_role=True
-        )
+        result = map_project_vfolder_to_project_admin_role(role_id, project_vfolder_data)
 
         # Admin should have all operations
         assert len(result.scope_permissions) == len(OperationType)
@@ -262,7 +260,7 @@ class TestMapVfolderPermissionDataToScope:
         assert perm.entity_type == EntityType.VFOLDER
         assert perm.operation == OperationType.READ
 
-        # Check association (same as admin)
+        # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
         assert assoc.scope_id.scope_type == ScopeType.PROJECT
