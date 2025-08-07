@@ -33,3 +33,29 @@ class VFolderMetadataResponse(BaseResponseModel):
     item: VFolderMetaField = Field(
         description="Provides metadata for a vfolder, used for storage tracking and access management."
     )
+
+
+# S3 Storage API Response Models
+class UploadObjectResponse(BaseResponseModel):
+    pass
+
+
+class PresignedUploadObjectResponse(BaseResponseModel):
+    url: str
+    fields: dict[str, str]
+
+
+class PresignedDownloadObjectResponse(BaseResponseModel):
+    url: str
+
+
+class DeleteObjectResponse(BaseResponseModel):
+    pass
+
+
+class ObjectMetaResponse(BaseResponseModel):
+    content_length: Optional[int]
+    content_type: Optional[str]
+    last_modified: Optional[str]
+    etag: Optional[str]
+    metadata: dict[str, str]

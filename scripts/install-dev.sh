@@ -887,7 +887,11 @@ configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see six containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Configure MinIO using separate configuration script
+  source "$(dirname "$0")/configure-minio.sh"
+  configure_minio "docker-compose.halfstack.current.yml"
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
