@@ -6,12 +6,13 @@ from ai.backend.manager.types import OptionalState
 
 from .id import ObjectId
 from .status import PermissionStatus
+from .types import EntityType
 
 
 @dataclass
 class ObjectPermissionCreateInput:
     role_id: uuid.UUID
-    entity_type: str
+    entity_type: EntityType
     entity_id: str
     operation: str
     status: PermissionStatus = PermissionStatus.ACTIVE

@@ -10,10 +10,12 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 
 from ..base import (
     Base,
     IDColumn,
+    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -29,19 +31,17 @@ class AssociationScopesEntitiesRow(Base):
 
     id: uuid.UUID = IDColumn()
 
-    scope_type: str = sa.Column(
-        "scope_type",
-        sa.String(32),
-        nullable=False,
-    )  # e.g., "global", "domain", "project", "user" etc.
+    scope_type: ScopeType = sa.Column(
+        "scope_type", StrEnumType(ScopeType, length=32), nullable=False
+    )
     scope_id: str = sa.Column(
         "scope_id",
         sa.String(64),
         nullable=False,
     )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
+    entity_type: EntityType = sa.Column(
+        "entity_type", StrEnumType(EntityType, length=32), nullable=False
+    )
     entity_id: str = sa.Column(
         "entity_id",
         sa.String(64),
