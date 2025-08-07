@@ -5,6 +5,7 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
+from .object_permission import ObjectPermissionData
 from .scope_permission import ScopePermissionData, ScopePermissionDataWithEntity
 from .status import RoleStatus
 from .types import EntityType
@@ -17,6 +18,7 @@ class RoleCreateInput:
     description: Optional[str] = None
 
     scope_permissions: list[ScopePermissionData] = field(default_factory=list)
+    object_permissions: list[ObjectPermissionData] = field(default_factory=list)
 
 
 @dataclass
@@ -59,6 +61,7 @@ class RoleDataWithPermissions:
     status: RoleStatus
 
     scope_permissions: list[ScopePermissionDataWithEntity]
+    object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
     updated_at: Optional[datetime]
