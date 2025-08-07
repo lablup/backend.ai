@@ -3,11 +3,10 @@ import enum
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, TypeAlias
 
 import attrs
-from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Middleware
 
 from ai.backend.common.docker import LabelName
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
@@ -168,7 +167,4 @@ class KernelOwnershipData:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
-WebMiddleware = Callable[
-    [web.Request, Handler],
-    Awaitable[web.StreamResponse],
-]
+WebMiddleware: TypeAlias = Middleware

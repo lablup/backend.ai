@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any, Iterable, List, Mapping, MutableMapping, cast
+from typing import Any, List, Mapping, MutableMapping, cast
 from uuid import UUID
 
 import attr
@@ -165,7 +166,7 @@ class MetadataServer(aobject):
         pkg_name: str,
         root_app: web.Application,
         subapp: web.Application,
-        global_middlewares: Iterable[Middleware],
+        global_middlewares: Sequence[Middleware],
         route_structure: Mapping[str, Any],
         is_extension: bool = True,
     ) -> None:
@@ -188,7 +189,7 @@ class MetadataServer(aobject):
         root_app.middlewares.extend(global_middlewares)
         self.loaded_apps.append(prefix)
 
-    async def load_metadata_plugins(self):
+    async def load_metadata_plugins(self) -> None:
         root_ctx = self.app["_root.context"]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
@@ -199,7 +200,7 @@ class MetadataServer(aobject):
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()
             self._init_subapp(plugin_name, self.app, subapp, global_middlewares, route_structure)
 
-    async def start_server(self):
+    async def start_server(self) -> None:
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
@@ -212,7 +213,7 @@ class MetadataServer(aobject):
         self.runner = metadata_server_runner
         await site.start()
 
-    async def cleanup(self):
+    async def cleanup(self) -> None:
         plugin_context = self.app["_root.context"].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()

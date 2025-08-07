@@ -1,6 +1,7 @@
 import asyncio
 import json
 from dataclasses import asdict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -120,7 +121,7 @@ async def test_scan_gpu_alloc_maps(
     create_app_and_client,
     test_case,
     extra_fixtures,
-):
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             event_hub_ctx,
@@ -148,7 +149,7 @@ async def test_scan_gpu_alloc_maps(
 
     root_ctx: RootContext = test_app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    done_handler_ctx = {}
+    done_handler_ctx: dict[str, Any] = {}
     done_event = asyncio.Event()
 
     async def done_sub(

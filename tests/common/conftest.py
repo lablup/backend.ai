@@ -1,9 +1,7 @@
-import asyncio
 import random
 import secrets
-import time
 import uuid
-from decimal import Decimal
+from collections.abc import AsyncIterator
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,7 +27,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 )
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser) -> None:
     parser.addoption(
         "--skip-test-redis",
         action="store_true",
@@ -38,11 +36,11 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "redis: mark test as part of Redis test suite")
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config, items) -> None:
     if config.getoption("--skip-test-redis"):
         # auto-skip tests marked with "redis" unless --test-redis option is given.
         do_skip = pytest.mark.skip(
@@ -54,22 +52,22 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_ns():
+def test_ns() -> str:
     return f"test-{secrets.token_hex(8)}"
 
 
 @pytest.fixture
-def test_case_ns():
+def test_case_ns() -> str:
     return secrets.token_hex(8)
 
 
 @pytest.fixture
-def test_node_id():
+def test_node_id() -> str:
     return f"test-{secrets.token_hex(4)}"
 
 
 @pytest.fixture
-async def etcd(etcd_container, test_ns):  # noqa: F811
+async def etcd(etcd_container, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     etcd = AsyncEtcd(
         addr=etcd_container[1],
         namespace=test_ns,
@@ -93,7 +91,7 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_live(redis_container):  # noqa: F811
+async def test_valkey_live(redis_container) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -110,7 +108,7 @@ async def test_valkey_live(redis_container):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container):  # noqa: F811
+async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -119,13 +117,13 @@ async def test_valkey_stream(redis_container):  # noqa: F811
         valkey_target,
         human_readable_name="event_producer.stream",
         db_id=REDIS_STREAM_DB,
-        pubsub_channels=["test-broadcast"],
+        pubsub_channels={"test-broadcast"},
     )
     yield client
 
 
 @pytest.fixture
-async def test_valkey_stat(redis_container):  # noqa: F811
+async def test_valkey_stat(redis_container) -> AsyncIterator[ValkeyStatClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -142,7 +140,7 @@ async def test_valkey_stat(redis_container):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_rate_limit(redis_container):  # noqa: F811
+async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -159,7 +157,7 @@ async def test_valkey_rate_limit(redis_container):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
+async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[RedisQueue]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
@@ -174,8 +172,8 @@ async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
         RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_broadcast",
-            consume_stream_keys=["events"],
-            subscribe_channels=["events_broadcast"],
+            consume_stream_keys={"events"},
+            subscribe_channels={"events_broadcast"},
             group_name=f"test-group-{random.randint(0, 1000)}",
             node_id=test_node_id,
             db=REDIS_STREAM_DB,
@@ -188,7 +186,7 @@ async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container, test_ns):  # noqa: F811
+async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     etcd = AsyncEtcd(
         addr=etcd_container[1],
         namespace=test_ns,
@@ -205,73 +203,17 @@ async def gateway_etcd(etcd_container, test_ns):  # noqa: F811
 
 
 @pytest.fixture
-async def chaos_generator():
-    async def _chaos():
-        try:
-            while True:
-                await asyncio.sleep(0.001)
-        except asyncio.CancelledError:
-            return
-
-    tasks = []
-    for i in range(20):
-        tasks.append(asyncio.create_task(_chaos()))
-    yield
-    for i in range(20):
-        tasks[i].cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-
-@pytest.fixture
-def mock_time(mocker):
-    total_delay = Decimal(0)
-    call_count = 0
-    base_time = time.monotonic()
-    accum_time = Decimal(0)
-    q = Decimal(".000000")
-
-    async def _mock_async_sleep(delay: float) -> None:
-        nonlocal total_delay, call_count, accum_time, q
-        call_count += 1
-        quantized_delay = Decimal(delay).quantize(q)
-        accum_time += quantized_delay
-        total_delay += quantized_delay
-
-    def _reset() -> None:
-        nonlocal total_delay, call_count
-        total_delay = Decimal(0)
-        call_count = 0
-
-    def _get_total_delay() -> float:
-        nonlocal total_delay
-        return float(total_delay)
-
-    def _get_call_count() -> int:
-        nonlocal call_count
-        return call_count
-
-    def _mock_time_monotonic() -> float:
-        nonlocal accum_time
-        return base_time + float(accum_time)
-
-    _mock_async_sleep.reset = _reset
-    _mock_async_sleep.get_total_delay = _get_total_delay
-    _mock_async_sleep.get_call_count = _get_call_count
-    yield _mock_async_sleep, _mock_time_monotonic
-
-
-@pytest.fixture
-def allow_and_block_list():
+def allow_and_block_list() -> tuple[set[str], ...]:
     return {"cuda"}, {"cuda_mock"}
 
 
 @pytest.fixture
-def allow_and_block_list_has_union():
+def allow_and_block_list_has_union() -> tuple[set[str], ...]:
     return {"cuda"}, {"cuda"}
 
 
 @pytest.fixture
-def mock_authenticated_request():
+def mock_authenticated_request() -> MagicMock:
     mock_request = MagicMock()
     mock_request["user"] = {
         "uuid": uuid.uuid4(),
