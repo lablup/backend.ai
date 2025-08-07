@@ -28,7 +28,7 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
-from ...services.storages import StoragesService
+from ...services.storages import StorageService
 from ...utils import log_client_api_entry
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ class StorageAPIHandler:
 
         await log_client_api_entry(log, "upload_file", req)
 
-        storages_service = StoragesService(config_ctx.storage_configs)
+        storage_service = StorageService(config_ctx.storage_configs)
 
         file_part = await file_reader.next()
         while file_part and not getattr(file_part, "filename", None):
@@ -89,7 +89,7 @@ class StorageAPIHandler:
                     break
                 yield chunk
 
-        response = await storages_service.stream_upload(
+        response = await storage_service.stream_upload(
             storage_name, bucket_name, filepath, content_type, content_length, data_stream()
         )
 
@@ -115,8 +115,8 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
-        storages_service = StoragesService(config_ctx.storage_configs)
-        download_stream = storages_service.stream_download(storage_name, bucket_name, filepath)
+        storage_service = StorageService(config_ctx.storage_configs)
+        download_stream = storage_service.stream_download(storage_name, bucket_name, filepath)
 
         return APIStreamResponse(
             body=download_stream,
@@ -142,8 +142,8 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
-        storages_service = StoragesService(config_ctx.storage_configs)
-        response = await storages_service.generate_presigned_upload_url(
+        storage_service = StorageService(config_ctx.storage_configs)
+        response = await storage_service.generate_presigned_upload_url(
             storage_name, bucket_name, req
         )
 
@@ -169,8 +169,8 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
-        storages_service = StoragesService(config_ctx.storage_configs)
-        response = await storages_service.generate_presigned_download_url(
+        storage_service = StorageService(config_ctx.storage_configs)
+        response = await storage_service.generate_presigned_download_url(
             storage_name, bucket_name, filepath
         )
 
@@ -197,8 +197,8 @@ class StorageAPIHandler:
 
         await log_client_api_entry(log, "get_file_meta", req)
 
-        storages_service = StoragesService(config_ctx.storage_configs)
-        response = await storages_service.get_object_info(storage_name, bucket_name, filepath)
+        storage_service = StorageService(config_ctx.storage_configs)
+        response = await storage_service.get_object_info(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -222,8 +222,8 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_file", req)
-        storages_service = StoragesService(config_ctx.storage_configs)
-        response = await storages_service.delete_file(storage_name, bucket_name, filepath)
+        storage_service = StorageService(config_ctx.storage_configs)
+        response = await storage_service.delete_file(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
