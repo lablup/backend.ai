@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import logging
-import time
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Generic, Self, Type, TypeVar, override
+from typing import TYPE_CHECKING, Self, override
 
-import jwt
 from aiohttp import web
-from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import (
     APIResponse,
     APIStreamResponse,
-    BaseRequestModel,
+    BodyParam,
     MiddlewareParam,
     PathParam,
     api_handler,
@@ -39,9 +36,6 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_JWT_MAX_TTL = 300
-_JWT_LEEWAY = 30
-
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
@@ -56,64 +50,12 @@ class StoragesConfigCtx(MiddlewareParam):
         return cls(storages=ctx.local_config.storages)
 
 
-TReq = TypeVar("TReq", bound=BaseRequestModel)
-
-
-class RequestValidationCtx(MiddlewareParam, Generic[TReq]):
-    data: TReq
-
-    @override
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        ctx: RootContext = request.app["ctx"]
-        secret = ctx.local_config.storage_proxy.secret
-
-        try:
-            auth = request.headers.get("Authorization", "")
-            scheme, _, token = auth.partition(" ")
-            if scheme.lower() != "bearer" or not token:
-                raise web.HTTPUnauthorized(reason="JWT token is missing")
-
-            try:
-                decrypted_data = jwt.decode(
-                    token,
-                    secret,
-                    algorithms=["HS256"],
-                    options={"require": ["exp"]},
-                    leeway=_JWT_LEEWAY,
-                )
-            except jwt.ExpiredSignatureError as e:
-                raise web.HTTPUnauthorized(reason=f"Expired JWT token: {str(e)}") from e
-            except jwt.PyJWTError as e:
-                raise web.HTTPUnauthorized(reason=f"Invalid JWT token: {str(e)}") from e
-
-            now = int(time.time())
-            if decrypted_data["exp"] - now > _JWT_MAX_TTL:
-                raise web.HTTPUnauthorized(reason="Token TTL too long")
-            iat = decrypted_data.get("iat")
-            if iat is not None:
-                if iat > now + _JWT_LEEWAY:
-                    raise web.HTTPUnauthorized(reason="Token issued in the future")
-                if now - iat > _JWT_MAX_TTL:
-                    raise web.HTTPUnauthorized(reason="Token too old")
-
-            ReqModel = cls._resolve_req_type()
-            return cls(data=ReqModel.model_validate(decrypted_data))
-        except ValidationError as e:
-            raise web.HTTPBadRequest(reason=f"Request data is invalid: {str(e)}") from e
-
-    @classmethod
-    def _resolve_req_type(cls) -> Type[TReq]:
-        meta = cls.__pydantic_generic_metadata__
-        return meta["args"][0]
-
-
 class StoragesAPIHandler:
     @api_handler
     async def upload_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[UploadFileReq],
+        body: BodyParam[UploadFileReq],
         multipart_ctx: MultipartUploadCtx,
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
@@ -121,7 +63,7 @@ class StoragesAPIHandler:
         Upload a file to the specified S3 bucket using streaming.
         Reads multipart file data in chunks to minimize memory usage.
         """
-        req = request_ctx.data
+        req = body.parsed
         content_type = req.content_type
         content_length = req.content_length
         filepath = req.key
@@ -161,14 +103,14 @@ class StoragesAPIHandler:
     async def download_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[DownloadFileReq],
+        body: BodyParam[DownloadFileReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIStreamResponse:
         """
         Download a file from the specified S3 bucket using streaming.
         Streams file content directly to the client without loading into memory.
         """
-        req = request_ctx.data
+        req = body.parsed
         filepath = req.key
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
@@ -189,14 +131,14 @@ class StoragesAPIHandler:
     async def presigned_upload_url(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[PresignedUploadReq],
+        body: BodyParam[PresignedUploadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for uploading files directly to S3.
         Allows clients to upload files without going through the proxy server.
         """
-        req = request_ctx.data
+        req = body.parsed
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
@@ -215,14 +157,14 @@ class StoragesAPIHandler:
     async def presigned_download_url(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[PresignedDownloadReq],
+        body: BodyParam[PresignedDownloadReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Generate a presigned URL for downloading files directly from S3.
         Allows clients to download files without going through the proxy server.
         """
-        req = request_ctx.data
+        req = body.parsed
         filepath = req.key
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
@@ -242,14 +184,14 @@ class StoragesAPIHandler:
     async def get_file_meta(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[GetFileMetaReq],
+        body: BodyParam[GetFileMetaReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Get metadata information about a file in S3.
         Returns file size, content type, last modified date, and ETag.
         """
-        req = request_ctx.data
+        req = body.parsed
         filepath = req.key
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
@@ -268,14 +210,14 @@ class StoragesAPIHandler:
     async def delete_file(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        request_ctx: RequestValidationCtx[DeleteFileReq],
+        body: BodyParam[DeleteFileReq],
         config_ctx: StoragesConfigCtx,
     ) -> APIResponse:
         """
         Delete a file from the specified S3 bucket.
         Permanently removes the object from storage.
         """
-        req = request_ctx.data
+        req = body.parsed
         filepath = req.key
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
