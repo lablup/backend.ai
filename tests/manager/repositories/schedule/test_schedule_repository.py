@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     AgentSelectionStrategy,
+    ClusterMode,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -280,8 +281,9 @@ async def sample_sessions_and_kernels(
                 access_key=keypair.access_key,
                 scaling_group_name=sample_scaling_groups[0].name,
                 status=status,
+                cluster_mode=ClusterMode.SINGLE_NODE,
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                created_at=datetime.now(tzutc()) - timedelta(minutes=i * 10),
+                created_at=datetime.now(tzutc()) - timedelta(minutes=i * 2),
                 # Required fields
                 images=["python:3.8"],
                 vfolder_mounts=[],
@@ -368,7 +370,9 @@ def mock_valkey_stat_client() -> ValkeyStatClient:
     """Create mock Valkey stat client"""
     mock_client = MagicMock(spec=ValkeyStatClient)
     mock_client.get_keypair_concurrency_used = AsyncMock(return_value=2)
-    mock_client._get_raw = AsyncMock(return_value=b"1")
+    # Mock _get_multiple_keys to return appropriate values for concurrency tracking
+    # Returns [sessions_count, sftp_sessions_count] for each access key
+    mock_client._get_multiple_keys = AsyncMock(return_value=[b"2", b"1"])
     return mock_client
 
 
@@ -634,7 +638,7 @@ class TestScheduleRepository:
 
             # Each kernel should have proper attributes
             for kernel in session.kernels:
-                assert hasattr(kernel, "kernel_id")
+                assert hasattr(kernel, "id")
                 assert hasattr(kernel, "image")
                 assert hasattr(kernel, "architecture")
                 assert hasattr(kernel, "requested_slots")

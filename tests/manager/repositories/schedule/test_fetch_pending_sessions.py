@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -301,6 +302,18 @@ class TestFetchPendingSessions:
     ):
         """Test that timeout filtering works correctly"""
         scaling_group = minimal_setup["scaling_group"].name
+        session_id = minimal_setup["session"].id
+
+        # First, update the session to be older than timeout
+        async with database_engine.begin_session() as db_sess:
+            # Query the session from DB to get it attached to this session
+            stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(created_at=datetime.now(tzutc()) - timedelta(minutes=10))
+            )
+            await db_sess.execute(stmt)
+            await db_sess.commit()
 
         # Set a very short timeout (1 second)
         pending_timeout = timedelta(seconds=1)
