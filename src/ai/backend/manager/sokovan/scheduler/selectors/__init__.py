@@ -10,6 +10,7 @@ from .exceptions import (
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,
+    AgentSelection,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
@@ -28,6 +29,7 @@ __all__ = [
     # Core interfaces
     "AbstractAgentSelector",
     "AgentInfo",
+    "AgentSelection",
     "AgentSelectionConfig",
     "AgentSelectionCriteria",
     "AgentSelector",

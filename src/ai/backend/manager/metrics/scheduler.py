@@ -1,8 +1,8 @@
 """Scheduler metrics for monitoring session scheduling performance."""
 
 import time
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional, Self
+from contextlib import contextmanager
+from typing import Iterator, Optional, Self
 
 from prometheus_client import Counter, Histogram
 
@@ -53,8 +53,8 @@ class SchedulerOperationMetricObserver:
         self._operation_count.labels(operation=operation, status=status).inc()
         self._operation_duration_sec.labels(operation=operation, status=status).observe(duration)
 
-    @asynccontextmanager
-    async def measure_operation(self, operation: str) -> AsyncGenerator[None, None]:
+    @contextmanager
+    def measure_operation(self, operation: str) -> Iterator[None]:
         """
         Context manager to measure a scheduler operation.
 
@@ -123,8 +123,8 @@ class SchedulerPhaseMetricObserver:
             scaling_group=scaling_group, phase=phase, status=status
         ).observe(duration)
 
-    @asynccontextmanager
-    async def measure_phase(self, scaling_group: str, phase: str) -> AsyncGenerator[None, None]:
+    @contextmanager
+    def measure_phase(self, scaling_group: str, phase: str) -> Iterator[None]:
         """
         Context manager to measure a scheduler phase.
 

@@ -84,3 +84,18 @@ class NoCompatibleAgentError(AgentSelectionError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class NoResourceRequirementsError(AgentSelectionError):
+    """Raised when no resource requirements are found for a session."""
+
+    error_type = "https://api.backend.ai/probs/no-resource-requirements"
+    error_title = "No resource requirements found for session."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

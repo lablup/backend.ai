@@ -5,13 +5,13 @@ This selector distributes workloads evenly across agents using
 a simple round-robin index.
 """
 
-from typing import Optional, Sequence
+from typing import Sequence
 
 from .selector import (
     AbstractAgentSelector,
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
+    AgentStateTracker,
     ResourceRequirements,
 )
 
@@ -33,22 +33,23 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         """
         self.next_index = next_index
 
-    def select_agent_by_strategy(
+    def select_tracker_by_strategy(
         self,
-        agents: Sequence[AgentInfo],
+        trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentInfo]:
+    ) -> AgentStateTracker:
         """
-        Select an agent using round-robin.
+        Select an agent tracker using round-robin.
 
+        Assumes trackers are already filtered for compatibility.
         The caller should track and update the index after successful allocation.
         """
-        # Sort agents by ID for consistent ordering
-        sorted_agents = sorted(agents, key=lambda agent: agent.agent_id)
+        # Sort trackers by agent ID for consistent ordering
+        sorted_trackers = sorted(trackers, key=lambda tracker: tracker.original_agent.agent_id)
 
         # Use modulo to wrap around
-        selected_index = self.next_index % len(sorted_agents)
+        selected_index = self.next_index % len(sorted_trackers)
 
-        return sorted_agents[selected_index]
+        return sorted_trackers[selected_index]
