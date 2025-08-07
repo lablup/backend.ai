@@ -31,12 +31,7 @@ if TYPE_CHECKING:
 
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
-    __table_args__ = (
-        sa.Index("ix_role_id_entity_id", "status", "role_id", "entity_id"),
-        sa.UniqueConstraint(
-            "entity_id", "operation", name="uq_object_permissions_entity_id_operation"
-        ),
-    )
+    __table_args__ = (sa.Index("ix_role_id_entity_id", "status", "role_id", "entity_id"),)
 
     id: uuid.UUID = IDColumn()
     status: PermissionStatus = sa.Column(
