@@ -1,7 +1,7 @@
 from abc import ABC
 from collections.abc import Iterable
 
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload
+from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
 
 
 class ValidatorRule(ABC):
@@ -10,7 +10,17 @@ class ValidatorRule(ABC):
     Subclasses should implement the `validate` method to apply specific validation logic.
     """
 
-    def validate(self, workload: SessionWorkload) -> None:
+    def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
+        """
+        Validate a session workload against the system snapshot.
+
+        Args:
+            snapshot: The current system state snapshot
+            workload: The session workload to validate
+
+        Raises:
+            SchedulingValidationError: If the workload fails validation
+        """
         raise NotImplementedError("Subclasses should implement this method.")
 
 
@@ -25,6 +35,16 @@ class SchedulingValidator:
     def __init__(self, rules: Iterable[ValidatorRule]) -> None:
         self._rules = rules
 
-    def validate(self, workload: SessionWorkload) -> None:
+    def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
+        """
+        Validate a session workload against all configured rules.
+
+        Args:
+            snapshot: The current system state snapshot
+            workload: The session workload to validate
+
+        Raises:
+            SchedulingValidationError: If any rule fails
+        """
         for rule in self._rules:
-            rule.validate(workload)
+            rule.validate(snapshot, workload)
