@@ -19,10 +19,10 @@ class S3Client:
     def __init__(
         self,
         bucket_name: str,
-        endpoint_url: Optional[str] = None,
-        region_name: str = "us-east-1",
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
+        endpoint_url: str,
+        region_name: str,
+        aws_access_key_id: Optional[str],
+        aws_secret_access_key: Optional[str],
     ):
         self.bucket_name = bucket_name
         self.endpoint_url = endpoint_url
@@ -209,7 +209,7 @@ class S3Client:
 
         Args:
             s3_key: The S3 object key to download
-            expiration: URL expiration time in seconds (default: 1 hour)
+            expiration: URL expiration time in seconds
             response_content_disposition: Override Content-Disposition header (optional)
             response_content_type: Override Content-Type header (optional)
 
