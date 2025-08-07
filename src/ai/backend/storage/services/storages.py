@@ -62,6 +62,7 @@ class StoragesService:
             bucket_name: Name of the S3 bucket
             filepath: Path to the file to upload
             content_type: Content type of the file
+            content_length: Length of the file in bytes
             data_stream: Async iterator of file data chunks
 
         Returns:
