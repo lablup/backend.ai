@@ -2,31 +2,32 @@ from collections.abc import Sequence
 from typing import override
 
 from ..types import SessionWorkload, SystemSnapshot
-from .prioritizer import SchedulingPrioritizer
+from .sequencer import WorkloadSequencer
 
 
-class LIFOSchedulingPrioritizer(SchedulingPrioritizer):
+class LIFOSequencer(WorkloadSequencer):
     """
-    A scheduling prioritizer that implements Last In, First Out (LIFO) prioritization.
-    This prioritizer will prioritize the most recently added workloads first.
+    A scheduling sequencer that implements Last In, First Out (LIFO) sequencing.
+    This sequencer will sequence the most recently added workloads first.
     """
 
     @property
     @override
     def name(self) -> str:
         """
-        The name of the prioritizer.
+        The name of the sequencer.
         This should be overridden by subclasses to provide a unique identifier.
         """
-        return "LIFO-scheduling-prioritizer"
+        return "LIFO-scheduling-sequencer"
 
     @override
-    async def prioritize(
+    async def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
-        Prioritize the workloads in LIFO order.
-        :param workload: A sequence of SessionWorkload objects to prioritize.
+        Sequence the workloads in LIFO order.
+        :param system_snapshot: The current system snapshot containing resource state.
+        :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects in LIFO order.
         """
         if not workloads:

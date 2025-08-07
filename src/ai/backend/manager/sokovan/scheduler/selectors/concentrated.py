@@ -6,15 +6,16 @@ resource utilization by concentrating workloads.
 """
 
 import sys
-from typing import Optional, Sequence
+from decimal import Decimal
+from typing import Sequence, Union
 
 from ai.backend.common.types import SessionTypes
 
 from .selector import (
     AbstractAgentSelector,
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
+    AgentStateTracker,
     ResourceRequirements,
 )
 from .utils import count_unutilized_capabilities, order_slots_by_priority
@@ -39,25 +40,27 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
-    def select_agent_by_strategy(
+    def select_tracker_by_strategy(
         self,
-        agents: Sequence[AgentInfo],
+        trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-    ) -> Optional[AgentInfo]:
+    ) -> AgentStateTracker:
         """
-        Select an agent to concentrate workloads.
+        Select an agent tracker to concentrate workloads.
 
-        Assumes agents are already filtered for compatibility.
+        Assumes trackers are already filtered for compatibility.
         """
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
             resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
-        # Choose the agent with minimum resources (to concentrate workloads)
-        def agent_sort_key(agent: AgentInfo):
+        # Choose the tracker with minimum resources (to concentrate workloads)
+        def tracker_sort_key(tracker: AgentStateTracker) -> tuple[Union[int, Decimal], ...]:
+            agent = tracker.original_agent
+            occupied_slots, _ = tracker.get_current_state()
             sort_key = []
 
             # First, consider kernel counts at endpoint for replica spreading
@@ -72,14 +75,12 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
             # Then, prefer agents with fewer unutilized capabilities
             sort_key.append(count_unutilized_capabilities(agent, resource_req.requested_slots))
 
-            # Finally, prefer agents with less available resources
+            # Finally, prefer agents with less available resources (using current state)
             for key in resource_priorities:
-                sort_key.append(
-                    (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
-                )
+                sort_key.append((agent.available_slots - occupied_slots).get(key, sys.maxsize))
 
             return tuple(sort_key)
 
-        chosen_agent = min(agents, key=agent_sort_key)
+        chosen_tracker = min(trackers, key=tracker_sort_key)
 
-        return chosen_agent
+        return chosen_tracker

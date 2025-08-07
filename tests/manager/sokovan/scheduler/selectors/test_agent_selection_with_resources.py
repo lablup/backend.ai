@@ -2,7 +2,6 @@
 
 import uuid
 from decimal import Decimal
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,7 +13,6 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    DesignatedAgentIncompatibleError,
     KernelResourceSpec,
     SessionMetadata,
 )
@@ -112,30 +110,31 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        # Get aggregated requirements
-        resource_reqs = criteria.get_resource_requirements()
-        assert len(resource_reqs) == 1
-        # For single-node, there's only one aggregated requirement
-        aggregated_req = resource_reqs[0]
-
         # Total requested: 6 CPU, 12288 memory
         # Available resources:
         # - agent-low: 1 CPU, 2048 memory (insufficient)
         # - agent-medium: 4 CPU, 8192 memory (insufficient)
         # - agent-high: 14 CPU, 28672 memory (sufficient)
 
-        selected_agent = await selector.select_agent_for_resource_requirements(
+        # Use batch selection API
+        selections = await selector.select_agents_for_batch_requirements(
             agents_with_varied_resources,
-            aggregated_req,
             criteria,
             config,
+            designated_agent=None,
         )
+
+        # For single-node, there should be one selection with aggregated resources
+        assert len(selections) == 1
+        selected_agent = selections[0].selected_agent
 
         # Only agent-high has enough resources for aggregated requirements
         assert selected_agent.agent_id == AgentId("agent-high")
 
     @pytest.mark.asyncio
-    async def test_multi_node_selection_individual_resources(self, agents_with_varied_resources):
+    async def test_multi_node_selection_individual_resources(
+        self, agents_with_varied_resources: list[AgentInfo]
+    ) -> None:
         """Test multi-node selection with individual kernel resources."""
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
@@ -176,27 +175,24 @@ class TestAgentSelectionWithResources:
         strategy = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        # Get individual requirements
-        resource_reqs = criteria.get_resource_requirements()
-        assert len(resource_reqs) == 2
+        # Use batch selection API
+        selections = await selector.select_agents_for_batch_requirements(
+            agents_with_varied_resources,
+            criteria,
+            config,
+            designated_agent=None,
+        )
 
-        # Select agent for each requirement
-        selected_agents = []
-        for req in resource_reqs:
-            selected_agent = await selector.select_agent_for_resource_requirements(
-                agents_with_varied_resources,
-                req,
-                criteria,
-                config,
-            )
-            selected_agents.append(selected_agent.agent_id)
+        # For multi-node, should have 2 selections (one per kernel)
+        assert len(selections) == 2
 
         # Both requirements can be satisfied by any agent
         # Dispersed selector should prefer agents with more available resources
-        assert all(selected_id is not None for selected_id in selected_agents)
+        selected_agents = [sel.selected_agent.agent_id for sel in selections]
+        assert all(agent_id is not None for agent_id in selected_agents)
 
     @pytest.mark.asyncio
-    async def test_designated_agent_with_resource_requirements(self):
+    async def test_designated_agent_with_resource_requirements(self) -> None:
         """Test designated agent selection respects resource requirements."""
         agents = [
             create_agent_info(
@@ -233,30 +229,27 @@ class TestAgentSelectionWithResources:
             kernel_requirements={kernel_id: kernel_spec},
         )
 
-        # Get resource requirements
-        resource_reqs = criteria.get_resource_requirements()
-        resource_req = resource_reqs[0]
-
         config = AgentSelectionConfig(max_container_count=None)
 
-        strategy = MagicMock()
+        strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        with pytest.raises(DesignatedAgentIncompatibleError) as exc_info:
-            await selector.select_agent_for_resource_requirements(
+        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoCompatibleAgentError
+
+        with pytest.raises(NoCompatibleAgentError) as exc_info:
+            await selector.select_agents_for_batch_requirements(
                 agents,
-                resource_req,
                 criteria,
                 config,
                 designated_agent=AgentId("designated"),
             )
 
         # Should raise error because designated agent lacks resources
-        assert "does not meet resource requirements" in str(exc_info.value)
+        assert "No agents meet the resource requirements" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_container_limit_with_resource_requirements(self):
+    async def test_container_limit_with_resource_requirements(self) -> None:
         """Test that container limits are respected with resource requirements."""
         agents = [
             create_agent_info(
@@ -294,10 +287,6 @@ class TestAgentSelectionWithResources:
             kernel_requirements={kernel_id: kernel_spec},
         )
 
-        # Get resource requirements
-        resource_reqs = criteria.get_resource_requirements()
-        resource_req = resource_reqs[0]
-
         config = AgentSelectionConfig(
             max_container_count=10,  # Set limit
             enforce_spreading_endpoint_replica=False,
@@ -306,18 +295,19 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        selected_agent = await selector.select_agent_for_resource_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents,
-            resource_req,
             criteria,
             config,
+            designated_agent=None,
         )
 
         # Should select "available" agent since "busy" is at container limit
-        assert selected_agent.agent_id == AgentId("available")
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("available")
 
     @pytest.mark.asyncio
-    async def test_architecture_mismatch_with_resource_requirements(self):
+    async def test_architecture_mismatch_with_resource_requirements(self) -> None:
         """Test that architecture requirements are enforced."""
         agents = [
             create_agent_info(
@@ -353,21 +343,18 @@ class TestAgentSelectionWithResources:
             kernel_requirements={kernel_id: kernel_spec},
         )
 
-        # Get resource requirements
-        resource_reqs = criteria.get_resource_requirements()
-        resource_req = resource_reqs[0]
-
         config = AgentSelectionConfig(max_container_count=None)
 
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        selected_agent = await selector.select_agent_for_resource_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents,
-            resource_req,
             criteria,
             config,
+            designated_agent=None,
         )
 
         # Should select ARM agent
-        assert selected_agent.agent_id == AgentId("arm")
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("arm")
