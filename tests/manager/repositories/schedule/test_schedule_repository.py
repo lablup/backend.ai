@@ -20,10 +20,12 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     ResourceSlot,
     SessionId,
+    SessionResult,
     SessionTypes,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.models import (
     AgentRow,
     AgentStatus,
@@ -33,17 +35,19 @@ from ai.backend.manager.models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    ProjectResourcePolicyRow,
     ScalingGroupOpts,
     ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
+    UserResourcePolicyRow,
     UserRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.scheduler import SchedulingConfig, SystemSnapshot
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.types import SchedulingConfig, SystemSnapshot
 
 
 @pytest.fixture
@@ -143,6 +147,25 @@ async def sample_resource_policies(
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create sample resource policies for testing"""
     async with database_engine.begin_session() as db_sess:
+        # Create user resource policy first (for foreign key)
+        user_policy = UserResourcePolicyRow(
+            name="test-keypair-policy",  # Same name for simplicity
+            max_vfolder_count=10,
+            max_quota_scope_size=-1,
+            max_session_count_per_model_session=10,
+            max_customized_image_count=10,
+        )
+        db_sess.add(user_policy)
+
+        # Create project resource policy (for foreign key)
+        project_policy = ProjectResourcePolicyRow(
+            name="test-keypair-policy",  # Same name to satisfy foreign key
+            max_vfolder_count=10,
+            max_quota_scope_size=-1,
+            max_network_count=10,
+        )
+        db_sess.add(project_policy)
+
         # Create keypair resource policy
         kp_policy = KeyPairResourcePolicyRow(
             name="test-keypair-policy",
@@ -161,11 +184,17 @@ async def sample_resource_policies(
 
         await db_sess.commit()
 
-    yield {"keypair_policy": kp_policy}
+    yield {
+        "keypair_policy": kp_policy,
+        "project_policy": project_policy,
+        "user_policy": user_policy,
+    }
 
     # Cleanup
     async with database_engine.begin_session() as db_sess:
         await db_sess.delete(kp_policy)
+        await db_sess.delete(project_policy)
+        await db_sess.delete(user_policy)
         await db_sess.commit()
 
 
@@ -202,6 +231,7 @@ async def sample_sessions_and_kernels(
             name="test-group",
             domain_name=domain.name,
             total_resource_slots=ResourceSlot({"cpu": Decimal("500"), "mem": Decimal("524288")}),
+            resource_policy=sample_resource_policies["keypair_policy"].name,  # Use the same policy
         )
         db_sess.add(group)
         data["groups"].append(group)
@@ -213,12 +243,16 @@ async def sample_sessions_and_kernels(
             email="test@example.com",
             password="dummy",
             domain_name=domain.name,
-            role="user",
+            role=UserRole.USER,
+            resource_policy=sample_resource_policies["keypair_policy"].name,
         )
         db_sess.add(user)
         data["users"].append(user)
 
-        # Create keypair
+        # Commit users first to ensure foreign key constraint is satisfied
+        await db_sess.commit()
+
+        # Create keypair (needs user to exist due to foreign key)
         keypair = KeyPairRow(
             access_key=AccessKey("test-access-key"),
             secret_key="dummy-secret",
@@ -248,6 +282,11 @@ async def sample_sessions_and_kernels(
                 status=status,
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 created_at=datetime.now(tzutc()) - timedelta(minutes=i * 10),
+                # Required fields
+                images=["python:3.8"],
+                vfolder_mounts=[],
+                environ={},
+                result=SessionResult.UNDEFINED,
             )
             db_sess.add(session)
             data["sessions"].append(session)
@@ -275,11 +314,24 @@ async def sample_sessions_and_kernels(
                 domain_name=domain.name,
                 group_id=group.id,
                 user_uuid=user.uuid,
+                # Required fields for kernel
+                mounts=[],
+                environ={},
+                vfolder_mounts=[],
+                preopen_ports=[],
+                # Port fields (required not null)
+                repl_in_port=2001,
+                repl_out_port=2002,
+                stdin_port=2003,
+                stdout_port=2004,
             )
             db_sess.add(kernel)
             data["kernels"].append(kernel)
 
-        # Create session dependencies
+        # Commit sessions and kernels first
+        await db_sess.commit()
+
+        # Create session dependencies after sessions are committed
         dep = SessionDependencyRow(
             session_id=data["sessions"][1].id,
             depends_on=data["sessions"][0].id,
@@ -549,3 +601,42 @@ class TestScheduleRepository:
         # Total capacity should match sum of available slots from agents
         total_cpu = sum(agent.available_slots.get("cpu", 0) for agent in agents)
         assert snapshot.total_capacity["cpu"] == total_cpu
+
+    async def test_fetch_pending_sessions_join(
+        self,
+        schedule_repository: ScheduleRepository,
+        sample_scaling_groups: list[ScalingGroupRow],
+        sample_sessions_and_kernels: dict[str, Any],
+        database_engine: ExtendedAsyncSAEngine,
+    ):
+        """Test _fetch_pending_sessions_join method directly"""
+        from datetime import timedelta
+
+        scaling_group = sample_scaling_groups[0].name
+        pending_timeout = timedelta(seconds=300)
+
+        # Call the private method directly
+        async with database_engine.begin_readonly_session() as db_sess:
+            pending_sessions = await schedule_repository._fetch_pending_sessions_join(
+                db_sess, scaling_group, pending_timeout
+            )
+
+        # Should return 2 pending sessions from fixture
+        assert len(pending_sessions) == 2
+
+        # Verify the data structure
+        for session in pending_sessions:
+            assert hasattr(session, "id")
+            assert hasattr(session, "access_key")
+            assert hasattr(session, "requested_slots")
+            assert hasattr(session, "kernels")
+            assert isinstance(session.kernels, list)
+
+            # Each kernel should have proper attributes
+            for kernel in session.kernels:
+                assert hasattr(kernel, "kernel_id")
+                assert hasattr(kernel, "image")
+                assert hasattr(kernel, "architecture")
+                assert hasattr(kernel, "requested_slots")
+                # agent might be None for pending kernels
+                assert hasattr(kernel, "agent")

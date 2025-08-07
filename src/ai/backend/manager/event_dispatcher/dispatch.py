@@ -77,6 +77,7 @@ from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventH
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
+from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 
 from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
@@ -93,11 +94,13 @@ from .reporters import EventLogger
 class DispatcherArgs:
     valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
+    sokovan_orchestrator: SokovanOrchestrator
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    use_sokovan: bool = True
 
 
 class Dispatchers:
@@ -125,7 +128,11 @@ class Dispatchers:
         self._kernel_event_handler = KernelEventHandler(
             args.valkey_stream, args.agent_registry, args.db
         )
-        self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
+        self._schedule_event_handler = ScheduleEventHandler(
+            args.scheduler_dispatcher,
+            args.sokovan_orchestrator,
+            args.use_sokovan,
+        )
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,

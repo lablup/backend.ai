@@ -16,7 +16,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import (
 class TestResourceRequirements:
     """Test ResourceRequirements functionality."""
 
-    def test_single_node_aggregation(self):
+    def test_single_node_aggregation(self) -> None:
         """Test that single-node sessions aggregate resource requirements."""
         # Create session metadata for single-node
         session_metadata = SessionMetadata(
@@ -70,7 +70,7 @@ class TestResourceRequirements:
         assert agg_req.requested_slots["mem"] == Decimal("14336")  # 4096+2048+8192
         assert agg_req.required_architecture == "x86_64"
 
-    def test_single_node_mixed_architecture_error(self):
+    def test_single_node_mixed_architecture_error(self) -> None:
         """Test that single-node sessions with mixed architectures raise error."""
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
@@ -108,7 +108,7 @@ class TestResourceRequirements:
 
         assert "different architectures" in str(exc_info.value)
 
-    def test_multi_node_individual_resources(self):
+    def test_multi_node_individual_resources(self) -> None:
         """Test that multi-node sessions return individual kernel resources."""
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
@@ -164,7 +164,7 @@ class TestResourceRequirements:
             assert req.requested_slots == original_req.requested_slots
             assert req.required_architecture == original_req.required_architecture
 
-    def test_empty_kernel_requirements(self):
+    def test_empty_kernel_requirements(self) -> None:
         """Test handling of empty kernel requirements."""
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
@@ -178,13 +178,11 @@ class TestResourceRequirements:
             kernel_requirements={},  # Empty
         )
 
-        # Should raise ValueError for empty kernel requirements
-        with pytest.raises(ValueError) as exc_info:
-            criteria.get_resource_requirements()
+        # Should return empty list for empty kernel requirements
+        resource_reqs = criteria.get_resource_requirements()
+        assert resource_reqs == []
 
-        assert "No kernel requirements specified" in str(exc_info.value)
-
-    def test_single_node_gpu_aggregation(self):
+    def test_single_node_gpu_aggregation(self) -> None:
         """Test GPU resource aggregation for single-node sessions."""
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
@@ -229,7 +227,7 @@ class TestResourceRequirements:
         assert agg_req.requested_slots["mem"] == Decimal("24576")
         assert agg_req.requested_slots["cuda.shares"] == Decimal("1.5")
 
-    def test_resource_slot_addition(self):
+    def test_resource_slot_addition(self) -> None:
         """Test that ResourceSlot addition works correctly."""
         slot1 = ResourceSlot({
             "cpu": Decimal("2"),

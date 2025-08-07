@@ -4,23 +4,24 @@ from collections.abc import Sequence
 from ..types import SessionWorkload, SystemSnapshot
 
 
-class SchedulingPrioritizer(ABC):
+class WorkloadSequencer(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
         """
-        The name of the prioritizer.
+        The name of the sequencer.
         This should be overridden by subclasses to provide a unique identifier.
         """
         raise NotImplementedError("Subclasses should implement this property.")
 
     @abstractmethod
-    async def prioritize(
+    async def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
-        Prioritize a collection of workloads based on specific criteria.
-        :param workload: An iterable of SessionWorkload objects to prioritize.
-        :return: An iterable of prioritized SessionWorkload objects.
+        Sequence the workloads based on the system snapshot.
+        :param system_snapshot: The current system snapshot containing resource state.
+        :param workloads: A sequence of SessionWorkload objects to order.
+        :return: A sequence of SessionWorkload objects ordered by the sequencer's logic.
         """
         raise NotImplementedError("Subclasses should implement this method.")

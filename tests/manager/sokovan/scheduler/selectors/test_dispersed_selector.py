@@ -10,6 +10,7 @@ from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAg
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
+    AgentStateTracker,
     ResourceRequirements,
     SessionMetadata,
 )
@@ -46,7 +47,12 @@ class TestDispersedAgentSelector:
             enforce_spreading_endpoint_replica=False,
         )
 
-    def test_selects_agent_with_most_resources(self, selector, basic_criteria, basic_config):
+    def test_selects_agent_with_most_resources(
+        self,
+        selector: DispersedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test that dispersed selector prefers agents with more available resources."""
         agents = [
             create_agent_info(
@@ -77,14 +83,22 @@ class TestDispersedAgentSelector:
         # agent-medium: 4 CPU, 8192 memory
         # agent-high: 6 CPU, 12288 memory
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select agent-high (most available resources)
-        assert selected.agent_id == AgentId("agent-high")
+        assert selected.original_agent.agent_id == AgentId("agent-high")
 
-    def test_prefers_fewer_unutilized_capabilities(self, selector, basic_criteria, basic_config):
+    def test_prefers_fewer_unutilized_capabilities(
+        self,
+        selector: DispersedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test preference for agents with fewer unutilized resource types."""
         agents = [
             create_agent_info(
@@ -118,15 +132,20 @@ class TestDispersedAgentSelector:
             required_architecture="x86_64",
         )
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select agent-cpu-only (no unutilized GPU capability)
         # even though both have same available CPU/mem
-        assert selected.agent_id == AgentId("agent-cpu-only")
+        assert selected.original_agent.agent_id == AgentId("agent-cpu-only")
 
-    def test_respects_resource_priority_order(self, basic_criteria, basic_config):
+    def test_respects_resource_priority_order(
+        self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
+    ) -> None:
         """Test that resource priorities are respected in order."""
         # Create selector with memory prioritized over CPU
         selector = DispersedAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
@@ -154,14 +173,22 @@ class TestDispersedAgentSelector:
         # low-mem-high-cpu: 14 CPU, 2048 memory
         # high-mem-low-cpu: 2 CPU, 12288 memory
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select high-mem-low-cpu (more memory available, which is higher priority)
-        assert selected.agent_id == AgentId("high-mem-low-cpu")
+        assert selected.original_agent.agent_id == AgentId("high-mem-low-cpu")
 
-    def test_handles_agents_with_no_available_slots(self, selector, basic_criteria, basic_config):
+    def test_handles_agents_with_no_available_slots(
+        self,
+        selector: DispersedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test behavior when some agents have zero available resources."""
         agents = [
             create_agent_info(
@@ -185,14 +212,22 @@ class TestDispersedAgentSelector:
         # agent-full has 0 available resources
         # agent-available has 4 CPU, 8192 memory
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select agent-available
-        assert selected.agent_id == AgentId("agent-available")
+        assert selected.original_agent.agent_id == AgentId("agent-available")
 
-    def test_tie_breaking_with_identical_resources(self, selector, basic_criteria, basic_config):
+    def test_tie_breaking_with_identical_resources(
+        self,
+        selector: DispersedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test consistent tie-breaking when agents have identical resources."""
         agents = [
             create_agent_info(
@@ -219,21 +254,33 @@ class TestDispersedAgentSelector:
         )
 
         # All agents have identical resources
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should consistently select the same agent
-        assert selected.agent_id in [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
+        assert selected.original_agent.agent_id in [
+            AgentId("agent-a"),
+            AgentId("agent-b"),
+            AgentId("agent-c"),
+        ]
 
         # Run multiple times to ensure consistency
         for _ in range(10):
-            result = selector.select_agent_by_strategy(
-                agents, resource_req, basic_criteria, basic_config
+            result = selector.select_tracker_by_strategy(
+                trackers, resource_req, basic_criteria, basic_config
             )
             assert result == selected
 
-    def test_handles_mixed_resource_types(self, selector, basic_criteria, basic_config):
+    def test_handles_mixed_resource_types(
+        self,
+        selector: DispersedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+    ) -> None:
         """Test selection with heterogeneous resource types."""
         agents = [
             create_agent_info(
@@ -287,14 +334,19 @@ class TestDispersedAgentSelector:
         # tpu-agent: 12 CPU, 24576 memory (has unutilized TPU)
         # cpu-agent: 16 CPU, 32768 memory (no unutilized resources)
 
-        selected = selector.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+
+        selected = selector.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Should select cpu-agent (no unutilized capabilities and most resources)
-        assert selected.agent_id == AgentId("cpu-agent")
+        assert selected.original_agent.agent_id == AgentId("cpu-agent")
 
-    def test_dispersed_opposite_of_concentrated(self, basic_criteria, basic_config):
+    def test_dispersed_opposite_of_concentrated(
+        self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
+    ) -> None:
         """Test that dispersed selector makes opposite choices from concentrated."""
         from ai.backend.manager.sokovan.scheduler.selectors.concentrated import (
             ConcentratedAgentSelector,
@@ -322,15 +374,19 @@ class TestDispersedAgentSelector:
             required_architecture="x86_64",
         )
 
-        dispersed_choice = dispersed.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        # Convert agents to trackers for dispersed
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        dispersed_choice = dispersed.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
-        concentrated_choice = concentrated.select_agent_by_strategy(
-            agents, resource_req, basic_criteria, basic_config
+        concentrated_choice = concentrated.select_tracker_by_strategy(
+            trackers, resource_req, basic_criteria, basic_config
         )
 
         # Dispersed should choose agent-2 (more available)
         # Concentrated should choose agent-1 (less available)
-        assert dispersed_choice.agent_id == AgentId("agent-2")
-        assert concentrated_choice.agent_id == AgentId("agent-1")
-        assert dispersed_choice.agent_id != concentrated_choice.agent_id
+        assert dispersed_choice.original_agent.agent_id == AgentId("agent-2")
+        assert concentrated_choice.original_agent.agent_id == AgentId("agent-1")
+        assert (
+            dispersed_choice.original_agent.agent_id != concentrated_choice.original_agent.agent_id
+        )
