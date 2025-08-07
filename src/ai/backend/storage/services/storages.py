@@ -201,6 +201,7 @@ class StoragesService:
             if object_info is None:
                 raise StorageBucketFileNotFoundError()
 
+            # TODO: Separate ObjectMetaResponse dto class
             return ObjectMetaResponse(
                 content_length=object_info.content_length,
                 content_type=object_info.content_type,

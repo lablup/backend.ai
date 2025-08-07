@@ -45,9 +45,8 @@ class StoragesConfigCtx(MiddlewareParam):
     @override
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
-        ctx: RootContext = request.app["ctx"]
-
-        return cls(storages=ctx.local_config.storages)
+        # TODO: Inject storages config from DB
+        return cls(storages=[])
 
 
 class StoragesAPIHandler:
