@@ -80,7 +80,7 @@ def mock_model_info() -> ModelInfo:
         author="microsoft",
         tags=["pytorch", "text-generation"],
         created_at=datetime(2021, 1, 1),
-        last_modified=datetime(2023, 6, 15),
+        modified_at=datetime(2023, 6, 15),
     )
 
 

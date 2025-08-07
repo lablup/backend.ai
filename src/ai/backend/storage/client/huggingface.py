@@ -226,7 +226,7 @@ class HuggingFaceScanner:
                             author=model.author,
                             tags=model.tags or [],
                             created_at=model.created_at,
-                            last_modified=model.last_modified,
+                            modified_at=model.last_modified,
                         )
                     )
                 except Exception as e:
@@ -269,7 +269,7 @@ class HuggingFaceScanner:
                 revision=revision,
                 tags=model_info.tags or [],
                 created_at=model_info.created_at,
-                last_modified=model_info.last_modified,
+                modified_at=model_info.last_modified,
             )
 
             log.info(
