@@ -251,10 +251,9 @@ class TestHuggingFaceService:
         mock_list_repo_files.side_effect = Exception("API Error")
 
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-        files = await hf_service.list_model_files(registry_name="test_registry", model=model_target)
 
-        # Should return empty list on error
-        assert files == []
+        with pytest.raises(HuggingFaceAPIError):
+            await hf_service.list_model_files(registry_name="test_registry", model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
