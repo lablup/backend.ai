@@ -171,8 +171,11 @@ services:
     ports:
       - "4000:4000"
     volumes:
+      - ./configs/graphql:/etc/graphql
       - ./docs/manager/graphql-reference:/etc/schemas
     command:
+      - "--config"
+      - "/etc/graphql/router.yaml"
       - "--supergraph"
       - "/etc/schemas/supergraph.graphql"
     extra_hosts:
