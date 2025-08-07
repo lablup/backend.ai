@@ -83,7 +83,7 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        ":vendor",
+        # ":vendor",
     ],
     sources=[
         "**/py.typed",
