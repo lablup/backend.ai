@@ -30,6 +30,7 @@ from .abc import AbstractFrontend
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
+    from redis.asyncio.client import Pipeline
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -132,11 +133,13 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBack
 
             ttl = get_default_redis_key_ttl()
 
-            async def _set_keys_with_expiry(r: Redis) -> None:
+            async def _pipe(r: Redis) -> Pipeline:
+                pipe = r.pipeline(transaction=False)
                 for k, v in keys.items():
-                    await r.set(k, v, ex=ttl)
+                    pipe.set(k, v, ex=ttl)
+                return pipe
 
-            await redis_helper.execute(self.root_context.redis_live, _set_keys_with_expiry)
+            await redis_helper.execute(self.root_context.redis_live, _pipe)
 
             log.debug("Wrote {} keys", len(keys))
         except Exception:
