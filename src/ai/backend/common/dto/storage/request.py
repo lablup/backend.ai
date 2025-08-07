@@ -108,48 +108,6 @@ class DeleteObjectReq(BaseRequestModel):
     key: str = Field(description="The object key (path) within the bucket to delete the file from.")
 
 
-class UploadDirectoryReq(BaseRequestModel):
-    """
-    Data model for directory upload requests to object storage.
-    This is used to specify the target bucket and directory prefix for multiple file uploads.
-    """
-
-    prefix: str = Field(
-        description="The directory prefix (path) within the bucket to upload files to."
-    )
-    overwrite: bool = Field(
-        default=False, description="Whether to overwrite existing files with the same keys."
-    )
-
-
-class DownloadDirectoryReq(BaseRequestModel):
-    """
-    Data model for directory download requests from object storage.
-    This is used to specify the directory prefix to download from the bucket.
-    """
-
-    prefix: str = Field(
-        description="The directory prefix (path) within the bucket to download files from."
-    )
-    recursive: bool = Field(
-        default=True, description="Whether to recursively download all files under the prefix."
-    )
-
-
-class DeleteDirectoryReq(BaseRequestModel):
-    """
-    Data model for directory deletion requests in object storage.
-    This is used to specify the directory prefix to delete from the bucket.
-    """
-
-    prefix: str = Field(
-        description="The directory prefix (path) within the bucket to delete files from."
-    )
-    recursive: bool = Field(
-        default=True, description="Whether to recursively delete all files under the prefix."
-    )
-
-
 # HuggingFace API Request Models
 class HuggingFaceScanModelsReq(BaseRequestModel):
     """Request for scanning HuggingFace models."""
