@@ -467,9 +467,7 @@ class TestHuggingFaceScanner:
         """Test model files info listing with API error."""
         mock_list_repo_files.side_effect = Exception("API Error")
 
-        file_infos = await hf_scanner.list_model_files_info(
-            ModelTarget(model_id="microsoft/DialoGPT-medium")
-        )
-
-        # Should return empty list on error
-        assert file_infos == []
+        with pytest.raises(HuggingFaceAPIError):
+            await hf_scanner.list_model_files_info(
+                ModelTarget(model_id="microsoft/DialoGPT-medium")
+            )
