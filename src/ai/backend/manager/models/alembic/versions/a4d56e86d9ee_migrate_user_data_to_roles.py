@@ -14,14 +14,21 @@ from typing import Any, Optional, cast
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Session, foreign, registry, relationship, selectinload
+from sqlalchemy.engine import Connection, Row
+from sqlalchemy.orm import foreign, registry, relationship
 
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
 from ai.backend.manager.models.rbac_models.migrate.types import PermissionCreateInputGroup
 from ai.backend.manager.models.rbac_models.migrate.user import (
-    map_role_to_project,
-    project_row_to_rbac_migration_data,
-    user_row_to_rbac_migration_data,
+    ADMIN_ROLE_NAME_SUFFIX,
+    ProjectData,
+    ProjectUserAssociationData,
+    RoleNameUtil,
+    UserData,
+    create_project_admin_role_and_permissions,
+    create_project_user_role_and_permissions,
+    create_user_self_role_and_permissions,
+    map_user_to_project_role,
 )
 
 # revision identifiers, used by Alembic.
@@ -144,95 +151,181 @@ class AssociationScopesEntitiesRow(Base):
     )
 
 
-def _insert_if_data_exists(db_session: Session, row_type, data: Collection) -> None:
+def _insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
     if data:
-        db_session.execute(sa.insert(row_type), data)
+        db_conn.execute(sa.insert(row_type), data)
 
 
 def _insert_from_create_input_group(
-    db_session: Session, input_group: PermissionCreateInputGroup
+    db_conn: Connection, input_group: PermissionCreateInputGroup
 ) -> None:
-    _insert_if_data_exists(db_session, RoleRow, input_group.to_role_insert_data())
-    _insert_if_data_exists(db_session, UserRoleRow, input_group.to_user_role_insert_data())
+    _insert_if_data_exists(db_conn, RoleRow, input_group.to_role_insert_data())
+    _insert_if_data_exists(db_conn, UserRoleRow, input_group.to_user_role_insert_data())
     _insert_if_data_exists(
-        db_session, ScopePermissionRow, input_group.to_scope_permission_insert_data()
+        db_conn, ScopePermissionRow, input_group.to_scope_permission_insert_data()
     )
     _insert_if_data_exists(
-        db_session,
+        db_conn,
         AssociationScopesEntitiesRow,
         input_group.to_association_scopes_entities_insert_data(),
     )
 
 
-def _migrate_project_data(db_session: Session) -> None:
+def _migrate_user_data(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
     while True:
-        project_query = sa.select(GroupRow).offset(offset).limit(page_size).order_by(GroupRow.id)
-        rows = db_session.scalars(project_query).all()
-        rows = cast(list[GroupRow], rows)
+        user_query = (
+            sa.select(UserRow.uuid, UserRow.username, UserRow.domain_name, UserRow.role)
+            .offset(offset)
+            .limit(page_size)
+            .order_by(UserRow.uuid)
+        )
+        rows = db_conn.execute(user_query).all()
+        rows = cast(list[Row], rows)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
-            data = project_row_to_rbac_migration_data(row)
-            input_group.merge(data)
-        _insert_from_create_input_group(db_session, input_group)
+            data = UserData.from_row(row)
+            input_data = create_user_self_role_and_permissions(data)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
 
 
-def _migrate_user_data(db_session: Session) -> None:
+def _migrate_project_data(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
     while True:
-        user_query = sa.select(UserRow).offset(offset).limit(page_size).order_by(UserRow.uuid)
-        rows = db_session.scalars(user_query).all()
-        rows = cast(list[UserRow], rows)
+        project_query = sa.select(GroupRow.id).offset(offset).limit(page_size).order_by(GroupRow.id)
+        rows = db_conn.scalars(project_query).all()
+        rows = cast(list[Row], rows)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
-            data = user_row_to_rbac_migration_data(row)
-            input_group.merge(data)
-        _insert_from_create_input_group(db_session, input_group)
+            data = ProjectData.from_row(row)
+            admin_input_data = create_project_admin_role_and_permissions(data)
+            user_input_data = create_project_user_role_and_permissions(data)
+            input_group.merge(admin_input_data)
+            input_group.merge(user_input_data)
+        _insert_from_create_input_group(db_conn, input_group)
 
 
-def _migrate_project_user_mapping_data(db_session: Session) -> None:
+def _migrate_admin_user_project_mapping_data(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
+    j = (
+        sa.join(
+            UserRow,
+            AssocGroupUserRow,
+            UserRow.uuid == AssocGroupUserRow.user_id,
+        )
+        .join(
+            ScopePermissionRow,
+            AssocGroupUserRow.group_id == sa.cast(ScopePermissionRow.scope_id, UUID),
+        )
+        .join(
+            RoleRow,
+            ScopePermissionRow.role_id == RoleRow.id,
+        )
+    )
     while True:
         query = (
-            sa.select(GroupRow)
-            .options(
-                selectinload(GroupRow.users),
-                selectinload(GroupRow.scope_permissions),
+            sa.select(
+                UserRow.uuid,
+                UserRow.role,
+                AssocGroupUserRow.group_id,
+                RoleRow.id.label("role_id"),  # type: ignore[attr-defined]
+                RoleRow.name.label("role_name"),  # type: ignore[attr-defined]
+            )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    RoleRow.name.like(f"%{ADMIN_ROLE_NAME_SUFFIX}"),  # type: ignore[attr-defined]
+                    UserRow.role.in_([UserRole.SUPERADMIN, UserRole.ADMIN]),
+                )
             )
             .offset(offset)
             .limit(page_size)
-            .order_by(GroupRow.id)
+            .order_by(UserRow.uuid)
         )
-        rows = db_session.scalars(query).all()
-        rows = cast(list[GroupRow], rows)
+        rows = db_conn.execute(query).all()
+        rows = cast(list[Row], rows)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
-            role_ids: set[uuid.UUID] = {permission.role_id for permission in row.scope_permissions}
-            for role_id in role_ids:
-                data = map_role_to_project(role_id, row)
-                input_group.merge(data)
-        _insert_from_create_input_group(db_session, input_group)
+            if not RoleNameUtil.is_admin_role(row.role_name):
+                continue
+            data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
+            input_data = map_user_to_project_role(row.role_id, data)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
+
+
+def _migrate_user_project_mapping_data(db_conn: Connection) -> None:
+    offset = 0
+    page_size = 1000
+    j = (
+        sa.join(
+            UserRow,
+            AssocGroupUserRow,
+            UserRow.uuid == AssocGroupUserRow.user_id,
+        )
+        .join(
+            ScopePermissionRow,
+            AssocGroupUserRow.group_id == sa.cast(ScopePermissionRow.scope_id, UUID),
+        )
+        .join(
+            RoleRow,
+            ScopePermissionRow.role_id == RoleRow.id,
+        )
+    )
+    while True:
+        query = (
+            sa.select(
+                UserRow.uuid,
+                UserRow.role,
+                AssocGroupUserRow.group_id,
+                RoleRow.id.label("role_id"),  # type: ignore[attr-defined]
+                RoleRow.name.label("role_name"),  # type: ignore[attr-defined]
+            )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    sa.not_(RoleRow.name.like(f"%{ADMIN_ROLE_NAME_SUFFIX}")),  # type: ignore[attr-defined]
+                    UserRow.role.not_in([UserRole.SUPERADMIN, UserRole.ADMIN]),
+                )
+            )
+            .offset(offset)
+            .limit(page_size)
+            .order_by(UserRow.uuid)
+        )
+        rows = db_conn.execute(query).all()
+        rows = cast(list[Row], rows)
+        offset += page_size
+        if not rows:
+            break
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            if RoleNameUtil.is_admin_role(row.role_name):
+                continue
+            data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
+            input_data = map_user_to_project_role(row.role_id, data)
+            input_group.merge(input_data)
+        _insert_from_create_input_group(db_conn, input_group)
 
 
 def upgrade() -> None:
     conn = op.get_bind()
-
-    with Session(bind=conn) as db_session:
-        _migrate_project_data(db_session)
-        _migrate_user_data(db_session)
-        _migrate_project_user_mapping_data(db_session)
+    _migrate_user_data(conn)
+    _migrate_project_data(conn)
+    _migrate_admin_user_project_mapping_data(conn)
+    _migrate_user_project_mapping_data(conn)
 
 
 def downgrade() -> None:
