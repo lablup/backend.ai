@@ -1,6 +1,8 @@
 import uuid
 from dataclasses import dataclass
 
+from ai.backend.common.dto.manager.response import ObjectStorageResponse
+
 
 @dataclass
 class ObjectStorageData:
@@ -12,3 +14,15 @@ class ObjectStorageData:
     endpoint: str
     region: str
     buckets: list[str]
+
+    def to_dto(self) -> ObjectStorageResponse:
+        return ObjectStorageResponse(
+            id=str(self.id),
+            name=self.name,
+            host=self.host,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            endpoint=self.endpoint,
+            region=self.region,
+            buckets=self.buckets,
+        )

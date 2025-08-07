@@ -117,6 +117,22 @@ enum ArtifactType {
   IMAGE
 }
 
+input AssociateArtifactWithStorageInput {
+  artifactId: ID!
+  storageId: ID!
+}
+
+type AssociateArtifactWithStoragePayload {
+  association: AssociationArtifactsStorages!
+}
+
+type AssociationArtifactsStorages implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  artifactId: ID!
+  storageId: ID!
+}
+
 scalar ByteSize
 
 type CancelImportArtifactPayload {
@@ -246,6 +262,15 @@ enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
   CANARY
+}
+
+input DisassociateArtifactWithStorageInput {
+  artifactId: ID!
+  storageId: ID!
+}
+
+type DisassociateArtifactWithStoragePayload {
+  association: AssociationArtifactsStorages!
 }
 
 extend type EndpointAutoScalingRuleNode @key(fields: "id") {
@@ -446,6 +471,8 @@ type Mutation {
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+  associateArtifactWithStorage(input: AssociateArtifactWithStorageInput!): AssociateArtifactWithStoragePayload!
+  disassociateArtifactWithStorage(input: DisassociateArtifactWithStorageInput!): DisassociateArtifactWithStoragePayload!
 }
 
 """An object with a Globally Unique ID"""

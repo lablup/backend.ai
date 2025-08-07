@@ -14,6 +14,10 @@ from .artifact import (
     import_artifact,
     update_artifact,
 )
+from .association_artifacts_storages import (
+    associate_artifact_with_storage,
+    disassociate_artifact_with_storage,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
@@ -66,6 +70,8 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
+    associate_artifact_with_storage = associate_artifact_with_storage
+    disassociate_artifact_with_storage = disassociate_artifact_with_storage
 
 
 @strawberry.type
