@@ -7,24 +7,25 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 from ai.backend.manager.services.artifact.actions.types import ImportArtifactTarget
 
 
+# TODO: Make this a batch action.
 @dataclass
-class ImportArtifactAction(ArtifactAction):
-    target: ImportArtifactTarget
+class ImportArtifactBatchAction(ArtifactAction):
+    target: list[ImportArtifactTarget]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.target.artifact_id)
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "import"
+        return "import_batch"
 
 
 @dataclass
-class ImportArtifactActionResult(BaseActionResult):
-    result: ArtifactData
+class ImportArtifactBatchActionResult(BaseActionResult):
+    result: list[ArtifactData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.result.id)
+        return None
