@@ -22,12 +22,11 @@ from ai.backend.storage.exception import (
     HuggingFaceModelNotFoundError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.services.storages import StoragesService
+from ai.backend.storage.services.storages import StorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_CHUNK_SIZE = 8192  # Default chunk size for streaming downloads
-_DEFAULT_EXPIRATION = 3600  # Default expiration time for storage tokens (1 hour)
 _DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in seconds
 
 
@@ -35,13 +34,13 @@ _DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in se
 class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
-    storage_service: StoragesService
+    storage_service: StorageService
 
 
 class HuggingFaceService:
     """Service for HuggingFace model operations"""
 
-    _storages_service: StoragesService
+    _storages_service: StorageService
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
 

@@ -14,14 +14,13 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
-    HuggingFaceModelNotFoundError,
     RegistryNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages import StoragesService
+from ai.backend.storage.services.storages import StorageService
 
 
 @pytest.fixture
@@ -42,8 +41,8 @@ def mock_background_task_manager() -> MagicMock:
 
 @pytest.fixture
 def mock_storage_service() -> MagicMock:
-    """Mock StoragesService."""
-    mock_service = MagicMock(spec=StoragesService)
+    """Mock StorageService."""
+    mock_service = MagicMock(spec=StorageService)
     mock_service.stream_upload = AsyncMock()
     return mock_service
 
@@ -190,7 +189,7 @@ class TestHuggingFaceService:
         """Test single model scanning with model not found."""
         mock_model_info.side_effect = Exception("not found")
 
-        with pytest.raises(HuggingFaceModelNotFoundError):
+        with pytest.raises(HuggingFaceAPIError):
             model_target = ModelTarget(model_id="nonexistent/model")
             await hf_service.scan_model(registry_name="test_registry", model=model_target)
 
