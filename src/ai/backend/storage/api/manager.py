@@ -74,8 +74,8 @@ from ..exception import (
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
-from .v1.storages import create_app as create_storages_app
 from .v1.registries import create_app as create_registries_app
+from .v1.storages import create_app as create_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
