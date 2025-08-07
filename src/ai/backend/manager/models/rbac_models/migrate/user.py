@@ -18,10 +18,12 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
 
-from .types import PermissionCreateInputGroup
-
-ROLE_NAME_PREFIX = "role_"
-ADMIN_ROLE_NAME_SUFFIX = "_admin"
+from .types import (
+    ADMIN_ROLE_NAME_SUFFIX,
+    ROLE_NAME_PREFIX,
+    PermissionCreateInputGroup,
+    is_admin_role,
+)
 
 USER_SELF_SCOPE_OPERATIONS = (
     OperationType.READ,
@@ -77,7 +79,7 @@ class RoleNameUtil:
         """
         Check if the role name indicates an admin role.
         """
-        return role_name.endswith(ADMIN_ROLE_NAME_SUFFIX)
+        return is_admin_role(role_name)
 
 
 @dataclass
@@ -119,6 +121,12 @@ class ProjectUserAssociationData:
 
 
 def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInputGroup:
+    """
+    Create a self role and permissions for a user.
+    This role allows the user to manage their own data.
+
+    For easy migration, we save user ID to user's roles.description.
+    """
     role_id = uuid.uuid4()
     scope_permissions: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
@@ -134,6 +142,7 @@ def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInp
         roles=[
             RoleCreateInput(
                 name=user.role_name(),
+                description=str(user.id),
                 id=role_id,
             )
         ],
@@ -148,6 +157,12 @@ def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInp
 
 
 def create_project_admin_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+    """
+    Create an admin role and permissions for a project.
+    This role allows the user to manage the project.
+
+    For easy migration, we save project ID to project's roles.description.
+    """
     role_id = uuid.uuid4()
     scope_permissions: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
@@ -163,6 +178,7 @@ def create_project_admin_role_and_permissions(project: ProjectData) -> Permissio
         roles=[
             RoleCreateInput(
                 name=project.role_name(is_admin=True),
+                description=str(project.id),
                 id=role_id,
             )
         ],
@@ -171,6 +187,12 @@ def create_project_admin_role_and_permissions(project: ProjectData) -> Permissio
 
 
 def create_project_user_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+    """
+    Create a user role and permissions for a project.
+    This role allows the user to read the project.
+
+    For easy migration, we save project ID to project's roles.description.
+    """
     role_id = uuid.uuid4()
     scope_permissions: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
@@ -185,6 +207,7 @@ def create_project_user_role_and_permissions(project: ProjectData) -> Permission
         roles=[
             RoleCreateInput(
                 name=project.role_name(is_admin=False),
+                description=str(project.id),
                 id=role_id,
             )
         ],
@@ -195,6 +218,10 @@ def create_project_user_role_and_permissions(project: ProjectData) -> Permission
 def map_user_to_project_role(
     role_id: uuid.UUID, association: ProjectUserAssociationData
 ) -> PermissionCreateInputGroup:
+    """
+    Map a user to a project role.
+    This is used when a user is assigned to a project.
+    """
     return PermissionCreateInputGroup(
         user_roles=[
             UserRoleCreateInput(
