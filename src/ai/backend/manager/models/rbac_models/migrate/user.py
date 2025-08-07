@@ -1,6 +1,9 @@
+import enum
 import uuid
 from dataclasses import dataclass
 from typing import Self
+
+from sqlalchemy.engine.row import Row
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesCreateInput,
@@ -14,45 +17,79 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.user import UserRole, UserRow
 
 from .types import PermissionCreateInputGroup
 
 ROLE_NAME_PREFIX = "role_"
+ADMIN_ROLE_NAME_SUFFIX = "_admin"
+
+USER_SELF_SCOPE_OPERATIONS = (
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.GRANT_ALL,
+    OperationType.GRANT_READ,
+    OperationType.GRANT_UPDATE,
+)
+ADMIN_OPERATIONS = (
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.HARD_DELETE,
+    OperationType.GRANT_ALL,
+    OperationType.GRANT_READ,
+    OperationType.GRANT_UPDATE,
+    OperationType.GRANT_SOFT_DELETE,
+    OperationType.GRANT_HARD_DELETE,
+)
+
+
+class UserRole(enum.StrEnum):
+    """
+    User's role.
+    """
+
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+    MONITOR = "monitor"
+
+
+class RoleNameUtil:
+    @staticmethod
+    def user_role_name(user: "UserData") -> str:
+        """
+        Generate a role name for a user.
+        """
+        return f"{ROLE_NAME_PREFIX}user_{user.username}"
+
+    @staticmethod
+    def project_role_name(project: "ProjectData", is_admin: bool) -> str:
+        """
+        Generate a role name for a project.
+        """
+        role_type = ADMIN_ROLE_NAME_SUFFIX if is_admin else "_user"
+        return f"{ROLE_NAME_PREFIX}project_{str(project.id)[:8]}{role_type}"
+
+    @staticmethod
+    def is_admin_role(role_name: str) -> bool:
+        """
+        Check if the role name indicates an admin role.
+        """
+        return role_name.endswith(ADMIN_ROLE_NAME_SUFFIX)
 
 
 @dataclass
 class ProjectData:
     id: uuid.UUID
 
+    def role_name(self, is_admin: bool) -> str:
+        return RoleNameUtil.project_role_name(self, is_admin)
+
     @classmethod
-    def from_row(cls, group_row: GroupRow) -> Self:
+    def from_row(cls, group_row: Row) -> Self:
         return cls(id=group_row.id)
-
-    @property
-    def role_name(self) -> str:
-        return f"{ROLE_NAME_PREFIX}project_{str(self.id)[:8]}"
-
-    def to_rbac_input_data(self) -> PermissionCreateInputGroup:
-        role_id = uuid.uuid4()
-        return PermissionCreateInputGroup(
-            roles=[
-                RoleCreateInput(
-                    name=self.role_name,
-                    id=role_id,
-                )
-            ],
-            scope_permissions=[
-                ScopePermissionCreateInput(
-                    role_id=role_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(self.id),
-                    entity_type=EntityType.USER,
-                    operation=OperationType.READ,
-                ),
-            ],
-        )
 
 
 @dataclass
@@ -62,12 +99,11 @@ class UserData:
     domain: str
     role: UserRole
 
-    @property
     def role_name(self) -> str:
-        return f"{ROLE_NAME_PREFIX}user_{self.username}"
+        return RoleNameUtil.user_role_name(self)
 
     @classmethod
-    def from_row(cls, user_row: UserRow) -> Self:
+    def from_row(cls, user_row: Row) -> Self:
         return cls(
             id=user_row.uuid,
             username=user_row.username,
@@ -75,109 +111,107 @@ class UserData:
             role=user_row.role,
         )
 
-    def to_rbac_input_data(self) -> PermissionCreateInputGroup:
-        role_id = uuid.uuid4()
-        scope_permissions: list[ScopePermissionCreateInput] = [
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.READ,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.UPDATE,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.SOFT_DELETE,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.GRANT_ALL,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.GRANT_READ,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.GRANT_UPDATE,
-            ),
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(self.id),
-                entity_type=EntityType.USER,
-                operation=OperationType.GRANT_SOFT_DELETE,
-            ),
-        ]
-        return PermissionCreateInputGroup(
-            roles=[
-                RoleCreateInput(
-                    name=self.role_name,
-                    id=role_id,
-                )
-            ],
-            user_roles=[
-                UserRoleCreateInput(
-                    user_id=self.id,
-                    role_id=role_id,
-                )
-            ],
-            scope_permissions=scope_permissions,
+
+@dataclass
+class ProjectUserAssociationData:
+    project_id: uuid.UUID
+    user_id: uuid.UUID
+
+
+def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInputGroup:
+    role_id = uuid.uuid4()
+    scope_permissions: list[ScopePermissionCreateInput] = [
+        ScopePermissionCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.USER,
+            scope_id=str(user.id),
+            entity_type=EntityType.USER,
+            operation=operation,
         )
-
-
-def user_row_to_rbac_migration_data(user_row: UserRow) -> PermissionCreateInputGroup:
-    data = UserData.from_row(user_row)
-    return data.to_rbac_input_data()
-
-
-def project_row_to_rbac_migration_data(project_row: GroupRow) -> PermissionCreateInputGroup:
-    data = ProjectData.from_row(project_row)
-    return data.to_rbac_input_data()
-
-
-def map_role_to_project(role_id: uuid.UUID, group_row: GroupRow) -> PermissionCreateInputGroup:
-    user_roles: list[UserRoleCreateInput] = []
-    association_scopes_entities: list[AssociationScopesEntitiesCreateInput] = []
-    for association_row in group_row.users:
-        user_roles.append(
+        for operation in USER_SELF_SCOPE_OPERATIONS
+    ]
+    return PermissionCreateInputGroup(
+        roles=[
+            RoleCreateInput(
+                name=user.role_name(),
+                id=role_id,
+            )
+        ],
+        user_roles=[
             UserRoleCreateInput(
-                user_id=association_row.user_id,
+                user_id=user.id,
                 role_id=role_id,
             )
+        ],
+        scope_permissions=scope_permissions,
+    )
+
+
+def create_project_admin_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+    role_id = uuid.uuid4()
+    scope_permissions: list[ScopePermissionCreateInput] = [
+        ScopePermissionCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(project.id),
+            entity_type=EntityType.USER,
+            operation=operation,
         )
-        association_scopes_entities.append(
+        for operation in ADMIN_OPERATIONS
+    ]
+    return PermissionCreateInputGroup(
+        roles=[
+            RoleCreateInput(
+                name=project.role_name(is_admin=True),
+                id=role_id,
+            )
+        ],
+        scope_permissions=scope_permissions,
+    )
+
+
+def create_project_user_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+    role_id = uuid.uuid4()
+    scope_permissions: list[ScopePermissionCreateInput] = [
+        ScopePermissionCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(project.id),
+            entity_type=EntityType.USER,
+            operation=OperationType.READ,
+        )
+    ]
+    return PermissionCreateInputGroup(
+        roles=[
+            RoleCreateInput(
+                name=project.role_name(is_admin=False),
+                id=role_id,
+            )
+        ],
+        scope_permissions=scope_permissions,
+    )
+
+
+def map_user_to_project_role(
+    role_id: uuid.UUID, association: ProjectUserAssociationData
+) -> PermissionCreateInputGroup:
+    return PermissionCreateInputGroup(
+        user_roles=[
+            UserRoleCreateInput(
+                user_id=association.user_id,
+                role_id=role_id,
+            )
+        ],
+        association_scopes_entities=[
             AssociationScopesEntitiesCreateInput(
                 scope_id=ScopeId(
                     scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_row.id),
+                    scope_id=str(association.project_id),
                 ),
                 object_id=ObjectId(
                     entity_type=EntityType.USER,
-                    entity_id=str(association_row.user_id),
+                    entity_id=str(association.user_id),
                 ),
             )
-        )
-    return PermissionCreateInputGroup(
-        user_roles=user_roles,
-        association_scopes_entities=association_scopes_entities,
+        ],
     )
