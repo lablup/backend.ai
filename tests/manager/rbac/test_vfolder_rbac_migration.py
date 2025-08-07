@@ -13,9 +13,10 @@ from ai.backend.manager.models.rbac_models.migrate.vfolder import (
     ProjectVFolderData,
     UserVFolderData,
     VFolderPermissionData,
-    map_project_vfolder_to_project_scope,
-    map_user_vfolder_to_user_scope,
-    map_vfolder_permission_to_user_scope,
+    map_project_vfolder_to_project_admin_role,
+    map_project_vfolder_to_project_user_role,
+    map_user_vfolder_to_user_role,
+    map_vfolder_permission_data_to_user_role,
 )
 
 
@@ -52,12 +53,12 @@ def role_id():
     return uuid.uuid4()
 
 
-class TestMapUserVFolderToUserScope:
-    """Test map_user_vfolder_to_user_scope function."""
+class TestMapUserVFolderToUserRole:
+    """Test map_user_vfolder_to_user_role function."""
 
     def test_basic_mapping(self, role_id, user_vfolder_data):
         """Test basic user vfolder mapping."""
-        result = map_user_vfolder_to_user_scope(role_id, user_vfolder_data)
+        result = map_user_vfolder_to_user_role(role_id, user_vfolder_data)
 
         # Check scope permissions - should have all operations
         assert len(result.scope_permissions) == len(OperationType)
@@ -93,7 +94,7 @@ class TestMapUserVFolderToUserScope:
 
         results = []
         for vfolder in vfolders:
-            result = map_user_vfolder_to_user_scope(role_id, vfolder)
+            result = map_user_vfolder_to_user_role(role_id, vfolder)
             results.append(result)
 
         # Each result should have the same scope but different object
@@ -103,14 +104,12 @@ class TestMapUserVFolderToUserScope:
             assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
 
 
-class TestMapProjectVFolderToProjectScope:
-    """Test map_project_vfolder_to_project_scope function."""
+class TestMapProjectVFolderToProjectAdminRole:
+    """Test map_project_vfolder_to_project_admin_role function."""
 
     def test_admin_role_mapping(self, role_id, project_vfolder_data):
         """Test project vfolder mapping with admin role."""
-        result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder_data, is_admin_role=True
-        )
+        result = map_project_vfolder_to_project_admin_role(role_id, project_vfolder_data)
 
         # Admin should have all operations
         assert len(result.scope_permissions) == len(OperationType)
@@ -134,13 +133,35 @@ class TestMapProjectVFolderToProjectScope:
         assert assoc.object_id.entity_type == EntityType.VFOLDER
         assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
-    def test_non_admin_role_mapping(self, role_id, project_vfolder_data):
-        """Test project vfolder mapping with non-admin role."""
-        result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder_data, is_admin_role=False
-        )
+    def test_multiple_vfolders_same_project(self, role_id):
+        """Test mapping multiple vfolders for the same project."""
+        project_id = uuid.uuid4()
+        vfolders = [
+            ProjectVFolderData(id=uuid.uuid4(), project_id=project_id),
+            ProjectVFolderData(id=uuid.uuid4(), project_id=project_id),
+            ProjectVFolderData(id=uuid.uuid4(), project_id=project_id),
+        ]
 
-        # Non-admin should only have READ operation
+        results = []
+        for vfolder in vfolders:
+            result = map_project_vfolder_to_project_admin_role(role_id, vfolder)
+            results.append(result)
+
+        # Each result should have the same scope but different object
+        for i, result in enumerate(results):
+            assert len(result.scope_permissions) == len(OperationType)
+            assert result.association_scopes_entities[0].scope_id.scope_id == str(project_id)
+            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
+
+
+class TestMapProjectVFolderToProjectUserRole:
+    """Test map_project_vfolder_to_project_user_role function."""
+
+    def test_user_role_mapping(self, role_id, project_vfolder_data):
+        """Test project vfolder mapping with user role."""
+        result = map_project_vfolder_to_project_user_role(role_id, project_vfolder_data)
+
+        # User should only have READ operation
         assert len(result.scope_permissions) == 1
         perm = result.scope_permissions[0]
 
@@ -150,7 +171,7 @@ class TestMapProjectVFolderToProjectScope:
         assert perm.entity_type == EntityType.VFOLDER
         assert perm.operation == OperationType.READ
 
-        # Check association (same as admin)
+        # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
         assert assoc.scope_id.scope_type == ScopeType.PROJECT
@@ -158,32 +179,26 @@ class TestMapProjectVFolderToProjectScope:
         assert assoc.object_id.entity_type == EntityType.VFOLDER
         assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
-    def test_admin_vs_non_admin_permissions(self, role_id, project_vfolder_data):
-        """Test difference between admin and non-admin permissions."""
-        admin_result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder_data, is_admin_role=True
-        )
-        non_admin_result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder_data, is_admin_role=False
-        )
+    def test_admin_vs_user_permissions(self, role_id, project_vfolder_data):
+        """Test difference between admin and user permissions."""
+        admin_result = map_project_vfolder_to_project_admin_role(role_id, project_vfolder_data)
+        user_result = map_project_vfolder_to_project_user_role(role_id, project_vfolder_data)
 
         # Admin should have more permissions
-        assert len(admin_result.scope_permissions) > len(non_admin_result.scope_permissions)
+        assert len(admin_result.scope_permissions) > len(user_result.scope_permissions)
         assert len(admin_result.scope_permissions) == len(OperationType)
-        assert len(non_admin_result.scope_permissions) == 1
+        assert len(user_result.scope_permissions) == 1
 
         # Both should have same association
-        assert (
-            admin_result.association_scopes_entities == non_admin_result.association_scopes_entities
-        )
+        assert admin_result.association_scopes_entities == user_result.association_scopes_entities
 
 
-class TestMapVFolderPermissionToUserScope:
-    """Test map_vfolder_permission_to_user_scope function."""
+class TestMapVFolderPermissionDataToUserRole:
+    """Test map_vfolder_permission_data_to_user_role function."""
 
     def test_basic_permission_mapping(self, role_id, vfolder_permission_data):
         """Test basic vfolder permission mapping."""
-        result = map_vfolder_permission_to_user_scope(role_id, vfolder_permission_data)
+        result = map_vfolder_permission_data_to_user_role(role_id, vfolder_permission_data)
 
         # Should only have READ permission
         assert len(result.scope_permissions) == 1
@@ -214,7 +229,7 @@ class TestMapVFolderPermissionToUserScope:
 
         results = []
         for perm in permissions:
-            result = map_vfolder_permission_to_user_scope(role_id, perm)
+            result = map_vfolder_permission_data_to_user_role(role_id, perm)
             results.append(result)
 
         # All should have same user scope but different vfolders
@@ -237,7 +252,7 @@ class TestMapVFolderPermissionToUserScope:
 
         results = []
         for perm in permissions:
-            result = map_vfolder_permission_to_user_scope(role_id, perm)
+            result = map_vfolder_permission_data_to_user_role(role_id, perm)
             results.append(result)
 
         # All should have same vfolder but different user scopes
@@ -258,13 +273,13 @@ class TestComplexScenarios:
 
         # Owner mapping (full permissions)
         owner_vfolder = UserVFolderData(id=vfolder_id, user_id=owner_id)
-        owner_result = map_user_vfolder_to_user_scope(role_id, owner_vfolder)
+        owner_result = map_user_vfolder_to_user_role(role_id, owner_vfolder)
 
         # Shared user mappings (read-only permissions)
         shared_results = []
         for user_id in shared_user_ids:
             perm = VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id)
-            result = map_vfolder_permission_to_user_scope(role_id, perm)
+            result = map_vfolder_permission_data_to_user_role(role_id, perm)
             shared_results.append(result)
 
         # Owner should have all operations
@@ -287,28 +302,23 @@ class TestComplexScenarios:
 
         # Project vfolder for admin
         project_vfolder = ProjectVFolderData(id=vfolder_id, project_id=project_id)
-        admin_result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder, is_admin_role=True
-        )
+        admin_result = map_project_vfolder_to_project_admin_role(role_id, project_vfolder)
 
-        # Same vfolder for non-admin
-        non_admin_result = map_project_vfolder_to_project_scope(
-            role_id, project_vfolder, is_admin_role=False
-        )
+        # Same vfolder for user
+        user_result = map_project_vfolder_to_project_user_role(role_id, project_vfolder)
 
         # External user with explicit permission
         external_user_id = uuid.uuid4()
         perm = VFolderPermissionData(vfolder_id=vfolder_id, user_id=external_user_id)
-        external_result = map_vfolder_permission_to_user_scope(role_id, perm)
+        external_result = map_vfolder_permission_data_to_user_role(role_id, perm)
 
         # Verify permission hierarchy
         admin_ops = {p.operation for p in admin_result.scope_permissions}
-        non_admin_ops = {p.operation for p in non_admin_result.scope_permissions}
+        user_ops = {p.operation for p in user_result.scope_permissions}
         external_ops = {p.operation for p in external_result.scope_permissions}
 
-        assert len(admin_ops) > len(non_admin_ops)
-        assert len(non_admin_ops) == len(external_ops)
-        assert OperationType.READ in non_admin_ops
+        assert OperationType.READ in admin_ops
+        assert OperationType.READ in user_ops
         assert OperationType.READ in external_ops
 
     def test_data_class_properties(self):
