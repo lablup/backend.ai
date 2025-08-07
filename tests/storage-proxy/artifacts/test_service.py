@@ -178,7 +178,9 @@ class TestHuggingFaceService:
         assert model.author == "microsoft"
         assert model.tags == ["pytorch", "text-generation"]
 
-        mock_model_info.assert_called_once_with("microsoft/DialoGPT-medium", token="test_token")
+        mock_model_info.assert_called_once_with(
+            "microsoft/DialoGPT-medium", revision="main", token="test_token"
+        )
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -274,7 +276,7 @@ class TestHuggingFaceService:
 
         assert url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         mock_hf_hub_url.assert_called_once_with(
-            repo_id="microsoft/DialoGPT-medium", filename="config.json"
+            repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
         )
 
     @pytest.mark.asyncio
@@ -396,7 +398,7 @@ class TestHuggingFaceService:
         with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
-            result = await hf_service._upload_model_file(
+            await hf_service._upload_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
@@ -404,7 +406,6 @@ class TestHuggingFaceService:
                 bucket_name="test_bucket",
             )
 
-            assert result is True
             mock_storage_service.stream_upload.assert_called_once()
 
     @pytest.mark.asyncio
@@ -424,15 +425,13 @@ class TestHuggingFaceService:
         with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
-            result = await hf_service._upload_model_file(
+            await hf_service._upload_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )
-
-            assert result is False
 
     @pytest.mark.asyncio
     async def test_upload_model_file_no_storage_service(
@@ -450,7 +449,7 @@ class TestHuggingFaceService:
             service._storages_service = None  # type: ignore
 
         with pytest.raises(HuggingFaceAPIError):
-            await service._upload_model_file(
+            await service._upload_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
@@ -472,12 +471,11 @@ class TestHuggingFaceService:
         with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
-            result = await hf_service._upload_model_file(
+        with pytest.raises(HuggingFaceAPIError):
+            await hf_service._upload_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
             )
-
-            assert result is False

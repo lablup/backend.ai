@@ -9,7 +9,6 @@ import aiohttp
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
-from ai.backend.common.dto.storage.request import ObjectStorageOperationType, ObjectStorageTokenData
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -185,7 +184,7 @@ class HuggingFaceService:
 
                 for file_info in file_infos:
                     try:
-                        success = await self._upload_model_file(
+                        await self._upload_single_file_to_storage(
                             file_info=file_info,
                             model_id=model_id,
                             revision=revision,
@@ -193,11 +192,7 @@ class HuggingFaceService:
                             bucket_name=bucket_name,
                         )
 
-                        if success:
-                            successful_uploads += 1
-                        else:
-                            failed_uploads += 1
-
+                        successful_uploads += 1
                     except Exception as e:
                         log.error(
                             f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
@@ -360,10 +355,10 @@ class HuggingFaceService:
         except Exception as e:
             raise HuggingFaceAPIError(f"Unexpected error downloading {url}: {str(e)}") from e
 
-    async def _upload_model_file(
+    async def _upload_single_file_to_storage(
         self, file_info: FileInfo, model_id: str, revision: str, storage_name: str, bucket_name: str
-    ) -> bool:
-        """Upload a single model file to storage.
+    ) -> None:
+        """Upload a single file to storage.
 
         Args:
             file_info: File information with download URL
@@ -371,11 +366,9 @@ class HuggingFaceService:
             revision: Git revision (branch, tag, or commit hash)
             storage_name: Target storage name
             bucket_name: Target bucket name
-
-        Returns:
-            True if upload successful, False otherwise
         """
         if not self._storages_service:
+            # TODO: Add new exception type for missing storage service
             raise HuggingFaceAPIError("Storage service not configured for import operations")
 
         try:
@@ -383,15 +376,6 @@ class HuggingFaceService:
             storage_key = f"{model_id}/{revision}/{file_info.path}"
 
             # Create token data for the upload
-            token_data = ObjectStorageTokenData(
-                op=ObjectStorageOperationType.UPLOAD,
-                bucket=bucket_name,
-                key=storage_key,
-                expiration=_DEFAULT_EXPIRATION,
-                content_type="application/octet-stream",
-                filename=file_info.path.split("/")[-1],  # Extract filename
-            )
-
             log.debug(
                 f"Starting file upload to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
@@ -401,28 +385,24 @@ class HuggingFaceService:
             download_stream = self._make_download_file_stream(file_info.download_url)
 
             # Upload to storage using existing service
-            upload_result = await self._storages_service.stream_upload(
+            await self._storages_service.stream_upload(
                 storage_name=storage_name,
                 bucket_name=bucket_name,
-                token_data=token_data,
+                filepath=storage_key,
                 data_stream=download_stream,
+                content_type=None,
+                content_length=None,
             )
 
-            if upload_result.success:
-                log.info(
-                    f"Successfully uploaded file to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
-                    f"storage_key={storage_key}"
-                )
-                return True
-            else:
-                log.error(
-                    f"Upload failed: model_id={model_id}@{revision}, file_path={file_info.path}, "
-                    f"storage_key={storage_key}"
-                )
-                return False
+            log.info(
+                f"Successfully uploaded file to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
+                f"storage_key={storage_key}"
+            )
 
         except Exception as e:
             log.error(
                 f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
             )
-            return False
+            raise HuggingFaceAPIError(
+                f"Unexpected error uploading {file_info.path}: {str(e)}"
+            ) from e
