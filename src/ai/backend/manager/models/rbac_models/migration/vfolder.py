@@ -33,7 +33,7 @@ class VFolderPermissionData:
     user_id: uuid.UUID
 
 
-def map_user_vfolder_to_user_scope(
+def map_user_vfolder_to_user_role(
     role_id: uuid.UUID,
     vfolder: UserVFolderData,
 ) -> PermissionCreateInputGroup:
@@ -65,32 +65,20 @@ def map_user_vfolder_to_user_scope(
     )
 
 
-def map_project_vfolder_to_project_scope(
+def map_project_vfolder_to_project_admin_role(
     role_id: uuid.UUID,
     vfolder: ProjectVFolderData,
-    is_admin_role: bool,
 ) -> PermissionCreateInputGroup:
-    if is_admin_role:
-        scope_permissions = [
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(vfolder.project_id),
-                entity_type=EntityType.VFOLDER,
-                operation=str(operation),
-            )
-            for operation in OperationType
-        ]
-    else:
-        scope_permissions = [
-            ScopePermissionCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(vfolder.project_id),
-                entity_type=EntityType.VFOLDER,
-                operation=OperationType.READ,
-            )
-        ]
+    scope_permissions = [
+        ScopePermissionCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(vfolder.project_id),
+            entity_type=EntityType.VFOLDER,
+            operation=str(operation),
+        )
+        for operation in OperationType
+    ]
     association_scopes_entities = [
         AssociationScopesEntitiesCreateInput(
             scope_id=ScopeId(
@@ -109,7 +97,38 @@ def map_project_vfolder_to_project_scope(
     )
 
 
-def map_vfolder_permission_to_user_scope(
+def map_project_vfolder_to_project_user_role(
+    role_id: uuid.UUID,
+    vfolder: ProjectVFolderData,
+) -> PermissionCreateInputGroup:
+    scope_permissions = [
+        ScopePermissionCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(vfolder.project_id),
+            entity_type=EntityType.VFOLDER,
+            operation=OperationType.READ,
+        )
+    ]
+    association_scopes_entities = [
+        AssociationScopesEntitiesCreateInput(
+            scope_id=ScopeId(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(vfolder.project_id),
+            ),
+            object_id=ObjectId(
+                entity_type=EntityType.VFOLDER,
+                entity_id=str(vfolder.id),
+            ),
+        )
+    ]
+    return PermissionCreateInputGroup(
+        scope_permissions=scope_permissions,
+        association_scopes_entities=association_scopes_entities,
+    )
+
+
+def map_vfolder_permission_data_to_user_role(
     role_id: uuid.UUID, vfolder_permission: VFolderPermissionData
 ) -> PermissionCreateInputGroup:
     scope_permissions = [
