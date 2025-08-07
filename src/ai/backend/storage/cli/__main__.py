@@ -13,8 +13,3 @@ def main(ctx: click.Context):
 @main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.config:cli")
 def config():
     """Command set for configuration management."""
-
-
-@main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.storages:cli")
-def storages():
-    """Command set for external storages management."""
