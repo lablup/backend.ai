@@ -619,14 +619,7 @@ class HuggingfaceConfig(BaseModel):
         """,
         alias="type",
     )
-    token: Optional[str] = Field(
-        default=None,
-        description="""
-        HuggingFace API token for authentication.
-        Required for accessing private models or performing write operations.
-        """,
-    )
-    endpoint: Optional[str] = Field(
+    endpoint: str = Field(
         default="https://huggingface.co",
         description="""
         Custom endpoint for HuggingFace API.
@@ -634,6 +627,13 @@ class HuggingfaceConfig(BaseModel):
         Useful for connecting to self-hosted HuggingFace instances.
         """,
         examples=["https://huggingface.co"],
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="""
+        HuggingFace API token for authentication.
+        You cannot access the gated repositories without this token.
+        """,
     )
 
 

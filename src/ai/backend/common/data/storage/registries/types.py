@@ -109,7 +109,7 @@ class ModelInfo(BaseModel):
         Provides information about the model's age and development timeline.
         """,
     )
-    last_modified: Optional[datetime] = Field(
+    modified_at: Optional[datetime] = Field(
         default=None,
         description="""
         ISO timestamp when the model was last updated or modified.
