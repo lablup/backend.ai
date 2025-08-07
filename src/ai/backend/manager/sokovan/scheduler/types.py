@@ -1,12 +1,13 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     ResourceSlot,
     SessionId,
@@ -14,6 +15,11 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+    AgentSelectionCriteria,
+    KernelResourceSpec,
+    SessionMetadata,
+)
 
 
 @dataclass(frozen=True)
@@ -55,14 +61,14 @@ class SessionDependencyInfo:
     dependency_result: SessionResult
 
 
-@dataclass(frozen=True)
+@dataclass
 class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
-    by_keypair: Mapping[AccessKey, ResourceSlot]
-    by_user: Mapping[UUID, ResourceSlot]
-    by_group: Mapping[UUID, ResourceSlot]
-    by_domain: Mapping[str, ResourceSlot]
+    by_keypair: MutableMapping[AccessKey, ResourceSlot]
+    by_user: MutableMapping[UUID, ResourceSlot]
+    by_group: MutableMapping[UUID, ResourceSlot]
+    by_domain: MutableMapping[str, ResourceSlot]
 
 
 @dataclass(frozen=True)
@@ -75,29 +81,29 @@ class ResourcePolicySnapshot:
     domain_limits: Mapping[str, ResourceSlot]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ConcurrencySnapshot:
     """Snapshot of concurrent session counts."""
 
-    sessions_by_keypair: Mapping[AccessKey, int]
-    sftp_sessions_by_keypair: Mapping[AccessKey, int]
+    sessions_by_keypair: MutableMapping[AccessKey, int]
+    sftp_sessions_by_keypair: MutableMapping[AccessKey, int]
 
 
-@dataclass(frozen=True)
+@dataclass
 class PendingSessionSnapshot:
     """Snapshot of pending sessions."""
 
-    by_keypair: Mapping[AccessKey, list[PendingSessionInfo]]
+    by_keypair: MutableMapping[AccessKey, list[PendingSessionInfo]]
 
 
-@dataclass(frozen=True)
+@dataclass
 class SessionDependencySnapshot:
     """Snapshot of session dependencies."""
 
     by_session: Mapping[SessionId, list[SessionDependencyInfo]]
 
 
-@dataclass(frozen=True)
+@dataclass
 class SystemSnapshot:
     """Represents a complete snapshot of the system's state for scheduling decisions."""
 
@@ -150,6 +156,8 @@ class SessionWorkload:
     group_id: UUID
     # Domain name for domain resource limit checks
     domain_name: str
+    # Scaling group name
+    scaling_group: str
     # Priority level (higher value = higher priority)
     priority: int = 0
     # Session type (INTERACTIVE, BATCH, INFERENCE)
@@ -162,6 +170,44 @@ class SessionWorkload:
     is_private: bool = False
     # Kernels to be scheduled for this session
     kernels: list[KernelWorkload] = field(default_factory=list)
+    # Manually designated agent (for superadmin)
+    designated_agent: Optional[AgentId] = None
+    # Kernel counts at endpoint for each agent (for inference session spreading)
+    # Only populated for inference sessions with enforce_spreading_endpoint_replica
+    kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
+
+    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
+        """
+        Convert to new agent selection criteria for scheduling.
+
+        Returns:
+            AgentSelectionCriteria for agent selection
+        """
+        # Create session metadata
+        session_metadata = SessionMetadata(
+            session_id=self.session_id,
+            session_type=self.session_type,
+            scaling_group=self.scaling_group,
+            cluster_mode=self.cluster_mode,
+        )
+
+        # Create kernel requirements map
+        kernel_requirements = {
+            kernel.kernel_id: KernelResourceSpec(
+                requested_slots=kernel.requested_slots,
+                required_architecture=kernel.architecture,
+            )
+            for kernel in self.kernels
+        }
+
+        # Create selection criteria
+        criteria = AgentSelectionCriteria(
+            session_metadata=session_metadata,
+            kernel_requirements=kernel_requirements,
+            kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,
+        )
+
+        return criteria
 
 
 @dataclass
@@ -176,20 +222,23 @@ class KernelAllocation:
     agent_addr: str
     # Scaling group that the agent belongs to
     scaling_group: str
-    # Resource slots requested by this kernel
-    requested_slots: ResourceSlot
     # Host ports allocated for this kernel (empty set if none)
     allocated_host_ports: set[int] = field(default_factory=set)
 
 
 @dataclass
-class AllocationSnapshot:
-    """
-    Represents a complete allocation decision for a session.
+class AgentAllocation:
+    """Represents resource allocation to a specific agent."""
 
-    Contains allocation information for all kernels in the session,
-    regardless of whether they are allocated to a single node or multiple nodes.
-    """
+    # Identifier of the agent
+    agent_id: AgentId
+    # List of resource slots allocated to this agent
+    allocated_slots: list[ResourceSlot]
+
+
+@dataclass
+class SessionAllocation:
+    """Represents an allocation decision for a session with all its kernels."""
 
     # Unique identifier of the session
     session_id: SessionId
@@ -197,5 +246,34 @@ class AllocationSnapshot:
     session_type: SessionTypes
     # Cluster mode of the session (SINGLE_NODE or MULTI_NODE)
     cluster_mode: ClusterMode
+    # Scaling group that the session belongs to
+    scaling_group: str
     # List of kernel allocations for this session
     kernel_allocations: list[KernelAllocation]
+    # List of agent allocations for this session
+    agent_allocations: list[AgentAllocation]
+
+
+@dataclass
+class AllocationBatch:
+    """Batch of session allocations with pre-collected agent IDs for efficient processing."""
+
+    allocations: list[SessionAllocation]
+    agent_ids: set[AgentId]
+
+
+@dataclass
+class SchedulingConfig:
+    """Configuration needed for scheduling decisions."""
+
+    max_container_count_per_agent: Optional[int]
+    enforce_spreading_endpoint_replica: bool
+
+
+@dataclass
+class ScalingGroupInfo:
+    """Scaling group configuration for scheduling."""
+
+    scheduler_name: str
+    agent_selection_strategy: AgentSelectionStrategy
+    pending_timeout: timedelta

@@ -29,15 +29,10 @@ class TestPendingSessionCountLimitValidator:
     def validator(self) -> PendingSessionCountLimitValidator:
         return PendingSessionCountLimitValidator()
 
-    def test_passes_when_under_limit(self, validator: PendingSessionCountLimitValidator) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-            user_uuid=uuid.uuid4(),
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+    def test_passes_when_under_limit(
+        self, validator: PendingSessionCountLimitValidator, user1_minimal_workload: SessionWorkload
+    ) -> None:
+        workload = user1_minimal_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
@@ -81,15 +76,10 @@ class TestPendingSessionCountLimitValidator:
         # Should not raise (2 < 3)
         validator.validate(snapshot, workload)
 
-    def test_fails_when_at_limit(self, validator: PendingSessionCountLimitValidator) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-            user_uuid=uuid.uuid4(),
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+    def test_fails_when_at_limit(
+        self, validator: PendingSessionCountLimitValidator, user1_minimal_workload: SessionWorkload
+    ) -> None:
+        workload = user1_minimal_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
@@ -134,15 +124,10 @@ class TestPendingSessionCountLimitValidator:
             validator.validate(snapshot, workload)
         assert "You cannot create more than 2 pending session(s)" in str(exc_info.value)
 
-    def test_passes_when_no_limit(self, validator: PendingSessionCountLimitValidator) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-            user_uuid=uuid.uuid4(),
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+    def test_passes_when_no_limit(
+        self, validator: PendingSessionCountLimitValidator, user1_minimal_workload: SessionWorkload
+    ) -> None:
+        workload = user1_minimal_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
@@ -182,15 +167,10 @@ class TestPendingSessionCountLimitValidator:
         # Should not raise when no limit is set
         validator.validate(snapshot, workload)
 
-    def test_passes_when_no_policy(self, validator: PendingSessionCountLimitValidator) -> None:
-        workload = SessionWorkload(
-            session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-            user_uuid=uuid.uuid4(),
-            group_id=uuid.uuid4(),
-            domain_name="default",
-        )
+    def test_passes_when_no_policy(
+        self, validator: PendingSessionCountLimitValidator, user1_minimal_workload: SessionWorkload
+    ) -> None:
+        workload = user1_minimal_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(

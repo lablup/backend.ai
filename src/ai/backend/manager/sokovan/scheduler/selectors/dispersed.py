@@ -6,11 +6,16 @@ workloads across the cluster.
 """
 
 import sys
-from typing import Optional, Sequence
+from decimal import Decimal
+from typing import Sequence, Union
 
-from ai.backend.common.types import AgentId
-
-from .selector import AbstractAgentSelector, AgentInfo, AgentSelectionCriteria
+from .selector import (
+    AbstractAgentSelector,
+    AgentSelectionConfig,
+    AgentSelectionCriteria,
+    AgentStateTracker,
+    ResourceRequirements,
+)
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
 
@@ -32,36 +37,38 @@ class DispersedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
-    async def select_agent_by_strategy(
+    def select_tracker_by_strategy(
         self,
-        agents: Sequence[AgentInfo],
+        trackers: Sequence[AgentStateTracker],
+        resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
-    ) -> Optional[AgentId]:
+        config: AgentSelectionConfig,
+    ) -> AgentStateTracker:
         """
-        Select an agent to disperse workloads.
+        Select an agent tracker to disperse workloads.
 
-        Assumes agents are already filtered for compatibility.
+        Assumes trackers are already filtered for compatibility.
         """
-        if not agents:
-            return None
-
         # Sort requested slots by priority
         resource_priorities = order_slots_by_priority(
-            criteria.requested_slots, self.agent_selection_resource_priority
+            resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
-        # Choose the agent with maximum available resources (to disperse workloads)
-        chosen_agent = max(
-            agents,
-            key=lambda agent: [
+        # Choose the tracker with maximum available resources (to disperse workloads)
+        def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
+            occupied_slots, _ = tracker.get_current_state()
+            return [
                 # First, prefer agents with fewer unutilized capabilities
-                -count_unutilized_capabilities(agent, criteria.requested_slots),
-                # Then, prefer agents with more available resources
+                -count_unutilized_capabilities(
+                    tracker.original_agent, resource_req.requested_slots
+                ),
+                # Then, prefer agents with more available resources (using current state)
                 *[
-                    (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
+                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
                     for key in resource_priorities
                 ],
-            ],
-        )
+            ]
 
-        return chosen_agent.agent_id
+        chosen_tracker = max(trackers, key=tracker_sort_key)
+
+        return chosen_tracker

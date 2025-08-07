@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.prioritizers.fifo import FIFOSchedulingPrioritizer
+from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -16,10 +16,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
 )
 
 
-class TestFIFOSchedulingPrioritizer:
+class TestFIFOSequencer:
     @pytest.fixture
-    def prioritizer(self) -> FIFOSchedulingPrioritizer:
-        return FIFOSchedulingPrioritizer()
+    def sequencer(self) -> FIFOSequencer:
+        return FIFOSequencer()
 
     @pytest.fixture
     def system_snapshot(self) -> SystemSnapshot:
@@ -50,19 +50,19 @@ class TestFIFOSchedulingPrioritizer:
         )
 
     @pytest.mark.asyncio
-    async def test_name(self, prioritizer: FIFOSchedulingPrioritizer) -> None:
-        assert prioritizer.name == "FIFO-scheduling-prioritizer"
+    async def test_name(self, sequencer: FIFOSequencer) -> None:
+        assert sequencer.name == "FIFO-scheduling-sequencer"
 
     @pytest.mark.asyncio
     async def test_empty_workload(
-        self, prioritizer: FIFOSchedulingPrioritizer, system_snapshot: SystemSnapshot
+        self, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
-        result = await prioritizer.prioritize(system_snapshot, [])
+        result = await sequencer.sequence(system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
     async def test_preserves_order(
-        self, prioritizer: FIFOSchedulingPrioritizer, system_snapshot: SystemSnapshot
+        self, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -72,6 +72,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -81,6 +82,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -90,11 +92,12 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
 
-        result = await prioritizer.prioritize(system_snapshot, workloads)
+        result = await sequencer.sequence(system_snapshot, workloads)
 
         # FIFO should preserve the original order
         assert len(result) == 3
@@ -103,7 +106,7 @@ class TestFIFOSchedulingPrioritizer:
         assert result[2] == workloads[2]
 
     @pytest.mark.asyncio
-    async def test_ignores_system_snapshot(self, prioritizer: FIFOSchedulingPrioritizer) -> None:
+    async def test_ignores_system_snapshot(self, sequencer: FIFOSequencer) -> None:
         # FIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -142,6 +145,7 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
             SessionWorkload(
@@ -151,11 +155,12 @@ class TestFIFOSchedulingPrioritizer:
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
+                scaling_group="default",
                 priority=0,
             ),
         ]
 
-        result = await prioritizer.prioritize(snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(snapshot_with_allocations, workloads)
 
         # Should still preserve original order despite different allocations
         assert len(result) == 2

@@ -19,7 +19,7 @@ class ValidatorRule(ABC):
             workload: The session workload to validate
 
         Raises:
-            ValidationError: If the workload fails validation
+            SchedulingValidationError: If the workload fails validation
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
@@ -44,7 +44,7 @@ class SchedulingValidator:
             workload: The session workload to validate
 
         Raises:
-            ValidationError: If any rule fails
+            SchedulingValidationError: If any rule fails
         """
         for rule in self._rules:
             rule.validate(snapshot, workload)
