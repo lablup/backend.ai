@@ -77,6 +77,7 @@ from ..watcher import ChownTask, MountTask, UmountTask
 from .v1.registries import create_app as create_registries_app
 from .v1.storages import create_app as create_storages_app
 from .v1.registries import create_app as create_registries_app
+from .v1.storages import create_app as create_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
