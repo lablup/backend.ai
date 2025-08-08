@@ -406,7 +406,6 @@ class Scheduler:
         :param scaling_group: The scaling group name
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
-        :raises NoResourceRequirementsError: If no resource requirements found
         """
         # Convert to new criteria format
         criteria = session_workload.to_agent_selection_criteria()

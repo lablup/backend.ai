@@ -22,8 +22,8 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
     def failed_predicates(self) -> list[SchedulingPredicate]:
@@ -41,7 +41,7 @@ class ConcurrencyLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -56,8 +56,8 @@ class DependenciesNotSatisfied(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.NOT_READY,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
@@ -71,7 +71,7 @@ class KeypairResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KEYPAIR,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -86,7 +86,7 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -101,7 +101,7 @@ class GroupResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -116,7 +116,7 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -131,8 +131,8 @@ class PendingSessionCountLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.CONFLICT,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
@@ -146,23 +146,8 @@ class PendingSessionResourceLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.UNAVAILABLE,
-        )
-
-
-class UserResourcePolicyNotFound(SchedulingValidationError):
-    """Raised when user has no resource policy."""
-
-    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
-    error_title = "User resource policy not found."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
@@ -203,7 +188,7 @@ class MultipleValidationErrors(SchedulingValidationError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.FORBIDDEN,
         )

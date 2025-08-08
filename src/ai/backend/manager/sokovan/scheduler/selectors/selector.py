@@ -269,8 +269,6 @@ class AgentSelector:
 
         Raises:
             NoAvailableAgentError: If no agents are available
-            DesignatedAgentNotFoundError: If designated agent is not found
-            DesignatedAgentIncompatibleError: If designated agent doesn't meet requirements
             NoCompatibleAgentError: If no compatible agents are found
             ValueError: If architecture mismatch in single-node session
         """

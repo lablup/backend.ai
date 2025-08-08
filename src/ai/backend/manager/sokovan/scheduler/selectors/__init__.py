@@ -3,8 +3,6 @@
 # Import exceptions first (they don't have dependencies)
 from .exceptions import (
     AgentSelectionError,
-    DesignatedAgentIncompatibleError,
-    DesignatedAgentNotFoundError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
@@ -25,8 +23,6 @@ from .selector import (
 __all__ = [
     # Exceptions
     "AgentSelectionError",
-    "DesignatedAgentIncompatibleError",
-    "DesignatedAgentNotFoundError",
     "NoAvailableAgentError",
     "NoCompatibleAgentError",
     # Core interfaces

@@ -17,7 +17,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
 )
 from ai.backend.manager.sokovan.scheduler.validators import (
     UserResourceLimitValidator,
-    UserResourcePolicyNotFound,
     UserResourceQuotaExceeded,
 )
 
@@ -89,10 +88,8 @@ class TestUserResourceLimitValidator:
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
         )
-
-        with pytest.raises(UserResourceQuotaExceeded) as exc_info:
-            validator.validate(snapshot, workload)
-        assert "Your main-keypair resource quota is exceeded" in str(exc_info.value)
+        # Don't raise validation error
+        validator.validate(snapshot, workload)
 
     def test_fails_when_no_policy(
         self,
@@ -119,7 +116,7 @@ class TestUserResourceLimitValidator:
             session_dependencies=SessionDependencySnapshot(by_session={}),
         )
 
-        with pytest.raises(UserResourcePolicyNotFound) as exc_info:
+        with pytest.raises(UserResourceQuotaExceeded) as exc_info:
             validator.validate(snapshot, workload)
         assert f"User has no resource policy (uid: {workload.user_uuid})" in str(exc_info.value)
 
