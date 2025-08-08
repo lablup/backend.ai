@@ -58,7 +58,7 @@ You may serve it for local inspection using `python -m http.server --directory _
 
 ```console
 $ make gettext
-```
+```  
  
 ### Build po (Portable Object) files using sphinx-intl 
 
