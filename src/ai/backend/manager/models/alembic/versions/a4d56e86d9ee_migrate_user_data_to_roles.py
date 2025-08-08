@@ -127,6 +127,17 @@ class ScopePermissionRow(Base):
     )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
 
 
+class ObjectPermissionRow(Base):
+    __tablename__ = "object_permissions"
+    __table_args__ = {"extend_existing": True}
+
+    id: uuid.UUID = IDColumn()
+    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
+    entity_type: str = sa.Column("entity_type", sa.String(32), nullable=False)
+    entity_id: str = sa.Column("entity_id", sa.String(64), nullable=False)
+    operation: str = sa.Column("operation", sa.String(32), nullable=False)
+
+
 class AssociationScopesEntitiesRow(Base):
     __tablename__ = "association_scopes_entities"
     __table_args__ = {"extend_existing": True}
@@ -164,6 +175,9 @@ def _insert_from_create_input_group(
     _insert_if_data_exists(db_conn, UserRoleRow, input_group.to_user_role_insert_data())
     _insert_if_data_exists(
         db_conn, ScopePermissionRow, input_group.to_scope_permission_insert_data()
+    )
+    _insert_if_data_exists(
+        db_conn, ObjectPermissionRow, input_group.to_object_permission_insert_data()
     )
     _insert_if_data_exists(
         db_conn,
