@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
+from dateutil.tz import tzutc
+
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -255,11 +257,32 @@ class SessionAllocation:
 
 
 @dataclass
+class SchedulingFailure:
+    """Information about a scheduling failure for status updates.
+
+    Maintains compatibility with frontend scheduler JSON structure:
+    {
+        failed_predicates: Array<{name: string, msg?: string}>,
+        passed_predicates: Array<{name: string}>,
+        retries: number,
+        last_try: string,
+        msg?: string
+    }
+    """
+
+    session_id: SessionId
+    failed_predicates: list[dict[str, str]] = field(default_factory=list)
+    last_try: Optional[datetime] = field(default_factory=lambda: datetime.now(tzutc()))
+    msg: Optional[str] = None
+
+
+@dataclass
 class AllocationBatch:
-    """Batch of session allocations with pre-collected agent IDs for efficient processing."""
+    """Batch of session allocations and failures with pre-collected agent IDs for efficient processing."""
 
     allocations: list[SessionAllocation]
     agent_ids: set[AgentId]
+    failures: list[SchedulingFailure] = field(default_factory=list)
 
 
 @dataclass

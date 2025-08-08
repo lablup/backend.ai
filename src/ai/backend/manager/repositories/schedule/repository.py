@@ -93,6 +93,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ResourcePolicySnapshot,
     ScalingGroupInfo,
     SchedulingConfig,
+    SchedulingFailure,
     SessionDependencyInfo,
     SessionDependencySnapshot,
     SessionWorkload,
@@ -516,6 +517,66 @@ class ScheduleRepository:
                 )
             )
             await session.execute(session_query)
+
+    async def _update_session_failure_status(
+        self,
+        db_session: SASession,
+        failure: SchedulingFailure,
+    ) -> None:
+        """
+        Update session status for a scheduling failure.
+        This is an internal method called within an existing transaction.
+        Increments retries count from existing status_data.
+        """
+        # Get existing session to retrieve current retries count
+        query = sa.select(SessionRow).where(SessionRow.id == failure.session_id)
+        result = await db_session.execute(query)
+        session_row = result.scalar_one_or_none()
+
+        if not session_row:
+            log.warning("Session {} not found for failure status update", failure.session_id)
+            return
+
+        # Get current retries count from existing status_data
+        current_status_data = session_row.status_data or {}
+        scheduler_data = current_status_data.get("scheduler", {})
+        current_retries = scheduler_data.get("retries", 0)
+
+        # Prepare status data with incremented retries
+        status_data = {
+            "failed_predicates": failure.failed_predicates,
+            "retries": current_retries + 1,
+            "last_try": failure.last_try.isoformat() if failure.last_try else None,
+            "msg": failure.msg,
+        }
+
+        # Update kernel status data
+        kernel_query = (
+            sa.update(KernelRow)
+            .where(KernelRow.session_id == failure.session_id)
+            .values(
+                status_data=sql_json_merge(
+                    KernelRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
+            )
+        )
+        await db_session.execute(kernel_query)
+
+        # Update session status data
+        session_query = (
+            sa.update(SessionRow)
+            .where(SessionRow.id == failure.session_id)
+            .values(
+                status_data=sql_json_merge(
+                    SessionRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
+            )
+        )
+        await db_session.execute(session_query)
 
     @repository_decorator()
     async def get_agent_available_slots(
@@ -1101,16 +1162,17 @@ class ScheduleRepository:
     @repository_decorator()
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
         """
-        Allocate resources for multiple sessions.
-        Uses a single database session for all allocations.
+        Allocate resources for multiple sessions and update status for failures.
+        Uses a single database session for all allocations and failure updates.
         Pre-fetches all agent, session, and kernel data for efficient processing.
         If a session allocation fails, the error is logged but processing continues.
         Note: Failed allocations remain uncommitted while successful ones are committed.
         """
         async with self._db.begin_session() as db_session:
-            # Pre-fetch all necessary data
+            # Pre-fetch all necessary data for allocations
             row_maps = await self._create_prefetched_row_maps(db_session, allocation_batch)
 
+            # Process successful allocations
             for allocation in allocation_batch.allocations:
                 try:
                     await self._allocate_single_session(db_session, row_maps, allocation)
@@ -1122,6 +1184,10 @@ class ScheduleRepository:
                         exc_info=True,
                     )
                     # Continue with next session allocation
+
+            # Process scheduling failures in the same transaction
+            for failure in allocation_batch.failures:
+                await self._update_session_failure_status(db_session, failure)
 
     async def _prefetch_agent_rows(
         self, db_session: SASession, agent_ids: set[AgentId]
@@ -1418,10 +1484,21 @@ class ScheduleRepository:
             db_session, session_row_map, allocation.session_id
         )
 
+        # Clear any previous scheduler failure status
+        cleared_status_data = session_row.status_data or {}
+        if "scheduler" in cleared_status_data:
+            # Clear scheduler-related failure data while preserving other status data
+            cleared_status_data["scheduler"] = {
+                "failed_predicates": [],
+                "passed_predicates": [],
+                "retries": 0,
+                "last_try": now.isoformat(),
+            }
+
         session_row.set_status(
             SessionStatus.SCHEDULED,
             status_info="scheduled",
-            status_data={},
+            status_data=cleared_status_data,
             status_changed_at=now,
         )
         session_row.scaling_group_name = allocation.scaling_group

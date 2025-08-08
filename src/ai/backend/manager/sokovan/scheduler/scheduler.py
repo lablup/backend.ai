@@ -30,6 +30,7 @@ from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AgentAllocation,
     KernelAllocation,
+    SchedulingFailure,
     SessionAllocation,
     SessionWorkload,
     SystemSnapshot,
@@ -208,6 +209,7 @@ class Scheduler:
 
         mutable_agents = context.agents
         session_allocations: list[SessionAllocation] = []
+        scheduling_failures: list[SchedulingFailure] = []
         agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
         for session_workload in sequenced_workloads:
             try:
@@ -222,20 +224,33 @@ class Scheduler:
                 session_allocations.append(session_allocation)
             except Exception as e:
                 log.debug(
-                    "Validation failed for workload {}: {}",
+                    "Scheduling failed for workload {}: {}",
                     session_workload.session_id,
                     e,
                 )
+                # Collect failure information for status update
+                # Parse the exception to determine if it's a validation or allocation failure
+                failed_predicate = {
+                    "name": type(e).__name__,
+                    "msg": str(e),
+                }
+                failure = SchedulingFailure(
+                    session_id=session_workload.session_id,
+                    failed_predicates=[failed_predicate],
+                    msg=str(e),
+                )
+                scheduling_failures.append(failure)
                 continue
-        # Allocate resources for each validated workload
-        if session_allocations:
+        # Allocate resources for validated workloads and update status for failures
+        if session_allocations or scheduling_failures:
             log.info(
-                "Allocating resources for {} session allocations in scaling group {}",
+                "Processing {} allocations and {} failures in scaling group {}",
                 len(session_allocations),
+                len(scheduling_failures),
                 scaling_group,
             )
             with self._phase_metrics.measure_phase(scaling_group, "allocation"):
-                await self._allocator.allocate(session_allocations)
+                await self._allocator.allocate(session_allocations, scheduling_failures)
 
         return len(session_allocations)
 

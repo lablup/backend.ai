@@ -159,3 +159,29 @@ class UserResourcePolicyNotFound(SchedulingValidationError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class MultipleValidationErrors(SchedulingValidationError):
+    """Raised when multiple validation errors occur."""
+
+    error_type = "https://api.backend.ai/probs/multiple-validation-errors"
+    error_title = "Multiple validation errors occurred."
+
+    def __init__(self, errors: list[SchedulingValidationError]) -> None:
+        """
+        Initialize with a list of validation errors.
+
+        Args:
+            errors: List of validation errors that occurred
+        """
+        self.errors = errors
+        messages = [f"{type(e).__name__}: {str(e)}" for e in errors]
+        super().__init__(f"Multiple validation errors: {'; '.join(messages)}")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

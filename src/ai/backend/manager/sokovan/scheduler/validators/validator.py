@@ -3,6 +3,8 @@ from collections.abc import Iterable
 
 from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
 
+from .exceptions import MultipleValidationErrors, SchedulingValidationError
+
 
 class ValidatorRule(ABC):
     """
@@ -38,13 +40,26 @@ class SchedulingValidator:
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         """
         Validate a session workload against all configured rules.
+        Collects all validation errors and raises them together.
 
         Args:
             snapshot: The current system state snapshot
             workload: The session workload to validate
 
         Raises:
-            SchedulingValidationError: If any rule fails
+            SchedulingValidationError: If exactly one rule fails
+            MultipleValidationErrors: If multiple rules fail
         """
+        errors: list[SchedulingValidationError] = []
+
         for rule in self._rules:
-            rule.validate(snapshot, workload)
+            try:
+                rule.validate(snapshot, workload)
+            except SchedulingValidationError as e:
+                errors.append(e)
+
+        if errors:
+            if len(errors) == 1:
+                raise errors[0]
+            else:
+                raise MultipleValidationErrors(errors)
