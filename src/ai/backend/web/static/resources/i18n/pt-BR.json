@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Não é possível excluir a pasta montada em uma ou mais sessões. Por favor, termine a sessão primeiro.",
       "CannotDeletePipelineFolder": "Você não pode excluir pastas de pipeline.",
       "CannotRestorePipelineFolder": "Você não pode restaurar pastas de pipeline.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "As pastas de projeto modelo só podem ser criadas em projetos exclusivos da loja de modelos. \nAltere o projeto atual ou o tipo de usuário.",
       "CloneAFolder": "Clonar uma pasta",
       "CloneFolder": "Clonar pasta",
       "Cloneable": "Clonável",
@@ -398,6 +399,7 @@
       "Path": "Caminho de armazenamento",
       "Permission": "Permissão",
       "ProjectFolderAlertDesc": "Esta pasta é compartilhada com todos os membros do projeto",
+      "ProjectFolderCreationHelp": "Uma pasta acessível por \"{{projectName}}\" \"os usuários do projeto serão criados.",
       "Rename": "Renomear",
       "Restore": "Restaurar",
       "RestoreDescription": "Deseja restaurar a pasta \"{{ folderName }}\"?",
@@ -634,8 +636,10 @@
     "Title": "Ocorreu um erro."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Pasta não encontrada ou acesso negado",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Pastas não gerenciadas não suportam o File Explorer.",
+    "NoPermissions": "Sem permissões para acessar esta pasta",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "Abra o aplicativo para o público",
     "OpenToPublicDesc": "A ativação desta opção permite o acesso do aplicativo para todos os usuários da rede.<br /><br /> \nPara gerenciamento de acesso, insira endereços IP específicos no campo 'IP permitido'.<br /><br /> \nDeixar este campo vazio permitirá o acesso de todos os endereços IP.<br /><br /> \nConsidere definir restrições de IP quando necessário para o gerenciamento de segurança.",
     "Others": "Outras",
+    "PanelSettings": "Configurações do painel",
     "PredicateChecks": "Verificações predicadas",
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -1971,6 +1976,7 @@
       "MyResources": "Meus recursos",
       "MyResourcesDescription": "<p> Este painel mostra o uso total de recursos e permanecendo em todos os projetos e grupos de recursos.",
       "MyResourcesIn": "Meus recursos em",
+      "MyResourcesInResourceGroup": "Meus recursos em grupo de recursos",
       "MyResourcesInResourceGroupDescription": "Este painel mostra o uso atual de recursos e a capacidade disponível no grupo de recursos selecionados.",
       "NewPassword": "Nova Senha",
       "NewPasswordAgain": "Nova senha (novamente)",
@@ -2001,6 +2007,7 @@
       "Tasks": "Tarefas",
       "TermsOfService": "Termos de serviço",
       "TotalResourcesIn": "Recursos totais em",
+      "TotalResourcesInResourceGroup": "Recursos totais no grupo de recursos",
       "TotalResourcesInResourceGroupDescription": "Este painel mostra o total de recursos usados ​​e restantes. \nOs valores são calculados adicionando o uso e as quantidades restantes de todos os agentes usando o grupo de recursos selecionados.",
       "TotpActivated": "2FA ativado",
       "Update": "Atualizar",

@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Impossible de supprimer le dossier monté dans une ou plusieurs sessions. Veuillez d'abord terminer la session.",
       "CannotDeletePipelineFolder": "Vous ne pouvez pas supprimer les dossiers du pipeline.",
       "CannotRestorePipelineFolder": "Vous ne pouvez pas restaurer les dossiers du pipeline.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Les dossiers de projets modèles ne peuvent être créés que dans des projets exclusifs en magasin de modèles. \nModifiez le projet ou le type d'utilisateur actuel.",
       "CloneAFolder": "Cloner un dossier",
       "CloneFolder": "Cloner un dossier",
       "Cloneable": "Clonable",
@@ -398,6 +399,7 @@
       "Path": "Chemin de stockage",
       "Permission": "Autorisation",
       "ProjectFolderAlertDesc": "Ce dossier est partagé avec tous les membres du projet",
+      "ProjectFolderCreationHelp": "Un dossier accessible par \"{{projectName}}\" Les utilisateurs du projet seront créés.",
       "Rename": "Renommer",
       "Restore": "Restaurer",
       "RestoreDescription": "Voulez-vous restaurer le dossier \"{{ folderName }}\"?",
@@ -634,8 +636,10 @@
     "Title": "Une erreur s'est produite."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Dossier non trouvé ou accès refusé",
     "InputTooShort": "Entrée Trop Courte",
     "NoExplorerSupportForUnmanagedFolder": "Les dossiers non gérés ne prennent pas en charge l'explorateur de fichiers.",
+    "NoPermissions": "Aucune autorisation pour accéder à ce dossier",
     "ValueRequired": "ValeurRequis"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "Ouvrir l'application au public",
     "OpenToPublicDesc": "L'activation de cette option permet un accès à l'application pour tous les utilisateurs du réseau.<br /><br /> \nPour la gestion de l'accès, entrez des adresses IP spécifiques dans le champ «IP autorisé».<br /><br /> \nLaisser ce champ vide permettra l'accès à partir de toutes les adresses IP.<br /><br /> \nEnvisagez de définir les restrictions IP lorsque cela est nécessaire pour la gestion de la sécurité.",
     "Others": "Autres",
+    "PanelSettings": "Paramètres du panneau",
     "PredicateChecks": "Contrôles de prédicat",
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -1971,6 +1976,7 @@
       "MyResources": "Mes ressources",
       "MyResourcesDescription": "<p> Ce panneau montre votre utilisation totale des ressources et restez dans tous les projets et groupes de ressources. </p> <p> Lorsqu'il existe plusieurs limites (telles que le domaine, le projet ou la clé), la limite la plus restrictive est appliquée pour montrer votre utilisation et votre capacité restante. </p>",
       "MyResourcesIn": "Mes ressources dans",
+      "MyResourcesInResourceGroup": "Mes ressources dans le groupe de ressources",
       "MyResourcesInResourceGroupDescription": "Ce panneau montre votre utilisation actuelle des ressources et restant dans le groupe de ressources sélectionné.",
       "NewPassword": "Nouveau mot de passe",
       "NewPasswordAgain": "Retapez le nouveau mot de passe",
@@ -2001,6 +2007,7 @@
       "Tasks": "Tâches",
       "TermsOfService": "Conditions d'utilisation",
       "TotalResourcesIn": "Ressources totales dans",
+      "TotalResourcesInResourceGroup": "Ressources totales dans le groupe de ressources",
       "TotalResourcesInResourceGroupDescription": "Ce panneau montre le total des ressources utilisées et restantes. \nLes valeurs sont calculées en additionnant l'utilisation et les quantités restantes de tous les agents à l'aide du groupe de ressources sélectionné.",
       "TotpActivated": "2FA activé",
       "Update": "Mettre à jour",

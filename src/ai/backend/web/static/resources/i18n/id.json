@@ -339,6 +339,7 @@
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
       "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
       "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif. \nUbah proyek atau jenis pengguna saat ini.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
@@ -397,6 +398,7 @@
       "Path": "Jalur penyimpanan",
       "Permission": "Izin",
       "ProjectFolderAlertDesc": "Folder ini dibagikan dengan semua anggota proyek",
+      "ProjectFolderCreationHelp": "Folder yang dapat diakses oleh \"{{projectName}}\" pengguna proyek akan dibuat.",
       "Rename": "Ganti nama",
       "Restore": "Memulihkan",
       "RestoreDescription": "Apakah Anda ingin mengembalikan \"{{ folderName }}\"?",
@@ -633,8 +635,10 @@
     "Title": "Telah terjadi kesalahan."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder tidak ditemukan atau akses ditolak",
     "InputTooShort": "MasukanTerlaluPendek",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikelola tidak mendukung file explorer.",
+    "NoPermissions": "Tidak ada izin untuk mengakses folder ini",
     "ValueRequired": "NilaiDiperlukan"
   },
   "general": {
@@ -1275,6 +1279,7 @@
     "OpenToPublic": "Buka aplikasi untuk publik",
     "OpenToPublicDesc": "Mengaktifkan opsi ini memungkinkan akses aplikasi untuk semua pengguna dalam jaringan.<br /><br /> \nUntuk manajemen akses, masukkan alamat IP tertentu di bidang 'IP yang diizinkan'.<br /><br /> \nMembiarkan bidang ini kosong akan memungkinkan akses dari semua alamat IP.<br /><br /> \nPertimbangkan untuk menetapkan pembatasan IP bila diperlukan untuk manajemen keamanan.",
     "Others": "Lainnya",
+    "PanelSettings": "Pengaturan Panel",
     "PredicateChecks": "Pemeriksaan Predikat",
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -1970,6 +1975,7 @@
       "MyResources": "Sumber daya saya",
       "MyResourcesDescription": "<p> Panel ini menunjukkan penggunaan total sumber daya Anda dan tetap di semua proyek dan grup sumber daya. </p> <p> Ketika ada beberapa batasan (seperti domain, proyek, atau keypair), batas yang paling membatasi diterapkan untuk menunjukkan penggunaan dan sisa kapasitas Anda. </p>",
       "MyResourcesIn": "Sumber daya saya di",
+      "MyResourcesInResourceGroup": "Sumber Daya Saya dalam Grup Sumber Daya",
       "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber daya Anda saat ini dan tersisa di grup sumber daya yang dipilih.",
       "NewPassword": "Kata sandi baru",
       "NewPasswordAgain": "Kata sandi (konfirmasi)",
@@ -2000,6 +2006,7 @@
       "Tasks": "Tugas",
       "TermsOfService": "Persyaratan Layanan",
       "TotalResourcesIn": "Total sumber daya di",
+      "TotalResourcesInResourceGroup": "Total Sumber Daya dalam Grup Sumber Daya",
       "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan total sumber daya yang digunakan dan sisa. \nNilai dihitung dengan menambahkan penggunaan dan jumlah yang tersisa dari semua agen menggunakan grup sumber daya yang dipilih.",
       "TotpActivated": "2FA Diaktifkan",
       "Update": "Perbarui",

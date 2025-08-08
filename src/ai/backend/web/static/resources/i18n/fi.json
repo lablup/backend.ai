@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
       "CannotDeletePipelineFolder": "Et voi poistaa putkilinjan kansioita.",
       "CannotRestorePipelineFolder": "Putkilinjan kansiot eivät voi palauttaa.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Malliprojektin kansiot voidaan luoda vain Model Store - Exclusive -projekteihin. \nVaihda nykyinen projekti tai käyttäjätyyppi.",
       "CloneAFolder": "Kloonaa kansio",
       "CloneFolder": "Kloonattu kansio",
       "Cloneable": "Kloonattavissa",
@@ -398,6 +399,7 @@
       "Path": "Säilytyspolku",
       "Permission": "Lupa",
       "ProjectFolderAlertDesc": "Tämä kansio on jaettu kaikkien projektin jäsenten kanssa",
+      "ProjectFolderCreationHelp": "Projektin käyttäjät luodaan kansioon, johon pääsee \"{{projectName}}\".",
       "Rename": "Nimeä uudelleen",
       "Restore": "Palauttaa",
       "RestoreDescription": "Haluatko palauttaa \"{{ folderName }}\" -kansio?",
@@ -634,8 +636,10 @@
     "Title": "On tapahtunut virhe."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Kansiota ei löydy tai pääsy kielletty",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Hallitsemattomat kansiot eivät tue tiedostotutkijaa.",
+    "NoPermissions": "Ei oikeuksia käyttää tätä kansiota",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -1276,6 +1280,7 @@
     "OpenToPublic": "Sovelluksen avaaminen yleisölle",
     "OpenToPublicDesc": "Tämän vaihtoehdon käyttöönotto mahdollistaa kaikille verkon käyttäjille sovellusten pääsyn.<br /><br /> \nSyötä pääsyn hallinta tietyt IP -osoitteet 'sallittu IP' -kenttään.<br /><br /> \nTämän kentän jättäminen tyhjiksi sallii pääsyn kaikista IP -osoitteista.<br /><br /> \nHarkitse IP -rajoitusten asettamista tarvittaessa turvallisuuden hallintaan.",
     "Others": "Muut",
+    "PanelSettings": "Paneelin asetukset",
     "PredicateChecks": "Predikaatin tarkistukset",
     "Preparing": "Valmistautuminen...",
     "PreparingSession": "Istunnon valmistelu...",
@@ -1970,6 +1975,7 @@
       "MyResources": "Resurssini",
       "MyResourcesDescription": "<p> Tämä paneeli näyttää resurssien kokonaiskäytön ja jäljellä kaikissa projekteissa ja resurssiryhmissä. </p> <p> Kun rajoja on useita (kuten verkkotunnus, projekti tai näppäimistö), rajoittavinta rajaa sovelletaan käytön ja jäljellä olevan kapasiteetin osoittamiseen. </p>",
       "MyResourcesIn": "Resurssini",
+      "MyResourcesInResourceGroup": "Resurssini resurssiryhmässä",
       "MyResourcesInResourceGroupDescription": "Tämä paneeli näyttää nykyisen resurssien käytön ja jäljellä valitussa resurssiryhmässä.",
       "NewPassword": "Uusi salasana",
       "NewPasswordAgain": "Uusi salasana (taas)",
@@ -2001,6 +2007,7 @@
       "Tasks": "Tehtävät",
       "TermsOfService": "Käyttöehdot",
       "TotalResourcesIn": "Resurssien kokonaismäärä",
+      "TotalResourcesInResourceGroup": "Resurssien kokonaismäärä resurssiryhmässä",
       "TotalResourcesInResourceGroupDescription": "Tämä paneeli näyttää käytetyt ja jäljellä olevat resurssit. \nArvot lasketaan lisäämällä kaikkien aineiden käyttö ja jäljellä olevat määrät valitun resurssiryhmän avulla.",
       "TotpActivated": "2FA käytössä",
       "Update": "Päivitys",

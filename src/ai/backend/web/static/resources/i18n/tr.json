@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Bir veya daha fazla oturuma bağlı klasör silinemez. Lütfen önce oturumu sonlandırın.",
       "CannotDeletePipelineFolder": "Boru hattı klasörlerini silemezsiniz.",
       "CannotRestorePipelineFolder": "Boru hattı klasörlerini geri yükleyemezsiniz.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir. \nGeçerli projeyi veya kullanıcı türünü değiştirin.",
       "CloneAFolder": "Klasörü klonla",
       "CloneFolder": "Klasör klonlama",
       "Cloneable": "klonlanabilir",
@@ -398,6 +399,7 @@
       "Path": "Depolama yolu",
       "Permission": "izin",
       "ProjectFolderAlertDesc": "Bu klasör projenin tüm üyeleriyle paylaşılıyor",
+      "ProjectFolderCreationHelp": "\"{{projectName}}\" proje kullanıcıları tarafından erişilebilen bir klasör oluşturulacaktır.",
       "Rename": "Adını değiştirmek",
       "Restore": "Eski haline getirmek",
       "RestoreDescription": "\"{{ folderName }}\" klasörünü geri yüklemek istiyor musunuz?",
@@ -634,8 +636,10 @@
     "Title": "Bir hata oluştu."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Klasör bulunamadı veya erişim reddedildi",
     "InputTooShort": "GirişÇok Kısa",
     "NoExplorerSupportForUnmanagedFolder": "Yönetilmeyen klasörler Dosya Gezgini'ni desteklemez.",
+    "NoPermissions": "Bu klasöre erişmek için izin yok",
     "ValueRequired": "DeğerGerekli"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "Uygulamayı herkese açık olarak aç",
     "OpenToPublicDesc": "Bu seçeneğin etkinleştirilmesi, ağ içindeki tüm kullanıcılar için uygulama erişimine izin verir.<br /><br /> \nErişim yönetimi için 'izin verilen IP' alanına belirli IP adreslerini girin.<br /><br /> \nBu alanı boş bırakmak tüm IP adreslerinden erişime izin verecektir.<br /><br /> \nGüvenlik yönetimi için gerektiğinde IP kısıtlamaları ayarlamayı düşünün.",
     "Others": "Diğerleri",
+    "PanelSettings": "Panel Ayarları",
     "PredicateChecks": "Yumurlamalı Çekler",
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -1971,6 +1976,7 @@
       "MyResources": "Kaynaklarım",
       "MyResourcesDescription": "<p> Bu panel, toplam kaynak kullanımınızı ve tüm projelerde ve kaynak gruplarında kaldığınızı gösterir.",
       "MyResourcesIn": "Kaynaklarım",
+      "MyResourcesInResourceGroup": "Kaynak Grubundaki Kaynaklarım",
       "MyResourcesInResourceGroupDescription": "Bu panel, mevcut kaynak kullanımınızı ve seçilen kaynak grubunda mevcut kapasitenizi gösterir.",
       "NewPassword": "Yeni Şifre",
       "NewPasswordAgain": "Yeni Şifre Tekrar)",
@@ -2001,6 +2007,7 @@
       "Tasks": "Görevler",
       "TermsOfService": "Kullanım Şartları",
       "TotalResourcesIn": "Toplam Kaynaklar",
+      "TotalResourcesInResourceGroup": "Kaynak Grubundaki Toplam Kaynaklar",
       "TotalResourcesInResourceGroupDescription": "Bu panel, kullanılan ve kalan toplam kaynakları gösterir. \nDeğerler, seçilen kaynak grubunu kullanan tüm ajanların kullanımını ve kalan miktarlarını ekleyerek hesaplanır.",
       "TotpActivated": "2FA Etkin",
       "Update": "Güncelleme",

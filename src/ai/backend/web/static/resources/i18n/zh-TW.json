@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "無法刪除安裝在一個或多個會話中的文件夾。請先終止會話。",
       "CannotDeletePipelineFolder": "您無法刪除管道文件夾。",
       "CannotRestorePipelineFolder": "您無法還原管道文件夾。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "模型項目文件夾只能在模型商店的獨家項目中創建。更改當前項目或用戶類型。",
       "CloneAFolder": "克隆文件夾",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
@@ -398,6 +399,7 @@
       "Path": "存儲路徑",
       "Permission": "允許",
       "ProjectFolderAlertDesc": "該文件夾與項目的所有成員共享",
+      "ProjectFolderCreationHelp": "將創建一個可以通過“{{projectName}}”項目用戶訪問的文件夾。",
       "Rename": "改名",
       "RenameAFolder": "重命名文件夾",
       "Restore": "恢復",
@@ -634,6 +636,7 @@
     "Title": "发生错误。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "未找到或拒絕訪問的文件夾",
     "InputTooShort": "輸入太短",
     "NoExplorerSupportForUnmanagedFolder": "未管理的文件夾不支持文件資源管理器。",
     "ValueRequired": "需要值"
@@ -1276,6 +1279,7 @@
     "OpenToPublic": "向公眾開放應用",
     "OpenToPublicDesc": "啟用此選項允許網絡中的所有用戶訪問應用程序。<br /><br />\n對於訪問管理，請在“允許IP”字段中輸入特定的IP地址。<br /><br />\n將此字段留為空，將允許從所有IP地址訪問。<br /><br />\n考慮安全管理時，請考慮設置IP限制。",
     "Others": "其他",
+    "PanelSettings": "面板設置",
     "PredicateChecks": "謂詞檢查",
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -1970,6 +1974,7 @@
       "MyResources": "我的資源",
       "MyResourcesDescription": "<p>此面板顯示了您的總資源使用情況，並保留在所有項目和資源組中。 </p> <p>當有多個限制（例如域，項目或按鍵）時，最限制的限制將用於顯示您的用法和剩餘能力。 </p> </p>",
       "MyResourcesIn": "我的資源",
+      "MyResourcesInResourceGroup": "我在資源組中的資源",
       "MyResourcesInResourceGroupDescription": "該面板顯示了您當前的資源使用情況和所選資源組中的可用容量。",
       "NewPassword": "新密碼",
       "NewPasswordAgain": "確認新密碼）",
@@ -2000,6 +2005,7 @@
       "Tasks": "任务",
       "TermsOfService": "服務條款",
       "TotalResourcesIn": "總資源中",
+      "TotalResourcesInResourceGroup": "資源組的總資源",
       "TotalResourcesInResourceGroupDescription": "該面板顯示了使用的總和剩餘資源。這些值是通過使用所選資源組添加所有代理的使用量和剩餘數量來計算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",

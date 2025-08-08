@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Không thể xóa thư mục được gắn trong một hoặc nhiều phiên. Vui lòng kết thúc phiên trước.",
       "CannotDeletePipelineFolder": "Bạn không thể xóa các thư mục đường ống.",
       "CannotRestorePipelineFolder": "Bạn không thể khôi phục các thư mục đường ống.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ. \nThay đổi dự án hiện tại hoặc loại người dùng.",
       "CloneAFolder": "Sao chép một thư mục",
       "CloneFolder": "Sao chép thư mục",
       "Cloneable": "Có thể nhân bản",
@@ -398,6 +399,7 @@
       "Path": "Đường dẫn lưu trữ",
       "Permission": "Sự cho phép",
       "ProjectFolderAlertDesc": "Thư mục này được chia sẻ với tất cả các thành viên của dự án",
+      "ProjectFolderCreationHelp": "Một thư mục có thể truy cập bằng \"{{projectName}}\" Người dùng dự án sẽ được tạo.",
       "Rename": "Đổi tên",
       "Restore": "Khôi phục",
       "RestoreDescription": "Bạn có muốn khôi phục thư mục \"{{ folderName }}\" không?",
@@ -634,8 +636,10 @@
     "Title": "Một lỗi đã xảy ra."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Thư mục không tìm thấy hoặc truy cập bị từ chối",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Các thư mục không được quản lý không hỗ trợ trình thám hiểm tệp.",
+    "NoPermissions": "Không có quyền truy cập thư mục này",
     "ValueRequired": "Giá trị bắt buộc"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "Mở ứng dụng công khai",
     "OpenToPublicDesc": "Kích hoạt tùy chọn này cho phép truy cập ứng dụng cho tất cả người dùng trong mạng.<br /><br /> \nĐể quản lý truy cập, hãy nhập các địa chỉ IP cụ thể trong trường 'IP được phép'.<br /><br /> \nĐể lại trường này trống sẽ cho phép truy cập từ tất cả các địa chỉ IP.<br /><br /> \nXem xét thiết lập các hạn chế IP khi cần thiết để quản lý bảo mật.",
     "Others": "Khác",
+    "PanelSettings": "Cài đặt bảng điều khiển",
     "PredicateChecks": "Kiểm tra vị ngữ",
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -1971,6 +1976,7 @@
       "MyResources": "Tài nguyên của tôi",
       "MyResourcesDescription": "<p> Bảng điều khiển này hiển thị tổng số sử dụng tài nguyên của bạn và còn lại trên tất cả các dự án và nhóm tài nguyên.",
       "MyResourcesIn": "Tài nguyên của tôi trong",
+      "MyResourcesInResourceGroup": "Tài nguyên của tôi trong nhóm tài nguyên",
       "MyResourcesInResourceGroupDescription": "Bảng điều khiển này hiển thị việc sử dụng tài nguyên hiện tại của bạn và công suất có sẵn trong nhóm tài nguyên đã chọn.",
       "NewPassword": "Mật khẩu mới",
       "NewPasswordAgain": "Mật khẩu mới (một lần nữa)",
@@ -2001,6 +2007,7 @@
       "Tasks": "Nhiệm vụ",
       "TermsOfService": "Điều khoản dịch vụ",
       "TotalResourcesIn": "Tổng tài nguyên trong",
+      "TotalResourcesInResourceGroup": "Tổng tài nguyên trong nhóm tài nguyên",
       "TotalResourcesInResourceGroupDescription": "Bảng điều khiển này cho thấy tổng tài nguyên được sử dụng và còn lại. \nCác giá trị được tính bằng cách thêm sử dụng và số lượng còn lại của tất cả các tác nhân bằng nhóm tài nguyên đã chọn.",
       "TotpActivated": "Đã bật 2FA",
       "Update": "Cập nhật",

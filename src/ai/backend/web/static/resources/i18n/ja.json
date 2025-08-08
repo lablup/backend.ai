@@ -339,6 +339,7 @@
       "CannotDeleteFolder": "1つ以上のセッションでマウントされたフォルダを削除できません。最初にセッションを終了してください。",
       "CannotDeletePipelineFolder": "パイプラインフォルダーを削除することはできません。",
       "CannotRestorePipelineFolder": "パイプラインフォルダーを復元することはできません。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "モデルプロジェクトフォルダーは、モデルストアと独占プロジェクトでのみ作成できます。\n現在のプロジェクトまたはユーザータイプを変更します。",
       "CloneAFolder": "フォルダのクローンを作成する",
       "CloneFolder": "フォルダクローン",
       "Cloneable": "クローン可能",
@@ -397,6 +398,7 @@
       "Path": "ストレージパス",
       "Permission": "許可",
       "ProjectFolderAlertDesc": "このフォルダはプロジェクトのすべてのメンバーと共有されます",
+      "ProjectFolderCreationHelp": "「{{projectName}}」プロジェクトユーザーが作成できるフォルダーが作成されます。",
       "Rename": "名前を変更",
       "Restore": "復元する",
       "RestoreDescription": "\"{{ folderName }}\"フォルダーを復元しますか？",
@@ -633,8 +635,10 @@
     "Title": "エラーが発生しました。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "フォルダーが見つかりませんまたはアクセスが拒否されません",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "管理されていないフォルダーは、ファイルエクスプローラーをサポートしていません。",
+    "NoPermissions": "このフォルダーにアクセスする権限はありません",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -1276,6 +1280,7 @@
     "OpenToPublic": "アプリを公開する",
     "OpenToPublicDesc": "このオプションを有効にすることで、ネットワーク内のすべてのユーザーにアプリケーションにアクセスできます。<br /><br />\nアクセス管理の場合、「許可されたIP」フィールドに特定のIPアドレスを入力します。<br /><br />\nこのフィールドを空にすると、すべてのIPアドレスからのアクセスが可能になります。<br /><br />\nセキュリティ管理に必要な場合は、IP制限を設定することを検討してください。",
     "Others": "その他",
+    "PanelSettings": "パネル設定",
     "PredicateChecks": "述語チェック",
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -1970,6 +1975,7 @@
       "MyResources": "私のリソース",
       "MyResourcesDescription": "<p>このパネルは、リソースの合計使用量とすべてのプロジェクトとリソースグループに残っていることを示しています。</p> <p>複数の制限（ドメイン、プロジェクト、キーペアなど）がある場合、使用容量と残りの容量を示すために最も制限的な制限が適用されます。</p>",
       "MyResourcesIn": "私のリソース",
+      "MyResourcesInResourceGroup": "リソースグループの私のリソース",
       "MyResourcesInResourceGroupDescription": "このパネルは、現在のリソースの使用と選択したリソースグループに残ることを示しています。",
       "NewPassword": "新しいパスワード",
       "NewPasswordAgain": "新しいパスワードを再入力）",
@@ -2000,6 +2006,7 @@
       "Tasks": "作業",
       "TermsOfService": "利用規約",
       "TotalResourcesIn": "総リソース",
+      "TotalResourcesInResourceGroup": "リソースグループの総リソース",
       "TotalResourcesInResourceGroupDescription": "このパネルは、使用されている合計と残りのリソースを示しています。\n値は、選択したリソースグループを使用して、すべてのエージェントの使用量と残りの量を追加することによって計算されます。",
       "TotpActivated": "二要素認証の使用",
       "Update": "更新",

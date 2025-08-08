@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "No se puede eliminar la carpeta montada en una o más sesiones. Por favor, termine la sesión primero.",
       "CannotDeletePipelineFolder": "No puede eliminar las carpetas de tuberías.",
       "CannotRestorePipelineFolder": "No puedes restaurar las carpetas de tuberías.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Las carpetas de proyectos modelo solo se pueden crear en proyectos exclusivos de Model Store. \nCambie el proyecto o tipo de usuario actual.",
       "CloneAFolder": "Clonar una carpeta",
       "CloneFolder": "Clonar carpeta",
       "Cloneable": "Clonable",
@@ -398,6 +399,7 @@
       "Path": "Ruta de almacenamiento",
       "Permission": "Permiso",
       "ProjectFolderAlertDesc": "Esta carpeta se comparte con todos los miembros del proyecto.",
+      "ProjectFolderCreationHelp": "Se creará una carpeta accesible por los usuarios del proyecto \"{{projectName}}\".",
       "Rename": "Cambie el nombre de",
       "Restore": "Restaurar",
       "RestoreDescription": "¿Quieres restaurar la carpeta \"{{ folderName }}\"?",
@@ -634,8 +636,10 @@
     "Title": "Se ha producido un error."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Carpeta no encontrada ni de acceso denegada",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Las carpetas no administradas no admiten el explorador de archivos.",
+    "NoPermissions": "No hay permisos para acceder a esta carpeta",
     "ValueRequired": "ValorRequerido"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "Aplicación abierta al público",
     "OpenToPublicDesc": "Habilitar esta opción permite el acceso a la aplicación para todos los usuarios dentro de la red.<br /><br /> \nPara la gestión de acceso, ingrese direcciones IP específicas en el campo 'IP permitido'.<br /><br /> \nDejar este campo vacío permitirá el acceso desde todas las direcciones IP.<br /><br /> \nConsidere establecer restricciones IP cuando sea necesario para la gestión de seguridad.",
     "Others": "Otros",
+    "PanelSettings": "Configuración del panel",
     "PredicateChecks": "Controles de predicado",
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sesión...",
@@ -1971,6 +1976,7 @@
       "MyResources": "Mis recursos",
       "MyResourcesDescription": "<p> Este panel muestra su uso total de recursos y restantes en todos los proyectos y grupos de recursos. </p> <p> Cuando hay múltiples límites (como dominio, proyecto o keypair), el límite más restrictivo se aplica para mostrar su uso y capacidad restante. </p>",
       "MyResourcesIn": "Mis recursos en",
+      "MyResourcesInResourceGroup": "Mis recursos en el grupo de recursos",
       "MyResourcesInResourceGroupDescription": "Este panel muestra su uso actual de recursos y permanece en el grupo de recursos seleccionado.",
       "NewPassword": "Nueva contraseña",
       "NewPasswordAgain": "Nueva contraseña (otra vez)",
@@ -2001,6 +2007,7 @@
       "Tasks": "Tareas",
       "TermsOfService": "Condiciones de uso",
       "TotalResourcesIn": "Recursos totales en",
+      "TotalResourcesInResourceGroup": "Recursos totales en el grupo de recursos",
       "TotalResourcesInResourceGroupDescription": "Este panel muestra el total de recursos utilizados y restantes. \nLos valores se calculan agregando el uso y las cantidades restantes de todos los agentes utilizando el grupo de recursos seleccionado.",
       "TotpActivated": "2FA Activado",
       "Update": "Actualización",

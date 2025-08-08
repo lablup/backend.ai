@@ -339,6 +339,7 @@
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang dalam satu atau lebih sesi. Tamatkan sesi terlebih dahulu.",
       "CannotDeletePipelineFolder": "Anda tidak boleh memadam folder saluran paip.",
       "CannotRestorePipelineFolder": "Anda tidak boleh memulihkan folder saluran paip.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder projek model hanya boleh dibuat dalam projek eksklusif kedai model. \nTukar projek semasa atau jenis pengguna.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Klon folder",
       "Cloneable": "Boleh diklon",
@@ -397,6 +398,7 @@
       "Path": "Laluan penyimpanan",
       "Permission": "Kebenaran",
       "ProjectFolderAlertDesc": "Folder ini dikongsi dengan semua ahli projek",
+      "ProjectFolderCreationHelp": "Folder yang boleh diakses oleh pengguna projek \"{{projectName}}\" akan dibuat.",
       "Rename": "Namakan semula",
       "Restore": "Pulihkan",
       "RestoreDescription": "Adakah anda mahu memulihkan folder \"{{ folderName }}\"?",
@@ -633,8 +635,10 @@
     "Title": "Ralat telah berlaku."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder tidak dijumpai atau akses ditolak",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikendalikan tidak menyokong penjelajah fail.",
+    "NoPermissions": "Tiada kebenaran untuk mengakses folder ini",
     "ValueRequired": "Nilai Diperlukan"
   },
   "general": {
@@ -1276,6 +1280,7 @@
     "OpenToPublic": "Buka aplikasi untuk umum",
     "OpenToPublicDesc": "Membolehkan pilihan ini membolehkan akses aplikasi untuk semua pengguna dalam rangkaian.<br /><br /> \nUntuk pengurusan akses, masukkan alamat IP tertentu dalam medan 'IP yang dibenarkan'.<br /><br /> \nMeninggalkan medan ini kosong akan membenarkan akses dari semua alamat IP.<br /><br /> \nPertimbangkan menetapkan sekatan IP apabila perlu untuk pengurusan keselamatan.",
     "Others": "Yang lain",
+    "PanelSettings": "Tetapan panel",
     "PredicateChecks": "Pemeriksaan predikat",
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -1968,6 +1973,7 @@
       "MyResources": "Sumber saya",
       "MyResourcesDescription": "<p> Panel ini menunjukkan jumlah penggunaan sumber anda dan tinggal di semua projek dan kumpulan sumber. </P> <p> Apabila terdapat banyak had (seperti domain, projek, atau keypair), had yang paling ketat digunakan untuk menunjukkan penggunaan dan kapasiti yang tinggal. </P>",
       "MyResourcesIn": "Sumber saya di",
+      "MyResourcesInResourceGroup": "Sumber saya dalam kumpulan sumber",
       "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber semasa anda dan kapasiti yang tersedia dalam kumpulan sumber yang dipilih.",
       "NewPassword": "Kata laluan baharu",
       "NewPasswordAgain": "Kata laluan baru (sekali lagi)",
@@ -1998,6 +2004,7 @@
       "Tasks": "Tugasan",
       "TermsOfService": "Syarat Perkhidmatan",
       "TotalResourcesIn": "Jumlah sumber dalam",
+      "TotalResourcesInResourceGroup": "Jumlah sumber dalam kumpulan sumber",
       "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan jumlah sumber yang digunakan dan baki. \nNilai dikira dengan menambah penggunaan dan baki jumlah semua ejen menggunakan kumpulan sumber yang dipilih.",
       "TotpActivated": "2FA Didayakan",
       "Update": "Kemas kini",

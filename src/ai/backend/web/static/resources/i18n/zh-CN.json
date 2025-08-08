@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "无法删除安装在一个或多个会话中的文件夹。请先终止会话。",
       "CannotDeletePipelineFolder": "您无法删除管道文件夹。",
       "CannotRestorePipelineFolder": "您无法还原管道文件夹。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "模型项目文件夹只能在模型商店的独家项目中创建。\n更改当前项目或用户类型。",
       "CloneAFolder": "克隆文件夹",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
@@ -398,6 +399,7 @@
       "Path": "存储路径",
       "Permission": "允许",
       "ProjectFolderAlertDesc": "该文件夹与项目的所有成员共享",
+      "ProjectFolderCreationHelp": "将创建一个可以通过“{{projectName}}”项目用户访问的文件夹。",
       "Rename": "改名",
       "Restore": "恢复",
       "RestoreDescription": "您要还原“{{ folderName }}”文件夹？",
@@ -634,8 +636,10 @@
     "Title": "发生错误。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "未找到或拒绝访问的文件夹",
     "InputTooShort": "输入太短",
     "NoExplorerSupportForUnmanagedFolder": "未管理的文件夹不支持文件资源管理器。",
+    "NoPermissions": "无权访问此文件夹",
     "ValueRequired": "需要值"
   },
   "general": {
@@ -1277,6 +1281,7 @@
     "OpenToPublic": "向公众开放应用",
     "OpenToPublicDesc": "启用此选项允许网络中的所有用户访问应用程序。<br /><br />\n对于访问管理，请在“允许IP”字段中输入特定的IP地址。<br /><br />\n将此字段留为空，将允许从所有IP地址访问。<br /><br />\n考虑安全管理时，请考虑设置IP限制。",
     "Others": "其他",
+    "PanelSettings": "面板设置",
     "PredicateChecks": "谓词检查",
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -1971,6 +1976,7 @@
       "MyResources": "我的资源",
       "MyResourcesDescription": "<p>此面板显示了您的总资源使用情况，并保留在所有项目和资源组中。</p> <p>当有多个限制（例如域，项目或按键）时，最限制的限制将用于显示您的用法和剩余能力。</p> </p>",
       "MyResourcesIn": "我的资源",
+      "MyResourcesInResourceGroup": "我在资源组中的资源",
       "MyResourcesInResourceGroupDescription": "该面板显示了您当前的资源使用情况和所选资源组中的可用容量。",
       "NewPassword": "新密码",
       "NewPasswordAgain": "确认新密码）",
@@ -2001,6 +2007,7 @@
       "Tasks": "任务",
       "TermsOfService": "服务条款",
       "TotalResourcesIn": "总资源中",
+      "TotalResourcesInResourceGroup": "资源组的总资源",
       "TotalResourcesInResourceGroupDescription": "该面板显示了使用的总和剩余资源。\n这些值是通过使用所选资源组添加所有代理的使用量和剩余数量来计算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",

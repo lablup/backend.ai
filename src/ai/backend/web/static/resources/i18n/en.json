@@ -342,6 +342,7 @@
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
       "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
       "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model project folders can only be created in model store–exclusive projects. Change the current project or user type.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
@@ -400,6 +401,7 @@
       "Path": "Path",
       "Permission": "Permission",
       "ProjectFolderAlertDesc": "This folder is shared with all members of the project",
+      "ProjectFolderCreationHelp": "A folder accessible by \"{{projectName}}\" project users will be created.",
       "Rename": "Rename",
       "Restore": "Restore",
       "RestoreDescription": "Do you want to restore \"{{ folderName }}\" folder?",
@@ -638,8 +640,10 @@
     "Title": "An error has occurred."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder not found or access denied",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Unmanaged folders do not support the file explorer.",
+    "NoPermissions": "No permissions to access this folder",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -1282,6 +1286,7 @@
     "OpenToPublic": "Open app to public",
     "OpenToPublicDesc": "Enabling this option allows application access for all users within the network.<br /><br />   For access management, enter specific IP addresses in the 'Allowed IP' field. <br /><br />  Leaving this field empty will permit access from all IP addresses.<br /> <br /> Consider setting IP restrictions when necessary for security management.",
     "Others": "Others",
+    "PanelSettings": "Panel Settings",
     "PredicateChecks": "Predicate Checks",
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -1979,6 +1984,7 @@
       "MyResources": "My Resources",
       "MyResourcesDescription": "<p>This panel shows your total resource usage and remaining across all projects and resource groups.</p><p>When there are multiple limits (such as domain, project, or keypair), the most restrictive limit is applied to show your usage and remaining capacity.</p>\n",
       "MyResourcesIn": "My Resources in",
+      "MyResourcesInResourceGroup": "My Resources in Resource Group",
       "MyResourcesInResourceGroupDescription": "This panel shows your current resource usage and available capacity in the selected resource group.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
@@ -2008,6 +2014,7 @@
       "Tasks": "Tasks",
       "TermsOfService": "Terms of Service",
       "TotalResourcesIn": "Total Resources in",
+      "TotalResourcesInResourceGroup": "Total Resources in Resource Group",
       "TotalResourcesInResourceGroupDescription": "This panel shows the total used and remaining resources. The values are calculated by adding up the usage and remaining amounts of all agents using the selected resource group.",
       "TotpActivated": "2FA Enabled",
       "Update": "Update",

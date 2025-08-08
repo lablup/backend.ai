@@ -340,6 +340,7 @@
       "CannotDeleteFolder": "Nie można usunąć folderu zamontowanego w co najmniej jednej sesji. Najpierw zakończ sesję.",
       "CannotDeletePipelineFolder": "Nie możesz usunąć folderów rurociągów.",
       "CannotRestorePipelineFolder": "Nie możesz przywrócić folderów rurociągów.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Modelowe foldery projektu można tworzyć tylko w projektach ekskluzywnych w magazynie modeli. \nZmień bieżący projekt lub typ użytkownika.",
       "CloneAFolder": "Sklonuj folder",
       "CloneFolder": "Klonowanie folderu",
       "Cloneable": "Możliwość klonowania",
@@ -398,6 +399,7 @@
       "Path": "Ścieżka przechowywania",
       "Permission": "Pozwolenie",
       "ProjectFolderAlertDesc": "Ten folder jest udostępniany wszystkim członkom projektu",
+      "ProjectFolderCreationHelp": "Folder dostępny przez użytkowników projektu „{{projectName}}”.",
       "Rename": "Przemianować",
       "Restore": "Przywrócić",
       "RestoreDescription": "Czy chcesz przywrócić folder \"{{ folderName }}\"?",
@@ -634,6 +636,7 @@
     "Title": "Wystąpił błąd."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder nie został znaleziony ani nie ma dostępu",
     "InputTooShort": "Wejście zbyt krótkie",
     "NoExplorerSupportForUnmanagedFolder": "Foldery niezarządzane nie obsługują eksploratora plików.",
     "ValueRequired": "Wymagana wartość"
@@ -1277,6 +1280,7 @@
     "OpenToPublic": "Otwórz aplikację publicznie",
     "OpenToPublicDesc": "Włączenie tej opcji umożliwia dostęp do aplikacji dla wszystkich użytkowników w sieci.<br /><br /> \nW celu zarządzania dostępem wprowadź określone adresy IP w polu „dozwolone IP”.<br /><br /> \nOpuszczenie tego pola pustego pozwoli na dostęp ze wszystkich adresów IP.<br /><br /> \nW razie potrzeby rozważ ustawienie ograniczeń IP do zarządzania bezpieczeństwem.",
     "Others": "Inne",
+    "PanelSettings": "Ustawienia panelowe",
     "PredicateChecks": "Kontrole predykatu",
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -1971,6 +1975,7 @@
       "MyResources": "Moje zasoby",
       "MyResourcesDescription": "<p> Ten panel pokazuje całkowite wykorzystanie zasobów i pozostałe we wszystkich projektach i grupach zasobów. </p> <p> Gdy istnieje wiele limitów (takich jak domena, projekt lub klawiatura), najbardziej restrykcyjny limit jest stosowany, aby pokazać twoje użycie i pozostałą pojemność. </p>",
       "MyResourcesIn": "Moje zasoby",
+      "MyResourcesInResourceGroup": "Moje zasoby w grupie zasobów",
       "MyResourcesInResourceGroupDescription": "Ten panel pokazuje bieżące wykorzystanie zasobów i dostępną pojemność w wybranej grupie zasobów.",
       "NewPassword": "Nowe hasło",
       "NewPasswordAgain": "Powtórz nowe hasło)",
@@ -2001,6 +2006,7 @@
       "Tasks": "Zadania",
       "TermsOfService": "Warunki usługi",
       "TotalResourcesIn": "Całkowite zasoby w",
+      "TotalResourcesInResourceGroup": "Całkowite zasoby w grupie zasobów",
       "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowite wykorzystane i pozostałe zasoby. \nWartości są obliczane przez dodanie użycia i pozostałych ilości wszystkich agentów za pomocą wybranej grupy zasobów.",
       "TotpActivated": "Włączone 2FA",
       "Update": "Aktualizacja",
