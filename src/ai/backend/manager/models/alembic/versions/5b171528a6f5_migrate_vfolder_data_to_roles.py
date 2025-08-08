@@ -7,9 +7,7 @@ Create Date: 2025-08-07 23:53:34.718192
 """
 
 import enum
-import uuid
-from collections.abc import Collection
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
@@ -20,11 +18,13 @@ from sqlalchemy.orm import registry
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
-from ai.backend.manager.models.rbac_models.migrate.types import (
+from ai.backend.manager.models.rbac_models.migration.models import RoleRow
+from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInputGroup,
     is_admin_role,
 )
-from ai.backend.manager.models.rbac_models.migrate.vfolder import (
+from ai.backend.manager.models.rbac_models.migration.utils import insert_from_create_input_group
+from ai.backend.manager.models.rbac_models.migration.vfolder import (
     ProjectVFolderData,
     UserVFolderData,
     VFolderPermissionData,
@@ -137,87 +137,6 @@ class UserRow(Base):
     role: UserRole = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
 
 
-class UserRoleRow(Base):
-    __tablename__ = "user_roles"
-    __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = IDColumn()
-    user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-
-
-class RoleRow(Base):
-    __tablename__ = "roles"
-    __table_args__ = {"extend_existing": True}
-    id = IDColumn()
-    name = sa.Column("name", sa.String(64), nullable=False)
-    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-
-
-class ScopePermissionRow(Base):
-    __tablename__ = "scope_permissions"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
-    operation: str = sa.Column(
-        "operation", sa.String(32), nullable=False
-    )  # e.g., "create", "read", "delete", "grant:create", "grant:read" etc.
-    scope_type: str = sa.Column(
-        "scope_type", sa.String(32), nullable=False
-    )  # e.g., "global", "domain", "project", "user" etc.
-    scope_id: str = sa.Column(
-        "scope_id", sa.String(64), nullable=False
-    )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-
-
-class AssociationScopesEntitiesRow(Base):
-    __tablename__ = "association_scopes_entities"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    scope_type: str = sa.Column(
-        "scope_type",
-        sa.String(32),
-        nullable=False,
-    )  # e.g., "global", "domain", "project", "user" etc.
-    scope_id: str = sa.Column(
-        "scope_id",
-        sa.String(64),
-        nullable=False,
-    )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
-    entity_id: str = sa.Column(
-        "entity_id",
-        sa.String(64),
-        nullable=False,
-    )
-
-
-def _insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
-    if data:
-        db_conn.execute(sa.insert(row_type), data)
-
-
-def _insert_from_create_input_group(
-    db_conn: Connection, input_group: PermissionCreateInputGroup
-) -> None:
-    _insert_if_data_exists(db_conn, RoleRow, input_group.to_role_insert_data())
-    _insert_if_data_exists(db_conn, UserRoleRow, input_group.to_user_role_insert_data())
-    _insert_if_data_exists(
-        db_conn, ScopePermissionRow, input_group.to_scope_permission_insert_data()
-    )
-    _insert_if_data_exists(
-        db_conn,
-        AssociationScopesEntitiesRow,
-        input_group.to_association_scopes_entities_insert_data(),
-    )
-
-
 def _query_user_vfolder_row_with_user_role(
     db_conn: Connection, offset: int, page_size: int
 ) -> list[Row]:
@@ -255,7 +174,7 @@ def _migrate_user_vfolder_rows(db_conn: Connection) -> None:
             data = UserVFolderData(row.id, row.user)
             input_data = map_user_vfolder_to_user_role(row.role_id, data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def _query_project_vfolder_with_project_role(
@@ -307,7 +226,7 @@ def _migrate_project_vfolder_rows(db_conn: Connection) -> None:
             else:
                 input_data = map_project_vfolder_to_project_user_role(row.role_id, data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def _query_vfolder_permission_with_user_role(
@@ -352,7 +271,7 @@ def _migrate_vfolder_permission_rows(db_conn: Connection) -> None:
             data = VFolderPermissionData(row.vfolder, row.user, row.permission)
             input_data = map_vfolder_permission_data_to_user_role(row.role_id, data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def upgrade() -> None:
