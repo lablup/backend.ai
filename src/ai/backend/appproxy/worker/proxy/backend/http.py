@@ -11,6 +11,7 @@ from typing import Any, AsyncIterator, Final, override
 import aiohttp
 import aiotools
 from aiohttp import ClientConnectorError, web
+from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
@@ -114,7 +115,7 @@ class HTTPBackend(BaseBackend):
             domain=str(route.route_id),
         )
         client_session = self.client_pool.load_client_session(client_key)
-        log.debug("connecting to {}{}", client_session._base_url, request.rel_url)
+        log.debug("connecting to {}", URL(client_key.endpoint) / request.rel_url.path)
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             log.debug("connected")
             yield ws
