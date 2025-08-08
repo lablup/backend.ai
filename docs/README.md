@@ -61,7 +61,7 @@ $ make gettext
 ```  
  
 ### Build po (Portable Object) files using sphinx-intl 
-
+  
 ```console
 $ sphinx-intl update -p _build/locale/ -l ko
 ```
