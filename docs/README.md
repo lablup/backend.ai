@@ -54,7 +54,7 @@ You may serve it for local inspection using `python -m http.server --directory _
 
 ## Translation
 
-### Generate/update pot (Portable Object Template) files
+### Generate/update pot (Portable Object Template) file  s
 
 ```console
 $ make gettext
