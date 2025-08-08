@@ -217,7 +217,7 @@ class Scheduler:
             passed_phases: list[SchedulingPredicate] = []
             failed_phases: list[SchedulingPredicate] = []
             passed_phases.append(
-                SchedulingPredicate(name=sequencer.name(), msg=sequencer.success_message())
+                SchedulingPredicate(name=sequencer.name, msg=sequencer.success_message())
             )
 
             try:

@@ -11,6 +11,7 @@ class FIFOSequencer(WorkloadSequencer):
     This sequencer will sequence the oldest workloads first.
     """
 
+    @property
     @override
     def name(self) -> str:
         """

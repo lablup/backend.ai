@@ -89,7 +89,7 @@ class TestDRFSequencer:
 
     @pytest.mark.asyncio
     async def test_name(self, sequencer: DRFSequencer) -> None:
-        assert sequencer.name == "DRF-scheduling-sequencer"
+        assert sequencer.name == "DRFSequencer"
 
     @pytest.mark.asyncio
     async def test_empty_workload(

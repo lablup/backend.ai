@@ -15,6 +15,7 @@ class DRFSequencer(WorkloadSequencer):
     This sequencer will sequence workloads based on their resource usage and fairness.
     """
 
+    @property
     @override
     def name(self) -> str:
         """

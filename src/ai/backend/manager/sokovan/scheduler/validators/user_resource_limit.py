@@ -49,4 +49,6 @@ class UserResourceLimitValidator(ValidatorRule):
                     f"{k}={v}" for k, v in policy.total_resource_slots.items() if v
                 )
                 exceeded_msg = f"limit: {limit_str}, current: {user_occupied}, requested: {workload.requested_slots}"
-            raise UserResourceQuotaExceeded(exceeded_msg)
+            raise UserResourceQuotaExceeded(
+                f"Your main-keypair resource quota is exceeded. ({exceeded_msg})"
+            )

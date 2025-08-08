@@ -5,6 +5,7 @@ from ..types import SessionWorkload, SystemSnapshot
 
 
 class WorkloadSequencer(ABC):
+    @property
     @abstractmethod
     def name(self) -> str:
         """

@@ -42,4 +42,6 @@ class DomainResourceLimitValidator(ValidatorRule):
                 exceeded_msg = f"limit: {limit_str}, current: {domain_occupied}, requested: {workload.requested_slots}"
             else:
                 exceeded_msg = f"No resource limits defined. current: {domain_occupied}, requested: {workload.requested_slots}"
-            raise DomainResourceQuotaExceeded(exceeded_msg)
+            raise DomainResourceQuotaExceeded(
+                f"Your domain resource quota is exceeded. ({exceeded_msg})"
+            )

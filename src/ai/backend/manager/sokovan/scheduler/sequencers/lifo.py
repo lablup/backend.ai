@@ -11,6 +11,7 @@ class LIFOSequencer(WorkloadSequencer):
     This sequencer will sequence the most recently added workloads first.
     """
 
+    @property
     @override
     def name(self) -> str:
         """

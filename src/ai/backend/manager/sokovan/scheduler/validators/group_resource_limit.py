@@ -40,4 +40,6 @@ class GroupResourceLimitValidator(ValidatorRule):
                 exceeded_msg = f"limit: {limit_str}, current: {group_occupied}, requested: {workload.requested_slots}"
             else:
                 exceeded_msg = f"No resource limits defined. current: {group_occupied}, requested: {workload.requested_slots}"
-            raise GroupResourceQuotaExceeded(exceeded_msg)
+            raise GroupResourceQuotaExceeded(
+                f"Your group resource quota is exceeded. ({exceeded_msg})"
+            )

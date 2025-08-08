@@ -51,7 +51,7 @@ class TestFIFOSequencer:
 
     @pytest.mark.asyncio
     async def test_name(self, sequencer: FIFOSequencer) -> None:
-        assert sequencer.name == "FIFO-scheduling-sequencer"
+        assert sequencer.name == "FIFOSequencer"
 
     @pytest.mark.asyncio
     async def test_empty_workload(
