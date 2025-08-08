@@ -48,7 +48,7 @@ Generated OpenAPI file will be located at under `manager/rest-reference/openapi.
 $ make html
 ```
 
-The compiled documentation is under `_build/html/index.html`.
+The compiled documentation is under `_build/html/index.html`.  
 You may serve it for local inspection using `python -m http.server --directory _build/html`.
 
 
