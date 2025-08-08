@@ -3549,7 +3549,7 @@ class AgentRegistry:
         """
         agent_client = self._get_agent_client(agent)
         return await agent_client.push_image(
-            str(image_ref),
+            image_ref,
             {**registry, "url": str(registry["url"])},
         )
 
