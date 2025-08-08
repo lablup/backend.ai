@@ -44,7 +44,7 @@ Generated OpenAPI file will be located at under `manager/rest-reference/openapi.
 
 ### Make the html version            
 
-```console
+```console  
 $ make html
 ```
 
