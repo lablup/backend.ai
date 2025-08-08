@@ -25,11 +25,11 @@ class RoleCreateInput:
 
 @dataclass
 class RoleUpdateInput(PartialModifier):
+    id: uuid.UUID
     name: OptionalState[str]
     source: OptionalState[RoleSource]
     status: OptionalState[RoleStatus]
     description: TriState[str]
-    id: Optional[uuid.UUID] = None
 
     @override
     def fields_to_update(self) -> dict[str, Any]:

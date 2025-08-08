@@ -12,11 +12,13 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.rbac_models.migrate.vfolder import (
     ProjectVFolderData,
     UserVFolderData,
+    VFolderPermission,
     VFolderPermissionData,
     map_project_vfolder_to_project_admin_role,
     map_project_vfolder_to_project_user_role,
     map_user_vfolder_to_user_role,
     map_vfolder_permission_data_to_user_role,
+    vfolder_mount_permission_to_operation,
 )
 
 
@@ -44,6 +46,7 @@ def vfolder_permission_data():
     return VFolderPermissionData(
         vfolder_id=uuid.uuid4(),
         user_id=uuid.uuid4(),
+        mount_permission=VFolderPermission.READ_ONLY,
     )
 
 
@@ -51,6 +54,48 @@ def vfolder_permission_data():
 def role_id():
     """Create a role ID for testing."""
     return uuid.uuid4()
+
+
+class TestVFolderMountPermissionToOperation:
+    """Test vfolder_mount_permission_to_operation mapping."""
+
+    def test_read_only_permission(self):
+        """Test READ_ONLY permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_ONLY]
+        assert operations == [OperationType.READ]
+
+    def test_read_write_permission(self):
+        """Test READ_WRITE permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_WRITE]
+        assert operations == [OperationType.READ, OperationType.UPDATE]
+
+    def test_rw_delete_permission(self):
+        """Test RW_DELETE permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
+        assert operations == [
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        ]
+
+    def test_owner_perm_permission(self):
+        """Test OWNER_PERM permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.OWNER_PERM]
+        assert operations == [
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        ]
+        # OWNER_PERM should be same as RW_DELETE
+        assert operations == vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
+
+    def test_all_permissions_are_mapped(self):
+        """Test that all VFolderPermission enum values are mapped."""
+        for perm in VFolderPermission:
+            assert perm in vfolder_mount_permission_to_operation
+            assert len(vfolder_mount_permission_to_operation[perm]) > 0
 
 
 class TestMapUserVFolderToUserRole:
@@ -98,10 +143,10 @@ class TestMapUserVFolderToUserRole:
             results.append(result)
 
         # Each result should have the same scope but different object
-        for i, result in enumerate(results):
+        for vfolder_data, result in zip(vfolders, results):
             assert len(result.scope_permissions) == len(OperationType)
             assert result.association_scopes_entities[0].scope_id.scope_id == str(user_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
+            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolder_data.id)
 
 
 class TestMapProjectVFolderToProjectAdminRole:
@@ -148,10 +193,10 @@ class TestMapProjectVFolderToProjectAdminRole:
             results.append(result)
 
         # Each result should have the same scope but different object
-        for i, result in enumerate(results):
+        for vfolder_data, result in zip(vfolders, results):
             assert len(result.scope_permissions) == len(OperationType)
             assert result.association_scopes_entities[0].scope_id.scope_id == str(project_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
+            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolder_data.id)
 
 
 class TestMapProjectVFolderToProjectUserRole:
@@ -200,14 +245,12 @@ class TestMapVFolderPermissionDataToUserRole:
         """Test basic vfolder permission mapping."""
         result = map_vfolder_permission_data_to_user_role(role_id, vfolder_permission_data)
 
-        # Should only have READ permission
-        assert len(result.scope_permissions) == 1
-        perm = result.scope_permissions[0]
+        assert len(result.object_permissions) == 1  # READ_ONLY has only READ operation
+        perm = result.object_permissions[0]
 
         assert perm.role_id == role_id
-        assert perm.scope_type == ScopeType.USER
-        assert perm.scope_id == str(vfolder_permission_data.user_id)
         assert perm.entity_type == EntityType.VFOLDER
+        assert perm.entity_id == str(vfolder_permission_data.vfolder_id)
         assert perm.operation == OperationType.READ
 
         # Check association
@@ -218,31 +261,75 @@ class TestMapVFolderPermissionDataToUserRole:
         assert assoc.object_id.entity_type == EntityType.VFOLDER
         assert assoc.object_id.entity_id == str(vfolder_permission_data.vfolder_id)
 
-    def test_permission_is_read_only(self, role_id, vfolder_permission_data):
-        """Test that vfolder permission mapping only grants READ access."""
-        result = map_vfolder_permission_data_to_user_role(role_id, vfolder_permission_data)
+        # Verify no scope permissions are set
+        assert result.scope_permissions is None or len(result.scope_permissions) == 0
 
-        # Extract all operations
-        operations = [perm.operation for perm in result.scope_permissions]
+    def test_permission_mapping_by_mount_permission(self, role_id):
+        """Test that vfolder permission mapping respects mount permissions."""
+        vfolder_id = uuid.uuid4()
+        user_id = uuid.uuid4()
 
-        # Should only contain READ operation
-        assert operations == [OperationType.READ]
+        # Test READ_ONLY permission
+        ro_perm = VFolderPermissionData(
+            vfolder_id=vfolder_id,
+            user_id=user_id,
+            mount_permission=VFolderPermission.READ_ONLY,
+        )
+        ro_result = map_vfolder_permission_data_to_user_role(role_id, ro_perm)
+        ro_operations = {perm.operation for perm in ro_result.object_permissions}
+        assert ro_operations == {OperationType.READ}
 
-        # Verify other operations are NOT included
-        assert OperationType.CREATE not in operations
-        assert OperationType.UPDATE not in operations
-        assert OperationType.SOFT_DELETE not in operations
-        assert OperationType.HARD_DELETE not in operations
-        assert OperationType.GRANT_ALL not in operations
-        assert OperationType.GRANT_READ not in operations
+        # Test READ_WRITE permission
+        rw_perm = VFolderPermissionData(
+            vfolder_id=vfolder_id,
+            user_id=user_id,
+            mount_permission=VFolderPermission.READ_WRITE,
+        )
+        rw_result = map_vfolder_permission_data_to_user_role(role_id, rw_perm)
+        rw_operations = {perm.operation for perm in rw_result.object_permissions}
+        assert rw_operations == {OperationType.READ, OperationType.UPDATE}
+
+        # Test RW_DELETE permission
+        wd_perm = VFolderPermissionData(
+            vfolder_id=vfolder_id,
+            user_id=user_id,
+            mount_permission=VFolderPermission.RW_DELETE,
+        )
+        wd_result = map_vfolder_permission_data_to_user_role(role_id, wd_perm)
+        wd_operations = {perm.operation for perm in wd_result.object_permissions}
+        assert wd_operations == {
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        }
+
+        # Test OWNER_PERM permission (should be same as RW_DELETE)
+        owner_perm = VFolderPermissionData(
+            vfolder_id=vfolder_id,
+            user_id=user_id,
+            mount_permission=VFolderPermission.OWNER_PERM,
+        )
+        owner_result = map_vfolder_permission_data_to_user_role(role_id, owner_perm)
+        owner_operations = {perm.operation for perm in owner_result.object_permissions}
+        assert owner_operations == wd_operations
 
     def test_multiple_permissions_same_user(self, role_id):
         """Test multiple vfolder permissions for the same user."""
         user_id = uuid.uuid4()
         vfolder_ids = [uuid.uuid4() for _ in range(3)]
+        mount_perms = [
+            VFolderPermission.READ_ONLY,
+            VFolderPermission.READ_WRITE,
+            VFolderPermission.RW_DELETE,
+        ]
         permissions = [
-            VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id)
-            for vfolder_id in vfolder_ids
+            VFolderPermissionData(
+                vfolder_id=vfolder_id,
+                user_id=user_id,
+                mount_permission=mount_perm,
+            )
+            for vfolder_id, mount_perm in zip(vfolder_ids, mount_perms)
         ]
 
         results = []
@@ -250,29 +337,35 @@ class TestMapVFolderPermissionDataToUserRole:
             result = map_vfolder_permission_data_to_user_role(role_id, perm)
             results.append(result)
 
-        # All should have same user scope but different vfolders
-        for i, result in enumerate(results):
-            # Verify scope permissions
-            assert len(result.scope_permissions) == 1
-            scope_perm = result.scope_permissions[0]
-            assert scope_perm.role_id == role_id
-            assert scope_perm.scope_type == ScopeType.USER
-            assert scope_perm.scope_id == str(user_id)
-            assert scope_perm.entity_type == EntityType.VFOLDER
-            assert scope_perm.operation == OperationType.READ
+        # Verify different permission levels
+        for result, perm, vfolder_id in zip(results, permissions, vfolder_ids):
+            # Verify object permissions match mount permission
+            expected_ops = set(vfolder_mount_permission_to_operation[perm.mount_permission])
+            actual_ops = {op.operation for op in result.object_permissions}
+            assert actual_ops == expected_ops
+
+            # Verify all permissions target the correct vfolder
+            for obj_perm in result.object_permissions:
+                assert obj_perm.entity_id == str(vfolder_id)
+                assert obj_perm.role_id == role_id
 
             # Verify associations
             assert len(result.association_scopes_entities) == 1
             assoc = result.association_scopes_entities[0]
             assert assoc.scope_id.scope_id == str(user_id)
-            assert assoc.object_id.entity_id == str(vfolder_ids[i])
+            assert assoc.object_id.entity_id == str(vfolder_id)
 
     def test_multiple_users_same_vfolder(self, role_id):
         """Test multiple users with permission to the same vfolder."""
         vfolder_id = uuid.uuid4()
         user_ids = [uuid.uuid4() for _ in range(3)]
         permissions = [
-            VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id) for user_id in user_ids
+            VFolderPermissionData(
+                vfolder_id=vfolder_id,
+                user_id=user_id,
+                mount_permission=VFolderPermission.READ_WRITE,
+            )
+            for user_id in user_ids
         ]
 
         results = []
@@ -281,20 +374,21 @@ class TestMapVFolderPermissionDataToUserRole:
             results.append(result)
 
         # All should have same vfolder but different user scopes
-        for i, result in enumerate(results):
-            # Verify scope permissions
-            assert len(result.scope_permissions) == 1
-            scope_perm = result.scope_permissions[0]
-            assert scope_perm.role_id == role_id
-            assert scope_perm.scope_type == ScopeType.USER
-            assert scope_perm.scope_id == str(user_ids[i])
-            assert scope_perm.entity_type == EntityType.VFOLDER
-            assert scope_perm.operation == OperationType.READ
+        for user_id, result in zip(user_ids, results):
+            # Verify object permissions
+            assert len(result.object_permissions) == 2  # READ and UPDATE for READ_WRITE
+            for obj_perm in result.object_permissions:
+                assert obj_perm.role_id == role_id
+                assert obj_perm.entity_type == EntityType.VFOLDER
+                assert obj_perm.entity_id == str(vfolder_id)
+
+            operations = {perm.operation for perm in result.object_permissions}
+            assert operations == {OperationType.READ, OperationType.UPDATE}
 
             # Verify associations
             assert len(result.association_scopes_entities) == 1
             assoc = result.association_scopes_entities[0]
-            assert assoc.scope_id.scope_id == str(user_ids[i])
+            assert assoc.scope_id.scope_id == str(user_id)
             assert assoc.object_id.entity_id == str(vfolder_id)
 
     def test_different_roles_same_permission(self):
@@ -302,6 +396,7 @@ class TestMapVFolderPermissionDataToUserRole:
         vfolder_permission = VFolderPermissionData(
             vfolder_id=uuid.uuid4(),
             user_id=uuid.uuid4(),
+            mount_permission=VFolderPermission.RW_DELETE,
         )
 
         role_ids = [uuid.uuid4() for _ in range(3)]
@@ -312,10 +407,17 @@ class TestMapVFolderPermissionDataToUserRole:
             results.append(result)
 
         # All results should have different role IDs but same permission structure
-        for i, result in enumerate(results):
-            assert result.scope_permissions[0].role_id == role_ids[i]
-            assert result.scope_permissions[0].scope_id == str(vfolder_permission.user_id)
-            assert result.scope_permissions[0].operation == OperationType.READ
+        for role_id, result in zip(role_ids, results):
+            # Each permission in the result should have the correct role_id
+            for obj_perm in result.object_permissions:
+                assert obj_perm.role_id == role_id
+                assert obj_perm.entity_id == str(vfolder_permission.vfolder_id)
+
+            # All should have same operations based on mount permission
+            operations = {perm.operation for perm in result.object_permissions}
+            expected_ops = set(vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE])
+            assert operations == expected_ops
+
             assert result.association_scopes_entities[0].object_id.entity_id == str(
                 vfolder_permission.vfolder_id
             )
@@ -334,20 +436,39 @@ class TestComplexScenarios:
         owner_vfolder = UserVFolderData(id=vfolder_id, user_id=owner_id)
         owner_result = map_user_vfolder_to_user_role(role_id, owner_vfolder)
 
-        # Shared user mappings (read-only permissions)
+        # Shared user mappings (with different permission levels)
         shared_results = []
-        for user_id in shared_user_ids:
-            perm = VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id)
+        mount_perms = [
+            VFolderPermission.READ_ONLY,
+            VFolderPermission.READ_WRITE,
+            VFolderPermission.RW_DELETE,
+        ]
+        for user_id, mount_perm in zip(shared_user_ids, mount_perms):
+            perm = VFolderPermissionData(
+                vfolder_id=vfolder_id,
+                user_id=user_id,
+                mount_permission=mount_perm,
+            )
             result = map_vfolder_permission_data_to_user_role(role_id, perm)
             shared_results.append(result)
 
         # Owner should have all operations
         assert len(owner_result.scope_permissions) == len(OperationType)
 
-        # Shared users should only have READ
-        for result in shared_results:
-            assert len(result.scope_permissions) == 1
-            assert result.scope_permissions[0].operation == OperationType.READ
+        # Shared users should have permissions based on mount permission
+        expected_ops_list = [
+            {OperationType.READ},
+            {OperationType.READ, OperationType.UPDATE},
+            {
+                OperationType.READ,
+                OperationType.UPDATE,
+                OperationType.SOFT_DELETE,
+                OperationType.HARD_DELETE,
+            },
+        ]
+        for result, expected_ops in zip(shared_results, expected_ops_list):
+            actual_ops = {perm.operation for perm in result.object_permissions}
+            assert actual_ops == expected_ops
 
         # All should reference the same vfolder
         assert owner_result.association_scopes_entities[0].object_id.entity_id == str(vfolder_id)
@@ -368,40 +489,18 @@ class TestComplexScenarios:
 
         # External user with explicit permission
         external_user_id = uuid.uuid4()
-        perm = VFolderPermissionData(vfolder_id=vfolder_id, user_id=external_user_id)
+        perm = VFolderPermissionData(
+            vfolder_id=vfolder_id,
+            user_id=external_user_id,
+            mount_permission=VFolderPermission.READ_ONLY,
+        )
         external_result = map_vfolder_permission_data_to_user_role(role_id, perm)
 
         # Verify permission hierarchy
         admin_ops = {p.operation for p in admin_result.scope_permissions}
         user_ops = {p.operation for p in user_result.scope_permissions}
-        external_ops = {p.operation for p in external_result.scope_permissions}
+        external_ops = {p.operation for p in external_result.object_permissions}
 
         assert OperationType.READ in admin_ops
         assert OperationType.READ in user_ops
         assert OperationType.READ in external_ops
-
-    def test_data_class_properties(self):
-        """Test data class creation and properties."""
-        # UserVFolderData
-        user_vfolder = UserVFolderData(
-            id=uuid.uuid4(),
-            user_id=uuid.uuid4(),
-        )
-        assert isinstance(user_vfolder.id, uuid.UUID)
-        assert isinstance(user_vfolder.user_id, uuid.UUID)
-
-        # ProjectVFolderData
-        project_vfolder = ProjectVFolderData(
-            id=uuid.uuid4(),
-            project_id=uuid.uuid4(),
-        )
-        assert isinstance(project_vfolder.id, uuid.UUID)
-        assert isinstance(project_vfolder.project_id, uuid.UUID)
-
-        # VFolderPermissionData
-        vfolder_permission = VFolderPermissionData(
-            vfolder_id=uuid.uuid4(),
-            user_id=uuid.uuid4(),
-        )
-        assert isinstance(vfolder_permission.vfolder_id, uuid.UUID)
-        assert isinstance(vfolder_permission.user_id, uuid.UUID)
