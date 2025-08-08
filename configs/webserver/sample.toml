@@ -182,19 +182,35 @@
   max_count_for_preopen_ports = 10
 
 [session.redis]
-    # Redis server address.
-    # Redis database number.
-    db = 0
-    # Redis sentinel addresses.
-    # Redis service name for sentinel.
-    # Redis password.
+    # Network address and port of the Redis server.
+    # Redis is used for distributed caching and messaging between managers.
+    # Set to None when using Sentinel for high availability.
+    # List of Redis Sentinel addresses for high availability.
+    # If provided, the manager will use Redis Sentinel for automatic failover.
+    # When using Sentinel, the addr field is ignored and service_name is required.
+    # Service name for Redis Sentinel.
+    # Required when using Redis Sentinel for high availability.
+    # Identifies which service to monitor for failover.
+    # Password for authenticating with Redis.
+    # Set to None if Redis doesn't require authentication.
+    # Should be kept secret in production environments.
+    # Optional override configurations for specific Redis contexts.
+    # Allows different Redis settings for different services within Backend.AI.
+    # Each key represents a context name, and the value is a complete Redis
+    # configuration.
 
 [session.redis.redis_helper_config]
-      # Socket timeout in seconds.
+      # Timeout in seconds for Redis socket operations.
+      # Controls how long operations wait before timing out.
+      # Increase for slow or congested networks.
       socket_timeout = 5.0
-      # Socket connection timeout in seconds.
+      # Timeout in seconds for establishing Redis connections.
+      # Controls how long connection attempts wait before failing.
+      # Shorter values fail faster but may be too aggressive for some networks.
       socket_connect_timeout = 2.0
-      # Reconnect poll timeout in seconds.
+      # Time in seconds to wait between reconnection attempts.
+      # Controls the polling frequency when trying to reconnect to Redis.
+      # Lower values reconnect faster but may increase network load.
       reconnect_poll_timeout = 0.3
 
 [license]

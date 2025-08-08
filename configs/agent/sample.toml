@@ -12,6 +12,9 @@
 # This field is injected at runtime based on etcd configuration.
 # It is not intended to be set in the configuration file.
 # plugins = ""
+# Redis configuration.
+# This field is injected at runtime based on etcd configuration.
+# It is not intended to be set in the other way.
 
 [agent]
   # Backend type for the agent.
@@ -69,7 +72,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  allow-compute-plugins = [ "cuda", "rocm",]
+  allow-compute-plugins = [ "rocm", "cuda",]
   # Blocked compute plugins
   block-compute-plugins = [ "cpu",]
   # Allowed network plugins
