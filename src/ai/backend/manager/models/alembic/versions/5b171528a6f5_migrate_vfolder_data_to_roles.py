@@ -148,8 +148,8 @@ class UserRoleRow(Base):
 class RoleRow(Base):
     __tablename__ = "roles"
     __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = IDColumn()
-    name: str = sa.Column("name", sa.String(64), nullable=False)
+    id = IDColumn()
+    name = sa.Column("name", sa.String(64), nullable=False)
     description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
 
 
