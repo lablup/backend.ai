@@ -8,20 +8,25 @@ Create Date: 2025-08-06 21:28:29.354670
 
 import enum
 import uuid
-from collections.abc import Collection
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Connection, Row
-from sqlalchemy.orm import foreign, registry, relationship
+from sqlalchemy.orm import registry
 
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
-from ai.backend.manager.models.rbac_models.migrate.types import (
+from ai.backend.manager.models.rbac_models.migration.models import (
+    AssociationScopesEntitiesRow,
+    RoleRow,
+    ScopePermissionRow,
+    UserRoleRow,
+)
+from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInputGroup,
 )
-from ai.backend.manager.models.rbac_models.migrate.user import (
+from ai.backend.manager.models.rbac_models.migration.user import (
     ADMIN_ROLE_NAME_SUFFIX,
     ProjectData,
     ProjectUserAssociationData,
@@ -31,6 +36,7 @@ from ai.backend.manager.models.rbac_models.migrate.user import (
     create_user_self_role_and_permissions,
     map_user_to_project_role,
 )
+from ai.backend.manager.models.rbac_models.migration.utils import insert_from_create_input_group
 
 # revision identifiers, used by Alembic.
 revision = "a4d56e86d9ee"
@@ -60,12 +66,6 @@ class GroupRow(Base):
 
     id: uuid.UUID = IDColumn()
 
-    users = relationship("AssocGroupUserRow")
-    scope_permissions: "list[ScopePermissionRow]" = relationship(
-        "ScopePermissionRow",
-        primaryjoin=lambda: GroupRow.id == sa.cast(foreign(ScopePermissionRow.scope_id), UUID),
-    )
-
 
 class AssocGroupUserRow(Base):
     __tablename__ = "association_groups_users"
@@ -89,101 +89,6 @@ class UserRow(Base):
     username = sa.Column("username", sa.String(length=64), unique=True)
     domain_name = sa.Column("domain_name", sa.String(length=64), index=True)
     role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
-
-
-class UserRoleRow(Base):
-    __tablename__ = "user_roles"
-    __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = IDColumn()
-    user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-
-
-class RoleRow(Base):
-    __tablename__ = "roles"
-    __table_args__ = {"extend_existing": True}
-    id: uuid.UUID = IDColumn()
-    name: str = sa.Column("name", sa.String(64), nullable=False)
-    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-
-
-class ScopePermissionRow(Base):
-    __tablename__ = "scope_permissions"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
-    operation: str = sa.Column(
-        "operation", sa.String(32), nullable=False
-    )  # e.g., "create", "read", "delete", "grant:create", "grant:read" etc.
-    scope_type: str = sa.Column(
-        "scope_type", sa.String(32), nullable=False
-    )  # e.g., "global", "domain", "project", "user" etc.
-    scope_id: str = sa.Column(
-        "scope_id", sa.String(64), nullable=False
-    )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-
-
-class ObjectPermissionRow(Base):
-    __tablename__ = "object_permissions"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: str = sa.Column("entity_type", sa.String(32), nullable=False)
-    entity_id: str = sa.Column("entity_id", sa.String(64), nullable=False)
-    operation: str = sa.Column("operation", sa.String(32), nullable=False)
-
-
-class AssociationScopesEntitiesRow(Base):
-    __tablename__ = "association_scopes_entities"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    scope_type: str = sa.Column(
-        "scope_type",
-        sa.String(32),
-        nullable=False,
-    )  # e.g., "global", "domain", "project", "user" etc.
-    scope_id: str = sa.Column(
-        "scope_id",
-        sa.String(64),
-        nullable=False,
-    )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
-    entity_id: str = sa.Column(
-        "entity_id",
-        sa.String(64),
-        nullable=False,
-    )
-
-
-def _insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
-    if data:
-        db_conn.execute(sa.insert(row_type), data)
-
-
-def _insert_from_create_input_group(
-    db_conn: Connection, input_group: PermissionCreateInputGroup
-) -> None:
-    _insert_if_data_exists(db_conn, RoleRow, input_group.to_role_insert_data())
-    _insert_if_data_exists(db_conn, UserRoleRow, input_group.to_user_role_insert_data())
-    _insert_if_data_exists(
-        db_conn, ScopePermissionRow, input_group.to_scope_permission_insert_data()
-    )
-    _insert_if_data_exists(
-        db_conn, ObjectPermissionRow, input_group.to_object_permission_insert_data()
-    )
-    _insert_if_data_exists(
-        db_conn,
-        AssociationScopesEntitiesRow,
-        input_group.to_association_scopes_entities_insert_data(),
-    )
 
 
 def _query_user_row(db_conn: Connection, offset: int, page_size: int) -> list[Row]:
@@ -218,7 +123,7 @@ def _migrate_user_data(db_conn: Connection) -> None:
             data = UserData.from_row(row)
             input_data = create_user_self_role_and_permissions(data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def _query_project_row(db_conn: Connection, offset: int, page_size: int) -> list[Row]:
@@ -250,7 +155,7 @@ def _migrate_project_data(db_conn: Connection) -> None:
             user_input_data = create_project_user_role_and_permissions(data)
             input_group.merge(admin_input_data)
             input_group.merge(user_input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def _query_admin_user_row_with_project_role(
@@ -303,7 +208,7 @@ def _migrate_admin_user_project_mapping_data(db_conn: Connection) -> None:
             data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
             input_data = map_user_to_project_role(row.role_id, data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def _query_non_admin_user_row_with_project_role(
@@ -355,7 +260,7 @@ def _migrate_user_project_mapping_data(db_conn: Connection) -> None:
             data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
             input_data = map_user_to_project_role(row.role_id, data)
             input_group.merge(input_data)
-        _insert_from_create_input_group(db_conn, input_group)
+        insert_from_create_input_group(db_conn, input_group)
 
 
 def upgrade() -> None:
