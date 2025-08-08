@@ -46,12 +46,13 @@ class AgentStateTracker:
     additional_slots: ResourceSlot = field(default_factory=ResourceSlot)
     additional_containers: int = 0
 
-    def get_current_state(self) -> tuple[ResourceSlot, int]:
-        """Get current state (original + diff)."""
-        return (
-            self.original_agent.occupied_slots + self.additional_slots,
-            self.original_agent.container_count + self.additional_containers,
-        )
+    def get_current_occupied_slots(self) -> ResourceSlot:
+        """Get current occupied slots (original + additional)."""
+        return self.original_agent.occupied_slots + self.additional_slots
+
+    def get_current_container_count(self) -> int:
+        """Get current container count (original + additional)."""
+        return self.original_agent.container_count + self.additional_containers
 
     def apply_diff(self, slots: ResourceSlot, containers: int) -> None:
         """Apply additional resource allocation."""
@@ -369,7 +370,8 @@ class AgentSelector:
             return False
 
         # Get current state with tracked changes
-        occupied_slots, container_count = tracker.get_current_state()
+        occupied_slots = tracker.get_current_occupied_slots()
+        container_count = tracker.get_current_container_count()
 
         # Check resource availability
         available_slots = agent.available_slots - occupied_slots

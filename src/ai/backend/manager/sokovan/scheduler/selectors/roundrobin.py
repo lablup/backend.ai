@@ -24,6 +24,15 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
     selection. Some variance is acceptable.
     """
 
+    def __init__(self, next_index: int = 0) -> None:
+        """
+        Initialize with the next index to use.
+
+        Args:
+            next_index: The index for the next selection
+        """
+        self.next_index = next_index
+
     def name(self) -> str:
         """
         Return the selector name for predicates.
@@ -35,15 +44,6 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         Return a message describing successful agent selection.
         """
         return "Agent selected using round-robin strategy for even workload distribution"
-
-    def __init__(self, next_index: int = 0) -> None:
-        """
-        Initialize with the next index to use.
-
-        Args:
-            next_index: The index for the next selection
-        """
-        self.next_index = next_index
 
     def select_tracker_by_strategy(
         self,
