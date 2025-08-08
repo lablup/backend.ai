@@ -54,7 +54,11 @@ from yarl import URL
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientKey, ClientPool
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientKey,
+    ClientPool,
+    tcp_client_session_factory,
+)
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -291,7 +295,7 @@ class AgentRegistry:
             hook_plugin_ctx,
             self,
         )
-        self._client_pool = ClientPool(ClientConfig())
+        self._client_pool = ClientPool(tcp_client_session_factory)
 
     def _get_agent_client(
         self,

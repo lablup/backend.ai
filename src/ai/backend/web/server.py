@@ -31,7 +31,7 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
+from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.manager.auth.field import (
@@ -674,7 +674,8 @@ async def server_main(
     )
     app["config"] = config
     app["client_pool"] = ClientPool(
-        ClientConfig(
+        partial(
+            tcp_client_session_factory,
             ssl=config.api.ssl_verify,
             limit=config.api.connection_limit,
         )

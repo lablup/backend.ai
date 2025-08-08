@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Protocol
 
 import aiohttp
 
@@ -12,11 +14,28 @@ from ai.backend.logging.utils import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class ClientConfig:
-    ssl: bool = True
-    limit: int = 100
-    limit_per_host: int = 0
+class ClientSessionFactory(Protocol):
+    def __call__(self, key: ClientKey, /) -> aiohttp.ClientSession: ...
+
+
+def tcp_client_session_factory(
+    key: ClientKey,
+    /,
+    ssl: bool = True,
+    limit: int = 100,
+    limit_per_host: int = 0,
+    timeout: Optional[aiohttp.ClientTimeout] = None,
+) -> aiohttp.ClientSession:
+    connector = aiohttp.TCPConnector(
+        ssl=ssl,
+        limit=limit,
+        limit_per_host=limit_per_host,
+    )
+    return aiohttp.ClientSession(
+        connector=connector,
+        base_url=key.endpoint,
+        timeout=timeout,
+    )
 
 
 @dataclass
@@ -28,22 +47,32 @@ class _Client:
 @dataclass(frozen=True)
 class ClientKey:
     endpoint: str
+    """The URL or unique identifier of the target server."""
+
     domain: str
+    """An arbitrary string reprenting the usage scope."""
+
     access_key: Optional[str] = None
+    """An optional identifier to associate with the API request context."""
 
 
 class ClientPool:
-    _config: ClientConfig
     _clients: MutableMapping[ClientKey, _Client]
-    _cleanup_task: asyncio.Task
+    _cleanup_task: asyncio.Task[None]
 
-    def __init__(self, config: ClientConfig, cleanup_interval_seconds: int = 600) -> None:
-        self._config = config
+    def __init__(self, factory: ClientSessionFactory, cleanup_interval_seconds: int = 600) -> None:
+        self._client_session_factory = factory
         self._clients = {}
         self._cleanup_task = asyncio.create_task(self._cleanup_loop(cleanup_interval_seconds))
 
     async def close(self) -> None:
-        self._cleanup_task.cancel()
+        if not (self._cleanup_task.cancelled() or self._cleanup_task.done()):
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                # FIXME: use safer cancel-and-wait approach
+                pass
         for client in self._clients.values():
             await client.session.close()
         self._clients.clear()
@@ -60,20 +89,12 @@ class ClientPool:
                     except Exception as e:
                         log.exception("Error closing client session: {}", e)
 
-    def _make_client_session(self) -> aiohttp.ClientSession:
-        connector = aiohttp.TCPConnector(
-            ssl=self._config.ssl,
-            limit=self._config.limit,
-            limit_per_host=self._config.limit_per_host,
-        )
-        return aiohttp.ClientSession(connector=connector)
-
     def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
         session = self._clients.get(key, None)
         now = time.perf_counter()
         if session is not None:
             session.last_used = now
             return session.session
-        client_session = self._make_client_session()
+        client_session = self._client_session_factory(key)
         self._clients[key] = _Client(session=client_session, last_used=now)
         return client_session

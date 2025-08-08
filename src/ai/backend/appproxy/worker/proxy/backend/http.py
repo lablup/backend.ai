@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import random
 import time
 from contextlib import asynccontextmanager
+from functools import partial
 from typing import Any, AsyncIterator, Final, override
 
 import aiohttp
@@ -12,6 +15,11 @@ from aiohttp import ClientConnectorError, web
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientKey,
+    ClientPool,
+    tcp_client_session_factory,
+)
 
 from .abc import AbstractBackend, HttpRequest
 
@@ -27,49 +35,22 @@ class HTTPBackend(AbstractBackend):
     def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
-        self.client_timeout = aiohttp.ClientTimeout(
+        client_timeout = aiohttp.ClientTimeout(
             total=None,
             connect=10.0,
             sock_connect=10.0,
             sock_read=None,
         )
-        self.client_opts: dict[str, Any] = {
+        client_opts: dict[str, Any] = {
             "auto_decompress": False,
         }
-        self.client_sessions = {
-            route.route_id: aiohttp.ClientSession(
-                base_url=f"http://{route.kernel_host}:{route.kernel_port}",
-                timeout=self.client_timeout,
-                **self.client_opts,
-            )
-            for route in routes
-        }
-        self.route_lock = asyncio.Lock()
+        self.client_pool = ClientPool(
+            partial(tcp_client_session_factory, timeout=client_timeout, **client_opts)
+        )
 
     @override
     async def close(self) -> None:
-        async with self.route_lock, asyncio.TaskGroup() as tg:
-            for session in self.client_sessions.values():
-                tg.create_task(session.close())
-
-    @override
-    async def update_routes(self, routes: list[RouteInfo]) -> None:
-        # Take a diff of new/old routes to create-or-destroy client sessions
-        async with self.route_lock:
-            old_route_ids = {route.route_id for route in self.routes}
-            new_route_ids = {route.route_id for route in routes}
-            await super().update_routes(routes)
-            new_routes_map = {route.route_id: route for route in self.routes}
-            async with asyncio.TaskGroup() as tg:
-                for route_id in old_route_ids - new_route_ids:
-                    tg.create_task(self.client_sessions.pop(route_id).close())
-            for route_id in new_route_ids - old_route_ids:
-                route = new_routes_map[route_id]
-                self.client_sessions[route_id] = aiohttp.ClientSession(
-                    base_url=f"http://{route.kernel_host}:{route.kernel_port}",
-                    timeout=self.client_timeout,
-                    **self.client_opts,
-                )
+        await self.client_pool.close()
 
     @property
     def selected_route(self) -> RouteInfo:
@@ -108,7 +89,11 @@ class HTTPBackend(AbstractBackend):
         metrics.proxy.observe_upstream_http_request(
             remote=remote, total_bytes_size=request.body.total_bytes
         )
-        client_session = self.client_sessions[route.route_id]
+        client_key = ClientKey(
+            endpoint=f"http://{route.kernel_host}:{route.kernel_port}",
+            domain=str(route.route_id),
+        )
+        client_session = self.client_pool.load_client_session(client_key)
         async with client_session.request(
             request.method,
             request.path,
@@ -124,7 +109,11 @@ class HTTPBackend(AbstractBackend):
     async def connect_websocket(
         self, route: RouteInfo, request: web.Request, protocols: list[str] = []
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
-        client_session = self.client_sessions[route.route_id]
+        client_key = ClientKey(
+            endpoint=f"http://{route.kernel_host}:{route.kernel_port}",
+            domain=str(route.route_id),
+        )
+        client_session = self.client_pool.load_client_session(client_key)
         log.debug("connecting to {}{}", client_session._base_url, request.rel_url)
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             log.debug("connected")
