@@ -128,6 +128,48 @@ class TestMapVfolderEntityToScope:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
+class TestVFolderMountPermissionToOperation:
+    """Test vfolder_mount_permission_to_operation mapping."""
+
+    def test_read_only_permission(self):
+        """Test READ_ONLY permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_ONLY]
+        assert operations == [OperationType.READ]
+
+    def test_read_write_permission(self):
+        """Test READ_WRITE permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_WRITE]
+        assert operations == [OperationType.READ, OperationType.UPDATE]
+
+    def test_rw_delete_permission(self):
+        """Test RW_DELETE permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
+        assert operations == [
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        ]
+
+    def test_owner_perm_permission(self):
+        """Test OWNER_PERM permission mapping."""
+        operations = vfolder_mount_permission_to_operation[VFolderPermission.OWNER_PERM]
+        assert operations == [
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        ]
+        # OWNER_PERM should be same as RW_DELETE
+        assert operations == vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
+
+    def test_all_permissions_are_mapped(self):
+        """Test that all VFolderPermission enum values are mapped."""
+        for perm in VFolderPermission:
+            assert perm in vfolder_mount_permission_to_operation
+            assert len(vfolder_mount_permission_to_operation[perm]) > 0
+
+
 class TestMapUserVFolderToUserRole:
     """Test map_user_vfolder_to_user_role function."""
 
@@ -179,10 +221,10 @@ class TestMapUserVFolderToUserRole:
         result = map_vfolder_entity_to_scope(vfolder)
 
         # Each result should have the same scope but different object
-        for i, result in enumerate(results):
+        for vfolder_data, result in zip(vfolders, results):
             assert len(result.scope_permissions) == len(OperationType)
             assert result.association_scopes_entities[0].scope_id.scope_id == str(user_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolders[i].id)
+            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolder_data.id)
 
 
 class TestMapProjectVFolderToProjectAdminRole:
