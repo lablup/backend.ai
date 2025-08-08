@@ -38,8 +38,7 @@ This script must be executed on behalf of the virtual environment managed by pan
 Generated OpenAPI file will be located at under `manager/rest-reference/openapi.json` and `manager/graphql-reference/schema.graphql`.
 
 
-## Building HTML document       
-
+## Building HTML document          
 > [!NOTE]
 > Please ensure that you are inside the `docs` directory and the virtualenv is activated.
 
@@ -61,7 +60,7 @@ You may serve it for local inspection using `python -m http.server --directory _
 $ make gettext
 ```
 
-### Build po (Portable Object) files using sphinx-intl
+### Build po (Portable Object) files using sphinx-intl 
 
 ```console
 $ sphinx-intl update -p _build/locale/ -l ko
