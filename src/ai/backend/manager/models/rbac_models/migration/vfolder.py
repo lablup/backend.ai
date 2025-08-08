@@ -10,6 +10,7 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesCreateInput,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.object_permission import ObjectPermissionCreateInput
 from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
 from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
 from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
@@ -95,6 +96,18 @@ class VFolderData:
     ownership_type: VFolderOwnershipType
     user_id: uuid.UUID | None
     group_id: uuid.UUID | None
+
+
+class VFolderPermission(enum.StrEnum):
+    """
+    Mount permission for vfolder.
+    Refer to `ai.backend.manager.models.vfolder.VFolderPermission`.
+    """
+
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
+    RW_DELETE = "wd"
+    OWNER_PERM = "wd"  # resolved as RW_DELETE
 
 
 @dataclass
