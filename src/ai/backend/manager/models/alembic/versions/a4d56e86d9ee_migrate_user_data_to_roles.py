@@ -19,6 +19,7 @@ from sqlalchemy.orm import registry
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
 from ai.backend.manager.models.rbac_models.migration.models import (
     AssociationScopesEntitiesRow,
+    ObjectPermissionRow,
     RoleRow,
     ScopePermissionRow,
     UserRoleRow,
@@ -275,6 +276,7 @@ def downgrade() -> None:
     conn = op.get_bind()
     # Remove all data from the new RBAC tables
     conn.execute(sa.delete(AssociationScopesEntitiesRow))
+    conn.execute(sa.delete(ObjectPermissionRow))
     conn.execute(sa.delete(ScopePermissionRow))
     conn.execute(sa.delete(UserRoleRow))
     conn.execute(sa.delete(RoleRow))
