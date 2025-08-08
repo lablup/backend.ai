@@ -218,13 +218,31 @@ class TestMapVFolderPermissionDataToUserRole:
         assert assoc.object_id.entity_type == EntityType.VFOLDER
         assert assoc.object_id.entity_id == str(vfolder_permission_data.vfolder_id)
 
+    def test_permission_is_read_only(self, role_id, vfolder_permission_data):
+        """Test that vfolder permission mapping only grants READ access."""
+        result = map_vfolder_permission_data_to_user_role(role_id, vfolder_permission_data)
+
+        # Extract all operations
+        operations = [perm.operation for perm in result.scope_permissions]
+
+        # Should only contain READ operation
+        assert operations == [OperationType.READ]
+
+        # Verify other operations are NOT included
+        assert OperationType.CREATE not in operations
+        assert OperationType.UPDATE not in operations
+        assert OperationType.SOFT_DELETE not in operations
+        assert OperationType.HARD_DELETE not in operations
+        assert OperationType.GRANT_ALL not in operations
+        assert OperationType.GRANT_READ not in operations
+
     def test_multiple_permissions_same_user(self, role_id):
         """Test multiple vfolder permissions for the same user."""
         user_id = uuid.uuid4()
+        vfolder_ids = [uuid.uuid4() for _ in range(3)]
         permissions = [
-            VFolderPermissionData(vfolder_id=uuid.uuid4(), user_id=user_id),
-            VFolderPermissionData(vfolder_id=uuid.uuid4(), user_id=user_id),
-            VFolderPermissionData(vfolder_id=uuid.uuid4(), user_id=user_id),
+            VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id)
+            for vfolder_id in vfolder_ids
         ]
 
         results = []
@@ -234,20 +252,27 @@ class TestMapVFolderPermissionDataToUserRole:
 
         # All should have same user scope but different vfolders
         for i, result in enumerate(results):
+            # Verify scope permissions
             assert len(result.scope_permissions) == 1
-            assert result.scope_permissions[0].scope_id == str(user_id)
-            assert result.scope_permissions[0].operation == OperationType.READ
-            assert result.association_scopes_entities[0].object_id.entity_id == str(
-                permissions[i].vfolder_id
-            )
+            scope_perm = result.scope_permissions[0]
+            assert scope_perm.role_id == role_id
+            assert scope_perm.scope_type == ScopeType.USER
+            assert scope_perm.scope_id == str(user_id)
+            assert scope_perm.entity_type == EntityType.VFOLDER
+            assert scope_perm.operation == OperationType.READ
+
+            # Verify associations
+            assert len(result.association_scopes_entities) == 1
+            assoc = result.association_scopes_entities[0]
+            assert assoc.scope_id.scope_id == str(user_id)
+            assert assoc.object_id.entity_id == str(vfolder_ids[i])
 
     def test_multiple_users_same_vfolder(self, role_id):
         """Test multiple users with permission to the same vfolder."""
         vfolder_id = uuid.uuid4()
+        user_ids = [uuid.uuid4() for _ in range(3)]
         permissions = [
-            VFolderPermissionData(vfolder_id=vfolder_id, user_id=uuid.uuid4()),
-            VFolderPermissionData(vfolder_id=vfolder_id, user_id=uuid.uuid4()),
-            VFolderPermissionData(vfolder_id=vfolder_id, user_id=uuid.uuid4()),
+            VFolderPermissionData(vfolder_id=vfolder_id, user_id=user_id) for user_id in user_ids
         ]
 
         results = []
@@ -257,9 +282,43 @@ class TestMapVFolderPermissionDataToUserRole:
 
         # All should have same vfolder but different user scopes
         for i, result in enumerate(results):
+            # Verify scope permissions
             assert len(result.scope_permissions) == 1
-            assert result.scope_permissions[0].scope_id == str(permissions[i].user_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolder_id)
+            scope_perm = result.scope_permissions[0]
+            assert scope_perm.role_id == role_id
+            assert scope_perm.scope_type == ScopeType.USER
+            assert scope_perm.scope_id == str(user_ids[i])
+            assert scope_perm.entity_type == EntityType.VFOLDER
+            assert scope_perm.operation == OperationType.READ
+
+            # Verify associations
+            assert len(result.association_scopes_entities) == 1
+            assoc = result.association_scopes_entities[0]
+            assert assoc.scope_id.scope_id == str(user_ids[i])
+            assert assoc.object_id.entity_id == str(vfolder_id)
+
+    def test_different_roles_same_permission(self):
+        """Test that different roles can be used for the same vfolder permission."""
+        vfolder_permission = VFolderPermissionData(
+            vfolder_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+        )
+
+        role_ids = [uuid.uuid4() for _ in range(3)]
+        results = []
+
+        for role_id in role_ids:
+            result = map_vfolder_permission_data_to_user_role(role_id, vfolder_permission)
+            results.append(result)
+
+        # All results should have different role IDs but same permission structure
+        for i, result in enumerate(results):
+            assert result.scope_permissions[0].role_id == role_ids[i]
+            assert result.scope_permissions[0].scope_id == str(vfolder_permission.user_id)
+            assert result.scope_permissions[0].operation == OperationType.READ
+            assert result.association_scopes_entities[0].object_id.entity_id == str(
+                vfolder_permission.vfolder_id
+            )
 
 
 class TestComplexScenarios:

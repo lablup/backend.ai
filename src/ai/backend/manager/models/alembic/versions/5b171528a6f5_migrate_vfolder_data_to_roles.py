@@ -226,12 +226,12 @@ def _query_user_vfolder_row_with_user_role(
     Assumes that all users have ONLY ONE role.
     """
     query = (
-        sa.select(VFolderRow.id, VFolderRow.user, ScopePermissionRow.role_id)
+        sa.select(VFolderRow.id, VFolderRow.user, RoleRow.id.label("role_id"))
         .select_from(
             sa.join(
                 VFolderRow,
-                ScopePermissionRow,
-                VFolderRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+                RoleRow,
+                VFolderRow.user == sa.cast(RoleRow.description, UUID),
             )
         )
         .where(VFolderRow.user.is_not(sa.null()))
@@ -268,15 +268,15 @@ def _query_project_vfolder_with_project_role(
         sa.select(
             VFolderRow.id,
             VFolderRow.group,
-            ScopePermissionRow.role_id,
+            RoleRow.id.label("role_id"),
             RoleRow.name.label("role_name"),
         )
         .select_from(
             sa.join(
                 VFolderRow,
-                ScopePermissionRow,
-                VFolderRow.group == sa.cast(ScopePermissionRow.scope_id, UUID),
-            ).join(RoleRow, ScopePermissionRow.role_id == RoleRow.id)
+                RoleRow,
+                VFolderRow.user == sa.cast(RoleRow.description, UUID),
+            )
         )
         .where(VFolderRow.group.is_not(sa.null()))
         .offset(offset)
@@ -319,13 +319,16 @@ def _query_vfolder_permission_with_user_role(
     """
     query = (
         sa.select(
-            VFolderPermissionRow.vfolder, VFolderPermissionRow.user, ScopePermissionRow.role_id
+            VFolderPermissionRow.vfolder,
+            VFolderPermissionRow.user,
+            VFolderPermissionRow.permission,
+            RoleRow.id.label("role_id"),
         )
         .select_from(
             sa.join(
                 VFolderPermissionRow,
-                ScopePermissionRow,
-                VFolderPermissionRow.user == sa.cast(ScopePermissionRow.scope_id, UUID),
+                RoleRow,
+                VFolderPermissionRow.user == sa.cast(RoleRow.description, UUID),
             )
         )
         .offset(offset)
@@ -346,7 +349,7 @@ def _migrate_vfolder_permission_rows(db_conn: Connection) -> None:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
-            data = VFolderPermissionData(row.vfolder, row.user)
+            data = VFolderPermissionData(row.vfolder, row.user, row.permission)
             input_data = map_vfolder_permission_data_to_user_role(row.role_id, data)
             input_group.merge(input_data)
         _insert_from_create_input_group(db_conn, input_group)
