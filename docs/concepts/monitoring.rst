@@ -13,4 +13,4 @@ The metrics include the number of sessions, cluster power usage, GPU utilization
 Alerts (Enterprise only)
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Administrators may configure automatic alerts based on several thrsholds on the monitored metrics, via an external messaging service like emails and SMS.
+Administrators may configure automatic alerts based on several thresholds on the monitored metrics, via an external messaging service like emails and SMS.
