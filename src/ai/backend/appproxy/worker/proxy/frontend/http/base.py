@@ -20,12 +20,12 @@ from ai.backend.appproxy.worker.types import (
     TCircuitKey,
 )
 
-from ..abc import AbstractFrontend
+from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, TCircuitKey]):
+class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitKey]):
     root_context: RootContext
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:

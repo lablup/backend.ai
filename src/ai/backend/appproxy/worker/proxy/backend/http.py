@@ -21,7 +21,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     tcp_client_session_factory,
 )
 
-from .abc import AbstractBackend, HttpRequest
+from .base import BaseBackend, HttpRequest
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -29,7 +29,7 @@ CHUNK_SIZE = 1 * 1024 * 1024  # 1 KiB
 SKIP_HEADERS: Final[set[str]] = {"connection"}
 
 
-class HTTPBackend(AbstractBackend):
+class HTTPBackend(BaseBackend):
     routes: list[RouteInfo]
 
     def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:

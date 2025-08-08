@@ -11,14 +11,14 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.worker.types import Circuit, RootContext, TCircuitKey
 
-from ..backend.abc import AbstractBackend
+from ..backend.base import BaseBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-TBackend = TypeVar("TBackend", bound=AbstractBackend)
+TBackend = TypeVar("TBackend", bound=BaseBackend)
 
 
-class AbstractFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
+class BaseFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
     root_context: RootContext
     circuits: dict[TCircuitKey, Circuit]
     backends: dict[TCircuitKey, TBackend]

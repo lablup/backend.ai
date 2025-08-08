@@ -1,6 +1,5 @@
 import logging
 import time
-from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,7 +22,7 @@ class HttpRequest:
     body: aiohttp.StreamReader
 
 
-class AbstractBackend(metaclass=ABCMeta):
+class BaseBackend:
     root_context: RootContext
     circuit: Circuit
     last_used: float

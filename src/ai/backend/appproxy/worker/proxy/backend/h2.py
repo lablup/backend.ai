@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import aiohttp
 from yarl import URL
 
-from .abc import AbstractBackend
+from .base import BaseBackend
 
 
 @dataclass
@@ -13,7 +13,7 @@ class BackendConfig:
     domain: str | None = None
 
 
-class H2Backend(AbstractBackend):
+class H2Backend(BaseBackend):
     api_endpoint: URL
 
     def __init__(self, api_endpoint: URL, *args, **kwargs) -> None:
