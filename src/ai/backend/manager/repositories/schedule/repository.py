@@ -38,6 +38,7 @@ from ai.backend.manager.models import (
     PRIVATE_SESSION_TYPES,
     AgentRow,
     AgentStatus,
+    DefaultForUnspecified,
     DomainRow,
     EndpointRow,
     GroupRow,
@@ -123,6 +124,7 @@ class ConsolidatedSessionData:
     # Policy info (optional as they come from outer joins)
     keypair_policy_name: Optional[str] = None
     keypair_total_slots: Optional[ResourceSlot] = None
+    keypair_default_for_unspecified: Optional[DefaultForUnspecified] = None
     keypair_max_concurrent: Optional[int] = None
     keypair_max_sftp: Optional[int] = None
     keypair_max_pending_count: Optional[int] = None
@@ -543,7 +545,8 @@ class ScheduleRepository:
 
         # Prepare status data with incremented retries
         status_data = {
-            "failed_predicates": failure.failed_predicates,
+            "passed_predicates": [p.serialize() for p in failure.passed_phases],
+            "failed_predicates": [p.serialize() for p in failure.failed_phases],
             "retries": current_retries + 1,
             "last_try": failure.last_try.isoformat() if failure.last_try else None,
             "msg": failure.msg,
@@ -1252,7 +1255,9 @@ class ScheduleRepository:
                 kernel_ids.add(kernel_alloc.kernel_id)
 
         # Pre-fetch all data in bulk
-        agent_row_map = await self._prefetch_agent_rows(db_session, allocation_batch.agent_ids)
+        agent_row_map = await self._prefetch_agent_rows(
+            db_session, allocation_batch.get_agent_ids()
+        )
         session_row_map = await self._prefetch_session_rows(db_session, session_ids)
         kernel_row_map = await self._prefetch_kernel_rows(db_session, kernel_ids)
 
@@ -1483,16 +1488,16 @@ class ScheduleRepository:
             db_session, session_row_map, allocation.session_id
         )
 
-        # Clear any previous scheduler failure status
+        # Update scheduler status with successful allocation predicates
         cleared_status_data = session_row.status_data or {}
-        if "scheduler" in cleared_status_data:
-            # Clear scheduler-related failure data while preserving other status data
-            cleared_status_data["scheduler"] = {
-                "failed_predicates": [],
-                "passed_predicates": [],
-                "retries": 0,
-                "last_try": now.isoformat(),
-            }
+        cleared_status_data["scheduler"] = {
+            "passed_predicates": [p.serialize() for p in allocation.passed_phases],
+            "failed_predicates": [
+                p.serialize() for p in allocation.failed_phases
+            ],  # Should be empty for successful allocations
+            "retries": 0,
+            "last_try": now.isoformat(),
+        }
 
         session_row.set_status(
             SessionStatus.SCHEDULED,
@@ -1541,18 +1546,15 @@ class ScheduleRepository:
                 continue
 
             # Collect keypair policies
-            if (
-                item.access_key not in keypair_policies
-                and item.keypair_policy_name
-                and item.keypair_total_slots is not None
-                and item.keypair_max_concurrent is not None
-                and item.keypair_max_sftp is not None
-            ):
+            if item.access_key not in keypair_policies and item.keypair_policy_name:
+                # Accept policies even with empty ResourceSlot or None values
+                # Empty ResourceSlot {} is valid and means no limits
+                # Provide defaults for None values from database
                 keypair_policies[item.access_key] = KeyPairResourcePolicy(
                     name=item.keypair_policy_name,
-                    total_resource_slots=item.keypair_total_slots,
-                    max_concurrent_sessions=item.keypair_max_concurrent,
-                    max_concurrent_sftp_sessions=item.keypair_max_sftp,
+                    total_resource_slots=item.keypair_total_slots or ResourceSlot(),
+                    max_concurrent_sessions=item.keypair_max_concurrent or 0,
+                    max_concurrent_sftp_sessions=item.keypair_max_sftp or 0,
                     max_pending_session_count=item.keypair_max_pending_count,
                     max_pending_session_resource_slots=item.keypair_max_pending_slots,
                 )
@@ -1756,6 +1758,9 @@ class ScheduleRepository:
                 # Keypair policy columns
                 KeyPairResourcePolicyRow.name.label("kp_policy_name"),
                 KeyPairResourcePolicyRow.total_resource_slots.label("kp_total_slots"),
+                KeyPairResourcePolicyRow.default_for_unspecified.label(
+                    "kp_default_for_unspecified"
+                ),
                 KeyPairResourcePolicyRow.max_concurrent_sessions.label("kp_max_concurrent"),
                 KeyPairResourcePolicyRow.max_concurrent_sftp_sessions.label("kp_max_sftp"),
                 KeyPairResourcePolicyRow.max_pending_session_count.label("kp_max_pending"),
@@ -1937,10 +1942,19 @@ class ScheduleRepository:
                 .where(UserRow.uuid.in_(user_uuids))
             )
             for row in user_policy_result:
-                user_policies[row.uuid] = UserResourcePolicy(
-                    name=row.name,
-                    total_resource_slots=row.total_resource_slots,
-                )
+                # Accept all policies, including those with empty ResourceSlot
+                # Empty ResourceSlot {} is valid and means no limits
+                if row.name:
+                    user_policies[row.uuid] = UserResourcePolicy(
+                        name=row.name,
+                        total_resource_slots=row.total_resource_slots,
+                    )
+                    log.debug(
+                        "User policy for {}: name={}, slots={}",
+                        row.uuid,
+                        row.name,
+                        row.total_resource_slots,
+                    )
 
         # Get session dependencies
         session_ids = [s.id for s in pending_sessions]

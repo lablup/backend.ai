@@ -3,15 +3,16 @@ Exceptions for agent selection in sokovan scheduler.
 """
 
 from ai.backend.common.exception import (
-    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
-class AgentSelectionError(BackendAIError):
+class AgentSelectionError(SchedulingError):
     """Base exception for agent selection errors."""
 
     error_type = "https://api.backend.ai/probs/agent-selection-failed"
@@ -24,6 +25,10 @@ class AgentSelectionError(BackendAIError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error."""
+        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
 class NoAvailableAgentError(AgentSelectionError):

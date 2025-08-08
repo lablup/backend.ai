@@ -12,6 +12,14 @@ class PendingSessionCountLimitValidator(ValidatorRule):
     This corresponds to check_pending_session_count_limit predicate.
     """
 
+    def name(self) -> str:
+        """Return the validator name for predicates."""
+        return "PendingSessionCountLimitValidator"
+
+    def success_message(self) -> str:
+        """Return a message describing successful validation."""
+        return "Pending session count is within the allowed limit for the access key"
+
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)

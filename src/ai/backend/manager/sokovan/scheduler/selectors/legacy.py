@@ -28,6 +28,18 @@ class LegacyAgentSelector(AbstractAgentSelector):
     2. More available resources in priority order
     """
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "LegacyAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using legacy priority-based strategy"
+
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 

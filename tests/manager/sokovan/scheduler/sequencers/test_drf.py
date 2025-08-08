@@ -95,7 +95,7 @@ class TestDRFSequencer:
     async def test_empty_workload(
         self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
-        result = await sequencer.sequence(empty_system_snapshot, [])
+        result = sequencer.sequence(empty_system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
@@ -125,7 +125,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(empty_system_snapshot, workloads)
+        result = sequencer.sequence(empty_system_snapshot, workloads)
 
         # With no existing allocations, order should be preserved
         assert len(result) == 2
@@ -171,7 +171,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
         assert len(result) == 3
@@ -217,7 +217,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(empty_system_snapshot, workloads)
+        result = sequencer.sequence(empty_system_snapshot, workloads)
 
         # With same dominant share, order should be preserved
         assert len(result) == 3
@@ -254,7 +254,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
 
         # New user with 0% dominant share should get priority
         assert len(result) == 2
@@ -310,5 +310,5 @@ class TestDRFSequencer:
         ]
 
         # Should not crash when dividing by zero capacity
-        result = await sequencer.sequence(system_snapshot, workloads)
+        result = sequencer.sequence(system_snapshot, workloads)
         assert len(result) == 1

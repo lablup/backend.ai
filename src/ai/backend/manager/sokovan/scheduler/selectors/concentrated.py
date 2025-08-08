@@ -31,6 +31,18 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
     3. Less available resources (to concentrate workloads)
     """
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "ConcentratedAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using concentrated strategy for maximum resource utilization"
+
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         """
         Initialize the concentrated selector.

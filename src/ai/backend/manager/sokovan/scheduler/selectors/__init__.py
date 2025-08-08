@@ -1,5 +1,6 @@
 """Agent selector interfaces and implementations for sokovan scheduler."""
 
+# Import exceptions first (they don't have dependencies)
 from .exceptions import (
     AgentSelectionError,
     DesignatedAgentIncompatibleError,
@@ -7,6 +8,8 @@ from .exceptions import (
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
+
+# Then import selector which depends on exceptions
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,

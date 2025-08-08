@@ -12,6 +12,27 @@ from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelecto
 from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.validators.concurrency import ConcurrencyValidator
 from ai.backend.manager.sokovan.scheduler.validators.dependencies import DependenciesValidator
+from ai.backend.manager.sokovan.scheduler.validators.domain_resource_limit import (
+    DomainResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.group_resource_limit import (
+    GroupResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.keypair_resource_limit import (
+    KeypairResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.pending_session_count_limit import (
+    PendingSessionCountLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.pending_session_resource_limit import (
+    PendingSessionResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.reserved_batch import (
+    ReservedBatchSessionValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.user_resource_limit import (
+    UserResourceLimitValidator,
+)
 from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -31,25 +52,21 @@ def create_default_scheduler(
     Returns:
         A configured Scheduler instance
     """
-    # Create default validator with concurrency rules
+    sequencer = FIFOSequencer()
     validator = SchedulingValidator([
         ConcurrencyValidator(),
         DependenciesValidator(),
+        DomainResourceLimitValidator(),
+        GroupResourceLimitValidator(),
+        KeypairResourceLimitValidator(),
+        PendingSessionCountLimitValidator(),
+        PendingSessionResourceLimitValidator(),
+        ReservedBatchSessionValidator(),
+        UserResourceLimitValidator(),
     ])
-
-    # Create default sequencer (FIFO)
-    sequencer = FIFOSequencer()
-
-    # Get resource priority from config
     resource_priority = config_provider.config.manager.agent_selection_resource_priority
-
-    # Create default agent selector (Concentrated)
     agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
-
-    # Create default allocator (Repository-based) - uses original repository
     allocator = RepositoryAllocator(repository)
-
-    # Create scheduler args
     args = SchedulerArgs(
         validator=validator,
         sequencer=sequencer,

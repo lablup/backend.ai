@@ -12,6 +12,14 @@ class ConcurrencyValidator(ValidatorRule):
     This corresponds to check_concurrency predicate.
     """
 
+    def name(self) -> str:
+        """Return the validator name for predicates."""
+        return "ConcurrencyLimitValidator"
+
+    def success_message(self) -> str:
+        """Return a message describing successful validation."""
+        return "Session count is within the maximum concurrent session limit for the access key"
+
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)

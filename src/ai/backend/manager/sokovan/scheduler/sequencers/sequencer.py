@@ -5,17 +5,22 @@ from ..types import SessionWorkload, SystemSnapshot
 
 
 class WorkloadSequencer(ABC):
-    @property
     @abstractmethod
     def name(self) -> str:
         """
-        The name of the sequencer.
-        This should be overridden by subclasses to provide a unique identifier.
+        Return the sequencer name for predicates.
         """
-        raise NotImplementedError("Subclasses should implement this property.")
+        raise NotImplementedError
 
     @abstractmethod
-    async def sequence(
+    def success_message(self) -> str:
+        """
+        Return a message describing successful sequencing.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """

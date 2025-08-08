@@ -2,6 +2,8 @@
 Exceptions for the sokovan scheduler.
 """
 
+from abc import ABC, abstractmethod
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,10 +11,15 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
-class SchedulingError(BackendAIError):
-    """Base exception for scheduling errors."""
+class SchedulingError(BackendAIError, ABC):
+    """Base exception for scheduling errors.
+
+    All exceptions used in the scheduler must inherit from this class
+    and implement the failed_predicates method.
+    """
 
     error_type = "https://api.backend.ai/probs/scheduling-failed"
     error_title = "Scheduling failed."
@@ -24,6 +31,15 @@ class SchedulingError(BackendAIError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+    @abstractmethod
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error.
+
+        Returns:
+            List of SchedulingPredicate objects.
+        """
+        raise NotImplementedError
 
 
 class NoResourceRequirementsError(SchedulingError):
@@ -40,6 +56,10 @@ class NoResourceRequirementsError(SchedulingError):
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error."""
+        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
+
 
 class InvalidAllocationError(SchedulingError):
     """Raised when allocation is invalid or inconsistent."""
@@ -54,3 +74,7 @@ class InvalidAllocationError(SchedulingError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error."""
+        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]

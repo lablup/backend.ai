@@ -28,6 +28,18 @@ class DispersedAgentSelector(AbstractAgentSelector):
     2. More available resources (to spread workloads)
     """
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "DispersedAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using dispersed strategy for balanced workload distribution"
+
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         """
         Initialize the dispersed selector.

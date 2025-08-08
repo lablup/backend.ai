@@ -57,7 +57,7 @@ class TestFIFOSequencer:
     async def test_empty_workload(
         self, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
-        result = await sequencer.sequence(system_snapshot, [])
+        result = sequencer.sequence(system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
@@ -97,7 +97,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(system_snapshot, workloads)
+        result = sequencer.sequence(system_snapshot, workloads)
 
         # FIFO should preserve the original order
         assert len(result) == 3
@@ -160,7 +160,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(snapshot_with_allocations, workloads)
+        result = sequencer.sequence(snapshot_with_allocations, workloads)
 
         # Should still preserve original order despite different allocations
         assert len(result) == 2

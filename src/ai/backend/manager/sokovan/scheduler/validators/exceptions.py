@@ -3,15 +3,16 @@
 from aiohttp import web
 
 from ai.backend.common.exception import (
-    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
-class SchedulingValidationError(BackendAIError, web.HTTPPreconditionFailed):
+class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
     """Base exception for validation errors in the Sokovan scheduler."""
 
     error_type = "https://api.backend.ai/probs/scheduling-validation-failed"
@@ -24,6 +25,10 @@ class SchedulingValidationError(BackendAIError, web.HTTPPreconditionFailed):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error."""
+        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
 class ConcurrencyLimitExceeded(SchedulingValidationError):
@@ -167,6 +172,8 @@ class MultipleValidationErrors(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/multiple-validation-errors"
     error_title = "Multiple validation errors occurred."
 
+    _errors: list[SchedulingValidationError]
+
     def __init__(self, errors: list[SchedulingValidationError]) -> None:
         """
         Initialize with a list of validation errors.
@@ -174,9 +181,24 @@ class MultipleValidationErrors(SchedulingValidationError):
         Args:
             errors: List of validation errors that occurred
         """
-        self.errors = errors
-        messages = [f"{type(e).__name__}: {str(e)}" for e in errors]
-        super().__init__(f"Multiple validation errors: {'; '.join(messages)}")
+        self._errors = errors
+        # Format each error on a new line for better readability
+        messages = []
+        for i, e in enumerate(errors, 1):
+            error_name = type(e).__name__
+            error_msg = str(e)
+            messages.append(f"  {i}. {error_name}: {error_msg}")
+
+        # Join with newlines for better formatting
+        formatted_errors = "\n".join(messages)
+        super().__init__(f"Multiple validation errors occurred:\n{formatted_errors}")
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of all failed predicates from all errors."""
+        predicates = []
+        for error in self._errors:
+            predicates.extend(error.failed_predicates())
+        return predicates
 
     @classmethod
     def error_code(cls) -> ErrorCode:

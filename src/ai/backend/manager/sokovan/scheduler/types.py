@@ -1,7 +1,7 @@
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from dateutil.tz import tzutc
@@ -17,11 +17,26 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
-    AgentSelectionCriteria,
-    KernelResourceSpec,
-    SessionMetadata,
-)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+        AgentSelection,
+        AgentSelectionCriteria,
+    )
+
+
+@dataclass
+class SchedulingPredicate:
+    """Represents a scheduling predicate (passed or failed)."""
+
+    # Name of the component that generated this predicate
+    name: str
+    # Message describing the result
+    msg: str
+
+    def serialize(self) -> dict[str, str]:
+        """Convert to dictionary for JSON serialization."""
+        return {"name": self.name, "msg": self.msg}
 
 
 @dataclass(frozen=True)
@@ -178,13 +193,20 @@ class SessionWorkload:
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
-    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
+    def to_agent_selection_criteria(self) -> "AgentSelectionCriteria":
         """
         Convert to new agent selection criteria for scheduling.
 
         Returns:
             AgentSelectionCriteria for agent selection
         """
+        # Import here to avoid circular dependency
+        from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+            AgentSelectionCriteria,
+            KernelResourceSpec,
+            SessionMetadata,
+        )
+
         # Create session metadata
         session_metadata = SessionMetadata(
             session_id=self.session_id,
@@ -254,6 +276,65 @@ class SessionAllocation:
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session
     agent_allocations: list[AgentAllocation]
+    # Phases that passed during scheduling
+    passed_phases: list[SchedulingPredicate] = field(default_factory=list)
+    # Phases that failed during scheduling (normally empty for successful allocations)
+    failed_phases: list[SchedulingPredicate] = field(default_factory=list)
+
+    @classmethod
+    def from_agent_selections(
+        cls,
+        session_workload: "SessionWorkload",
+        selections: list["AgentSelection"],
+        scaling_group: str,
+    ) -> "SessionAllocation":
+        """
+        Build a SessionAllocation from agent selection results.
+
+        :param session_workload: The original session workload
+        :param selections: List of agent selection results
+        :param scaling_group: The scaling group name
+        :return: SessionAllocation with kernel and agent allocations
+        """
+        kernel_allocations: list[KernelAllocation] = []
+        agent_allocation_map: dict[AgentId, AgentAllocation] = {}
+
+        for selection in selections:
+            resource_req = selection.resource_requirements
+            selected_agent = selection.selected_agent
+
+            # Track resource allocation for this agent
+            if selected_agent.agent_id not in agent_allocation_map:
+                agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
+                    agent_id=selected_agent.agent_id,
+                    allocated_slots=[],
+                )
+            agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
+                resource_req.requested_slots
+            )
+
+            # Create kernel allocations
+            for kernel_id in resource_req.kernel_ids:
+                kernel_allocations.append(
+                    KernelAllocation(
+                        kernel_id=kernel_id,
+                        agent_id=selected_agent.agent_id,
+                        agent_addr=selected_agent.agent_addr,
+                        scaling_group=selected_agent.scaling_group,
+                    )
+                )
+
+        # Create session allocation
+        agent_allocations = list(agent_allocation_map.values())
+
+        return cls(
+            session_id=session_workload.session_id,
+            session_type=session_workload.session_type,
+            cluster_mode=session_workload.cluster_mode,
+            scaling_group=scaling_group,
+            kernel_allocations=kernel_allocations,
+            agent_allocations=agent_allocations,
+        )
 
 
 @dataclass
@@ -271,18 +352,28 @@ class SchedulingFailure:
     """
 
     session_id: SessionId
-    failed_predicates: list[dict[str, str]] = field(default_factory=list)
+    passed_phases: list[SchedulingPredicate] = field(default_factory=list)
+    failed_phases: list[SchedulingPredicate] = field(default_factory=list)
     last_try: Optional[datetime] = field(default_factory=lambda: datetime.now(tzutc()))
     msg: Optional[str] = None
 
 
 @dataclass
 class AllocationBatch:
-    """Batch of session allocations and failures with pre-collected agent IDs for efficient processing."""
+    """Bundle of session allocations and scheduling failures for batch processing."""
 
+    # Successful allocations to process
     allocations: list[SessionAllocation]
-    agent_ids: set[AgentId]
-    failures: list[SchedulingFailure] = field(default_factory=list)
+    # Failed scheduling attempts to update status for
+    failures: list[SchedulingFailure]
+
+    def get_agent_ids(self) -> set[AgentId]:
+        """Extract all agent IDs from allocations for efficient pre-fetching."""
+        agent_ids: set[AgentId] = set()
+        for allocation in self.allocations:
+            for agent_alloc in allocation.agent_allocations:
+                agent_ids.add(agent_alloc.agent_id)
+        return agent_ids
 
 
 @dataclass

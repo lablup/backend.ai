@@ -192,6 +192,20 @@ class AbstractAgentSelector(ABC):
     """
 
     @abstractmethod
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

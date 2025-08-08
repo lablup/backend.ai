@@ -15,17 +15,22 @@ class DRFSequencer(WorkloadSequencer):
     This sequencer will sequence workloads based on their resource usage and fairness.
     """
 
-    @property
     @override
     def name(self) -> str:
         """
-        The name of the sequencer.
-        This should be overridden by subclasses to provide a unique identifier.
+        Return the sequencer name for predicates.
         """
-        return "DRF-scheduling-sequencer"
+        return "DRFSequencer"
 
     @override
-    async def sequence(
+    def success_message(self) -> str:
+        """
+        Return a message describing successful sequencing.
+        """
+        return "Sessions sequenced using Dominant Resource Fairness algorithm"
+
+    @override
+    def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """
