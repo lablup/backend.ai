@@ -1,5 +1,5 @@
-schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key"]) {
-  query: Query
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+  query: Queries
   mutation: Mutation
   subscription: Subscription
 }
@@ -433,7 +433,7 @@ enum OrderDirection {
 }
 
 """Information to aid in pagination."""
-type PageInfo {
+type PageInfo @shareable {
   """When paginating forwards, are there more items?"""
   hasNextPage: Boolean!
 
@@ -447,7 +447,7 @@ type PageInfo {
   endCursor: String
 }
 
-type Query {
+type Queries {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
   artifact(id: ID!): Artifact
