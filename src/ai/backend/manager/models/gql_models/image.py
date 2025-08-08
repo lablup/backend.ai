@@ -595,7 +595,7 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(
         cls, image: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> ImageNode:
-        labels: dict[str, str] = {pair.key: pair.value for pair in cast(list, image.labels)}
+        labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         result = cls(
             id=image.id,
