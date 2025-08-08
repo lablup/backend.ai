@@ -34,7 +34,10 @@ class PermissionCreateInputGroup:
         self.roles.extend(other.roles)
         self.user_roles.extend(other.user_roles)
         self.scope_permissions.extend(other.scope_permissions)
+<<<<<<< HEAD
         self.object_permissions.extend(other.object_permissions)
+=======
+>>>>>>> b6c5e061b (rename module)
         self.association_scopes_entities.extend(other.association_scopes_entities)
 
     def to_role_insert_data(self) -> list[dict[str, Any]]:
