@@ -42,7 +42,7 @@ Generated OpenAPI file will be located at under `manager/rest-reference/openapi.
 > [!NOTE]
 > Please ensure that you are inside the `docs` directory and the virtualenv is activated.  
 
-### Make the html version            
+### Make the html version              
 
 ```console  
 $ make html
