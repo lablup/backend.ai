@@ -9,6 +9,7 @@ REDIS_LIVE_DB: Final = 2
 REDIS_IMAGE_DB: Final = 3
 REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
+REDIS_CONTAINER_LOG: Final = 6
 
 
 class RedisRole(StrEnum):
@@ -18,6 +19,7 @@ class RedisRole(StrEnum):
     IMAGE = "image"
     STREAM = "stream"
     STREAM_LOCK = "stream_lock"
+    CONTAINER_LOG = "container_log"
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
