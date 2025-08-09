@@ -3,14 +3,11 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 
-from ..types import (
-    ContainerMetricOptionalLabel,
-    ContainerMetricResult,
-)
+from ..types import DeviceMetricOptionalLabel, DeviceMetricResult
 
 
 @dataclass
-class ContainerMetricMetadataAction(BaseAction):
+class DeviceMetricMetadataAction(BaseAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -18,7 +15,7 @@ class ContainerMetricMetadataAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> str:
-        return "container_metric_metadata"
+        return "agent_metric_metadata"
 
     @override
     @classmethod
@@ -27,7 +24,7 @@ class ContainerMetricMetadataAction(BaseAction):
 
 
 @dataclass
-class ContainerMetricMetadataActionResult(BaseActionResult):
+class DeviceMetricMetadataActionResult(BaseActionResult):
     metric_names: list[str]
 
     @override
@@ -36,9 +33,9 @@ class ContainerMetricMetadataActionResult(BaseActionResult):
 
 
 @dataclass
-class ContainerMetricAction(BaseAction):
+class DeviceMetricAction(BaseAction):
     metric_name: str
-    labels: ContainerMetricOptionalLabel
+    labels: DeviceMetricOptionalLabel
 
     start: str
     end: str
@@ -60,8 +57,8 @@ class ContainerMetricAction(BaseAction):
 
 
 @dataclass
-class ContainerMetricActionResult(BaseActionResult):
-    result: list[ContainerMetricResult]
+class DeviceMetricActionResult(BaseActionResult):
+    result: list[DeviceMetricResult]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -69,8 +66,8 @@ class ContainerMetricActionResult(BaseActionResult):
 
 
 @dataclass
-class ContainerCurrentMetricAction(BaseAction):
-    labels: ContainerMetricOptionalLabel
+class DeviceCurrentMetricAction(BaseAction):
+    labels: DeviceMetricOptionalLabel
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -79,7 +76,7 @@ class ContainerCurrentMetricAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> str:
-        return "container_current_metric"
+        return "device_current_metric"
 
     @override
     @classmethod
@@ -88,8 +85,8 @@ class ContainerCurrentMetricAction(BaseAction):
 
 
 @dataclass
-class ContainerCurrentMetricActionResult(BaseActionResult):
-    result: list[ContainerMetricResult]
+class DeviceCurrentMetricActionResult(BaseActionResult):
+    result: list[DeviceMetricResult]
 
     @override
     def entity_id(self) -> Optional[str]:
