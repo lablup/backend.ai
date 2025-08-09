@@ -180,15 +180,15 @@ def create_project_admin_role_and_permissions(project: ProjectData) -> Permissio
     )
 
 
-def create_project_user_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+def create_project_member_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
     """
-    Create a user role and permissions for a project.
+    Create a member role and permissions for a project.
     This role allows the user to read the project.
     """
     role_id = uuid.uuid4()
     role_input = RoleCreateInput(
         name=project.role_name(is_admin=False),
-        source=RoleSource.SYSTEM,
+        source=RoleSource.CUSTOM,
         id=role_id,
     )
     scope_permission_inputs: list[ScopePermissionCreateInput] = [
