@@ -1,9 +1,9 @@
 import enum
 
 
-class RoleDefinitionSource(enum.StrEnum):
+class RoleOrigin(enum.StrEnum):
     """
-    Source of the role definition.
+    Origin of the role.
     """
 
     SYSTEM = "system"  # System-defined role, e.g., default roles

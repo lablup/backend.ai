@@ -8,13 +8,13 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 from .object_permission import ObjectPermissionData
 from .scope_permission import ScopePermissionData, ScopePermissionDataWithEntity
 from .status import RoleStatus
-from .types import EntityType, RoleDefinitionSource
+from .types import EntityType, RoleOrigin
 
 
 @dataclass
 class RoleCreateInput:
     name: str
-    definition_source: RoleDefinitionSource = RoleDefinitionSource.CUSTOM
+    origin: RoleOrigin = RoleOrigin.CUSTOM
     status: RoleStatus = RoleStatus.ACTIVE
     description: Optional[str] = None
 
@@ -26,7 +26,7 @@ class RoleCreateInput:
 class RoleUpdateInput(PartialModifier):
     id: uuid.UUID
     name: OptionalState[str]
-    definition_source: OptionalState[RoleDefinitionSource]
+    origin: OptionalState[RoleOrigin]
     status: OptionalState[RoleStatus]
     description: TriState[str]
 
@@ -34,7 +34,7 @@ class RoleUpdateInput(PartialModifier):
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
-        self.definition_source.update_dict(to_update, "definition_source")
+        self.origin.update_dict(to_update, "origin")
         self.status.update_dict(to_update, "status")
         self.description.update_dict(to_update, "description")
         return to_update
@@ -50,7 +50,7 @@ class RoleDeleteInput:
 class RoleData:
     id: uuid.UUID
     name: str
-    definition_source: RoleDefinitionSource
+    origin: RoleOrigin
     status: RoleStatus
     created_at: datetime
     updated_at: Optional[datetime]
@@ -62,7 +62,7 @@ class RoleData:
 class RoleDataWithPermissions:
     id: uuid.UUID
     name: str
-    definition_source: RoleDefinitionSource
+    origin: RoleOrigin
     status: RoleStatus
 
     scope_permissions: list[ScopePermissionDataWithEntity]

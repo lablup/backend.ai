@@ -22,7 +22,7 @@ from ai.backend.manager.data.permission.status import (
     PermissionStatus,
     RoleStatus,
 )
-from ai.backend.manager.data.permission.types import RoleDefinitionSource
+from ai.backend.manager.data.permission.types import RoleOrigin
 
 from ..base import (
     Base,
@@ -43,12 +43,12 @@ class RoleRow(Base):
     id: uuid.UUID = IDColumn()
     name: str = sa.Column("name", sa.String(64), nullable=False)
     description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-    definition_source: RoleDefinitionSource = sa.Column(
-        "definition_source",
-        StrEnumType(RoleDefinitionSource, length=16),
+    origin: RoleOrigin = sa.Column(
+        "origin",
+        StrEnumType(RoleOrigin, length=16),
         nullable=False,
-        default=RoleDefinitionSource.SYSTEM,
-        server_default=str(RoleDefinitionSource.SYSTEM),
+        default=RoleOrigin.SYSTEM,
+        server_default=str(RoleOrigin.SYSTEM),
     )
     status: RoleStatus = sa.Column(
         "status",
@@ -87,7 +87,7 @@ class RoleRow(Base):
         return RoleData(
             id=self.id,
             name=self.name,
-            definition_source=self.definition_source,
+            origin=self.origin,
             status=self.status,
             created_at=self.created_at,
             updated_at=self.updated_at,
@@ -115,7 +115,7 @@ class RoleRow(Base):
         return RoleDataWithPermissions(
             id=self.id,
             name=self.name,
-            definition_source=self.definition_source,
+            origin=self.origin,
             status=self.status,
             scope_permissions=scope_permissions,
             object_permissions=object_permissions,

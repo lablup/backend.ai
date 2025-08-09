@@ -1,4 +1,4 @@
-"""add definition_source col to roles
+"""add origin col to roles
 
 Revision ID: 42feff246198
 Revises: ec7a778bcb78
@@ -19,11 +19,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "roles",
-        sa.Column(
-            "definition_source", sa.VARCHAR(length=16), server_default="system", nullable=False
-        ),
+        sa.Column("origin", sa.VARCHAR(length=16), server_default="system", nullable=False),
     )
 
 
 def downgrade() -> None:
-    op.drop_column("roles", "definition_source")
+    op.drop_column("roles", "origin")
