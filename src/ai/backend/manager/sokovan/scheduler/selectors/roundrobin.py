@@ -33,6 +33,18 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         """
         self.next_index = next_index
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "RoundRobinAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using round-robin strategy for even workload distribution"
+
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

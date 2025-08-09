@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
+from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
@@ -28,8 +28,9 @@ from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import WorkloadSequencer
 from .types import (
-    AgentAllocation,
-    KernelAllocation,
+    AllocationBatch,
+    SchedulingFailure,
+    SchedulingPredicate,
     SessionAllocation,
     SessionWorkload,
     SystemSnapshot,
@@ -200,16 +201,25 @@ class Scheduler:
             max_container_count=config.max_container_count_per_agent,
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
+        # Add sequencing predicate to track in passed predicates
         with self._phase_metrics.measure_phase(
             scaling_group, f"sequencing_{sg_info.scheduler_name}"
         ):
             sequencer = self._sequencer_pool[sg_info.scheduler_name]
-            sequenced_workloads = await sequencer.sequence(system_snapshot, workloads)
+            sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
         mutable_agents = context.agents
         session_allocations: list[SessionAllocation] = []
+        scheduling_failures: list[SchedulingFailure] = []
         agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
         for session_workload in sequenced_workloads:
+            # Track predicates for this session
+            passed_phases: list[SchedulingPredicate] = []
+            failed_phases: list[SchedulingPredicate] = []
+            passed_phases.append(
+                SchedulingPredicate(name=sequencer.name, msg=sequencer.success_message())
+            )
+
             try:
                 session_allocation = await self._schedule_workload(
                     scaling_group,
@@ -218,24 +228,45 @@ class Scheduler:
                     selection_config,
                     agent_selector,
                     session_workload,
+                    passed_phases,
+                    failed_phases,
                 )
                 session_allocations.append(session_allocation)
             except Exception as e:
                 log.debug(
-                    "Validation failed for workload {}: {}",
+                    "Scheduling failed for workload {}: {}",
                     session_workload.session_id,
                     e,
                 )
+                if not failed_phases:
+                    # If no specific failure predicates were added, add a exception information
+                    failed_phases.append(
+                        SchedulingPredicate(
+                            name=type(e).__name__,
+                            msg=str(e),
+                        )
+                    )
+                failure = SchedulingFailure(
+                    session_id=session_workload.session_id,
+                    passed_phases=passed_phases,
+                    failed_phases=failed_phases,
+                    msg=str(e),
+                )
+                scheduling_failures.append(failure)
                 continue
-        # Allocate resources for each validated workload
-        if session_allocations:
-            log.info(
-                "Allocating resources for {} session allocations in scaling group {}",
-                len(session_allocations),
-                scaling_group,
-            )
-            with self._phase_metrics.measure_phase(scaling_group, "allocation"):
-                await self._allocator.allocate(session_allocations)
+        log.info(
+            "Processing {} allocations and {} failures in scaling group {}",
+            len(session_allocations),
+            len(scheduling_failures),
+            scaling_group,
+        )
+        # Create batch with allocations and failures
+        batch = AllocationBatch(
+            allocations=session_allocations,
+            failures=scheduling_failures,
+        )
+        with self._phase_metrics.measure_phase(scaling_group, "allocation"):
+            await self._allocator.allocate(batch)
 
         return len(session_allocations)
 
@@ -247,18 +278,43 @@ class Scheduler:
         selection_config: AgentSelectionConfig,
         agent_selector: AgentSelector,
         session_workload: SessionWorkload,
+        passed_phases: list[SchedulingPredicate],
+        failed_phases: list[SchedulingPredicate],
     ) -> SessionAllocation:
+        # Phase 1: Validation
         with self._phase_metrics.measure_phase(scaling_group, "validation"):
-            self._validator.validate(mutable_snapshot, session_workload)
-
-        with self._phase_metrics.measure_phase(scaling_group, "agent_selection"):
-            session_allocation = await self._allocate_workload(
-                session_workload,
-                mutable_agents,
-                selection_config,
-                scaling_group,
-                agent_selector,
+            # validate_with_predicates will update both lists and raise if validation fails
+            self._validator.validate(
+                mutable_snapshot, session_workload, passed_phases, failed_phases
             )
+
+        # Phase 2: Agent Selection
+        with self._phase_metrics.measure_phase(scaling_group, "agent_selection"):
+            try:
+                session_allocation = await self._allocate_workload(
+                    session_workload,
+                    mutable_agents,
+                    selection_config,
+                    scaling_group,
+                    agent_selector,
+                )
+                # Agent selection succeeded - add to passed predicates
+                selector_strategy = agent_selector._strategy
+                passed_phases.append(
+                    SchedulingPredicate(
+                        name=selector_strategy.name(), msg=selector_strategy.success_message()
+                    )
+                )
+            except Exception as e:
+                # Add failed predicate for agent selection
+                selector_strategy = agent_selector._strategy
+                failed_phases.append(SchedulingPredicate(name=selector_strategy.name(), msg=str(e)))
+                raise
+
+        # Phase 3: Allocation success - add allocator predicate
+        passed_phases.append(
+            SchedulingPredicate(name=self._allocator.name(), msg=self._allocator.success_message())
+        )
 
         # Update the snapshot to reflect this allocation
         # Note: agent state changes are already applied to mutable_agents by select_agents_for_batch_requirements
@@ -267,6 +323,11 @@ class Scheduler:
             session_workload,
             session_allocation,
         )
+
+        # Store predicates in the allocation
+        session_allocation.passed_phases = passed_phases
+        session_allocation.failed_phases = failed_phases
+
         return session_allocation
 
     def _update_system_snapshot(
@@ -345,7 +406,6 @@ class Scheduler:
         :param scaling_group: The scaling group name
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
-        :raises NoResourceRequirementsError: If no resource requirements found
         """
         # Convert to new criteria format
         criteria = session_workload.to_agent_selection_criteria()
@@ -359,45 +419,9 @@ class Scheduler:
             session_workload.designated_agent,
         )
 
-        # Build kernel allocations and agent allocations from selections
-        kernel_allocations: list[KernelAllocation] = []
-        agent_allocation_map: dict[AgentId, AgentAllocation] = {}
-
-        for selection in selections:
-            resource_req = selection.resource_requirements
-            selected_agent = selection.selected_agent
-
-            # Track resource allocation for this agent
-            if selected_agent.agent_id not in agent_allocation_map:
-                agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
-                    agent_id=selected_agent.agent_id,
-                    allocated_slots=[],
-                )
-            agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
-                resource_req.requested_slots
-            )
-
-            # Create kernel allocations
-            for kernel_id in resource_req.kernel_ids:
-                kernel_allocations.append(
-                    KernelAllocation(
-                        kernel_id=kernel_id,
-                        agent_id=selected_agent.agent_id,
-                        agent_addr=selected_agent.agent_addr,
-                        scaling_group=selected_agent.scaling_group,
-                    )
-                )
-
-        # Create session allocation
-        agent_allocations = list(agent_allocation_map.values())
-
-        session_allocation = SessionAllocation(
-            session_id=session_workload.session_id,
-            session_type=session_workload.session_type,
-            cluster_mode=session_workload.cluster_mode,
-            scaling_group=scaling_group,
-            kernel_allocations=kernel_allocations,
-            agent_allocations=agent_allocations,
+        # Build session allocation from selections
+        return SessionAllocation.from_agent_selections(
+            session_workload,
+            selections,
+            scaling_group,
         )
-
-        return session_allocation

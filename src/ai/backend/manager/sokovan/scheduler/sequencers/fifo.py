@@ -15,13 +15,19 @@ class FIFOSequencer(WorkloadSequencer):
     @override
     def name(self) -> str:
         """
-        The name of the sequencer.
-        This should be overridden by subclasses to provide a unique identifier.
+        Return the sequencer name for predicates.
         """
-        return "FIFO-scheduling-sequencer"
+        return "FIFOSequencer"
 
     @override
-    async def sequence(
+    def success_message(self) -> str:
+        """
+        Return a message describing successful sequencing.
+        """
+        return "Sessions sequenced in first-in-first-out order"
+
+    @override
+    def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
         """

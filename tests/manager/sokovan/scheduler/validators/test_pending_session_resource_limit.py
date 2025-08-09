@@ -74,6 +74,7 @@ class TestPendingSessionResourceLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (3 + 2 <= 10)
@@ -126,6 +127,7 @@ class TestPendingSessionResourceLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(PendingSessionResourceLimitExceeded) as exc_info:
@@ -175,6 +177,7 @@ class TestPendingSessionResourceLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no limit is set
@@ -214,6 +217,7 @@ class TestPendingSessionResourceLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no policy is defined
@@ -276,6 +280,7 @@ class TestPendingSessionResourceLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (3+3+3 + 1 = 10 <= 10)

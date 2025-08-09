@@ -3,15 +3,16 @@
 from aiohttp import web
 
 from ai.backend.common.exception import (
-    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
-class SchedulingValidationError(BackendAIError, web.HTTPPreconditionFailed):
+class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
     """Base exception for validation errors in the Sokovan scheduler."""
 
     error_type = "https://api.backend.ai/probs/scheduling-validation-failed"
@@ -21,9 +22,13 @@ class SchedulingValidationError(BackendAIError, web.HTTPPreconditionFailed):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of failed predicates for this error."""
+        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
 class ConcurrencyLimitExceeded(SchedulingValidationError):
@@ -36,7 +41,7 @@ class ConcurrencyLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -51,8 +56,8 @@ class DependenciesNotSatisfied(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.NOT_READY,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
@@ -66,7 +71,7 @@ class KeypairResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KEYPAIR,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -81,7 +86,7 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -96,7 +101,7 @@ class GroupResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -111,7 +116,7 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.CREATE,
+            operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -126,8 +131,8 @@ class PendingSessionCountLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.CONFLICT,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
@@ -141,21 +146,49 @@ class PendingSessionResourceLimitExceeded(SchedulingValidationError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.UNAVAILABLE,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
-class UserResourcePolicyNotFound(SchedulingValidationError):
-    """Raised when user has no resource policy."""
+class MultipleValidationErrors(SchedulingValidationError):
+    """Raised when multiple validation errors occur."""
 
-    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
-    error_title = "User resource policy not found."
+    error_type = "https://api.backend.ai/probs/multiple-validation-errors"
+    error_title = "Multiple validation errors occurred."
+
+    _errors: list[SchedulingValidationError]
+
+    def __init__(self, errors: list[SchedulingValidationError]) -> None:
+        """
+        Initialize with a list of validation errors.
+
+        Args:
+            errors: List of validation errors that occurred
+        """
+        self._errors = errors
+        # Format each error on a new line for better readability
+        messages = []
+        for i, e in enumerate(errors, 1):
+            error_name = type(e).__name__
+            error_msg = str(e)
+            messages.append(f"  {i}. {error_name}: {error_msg}")
+
+        # Join with newlines for better formatting
+        formatted_errors = "\n".join(messages)
+        super().__init__(f"Multiple validation errors occurred:\n{formatted_errors}")
+
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        """Return list of all failed predicates from all errors."""
+        predicates = []
+        for error in self._errors:
+            predicates.extend(error.failed_predicates())
+        return predicates
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.FORBIDDEN,
         )

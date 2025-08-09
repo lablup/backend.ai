@@ -269,13 +269,10 @@ class TestFetchPendingSessions:
     ):
         """Test basic functionality of _fetch_pending_sessions_join"""
         scaling_group = minimal_setup["scaling_group"].name
-        pending_timeout = timedelta(seconds=300)
 
         # Call the method directly
         async with database_engine.begin_readonly_session() as db_sess:
-            result = await schedule_repository._fetch_pending_sessions_join(
-                db_sess, scaling_group, pending_timeout
-            )
+            result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Verify results
         assert len(result) == 1
@@ -294,17 +291,17 @@ class TestFetchPendingSessions:
         assert kernel_data.architecture == "x86_64"
         assert kernel_data.agent is None  # Pending kernel has no agent
 
-    async def test_fetch_pending_sessions_join_with_timeout(
+    async def test_fetch_pending_sessions_join_with_old_session(
         self,
         schedule_repository: ScheduleRepository,
         minimal_setup: dict[str, Any],
         database_engine: ExtendedAsyncSAEngine,
     ):
-        """Test that timeout filtering works correctly"""
+        """Test that old sessions are still fetched (no timeout filtering)"""
         scaling_group = minimal_setup["scaling_group"].name
         session_id = minimal_setup["session"].id
 
-        # First, update the session to be older than timeout
+        # First, update the session to be older
         async with database_engine.begin_session() as db_sess:
             # Query the session from DB to get it attached to this session
             stmt = (
@@ -315,17 +312,13 @@ class TestFetchPendingSessions:
             await db_sess.execute(stmt)
             await db_sess.commit()
 
-        # Set a very short timeout (1 second)
-        pending_timeout = timedelta(seconds=1)
-
         # Call the method
         async with database_engine.begin_readonly_session() as db_sess:
-            result = await schedule_repository._fetch_pending_sessions_join(
-                db_sess, scaling_group, pending_timeout
-            )
+            result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
-        # Should return empty list as session is older than 1 second
-        assert len(result) == 0
+        # Should still return the session as there's no timeout filtering
+        assert len(result) == 1
+        assert result[0].id == session_id
 
     async def test_fetch_pending_sessions_join_no_sessions(
         self,
@@ -334,13 +327,10 @@ class TestFetchPendingSessions:
     ):
         """Test with non-existent scaling group"""
         scaling_group = "non-existent-sgroup"
-        pending_timeout = timedelta(seconds=300)
 
         # Call the method
         async with database_engine.begin_readonly_session() as db_sess:
-            result = await schedule_repository._fetch_pending_sessions_join(
-                db_sess, scaling_group, pending_timeout
-            )
+            result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Should return empty list
         assert len(result) == 0

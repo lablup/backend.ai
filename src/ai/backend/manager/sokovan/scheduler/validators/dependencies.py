@@ -14,6 +14,14 @@ class DependenciesValidator(ValidatorRule):
     This corresponds to check_dependencies predicate.
     """
 
+    def name(self) -> str:
+        """Return the validator name for predicates."""
+        return "SessionDependenciesValidator"
+
+    def success_message(self) -> str:
+        """Return a message describing successful validation."""
+        return "All dependent sessions have completed successfully"
+
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get dependencies for this session
         dependencies = snapshot.session_dependencies.by_session.get(workload.session_id, [])

@@ -40,6 +40,18 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "ConcentratedAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using concentrated strategy for maximum resource utilization"
+
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],
@@ -60,7 +72,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         # Choose the tracker with minimum resources (to concentrate workloads)
         def tracker_sort_key(tracker: AgentStateTracker) -> tuple[Union[int, Decimal], ...]:
             agent = tracker.original_agent
-            occupied_slots, _ = tracker.get_current_state()
+            occupied_slots = tracker.get_current_occupied_slots()
             sort_key = []
 
             # First, consider kernel counts at endpoint for replica spreading

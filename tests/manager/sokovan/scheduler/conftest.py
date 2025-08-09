@@ -425,4 +425,5 @@ def empty_system_snapshot() -> SystemSnapshot:
         session_dependencies=SessionDependencySnapshot(
             by_session={},
         ),
+        known_slot_types={},
     )

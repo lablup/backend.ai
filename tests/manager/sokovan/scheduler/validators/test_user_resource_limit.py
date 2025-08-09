@@ -17,7 +17,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
 )
 from ai.backend.manager.sokovan.scheduler.validators import (
     UserResourceLimitValidator,
-    UserResourcePolicyNotFound,
     UserResourceQuotaExceeded,
 )
 
@@ -55,6 +54,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (3 + 2 <= 10)
@@ -88,13 +88,14 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(UserResourceQuotaExceeded) as exc_info:
             validator.validate(snapshot, workload)
         assert "Your main-keypair resource quota is exceeded" in str(exc_info.value)
 
-    def test_fails_when_no_policy(
+    def test_passes_when_no_policy(
         self,
         validator: UserResourceLimitValidator,
         user_specific_minimal_workload: SessionWorkload,
@@ -117,11 +118,11 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
-        with pytest.raises(UserResourcePolicyNotFound) as exc_info:
-            validator.validate(snapshot, workload)
-        assert f"User has no resource policy (uid: {workload.user_uuid})" in str(exc_info.value)
+        # Should not raise when no user-specific policy is defined
+        validator.validate(snapshot, workload)
 
     def test_passes_when_no_current_occupancy(
         self,
@@ -151,6 +152,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (0 + 5 <= 10)
