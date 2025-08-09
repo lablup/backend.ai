@@ -1,6 +1,15 @@
 import enum
 
 
+class RoleSource(enum.StrEnum):
+    """
+    Definition source of the role.
+    """
+
+    SYSTEM = "system"  # System-defined role, e.g., default roles
+    CUSTOM = "custom"  # Custom role defined
+
+
 class OperationType(enum.StrEnum):
     CREATE = "create"
     READ = "read"
