@@ -61,7 +61,7 @@ class ScopePermissionRow(Base):
     )
     scope_id: str = sa.Column(
         "scope_id", sa.String(64), nullable=False
-    )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
+    )  # e.g., "domain_id", "project_id", "user_id" etc.
     created_at: datetime = sa.Column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
