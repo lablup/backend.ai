@@ -1,6 +1,6 @@
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
@@ -15,6 +15,8 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
+    SlotName,
+    SlotTypes,
 )
 from ai.backend.manager.models.session import SessionStatus
 
@@ -141,6 +143,9 @@ class SystemSnapshot:
 
     # Session dependency state
     session_dependencies: SessionDependencySnapshot
+
+    # Known slot types from etcd config
+    known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -390,4 +395,3 @@ class ScalingGroupInfo:
 
     scheduler_name: str
     agent_selection_strategy: AgentSelectionStrategy
-    pending_timeout: timedelta

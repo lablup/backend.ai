@@ -54,6 +54,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (3 + 2 <= 10)
@@ -87,6 +88,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(UserResourceQuotaExceeded) as exc_info:
@@ -116,6 +118,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no user-specific policy is defined
@@ -149,6 +152,7 @@ class TestUserResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (0 + 5 <= 10)

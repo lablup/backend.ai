@@ -34,21 +34,7 @@ class UserResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = user_occupied + workload.requested_slots
         if not (total_after <= policy.total_resource_slots):
-            # Format the limit for human-readable output
-            if policy.total_resource_slots is None:
-                # None means no policy at all
-                exceeded_msg = f"No resource policy found. current: {user_occupied}, requested: {workload.requested_slots}"
-            elif not policy.total_resource_slots or not any(
-                v for v in policy.total_resource_slots.values()
-            ):
-                # Empty ResourceSlot {} means unlimited - this shouldn't cause an error
-                # But if we're here, it means the comparison failed for some reason
-                exceeded_msg = f"Resource comparison failed (empty limit). current: {user_occupied}, requested: {workload.requested_slots}"
-            else:
-                limit_str = " ".join(
-                    f"{k}={v}" for k, v in policy.total_resource_slots.items() if v
-                )
-                exceeded_msg = f"limit: {limit_str}, current: {user_occupied}, requested: {workload.requested_slots}"
+            exceeded_msg = " ".join(f"{k}={v}" for k, v in policy.total_resource_slots.items() if v)
             raise UserResourceQuotaExceeded(
                 f"Your main-keypair resource quota is exceeded. ({exceeded_msg})"
             )

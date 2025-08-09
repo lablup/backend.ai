@@ -86,6 +86,7 @@ class TestConcurrencyValidator:
             ),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise
@@ -120,6 +121,7 @@ class TestConcurrencyValidator:
             ),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(ConcurrencyLimitExceeded) as exc_info:
@@ -155,6 +157,7 @@ class TestConcurrencyValidator:
             ),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(ConcurrencyLimitExceeded) as exc_info:
@@ -181,6 +184,7 @@ class TestConcurrencyValidator:
             ),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no policy is defined

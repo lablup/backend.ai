@@ -71,6 +71,7 @@ class TestPendingSessionCountLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (2 < 3)
@@ -118,6 +119,7 @@ class TestPendingSessionCountLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(PendingSessionCountLimitExceeded) as exc_info:
@@ -162,6 +164,7 @@ class TestPendingSessionCountLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no limit is set
@@ -196,6 +199,7 @@ class TestPendingSessionCountLimitValidator:
                 }
             ),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no policy is defined

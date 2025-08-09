@@ -47,6 +47,7 @@ class TestLIFOSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
     @pytest.mark.asyncio
@@ -158,6 +159,7 @@ class TestLIFOSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
         workloads = [

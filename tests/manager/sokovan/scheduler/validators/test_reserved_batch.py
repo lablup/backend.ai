@@ -25,6 +25,7 @@ def create_empty_snapshot() -> SystemSnapshot:
         concurrency=ConcurrencySnapshot({}, {}),
         pending_sessions=PendingSessionSnapshot({}),
         session_dependencies=SessionDependencySnapshot({}),
+        known_slot_types={},
     )
 
 

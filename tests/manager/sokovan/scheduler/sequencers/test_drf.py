@@ -47,6 +47,7 @@ class TestDRFSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
     @pytest.fixture
@@ -85,6 +86,7 @@ class TestDRFSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
     @pytest.mark.asyncio
@@ -294,6 +296,7 @@ class TestDRFSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
         workloads = [

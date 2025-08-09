@@ -27,6 +27,8 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
+    SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -66,7 +68,10 @@ from ai.backend.manager.models.kernel import (
     recalc_concurrency_used,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.session import _build_session_fetch_query
+from ai.backend.manager.models.session import (
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    _build_session_fetch_query,
+)
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -108,8 +113,17 @@ repository_decorator = create_layer_aware_repository_decorator(LayerType.SCHEDUL
 
 
 @dataclass
-class ConsolidatedSessionData:
-    """Container for consolidated session data fetched in a single query."""
+class ExtractedResourcePolicies:
+    """Resource policies extracted from session data."""
+
+    keypair_policies: dict[AccessKey, KeyPairResourcePolicy]
+    group_limits: dict[uuid.UUID, ResourceSlot]
+    domain_limits: dict[str, ResourceSlot]
+
+
+@dataclass
+class SessionResourcePolicyData:
+    """Session data with resource policy information fetched in a single query."""
 
     # Session basic info
     session_id: SessionId
@@ -118,6 +132,7 @@ class ConsolidatedSessionData:
     group_id: Optional[uuid.UUID]
     domain_name: str
     status: SessionStatus
+    session_type: SessionTypes
     requested_slots: ResourceSlot
     created_at: datetime
 
@@ -148,7 +163,7 @@ class SnapshotDatabaseData:
 
     total_capacity: ResourceSlot
     resource_occupancy: ResourceOccupancySnapshot
-    consolidated_sessions: list[ConsolidatedSessionData]
+    consolidated_sessions: list[SessionResourcePolicyData]
     user_policies: dict[uuid.UUID, UserResourcePolicy]
     session_dependencies: SessionDependencySnapshot
 
@@ -163,7 +178,7 @@ class KernelAgentInfo:
 
 
 @dataclass
-class PendingSessionData:
+class _PendingSessionData:
     """Data for a pending session fetched from database."""
 
     id: SessionId
@@ -193,21 +208,22 @@ class KernelData:
 
 
 @dataclass
-class AllSchedulingDatabaseData:
+class _AllSchedulingDatabaseData:
     """Container for ALL data fetched from database for scheduling."""
 
     scaling_group_row: ScalingGroupRow
-    pending_sessions: list[PendingSessionData]
+    pending_sessions: list[_PendingSessionData]
     agents: Optional[list[AgentRow]]
     snapshot_data: Optional[SnapshotDatabaseData]
 
 
 @dataclass
-class RawSchedulingData:
+class _RawSchedulingData:
     """Raw data fetched from database for scheduling operations."""
 
     scaling_group_row: ScalingGroupRow
-    pending_sessions: list[PendingSessionData]
+    pending_sessions: list[_PendingSessionData]
+    known_slot_types: Mapping[SlotName, SlotTypes]
     # Only populated if pending sessions exist:
     agents: Optional[list[AgentRow]] = None
     snapshot_data: Optional[SnapshotDatabaseData] = None
@@ -1356,7 +1372,7 @@ class ScheduleRepository:
         await self._update_kernels_with_agents(db_session, row_maps.kernel_row_map, allocation)
 
         # 4. Update session information
-        await self._update_session_status(db_session, row_maps.session_row_map, allocation)
+        await self._update_session_success_status(db_session, row_maps.session_row_map, allocation)
 
     async def _validate_agent_resources(
         self,
@@ -1465,7 +1481,7 @@ class ScheduleRepository:
             kernel.agent_addr = agent_info.agent_addr
             kernel.scaling_group = agent_info.scaling_group
 
-    async def _update_session_status(
+    async def _update_session_success_status(
         self,
         db_session: SASession,
         session_row_map: dict[SessionId, SessionRow],
@@ -1489,7 +1505,7 @@ class ScheduleRepository:
         )
 
         # Update scheduler status with successful allocation predicates
-        cleared_status_data = session_row.status_data or {}
+        cleared_status_data = {**session_row.status_data} if session_row.status_data else {}
         cleared_status_data["scheduler"] = {
             "passed_predicates": [p.serialize() for p in allocation.passed_phases],
             "failed_predicates": [
@@ -1526,56 +1542,93 @@ class ScheduleRepository:
 
     def _extract_resource_policies(
         self,
-        data: list[ConsolidatedSessionData],
-        status_filter: list[SessionStatus],
-    ) -> tuple[
-        dict[AccessKey, KeyPairResourcePolicy],
-        dict[uuid.UUID, UserResourcePolicy],
-        dict[uuid.UUID, ResourceSlot],
-        dict[str, ResourceSlot],
-        set[uuid.UUID],
-    ]:
-        """Extract resource policies from consolidated data."""
+        data: list[SessionResourcePolicyData],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> ExtractedResourcePolicies:
+        """Extract resource policies from session data."""
         keypair_policies: dict[AccessKey, KeyPairResourcePolicy] = {}
         group_limits: dict[uuid.UUID, ResourceSlot] = {}
         domain_limits: dict[str, ResourceSlot] = {}
-        user_uuids: set[uuid.UUID] = set()
 
-        for item in data:
-            if item.status not in status_filter:
-                continue
-
+        for session_data in data:
             # Collect keypair policies
-            if item.access_key not in keypair_policies and item.keypair_policy_name:
-                # Accept policies even with empty ResourceSlot or None values
-                # Empty ResourceSlot {} is valid and means no limits
-                # Provide defaults for None values from database
-                keypair_policies[item.access_key] = KeyPairResourcePolicy(
-                    name=item.keypair_policy_name,
-                    total_resource_slots=item.keypair_total_slots or ResourceSlot(),
-                    max_concurrent_sessions=item.keypair_max_concurrent or 0,
-                    max_concurrent_sftp_sessions=item.keypair_max_sftp or 0,
-                    max_pending_session_count=item.keypair_max_pending_count,
-                    max_pending_session_resource_slots=item.keypair_max_pending_slots,
+            if session_data.access_key not in keypair_policies and session_data.keypair_policy_name:
+                # Use ResourceSlot.from_policy() to properly handle default_for_unspecified
+                resource_policy_map = {
+                    "total_resource_slots": session_data.keypair_total_slots or ResourceSlot(),
+                    "default_for_unspecified": session_data.keypair_default_for_unspecified
+                    or DefaultForUnspecified.LIMITED,
+                }
+                total_resource_slots = ResourceSlot.from_policy(
+                    resource_policy_map, known_slot_types
                 )
 
-            # Collect user UUIDs for later fetch
-            user_uuids.add(item.user_uuid)
+                keypair_policies[session_data.access_key] = KeyPairResourcePolicy(
+                    name=session_data.keypair_policy_name,
+                    total_resource_slots=total_resource_slots,
+                    max_concurrent_sessions=session_data.keypair_max_concurrent or 0,
+                    max_concurrent_sftp_sessions=session_data.keypair_max_sftp or 0,
+                    max_pending_session_count=session_data.keypair_max_pending_count,
+                    max_pending_session_resource_slots=session_data.keypair_max_pending_slots,
+                )
 
             # Collect group limits
-            if item.group_id and item.group_limit is not None:
-                group_limits[item.group_id] = item.group_limit
+            if session_data.group_id and session_data.group_limit is not None:
+                group_resource_policy = {
+                    "total_resource_slots": session_data.group_limit,
+                    "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+                }
+                group_limits[session_data.group_id] = ResourceSlot.from_policy(
+                    group_resource_policy, known_slot_types
+                )
 
             # Collect domain limits
-            if item.domain_name and item.domain_limit is not None:
-                domain_limits[item.domain_name] = item.domain_limit
+            if session_data.domain_name and session_data.domain_limit is not None:
+                domain_resource_policy = {
+                    "total_resource_slots": session_data.domain_limit,
+                    "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+                }
+                domain_limits[session_data.domain_name] = ResourceSlot.from_policy(
+                    domain_resource_policy, known_slot_types
+                )
 
-        # Note: user_policies still need separate query due to different join path
-        return keypair_policies, {}, group_limits, domain_limits, user_uuids
+        return ExtractedResourcePolicies(
+            keypair_policies=keypair_policies,
+            group_limits=group_limits,
+            domain_limits=domain_limits,
+        )
+
+    def _extract_concurrency_from_sessions(
+        self,
+        data: list[SessionResourcePolicyData],
+    ) -> ConcurrencySnapshot:
+        """Extract concurrency information from session data."""
+        sessions_by_keypair: dict[AccessKey, int] = {}
+        sftp_sessions_by_keypair: dict[AccessKey, int] = {}
+
+        # Count sessions by access key and type
+        for session_data in data:
+            access_key = session_data.access_key
+
+            # Check if this is an SFTP/private session
+            if session_data.session_type in PRIVATE_SESSION_TYPES:
+                if access_key not in sftp_sessions_by_keypair:
+                    sftp_sessions_by_keypair[access_key] = 0
+                sftp_sessions_by_keypair[access_key] += 1
+            else:
+                # Regular sessions
+                if access_key not in sessions_by_keypair:
+                    sessions_by_keypair[access_key] = 0
+                sessions_by_keypair[access_key] += 1
+
+        return ConcurrencySnapshot(
+            sessions_by_keypair=sessions_by_keypair,
+            sftp_sessions_by_keypair=sftp_sessions_by_keypair,
+        )
 
     def _extract_pending_sessions(
         self,
-        data: list[ConsolidatedSessionData],
+        data: list[SessionResourcePolicyData],
     ) -> PendingSessionSnapshot:
         """Extract pending sessions from consolidated data."""
         pending_by_keypair: dict[AccessKey, list[PendingSessionInfo]] = defaultdict(list)
@@ -1628,37 +1681,13 @@ class ScheduleRepository:
             sftp_sessions_by_keypair=sftp_sessions_by_keypair,
         )
 
-    async def _fetch_raw_scheduling_data(
-        self, db_sess: SASession, scaling_group: str
-    ) -> Optional[RawSchedulingData]:
-        """
-        Fetch all raw data needed for scheduling.
-        ALL database queries happen in _fetch_all_scheduling_database_data.
-        """
-        all_data = await self._fetch_all_scheduling_database_data(db_sess, scaling_group)
-        if all_data is None:
-            return None
-        if not all_data.pending_sessions:
-            return RawSchedulingData(
-                scaling_group_row=all_data.scaling_group_row, pending_sessions=[]
-            )
-
-        return RawSchedulingData(
-            scaling_group_row=all_data.scaling_group_row,
-            pending_sessions=all_data.pending_sessions,
-            agents=all_data.agents,
-            snapshot_data=all_data.snapshot_data,
-            max_container_count=None,  # Will be set from etcd later
-        )
-
     async def _fetch_pending_sessions_join(
-        self, db_sess: SASession, scaling_group: str, pending_timeout: timedelta
-    ) -> list[PendingSessionData]:
+        self, db_sess: SASession, scaling_group: str
+    ) -> list[_PendingSessionData]:
         """
         Fetch pending sessions with kernels using single JOIN query.
         Returns strongly-typed PendingSessionData objects.
         """
-        now = datetime.now(tzutc())
 
         # Single JOIN query for sessions and kernels
         query = (
@@ -1689,23 +1718,17 @@ class ScheduleRepository:
                 & (SessionRow.status == SessionStatus.PENDING)
             )
         )
-
-        # Apply timeout filter
-        if pending_timeout.total_seconds() > 0:
-            timeout_cutoff = now - pending_timeout
-            query = query.where(SessionRow.created_at >= timeout_cutoff)
-
         result = await db_sess.execute(query)
 
         # Process results into strongly-typed objects
-        sessions_map: dict[SessionId, PendingSessionData] = {}
+        sessions_map: dict[SessionId, _PendingSessionData] = {}
 
         for row in result:
             session_id = row.id
 
             # Create or get session
             if session_id not in sessions_map:
-                sessions_map[session_id] = PendingSessionData(
+                sessions_map[session_id] = _PendingSessionData(
                     id=session_id,
                     access_key=row.access_key,
                     requested_slots=row.requested_slots,
@@ -1734,15 +1757,13 @@ class ScheduleRepository:
 
         return list(sessions_map.values())
 
-    async def _fetch_consolidated_session_data(
-        self, db_sess: SASession, scaling_group: str
-    ) -> list[ConsolidatedSessionData]:
+    async def _fetch_session_resource_policies(
+        self, db_sess: SASession, scaling_group: str, status_filter: tuple[SessionStatus, ...]
+    ) -> list[SessionResourcePolicyData]:
         """
-        Fetch all session-related data in a single query.
-        This consolidates what was previously done in:
-        - _get_resource_policy_snapshot
-        - _get_pending_session_snapshot
-        - _get_session_dependency_snapshot (partial)
+        Fetch session resource policies and limits in a single query.
+        This includes keypair policies, group limits, and domain limits
+        for sessions in the given scaling group with specified statuses.
         """
         comprehensive_query = (
             sa.select(
@@ -1753,6 +1774,7 @@ class ScheduleRepository:
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.status,
+                SessionRow.session_type,
                 SessionRow.requested_slots,
                 SessionRow.created_at,
                 # Keypair policy columns
@@ -1779,24 +1801,28 @@ class ScheduleRepository:
             )
             .outerjoin(GroupRow, SessionRow.group_id == GroupRow.id)
             .outerjoin(DomainRow, SessionRow.domain_name == DomainRow.name)
-            .where(SessionRow.scaling_group_name == scaling_group)
-            # Include all statuses - filter in memory for different uses
+            .where(
+                (SessionRow.scaling_group_name == scaling_group)
+                & (SessionRow.status.in_(status_filter))
+            )
         )
 
         result = []
         async for row in await db_sess.stream(comprehensive_query):
             result.append(
-                ConsolidatedSessionData(
+                SessionResourcePolicyData(
                     session_id=row.id,
                     access_key=row.access_key,
                     user_uuid=row.user_uuid,
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     status=row.status,
+                    session_type=row.session_type,
                     requested_slots=row.requested_slots,
                     created_at=row.created_at,
                     keypair_policy_name=row.kp_policy_name,
                     keypair_total_slots=row.kp_total_slots,
+                    keypair_default_for_unspecified=row.kp_default_for_unspecified,
                     keypair_max_concurrent=row.kp_max_concurrent,
                     keypair_max_sftp=row.kp_max_sftp,
                     keypair_max_pending_count=row.kp_max_pending,
@@ -1807,12 +1833,11 @@ class ScheduleRepository:
             )
         return result
 
-    async def _fetch_session_dependencies_optimized(
+    async def _fetch_session_dependencies(
         self, db_sess: SASession, session_ids: list[SessionId]
     ) -> dict[SessionId, list[SessionDependencyInfo]]:
         """
         Fetch all session dependencies in a single query.
-        Eliminates the N+1 pattern from the original implementation.
         """
         if not session_ids:
             return {}
@@ -1845,8 +1870,8 @@ class ScheduleRepository:
 
     @repository_decorator()
     async def _fetch_all_scheduling_database_data(
-        self, db_sess: SASession, scaling_group: str
-    ) -> Optional[AllSchedulingDatabaseData]:
+        self, db_sess: SASession, scaling_group: str, known_slot_types: Mapping[SlotName, SlotTypes]
+    ) -> Optional[_AllSchedulingDatabaseData]:
         """
         Execute ALL database queries in a single method.
         This is the ONLY method that should execute database queries for scheduling.
@@ -1858,15 +1883,14 @@ class ScheduleRepository:
         scaling_group_row = sg_result.scalar_one_or_none()
         if not scaling_group_row:
             return None
+        scaling_group_row = cast(ScalingGroupRow, scaling_group_row)
 
         # 2. Get pending sessions with kernels using single JOIN query
-        pending_sessions = await self._fetch_pending_sessions_join(
-            db_sess, scaling_group, scaling_group_row.scheduler_opts.pending_timeout
-        )
+        pending_sessions = await self._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Early exit if no pending sessions
         if not pending_sessions:
-            return AllSchedulingDatabaseData(
+            return _AllSchedulingDatabaseData(
                 scaling_group_row=scaling_group_row,
                 pending_sessions=[],
                 agents=None,
@@ -1920,8 +1944,10 @@ class ScheduleRepository:
             by_domain=dict(occupancy_by_domain),
         )
 
-        # Get consolidated session data for policies
-        consolidated_sessions = await self._fetch_consolidated_session_data(db_sess, scaling_group)
+        # Get session resource policies and limits for active sessions
+        consolidated_sessions = await self._fetch_session_resource_policies(
+            db_sess, scaling_group, USER_RESOURCE_OCCUPYING_SESSION_STATUSES
+        )
 
         # Get user policies
         user_uuids = {s.user_uuid for s in pending_sessions}
@@ -1932,6 +1958,7 @@ class ScheduleRepository:
                     UserRow.uuid,
                     KeyPairResourcePolicyRow.name,
                     KeyPairResourcePolicyRow.total_resource_slots,
+                    KeyPairResourcePolicyRow.default_for_unspecified,
                 )
                 .select_from(UserRow)
                 .join(KeyPairRow, UserRow.main_access_key == KeyPairRow.access_key)
@@ -1945,9 +1972,17 @@ class ScheduleRepository:
                 # Accept all policies, including those with empty ResourceSlot
                 # Empty ResourceSlot {} is valid and means no limits
                 if row.name:
+                    resource_policy_map = {
+                        "total_resource_slots": row.total_resource_slots,
+                        "default_for_unspecified": row.default_for_unspecified
+                        or DefaultForUnspecified.LIMITED,
+                    }
+                    total_resource_slots = ResourceSlot.from_policy(
+                        resource_policy_map, known_slot_types
+                    )
                     user_policies[row.uuid] = UserResourcePolicy(
                         name=row.name,
-                        total_resource_slots=row.total_resource_slots,
+                        total_resource_slots=total_resource_slots,
                     )
                     log.debug(
                         "User policy for {}: name={}, slots={}",
@@ -1958,7 +1993,7 @@ class ScheduleRepository:
 
         # Get session dependencies
         session_ids = [s.id for s in pending_sessions]
-        dependencies_map = await self._fetch_session_dependencies_optimized(db_sess, session_ids)
+        dependencies_map = await self._fetch_session_dependencies(db_sess, session_ids)
 
         snapshot_data = SnapshotDatabaseData(
             total_capacity=total_capacity,
@@ -1968,7 +2003,7 @@ class ScheduleRepository:
             session_dependencies=SessionDependencySnapshot(by_session=dependencies_map),
         )
 
-        return AllSchedulingDatabaseData(
+        return _AllSchedulingDatabaseData(
             scaling_group_row=scaling_group_row,
             pending_sessions=pending_sessions,
             agents=agents,
@@ -1976,7 +2011,7 @@ class ScheduleRepository:
         )
 
     def _transform_to_scheduling_context(
-        self, raw_data: RawSchedulingData
+        self, raw_data: _RawSchedulingData
     ) -> SchedulingContextData:
         """
         Transform raw DB data to domain objects.
@@ -1997,7 +2032,9 @@ class ScheduleRepository:
         )
 
         # 5. Transform system snapshot
-        system_snapshot = self._create_system_snapshot(raw_data.snapshot_data)
+        system_snapshot = self._create_system_snapshot(
+            raw_data.snapshot_data, raw_data.known_slot_types
+        )
 
         return SchedulingContextData(
             scaling_group_info=scaling_group_info,
@@ -2012,11 +2049,10 @@ class ScheduleRepository:
         return ScalingGroupInfo(
             scheduler_name=scaling_group_row.scheduler,
             agent_selection_strategy=scaling_group_row.scheduler_opts.agent_selection_strategy,
-            pending_timeout=scaling_group_row.scheduler_opts.pending_timeout,
         )
 
     def _transform_sessions_to_workloads(
-        self, sessions: list[PendingSessionData]
+        self, sessions: list[_PendingSessionData]
     ) -> list[SessionWorkload]:
         """Transform pending session data to workload objects."""
         workloads: list[SessionWorkload] = []
@@ -2079,41 +2115,44 @@ class ScheduleRepository:
         )
 
     def _create_system_snapshot(
-        self, snapshot_data: Optional[SnapshotDatabaseData]
+        self,
+        snapshot_data: Optional[SnapshotDatabaseData],
+        known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> SystemSnapshot:
         """Create system snapshot from raw snapshot data."""
         if snapshot_data:
-            # Extract resource policies
-            keypair_policies, _, group_limits, domain_limits, _ = self._extract_resource_policies(
+            # Extract resource policies (already filtered by status in query)
+            extracted_policies = self._extract_resource_policies(
                 snapshot_data.consolidated_sessions,
-                [
-                    SessionStatus.PENDING,
-                    SessionStatus.SCHEDULED,
-                    SessionStatus.PREPARING,
-                    SessionStatus.RUNNING,
-                ],
+                known_slot_types,
             )
 
             resource_policy = ResourcePolicySnapshot(
-                keypair_policies=keypair_policies,
+                keypair_policies=extracted_policies.keypair_policies,
                 user_policies=snapshot_data.user_policies,
-                group_limits=group_limits,
-                domain_limits=domain_limits,
+                group_limits=extracted_policies.group_limits,
+                domain_limits=extracted_policies.domain_limits,
             )
 
             # Extract pending sessions
             pending_sessions = self._extract_pending_sessions(snapshot_data.consolidated_sessions)
 
+            # Get concurrency from consolidated sessions or Redis
+            # First try to get from consolidated session data
+            concurrency = self._extract_concurrency_from_sessions(
+                snapshot_data.consolidated_sessions
+            )
+            # Note: For real-time accuracy, you may want to fetch from Redis instead:
+            # concurrency = await self._get_concurrency_snapshot(access_keys)
+
             system_snapshot = SystemSnapshot(
                 total_capacity=snapshot_data.total_capacity,
                 resource_occupancy=snapshot_data.resource_occupancy,
                 resource_policy=resource_policy,
-                concurrency=ConcurrencySnapshot(
-                    sessions_by_keypair={},  # Will be populated from Redis if needed
-                    sftp_sessions_by_keypair={},
-                ),
+                concurrency=concurrency,
                 pending_sessions=pending_sessions,
                 session_dependencies=snapshot_data.session_dependencies,
+                known_slot_types=known_slot_types,
             )
         else:
             # Create empty snapshot if no data
@@ -2130,6 +2169,7 @@ class ScheduleRepository:
                 ),
                 pending_sessions=PendingSessionSnapshot(by_keypair={}),
                 session_dependencies=SessionDependencySnapshot(by_session={}),
+                known_slot_types=known_slot_types,
             )
 
         return system_snapshot
@@ -2149,14 +2189,26 @@ class ScheduleRepository:
         - get_system_snapshot (only if pending sessions exist)
         - get_scheduling_config
         """
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
         async with self._db.begin_readonly_session() as db_sess:
-            raw_data = await self._fetch_raw_scheduling_data(db_sess, scaling_group)
+            raw_data = await self._fetch_all_scheduling_database_data(
+                db_sess, scaling_group, known_slot_types
+            )
 
         if raw_data is None or not raw_data.pending_sessions:
             return None
-        raw_value = await self._config_provider.legacy_etcd_config_loader.get_raw(
+
+        max_countainer_count = await self._config_provider.legacy_etcd_config_loader.get_raw(
             "config/agent/max-container-count"
         )
-        if raw_value is not None:
-            raw_data.max_container_count = int(raw_value)
-        return self._transform_to_scheduling_context(raw_data)
+        raw_scheduling_data = _RawSchedulingData(
+            scaling_group_row=raw_data.scaling_group_row,
+            pending_sessions=raw_data.pending_sessions,
+            known_slot_types=known_slot_types,
+            agents=raw_data.agents,
+            snapshot_data=raw_data.snapshot_data,
+            max_container_count=int(max_countainer_count) if max_countainer_count else None,
+        )
+        return self._transform_to_scheduling_context(raw_scheduling_data)
