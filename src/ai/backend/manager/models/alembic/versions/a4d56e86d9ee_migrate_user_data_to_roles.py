@@ -1,7 +1,7 @@
 """migrate user data to roles
 
 Revision ID: a4d56e86d9ee
-Revises: ec7a778bcb78
+Revises: 42feff246198
 Create Date: 2025-08-06 21:28:29.354670
 
 """
@@ -41,7 +41,7 @@ from ai.backend.manager.models.rbac_models.migration.utils import insert_from_cr
 
 # revision identifiers, used by Alembic.
 revision = "a4d56e86d9ee"
-down_revision = "ec7a778bcb78"
+down_revision = "42feff246198"
 branch_labels = None
 depends_on = None
 
@@ -109,8 +109,6 @@ def _migrate_user_data(db_conn: Connection) -> None:
     """
     Migrate user data to roles and permissions.
     All users have a default self role and permissions.
-
-    For easy migration, we save project ID to project's roles.description.
     """
     offset = 0
     page_size = 1000
@@ -139,8 +137,6 @@ def _migrate_project_data(db_conn: Connection) -> None:
     """
     Migrate project data to roles and permissions.
     All projects have a default admin role and a user role.
-
-    For easy migration, we save project ID to project's roles.description.
     """
     offset = 0
     page_size = 1000
