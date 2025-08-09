@@ -33,7 +33,7 @@ from ai.backend.manager.models.rbac_models.migration.user import (
     ProjectUserAssociationData,
     UserData,
     create_project_admin_role_and_permissions,
-    create_project_user_role_and_permissions,
+    create_project_member_role_and_permissions,
     create_user_self_role_and_permissions,
     map_user_to_project_role,
 )
@@ -149,7 +149,7 @@ def _migrate_project_data(db_conn: Connection) -> None:
         for row in rows:
             data = ProjectData.from_row(row)
             admin_input_data = create_project_admin_role_and_permissions(data)
-            user_input_data = create_project_user_role_and_permissions(data)
+            user_input_data = create_project_member_role_and_permissions(data)
             input_group.merge(admin_input_data)
             input_group.merge(user_input_data)
         insert_from_create_input_group(db_conn, input_group)
