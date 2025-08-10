@@ -72,7 +72,11 @@ class EntityType(enum.StrEnum):
         """
         Returns a set of entity types that are considered resource types.
         """
-        return {entity for entity in cls if entity not in cls._scope_types()}
+        return {
+            cls.VFOLDER,
+            cls.IMAGE,
+            cls.SESSION,
+        }
 
     @classmethod
     def owner_accessible_entity_types_in_user(cls) -> set["EntityType"]:
