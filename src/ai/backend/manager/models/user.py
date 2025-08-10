@@ -21,7 +21,7 @@ from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
+from ai.backend.manager.data.user.types import UserCreator, UserData, UserRole, UserStatus
 
 from .base import (
     Base,
@@ -184,6 +184,26 @@ class UserRow(Base):
         back_populates="user_row",
         primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
     )
+
+    @classmethod
+    def from_creator(cls, creator: UserCreator) -> Self:
+        """
+        Create a UserRow instance from a UserCreator instance.
+        """
+        return cls(
+            username=creator.username,
+            email=creator.email,
+            need_password_change=creator.need_password_change,
+            full_name=creator.full_name,
+            description=creator.description,
+            status=creator.status or UserStatus.ACTIVE,
+            domain_name=creator.domain_name,
+            role=creator.role or UserRole.USER,
+            resource_policy=creator.resource_policy,
+            allowed_client_ip=creator.allowed_client_ip,
+            totp_activated=creator.totp_activated,
+            sudo_session_enabled=creator.sudo_session_enabled or False,
+        )
 
     @classmethod
     def load_keypairs(cls) -> Callable:

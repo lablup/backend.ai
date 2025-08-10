@@ -5,13 +5,13 @@ from .id import ObjectId, ScopeId
 
 
 @dataclass
-class AssociationScopesEntitiesCreateInput:
+class ScopeEntityMappingCreateInput:
     scope_id: ScopeId
     object_id: ObjectId
 
 
 @dataclass
-class AssociationScopesEntitiesData:
+class ScopeEntityMappingData:
     id: uuid.UUID
     scope_id: ScopeId
     object_id: ObjectId

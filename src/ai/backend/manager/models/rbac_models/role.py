@@ -23,6 +23,8 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.user.types import UserData
 
 from ..base import (
     Base,
@@ -131,4 +133,28 @@ class RoleRow(Base):
             name=data.name,
             status=data.status,
             description=data.description,
+        )
+
+    @classmethod
+    def from_user_data(cls, user_data: UserData) -> Self:
+        role_name = f"user_{user_data.username}"
+        return cls(
+            name=role_name,
+            source=RoleSource.CUSTOM,
+        )
+
+    @classmethod
+    def project_admin_role(cls, project_data: ProjectData) -> Self:
+        role_name = f"project_{str(project_data.id)[:8]}_admin"
+        return cls(
+            name=role_name,
+            source=RoleSource.SYSTEM,
+        )
+
+    @classmethod
+    def project_member_role(cls, project_data: ProjectData) -> Self:
+        role_name = f"project_{str(project_data.id)[:8]}"
+        return cls(
+            name=role_name,
+            source=RoleSource.CUSTOM,
         )

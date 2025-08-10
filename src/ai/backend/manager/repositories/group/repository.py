@@ -2,7 +2,7 @@ import copy
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from uuid import UUID
 
 import msgpack
@@ -13,16 +13,21 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.project.types import ProjectCreator, ProjectData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scope_permission import ScopePermissionRow
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
-from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.services.group.types import GroupData, GroupModifier
 
 # Layer-specific decorator for group repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
@@ -51,17 +56,71 @@ class GroupRepository:
         return result.scalar_one_or_none()
 
     @repository_decorator()
-    async def create(self, creator: GroupCreator) -> GroupData:
+    async def create(self, creator: ProjectCreator) -> ProjectData:
         """Create a new group."""
-        data = creator.fields_to_store()
         async with self._db.begin_session() as session:
-            query = sa.insert(groups).values(data).returning(groups)
-            result = await session.execute(query)
-            row = result.first()
-            group_data = GroupData.from_row(row)
-            if group_data is None:
-                raise GroupNotFound()
-            return group_data
+            project_data = await self._create_project_row(session, creator)
+            await self._create_project_rbac_data(session, project_data)
+            return project_data
+
+    async def _create_project_row(
+        self, db_session: SASession, creator: ProjectCreator
+    ) -> ProjectData:
+        project_row = GroupRow.from_creator(creator)
+        db_session.add(project_row)
+        await db_session.flush()
+        return project_row.to_data()
+
+    async def _create_project_rbac_data(
+        self, db_session: SASession, project_data: ProjectData
+    ) -> None:
+        await self._create_admin_role(db_session, project_data)
+        await self._create_member_role(db_session, project_data)
+
+    async def _create_admin_role(
+        self, db_session: SASession, project_data: ProjectData
+    ) -> RoleData:
+        admin_role_row = RoleRow.project_admin_role(project_data)
+        db_session.add(admin_role_row)
+        await db_session.flush()
+        data = admin_role_row.to_data()
+        await self._create_admin_permissions(db_session, data.id)
+        return data
+
+    async def _create_admin_permissions(self, db_session: SASession, role_id: UUID) -> None:
+        scope_permission_inputs: list[dict[str, Any]] = []
+        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION, EntityType.USER):
+            for operation in OperationType:
+                scope_permission_inputs.append({
+                    "role_id": role_id,
+                    "scope_type": ScopeType.PROJECT,
+                    "scope_id": role_id,
+                    "entity_type": entity,
+                    "operation": operation,
+                })
+        await db_session.execute(sa.insert(ScopePermissionRow), scope_permission_inputs)
+
+    async def _create_member_role(
+        self, db_session: SASession, project_data: ProjectData
+    ) -> RoleData:
+        member_role_row = RoleRow.project_member_role(project_data)
+        db_session.add(member_role_row)
+        await db_session.flush()
+        data = member_role_row.to_data()
+        await self._create_member_permissions(db_session, data.id)
+        return data
+
+    async def _create_member_permissions(self, db_session: SASession, role_id: UUID) -> None:
+        scope_permission_inputs: list[dict[str, Any]] = []
+        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION, EntityType.USER):
+            scope_permission_inputs.append({
+                "role_id": role_id,
+                "scope_type": ScopeType.PROJECT,
+                "scope_id": role_id,
+                "entity_type": entity,
+                "operation": OperationType.READ,
+            })
+        await db_session.execute(sa.insert(ScopePermissionRow), scope_permission_inputs)
 
     @repository_decorator()
     async def modify_validated(

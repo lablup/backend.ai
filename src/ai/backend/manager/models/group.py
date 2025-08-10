@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from collections.abc import Container, Sequence
@@ -8,7 +7,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Any,
     Callable,
     Iterable,
     Optional,
@@ -30,6 +28,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.project.types import ProjectCreator, ProjectData, ProjectType
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -121,21 +120,6 @@ class AssocGroupUserRow(Base):
     group = relationship("GroupRow", back_populates="users")
 
 
-class ProjectType(enum.StrEnum):
-    GENERAL = "general"
-    MODEL_STORE = "model-store"
-
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[ProjectType]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "GENERAL":
-                return cls.GENERAL
-            case "MODEL_STORE" | "MODEL-STORE":
-                return cls.MODEL_STORE
-        return None
-
-
 groups = sa.Table(
     "groups",
     mapper_registry.metadata,
@@ -216,6 +200,33 @@ class GroupRow(Base):
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
     )
+
+    @classmethod
+    def from_creator(cls, creator: ProjectCreator) -> Self:
+        return cls(
+            name=creator.name,
+            domain_name=creator.domain_name,
+            resource_policy=creator.resource_policy,
+            type=creator.type,
+            description=creator.description,
+            is_active=creator.is_active,
+            total_resource_slots=creator.total_resource_slots,
+            allowed_vfolder_hosts=creator.allowed_vfolder_hosts,
+            integration_id=creator.integration_id,
+            container_registry=creator.container_registry,
+        )
+
+    def to_data(self) -> ProjectData:
+        return ProjectData(
+            id=self.id,
+            name=self.name,
+            type=self.type,
+            domain_name=self.domain_name,
+            description=self.description,
+            total_resource_slots=self.total_resource_slots,
+            created_at=self.created_at,
+            updated_at=self.modified_at,
+        )
 
     @classmethod
     async def get(

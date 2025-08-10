@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
-
-from ...data.permission.id import (
-    ObjectId,
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    ScopeEntityMappingCreateInput,
+    ScopeEntityMappingData,
 )
 from ...data.permission.role import (
     PermissionCheckInput,
@@ -19,6 +19,10 @@ from ...data.permission.role import (
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
+
+from ...data.permission.id import (
+    ObjectId,
+)
 from ...data.permission.status import (
     RoleStatus,
 )
@@ -26,11 +30,13 @@ from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ...errors.common import ObjectNotFound
+from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from ...models.rbac_models.object_permission import ObjectPermissionRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
+from ..types import RepositoryArgs
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
@@ -39,8 +45,8 @@ repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISS
 class PermissionControllerRepository:
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
+    def __init__(self, args: RepositoryArgs) -> None:
+        self._db = args.db
 
     @repository_decorator()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
@@ -78,6 +84,22 @@ class PermissionControllerRepository:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
         return cast(Optional[RoleRow], role_row)
+
+    @repository_decorator()
+    async def register_entity_to_scope(
+        self,
+        data: ScopeEntityMappingCreateInput,
+    ) -> ScopeEntityMappingData:
+        async with self._db.begin_session() as db_session:
+            row = AssociationScopesEntitiesRow(
+                scope_type=data.scope_id.scope_type,
+                scope_id=data.scope_id.scope_id,
+                entity_type=data.object_id.entity_type,
+                entity_id=data.object_id.entity_id,
+            )
+            db_session.add(row)  # type: ignore[arg-type]
+            await db_session.flush()
+            return row.to_data()
 
     @repository_decorator()
     async def update_role(self, data: RoleUpdateInput) -> RoleData:

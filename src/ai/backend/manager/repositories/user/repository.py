@@ -1,6 +1,7 @@
+from collections.abc import Collection
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -13,6 +14,13 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    RoleSource,
+    ScopeType,
+)
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -20,9 +28,18 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
 from ai.backend.manager.models import kernels
-from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
+from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
+    GroupRow,
+    ProjectType,
+    association_groups_users,
+    groups,
+)
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scope_permission import ScopePermissionRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
@@ -67,31 +84,24 @@ class UserRepository:
         """
         Create a new user with default keypair and group associations.
         """
-        user_data = user_creator.fields_to_store()
-        async with self._db.begin() as conn:
+        # user_data = user_creator.fields_to_store()
+        async with self._db.begin_session() as db_session:
             # Insert user
-            user_insert_query = sa.insert(users).values(user_data)
-            query = user_insert_query.returning(user_insert_query.table)
-            result = await conn.execute(query)
-            created_user = result.first()
-
-            if not created_user:
-                raise RuntimeError("Failed to create user")
+            created_user = await self._create_user(db_session, user_creator)
 
             # Create default keypair
-            email = user_data["email"]
             keypair_creator = KeyPairCreator(
-                is_active=(user_data["status"] == UserStatus.ACTIVE),
-                is_admin=user_data["role"] in ["superadmin", "admin"],
+                is_active=(created_user.status == UserStatus.ACTIVE),
+                is_admin=created_user.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
-            kp_data = prepare_new_keypair(email, keypair_creator)
+            kp_data = prepare_new_keypair(created_user.email, keypair_creator)
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
                 user=created_user.uuid,
             )
-            await conn.execute(kp_insert_query)
+            await db_session.execute(kp_insert_query)
 
             # Update user main_access_key
             main_ak = kp_data["access_key"]
@@ -100,17 +110,106 @@ class UserRepository:
                 .where(users.c.uuid == created_user.uuid)
                 .values(main_access_key=main_ak)
             )
-            await conn.execute(update_query)
+            await db_session.execute(update_query)
+            created_user.main_access_key = main_ak
 
             # Add user to groups including model store project
-            await self._add_user_to_groups(
-                conn, created_user.uuid, user_data["domain_name"], group_ids or []
+            await self._add_user_to_projects(
+                db_session, created_user.uuid, created_user.domain_name, group_ids or []
             )
 
-            res = UserData.from_row(created_user)
-        if not res:
-            raise RuntimeError("Failed to convert created user row to UserData")
-        return res
+            # Create RBAC associations
+            await self._create_user_rbac_data(db_session, created_user)
+            project_ids: list[UUID] = []
+            for gid in group_ids or []:
+                try:
+                    project_ids.append(UUID(gid))
+                except (ValueError, TypeError):
+                    continue
+            await self._map_user_to_project_roles(db_session, created_user.id, project_ids)
+            return created_user
+
+    async def _create_user(self, db_session: SASession, user_creator: UserCreator) -> UserData:
+        row = UserRow.from_creator(user_creator)
+        db_session.add(row)
+        await db_session.flush()
+        return row.to_data()
+
+    async def _create_user_rbac_data(self, db_session: SASession, user_data: UserData) -> None:
+        """
+        Create RBAC associations for the new user.
+        """
+        role = await self._create_role(db_session, user_data)
+        await self._create_scope_permissions(db_session, role.id)
+        await self._map_user_to_role(db_session, user_data.id, role.id)
+
+    async def _map_user_to_project_roles(
+        self, db_session: SASession, user_id: UUID, project_ids: Collection[UUID]
+    ) -> None:
+        roles = await self._query_custom_project_roles_by_project_ids(
+            db_session,
+            project_ids,
+        )
+        role_ids = {role.id for role in roles}
+        for role_id in role_ids:
+            await self._map_user_to_role(db_session, user_id, role_id)
+
+    async def _query_custom_project_roles_by_project_ids(
+        self, db_session: SASession, project_ids: Collection[UUID]
+    ) -> list[RoleData]:
+        if not project_ids:
+            return []
+        str_project_ids = [str(project) for project in project_ids]
+        query = (
+            sa.select(RoleRow)
+            .join(ScopePermissionRow, RoleRow.id == ScopePermissionRow.role_id)
+            .where(
+                sa.and_(
+                    RoleRow.source == RoleSource.CUSTOM,
+                    ScopePermissionRow.scope_type == ScopeType.PROJECT,
+                    ScopePermissionRow.scope_id.in_(str_project_ids),  # type: ignore[attr-defined]
+                )
+            )
+        )
+        result = await db_session.scalars(query)
+        roles = cast(list[RoleRow], result.all())
+        return [role.to_data() for role in roles]
+
+    async def _create_role(self, db_session: SASession, user_data: UserData) -> RoleData:
+        """
+        Create a role for the user based on their data.
+        """
+        role_row = RoleRow.from_user_data(user_data)
+        db_session.add(role_row)
+        await db_session.flush()
+        return role_row.to_data()
+
+    async def _create_scope_permissions(self, db_session: SASession, role_id: UUID) -> None:
+        """
+        Create scope permissions for the role.
+        """
+        scope_permission_inputs: list[dict[str, Any]] = []
+        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION):
+            for operation in OperationType:
+                scope_permission_inputs.append({
+                    "role_id": role_id,
+                    "scope_type": ScopeType.USER,
+                    "scope_id": role_id,
+                    "entity_type": entity,
+                    "operation": operation,
+                })
+        await db_session.execute(sa.insert(ScopePermissionRow), scope_permission_inputs)
+
+    async def _map_user_to_role(self, db_session: SASession, user_id: UUID, role_id: UUID) -> None:
+        """
+        Map user to a role.
+        """
+        user_role_row = UserRoleRow(
+            user_id=user_id,
+            role_id=role_id,
+        )
+        db_session.add(user_role_row)
+        await db_session.flush()
 
     @repository_decorator()
     async def update_user_validated(
@@ -209,30 +308,33 @@ class UserRepository:
         # For now, allow access - this can be extended with ownership validation
         return True
 
-    async def _add_user_to_groups(
-        self, conn, user_uuid: UUID, domain_name: str, group_ids: list[str]
+    async def _add_user_to_projects(
+        self, db_session: SASession, user_uuid: UUID, domain_name: str, project_ids: list[str]
     ) -> None:
         """Private method to add user to groups including model store project."""
         # Check for model store project
-        model_store_query = sa.select([groups.c.id]).where(groups.c.type == ProjectType.MODEL_STORE)
-        model_store_project = (await conn.execute(model_store_query)).first()
+        model_store_query = sa.select(GroupRow).where(GroupRow.type == ProjectType.MODEL_STORE)
+        model_store_query_result = (await db_session.scalars(model_store_query)).first()
+        model_store = cast(Optional[GroupRow], model_store_query_result)
 
-        gids_to_join = list(group_ids)
-        if model_store_project:
-            gids_to_join.append(model_store_project["id"])
+        project_ids_to_add = list(project_ids)
+        if model_store is not None:
+            project_ids_to_add.append(model_store.id)
 
-        if gids_to_join:
+        if project_ids_to_add:
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.id.in_(gids_to_join))
+                sa.select(GroupRow)
+                .where(GroupRow.domain_name == domain_name)
+                .where(GroupRow.id.in_(project_ids_to_add))
             )
-            grps = (await conn.execute(query)).all()
-            if grps:
-                group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
-                group_insert_query = sa.insert(association_groups_users).values(group_data)
-                await conn.execute(group_insert_query)
+            query_result = (await db_session.scalars(query)).all()
+            projects = cast(list[GroupRow], query_result)
+            if projects:
+                group_data = [
+                    {"user_id": user_uuid, "group_id": project.id} for project in projects
+                ]
+                group_insert_query = sa.insert(AssocGroupUserRow).values(group_data)
+                await db_session.execute(group_insert_query)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str
