@@ -30,6 +30,16 @@ from ai.backend.manager.models.rbac_models.migration.vfolder import (
 PROJECT_RESOURCE_POLICY_NAME = "default"
 USER_RESOURCE_POLICY_NAME = "default"
 
+    def test_system_role_gets_all_operations(self):
+        """Test that system-defined roles get all vfolder operations."""
+        role = RoleData(
+            id=uuid.uuid4(),
+            source=RoleSource.SYSTEM,
+        )
+        scope = ScopeData(
+            type=ScopeType.PROJECT,
+            id=str(uuid.uuid4()),
+        )
 
 class TestAddVfolderScopePermissionsToRole:
     """Test add_vfolder_scope_permissions_to_role function."""
@@ -180,25 +190,26 @@ class TestMapUserVFolderToUserRole:
         # Check scope permissions - should have all operations
         assert len(result.scope_permissions) == len(OperationType)
 
+        assert len(result.scope_permissions) == len(OPERATIONS_FOR_SYSTEM_ROLE)
         for perm in result.scope_permissions:
-            assert perm.role_id == role_id
-            assert perm.scope_type == ScopeType.USER
-            assert perm.scope_id == str(user_vfolder_data.user_id)
-            assert perm.entity_type == EntityType.VFOLDER
-            assert perm.operation in [str(op) for op in OperationType]
+            assert perm.role_id == role.id
+            assert perm.scope_type == scope.type.to_original()
+            assert perm.scope_id == scope.id
+            assert perm.entity_type == EntityType.VFOLDER.to_original()
+            assert perm.operation in [op.to_original() for op in OPERATIONS_FOR_SYSTEM_ROLE]
 
-        # Check all operations are present
-        operations = {perm.operation for perm in result.scope_permissions}
-        expected_operations = {str(op) for op in OperationType}
-        assert operations == expected_operations
+    def test_custom_role_gets_limited_operations(self):
+        """Test that custom-defined roles get limited vfolder operations."""
+        role = RoleData(
+            id=uuid.uuid4(),
+            source=RoleSource.CUSTOM,
+        )
+        scope = ScopeData(
+            type=ScopeType.USER,
+            id=str(uuid.uuid4()),
+        )
 
-        # Check association scopes entities
-        assert len(result.association_scopes_entities) == 1
-        assoc = result.association_scopes_entities[0]
-        assert assoc.scope_id.scope_type == ScopeType.USER
-        assert assoc.scope_id.scope_id == str(user_vfolder_data.user_id)
-        assert assoc.object_id.entity_type == EntityType.VFOLDER
-        assert assoc.object_id.entity_id == str(user_vfolder_data.id)
+        result = add_vfolder_scope_permissions_to_role(role, scope)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.USER
         assert assoc.scope_id.scope_id == str(user_id)
@@ -220,41 +231,8 @@ class TestMapUserVFolderToUserRole:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
-        # Each result should have the same scope but different object
-        for vfolder_data, result in zip(vfolders, results):
-            assert len(result.scope_permissions) == len(OperationType)
-            assert result.association_scopes_entities[0].scope_id.scope_id == str(user_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(vfolder_data.id)
-
-
-class TestMapProjectVFolderToProjectAdminRole:
-    """Test map_project_vfolder_to_project_admin_role function."""
-
-    def test_admin_role_mapping(self, role_id, project_vfolder_data):
-        """Test project vfolder mapping with admin role."""
-        result = map_project_vfolder_to_project_admin_role(role_id, project_vfolder_data)
-
-        # Admin should have all operations
-        assert len(result.scope_permissions) == len(OperationType)
-
-        for perm in result.scope_permissions:
-            assert perm.role_id == role_id
-            assert perm.scope_type == ScopeType.PROJECT
-            assert perm.scope_id == str(project_vfolder_data.project_id)
-            assert perm.entity_type == EntityType.VFOLDER
-
-        # Check all operations are present
-        operations = {perm.operation for perm in result.scope_permissions}
-        expected_operations = {str(op) for op in OperationType}
-        assert operations == expected_operations
-
-        # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
-        assert assoc.scope_id.scope_type == ScopeType.PROJECT
-        assert assoc.scope_id.scope_id == str(project_vfolder_data.project_id)
-        assert assoc.object_id.entity_type == EntityType.VFOLDER
-        assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.PROJECT
         assert assoc.scope_id.scope_id == str(group_id)
@@ -280,6 +258,7 @@ class TestMapProjectVFolderToProjectAdminRole:
         assert result.scope_permissions == []
         assert result.object_permissions == []
 
+        result = map_vfolder_entity_to_scope(vfolder)
 
 class TestMapVfolderPermissionDataToScope:
     """Test map_vfolder_permission_data_to_scope function."""
@@ -305,10 +284,6 @@ class TestMapVfolderPermissionDataToScope:
         # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
-        assert assoc.scope_id.scope_type == ScopeType.PROJECT
-        assert assoc.scope_id.scope_id == str(project_vfolder_data.project_id)
-        assert assoc.object_id.entity_type == EntityType.VFOLDER
-        assert assoc.object_id.entity_id == str(project_vfolder_data.id)
 
         assert assoc.scope_id.scope_type == OriginalScopeType.USER
         assert assoc.scope_id.scope_id == str(user_id)

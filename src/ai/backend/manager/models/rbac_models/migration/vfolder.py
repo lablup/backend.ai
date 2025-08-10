@@ -10,7 +10,6 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesCreateInput,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import ObjectPermissionCreateInput
 from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
 from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
 from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
@@ -98,6 +97,18 @@ class VFolderData:
     group_id: uuid.UUID | None
 
 
+class VFolderOwnershipType(enum.StrEnum):
+    """
+    Ownership type of virtual folder.
+    """
+
+    USER = "user"
+    GROUP = "group"
+
+    def to_original(self) -> OriginalVFolderOwnershipType:
+        return OriginalVFolderOwnershipType(self.value)
+
+
 class VFolderPermission(enum.StrEnum):
     """
     Mount permission for vfolder.
@@ -108,6 +119,43 @@ class VFolderPermission(enum.StrEnum):
     READ_WRITE = "rw"
     RW_DELETE = "wd"
     OWNER_PERM = "wd"  # resolved as RW_DELETE
+
+    def to_original(self) -> OriginalVFolderPermission:
+        return OriginalVFolderPermission(self.value)
+
+
+@dataclass
+class RoleData:
+    id: uuid.UUID
+    source: RoleSource
+
+    @classmethod
+    def from_row(cls, row: Row) -> Self:
+        return cls(
+            id=row.id,
+            source=RoleSource(row.source),
+        )
+
+
+@dataclass
+class ScopeData:
+    type: ScopeType
+    id: str
+
+    @classmethod
+    def from_row(cls, row: Row) -> Self:
+        return cls(
+            type=ScopeType(row.scope_type),
+            id=row.scope_id,
+        )
+
+
+@dataclass
+class VFolderData:
+    id: uuid.UUID
+    ownership_type: VFolderOwnershipType
+    user_id: uuid.UUID | None
+    group_id: uuid.UUID | None
 
 
 @dataclass
