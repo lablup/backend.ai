@@ -9,7 +9,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
-from ai.backend.manager.models.rbac_models.migrate.user import (
+from ai.backend.manager.models.rbac_models.migration.user import (
     ADMIN_OPERATIONS,
     ADMIN_ROLE_NAME_SUFFIX,
     ROLE_NAME_PREFIX,
@@ -19,7 +19,7 @@ from ai.backend.manager.models.rbac_models.migrate.user import (
     UserData,
     UserRole,
     create_project_admin_role_and_permissions,
-    create_project_user_role_and_permissions,
+    create_project_member_role_and_permissions,
     create_user_self_role_and_permissions,
     map_user_to_project_role,
 )
@@ -193,11 +193,11 @@ class TestCreateProjectAdminRoleAndPermissions:
 
 
 class TestCreateProjectUserRoleAndPermissions:
-    """Test create_project_user_role_and_permissions function."""
+    """Test create_project_member_role_and_permissions function."""
 
     def test_project_user_role_creation(self, project_data):
         """Test creating project user role and permissions."""
-        result = create_project_user_role_and_permissions(project_data)
+        result = create_project_member_role_and_permissions(project_data)
 
         # Check role creation
         assert len(result.roles) == 1
@@ -226,7 +226,7 @@ class TestCreateProjectUserRoleAndPermissions:
     def test_user_vs_admin_permissions_difference(self, project_data):
         """Test the difference between user and admin project permissions."""
         admin_result = create_project_admin_role_and_permissions(project_data)
-        user_result = create_project_user_role_and_permissions(project_data)
+        user_result = create_project_member_role_and_permissions(project_data)
 
         # Admin should have more permissions
         assert len(admin_result.scope_permissions) > len(user_result.scope_permissions)
@@ -338,7 +338,7 @@ class TestComplexScenarios:
 
         # Step 2: Create project roles
         project1_admin_result = create_project_admin_role_and_permissions(project1)
-        project2_user_result = create_project_user_role_and_permissions(project2)
+        project2_user_result = create_project_member_role_and_permissions(project2)
 
         # Step 3: Map user to projects
         # User is admin in project1

@@ -11,14 +11,14 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.role import RoleCreateInput
 from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
-from ai.backend.manager.data.permission.types import (
+from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
+
+from .enums import (
     EntityType,
     OperationType,
     RoleSource,
     ScopeType,
 )
-from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
-
 from .types import (
     ADMIN_ROLE_NAME_SUFFIX,
     ROLE_NAME_PREFIX,
@@ -129,16 +129,16 @@ def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInp
     role_id = uuid.uuid4()
     role_input = RoleCreateInput(
         name=user.role_name(),
-        source=RoleSource.SYSTEM,
+        source=RoleSource.SYSTEM.to_original(),
         id=role_id,
     )
     scope_permission_inputs: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
             role_id=role_id,
-            scope_type=ScopeType.USER,
+            scope_type=ScopeType.USER.to_original(),
             scope_id=str(user.id),
-            entity_type=EntityType.USER,
-            operation=operation,
+            entity_type=EntityType.USER.to_original(),
+            operation=operation.to_original(),
         )
         for operation in USER_SELF_SCOPE_OPERATIONS
     ]
@@ -157,20 +157,22 @@ def create_project_admin_role_and_permissions(project: ProjectData) -> Permissio
     """
     Create an admin role and permissions for a project.
     This role allows the user to manage the project.
+
+    The admin role is created with SYSTEM source and has all operations.
     """
     role_id = uuid.uuid4()
     role_input = RoleCreateInput(
         name=project.role_name(is_admin=True),
-        source=RoleSource.SYSTEM,
+        source=RoleSource.SYSTEM.to_original(),
         id=role_id,
     )
     scope_permission_inputs: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
             role_id=role_id,
-            scope_type=ScopeType.PROJECT,
+            scope_type=ScopeType.PROJECT.to_original(),
             scope_id=str(project.id),
-            entity_type=EntityType.USER,
-            operation=operation,
+            entity_type=EntityType.USER.to_original(),
+            operation=operation.to_original(),
         )
         for operation in ADMIN_OPERATIONS
     ]
@@ -184,20 +186,22 @@ def create_project_member_role_and_permissions(project: ProjectData) -> Permissi
     """
     Create a member role and permissions for a project.
     This role allows the user to read the project.
+
+    The member role is created with CUSTOM source and has only READ operation.
     """
     role_id = uuid.uuid4()
     role_input = RoleCreateInput(
         name=project.role_name(is_admin=False),
-        source=RoleSource.CUSTOM,
+        source=RoleSource.CUSTOM.to_original(),
         id=role_id,
     )
     scope_permission_inputs: list[ScopePermissionCreateInput] = [
         ScopePermissionCreateInput(
             role_id=role_id,
-            scope_type=ScopeType.PROJECT,
+            scope_type=ScopeType.PROJECT.to_original(),
             scope_id=str(project.id),
-            entity_type=EntityType.USER,
-            operation=OperationType.READ,
+            entity_type=EntityType.USER.to_original(),
+            operation=OperationType.READ.to_original(),
         )
     ]
     return PermissionCreateInputGroup(
@@ -219,11 +223,11 @@ def map_user_to_project_role(
     )
     association_input = AssociationScopesEntitiesCreateInput(
         scope_id=ScopeId(
-            scope_type=ScopeType.PROJECT,
+            scope_type=ScopeType.PROJECT.to_original(),
             scope_id=str(association.project_id),
         ),
         object_id=ObjectId(
-            entity_type=EntityType.USER,
+            entity_type=EntityType.USER.to_original(),
             entity_id=str(association.user_id),
         ),
     )
