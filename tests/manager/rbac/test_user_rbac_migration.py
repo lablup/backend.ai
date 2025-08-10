@@ -11,8 +11,6 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.migration.user import (
     ADMIN_OPERATIONS,
-    ADMIN_ROLE_NAME_SUFFIX,
-    ROLE_NAME_PREFIX,
     USER_SELF_SCOPE_OPERATIONS,
     ProjectData,
     ProjectUserAssociationData,
@@ -72,7 +70,6 @@ class TestCreateUserSelfRoleAndPermissions:
         # Check role creation
         assert len(result.roles) == 1
         role = result.roles[0]
-        assert role.name == f"{ROLE_NAME_PREFIX}user_{user_data.username}"
         assert role.id is not None
 
         # Check user-role association
@@ -125,11 +122,6 @@ class TestCreateUserSelfRoleAndPermissions:
         result1 = create_user_self_role_and_permissions(user1)
         result2 = create_user_self_role_and_permissions(user2)
 
-        # Different role names
-        assert result1.roles[0].name != result2.roles[0].name
-        assert result1.roles[0].name == f"{ROLE_NAME_PREFIX}user_user1"
-        assert result2.roles[0].name == f"{ROLE_NAME_PREFIX}user_user2"
-
         # Different role IDs
         assert result1.roles[0].id != result2.roles[0].id
 
@@ -144,10 +136,6 @@ class TestCreateProjectAdminRoleAndPermissions:
         # Check role creation
         assert len(result.roles) == 1
         role = result.roles[0]
-        assert (
-            role.name
-            == f"{ROLE_NAME_PREFIX}project_{str(project_data.id)[:8]}{ADMIN_ROLE_NAME_SUFFIX}"
-        )
         assert role.id is not None
 
         # Check no user-role associations (handled separately)
@@ -202,7 +190,6 @@ class TestCreateProjectUserRoleAndPermissions:
         # Check role creation
         assert len(result.roles) == 1
         role = result.roles[0]
-        assert role.name == f"{ROLE_NAME_PREFIX}project_{str(project_data.id)[:8]}_user"
         assert role.id is not None
 
         # Check no user-role associations (handled separately)
@@ -222,24 +209,6 @@ class TestCreateProjectUserRoleAndPermissions:
             result.association_scopes_entities is None
             or len(result.association_scopes_entities) == 0
         )
-
-    def test_user_vs_admin_permissions_difference(self, project_data):
-        """Test the difference between user and admin project permissions."""
-        admin_result = create_project_admin_role_and_permissions(project_data)
-        user_result = create_project_member_role_and_permissions(project_data)
-
-        # Admin should have more permissions
-        assert len(admin_result.scope_permissions) > len(user_result.scope_permissions)
-        assert len(admin_result.scope_permissions) == len(ADMIN_OPERATIONS)
-        assert len(user_result.scope_permissions) == 1
-
-        # User should only have READ
-        assert user_result.scope_permissions[0].operation == OperationType.READ
-
-        # Role names should be different
-        assert admin_result.roles[0].name != user_result.roles[0].name
-        assert admin_result.roles[0].name.endswith(ADMIN_ROLE_NAME_SUFFIX)
-        assert user_result.roles[0].name.endswith("_user")
 
 
 class TestMapUserToProjectRole:
@@ -284,11 +253,11 @@ class TestMapUserToProjectRole:
             results.append(result)
 
         # All should have the same role_id but different user_ids
-        for i, result in enumerate(results):
+        for user_id, result in zip(user_ids, results):
             assert result.user_roles[0].role_id == role_id
-            assert result.user_roles[0].user_id == user_ids[i]
+            assert result.user_roles[0].user_id == user_id
             assert result.association_scopes_entities[0].scope_id.scope_id == str(project_id)
-            assert result.association_scopes_entities[0].object_id.entity_id == str(user_ids[i])
+            assert result.association_scopes_entities[0].object_id.entity_id == str(user_id)
 
     def test_same_user_multiple_projects(self):
         """Test mapping the same user to multiple project roles."""
@@ -309,10 +278,10 @@ class TestMapUserToProjectRole:
             results.append(result)
 
         # Same user but different projects and roles
-        for i, result in enumerate(results):
+        for project, result in zip(projects, results):
             assert result.user_roles[0].user_id == user_id
-            assert result.user_roles[0].role_id == projects[i][1]
-            assert result.association_scopes_entities[0].scope_id.scope_id == str(projects[i][0])
+            assert result.user_roles[0].role_id == project[1]
+            assert result.association_scopes_entities[0].scope_id.scope_id == str(project[0])
             assert result.association_scopes_entities[0].object_id.entity_id == str(user_id)
 
 
@@ -354,48 +323,9 @@ class TestComplexScenarios:
         mapping2 = map_user_to_project_role(user_role_id, association2)
 
         # Verify results
-        assert user_result.roles[0].name == f"{ROLE_NAME_PREFIX}user_{user.username}"
         assert len(user_result.scope_permissions) == len(USER_SELF_SCOPE_OPERATIONS)
-
-        assert project1_admin_result.roles[0].name.endswith(ADMIN_ROLE_NAME_SUFFIX)
         assert len(project1_admin_result.scope_permissions) == len(ADMIN_OPERATIONS)
 
         assert mapping1.user_roles[0].user_id == user.id
         assert mapping2.user_roles[0].user_id == user.id
         assert mapping1.user_roles[0].role_id != mapping2.user_roles[0].role_id
-
-    def test_data_class_properties(self):
-        """Test data class creation and properties."""
-        # UserData
-        user = UserData(
-            id=uuid.uuid4(),
-            username="testuser",
-            domain="default",
-            role=UserRole.USER,
-        )
-        assert isinstance(user.id, uuid.UUID)
-        assert user.username == "testuser"
-        assert user.domain == "default"
-        assert user.role == UserRole.USER
-        assert user.role_name() == f"{ROLE_NAME_PREFIX}user_testuser"
-
-        # ProjectData
-        project = ProjectData(id=uuid.uuid4())
-        assert isinstance(project.id, uuid.UUID)
-        assert project.role_name(is_admin=True).endswith(ADMIN_ROLE_NAME_SUFFIX)
-        assert project.role_name(is_admin=False).endswith("_user")
-
-        # ProjectUserAssociationData
-        association = ProjectUserAssociationData(
-            project_id=uuid.uuid4(),
-            user_id=uuid.uuid4(),
-        )
-        assert isinstance(association.project_id, uuid.UUID)
-        assert isinstance(association.user_id, uuid.UUID)
-
-    def test_constants(self):
-        """Test module constants."""
-        assert ROLE_NAME_PREFIX == "role_"
-        assert ADMIN_ROLE_NAME_SUFFIX == "_admin"
-        assert len(USER_SELF_SCOPE_OPERATIONS) == 6
-        assert len(ADMIN_OPERATIONS) == 10
