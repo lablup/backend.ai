@@ -55,7 +55,7 @@ class UserRole(enum.StrEnum):
     MONITOR = "monitor"
 
 
-def get_groups_table() -> sa.Table:
+def _get_groups_table() -> sa.Table:
     groups_table = sa.Table(
         "groups",
         mapper_registry.metadata,
@@ -66,7 +66,7 @@ def get_groups_table() -> sa.Table:
     return groups_table
 
 
-def get_association_groups_users_table() -> sa.Table:
+def _get_association_groups_users_table() -> sa.Table:
     association_groups_users_table = sa.Table(
         "association_groups_users",
         mapper_registry.metadata,
@@ -83,7 +83,7 @@ def get_association_groups_users_table() -> sa.Table:
     return association_groups_users_table
 
 
-def get_users_table() -> sa.Table:
+def _get_users_table() -> sa.Table:
     users_table = sa.Table(
         "users",
         mapper_registry.metadata,
@@ -100,7 +100,7 @@ def _query_user_row(db_conn: Connection, offset: int, page_size: int) -> list[Ro
     """
     Query all user rows with pagination.
     """
-    users_table = get_users_table()
+    users_table = _get_users_table()
     user_query = (
         sa.select(
             users_table.c.uuid,
@@ -139,7 +139,7 @@ def _query_project_row(db_conn: Connection, offset: int, page_size: int) -> list
     """
     Query all project rows with pagination.
     """
-    groups_table = get_groups_table()
+    groups_table = _get_groups_table()
     project_query = (
         sa.select(groups_table.c.id).offset(offset).limit(page_size).order_by(groups_table.c.id)
     )
@@ -176,8 +176,8 @@ def _define_cte() -> sa.sql.Select:
     """
     roles_table = get_roles_table()
     scope_permissions_table = get_scope_permissions_table()
-    association_groups_users_table = get_association_groups_users_table()
-    users_table = get_users_table()
+    association_groups_users_table = _get_association_groups_users_table()
+    users_table = _get_users_table()
 
     roles_batch = (
         sa.select(
