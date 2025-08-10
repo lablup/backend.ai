@@ -172,7 +172,7 @@ def _define_cte() -> sa.sql.Select:
     """
     Define a CTE to get all roles that need vfolder permissions.
     Join roles with scope permissions to get the first scope permissions row for each role.
-    Assumes that all scope_id of scope permissions for a role are the same.
+    Assumes that all `scope_id`s of scope permissions in one role are the same.
     """
     roles_table = get_roles_table()
     scope_permissions_table = get_scope_permissions_table()
@@ -202,13 +202,6 @@ def _define_cte() -> sa.sql.Select:
             )
             .join(users_table, association_groups_users_table.c.user_id == users_table.c.uuid)
         )
-        # .group_by(
-        #     # Group by combination of (user_id + scope_id)
-        #     users_table.c.uuid,
-        #     scope_permissions_table.c.scope_id,
-        #     scope_permissions_table.c.scope_type,
-        #     users_table.c.role
-        # )
         .cte("roles_batch")
     )
 
