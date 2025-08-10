@@ -6,8 +6,6 @@ Create Date: 2025-08-07 23:53:34.718192
 
 """
 
-from typing import Any
-
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
@@ -16,7 +14,10 @@ from sqlalchemy.orm import registry
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
-from ai.backend.manager.models.rbac_models.migration.models import RoleRow, ScopePermissionRow
+from ai.backend.manager.models.rbac_models.migration.models import (
+    get_roles_table,
+    get_scope_permissions_table,
+)
 from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInputGroup,
 )
@@ -41,41 +42,49 @@ depends_on = None
 
 
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()
 
 
-class VFolderRow(Base):
-    __tablename__ = "vfolders"
-    __table_args__ = {"extend_existing": True}
-    id = IDColumn("id")
-    name = sa.Column(
-        "name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True
+def _get_vfolders_table() -> sa.Table:
+    vfolders_table = sa.Table(
+        "vfolders",
+        mapper_registry.metadata,
+        IDColumn("id"),
+        sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
+        sa.Column(
+            "ownership_type",
+            EnumValueType(VFolderOwnershipType),
+            default=VFolderOwnershipType.USER,
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("user", GUID, nullable=True),  # owner if user vfolder
+        sa.Column("group", GUID, nullable=True),  # owner if project vfolder
+        extend_existing=True,
     )
-    ownership_type = sa.Column(
-        "ownership_type",
-        EnumValueType(VFolderOwnershipType),
-        default=VFolderOwnershipType.USER,
-        nullable=False,
-        index=True,
-    )
-    user = sa.Column("user", GUID, nullable=True)  # owner if user vfolder
-    group = sa.Column("group", GUID, nullable=True)  # owner if project vfolder
+    return vfolders_table
 
 
-class VFolderPermissionRow(Base):
-    __tablename__ = "vfolder_permissions"
-    __table_args__ = {"extend_existing": True}
-    id = IDColumn()
-    permission = sa.Column(
-        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+def _get_vfolder_permissions_table() -> sa.Table:
+    vfolder_permissions_table = sa.Table(
+        "vfolder_permissions",
+        mapper_registry.metadata,
+        IDColumn("id"),
+        sa.Column(
+            "permission",
+            EnumValueType(VFolderPermission),
+            default=VFolderPermission.READ_WRITE,
+            nullable=False,
+        ),
+        sa.Column(
+            "vfolder",
+            GUID,
+            sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
+        extend_existing=True,
     )
-    vfolder = sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    )
-    user = sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
+    return vfolder_permissions_table
 
 
 def _define_cte() -> sa.sql.Select:
@@ -84,17 +93,29 @@ def _define_cte() -> sa.sql.Select:
     Join roles with scope permissions to get the first scope permissions row for each role.
     Assumes that all scope_id of scope permissions for a role are the same.
     """
+    roles_table = get_roles_table()
+    scope_permissions_table = get_scope_permissions_table()
+
     roles_batch = (
         sa.select(
-            RoleRow.id,
-            RoleRow.source,
-            ScopePermissionRow.scope_id,
-            ScopePermissionRow.scope_type,
+            roles_table.c.id,
+            roles_table.c.source,
+            scope_permissions_table.c.scope_id,
+            scope_permissions_table.c.scope_type,
             sa.func.row_number()
-            .over(partition_by=ScopePermissionRow.role_id, order_by=ScopePermissionRow.id)
+            .over(
+                partition_by=scope_permissions_table.c.role_id,
+                order_by=scope_permissions_table.c.id,
+            )
             .label("row_num"),
         )
-        .select_from(sa.join(RoleRow, ScopePermissionRow, RoleRow.id == ScopePermissionRow.role_id))
+        .select_from(
+            sa.join(
+                roles_table,
+                scope_permissions_table,
+                roles_table.c.id == scope_permissions_table.c.role_id,
+            )
+        )
         .cte("roles_batch")
     )
 
@@ -139,11 +160,17 @@ def _query_vfolder_rows(db_conn: Connection, offset: int, page_size: int) -> lis
     """
     Query to get all vfolders.
     """
+    vfolders_table = _get_vfolders_table()
     query = (
-        sa.select(VFolderRow.id, VFolderRow.ownership_type, VFolderRow.user, VFolderRow.group)
+        sa.select(
+            vfolders_table.c.id,
+            vfolders_table.c.ownership_type,
+            vfolders_table.c.user,
+            vfolders_table.c.group,
+        )
         .offset(offset)
         .limit(page_size)
-        .order_by(VFolderRow.id)
+        .order_by(vfolders_table.c.id)
     )
     return db_conn.execute(query).all()
 
@@ -173,15 +200,16 @@ def _query_vfolder_permission_rows(db_conn: Connection, offset: int, page_size: 
     """
     Query to get all vfolder permissions.
     """
+    vfolder_permissions_table = _get_vfolder_permissions_table()
     query = (
         sa.select(
-            VFolderPermissionRow.vfolder,
-            VFolderPermissionRow.user,
-            VFolderPermissionRow.permission,
+            vfolder_permissions_table.c.vfolder,
+            vfolder_permissions_table.c.user,
+            vfolder_permissions_table.c.permission,
         )
         .offset(offset)
         .limit(page_size)
-        .order_by(VFolderPermissionRow.id)
+        .order_by(vfolder_permissions_table.c.id)
     )
     return db_conn.execute(query).all()
 
