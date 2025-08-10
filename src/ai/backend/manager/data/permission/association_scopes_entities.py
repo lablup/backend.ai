@@ -11,7 +11,7 @@ class AssociationScopesEntitiesCreateInput:
 
 
 @dataclass
-class AssociationScopesEntitiesData:
+class ScopeEntityMappingData:
     id: uuid.UUID
     scope_id: ScopeId
     object_id: ObjectId
