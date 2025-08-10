@@ -189,8 +189,8 @@ class UserRepository:
         Create scope permissions for the role.
         """
         scope_permission_inputs: list[dict[str, Any]] = []
-        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION):
-            for operation in OperationType:
+        for entity in EntityType.owner_accessible_entity_types_in_user():
+            for operation in OperationType.owner_operations():
                 scope_permission_inputs.append({
                     "role_id": role_id,
                     "scope_type": ScopeType.USER,

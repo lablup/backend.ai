@@ -145,6 +145,10 @@ class RoleRow(Base):
 
     @classmethod
     def project_admin_role(cls, project_data: ProjectData) -> Self:
+        """
+        Create a project admin role.
+        This role allows the user to manage the project.
+        """
         role_name = f"project_{str(project_data.id)[:8]}_admin"
         return cls(
             name=role_name,
@@ -153,6 +157,13 @@ class RoleRow(Base):
 
     @classmethod
     def project_member_role(cls, project_data: ProjectData) -> Self:
+        """
+        Create a project member role.
+        This role allows the user to access the project.
+
+        This role is created automatically when a project is created
+        but the source is set to CUSTOM because creating a member role is not implemented yet.
+        """
         role_name = f"project_{str(project_data.id)[:8]}"
         return cls(
             name=role_name,

@@ -89,8 +89,8 @@ class GroupRepository:
 
     async def _create_admin_permissions(self, db_session: SASession, role_id: UUID) -> None:
         scope_permission_inputs: list[dict[str, Any]] = []
-        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION, EntityType.USER):
-            for operation in OperationType:
+        for entity in EntityType.admin_accessible_entity_types_in_project():
+            for operation in OperationType.admin_operations():
                 scope_permission_inputs.append({
                     "role_id": role_id,
                     "scope_type": ScopeType.PROJECT,
@@ -112,14 +112,15 @@ class GroupRepository:
 
     async def _create_member_permissions(self, db_session: SASession, role_id: UUID) -> None:
         scope_permission_inputs: list[dict[str, Any]] = []
-        for entity in (EntityType.VFOLDER, EntityType.IMAGE, EntityType.SESSION, EntityType.USER):
-            scope_permission_inputs.append({
-                "role_id": role_id,
-                "scope_type": ScopeType.PROJECT,
-                "scope_id": role_id,
-                "entity_type": entity,
-                "operation": OperationType.READ,
-            })
+        for entity in EntityType.member_accessible_entity_types_in_project():
+            for operation in OperationType.member_operations():
+                scope_permission_inputs.append({
+                    "role_id": role_id,
+                    "scope_type": ScopeType.PROJECT,
+                    "scope_id": role_id,
+                    "entity_type": entity,
+                    "operation": operation,
+                })
         await db_session.execute(sa.insert(ScopePermissionRow), scope_permission_inputs)
 
     @repository_decorator()
