@@ -7,8 +7,12 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.permission.association_scopes_entities import (
-    ScopeEntityMappingCreateInput,
+    AssociationScopesEntitiesCreateInput,
     ScopeEntityMappingData,
+)
+
+from ...data.permission.id import (
+    ObjectId,
 )
 from ...data.permission.role import (
     PermissionCheckInput,
@@ -18,10 +22,6 @@ from ...data.permission.role import (
     RoleDeleteInput,
     RoleUpdateInput,
     UserRoleAssignmentInput,
-)
-
-from ...data.permission.id import (
-    ObjectId,
 )
 from ...data.permission.status import (
     RoleStatus,
@@ -88,7 +88,7 @@ class PermissionControllerRepository:
     @repository_decorator()
     async def register_entity_to_scope(
         self,
-        data: ScopeEntityMappingCreateInput,
+        data: AssociationScopesEntitiesCreateInput,
     ) -> ScopeEntityMappingData:
         async with self._db.begin_session() as db_session:
             row = AssociationScopesEntitiesRow(

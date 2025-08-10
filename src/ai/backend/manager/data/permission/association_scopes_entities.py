@@ -5,7 +5,7 @@ from .id import ObjectId, ScopeId
 
 
 @dataclass
-class ScopeEntityMappingCreateInput:
+class AssociationScopesEntitiesCreateInput:
     scope_id: ScopeId
     object_id: ObjectId
 

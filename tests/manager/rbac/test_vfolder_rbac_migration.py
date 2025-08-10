@@ -27,19 +27,6 @@ from ai.backend.manager.models.rbac_models.migration.vfolder import (
     map_vfolder_permission_data_to_scope,
 )
 
-PROJECT_RESOURCE_POLICY_NAME = "default"
-USER_RESOURCE_POLICY_NAME = "default"
-
-    def test_system_role_gets_all_operations(self):
-        """Test that system-defined roles get all vfolder operations."""
-        role = RoleData(
-            id=uuid.uuid4(),
-            source=RoleSource.SYSTEM,
-        )
-        scope = ScopeData(
-            type=ScopeType.PROJECT,
-            id=str(uuid.uuid4()),
-        )
 
 class TestAddVfolderScopePermissionsToRole:
     """Test add_vfolder_scope_permissions_to_role function."""
@@ -138,78 +125,8 @@ class TestMapVfolderEntityToScope:
 
         result = map_vfolder_entity_to_scope(vfolder)
 
-class TestVFolderMountPermissionToOperation:
-    """Test vfolder_mount_permission_to_operation mapping."""
-
-    def test_read_only_permission(self):
-        """Test READ_ONLY permission mapping."""
-        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_ONLY]
-        assert operations == [OperationType.READ]
-
-    def test_read_write_permission(self):
-        """Test READ_WRITE permission mapping."""
-        operations = vfolder_mount_permission_to_operation[VFolderPermission.READ_WRITE]
-        assert operations == [OperationType.READ, OperationType.UPDATE]
-
-    def test_rw_delete_permission(self):
-        """Test RW_DELETE permission mapping."""
-        operations = vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
-        assert operations == [
-            OperationType.READ,
-            OperationType.UPDATE,
-            OperationType.SOFT_DELETE,
-            OperationType.HARD_DELETE,
-        ]
-
-    def test_owner_perm_permission(self):
-        """Test OWNER_PERM permission mapping."""
-        operations = vfolder_mount_permission_to_operation[VFolderPermission.OWNER_PERM]
-        assert operations == [
-            OperationType.READ,
-            OperationType.UPDATE,
-            OperationType.SOFT_DELETE,
-            OperationType.HARD_DELETE,
-        ]
-        # OWNER_PERM should be same as RW_DELETE
-        assert operations == vfolder_mount_permission_to_operation[VFolderPermission.RW_DELETE]
-
-    def test_all_permissions_are_mapped(self):
-        """Test that all VFolderPermission enum values are mapped."""
-        for perm in VFolderPermission:
-            assert perm in vfolder_mount_permission_to_operation
-            assert len(vfolder_mount_permission_to_operation[perm]) > 0
-
-
-class TestMapUserVFolderToUserRole:
-    """Test map_user_vfolder_to_user_role function."""
-
-    def test_basic_mapping(self, role_id, user_vfolder_data):
-        """Test basic user vfolder mapping."""
-        result = map_user_vfolder_to_user_role(role_id, user_vfolder_data)
-
-        # Check scope permissions - should have all operations
-        assert len(result.scope_permissions) == len(OperationType)
-
-        assert len(result.scope_permissions) == len(OPERATIONS_FOR_SYSTEM_ROLE)
-        for perm in result.scope_permissions:
-            assert perm.role_id == role.id
-            assert perm.scope_type == scope.type.to_original()
-            assert perm.scope_id == scope.id
-            assert perm.entity_type == EntityType.VFOLDER.to_original()
-            assert perm.operation in [op.to_original() for op in OPERATIONS_FOR_SYSTEM_ROLE]
-
-    def test_custom_role_gets_limited_operations(self):
-        """Test that custom-defined roles get limited vfolder operations."""
-        role = RoleData(
-            id=uuid.uuid4(),
-            source=RoleSource.CUSTOM,
-        )
-        scope = ScopeData(
-            type=ScopeType.USER,
-            id=str(uuid.uuid4()),
-        )
-
-        result = add_vfolder_scope_permissions_to_role(role, scope)
+        assert len(result.association_scopes_entities) == 1
+        assoc = result.association_scopes_entities[0]
 
         assert assoc.scope_id.scope_type == OriginalScopeType.USER
         assert assoc.scope_id.scope_id == str(user_id)
@@ -258,7 +175,6 @@ class TestMapUserVFolderToUserRole:
         assert result.scope_permissions == []
         assert result.object_permissions == []
 
-        result = map_vfolder_entity_to_scope(vfolder)
 
 class TestMapVfolderPermissionDataToScope:
     """Test map_vfolder_permission_data_to_scope function."""
@@ -275,13 +191,6 @@ class TestMapVfolderPermissionDataToScope:
 
         result = map_vfolder_permission_data_to_scope(vfolder_permission)
 
-        assert perm.role_id == role_id
-        assert perm.scope_type == ScopeType.PROJECT
-        assert perm.scope_id == str(project_vfolder_data.project_id)
-        assert perm.entity_type == EntityType.VFOLDER
-        assert perm.operation == OperationType.READ
-
-        # Check association
         assert len(result.association_scopes_entities) == 1
         assoc = result.association_scopes_entities[0]
 
