@@ -17,6 +17,7 @@ from sqlalchemy.engine import Connection, Row
 from sqlalchemy.orm import registry
 
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
+from ai.backend.manager.models.rbac_models.migration.enums import RoleSource
 from ai.backend.manager.models.rbac_models.migration.models import (
     AssociationScopesEntitiesRow,
     ObjectPermissionRow,
@@ -28,7 +29,6 @@ from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInputGroup,
 )
 from ai.backend.manager.models.rbac_models.migration.user import (
-    ADMIN_ROLE_NAME_SUFFIX,
     ProjectData,
     ProjectUserAssociationData,
     UserData,
@@ -105,7 +105,7 @@ def _query_user_row(db_conn: Connection, offset: int, page_size: int) -> list[Ro
     return db_conn.execute(user_query).all()
 
 
-def _migrate_user_data(db_conn: Connection) -> None:
+def _create_user_self_roles_and_permissions(db_conn: Connection) -> None:
     """
     Migrate user data to roles and permissions.
     All users have a default self role and permissions.
@@ -133,7 +133,7 @@ def _query_project_row(db_conn: Connection, offset: int, page_size: int) -> list
     return db_conn.execute(project_query).all()
 
 
-def _migrate_project_data(db_conn: Connection) -> None:
+def _create_project_roles_and_permissions(db_conn: Connection) -> None:
     """
     Migrate project data to roles and permissions.
     All projects have a default admin role and a user role.
@@ -155,7 +155,7 @@ def _migrate_project_data(db_conn: Connection) -> None:
         insert_from_create_input_group(db_conn, input_group)
 
 
-def _query_admin_user_row_with_project_role(
+def _query_admin_user_rows_with_project_role(
     db_conn: Connection, offset: int, page_size: int
 ) -> list[Row]:
     """
@@ -181,7 +181,7 @@ def _query_admin_user_row_with_project_role(
         .where(
             sa.and_(
                 UserRow.role.in_([UserRole.SUPERADMIN, UserRole.ADMIN]),
-                RoleRow.name.like(f"%{ADMIN_ROLE_NAME_SUFFIX}"),  # type: ignore[attr-defined]
+                RoleRow.source == RoleSource.SYSTEM,
             )
         )
         .offset(offset)
@@ -191,12 +191,12 @@ def _query_admin_user_row_with_project_role(
     return db_conn.execute(query).all()
 
 
-def _migrate_admin_user_project_mapping_data(db_conn: Connection) -> None:
+def _map_admin_users_to_project_role(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
 
     while True:
-        rows = _query_admin_user_row_with_project_role(db_conn, offset, page_size)
+        rows = _query_admin_user_rows_with_project_role(db_conn, offset, page_size)
         offset += page_size
         if not rows:
             break
@@ -208,7 +208,7 @@ def _migrate_admin_user_project_mapping_data(db_conn: Connection) -> None:
         insert_from_create_input_group(db_conn, input_group)
 
 
-def _query_non_admin_user_row_with_project_role(
+def _query_member_user_rows_with_project_role(
     db_conn: Connection, offset: int, page_size: int
 ) -> list[Row]:
     """
@@ -234,7 +234,7 @@ def _query_non_admin_user_row_with_project_role(
         .where(
             sa.and_(
                 UserRow.role.not_in([UserRole.SUPERADMIN, UserRole.ADMIN]),
-                RoleRow.name.not_like(f"%{ADMIN_ROLE_NAME_SUFFIX}"),  # type: ignore[attr-defined]
+                RoleRow.source == RoleSource.CUSTOM,
             )
         )
         .offset(offset)
@@ -244,11 +244,11 @@ def _query_non_admin_user_row_with_project_role(
     return db_conn.execute(query).all()
 
 
-def _migrate_user_project_mapping_data(db_conn: Connection) -> None:
+def _map_member_users_to_project_role(db_conn: Connection) -> None:
     offset = 0
     page_size = 1000
     while True:
-        rows = _query_non_admin_user_row_with_project_role(db_conn, offset, page_size)
+        rows = _query_member_user_rows_with_project_role(db_conn, offset, page_size)
         offset += page_size
         if not rows:
             break
@@ -262,10 +262,10 @@ def _migrate_user_project_mapping_data(db_conn: Connection) -> None:
 
 def upgrade() -> None:
     conn = op.get_bind()
-    _migrate_user_data(conn)
-    _migrate_project_data(conn)
-    _migrate_admin_user_project_mapping_data(conn)
-    _migrate_user_project_mapping_data(conn)
+    _create_user_self_roles_and_permissions(conn)
+    _create_project_roles_and_permissions(conn)
+    _map_admin_users_to_project_role(conn)
+    _map_member_users_to_project_role(conn)
 
 
 def downgrade() -> None:
