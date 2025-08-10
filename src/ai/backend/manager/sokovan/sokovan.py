@@ -13,6 +13,9 @@ class SokovanOrchestrator:
     Orchestrator for Sokovan scheduler that handles schedule events.
     """
 
+    _scheduler: Scheduler
+    _event_producer: EventProducer
+
     def __init__(
         self,
         scheduler: Scheduler,
