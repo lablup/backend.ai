@@ -422,6 +422,7 @@ class LayerType(enum.StrEnum):
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"
     VALKEY_RATE_LIMIT = "valkey_rate_limit"
+    VALKEY_SCHEDULE = "valkey_schedule"
     VALKEY_SESSION = "valkey_session"
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
