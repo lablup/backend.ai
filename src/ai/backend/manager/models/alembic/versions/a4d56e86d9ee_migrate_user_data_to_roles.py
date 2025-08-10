@@ -7,23 +7,21 @@ Create Date: 2025-08-06 21:28:29.354670
 """
 
 import enum
-import uuid
-from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Connection, Row
-from sqlalchemy.orm import registry
 
-from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, metadata
+from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn
 from ai.backend.manager.models.rbac_models.migration.enums import RoleSource
 from ai.backend.manager.models.rbac_models.migration.models import (
-    AssociationScopesEntitiesRow,
-    ObjectPermissionRow,
-    RoleRow,
-    ScopePermissionRow,
-    UserRoleRow,
+    get_association_scopes_entities_table,
+    get_object_permissions_table,
+    get_roles_table,
+    get_scope_permissions_table,
+    get_user_roles_table,
+    mapper_registry,
 )
 from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInputGroup,
@@ -46,10 +44,6 @@ branch_labels = None
 depends_on = None
 
 
-mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
-
-
 class UserRole(enum.StrEnum):
     """
     User's role.
@@ -61,46 +55,62 @@ class UserRole(enum.StrEnum):
     MONITOR = "monitor"
 
 
-class GroupRow(Base):
-    __tablename__ = "groups"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-
-
-class AssocGroupUserRow(Base):
-    __tablename__ = "association_groups_users"
-    __table_args__ = {"extend_existing": True}
-
-    id: uuid.UUID = IDColumn()
-    user_id: uuid.UUID = sa.Column("user_id", GUID, nullable=False)
-    group_id: uuid.UUID = sa.Column(
-        "group_id",
-        GUID,
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
+def get_groups_table() -> sa.Table:
+    groups_table = sa.Table(
+        "groups",
+        mapper_registry.metadata,
+        IDColumn(),
+        sa.Column("name", sa.String(64), nullable=False, unique=True),
+        extend_existing=True,
     )
+    return groups_table
 
 
-class UserRow(Base):
-    __tablename__ = "users"
-    __table_args__ = {"extend_existing": True}
+def get_association_groups_users_table() -> sa.Table:
+    association_groups_users_table = sa.Table(
+        "association_groups_users",
+        mapper_registry.metadata,
+        IDColumn(),
+        sa.Column("user_id", GUID, nullable=False),
+        sa.Column(
+            "group_id",
+            GUID,
+            sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        extend_existing=True,
+    )
+    return association_groups_users_table
 
-    uuid = IDColumn("uuid")
-    username = sa.Column("username", sa.String(length=64), unique=True)
-    domain_name = sa.Column("domain_name", sa.String(length=64), index=True)
-    role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
+
+def get_users_table() -> sa.Table:
+    users_table = sa.Table(
+        "users",
+        mapper_registry.metadata,
+        IDColumn("uuid"),
+        sa.Column("username", sa.String(length=64), unique=True),
+        sa.Column("domain_name", sa.String(length=64), index=True),
+        sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
+        extend_existing=True,
+    )
+    return users_table
 
 
 def _query_user_row(db_conn: Connection, offset: int, page_size: int) -> list[Row]:
     """
     Query all user rows with pagination.
     """
+    users_table = get_users_table()
     user_query = (
-        sa.select(UserRow.uuid, UserRow.username, UserRow.domain_name, UserRow.role)
+        sa.select(
+            users_table.c.uuid,
+            users_table.c.username,
+            users_table.c.domain_name,
+            users_table.c.role,
+        )
         .offset(offset)
         .limit(page_size)
-        .order_by(UserRow.uuid)
+        .order_by(users_table.c.uuid)
     )
     return db_conn.execute(user_query).all()
 
@@ -129,7 +139,10 @@ def _query_project_row(db_conn: Connection, offset: int, page_size: int) -> list
     """
     Query all project rows with pagination.
     """
-    project_query = sa.select(GroupRow.id).offset(offset).limit(page_size).order_by(GroupRow.id)
+    groups_table = get_groups_table()
+    project_query = (
+        sa.select(groups_table.c.id).offset(offset).limit(page_size).order_by(groups_table.c.id)
+    )
     return db_conn.execute(project_query).all()
 
 
@@ -155,124 +168,145 @@ def _create_project_roles_and_permissions(db_conn: Connection) -> None:
         insert_from_create_input_group(db_conn, input_group)
 
 
-def _query_admin_user_rows_with_project_role(
-    db_conn: Connection, offset: int, page_size: int
-) -> list[Row]:
+def _define_cte() -> sa.sql.Select:
     """
-    Query all admin user rows with project association and project admin role.
+    Define a CTE to get all roles that need vfolder permissions.
+    Join roles with scope permissions to get the first scope permissions row for each role.
+    Assumes that all scope_id of scope permissions for a role are the same.
     """
-    query = (
+    roles_table = get_roles_table()
+    scope_permissions_table = get_scope_permissions_table()
+    association_groups_users_table = get_association_groups_users_table()
+    users_table = get_users_table()
+
+    roles_batch = (
         sa.select(
-            UserRow.uuid,
-            UserRow.role,
-            AssocGroupUserRow.group_id,
-            RoleRow.id.label("role_id"),  # type: ignore[attr-defined]
+            roles_table.c.id.label("role_id"),
+            roles_table.c.source,
+            scope_permissions_table.c.scope_id,
+            scope_permissions_table.c.scope_type,
+            users_table.c.uuid.label("user_id"),
+            users_table.c.role.label("user_role"),
         )
+        .distinct(users_table.c.uuid, scope_permissions_table.c.scope_id)
         .select_from(
             sa.join(
-                UserRow,
-                AssocGroupUserRow,
-                UserRow.uuid == AssocGroupUserRow.user_id,
-            ).join(
-                RoleRow,
-                AssocGroupUserRow.group_id == sa.cast(RoleRow.description, UUID),
+                roles_table,
+                scope_permissions_table,
+                roles_table.c.id == scope_permissions_table.c.role_id,
             )
+            .join(
+                association_groups_users_table,
+                sa.cast(scope_permissions_table.c.scope_id, UUID)
+                == association_groups_users_table.c.group_id,
+            )
+            .join(users_table, association_groups_users_table.c.user_id == users_table.c.uuid)
         )
+        # .group_by(
+        #     # Group by combination of (user_id + scope_id)
+        #     users_table.c.uuid,
+        #     scope_permissions_table.c.scope_id,
+        #     scope_permissions_table.c.scope_type,
+        #     users_table.c.role
+        # )
+        .cte("roles_batch")
+    )
+
+    return roles_batch
+
+
+def _query_admin_user_rows_with_project_role(
+    db_conn: Connection, cte: sa.sql.Select, offset: int, page_size: int
+) -> list[Row]:
+    stmt = (
+        sa.select(cte)
         .where(
             sa.and_(
-                UserRow.role.in_([UserRole.SUPERADMIN, UserRole.ADMIN]),
-                RoleRow.source == RoleSource.SYSTEM,
+                cte.c.user_role.in_([UserRole.ADMIN, UserRole.SUPERADMIN]),
+                cte.c.source == RoleSource.SYSTEM,
             )
         )
         .offset(offset)
         .limit(page_size)
-        .order_by(UserRow.uuid)
+        .order_by(cte.c.role_id)
     )
-    return db_conn.execute(query).all()
 
-
-def _map_admin_users_to_project_role(db_conn: Connection) -> None:
-    offset = 0
-    page_size = 1000
-
-    while True:
-        rows = _query_admin_user_rows_with_project_role(db_conn, offset, page_size)
-        offset += page_size
-        if not rows:
-            break
-        input_group = PermissionCreateInputGroup()
-        for row in rows:
-            data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
-            input_data = map_user_to_project_role(row.role_id, data)
-            input_group.merge(input_data)
-        insert_from_create_input_group(db_conn, input_group)
+    return db_conn.execute(stmt).all()
 
 
 def _query_member_user_rows_with_project_role(
-    db_conn: Connection, offset: int, page_size: int
+    db_conn: Connection, cte: sa.sql.Select, offset: int, page_size: int
 ) -> list[Row]:
-    """
-    Query all admin user rows with project association and project role.
-    """
-    query = (
-        sa.select(
-            UserRow.uuid,
-            UserRow.role,
-            AssocGroupUserRow.group_id,
-            RoleRow.id.label("role_id"),  # type: ignore[attr-defined]
-        )
-        .select_from(
-            sa.join(
-                UserRow,
-                AssocGroupUserRow,
-                UserRow.uuid == AssocGroupUserRow.user_id,
-            ).join(
-                RoleRow,
-                AssocGroupUserRow.group_id == sa.cast(RoleRow.description, UUID),
-            )
-        )
+    stmt = (
+        sa.select(cte)
         .where(
             sa.and_(
-                UserRow.role.not_in([UserRole.SUPERADMIN, UserRole.ADMIN]),
-                RoleRow.source == RoleSource.CUSTOM,
+                cte.c.user_role.not_in([UserRole.ADMIN, UserRole.SUPERADMIN]),
+                cte.c.source == RoleSource.CUSTOM,
             )
         )
         .offset(offset)
         .limit(page_size)
-        .order_by(UserRow.uuid)
+        .order_by(cte.c.role_id)
     )
-    return db_conn.execute(query).all()
+
+    return db_conn.execute(stmt).all()
 
 
-def _map_member_users_to_project_role(db_conn: Connection) -> None:
+def _map_admin_users_to_project_role(db_conn: Connection, roles_batch_cte: sa.sql.Select) -> None:
     offset = 0
     page_size = 1000
+
     while True:
-        rows = _query_member_user_rows_with_project_role(db_conn, offset, page_size)
+        rows = _query_admin_user_rows_with_project_role(db_conn, roles_batch_cte, offset, page_size)
         offset += page_size
         if not rows:
             break
         input_group = PermissionCreateInputGroup()
         for row in rows:
-            data = ProjectUserAssociationData(project_id=row.group_id, user_id=row.uuid)
+            data = ProjectUserAssociationData(project_id=row.scope_id, user_id=row.user_id)
             input_data = map_user_to_project_role(row.role_id, data)
             input_group.merge(input_data)
         insert_from_create_input_group(db_conn, input_group)
+
+
+def _map_member_users_to_project_role(db_conn: Connection, roles_batch_cte: sa.sql.Select) -> None:
+    offset = 0
+    page_size = 1000
+
+    while True:
+        rows = _query_member_user_rows_with_project_role(
+            db_conn, roles_batch_cte, offset, page_size
+        )
+        offset += page_size
+        if not rows:
+            break
+        input_group = PermissionCreateInputGroup()
+        for row in rows:
+            data = ProjectUserAssociationData(project_id=row.scope_id, user_id=row.user_id)
+            input_data = map_user_to_project_role(row.role_id, data)
+            input_group.merge(input_data)
+        insert_from_create_input_group(db_conn, input_group)
+
+
+def _map_users_to_project_role(db_conn: Connection) -> None:
+    roles_batch_cte = _define_cte()
+    _map_admin_users_to_project_role(db_conn, roles_batch_cte)
+    _map_member_users_to_project_role(db_conn, roles_batch_cte)
 
 
 def upgrade() -> None:
     conn = op.get_bind()
     _create_user_self_roles_and_permissions(conn)
     _create_project_roles_and_permissions(conn)
-    _map_admin_users_to_project_role(conn)
-    _map_member_users_to_project_role(conn)
+    _map_users_to_project_role(conn)
 
 
 def downgrade() -> None:
     conn = op.get_bind()
     # Remove all data from the new RBAC tables
-    conn.execute(sa.delete(AssociationScopesEntitiesRow))
-    conn.execute(sa.delete(ObjectPermissionRow))
-    conn.execute(sa.delete(ScopePermissionRow))
-    conn.execute(sa.delete(UserRoleRow))
-    conn.execute(sa.delete(RoleRow))
+    conn.execute(sa.delete(get_association_scopes_entities_table()))
+    conn.execute(sa.delete(get_object_permissions_table()))
+    conn.execute(sa.delete(get_scope_permissions_table()))
+    conn.execute(sa.delete(get_user_roles_table()))
+    conn.execute(sa.delete(get_roles_table()))
