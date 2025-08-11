@@ -34,6 +34,7 @@ class UserConflict(BackendAIError, web.HTTPConflict):
             error_detail=ErrorDetail.CONFLICT,
         )
 
+
 class UserCreationFailure(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-creation-failure"
     error_title = "Failed to create user."

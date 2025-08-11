@@ -23,7 +23,6 @@ from sqlalchemy.engine.row import Row
 from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
-    CreateUserActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
@@ -924,14 +923,12 @@ class CreateUser(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email)
 
-        res: CreateUserActionResult = await graph_ctx.processors.user.create_user.wait_for_complete(
-            action
-        )
+        action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            user=User.from_dto(res.data) if res.data else None,
+            ok=action_result.success,
+            msg="success",
+            user=User.from_dto(action_result.data) if action_result.data else None,
         )
 
 
