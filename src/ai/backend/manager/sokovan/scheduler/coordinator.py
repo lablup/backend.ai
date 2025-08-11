@@ -56,7 +56,10 @@ class ScheduleCoordinator:
         schedule_type: ScheduleType,
     ) -> bool:
         """
-        Process a scheduling operation based on the schedule type.
+        Force processing of a specific schedule type.
+        This method processes the scheduling operation even if it was not requested for guaranteed execution.
+        So it should be called in long term loops.
+
         :param schedule_type: Type of scheduling operation
         :return: True if operation was performed, False otherwise
         """
@@ -84,6 +87,7 @@ class ScheduleCoordinator:
     async def process_if_needed(self, schedule_type: ScheduleType) -> bool:
         """
         Process scheduling operation if needed (based on internal state).
+        This method checks if the scheduling operation was requested and processes it if so.
 
         :param schedule_type: Type of scheduling operation
         :return: True if operation was performed, False otherwise
