@@ -23,7 +23,7 @@ class AffinityHint:
     """
     Represents the affinity hint for realization of an entire resource slot for a single kernel.
 
-    The devices field starts with None and gets replaced with the devices alloacted in the prior resource slot
+    The devices field starts with None and gets replaced with the devices allocated in the prior resource slot
     as the allocation proceeds with the next resource slot.
     """
 
