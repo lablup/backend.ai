@@ -25,7 +25,7 @@ class PermissionGroupRow(Base):
     id: uuid.UUID = IDColumn()
     status: PermissionStatus = sa.Column(
         "status",
-        StrEnumType(PermissionStatus),
+        StrEnumType(PermissionStatus, length=32),
         nullable=False,
         default=PermissionStatus.ACTIVE,
         server_default=PermissionStatus.ACTIVE,

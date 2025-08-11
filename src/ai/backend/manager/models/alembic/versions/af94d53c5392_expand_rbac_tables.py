@@ -23,9 +23,9 @@ def upgrade() -> None:
     op.create_table(
         "permission_groups",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
-        sa.Column("status", sa.VARCHAR(length=64), server_default="active", nullable=False),
+        sa.Column("status", sa.VARCHAR(length=32), server_default="active", nullable=False),
         sa.Column("role_id", GUID(), nullable=False),
-        sa.Column("scope_type", sa.VARCHAR(length=64), nullable=False),
+        sa.Column("scope_type", sa.VARCHAR(length=32), nullable=False),
         sa.Column("scope_id", sa.String(length=64), nullable=False),
         sa.Column(
             "created_at",
