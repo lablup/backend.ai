@@ -13,7 +13,7 @@ Developer guide for Backend.AI documentation
 
 ### Setting up the documenting environment  
   
-Then, follow the instructions below:
+Then, follow the instructions below:  
 
 ```console
 $ pyenv virtualenv $(pyenv latest 3.12) bai-docs
