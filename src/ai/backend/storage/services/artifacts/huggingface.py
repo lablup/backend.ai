@@ -8,7 +8,7 @@ from typing import AsyncIterator, Optional
 import aiohttp
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelInfo, ModelTarget
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -109,7 +109,9 @@ class HuggingFaceService:
         log.info(f"Scanning HuggingFace model: model_id={model.model_id}@{model.revision}")
         return await self._make_scanner(registry_name).scan_model(model)
 
-    async def list_model_files(self, registry_name: str, model: ModelTarget) -> list[FileInfo]:
+    async def list_model_files(
+        self, registry_name: str, model: ModelTarget
+    ) -> list[FileObjectData]:
         """List all files in a specific model.
 
         Args:
@@ -355,7 +357,12 @@ class HuggingFaceService:
             raise HuggingFaceAPIError(f"Unexpected error downloading {url}: {str(e)}") from e
 
     async def _upload_single_file_to_storage(
-        self, file_info: FileInfo, model_id: str, revision: str, storage_name: str, bucket_name: str
+        self,
+        file_info: FileObjectData,
+        model_id: str,
+        revision: str,
+        storage_name: str,
+        bucket_name: str,
     ) -> None:
         """Upload a single file to storage.
 

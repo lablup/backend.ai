@@ -22,7 +22,7 @@ class ModelTarget(BaseModel):
     )
 
 
-class FileInfo(BaseModel):
+class FileObjectData(BaseModel):
     """
     Model file information.
     """
@@ -35,7 +35,6 @@ class FileInfo(BaseModel):
         examples=["config.json", "pytorch_model.bin", "tokenizer/vocab.txt"],
     )
     size: int = Field(
-        default=0,
         description="""
         File size in bytes, 0 if size information is unavailable.
         Used for storage planning and transfer progress tracking.
@@ -43,7 +42,6 @@ class FileInfo(BaseModel):
         examples=[1024, 2048000, 0],
     )
     type: str = Field(
-        default="file",
         description="""
         Type of the file (e.g., 'file', 'directory', 'lfs').
         Indicates the nature of the file system object.

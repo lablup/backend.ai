@@ -9,7 +9,7 @@ from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, mod
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelInfo, ModelTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
@@ -271,7 +271,7 @@ class HuggingFaceScanner:
         """
         return self._client.get_download_url(model, filename)
 
-    async def list_model_files_info(self, model: ModelTarget) -> list[FileInfo]:
+    async def list_model_files_info(self, model: ModelTarget) -> list[FileObjectData]:
         """Get model file information list as FileInfo objects.
 
         Args:
@@ -292,21 +292,21 @@ class HuggingFaceScanner:
                 try:
                     match file:
                         case RepoFile():
-                            file_obj = FileInfo(
+                            file_obj = FileObjectData(
                                 path=file.path,
                                 size=file.size,
                                 type="file",
                                 download_url=self._client.get_download_url(model, file.path),
                             )
                         case RepoFolder():
-                            file_obj = FileInfo(
+                            file_obj = FileObjectData(
                                 path=file.path,
                                 size=0,
                                 type="directory",
                                 download_url=self._client.get_download_url(model, file.path),
                             )
                         case _:
-                            log.error(f"Unknown file type for {file}, skipping...")
+                            log.error("Unknown file type for {}, skipping...", file)
                             continue
                     file_infos.append(file_obj)
 
