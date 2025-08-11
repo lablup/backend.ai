@@ -53,7 +53,6 @@ from ..data.model_serving.types import (
     EndpointLifecycle,
     EndpointTokenData,
 )
-from ..defs import DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
 from ..models.storage import StorageSessionManager
@@ -479,7 +478,7 @@ class EndpointRow(Base):
         from .routing import RoutingRow
 
         active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
-        target_kernels = await KernelRow.batch_load_by_session_id(
+        main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
             [
                 r.session
@@ -491,9 +490,17 @@ class EndpointRow(Base):
         )
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        for kernel in target_kernels:
-            if kernel.cluster_role != DEFAULT_ROLE:
-                continue
+        if len(main_kernels) != len(active_routes):
+            raise ValueError(
+                "Number of active routes does not match the number of the main kernels."
+            )
+        for kernel in main_kernels:
+            num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
+            if num_inference_ports > 1:
+                log.warning(
+                    "Multiple inference ports found. Currently only the first-seen inference port is used. (Endpoint: {})",
+                    self.name,
+                )
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
                     connection_info[port_info["name"]].append({

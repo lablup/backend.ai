@@ -701,6 +701,17 @@ class KernelRow(Base):
         return (await session.execute(query)).scalars().all()
 
     @staticmethod
+    async def batch_load_main_kernels_by_session_id(
+        session: SASession, session_ids: list[uuid.UUID]
+    ) -> list["KernelRow"]:
+        query = (
+            sa.select(KernelRow)
+            .where(KernelRow.session_id.in_(session_ids))
+            .where(KernelRow.cluster_role == DEFAULT_ROLE)
+        )
+        return (await session.execute(query)).scalars().all()
+
+    @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
