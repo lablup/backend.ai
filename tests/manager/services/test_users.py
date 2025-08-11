@@ -206,7 +206,6 @@ async def test_create_user(
 
     result = await processors.create_user.wait_for_complete(action)
 
-    assert result.data is not None
     assert result.data.username == "testuser"
     assert result.data.email == "test_user@test.com"
     assert result.data.need_password_change is False
@@ -325,8 +324,6 @@ async def test_modify_user(
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.data is not None
-
         # Check if the user data is modified correctly
         assert result.data.full_name == "Modified User"
         assert result.data.totp_activated is True
@@ -358,8 +355,6 @@ async def test_modify_user_role_to_admin(
             ),
         )
         result = await processors.modify_user.wait_for_complete(action)
-
-        assert result.data is not None
 
         # Check if the user data is modified correctly
         assert result.data.role == UserRole.ADMIN
@@ -394,8 +389,6 @@ async def test_modify_admin_user_to_normal_user(
             ),
         )
         result = await processors.modify_user.wait_for_complete(action)
-
-        assert result.data is not None
 
         # Check if the user data is modified correctly
         assert result.data.role == UserRole.USER
