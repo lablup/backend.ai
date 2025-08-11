@@ -67,8 +67,8 @@ class ScheduleEventHandler:
 
     async def handle_do_schedule(self, context: None, agent_id: str, ev: DoScheduleEvent) -> None:
         if self._use_sokovan:
-            # Process scheduling if needed (checks mark)
-            await self._schedule_coordinator.process_if_needed(ScheduleType.SCHEDULE)
+            # Request scheduling for next cycle
+            await self._schedule_coordinator.request_scheduling(ScheduleType.SCHEDULE)
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -77,7 +77,7 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Process start if needed (checks mark)
-            await self._schedule_coordinator.process_if_needed(ScheduleType.START)
+            await self._schedule_coordinator.request_scheduling(ScheduleType.START)
         else:
             await self._scheduler_dispatcher.start(ev.event_name())
 
@@ -86,7 +86,7 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Process check precondition if needed (checks mark)
-            await self._schedule_coordinator.process_if_needed(ScheduleType.CHECK_PRECONDITION)
+            await self._schedule_coordinator.request_scheduling(ScheduleType.CHECK_PRECONDITION)
         else:
             await self._scheduler_dispatcher.check_precond(ev.event_name())
 
