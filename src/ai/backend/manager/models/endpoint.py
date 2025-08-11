@@ -471,7 +471,7 @@ class EndpointRow(Base):
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
-    async def generate_redis_route_info(
+    async def generate_route_info(
         self, db_sess: AsyncSession
     ) -> ModelServiceSerializableConnectionInfo:
         from .kernel import KernelRow
@@ -488,18 +488,21 @@ class EndpointRow(Base):
                 and r.session_row.status == SessionStatus.RUNNING
             ],
         )
+        if len(main_kernels) < len(active_routes):
+            log.warning(
+                "generate_route_info(): There are some active routes without corresponding RUNNING sessions, "
+                "which may be still provisioning or being terminated. (Endpoint: {})",
+                self.id,
+            )
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        if len(main_kernels) != len(active_routes):
-            raise ValueError(
-                "Number of active routes does not match the number of the main kernels."
-            )
         for kernel in main_kernels:
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(
-                    "Multiple inference ports found. Currently only the first-seen inference port is used. (Endpoint: {})",
-                    self.name,
+                    "generate_route_info(): Multiple inference ports found. "
+                    "Currently only the first-seen inference port is used. (Endpoint: {})",
+                    self.id,
                 )
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
