@@ -3,7 +3,7 @@
 Developer guide for Backend.AI documentation
 
 
-## Setting up the build environment for docs
+## Setting up the build environment for docs  
   
 ### Installing pyenv and pyenv-virtualenv        
   
