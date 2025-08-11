@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 
@@ -122,7 +122,6 @@ class ObjectPermissionCreateInputBeforeRoleCreation:
 @dataclass
 class RoleCreationInputGroup:
     role: RoleCreateInput
-    user_role: Optional[UserRoleCreateInputBeforeRoleCreation] = None
     scope_permissions: list[ScopePermissionCreateInputBeforeRoleCreation] = field(
         default_factory=list
     )
