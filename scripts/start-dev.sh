@@ -4,9 +4,6 @@ tmux new-session -d -s backendai-manager-dev \
 tmux new-session -d -s backendai-agent-dev \
     "./backend.ai ag start-server --debug"
 
-tmux new-session -d -s backendai-storage-proxy-dev \
-    "./backend.ai storage-proxy start-server --debug"
-
 tmux new-session -d -s backendai-storage-dev \
     "./backend.ai storage start-server --debug"
 
