@@ -281,6 +281,8 @@ class SessionAllocation:
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session
     agent_allocations: list[AgentAllocation]
+    # Keypair associated with the session
+    access_key: AccessKey
     # Phases that passed during scheduling
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
     # Phases that failed during scheduling (normally empty for successful allocations)
@@ -299,6 +301,7 @@ class SessionAllocation:
         :param session_workload: The original session workload
         :param selections: List of agent selection results
         :param scaling_group: The scaling group name
+        :param access_key: The access key associated with the session
         :return: SessionAllocation with kernel and agent allocations
         """
         kernel_allocations: list[KernelAllocation] = []
@@ -339,6 +342,7 @@ class SessionAllocation:
             scaling_group=scaling_group,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
+            access_key=session_workload.access_key,
         )
 
 
