@@ -17,7 +17,7 @@ Then, follow the instructions below:
 
 ```console
 $ pyenv virtualenv $(pyenv latest 3.12) bai-docs
-$ git clone https://github.com/lablup/backend.ai bai-dev
+$ git clone https://github.com/lablup/backend.ai bai-dev  
 $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
