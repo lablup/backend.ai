@@ -13,8 +13,7 @@ tmux new-session -d -s backendai-storage-dev \
 tmux new-session -d -s backendai-webserver-dev \
     "./backend.ai web start-server --debug"
 
-tmux new-session -d -s backendai-appproxy-dev \
-    "./backend.ai app-proxy start-server --debug"
+tmux new-session -d -s backendai-appproxy-dev
 
 tmux new-window -t backendai-appproxy-dev -n "coordinator"
 tmux send-keys "./backend.ai app-proxy-coordinator start-server --debug" C-m
