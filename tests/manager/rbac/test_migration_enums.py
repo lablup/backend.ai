@@ -11,8 +11,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType as OriginalScopeType,
 )
 from ai.backend.manager.models.rbac_models.migration.enums import (
-    OPERATIONS_FOR_CUSTOM_ROLE,
-    OPERATIONS_FOR_SYSTEM_ROLE,
     EntityType,
     OperationType,
     RoleSource,
@@ -41,16 +39,44 @@ class TestOperationType:
         assert OperationType.GRANT_SOFT_DELETE in grant_operations
         assert OperationType.GRANT_HARD_DELETE in grant_operations
 
-    def test_operations_for_system_role(self):
-        assert isinstance(OPERATIONS_FOR_SYSTEM_ROLE, tuple)
-        assert len(OPERATIONS_FOR_SYSTEM_ROLE) == len(OperationType)
-        for op in OperationType:
-            assert op in OPERATIONS_FOR_SYSTEM_ROLE
+    def test_owner_operations_match_original(self):
+        """Test that owner_operations() returns the same values as original."""
+        migration_ops = OperationType.owner_operations()
+        original_ops = OriginalOperationType.owner_operations()
 
-    def test_operations_for_custom_role(self):
-        assert isinstance(OPERATIONS_FOR_CUSTOM_ROLE, tuple)
-        assert len(OPERATIONS_FOR_CUSTOM_ROLE) == 1
-        assert OperationType.READ in OPERATIONS_FOR_CUSTOM_ROLE
+        # Convert migration ops to values for comparison
+        migration_values = {op.value for op in migration_ops}
+        original_values = {op.value for op in original_ops}
+
+        assert migration_values == original_values, (
+            f"owner_operations mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_admin_operations_match_original(self):
+        """Test that admin_operations() returns the same values as original."""
+        migration_ops = OperationType.admin_operations()
+        original_ops = OriginalOperationType.admin_operations()
+
+        # Convert migration ops to values for comparison
+        migration_values = {op.value for op in migration_ops}
+        original_values = {op.value for op in original_ops}
+
+        assert migration_values == original_values, (
+            f"admin_operations mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_member_operations_match_original(self):
+        """Test that member_operations() returns the same values as original."""
+        migration_ops = OperationType.member_operations()
+        original_ops = OriginalOperationType.member_operations()
+
+        # Convert migration ops to values for comparison
+        migration_values = {op.value for op in migration_ops}
+        original_values = {op.value for op in original_ops}
+
+        assert migration_values == original_values, (
+            f"member_operations mismatch: migration={migration_values}, original={original_values}"
+        )
 
 
 class TestScopeType:
@@ -65,6 +91,71 @@ class TestEntityType:
         for entity_type in EntityType:
             original = entity_type.to_original()
             assert original.value == entity_type.value
+
+    def test_scope_types_match_original(self):
+        """Test that _scope_types() returns the same values as original."""
+        migration_types = EntityType._scope_types()
+        original_types = OriginalEntityType._scope_types()
+
+        # Convert to values for comparison
+        migration_values = {t.value for t in migration_types}
+        original_values = {t.value for t in original_types}
+
+        assert migration_values == original_values, (
+            f"_scope_types mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_resource_types_match_original(self):
+        """Test that _resource_types() returns the same values as original."""
+        migration_types = EntityType._resource_types()
+        original_types = OriginalEntityType._resource_types()
+
+        # Convert to values for comparison
+        migration_values = {t.value for t in migration_types}
+        original_values = {t.value for t in original_types}
+
+        assert migration_values == original_values, (
+            f"_resource_types mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_owner_accessible_entity_types_in_user_match_original(self):
+        """Test that owner_accessible_entity_types_in_user() returns the same values as original."""
+        migration_types = EntityType.owner_accessible_entity_types_in_user()
+        original_types = OriginalEntityType.owner_accessible_entity_types_in_user()
+
+        # Convert to values for comparison
+        migration_values = {t.value for t in migration_types}
+        original_values = {t.value for t in original_types}
+
+        assert migration_values == original_values, (
+            f"owner_accessible_entity_types_in_user mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_admin_accessible_entity_types_in_project_match_original(self):
+        """Test that admin_accessible_entity_types_in_project() returns the same values as original."""
+        migration_types = EntityType.admin_accessible_entity_types_in_project()
+        original_types = OriginalEntityType.admin_accessible_entity_types_in_project()
+
+        # Convert to values for comparison
+        migration_values = {t.value for t in migration_types}
+        original_values = {t.value for t in original_types}
+
+        assert migration_values == original_values, (
+            f"admin_accessible_entity_types_in_project mismatch: migration={migration_values}, original={original_values}"
+        )
+
+    def test_member_accessible_entity_types_in_project_match_original(self):
+        """Test that member_accessible_entity_types_in_project() returns the same values as original."""
+        migration_types = EntityType.member_accessible_entity_types_in_project()
+        original_types = OriginalEntityType.member_accessible_entity_types_in_project()
+
+        # Convert to values for comparison
+        migration_values = {t.value for t in migration_types}
+        original_values = {t.value for t in original_types}
+
+        assert migration_values == original_values, (
+            f"member_accessible_entity_types_in_project mismatch: migration={migration_values}, original={original_values}"
+        )
 
 
 class TestEnumConsistency:

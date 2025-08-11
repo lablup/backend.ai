@@ -53,10 +53,31 @@ class OperationType(enum.StrEnum):
     def to_original(self) -> OriginalOperationType:
         return OriginalOperationType(self.value)
 
+    @classmethod
+    def owner_operations(cls) -> set["OperationType"]:
+        """
+        Returns a set of operations that are considered owner operations.
+        Owner operations are those that allow full control over an entity.
+        """
+        return {op for op in cls}
 
-OPERATIONS_FOR_SYSTEM_ROLE = tuple(op for op in OperationType)
+    @classmethod
+    def admin_operations(cls) -> set["OperationType"]:
+        """
+        Returns a set of operations that are considered admin operations.
+        Admin operations are those that allow management of entities, including creation and deletion.
+        """
+        return {op for op in cls}
 
-OPERATIONS_FOR_CUSTOM_ROLE = (OperationType.READ,)
+    @classmethod
+    def member_operations(cls) -> set["OperationType"]:
+        """
+        Returns a set of operations that are considered member operations.
+        Member operations are those that allow read access.
+        """
+        return {
+            cls.READ,
+        }
 
 
 class ScopeType(enum.StrEnum):
@@ -79,3 +100,42 @@ class EntityType(enum.StrEnum):
 
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
+
+    @classmethod
+    def _scope_types(cls) -> set["EntityType"]:
+        """
+        Returns a set of entity types that are considered scope types.
+        """
+        return {cls.USER, cls.PROJECT, cls.DOMAIN}
+
+    @classmethod
+    def _resource_types(cls) -> set["EntityType"]:
+        """
+        Returns a set of entity types that are considered resource types.
+        """
+        return {
+            cls.VFOLDER,
+            cls.IMAGE,
+            cls.SESSION,
+        }
+
+    @classmethod
+    def owner_accessible_entity_types_in_user(cls) -> set["EntityType"]:
+        """
+        Returns a set of entity types that are accessible by owner roles in user scope.
+        """
+        return cls._resource_types()
+
+    @classmethod
+    def admin_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+        """
+        Returns a set of entity types that are accessible by admin roles.
+        """
+        return {*cls._resource_types(), cls.USER}
+
+    @classmethod
+    def member_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+        """
+        Returns a set of entity types that are accessible by member roles.
+        """
+        return {*cls._resource_types(), cls.USER}
