@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
@@ -1505,15 +1505,16 @@ class ScheduleRepository:
         )
 
         # Update scheduler status with successful allocation predicates
-        cleared_status_data = {**session_row.status_data} if session_row.status_data else {}
-        cleared_status_data["scheduler"] = {
-            "passed_predicates": [p.serialize() for p in allocation.passed_phases],
-            "failed_predicates": [
-                p.serialize() for p in allocation.failed_phases
-            ],  # Should be empty for successful allocations
-            "retries": 0,
-            "last_try": now.isoformat(),
-        }
+        cleared_status_data: dict[str, Any] = {}
+        if allocation.failed_phases:
+            cleared_status_data["scheduler"] = {
+                "passed_predicates": [p.serialize() for p in allocation.passed_phases],
+                "failed_predicates": [
+                    p.serialize() for p in allocation.failed_phases
+                ],  # Should be empty for successful allocations
+                "retries": 0,
+                "last_try": now.isoformat(),
+            }
 
         session_row.set_status(
             SessionStatus.SCHEDULED,
