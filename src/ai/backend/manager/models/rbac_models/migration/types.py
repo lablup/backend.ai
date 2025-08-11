@@ -82,9 +82,13 @@ class PermissionCreateInput:
 class ObjectPermissionCreateInput:
     role_id: uuid.UUID
     entity_id: str
+    entity_type: str
+    operation: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "role_id": self.role_id,
             "entity_id": self.entity_id,
+            "entity_type": self.entity_type,
+            "operation": self.operation,
         }
