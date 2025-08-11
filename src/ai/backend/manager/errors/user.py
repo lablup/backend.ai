@@ -48,6 +48,32 @@ class UserCreationFailure(BackendAIError, web.HTTPConflict):
         )
 
 
+class UserModificationFailure(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/user-modification-failure"
+    error_title = "Failed to modify user."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class UserPurgeFailure(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/user-purge-failure"
+    error_title = "Failed to purge user."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class KeyPairNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/keypair-not-found"
     error_title = "The key pair does not exist."

@@ -24,7 +24,6 @@ class CreateUserAction(UserAction):
 @dataclass
 class CreateUserActionResult(BaseActionResult):
     data: UserData
-    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -23,6 +23,7 @@ from ai.backend.manager.errors.user import (
     KeyPairNotFound,
     UserConflict,
     UserCreationFailure,
+    UserModificationFailure,
     UserNotFound,
 )
 from ai.backend.manager.models import kernels
@@ -83,8 +84,8 @@ class UserRepository:
             try:
                 result = await conn.execute(query)
                 created_user = result.first()
-            except sa.exc.IntegrityError:
-                raise UserConflict(f"User with email {user_data['email']} already exists.")
+            except sa.exc.IntegrityError as e:
+                raise UserConflict(f"User with email {user_data['email']} already exists.") from e
 
             if not created_user:
                 raise UserCreationFailure("Failed to create user")
@@ -156,7 +157,7 @@ class UserRepository:
             result = await conn.execute(update_query)
             updated_user = result.first()
             if not updated_user:
-                raise RuntimeError("Failed to update user")
+                raise UserModificationFailure("Failed to update user")
 
             # Handle role changes
             prev_role = current_user.role

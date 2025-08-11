@@ -21,8 +21,6 @@ class DeleteUserAction(UserAction):
 
 @dataclass
 class DeleteUserActionResult(BaseActionResult):
-    success: bool
-
     @override
     def entity_id(self) -> Optional[str]:
         return None

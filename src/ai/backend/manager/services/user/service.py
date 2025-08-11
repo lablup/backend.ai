@@ -6,6 +6,7 @@ from typing import Any, Optional
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
@@ -73,7 +74,6 @@ class UserService:
         )
         return CreateUserActionResult(
             data=user_data_result,
-            success=True,
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
@@ -82,36 +82,27 @@ class UserService:
         group_ids = action.group_ids
         if not data and group_ids is None:
             raise NoUserUpdateError("No fields to update for user {email}.")
-        try:
-            user_data_result = await self._user_repository.update_user_validated(
-                email=email,
-                modifier=action.modifier,
-                group_ids=group_ids,
-                requester_uuid=None,  # No user context available in ModifyUserAction
-            )
-            return ModifyUserActionResult(
-                success=True,
-                data=user_data_result,
-            )
-        except Exception:
-            return ModifyUserActionResult(
-                success=False,
-                data=None,
-            )
+
+        user_data_result = await self._user_repository.update_user_validated(
+            email=email,
+            modifier=action.modifier,
+            group_ids=group_ids,
+            requester_uuid=None,  # No user context available in ModifyUserAction
+        )
+        return ModifyUserActionResult(
+            data=user_data_result,
+        )
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        try:
-            await self._user_repository.soft_delete_user_validated(
-                email=action.email,
-                requester_uuid=None,  # No user context available in DeleteUserAction
-            )
-            return DeleteUserActionResult(success=True)
-        except Exception:
-            return DeleteUserActionResult(success=False)
+        await self._user_repository.soft_delete_user_validated(
+            email=action.email,
+            requester_uuid=None,  # No user context available in DeleteUserAction
+        )
+        return DeleteUserActionResult()
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
         email = action.email
-        log.info("Purging all records of the user {0}...", email)
+        log.info(f"Purging all records of the user {email}...")
 
         # Check if user exists
         user_data = await self._user_repository.get_by_email_validated(
@@ -123,7 +114,7 @@ class UserService:
         if await self._admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force(
             user_uuid
         ):
-            raise RuntimeError(
+            raise UserPurgeFailure(
                 "Some of user's virtual folders are mounted to active kernels. "
                 "Terminate those kernels first.",
             )
@@ -183,7 +174,7 @@ class UserService:
         # Finally purge the user completely
         await self._admin_user_repository.purge_user_force(email)
 
-        return PurgeUserActionResult(success=True)
+        return PurgeUserActionResult()
 
     async def user_month_stats(self, action: UserMonthStatsAction) -> UserMonthStatsActionResult:
         stats = await self._user_repository.get_user_time_binned_monthly_stats(

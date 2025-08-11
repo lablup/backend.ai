@@ -11,6 +11,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.user import UserConflict
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
     GroupRow,
@@ -205,7 +206,6 @@ async def test_create_user(
 
     result = await processors.create_user.wait_for_complete(action)
 
-    assert result.success is True
     assert result.data is not None
     assert result.data.username == "testuser"
     assert result.data.email == "test_user@test.com"
@@ -229,7 +229,7 @@ async def test_create_user(
 async def test_create_user_non_existing_domain(
     processors: UserProcessors,
 ) -> None:
-    """Test user creation with non-existing domain returns failure"""
+    """Test user creation with non-existing domain"""
     action = CreateUserAction(
         creator=UserCreator(
             username="test_user_not_existing_domain",
@@ -253,10 +253,8 @@ async def test_create_user_non_existing_domain(
         group_ids=None,
     )
 
-    result = await processors.create_user.wait_for_complete(action)
-
-    assert result.success is False
-    assert result.data is None
+    with pytest.raises(UserConflict):
+        await processors.create_user.wait_for_complete(action)
 
 
 async def test_create_default_keypair_after_create_user(
@@ -327,7 +325,6 @@ async def test_modify_user(
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
         assert result.data is not None
 
         # Check if the user data is modified correctly
@@ -362,7 +359,6 @@ async def test_modify_user_role_to_admin(
         )
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
         assert result.data is not None
 
         # Check if the user data is modified correctly
@@ -399,7 +395,6 @@ async def test_modify_admin_user_to_normal_user(
         )
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
         assert result.data is not None
 
         # Check if the user data is modified correctly
@@ -426,7 +421,6 @@ async def test_delete_user_success(
     ) as user_id:
         delete_action = DeleteUserAction(email=delete_user_email)
         result = await processors.delete_user.wait_for_complete(delete_action)
-        assert result.success is True
 
         # Check if the user and user keypair both deleted
         async with database_engine.begin_session() as session:

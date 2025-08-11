@@ -26,7 +26,6 @@ from ai.backend.manager.services.user.actions.create_user import (
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
-    DeleteUserActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
@@ -35,7 +34,6 @@ from ai.backend.manager.services.user.actions.modify_user import (
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
-    PurgeUserActionResult,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -926,9 +924,9 @@ class CreateUser(graphene.Mutation):
         action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
 
         return cls(
-            ok=action_result.success,
+            ok=True,
             msg="success",
-            user=User.from_dto(action_result.data) if action_result.data else None,
+            user=User.from_dto(action_result.data),
         )
 
 
@@ -959,9 +957,9 @@ class ModifyUser(graphene.Mutation):
         )
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            user=User.from_dto(res.data) if res.data else None,
+            ok=True,
+            msg="success",
+            user=User.from_dto(res.data),
         )
 
 
@@ -988,15 +986,11 @@ class DeleteUser(graphene.Mutation):
         email: str,
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
-
         action = DeleteUserAction(email)
-        res: DeleteUserActionResult = await graph_ctx.processors.user.delete_user.wait_for_complete(
-            action
-        )
-
+        await graph_ctx.processors.user.delete_user.wait_for_complete(action)
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
+            ok=True,
+            msg="success",
         )
 
 
@@ -1041,11 +1035,9 @@ class PurgeUser(graphene.Mutation):
         )
         action = props.to_action(email, user_info_ctx)
 
-        res: PurgeUserActionResult = await graph_ctx.processors.user.purge_user.wait_for_complete(
-            action
-        )
+        await graph_ctx.processors.user.purge_user.wait_for_complete(action)
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
+            ok=True,
+            msg="success",
         )
