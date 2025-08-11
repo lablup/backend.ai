@@ -1,16 +1,14 @@
-import uuid
 from collections.abc import Collection, Sequence
-from typing import Any, cast
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
 from .models import (
-    get_object_permissions_table,
-    get_roles_table,
-    get_scope_permissions_table,
+    get_association_scopes_entities_table,
+    get_user_roles_table,
 )
-from .types import RoleCreationInputGroup
+from .types import UserRoleMappingInputGroup
 
 
 def insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
@@ -18,27 +16,13 @@ def insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> No
         db_conn.execute(sa.insert(row_type), data)
 
 
-def batch_insert_from_role_creation_input_group(
-    db_conn: Connection, input_groups: Sequence[RoleCreationInputGroup]
+def insert_from_user_role_mapping_input_group(
+    db_conn: Connection, input_groups: Sequence[UserRoleMappingInputGroup]
 ) -> None:
-    if not input_groups:
-        return
-    roles_table = get_roles_table()
-    role_insert_stmt = sa.insert(roles_table).returning(roles_table.c.id)
-    role_result = db_conn.execute(
-        role_insert_stmt, [group.role.to_dict() for group in input_groups]
-    )
-    role_records = cast(list[uuid.UUID], role_result.all())
-
-    scope_permission_values: list[dict[str, Any]] = []
-    object_permission_values: list[dict[str, Any]] = []
-    for group, role_id in zip(input_groups, role_records):
-        for scope_permission in group.scope_permissions:
-            scope_permission_input = scope_permission.to_input(role_id)
-            scope_permission_values.append(scope_permission_input.to_dict())
-        for object_permission in group.object_permissions:
-            object_permission_input = object_permission.to_input(role_id)
-            object_permission_values.append(object_permission_input.to_dict())
-
-    insert_if_data_exists(db_conn, get_scope_permissions_table(), scope_permission_values)
-    insert_if_data_exists(db_conn, get_object_permissions_table(), object_permission_values)
+    user_roles: list[dict[str, Any]] = []
+    scope_entities: list[dict[str, Any]] = []
+    for group in input_groups:
+        user_roles.append(group.user_role_input.to_dict())
+        scope_entities.append(group.association_scopes_entities_input.to_dict())
+    insert_if_data_exists(db_conn, get_user_roles_table(), user_roles)
+    insert_if_data_exists(db_conn, get_association_scopes_entities_table(), scope_entities)
