@@ -51,17 +51,15 @@ class ScheduleCoordinator:
             ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self, event_producer),
         }
 
-    async def process_if_needed(self, schedule_type: ScheduleType) -> bool:
+    async def process_schedule(
+        self,
+        schedule_type: ScheduleType,
+    ) -> bool:
         """
-        Process scheduling operation if needed (based on internal state).
-
+        Process a scheduling operation based on the schedule type.
         :param schedule_type: Type of scheduling operation
         :return: True if operation was performed, False otherwise
         """
-        # Check internal state (uses Redis marks)
-        if not await self._valkey_schedule.load_and_delete_schedule_mark(schedule_type.value):
-            return False
-
         try:
             log.debug("Processing schedule type: {}", schedule_type.value)
 
@@ -74,7 +72,6 @@ class ScheduleCoordinator:
             # Execute the handler (includes operation and post-processing)
             await handler.handle()
             return True
-
         except Exception as e:
             log.exception(
                 "Error processing schedule type {}: {}",
@@ -83,6 +80,19 @@ class ScheduleCoordinator:
             )
             # No re-queueing as per user request
             raise
+
+    async def process_if_needed(self, schedule_type: ScheduleType) -> bool:
+        """
+        Process scheduling operation if needed (based on internal state).
+
+        :param schedule_type: Type of scheduling operation
+        :return: True if operation was performed, False otherwise
+        """
+        # Check internal state (uses Redis marks)
+        if not await self._valkey_schedule.load_and_delete_schedule_mark(schedule_type.value):
+            return False
+
+        return await self.process_schedule(schedule_type)
 
     async def request_scheduling(self, schedule_type: ScheduleType) -> None:
         """
