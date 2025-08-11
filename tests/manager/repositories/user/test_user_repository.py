@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.errors.auth import UserNotFound
+from ai.backend.manager.errors.user import UserCreationFailure
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -148,6 +149,10 @@ class TestUserRepository:
         mock_conn = AsyncMock()
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
+        # Mock scalar calls for domain check and existing user check
+        # First call (domain check) returns True, second call (existing user check) returns None
+        mock_conn.scalar.side_effect = [True, None]
+
         # Mock the created user result
         created_user_row = MagicMock()
         created_user_row.uuid = uuid.uuid4()
@@ -204,12 +209,16 @@ class TestUserRepository:
         mock_conn = AsyncMock()
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
+        # Mock scalar calls for domain check and existing user check
+        # First call (domain check) returns True, second call (existing user check) returns None
+        mock_conn.scalar.side_effect = [True, None]
+
         # Mock execute to return None (creation failed)
         mock_result = MagicMock()
         mock_result.first.return_value = None
         mock_conn.execute.return_value = mock_result
 
-        with pytest.raises(RuntimeError, match="Failed to create user"):
+        with pytest.raises(UserCreationFailure):
             await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
     @pytest.mark.asyncio

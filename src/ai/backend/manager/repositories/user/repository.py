@@ -18,8 +18,17 @@ from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
+from ai.backend.manager.errors.user import (
+    KeyPairForbidden,
+    KeyPairNotFound,
+    UserConflict,
+    UserCreationBadRequest,
+    UserCreationFailure,
+    UserModificationFailure,
+    UserNotFound,
+)
 from ai.backend.manager.models import kernels
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
@@ -67,16 +76,44 @@ class UserRepository:
         """
         Create a new user with default keypair and group associations.
         """
+        domain_name = user_creator.domain_name
+        email = user_creator.email
+        user_name = user_creator.username
+
         user_data = user_creator.fields_to_store()
         async with self._db.begin() as conn:
+            # Check if domain exists before creating user
+            domain_check_query = sa.select(domains.c.name).where(domains.c.name == domain_name)
+            domain_exists = await conn.scalar(domain_check_query)
+            if not domain_exists:
+                raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
+
+            # Check if user with the same email or username already exists
+            existing_user_query = sa.select(users.c.email).where(
+                sa.or_(users.c.email == email, users.c.username == user_name)
+            )
+            existing_user = await conn.scalar(existing_user_query)
+            if existing_user:
+                raise UserConflict(
+                    f"User with email {email} or username {user_name} already exists."
+                )
+
             # Insert user
             user_insert_query = sa.insert(users).values(user_data)
             query = user_insert_query.returning(user_insert_query.table)
-            result = await conn.execute(query)
-            created_user = result.first()
+            created_user = None
+
+            try:
+                result = await conn.execute(query)
+                created_user = result.first()
+            except sa.exc.IntegrityError as e:
+                error_msg = str(e)
+                raise UserCreationBadRequest(
+                    f"Failed to create user due to database constraint violation: {error_msg}"
+                ) from e
 
             if not created_user:
-                raise RuntimeError("Failed to create user")
+                raise UserCreationFailure("Failed to create user")
 
             # Create default keypair
             email = user_data["email"]
@@ -108,8 +145,6 @@ class UserRepository:
             )
 
             res = UserData.from_row(created_user)
-        if not res:
-            raise RuntimeError("Failed to convert created user row to UserData")
         return res
 
     @repository_decorator()
@@ -145,7 +180,7 @@ class UserRepository:
             result = await conn.execute(update_query)
             updated_user = result.first()
             if not updated_user:
-                raise RuntimeError("Failed to update user")
+                raise UserModificationFailure("Failed to update user")
 
             # Handle role changes
             prev_role = current_user.role
