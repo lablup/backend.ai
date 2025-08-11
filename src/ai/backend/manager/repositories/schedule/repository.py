@@ -1505,20 +1505,10 @@ class ScheduleRepository:
         )
 
         # Update scheduler status with successful allocation predicates
-        cleared_status_data = {**session_row.status_data} if session_row.status_data else {}
-        cleared_status_data["scheduler"] = {
-            "passed_predicates": [p.serialize() for p in allocation.passed_phases],
-            "failed_predicates": [
-                p.serialize() for p in allocation.failed_phases
-            ],  # Should be empty for successful allocations
-            "retries": 0,
-            "last_try": now.isoformat(),
-        }
-
         session_row.set_status(
             SessionStatus.SCHEDULED,
             status_info="scheduled",
-            status_data=cleared_status_data,
+            status_data={},
             status_changed_at=now,
         )
         session_row.scaling_group_name = allocation.scaling_group
