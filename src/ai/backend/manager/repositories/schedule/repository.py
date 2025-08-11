@@ -1186,8 +1186,8 @@ class ScheduleRepository:
         If a session allocation fails, the error is logged but processing continues.
         Note: Failed allocations remain uncommitted while successful ones are committed.
         """
-        concurrency_to_increment: dict[str, int] = defaultdict(lambda: 0)
-        sftp_concurrency_to_increment: dict[str, int] = defaultdict(lambda: 0)
+        concurrency_to_increment: dict[str, int] = defaultdict(int)
+        sftp_concurrency_to_increment: dict[str, int] = defaultdict(int)
 
         async with self._db.begin_session() as db_session:
             # Pre-fetch all necessary data for allocations
@@ -1215,9 +1215,8 @@ class ScheduleRepository:
                 await self._update_session_failure_status(db_session, failure)
 
             # Update concurrency statistics
-            await self._valkey_stat.increment_keypair_concurrencies(concurrency_to_increment)
             await self._valkey_stat.increment_keypair_concurrencies(
-                sftp_concurrency_to_increment, is_private=True
+                concurrency_to_increment, sftp_concurrency_to_increment
             )
 
     async def _prefetch_agent_rows(

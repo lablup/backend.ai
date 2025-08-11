@@ -688,7 +688,9 @@ class ValkeyStatClient:
 
     @valkey_decorator()
     async def increment_keypair_concurrencies(
-        self, concurrency_to_increment: Mapping[str, int], is_private: bool = False
+        self,
+        concurrency_to_increment: Mapping[str, int],
+        sftp_concurrency_to_increment: Mapping[str, int],
     ) -> None:
         """
         Increment keypair concurrency counters.
@@ -701,18 +703,16 @@ class ValkeyStatClient:
             return
 
         batch = self._create_batch()
-        op_count = 0
 
         for access_key, delta in concurrency_to_increment.items():
-            # Skip no-op changes
-            if not delta:
-                continue
-            key = self._get_keypair_concurrency_key(access_key, is_private)
+            key = self._get_keypair_concurrency_key(access_key, is_private=False)
             batch.incrby(key, int(delta))
-            op_count += 1
 
-        if op_count > 0:
-            await self._client.client.exec(batch, raise_on_error=True)
+        for access_key, delta in sftp_concurrency_to_increment.items():
+            key = self._get_keypair_concurrency_key(access_key, is_private=True)
+            batch.incrby(key, int(delta))
+
+        await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
     async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:

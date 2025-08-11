@@ -420,6 +420,4 @@ class Scheduler:
         )
 
         # Build session allocation from selections
-        return SessionAllocation.from_agent_selections(
-            session_workload, selections, scaling_group, session_workload.access_key
-        )
+        return SessionAllocation.from_agent_selections(session_workload, selections, scaling_group)

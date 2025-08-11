@@ -294,7 +294,6 @@ class SessionAllocation:
         session_workload: "SessionWorkload",
         selections: list["AgentSelection"],
         scaling_group: str,
-        access_key: AccessKey,
     ) -> "SessionAllocation":
         """
         Build a SessionAllocation from agent selection results.
@@ -343,7 +342,7 @@ class SessionAllocation:
             scaling_group=scaling_group,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
-            access_key=access_key,
+            access_key=session_workload.access_key,
         )
 
 
