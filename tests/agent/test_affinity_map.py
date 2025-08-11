@@ -173,7 +173,7 @@ def test_affinity_map_prefer_larger_chunks():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 0
     assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 0
 
-    # The second-time alloaction with 2 devices should happen in the largest neighbor component.
+    # The second-time allocation with 2 devices should happen in the largest neighbor component.
     print("second allocation")
     affinity_hint = AffinityHint(
         None,
