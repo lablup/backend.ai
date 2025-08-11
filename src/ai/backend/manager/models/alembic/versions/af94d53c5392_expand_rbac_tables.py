@@ -23,7 +23,6 @@ def upgrade() -> None:
     op.create_table(
         "permission_groups",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
-        sa.Column("status", sa.VARCHAR(length=32), server_default="active", nullable=False),
         sa.Column("role_id", GUID(), nullable=False),
         sa.Column("scope_type", sa.VARCHAR(length=32), nullable=False),
         sa.Column("scope_id", sa.String(length=64), nullable=False),
@@ -35,9 +34,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_permission_groups")),
     )
-    op.create_index(
-        "ix_id_status_role_id", "permission_groups", ["id", "status", "role_id"], unique=False
-    )
+    op.create_index("ix_id_role_id", "permission_groups", ["id", "role_id"], unique=False)
     op.add_column("scope_permissions", sa.Column("permission_group_id", GUID(), nullable=False))
     op.drop_index("ix_role_id_entity_type_scope_id", table_name="scope_permissions")
     op.create_index(
@@ -72,5 +69,4 @@ def downgrade() -> None:
         unique=False,
     )
     op.drop_column("scope_permissions", "permission_group_id")
-    op.drop_index("ix_id_status_role_id", table_name="permission_groups")
     op.drop_table("permission_groups")
