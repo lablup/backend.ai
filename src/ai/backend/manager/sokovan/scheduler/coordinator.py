@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 
 from .handlers import (
@@ -30,22 +31,27 @@ class ScheduleCoordinator:
     _scheduler: "Scheduler"
     _event_producer: EventProducer
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
+    _scheduler_dispatcher: SchedulerDispatcher
 
     def __init__(
         self,
         valkey_schedule: ValkeyScheduleClient,
         scheduler: "Scheduler",
         event_producer: EventProducer,
+        scheduler_dispatcher: SchedulerDispatcher,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._scheduler = scheduler
         self._event_producer = event_producer
+        self._scheduler_dispatcher = scheduler_dispatcher
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
             ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(scheduler, self),
-            ScheduleType.START: StartSessionsHandler(scheduler, self),
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
+                scheduler, self, self._scheduler_dispatcher
+            ),
+            ScheduleType.START: StartSessionsHandler(scheduler, self, self._scheduler_dispatcher),
             ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self),
         }
 
@@ -104,3 +110,17 @@ class ScheduleCoordinator:
         """
         await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
         log.debug("Requested scheduling for type: {}", schedule_type.value)
+
+    async def start(self) -> None:
+        """
+        Start the scheduling process.
+        """
+        await self._scheduler_dispatcher.start("do_start_session")
+        log.debug("Starting scheduling process")
+
+    async def check_preconditions(self):
+        """
+        Check preconditions for scheduling.
+        """
+        await self._scheduler_dispatcher.check_precond("do_check_precond")
+        log.debug("Checking preconditions for scheduling")
