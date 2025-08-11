@@ -38,8 +38,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
-class StoragesConfigCtx(MiddlewareParam):
-    storages: list[ObjectStorageConfig]
 
 class StorageConfigsCtx(MiddlewareParam):
     storage_configs: list[ObjectStorageConfig]
@@ -49,11 +47,6 @@ class StorageConfigsCtx(MiddlewareParam):
     async def from_request(cls, request: web.Request) -> Self:
         # TODO: Inject storages config from DB
         return cls(storage_configs=[])
-
-    @classmethod
-    def _resolve_req_type(cls) -> Type[TReq]:
-        meta = cls.__pydantic_generic_metadata__
-        return meta["args"][0]
 
 
 class StorageAPIHandler:
