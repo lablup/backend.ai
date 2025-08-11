@@ -45,21 +45,19 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
-from ai.backend.manager.data.model_serving.types import (
+from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ..data.model_serving.creator import EndpointCreator
+from ..data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
     EndpointLifecycle,
     EndpointTokenData,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.types import MountOptionModel, UserScope
-
+from ..defs import DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
+from ..models.storage import StorageSessionManager
+from ..types import MountOptionModel, UserScope
 from .base import (
     GUID,
     Base,
@@ -80,6 +78,8 @@ from .user import UserRow
 from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -492,6 +492,8 @@ class EndpointRow(Base):
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
         for kernel in target_kernels:
+            if kernel.cluster_role != DEFAULT_ROLE:
+                continue
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
                     connection_info[port_info["name"]].append({
@@ -500,6 +502,7 @@ class EndpointRow(Base):
                         "kernel_host": kernel.kernel_host,
                         "kernel_port": port_info["host_ports"][0],
                     })
+                    break
         return connection_info
 
     def to_data(self) -> EndpointData:
