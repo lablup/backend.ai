@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -35,7 +35,7 @@ class ScopePermissionCreateInput:
             "role_id": self.role_id,
             "entity_type": self.entity_type,
             "operation": self.operation,
-            "scope_type": self.scope_type.value,
+            "scope_type": self.scope_type,
             "scope_id": self.scope_id,
         }
 
@@ -50,9 +50,9 @@ class ObjectPermissionCreateInput:
     def to_dict(self) -> dict[str, Any]:
         return {
             "role_id": self.role_id,
-            "entity_type": self.entity_type.value,
+            "entity_type": self.entity_type,
             "entity_id": self.entity_id,
-            "operation": self.operation.value,
+            "operation": self.operation,
         }
 
 
@@ -60,6 +60,14 @@ class ObjectPermissionCreateInput:
 class AssociationScopesEntitiesCreateInput:
     scope_id: ScopeId
     object_id: ObjectId
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "scope_type": self.scope_id.scope_type,
+            "scope_id": self.scope_id.scope_id,
+            "entity_type": self.object_id.entity_type,
+            "entity_id": self.object_id.entity_id,
+        }
 
 
 @dataclass
@@ -71,8 +79,8 @@ class RoleCreateInput:
     def to_dict(self) -> dict[str, str]:
         return {
             "name": self.name,
-            "source": self.source.value,
-            "status": self.status.value,
+            "source": self.source,
+            "status": self.status,
         }
 
 
@@ -117,17 +125,6 @@ class ObjectPermissionCreateInputBeforeRoleCreation:
             entity_id=self.entity_id,
             operation=self.operation,
         )
-
-
-@dataclass
-class RoleCreationInputGroup:
-    role: RoleCreateInput
-    scope_permissions: list[ScopePermissionCreateInputBeforeRoleCreation] = field(
-        default_factory=list
-    )
-    object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
-        default_factory=list
-    )
 
 
 @dataclass
