@@ -136,10 +136,7 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     async def execute(self) -> ScheduleResult:
         """Terminate sessions marked for termination."""
-        # TODO: Implement when method is added to Scheduler
-        log.trace("Terminating sessions (not yet implemented)")
-        return ScheduleResult()
-        # return await self._scheduler.terminate_sessions()
+        return await self._scheduler.terminate_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""

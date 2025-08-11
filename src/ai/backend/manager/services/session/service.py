@@ -195,6 +195,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
+from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -210,6 +211,7 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     admin_session_repository: AdminSessionRepository
+    scheduler: Scheduler
 
 
 class SessionService:
@@ -221,6 +223,7 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _admin_session_repository: AdminSessionRepository
+    _scheduler: Scheduler
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -236,6 +239,7 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._admin_session_repository = args.admin_session_repository
+        self._scheduler = args.scheduler
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()

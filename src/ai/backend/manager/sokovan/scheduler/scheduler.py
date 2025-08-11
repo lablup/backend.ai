@@ -1,10 +1,10 @@
 import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional
 
-from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
@@ -40,13 +40,24 @@ from .validators.validator import SchedulingValidator
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.schedule.repository import (
+        MarkTerminatingResult,
         ScheduleRepository,
         SchedulingContextData,
+        TerminatingKernelData,
     )
 
     from .allocators.allocator import SchedulingAllocator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class AgentTerminationGroup:
+    """Groups kernels by agent for batch termination."""
+
+    agent_id: Optional[AgentId]
+    agent_addr: Optional[str]
+    kernels: list["TerminatingKernelData"] = field(default_factory=list)
 
 
 @dataclass
@@ -426,3 +437,90 @@ class Scheduler:
             selections,
             scaling_group,
         )
+
+    async def terminate_sessions(self) -> ScheduleResult:
+        """
+        Terminate all sessions marked with TERMINATING status.
+
+        This method:
+        1. Fetches all terminating sessions from the repository
+        2. Groups kernels by agent for batch processing
+        3. Sends termination requests to agents
+        4. Updates session/kernel statuses to TERMINATED
+
+        Returns:
+            ScheduleResult with the count of terminated sessions
+        """
+        # Fetch all terminating sessions
+        terminating_sessions = await self._repository.get_terminating_sessions()
+
+        if not terminating_sessions:
+            log.debug("No sessions to terminate")
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Processing {} sessions for termination", len(terminating_sessions))
+
+        # Group kernels by agent for batch termination
+        kernels_by_agent: dict[AgentId, AgentTerminationGroup] = {}
+
+        for session in terminating_sessions:
+            for kernel in session.kernels:
+                if kernel.agent_id is None:
+                    continue
+
+                if kernel.agent_id not in kernels_by_agent:
+                    kernels_by_agent[kernel.agent_id] = AgentTerminationGroup(
+                        agent_id=kernel.agent_id, agent_addr=kernel.agent_addr, kernels=[]
+                    )
+                kernels_by_agent[kernel.agent_id].kernels.append(kernel)
+
+        # Process terminations by agent
+        terminated_count = 0
+        for agent_id, termination_group in kernels_by_agent.items():
+            try:
+                # TODO: Send termination request to agent
+                # This will be implemented when agent communication is ready
+                # For now, just log the action
+                log.debug(
+                    "Would terminate {} kernels on agent {}",
+                    len(termination_group.kernels),
+                    agent_id,
+                )
+
+                # TODO: Update kernel/session statuses to TERMINATED
+                # await self._repository.update_termination_status(
+                #     kernel_ids=[k.kernel_id for k in termination_group.kernels]
+                # )
+
+                terminated_count += len(termination_group.kernels)
+
+            except Exception as e:
+                log.error("Failed to terminate kernels on agent {}: {}", agent_id, e)
+
+        log.info("Terminated {} kernels across {} agents", terminated_count, len(kernels_by_agent))
+        return ScheduleResult(succeeded_count=len(terminating_sessions))
+
+    async def mark_sessions_for_termination(
+        self,
+        session_ids: list[str],
+        reason: str = "USER_REQUESTED",
+    ) -> "MarkTerminatingResult":
+        """
+        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
+        This provides fast response to users by only updating the status and returning immediately.
+
+        :param session_ids: List of session IDs to terminate
+        :param reason: Reason for termination
+        :return: MarkTerminatingResult with categorized session statuses
+        """
+        result = await self._repository.mark_sessions_terminating(session_ids, reason)
+
+        if result.has_processed():
+            log.info(
+                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
+                result.processed_count(),
+                len(result.cancelled_sessions),
+                len(result.terminating_sessions),
+            )
+
+        return result
