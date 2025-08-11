@@ -43,12 +43,10 @@ class ScheduleCoordinator:
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
-            ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self, event_producer),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                scheduler, self, event_producer
-            ),
-            ScheduleType.START: StartSessionsHandler(scheduler, self, event_producer),
-            ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self, event_producer),
+            ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self),
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(scheduler, self),
+            ScheduleType.START: StartSessionsHandler(scheduler, self),
+            ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self),
         }
 
     async def process_schedule(
