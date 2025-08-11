@@ -102,7 +102,7 @@ class UserService:
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
         email = action.email
-        log.info(f"Purging all records of the user {email}...")
+        log.info(f"Purging all records of the user {0}...", email)
 
         # Check if user exists
         user_data = await self._user_repository.get_by_email_validated(

@@ -107,7 +107,6 @@ class UserRepository:
                 result = await conn.execute(query)
                 created_user = result.first()
             except sa.exc.IntegrityError as e:
-                # For any integrity errors, raise a generic creation failure
                 error_msg = str(e)
                 raise UserCreationBadRequest(
                     f"Failed to create user due to database constraint violation: {error_msg}"
