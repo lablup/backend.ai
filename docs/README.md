@@ -12,7 +12,7 @@ Developer guide for Backend.AI documentation
   - https://github.com/pyenv/pyenv-virtualenv#installation
 
 ### Setting up the documenting environment    
-  
+    
 Then, follow the instructions below:  
 
 ```console
