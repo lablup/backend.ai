@@ -88,9 +88,3 @@ class ObjectPermissionCreateInput:
             "role_id": self.role_id,
             "entity_id": self.entity_id,
         }
-
-
-@dataclass
-class UserRoleMappingCreateInput:
-    user_role_input: UserRoleCreateInput
-    association_scopes_entities_input: AssociationScopesEntitiesCreateInput
