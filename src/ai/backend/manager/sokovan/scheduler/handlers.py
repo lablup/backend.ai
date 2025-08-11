@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, final
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 
 from .results import ScheduleResult
@@ -78,20 +79,21 @@ class CheckPreconditionHandler(ScheduleHandler):
         self,
         scheduler: "Scheduler",
         coordinator: "ScheduleCoordinator",
+        dispatcher: "SchedulerDispatcher",
     ):
         self._scheduler = scheduler
         self._coordinator = coordinator
+        self._dispatcher = dispatcher
 
     async def execute(self) -> ScheduleResult:
         """Check preconditions for scheduled sessions."""
-        # TODO: Implement when method is added to Scheduler
-        log.trace("Checking preconditions (not yet implemented)")
+        # TODO: Remove dispatcher
+        await self._dispatcher.check_precond("do_check_precond")
+        log.debug("Checking preconditions")
         return ScheduleResult()
-        # return await self._scheduler.check_preconditions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if preconditions are met."""
-        await self._coordinator.request_scheduling(ScheduleType.START)
         log.trace("Checked {} sessions, requesting start", result.succeeded_count)
 
 
@@ -102,14 +104,17 @@ class StartSessionsHandler(ScheduleHandler):
         self,
         scheduler: "Scheduler",
         coordinator: "ScheduleCoordinator",
+        dispatcher: "SchedulerDispatcher",
     ):
         self._scheduler = scheduler
         self._coordinator = coordinator
+        self._dispatcher = dispatcher
 
     async def execute(self) -> ScheduleResult:
         """Start sessions that passed precondition checks."""
-        # TODO: Implement when method is added to Scheduler
-        log.trace("Starting sessions (not yet implemented)")
+        # TODO: Remove dispatcher
+        await self._dispatcher.start("do_start_session")
+        log.debug("Starting sessions")
         return ScheduleResult()
         # return await self._scheduler.start_sessions()
 

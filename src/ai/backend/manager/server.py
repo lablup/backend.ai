@@ -958,6 +958,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,
+        scheduler_dispatcher=root_ctx.scheduler_dispatcher,
     )
 
     # Initialize the GlobalTimers for scheduling operations

@@ -12,6 +12,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
@@ -31,6 +32,7 @@ class SokovanOrchestrator:
     _coordinator: ScheduleCoordinator
     _event_producer: EventProducer
     _lock_factory: "DistributedLockFactory"
+    _scheduler_dispatcher: SchedulerDispatcher  # TODO: Remove this
 
     # GlobalTimers for scheduling operations
     timers: list[GlobalTimer] = []
@@ -41,11 +43,13 @@ class SokovanOrchestrator:
         event_producer: EventProducer,
         valkey_schedule: ValkeyScheduleClient,
         lock_factory: "DistributedLockFactory",
+        scheduler_dispatcher: SchedulerDispatcher,
     ) -> None:
         self._coordinator = ScheduleCoordinator(
             valkey_schedule=valkey_schedule,
             scheduler=scheduler,
             event_producer=event_producer,
+            scheduler_dispatcher=scheduler_dispatcher,
         )
         self._event_producer = event_producer
         self._lock_factory = lock_factory
