@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+
 from .enums import EntityType, OperationType, RoleSource, RoleStatus, ScopeType
 
 ROLE_NAME_PREFIX = "role_"
@@ -52,6 +54,12 @@ class ObjectPermissionCreateInput:
             "entity_id": self.entity_id,
             "operation": self.operation.value,
         }
+
+
+@dataclass
+class AssociationScopesEntitiesCreateInput:
+    scope_id: ScopeId
+    object_id: ObjectId
 
 
 @dataclass
@@ -121,3 +129,9 @@ class RoleCreationInputGroup:
     object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
         default_factory=list
     )
+
+
+@dataclass
+class UserRoleMappingInputGroup:
+    user_role_input: UserRoleCreateInput
+    association_scopes_entities_input: AssociationScopesEntitiesCreateInput
