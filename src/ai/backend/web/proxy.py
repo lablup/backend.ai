@@ -11,6 +11,7 @@ import aiohttp
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
+from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
@@ -134,7 +135,7 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     try:
         request_headers = extra_config_headers.check(request.headers)
-    except Exception as e:
+    except DataError as e:
         raise InvalidAPIParameters("Invalid request headers") from e
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
