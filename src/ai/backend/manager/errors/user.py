@@ -61,7 +61,7 @@ class UserCreationBadRequest(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class UserModificationFailure(BackendAIError, web.HTTPConflict):
+class UserModificationFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-modification-failure"
     error_title = "Failed to modify user."
 
@@ -74,7 +74,7 @@ class UserModificationFailure(BackendAIError, web.HTTPConflict):
         )
 
 
-class UserPurgeFailure(BackendAIError, web.HTTPConflict):
+class UserPurgeFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-purge-failure"
     error_title = "Failed to purge user."
 
