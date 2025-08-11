@@ -109,7 +109,7 @@ class UserRepository:
             except sa.exc.IntegrityError as e:
                 # For any integrity errors, raise a generic creation failure
                 error_msg = str(e)
-                raise UserCreationFailure(
+                raise UserCreationBadRequest(
                     f"Failed to create user due to database constraint violation: {error_msg}"
                 ) from e
 
@@ -146,8 +146,6 @@ class UserRepository:
             )
 
             res = UserData.from_row(created_user)
-        if not res:
-            raise UserCreationFailure("Failed to convert created user row to UserData")
         return res
 
     @repository_decorator()
