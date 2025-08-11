@@ -236,10 +236,10 @@ class Circuit(Base, BaseMixin):
     async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
         from .worker import Worker
 
-        if session is not None:
-            self.worker_row = await Worker.get(session, self.worker)
+        worker: Worker = (
+            await Worker.get(session, self.worker) if session is not None else self.worker_row
+        )
 
-        worker: Worker = self.worker_row
         match (worker.use_tls, self.protocol):
             case (True, ProxyProtocol.TCP):
                 scheme = "tls"
