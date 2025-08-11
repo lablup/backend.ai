@@ -14,6 +14,7 @@ from ai.backend.manager.metrics.scheduler import (
 )
 from ai.backend.manager.types import DistributedLockFactory
 
+from .results import ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
@@ -116,12 +117,12 @@ class Scheduler:
         )
         return pool
 
-    async def schedule_all_scaling_groups(self) -> int:
+    async def schedule_all_scaling_groups(self) -> ScheduleResult:
         """
         Schedule sessions for all scaling groups.
 
         Returns:
-            int: The number of sessions successfully scheduled.
+            ScheduleResult: Result of the scheduling operation.
         """
         lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
         total_scheduled_count = 0
@@ -155,7 +156,7 @@ class Scheduler:
                         # Continue with other scaling groups even if one fails
                         continue
 
-                return total_scheduled_count
+                return ScheduleResult(succeeded_count=total_scheduled_count)
 
     async def _schedule_scaling_group(self, scaling_group: str) -> int:
         """

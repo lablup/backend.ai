@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+    from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.etcd import AsyncEtcd
@@ -59,6 +60,7 @@ class RootContext(BaseContext):
     valkey_stat: ValkeyStatClient
     valkey_image: ValkeyImageClient
     valkey_stream: ValkeyStreamClient
+    valkey_schedule: ValkeyScheduleClient
     valkey_profile_target: ValkeyProfileTarget
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions

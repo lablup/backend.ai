@@ -1,8 +1,10 @@
 import logging
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.schedule.anycast import DoCheckPrecondEvent
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -10,35 +12,61 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 class SokovanOrchestrator:
     """
-    Orchestrator for Sokovan scheduler that handles schedule events.
+    Orchestrator for Sokovan scheduler.
+    Provides event handler interface for the coordinator.
     """
 
-    _scheduler: Scheduler
-    _event_producer: EventProducer
+    _coordinator: ScheduleCoordinator
 
     def __init__(
         self,
         scheduler: Scheduler,
         event_producer: EventProducer,
+        valkey_schedule: ValkeyScheduleClient,
     ) -> None:
-        self._scheduler = scheduler
-        self._event_producer = event_producer
+        self._coordinator = ScheduleCoordinator(
+            valkey_schedule=valkey_schedule,
+            scheduler=scheduler,
+            event_producer=event_producer,
+        )
+
+    @property
+    def coordinator(self) -> ScheduleCoordinator:
+        """Get the schedule coordinator."""
+        return self._coordinator
+
+    # Event handlers - delegate to coordinator
+    async def handle_schedule_if_needed_event(self, schedule_type: str) -> None:
+        """
+        Handle conditional scheduling event (checks internal state).
+        Called by timer with high frequency (e.g., 5s).
+        """
+        await self._coordinator.process_if_needed(ScheduleType(schedule_type))
 
     async def handle_schedule_event(self) -> None:
         """
-        Handle schedule event by triggering the Sokovan scheduler.
-
-        The distributed lock and actual scheduling logic is handled by the Scheduler.
+        Handle unconditional schedule event.
+        Called by timer with low frequency (e.g., 30s).
+        Direct execution without checking marks.
         """
-        try:
-            # Delegate to scheduler which handles locking internally
-            # Returns True if any sessions were scheduled
-            scheduled_session_count = await self._scheduler.schedule_all_scaling_groups()
+        handler = self._coordinator._schedule_handlers.get(ScheduleType.SCHEDULE)
+        if handler:
+            await handler.handle()
 
-            # Trigger check precondition event only if sessions were actually scheduled
-            if scheduled_session_count > 0:
-                await self._event_producer.anycast_event(DoCheckPrecondEvent())
+    async def handle_check_precond_event(self) -> None:
+        """
+        Handle unconditional check precondition event.
+        Called by timer with low frequency (e.g., 30s).
+        """
+        handler = self._coordinator._schedule_handlers.get(ScheduleType.CHECK_PRECONDITION)
+        if handler:
+            await handler.handle()
 
-        except Exception as e:
-            log.exception("handle_schedule_event(): scheduling error: {}", repr(e))
-            raise
+    async def handle_start_event(self) -> None:
+        """
+        Handle unconditional session start event.
+        Called by timer with low frequency (e.g., 30s).
+        """
+        handler = self._coordinator._schedule_handlers.get(ScheduleType.START)
+        if handler:
+            await handler.handle()

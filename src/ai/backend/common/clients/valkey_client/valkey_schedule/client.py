@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Self
 
 from glide import Batch
@@ -13,15 +12,6 @@ from ai.backend.common.types import ValkeyTarget
 
 # Layer-specific decorator for valkey_schedule client
 valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_SCHEDULE)
-
-
-class ScheduleMarkType(StrEnum):
-    """Types of scheduling marks that indicate work is needed in the next scheduling loop."""
-
-    SCHEDULE = "schedule"  # Need to schedule pending sessions
-    CHECK_PRECONDITION = "check_precondition"  # Need to check preconditions for scheduled sessions
-    START = "start"  # Need to start prepared sessions
-    TERMINATE = "terminate"  # Need to terminate sessions
 
 
 class ValkeyScheduleClient:
@@ -61,17 +51,17 @@ class ValkeyScheduleClient:
         await client.connect()
         return cls(client=client)
 
-    def _get_schedule_key(self, schedule_type: ScheduleMarkType) -> str:
+    def _get_schedule_key(self, schedule_type: str) -> str:
         """
         Generate the Redis key for the given schedule type.
 
         :param schedule_type: The type of scheduling
         :return: The formatted key string
         """
-        return f"schedule:{schedule_type.value}"
+        return f"schedule:{schedule_type}"
 
     @valkey_decorator()
-    async def mark_schedule_needed(self, schedule_type: ScheduleMarkType) -> None:
+    async def mark_schedule_needed(self, schedule_type: str) -> None:
         """
         Mark that scheduling is needed for the given schedule type.
         Simply sets a flag that will be checked in the next scheduling loop.
@@ -82,7 +72,7 @@ class ValkeyScheduleClient:
         await self._client.client.set(key, b"1")
 
     @valkey_decorator()
-    async def load_and_delete_schedule_mark(self, schedule_type: ScheduleMarkType) -> bool:
+    async def load_and_delete_schedule_mark(self, schedule_type: str) -> bool:
         """
         Check if a scheduling mark exists and atomically delete it.
         This ensures that only one scheduler processes the mark.
