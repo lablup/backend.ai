@@ -1,5 +1,8 @@
 import enum
 
+from ai.backend.manager.data.permission.status import (
+    RoleStatus as OriginalRoleStatus,
+)
 from ai.backend.manager.data.permission.types import (
     EntityType as OriginalEntityType,
 )
@@ -24,6 +27,15 @@ class RoleSource(enum.StrEnum):
 
     def to_original(self) -> OriginalRoleSource:
         return OriginalRoleSource(self.value)
+
+
+class RoleStatus(enum.StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
+
+    def to_original(self) -> OriginalRoleStatus:
+        return OriginalRoleStatus(self.value)
 
 
 class OperationType(enum.StrEnum):
