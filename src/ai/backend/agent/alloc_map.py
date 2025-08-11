@@ -145,7 +145,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
             primary_sets = affinity_hint.affinity_map.get_device_clusters_with_lowest_distance(
                 device_name
             )
-            secondary_set = []
+            secondary_set: Sequence[AbstractComputeDevice] = []
         else:
             primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
                 affinity_hint.devices, device_name
