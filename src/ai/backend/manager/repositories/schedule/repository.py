@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Optional, cast
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -218,6 +218,28 @@ class _AllSchedulingDatabaseData:
 
 
 @dataclass
+class TerminatingSessionData:
+    """Data for a session that needs to be terminated."""
+
+    session_id: SessionId
+    access_key: AccessKey
+    creation_id: str
+    status: SessionStatus
+    kernels: list["TerminatingKernelData"]
+
+
+@dataclass
+class TerminatingKernelData:
+    """Kernel data for termination processing."""
+
+    kernel_id: KernelId
+    status: KernelStatus
+    container_id: Optional[str]
+    agent_id: Optional[AgentId]
+    agent_addr: Optional[str]
+
+
+@dataclass
 class _RawSchedulingData:
     """Raw data fetched from database for scheduling operations."""
 
@@ -396,6 +418,57 @@ class ScheduleRepository:
         sess_row: SessionRow,
     ) -> None:
         await recalc_concurrency_used(session, sched_ctx.registry.valkey_stat, sess_row.access_key)
+
+    @repository_decorator()
+    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
+        """
+        Fetch all sessions with TERMINATING status.
+        Returns dataclass objects with session and kernel information for termination processing.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == SessionStatus.TERMINATING)
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                        )
+                    )
+                )
+            )
+            result = await session.execute(query)
+            session_rows = list(result.scalars().all())
+
+            # Transform Row objects to dataclasses
+            terminating_sessions = []
+            for session_row in session_rows:
+                kernels = [
+                    TerminatingKernelData(
+                        kernel_id=kernel.id,
+                        status=kernel.status,
+                        container_id=kernel.container_id,
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                    )
+                    for kernel in session_row.kernels
+                ]
+
+                terminating_sessions.append(
+                    TerminatingSessionData(
+                        session_id=session_row.id,
+                        access_key=session_row.access_key,
+                        creation_id=session_row.creation_id,
+                        status=session_row.status,
+                        kernels=kernels,
+                    )
+                )
+
+            return terminating_sessions
 
     @repository_decorator()
     async def get_schedulable_scaling_groups(self) -> list[str]:
