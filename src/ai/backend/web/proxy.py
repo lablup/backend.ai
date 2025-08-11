@@ -14,6 +14,7 @@ from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -131,7 +132,10 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 @web.middleware
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
-    request_headers = extra_config_headers.check(request.headers)
+    try:
+        request_headers = extra_config_headers.check(request.headers)
+    except Exception as e:
+        raise InvalidAPIParameters("Invalid request headers") from e
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
         if not request.can_read_body:  # designated as encrypted but has an empty payload
