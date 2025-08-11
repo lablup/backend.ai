@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -233,8 +233,11 @@ class Circuit(Base, BaseMixin):
 
         return c
 
-    async def get_endpoint_url(self) -> URL:
+    async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
         from .worker import Worker
+
+        if session is not None:
+            self.worker_row = await Worker.get(session, self.worker)
 
         worker: Worker = self.worker_row
         match (worker.use_tls, self.protocol):
