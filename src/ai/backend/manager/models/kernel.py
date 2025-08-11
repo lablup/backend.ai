@@ -696,14 +696,14 @@ class KernelRow(Base):
     @staticmethod
     async def batch_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
-    ) -> list["KernelRow"]:
+    ) -> list[KernelRow]:
         query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
         return (await session.execute(query)).scalars().all()
 
     @staticmethod
     async def batch_load_main_kernels_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
-    ) -> list["KernelRow"]:
+    ) -> list[KernelRow]:
         query = (
             sa.select(KernelRow)
             .where(KernelRow.session_id.in_(session_ids))
