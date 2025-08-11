@@ -136,7 +136,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     try:
         request_headers = extra_config_headers.check(request.headers)
     except DataError as e:
-        raise InvalidAPIParameters("Invalid request headers") from e
+        raise InvalidAPIParameters(f"Invalid request headers: {e}") from e
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
         if not request.can_read_body:  # designated as encrypted but has an empty payload
