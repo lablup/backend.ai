@@ -420,6 +420,20 @@ class SessionTypes(CIStrEnum):
     INFERENCE = "inference"
     SYSTEM = "system"
 
+    @classmethod
+    def private_types(cls) -> tuple[SessionTypes]:
+        """
+        Returns a set of private session types.
+        """
+        return (cls.SYSTEM,)
+
+    def is_private(self) -> bool:
+        """
+        Returns True if the session type is private.
+        Private session types are INTERACTIVE and BATCH.
+        """
+        return self in self.private_types()
+
 
 class SessionResult(CIStrEnum):
     UNDEFINED = "undefined"

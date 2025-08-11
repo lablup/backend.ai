@@ -1197,7 +1197,7 @@ class ScheduleRepository:
             for allocation in allocation_batch.allocations:
                 try:
                     await self._allocate_single_session(db_session, row_maps, allocation)
-                    if allocation.session_type == SessionTypes.SYSTEM:
+                    if allocation.session_type.is_private():
                         sftp_concurrency_to_increment[allocation.access_key] += 1
                     else:
                         concurrency_to_increment[allocation.access_key] += 1

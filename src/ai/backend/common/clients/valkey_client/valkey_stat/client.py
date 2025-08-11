@@ -695,11 +695,10 @@ class ValkeyStatClient:
         """
         Increment keypair concurrency counters.
 
-        :param access_key: The access key to increment concurrency for.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        :return: The new value after increment.
+        :param concurrency_to_increment: Mapping of access keys to concurrency increments.
+        :param sftp_concurrency_to_increment: Mapping of access keys to SFTP concurrency increments.
         """
-        if not concurrency_to_increment:
+        if not concurrency_to_increment and not sftp_concurrency_to_increment:
             return
 
         batch = self._create_batch()
