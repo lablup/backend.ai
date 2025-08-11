@@ -1,99 +1,123 @@
+import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesCreateInput,
-)
-from ai.backend.manager.data.permission.object_permission import ObjectPermissionCreateInput
-from ai.backend.manager.data.permission.role import RoleCreateInput
-from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
-from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
+from .enums import EntityType, OperationType, RoleSource, RoleStatus, ScopeType
 
 ROLE_NAME_PREFIX = "role_"
 ADMIN_ROLE_NAME_SUFFIX = "_admin"
 
 
-def is_admin_role(role_name: str) -> bool:
-    """
-    Check if the role name indicates an admin role.
-    """
-    return role_name.endswith(ADMIN_ROLE_NAME_SUFFIX)
+@dataclass
+class UserRoleCreateInput:
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+    def to_dict(self) -> dict[str, uuid.UUID]:
+        return {
+            "user_id": self.user_id,
+            "role_id": self.role_id,
+        }
 
 
 @dataclass
-class PermissionCreateInputGroup:
-    roles: list[RoleCreateInput] = field(default_factory=list)
-    user_roles: list[UserRoleCreateInput] = field(default_factory=list)
-    scope_permissions: list[ScopePermissionCreateInput] = field(default_factory=list)
-    object_permissions: list[ObjectPermissionCreateInput] = field(default_factory=list)
-    association_scopes_entities: list[AssociationScopesEntitiesCreateInput] = field(
+class ScopePermissionCreateInput:
+    role_id: uuid.UUID
+    entity_type: str
+    operation: str
+    scope_type: ScopeType
+    scope_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "entity_type": self.entity_type,
+            "operation": self.operation,
+            "scope_type": self.scope_type.value,
+            "scope_id": self.scope_id,
+        }
+
+
+@dataclass
+class ObjectPermissionCreateInput:
+    role_id: uuid.UUID
+    entity_type: EntityType
+    entity_id: str
+    operation: OperationType
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "entity_type": self.entity_type.value,
+            "entity_id": self.entity_id,
+            "operation": self.operation.value,
+        }
+
+
+@dataclass
+class RoleCreateInput:
+    name: str
+    source: RoleSource
+    status: RoleStatus = RoleStatus.ACTIVE
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "name": self.name,
+            "source": self.source.value,
+            "status": self.status.value,
+        }
+
+
+@dataclass
+class UserRoleCreateInputBeforeRoleCreation:
+    user_id: uuid.UUID
+
+    def to_input(self, role_id: uuid.UUID) -> UserRoleCreateInput:
+        return UserRoleCreateInput(
+            user_id=self.user_id,
+            role_id=role_id,
+        )
+
+
+@dataclass
+class ScopePermissionCreateInputBeforeRoleCreation:
+    entity_type: str
+    operation: str
+    scope_type: ScopeType
+    scope_id: str
+
+    def to_input(self, role_id: uuid.UUID) -> ScopePermissionCreateInput:
+        return ScopePermissionCreateInput(
+            role_id=role_id,
+            entity_type=self.entity_type,
+            operation=self.operation,
+            scope_type=self.scope_type,
+            scope_id=self.scope_id,
+        )
+
+
+@dataclass
+class ObjectPermissionCreateInputBeforeRoleCreation:
+    entity_type: EntityType
+    entity_id: str
+    operation: OperationType
+
+    def to_input(self, role_id: uuid.UUID) -> ObjectPermissionCreateInput:
+        return ObjectPermissionCreateInput(
+            role_id=role_id,
+            entity_type=self.entity_type,
+            entity_id=self.entity_id,
+            operation=self.operation,
+        )
+
+
+@dataclass
+class RoleCreationInputGroup:
+    role: RoleCreateInput
+    user_role: Optional[UserRoleCreateInputBeforeRoleCreation] = None
+    scope_permissions: list[ScopePermissionCreateInputBeforeRoleCreation] = field(
         default_factory=list
     )
-
-    def merge(self, other: "PermissionCreateInputGroup") -> None:
-        self.roles.extend(other.roles)
-        self.user_roles.extend(other.user_roles)
-        self.scope_permissions.extend(other.scope_permissions)
-        self.object_permissions.extend(other.object_permissions)
-        self.association_scopes_entities.extend(other.association_scopes_entities)
-
-    def to_role_insert_data(self) -> list[dict[str, Any]]:
-        def to_dict(input: RoleCreateInput) -> dict[str, Any]:
-            if input.id is not None:
-                return {
-                    "id": input.id,
-                    "name": input.name,
-                    "status": input.status,
-                    "description": input.description,
-                }
-            else:
-                return {
-                    "name": input.name,
-                    "status": input.status,
-                    "description": input.description,
-                }
-
-        return [to_dict(role) for role in self.roles]
-
-    def to_user_role_insert_data(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "user_id": user_role.user_id,
-                "role_id": user_role.role_id,
-            }
-            for user_role in self.user_roles
-        ]
-
-    def to_scope_permission_insert_data(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "role_id": scope_permission.role_id,
-                "scope_type": scope_permission.scope_type,
-                "scope_id": scope_permission.scope_id,
-                "entity_type": scope_permission.entity_type,
-                "operation": scope_permission.operation,
-            }
-            for scope_permission in self.scope_permissions
-        ]
-
-    def to_object_permission_insert_data(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "role_id": object_permission.role_id,
-                "entity_type": object_permission.entity_type,
-                "entity_id": object_permission.entity_id,
-                "operation": object_permission.operation,
-            }
-            for object_permission in self.object_permissions
-        ]
-
-    def to_association_scopes_entities_insert_data(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "scope_type": association.scope_id.scope_type,
-                "scope_id": association.scope_id.scope_id,
-                "entity_id": association.object_id.entity_id,
-                "entity_type": association.object_id.entity_type,
-            }
-            for association in self.association_scopes_entities
-        ]
+    object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
+        default_factory=list
+    )
