@@ -35,19 +35,6 @@ class UserConflict(BackendAIError, web.HTTPConflict):
         )
 
 
-class UserCreationFailure(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/user-creation-failure"
-    error_title = "Failed to create user."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
 class UserCreationBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/user-creation-bad-request"
     error_title = "Failed to create user due to bad request."
@@ -58,6 +45,19 @@ class UserCreationBadRequest(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.USER,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class UserCreationFailure(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/user-creation-failure"
+    error_title = "Failed to create user."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
