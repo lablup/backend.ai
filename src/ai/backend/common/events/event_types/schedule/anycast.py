@@ -54,3 +54,71 @@ class DoScaleEvent(BaseScheduleEvent):
     @override
     def event_name(cls) -> str:
         return "do_scale"
+
+
+class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
+    """Event to trigger Sokovan scheduler to process if marks are present (short cycle)."""
+
+    def __init__(self, schedule_type: str) -> None:
+        self.schedule_type = schedule_type
+
+    @override
+    def serialize(self) -> tuple:
+        return (self.schedule_type,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(schedule_type=value[0])
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_sokovan_process_if_needed"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SCHEDULE
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
+    """Event to trigger Sokovan scheduler to process unconditionally (long cycle)."""
+
+    def __init__(self, schedule_type: str) -> None:
+        self.schedule_type = schedule_type
+
+    @override
+    def serialize(self) -> tuple:
+        return (self.schedule_type,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(schedule_type=value[0])
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_sokovan_process_schedule"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SCHEDULE
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None

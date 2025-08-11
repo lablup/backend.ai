@@ -952,13 +952,22 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.distributed_lock_factory,
     )
 
-    # Create sokovan orchestrator
+    # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
         scheduler=scheduler,
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
+        lock_factory=root_ctx.distributed_lock_factory,
     )
-    yield
+
+    # Initialize the GlobalTimers for scheduling operations
+    await root_ctx.sokovan_orchestrator.init_timers()
+
+    try:
+        yield
+    finally:
+        # Shutdown timers gracefully
+        await root_ctx.sokovan_orchestrator.shutdown_timers()
 
 
 @actxmgr
