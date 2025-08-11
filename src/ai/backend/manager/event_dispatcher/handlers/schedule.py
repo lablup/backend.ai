@@ -6,6 +6,8 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
@@ -97,3 +99,19 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: DoUpdateSessionStatusEvent
     ) -> None:
         await self._scheduler_dispatcher.update_session_status()
+
+    async def handle_do_sokovan_process_if_needed(
+        self, context: None, agent_id: str, ev: DoSokovanProcessIfNeededEvent
+    ) -> None:
+        """Handle Sokovan process if needed event (checks marks)."""
+        if self._use_sokovan:
+            schedule_type = ScheduleType(ev.schedule_type)
+            await self._schedule_coordinator.process_if_needed(schedule_type)
+
+    async def handle_do_sokovan_process_schedule(
+        self, context: None, agent_id: str, ev: DoSokovanProcessScheduleEvent
+    ) -> None:
+        """Handle Sokovan process schedule event (unconditional)."""
+        if self._use_sokovan:
+            schedule_type = ScheduleType(ev.schedule_type)
+            await self._schedule_coordinator.process_schedule(schedule_type)

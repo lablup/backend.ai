@@ -46,6 +46,8 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
@@ -341,6 +343,19 @@ class Dispatchers:
             DoUpdateSessionStatusEvent,
             None,
             self._schedule_event_handler.handle_do_update_session_status,
+        )
+        # Sokovan scheduler events
+        event_dispatcher.consume(
+            DoSokovanProcessIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_if_needed,
+            name="sokovan.process_if_needed",
+        )
+        event_dispatcher.consume(
+            DoSokovanProcessScheduleEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_schedule,
+            name="sokovan.process_schedule",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:
