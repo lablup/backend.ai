@@ -48,6 +48,19 @@ class UserCreationFailure(BackendAIError, web.HTTPConflict):
         )
 
 
+class UserCreationBadRequest(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/user-creation-bad-request"
+    error_title = "Failed to create user due to bad request."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class UserModificationFailure(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-modification-failure"
     error_title = "Failed to modify user."
