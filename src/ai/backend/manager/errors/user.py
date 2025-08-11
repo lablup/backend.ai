@@ -22,6 +22,31 @@ class UserNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class UserConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/user-conflict"
+    error_title = "The user already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+class UserCreationFailure(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/user-creation-failure"
+    error_title = "Failed to create user."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class KeyPairNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/keypair-not-found"
     error_title = "The key pair does not exist."

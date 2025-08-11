@@ -68,19 +68,13 @@ class UserService:
         self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        try:
-            user_data_result = await self._user_repository.create_user_validated(
-                action.creator, action.group_ids
-            )
-            return CreateUserActionResult(
-                data=user_data_result,
-                success=True,
-            )
-        except Exception:
-            return CreateUserActionResult(
-                data=None,
-                success=False,
-            )
+        user_data_result = await self._user_repository.create_user_validated(
+            action.creator, action.group_ids
+        )
+        return CreateUserActionResult(
+            data=user_data_result,
+            success=True,
+        )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         email = action.email

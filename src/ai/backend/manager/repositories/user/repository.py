@@ -18,7 +18,7 @@ from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
+from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserConflict, UserCreationFailure, UserNotFound
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
@@ -72,11 +72,16 @@ class UserRepository:
             # Insert user
             user_insert_query = sa.insert(users).values(user_data)
             query = user_insert_query.returning(user_insert_query.table)
-            result = await conn.execute(query)
-            created_user = result.first()
+            created_user = None
+
+            try:
+                result = await conn.execute(query)
+                created_user = result.first()
+            except sa.exc.IntegrityError:
+                raise UserConflict(f"User with email {user_data['email']} already exists.")
 
             if not created_user:
-                raise RuntimeError("Failed to create user")
+                raise UserCreationFailure("Failed to create user")
 
             # Create default keypair
             email = user_data["email"]
@@ -109,7 +114,7 @@ class UserRepository:
 
             res = UserData.from_row(created_user)
         if not res:
-            raise RuntimeError("Failed to convert created user row to UserData")
+            raise UserCreationFailure("Failed to convert created user row to UserData")
         return res
 
     @repository_decorator()
