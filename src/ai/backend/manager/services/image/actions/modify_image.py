@@ -8,7 +8,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.services.image.actions.base import ImageAction

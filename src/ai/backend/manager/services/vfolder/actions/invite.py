@@ -7,7 +7,7 @@ from typing import (
     override,
 )
 
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.action.base import BaseAction, BaseActionResult
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 
 from ..types import VFolderInvitationInfo

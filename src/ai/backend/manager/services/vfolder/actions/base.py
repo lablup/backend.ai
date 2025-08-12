@@ -9,7 +9,7 @@ from ai.backend.common.types import (
     QuotaScopeID,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.action.base import BaseAction, BaseActionResult
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.session.base import SessionAction
 
 

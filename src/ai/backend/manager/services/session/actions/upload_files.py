@@ -4,7 +4,7 @@ from typing import Any, Optional, override
 from aiohttp import MultipartReader
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
 

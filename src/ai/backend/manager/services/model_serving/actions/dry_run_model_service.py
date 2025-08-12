@@ -5,7 +5,7 @@ from typing import Optional, override
 from pydantic import AnyUrl
 
 from ai.backend.common.types import ClusterMode, RuntimeVariant
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 from ai.backend.manager.services.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 

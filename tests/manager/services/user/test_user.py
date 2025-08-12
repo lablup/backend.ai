@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus

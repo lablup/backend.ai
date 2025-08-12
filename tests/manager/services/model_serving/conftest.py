@@ -11,7 +11,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.events.dispatcher import EventDispatcher
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor.base import ActionMonitor
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
