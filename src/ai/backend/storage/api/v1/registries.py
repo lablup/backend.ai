@@ -50,25 +50,21 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "scan", body.parsed)
 
-        try:
-            models = await self._huggingface_service.scan_models(
-                registry_name=body.parsed.registry_name,
-                limit=body.parsed.limit,
-                search=body.parsed.search,
-                sort=body.parsed.order,
-            )
+        models = await self._huggingface_service.scan_models(
+            registry_name=body.parsed.registry_name,
+            limit=body.parsed.limit,
+            search=body.parsed.search,
+            sort=body.parsed.order,
+        )
 
-            response = HuggingFaceScanModelsResponse(
-                models=models,
-            )
+        response = HuggingFaceScanModelsResponse(
+            models=models,
+        )
 
-            return APIResponse.build(
-                status_code=HTTPStatus.OK,
-                response_model=response,
-            )
-        except Exception as e:
-            log.error("Failed to scan HuggingFace: {}", str(e))
-            raise web.HTTPInternalServerError(reason=f"Scan failed: {str(e)}") from e
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
 
     @api_handler
     async def import_models(
@@ -80,25 +76,21 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models_batch", body.parsed)
 
-        try:
-            task_id = await self._huggingface_service.import_models_batch(
-                registry_name=body.parsed.registry_name,
-                models=body.parsed.models,
-                storage_name=body.parsed.storage_name,
-                bucket_name=body.parsed.bucket_name,
-            )
+        task_id = await self._huggingface_service.import_models_batch(
+            registry_name=body.parsed.registry_name,
+            models=body.parsed.models,
+            storage_name=body.parsed.storage_name,
+            bucket_name=body.parsed.bucket_name,
+        )
 
-            response = HuggingFaceImportModelsResponse(
-                task_id=task_id,
-            )
+        response = HuggingFaceImportModelsResponse(
+            task_id=task_id,
+        )
 
-            return APIResponse.build(
-                status_code=HTTPStatus.ACCEPTED,
-                response_model=response,
-            )
-        except Exception as e:
-            log.error("Failed to start batch import job: {}", str(e))
-            raise web.HTTPInternalServerError(reason=f"Batch import failed: {str(e)}") from e
+        return APIResponse.build(
+            status_code=HTTPStatus.ACCEPTED,
+            response_model=response,
+        )
 
 
 def create_app(ctx: RootContext) -> web.Application:
