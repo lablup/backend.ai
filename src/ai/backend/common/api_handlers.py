@@ -161,8 +161,6 @@ class MiddlewareParam(ABC, BaseModel):
     async def from_request(cls, request: web.Request) -> Self:
         pass
 
-    # TODO: How about adding `model_config = ConfigDict(arbitrary_types_allowed=True)` here?
-
 
 JSONDict: TypeAlias = dict[str, Any]
 

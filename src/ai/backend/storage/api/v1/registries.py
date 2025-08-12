@@ -41,7 +41,7 @@ class HuggingFaceRegistryAPIHandler:
         self._huggingface_service = huggingface_service
 
     @api_handler
-    async def scan(
+    async def scan_models(
         self,
         body: BodyParam[HuggingFaceScanModelsReq],
     ) -> APIResponse:
@@ -124,7 +124,7 @@ def create_app(ctx: RootContext) -> web.Application:
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
 
     # HuggingFace registry endpoints
-    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan)
+    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_models)
 
     return app

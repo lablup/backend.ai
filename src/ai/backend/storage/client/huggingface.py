@@ -1,6 +1,7 @@
 """HuggingFace client implementation for Backend.AI storage."""
 
 import asyncio
+import enum
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -14,6 +15,14 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+class ModelSortKey(enum.StrEnum):
+    LAST_MODIFIED = "last_modified"
+    TRENDING_SCORE = "trending_score"
+    CREATED_AT = "created_at"
+    DOWNLOADS = "downloads"
+    LIKES = "likes"
 
 
 @dataclass
@@ -40,14 +49,14 @@ class HuggingFaceClient:
         self._api = HfApi(token=args.token, endpoint=args.endpoint)
 
     async def scan_models(
-        self, limit: int, search: Optional[str] = None, sort: str = "downloads"
+        self, limit: int, sort: ModelSortKey, search: Optional[str] = None
     ) -> list[HfModelInfo]:
         """List models from HuggingFace Hub.
 
         Args:
-            search: Search query to filter models
-            sort: Sort criteria ("downloads", "likes", "created", "modified")
             limit: Maximum number of models to retrieve
+            sort: Sort criteria
+            search: Search query to filter models
 
         Returns:
             List of HfModelInfo objects
@@ -57,7 +66,7 @@ class HuggingFaceClient:
                 None,
                 lambda: list_models(
                     search=search,
-                    sort=sort,
+                    sort=sort.value,
                     direction=-1,  # Descending order
                     limit=limit,
                     token=self._token,
@@ -122,7 +131,7 @@ class HuggingFaceClient:
             paths: List of file paths to get info for
 
         Returns:
-            Path information from HfApi
+            List of RepoFile or RepoFolder objects
         """
         model_id = model.model_id
         revision = model.revision
@@ -179,15 +188,15 @@ class HuggingFaceScanner:
     async def scan_models(
         self,
         limit: int,
+        sort: ModelSortKey,
         search: Optional[str] = None,
-        sort: str = "downloads",
     ) -> list[ModelData]:
         """Scan HuggingFace models and retrieve metadata.
 
         Args:
             limit: Maximum number of models to retrieve
+            sort: Sort criteria
             search: Search query to filter models
-            sort: Sort criteria ("downloads", "likes", "created", "modified")
 
         Returns:
             List of ModelInfo objects containing model metadata
@@ -198,11 +207,12 @@ class HuggingFaceScanner:
 
             model_infos: list[ModelData] = []
             for model in models:
+                filename = model.id.split("/")[-1]
                 try:
                     model_infos.append(
                         ModelData(
                             id=model.id,
-                            name=model.id.split("/")[-1],
+                            name=filename,
                             author=model.author,
                             tags=model.tags or [],
                             created_at=model.created_at,
