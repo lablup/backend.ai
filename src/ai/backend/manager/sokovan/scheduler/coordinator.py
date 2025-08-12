@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 
@@ -33,6 +34,7 @@ class ScheduleCoordinator:
     _event_producer: EventProducer
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _scheduler_dispatcher: SchedulerDispatcher
+    _operation_metrics: SchedulerOperationMetricObserver
 
     def __init__(
         self,
@@ -45,6 +47,7 @@ class ScheduleCoordinator:
         self._scheduler = scheduler
         self._event_producer = event_producer
         self._scheduler_dispatcher = scheduler_dispatcher
+        self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
@@ -78,7 +81,8 @@ class ScheduleCoordinator:
                 return False
 
             # Execute the handler (includes operation and post-processing)
-            await handler.handle()
+            with self._operation_metrics.measure_operation(handler.name()):
+                await handler.handle()
             return True
         except Exception as e:
             log.exception(
@@ -86,7 +90,6 @@ class ScheduleCoordinator:
                 schedule_type.value,
                 e,
             )
-            # No re-queueing as per user request
             raise
 
     async def process_if_needed(self, schedule_type: ScheduleType) -> bool:

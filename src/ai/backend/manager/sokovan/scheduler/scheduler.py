@@ -12,7 +12,6 @@ from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.scheduler import (
-    SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.repositories.schedule.repository import (
@@ -87,7 +86,6 @@ class Scheduler:
     _valkey_stat: "ValkeyStatClient"
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
-    _operation_metrics: SchedulerOperationMetricObserver
     _phase_metrics: SchedulerPhaseMetricObserver
 
     def __init__(self, args: SchedulerArgs) -> None:
@@ -104,7 +102,6 @@ class Scheduler:
         self._agent_selector_pool = self._make_agent_selector_pool(
             args.config_provider.config.manager.agent_selection_resource_priority
         )
-        self._operation_metrics = SchedulerOperationMetricObserver.instance()
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
     @classmethod
@@ -147,35 +144,32 @@ class Scheduler:
         total_scheduled_count = 0
         # Acquire distributed lock before scheduling
         async with self._lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
-            with self._operation_metrics.measure_operation("schedule_all_scaling_groups"):
-                # Get all schedulable scaling groups from repository
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
-                for scaling_group in scaling_groups:
-                    try:
-                        log.trace("Scheduling sessions for scaling group: {}", scaling_group)
-                        # Schedule sessions for this scaling group
-                        with self._operation_metrics.measure_operation(
-                            f"schedule_scaling_group_{scaling_group}"
-                        ):
-                            scheduled_count = await self._schedule_scaling_group(scaling_group)
-                        total_scheduled_count += scheduled_count
-                        if scheduled_count > 0:
-                            log.info(
-                                "Scheduled {} sessions for scaling group: {}",
-                                scheduled_count,
-                                scaling_group,
-                            )
-                    except Exception as e:
-                        log.error(
-                            "Failed to schedule sessions for scaling group {}: {}",
+            # Get all schedulable scaling groups from repository
+            scaling_groups = await self._repository.get_schedulable_scaling_groups()
+            for scaling_group in scaling_groups:
+                try:
+                    log.trace("Scheduling sessions for scaling group: {}", scaling_group)
+                    # Schedule sessions for this scaling group
+                    with self._phase_metrics.measure_phase(scaling_group, "scheduling"):
+                        scheduled_count = await self._schedule_scaling_group(scaling_group)
+                    total_scheduled_count += scheduled_count
+                    if scheduled_count > 0:
+                        log.info(
+                            "Scheduled {} sessions for scaling group: {}",
+                            scheduled_count,
                             scaling_group,
-                            str(e),
-                            exc_info=True,
                         )
-                        # Continue with other scaling groups even if one fails
-                        continue
+                except Exception as e:
+                    log.error(
+                        "Failed to schedule sessions for scaling group {}: {}",
+                        scaling_group,
+                        str(e),
+                        exc_info=True,
+                    )
+                    # Continue with other scaling groups even if one fails
+                    continue
 
-                return ScheduleResult(succeeded_count=total_scheduled_count)
+            return ScheduleResult(succeeded_count=total_scheduled_count)
 
     async def _schedule_scaling_group(self, scaling_group: str) -> int:
         """
@@ -475,7 +469,7 @@ class Scheduler:
             # Create session result with reason from session's status_info
             session_result = SessionTerminationResult(
                 session_id=session.session_id,
-                reason=session.status_info or "TERMINATED",
+                reason=session.status_info,
                 kernel_results=[],
             )
 
@@ -487,7 +481,7 @@ class Scheduler:
                     task = self._terminate_kernel(
                         kernel.agent_id,
                         str(kernel.kernel_id),
-                        kernel.container_id,
+                        str(session.session_id),
                         session_result.reason,
                     )
                     termination_tasks.append(task)
@@ -520,7 +514,7 @@ class Scheduler:
         self,
         agent_id: AgentId,
         kernel_id: str,
-        container_id: str,
+        session_id: str,
         reason: str,
     ) -> KernelTerminationResult:
         """
@@ -528,15 +522,15 @@ class Scheduler:
 
         :param agent_id: The agent ID where the kernel is running
         :param kernel_id: The kernel ID to terminate
-        :param container_id: The container ID to destroy
+        :param session_id: The session ID that owns the kernel
         :param reason: The reason for termination
         :return: KernelTerminationResult with success status
         """
         try:
             agent_client = self._agent_pool.get_agent_client(agent_id)
 
-            # Call agent's destroy_kernel RPC method with reason
-            await agent_client.destroy_kernel(kernel_id, container_id, reason)
+            # Call agent's destroy_kernel RPC method with correct parameters
+            await agent_client.destroy_kernel(kernel_id, session_id, reason)
 
             return KernelTerminationResult(
                 kernel_id=kernel_id,

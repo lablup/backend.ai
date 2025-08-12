@@ -94,12 +94,12 @@ class SokovanOrchestrator:
             ) -> DoSokovanProcessScheduleEvent:
                 return DoSokovanProcessScheduleEvent(st.value)
 
-            # Short cycle timer (5s) - checks marks before execution
+            # Short cycle timer (2s) - checks marks before execution
             process_if_needed_timer = GlobalTimer(
                 self._lock_factory(if_needed_lock_id, 10.0),
                 self._event_producer,
                 create_if_needed_event,
-                interval=5.0,
+                interval=2.0,
                 task_name=f"sokovan_process_if_needed_{schedule_type.value}",
             )
             self.timers.append(process_if_needed_timer)

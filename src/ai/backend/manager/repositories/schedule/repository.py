@@ -225,6 +225,7 @@ class TerminatingSessionData:
     access_key: AccessKey
     creation_id: str
     status: SessionStatus
+    status_info: str
     kernels: list["TerminatingKernelData"]
 
 
@@ -714,6 +715,7 @@ class ScheduleRepository:
                         access_key=session_row.access_key,
                         creation_id=session_row.creation_id,
                         status=session_row.status,
+                        status_info=session_row.status_info or "UNKNOWN",
                         kernels=kernels,
                     )
                 )
