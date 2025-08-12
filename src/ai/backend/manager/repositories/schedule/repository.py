@@ -1524,11 +1524,10 @@ class ScheduleRepository:
                 try:
                     await self._allocate_single_session(db_session, row_maps, allocation)
                 except Exception as e:
-                    log.error(
+                    log.debug(
                         "Failed to allocate session {}: {}",
                         allocation.session_id,
-                        str(e),
-                        exc_info=True,
+                        e,
                     )
                     # Continue with next session allocation
 
