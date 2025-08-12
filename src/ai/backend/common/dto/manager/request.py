@@ -52,8 +52,9 @@ class ImportArtifactPathParam(BaseRequestModel):
 
 
 class ImportArtifactReq(BaseRequestModel):
-    storage_name: str = Field(description="Storage name for the artifact")
-    bucket_name: str = Field(description="Bucket name for the artifact")
+    storage_id: uuid.UUID = Field(
+        description="The unique identifier of the storage where the artifact will be imported."
+    )
 
 
 class UpdateArtifactPathParam(BaseRequestModel):
@@ -107,3 +108,19 @@ class AssociateArtifactWithStorageReq(BaseRequestModel):
 class DisassociateArtifactWithStorageReq(BaseRequestModel):
     artifact_id: uuid.UUID = Field(description="The unique identifier of the artifact")
     storage_id: uuid.UUID = Field(description="The unique identifier of the storage")
+
+
+class CreateHuggingFaceRegistryReq(BaseRequestModel):
+    name: str = Field(description="Name of the Hugging Face model registry")
+    endpoint: str = Field(
+        description="Endpoint URL of the Hugging Face model registry",
+        examples=["https://huggingface.co"],
+    )
+    token: Optional[str] = Field(
+        description="Authentication token for the Hugging Face model registry",
+        examples=["your_token_here"],
+    )
+
+
+class DeleteHuggingFaceRegistryReq(BaseRequestModel):
+    id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")

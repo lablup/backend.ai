@@ -403,6 +403,7 @@ class LayerType(enum.StrEnum):
     AGENT = "agent"
     AUTH = "auth"
     ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
     CONTAINER_REGISTRY = "container_registry"
     DOMAIN = "domain"
     GROUP = "group"

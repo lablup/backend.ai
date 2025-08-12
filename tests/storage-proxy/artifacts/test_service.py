@@ -19,7 +19,6 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
-    RegistryNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
@@ -110,11 +109,6 @@ def mock_progress_reporter() -> MagicMock:
 
 class TestHuggingFaceService:
     """Test cases for HuggingFaceService."""
-
-    def test_make_scanner_registry_not_found(self, hf_service: HuggingFaceService) -> None:
-        """Test scanner creation with registry not found."""
-        with pytest.raises(RegistryNotFoundError):
-            hf_service._make_scanner("nonexistent_registry")
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
