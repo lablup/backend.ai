@@ -44,33 +44,30 @@ def get_roles_table() -> sa.Table:
     return roles_table
 
 
-def get_scope_permissions_table() -> sa.Table:
-    scope_permissions_table = sa.Table(
-        "scope_permissions",
+def get_permission_groups_table() -> sa.Table:
+    permission_groups_table = sa.Table(
+        "permission_groups",
         mapper_registry.metadata,
         IDColumn(),
         sa.Column("role_id", GUID, nullable=False),
-        sa.Column("entity_type", sa.String(32), nullable=False),
-        sa.Column("operation", sa.String(32), nullable=False),
-        sa.Column("scope_type", sa.String(32), nullable=False),
-        sa.Column("scope_id", sa.String(64), nullable=False),
+        sa.Column("scope_type", sa.VARCHAR(length=32), nullable=False),
+        sa.Column("scope_id", sa.String(length=64), nullable=False),
         extend_existing=True,
     )
-    return scope_permissions_table
+    return permission_groups_table
 
 
-def get_object_permissions_table() -> sa.Table:
-    object_permissions_table = sa.Table(
-        "object_permissions",
+def get_permissions_table() -> sa.Table:
+    permissions_table = sa.Table(
+        "permissions",
         mapper_registry.metadata,
         IDColumn(),
-        sa.Column("role_id", GUID, nullable=False),
+        sa.Column("permission_group_id", GUID, nullable=False),
         sa.Column("entity_type", sa.String(32), nullable=False),
-        sa.Column("entity_id", sa.String(64), nullable=False),
         sa.Column("operation", sa.String(32), nullable=False),
         extend_existing=True,
     )
-    return object_permissions_table
+    return permissions_table
 
 
 def get_association_scopes_entities_table() -> sa.Table:
