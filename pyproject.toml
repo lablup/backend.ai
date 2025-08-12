@@ -1,5 +1,7 @@
 [project]
 requires-python = "~=3.12.8"
+name = "backend.ai"
+dynamic = ["version"]
 
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
