@@ -3,18 +3,29 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.repositories.schedule.repository import (
+    KernelTerminationResult,
+    MarkTerminatingResult,
+    ScheduleRepository,
+    SchedulingContextData,
+    SessionTerminationResult,
+    TerminatingKernelData,
+)
 from ai.backend.manager.types import DistributedLockFactory
 
+from .allocators.allocator import SchedulingAllocator
 from .results import ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
@@ -38,20 +49,6 @@ from .types import (
     SystemSnapshot,
 )
 from .validators.validator import SchedulingValidator
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-    from ai.backend.manager.clients.agent import AgentPool
-    from ai.backend.manager.repositories.schedule.repository import (
-        KernelTerminationResult,
-        MarkTerminatingResult,
-        ScheduleRepository,
-        SchedulingContextData,
-        SessionTerminationResult,
-        TerminatingKernelData,
-    )
-
-    from .allocators.allocator import SchedulingAllocator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

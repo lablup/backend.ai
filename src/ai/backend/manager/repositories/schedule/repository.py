@@ -540,7 +540,6 @@ class ScheduleRepository:
             .values(
                 status=SessionStatus.CANCELLED,
                 status_info=reason,
-                status_changed=now,
                 terminated_at=now,
                 status_history=sql_json_merge(
                     SessionRow.status_history,
@@ -590,7 +589,6 @@ class ScheduleRepository:
             .values(
                 status=SessionStatus.TERMINATING,
                 status_info=reason,
-                status_changed=now,
                 status_history=sql_json_merge(
                     SessionRow.status_history,
                     (),
@@ -611,7 +609,6 @@ class ScheduleRepository:
             .values(
                 status=KernelStatus.TERMINATING,
                 status_info=reason,
-                status_changed=now,
                 status_history=sql_json_merge(
                     KernelRow.status_history,
                     (),
@@ -2570,7 +2567,7 @@ class ScheduleRepository:
                         .values(
                             status=KernelStatus.TERMINATED,
                             status_info=session_result.reason,
-                            status_changed_at=now,
+                            status_changed=now,
                             terminated_at=now,
                         )
                     )
@@ -2584,7 +2581,11 @@ class ScheduleRepository:
                         .values(
                             status=SessionStatus.TERMINATED,
                             status_info=session_result.reason,
-                            status_changed_at=now,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {SessionStatus.TERMINATED.name: now.isoformat()},
+                            ),
                             terminated_at=now,
                         )
                     )
