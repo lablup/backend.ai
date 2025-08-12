@@ -1,47 +1,55 @@
 """migrate user data to roles
 
 Revision ID: a4d56e86d9ee
-Revises: 42feff246198
+Revises: 34362a3b065d
 Create Date: 2025-08-06 21:28:29.354670
 
 """
 
 import enum
+import uuid
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Connection, Row
 
-from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn
-from ai.backend.manager.models.rbac_models.migration.enums import RoleSource
+from ai.backend.manager.models.base import EnumValueType, IDColumn
+from ai.backend.manager.models.rbac_models.migration.enums import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
 from ai.backend.manager.models.rbac_models.migration.models import (
     get_association_scopes_entities_table,
-    get_object_permissions_table,
+    get_permission_groups_table,
+    get_permissions_table,
     get_roles_table,
-    get_scope_permissions_table,
     get_user_roles_table,
     mapper_registry,
 )
 from ai.backend.manager.models.rbac_models.migration.types import (
-    PermissionCreateInputGroup,
+    PermissionCreateInput,
+    ScopePermissionGroupCreateInput,
+    UserRoleCreateInput,
 )
 from ai.backend.manager.models.rbac_models.migration.user import (
-    ProjectData,
-    ProjectUserAssociationData,
     UserData,
-    create_project_admin_role_and_permissions,
-    create_project_member_role_and_permissions,
-    create_user_self_role_and_permissions,
-    map_user_to_project_role,
+    get_user_self_role_creation_input,
 )
-from ai.backend.manager.models.rbac_models.migration.utils import insert_from_create_input_group
+from ai.backend.manager.models.rbac_models.migration.utils import (
+    insert_if_data_exists,
+)
 
 # revision identifiers, used by Alembic.
 revision = "a4d56e86d9ee"
-down_revision = "42feff246198"
+down_revision = "34362a3b065d"
 branch_labels = None
 depends_on = None
+
+
+OWNER_ACCESSIBLE_ENTITY_TYPES_IN_USER: set[EntityType] = set()
 
 
 class UserRole(enum.StrEnum):
@@ -53,34 +61,6 @@ class UserRole(enum.StrEnum):
     ADMIN = "admin"
     USER = "user"
     MONITOR = "monitor"
-
-
-def _get_groups_table() -> sa.Table:
-    groups_table = sa.Table(
-        "groups",
-        mapper_registry.metadata,
-        IDColumn(),
-        sa.Column("name", sa.String(64), nullable=False, unique=True),
-        extend_existing=True,
-    )
-    return groups_table
-
-
-def _get_association_groups_users_table() -> sa.Table:
-    association_groups_users_table = sa.Table(
-        "association_groups_users",
-        mapper_registry.metadata,
-        IDColumn(),
-        sa.Column("user_id", GUID, nullable=False),
-        sa.Column(
-            "group_id",
-            GUID,
-            sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        extend_existing=True,
-    )
-    return association_groups_users_table
 
 
 def _get_users_table() -> sa.Table:
@@ -115,6 +95,86 @@ def _query_user_row(db_conn: Connection, offset: int, page_size: int) -> list[Ro
     return db_conn.execute(user_query).all()
 
 
+def _query_role_rows_by_name(db_conn: Connection, role_names: Iterable[str]) -> list[Row]:
+    """
+    Query role rows by their names.
+    """
+    roles_table = get_roles_table()
+    role_query = sa.select(roles_table).where(roles_table.c.name.in_(role_names))
+    return db_conn.execute(role_query).all()
+
+
+def _create_roles_from_user_rows(db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    roles_table = get_roles_table()
+    role_inputs: list[dict[str, Any]] = []
+    role_name_user_id_map: dict[str, uuid.UUID] = {}
+    for row in rows:
+        data = UserData.from_row(row)
+        role_input = get_user_self_role_creation_input(data)
+        role_inputs.append(role_input.to_dict())
+        role_name_user_id_map[role_input.name] = data.id
+    insert_if_data_exists(db_conn, roles_table, role_inputs)
+    return role_name_user_id_map
+
+
+def _create_permission_groups_for_user_role(
+    db_conn: Connection, role_id_user_id_map: Mapping[uuid.UUID, uuid.UUID]
+) -> None:
+    permission_groups_table = get_permission_groups_table()
+    permission_group_inputs: list[dict[str, Any]] = []
+    for role_id, user_id in role_id_user_id_map.items():
+        input = ScopePermissionGroupCreateInput(
+            role_id=role_id,
+            scope_type=ScopeType.USER,
+            scope_id=str(user_id),
+        )
+        permission_group_inputs.append(input.to_dict())
+    insert_if_data_exists(db_conn, permission_groups_table, permission_group_inputs)
+
+
+def _query_permission_groups_by_scope_ids(
+    db_conn: Connection, scope_ids: Iterable[str]
+) -> list[uuid.UUID]:
+    """
+    Query permission groups by scope IDs.
+    """
+    permission_groups_table = get_permission_groups_table()
+    query = sa.select(permission_groups_table.c.id).where(
+        permission_groups_table.c.scope_id.in_(scope_ids)
+    )
+    return db_conn.scalars(query).all()
+
+
+def _create_user_roles_from_mapping(
+    db_conn: Connection, role_id_user_id_map: Mapping[uuid.UUID, uuid.UUID]
+) -> None:
+    user_roles_table = get_user_roles_table()
+    user_role_inputs: list[UserRoleCreateInput] = []
+    for role_id, user_id in role_id_user_id_map.items():
+        user_role_input = UserRoleCreateInput(user_id=user_id, role_id=role_id)
+        user_role_inputs.append(user_role_input)
+    insert_if_data_exists(
+        db_conn, user_roles_table, [input.to_dict() for input in user_role_inputs]
+    )
+
+
+def _create_permissions_for_user_self_roles(
+    db_conn: Connection,
+    permission_group_ids: Iterable[uuid.UUID],
+) -> None:
+    scope_permission_inputs: list[dict[str, Any]] = []
+    for permission_group_id in permission_group_ids:
+        for entity_type in OWNER_ACCESSIBLE_ENTITY_TYPES_IN_USER:
+            for operation in OperationType.owner_operations():
+                input = PermissionCreateInput(
+                    permission_group_id=permission_group_id,
+                    entity_type=entity_type,
+                    operation=operation,
+                )
+                scope_permission_inputs.append(input.to_dict())
+    insert_if_data_exists(db_conn, get_permissions_table(), scope_permission_inputs)
+
+
 def _create_user_self_roles_and_permissions(db_conn: Connection) -> None:
     """
     Migrate user data to roles and permissions.
@@ -127,179 +187,28 @@ def _create_user_self_roles_and_permissions(db_conn: Connection) -> None:
         offset += page_size
         if not rows:
             break
-        input_group = PermissionCreateInputGroup()
-        for row in rows:
-            data = UserData.from_row(row)
-            input_data = create_user_self_role_and_permissions(data)
-            input_group.merge(input_data)
-        insert_from_create_input_group(db_conn, input_group)
-
-
-def _query_project_row(db_conn: Connection, offset: int, page_size: int) -> list[Row]:
-    """
-    Query all project rows with pagination.
-    """
-    groups_table = _get_groups_table()
-    project_query = (
-        sa.select(groups_table.c.id).offset(offset).limit(page_size).order_by(groups_table.c.id)
-    )
-    return db_conn.execute(project_query).all()
-
-
-def _create_project_roles_and_permissions(db_conn: Connection) -> None:
-    """
-    Migrate project data to roles and permissions.
-    All projects have a default admin role and a user role.
-    """
-    offset = 0
-    page_size = 1000
-    while True:
-        rows = _query_project_row(db_conn, offset, page_size)
-        offset += page_size
-        if not rows:
-            break
-        input_group = PermissionCreateInputGroup()
-        for row in rows:
-            data = ProjectData.from_row(row)
-            admin_input_data = create_project_admin_role_and_permissions(data)
-            user_input_data = create_project_member_role_and_permissions(data)
-            input_group.merge(admin_input_data)
-            input_group.merge(user_input_data)
-        insert_from_create_input_group(db_conn, input_group)
-
-
-def _define_cte() -> sa.sql.Select:
-    """
-    Define a CTE to get all roles that need vfolder permissions.
-    Join roles with scope permissions to get the first scope permissions row for each role.
-    Assumes that all `scope_id`s of scope permissions in one role are the same.
-    """
-    roles_table = get_roles_table()
-    scope_permissions_table = get_scope_permissions_table()
-    association_groups_users_table = _get_association_groups_users_table()
-    users_table = _get_users_table()
-
-    roles_batch = (
-        sa.select(
-            roles_table.c.id.label("role_id"),
-            roles_table.c.source,
-            scope_permissions_table.c.scope_id,
-            scope_permissions_table.c.scope_type,
-            users_table.c.uuid.label("user_id"),
-            users_table.c.role.label("user_role"),
-        )
-        .distinct(users_table.c.uuid, scope_permissions_table.c.scope_id)
-        .select_from(
-            sa.join(
-                roles_table,
-                scope_permissions_table,
-                roles_table.c.id == scope_permissions_table.c.role_id,
-            )
-            .join(
-                association_groups_users_table,
-                sa.cast(scope_permissions_table.c.scope_id, UUID)
-                == association_groups_users_table.c.group_id,
-            )
-            .join(users_table, association_groups_users_table.c.user_id == users_table.c.uuid)
-        )
-        .cte("roles_batch")
-    )
-
-    return roles_batch
-
-
-def _query_admin_user_rows_with_project_role(
-    db_conn: Connection, cte: sa.sql.Select, offset: int, page_size: int
-) -> list[Row]:
-    stmt = (
-        sa.select(cte)
-        .where(
-            sa.and_(
-                cte.c.user_role.in_([UserRole.ADMIN, UserRole.SUPERADMIN]),
-                cte.c.source == RoleSource.SYSTEM,
-            )
-        )
-        .offset(offset)
-        .limit(page_size)
-        .order_by(cte.c.role_id)
-    )
-
-    return db_conn.execute(stmt).all()
-
-
-def _query_member_user_rows_with_project_role(
-    db_conn: Connection, cte: sa.sql.Select, offset: int, page_size: int
-) -> list[Row]:
-    stmt = (
-        sa.select(cte)
-        .where(
-            sa.and_(
-                cte.c.user_role.not_in([UserRole.ADMIN, UserRole.SUPERADMIN]),
-                cte.c.source == RoleSource.CUSTOM,
-            )
-        )
-        .offset(offset)
-        .limit(page_size)
-        .order_by(cte.c.role_id)
-    )
-
-    return db_conn.execute(stmt).all()
-
-
-def _map_admin_users_to_project_role(db_conn: Connection, roles_batch_cte: sa.sql.Select) -> None:
-    offset = 0
-    page_size = 1000
-
-    while True:
-        rows = _query_admin_user_rows_with_project_role(db_conn, roles_batch_cte, offset, page_size)
-        offset += page_size
-        if not rows:
-            break
-        input_group = PermissionCreateInputGroup()
-        for row in rows:
-            data = ProjectUserAssociationData(project_id=row.scope_id, user_id=row.user_id)
-            input_data = map_user_to_project_role(row.role_id, data)
-            input_group.merge(input_data)
-        insert_from_create_input_group(db_conn, input_group)
-
-
-def _map_member_users_to_project_role(db_conn: Connection, roles_batch_cte: sa.sql.Select) -> None:
-    offset = 0
-    page_size = 1000
-
-    while True:
-        rows = _query_member_user_rows_with_project_role(
-            db_conn, roles_batch_cte, offset, page_size
-        )
-        offset += page_size
-        if not rows:
-            break
-        input_group = PermissionCreateInputGroup()
-        for row in rows:
-            data = ProjectUserAssociationData(project_id=row.scope_id, user_id=row.user_id)
-            input_data = map_user_to_project_role(row.role_id, data)
-            input_group.merge(input_data)
-        insert_from_create_input_group(db_conn, input_group)
-
-
-def _map_users_to_project_role(db_conn: Connection) -> None:
-    roles_batch_cte = _define_cte()
-    _map_admin_users_to_project_role(db_conn, roles_batch_cte)
-    _map_member_users_to_project_role(db_conn, roles_batch_cte)
+        role_name_user_id_map = _create_roles_from_user_rows(db_conn, rows)
+        role_rows = _query_role_rows_by_name(db_conn, list(role_name_user_id_map.keys()))
+        role_id_user_id_map: dict[uuid.UUID, uuid.UUID] = {
+            row.id: role_name_user_id_map[row.name] for row in role_rows
+        }
+        _create_user_roles_from_mapping(db_conn, role_id_user_id_map)
+        _create_permission_groups_for_user_role(db_conn, role_id_user_id_map)
+        str_user_ids = [str(user_id) for user_id in role_id_user_id_map.values()]
+        permission_group_ids = _query_permission_groups_by_scope_ids(db_conn, str_user_ids)
+        _create_permissions_for_user_self_roles(db_conn, permission_group_ids)
 
 
 def upgrade() -> None:
     conn = op.get_bind()
     _create_user_self_roles_and_permissions(conn)
-    _create_project_roles_and_permissions(conn)
-    _map_users_to_project_role(conn)
 
 
 def downgrade() -> None:
     conn = op.get_bind()
     # Remove all data from the new RBAC tables
     conn.execute(sa.delete(get_association_scopes_entities_table()))
-    conn.execute(sa.delete(get_object_permissions_table()))
-    conn.execute(sa.delete(get_scope_permissions_table()))
+    conn.execute(sa.delete(get_permissions_table()))
+    conn.execute(sa.delete(get_permission_groups_table()))
     conn.execute(sa.delete(get_user_roles_table()))
     conn.execute(sa.delete(get_roles_table()))

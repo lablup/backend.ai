@@ -1,50 +1,24 @@
 import enum
 import uuid
 from dataclasses import dataclass
-from typing import Self
+from typing import Optional, Self
 
 from sqlalchemy.engine.row import Row
 
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesCreateInput,
-)
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.role import RoleCreateInput
-from ai.backend.manager.data.permission.scope_permission import ScopePermissionCreateInput
-from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
 
 from .enums import (
     EntityType,
-    OperationType,
     RoleSource,
     ScopeType,
 )
 from .types import (
     ADMIN_ROLE_NAME_SUFFIX,
     ROLE_NAME_PREFIX,
-    PermissionCreateInputGroup,
-    is_admin_role,
-)
-
-USER_SELF_SCOPE_OPERATIONS = (
-    OperationType.READ,
-    OperationType.UPDATE,
-    OperationType.SOFT_DELETE,
-    OperationType.GRANT_ALL,
-    OperationType.GRANT_READ,
-    OperationType.GRANT_UPDATE,
-)
-ADMIN_OPERATIONS = (
-    OperationType.CREATE,
-    OperationType.READ,
-    OperationType.UPDATE,
-    OperationType.SOFT_DELETE,
-    OperationType.HARD_DELETE,
-    OperationType.GRANT_ALL,
-    OperationType.GRANT_READ,
-    OperationType.GRANT_UPDATE,
-    OperationType.GRANT_SOFT_DELETE,
-    OperationType.GRANT_HARD_DELETE,
+    AssociationScopesEntitiesCreateInput,
+    RoleCreateInput,
+    UserRoleCreateInput,
+    UserRoleMappingInputGroup,
 )
 
 
@@ -71,16 +45,35 @@ class RoleNameUtil:
     def project_role_name(project: "ProjectData", is_admin: bool) -> str:
         """
         Generate a role name for a project.
+
+        'role_project_<project_id>_admin' for admin roles.
+        'role_project_<project_id>_member' for member roles.
         """
-        role_type = ADMIN_ROLE_NAME_SUFFIX if is_admin else "_user"
+        role_type = ADMIN_ROLE_NAME_SUFFIX if is_admin else "_member"
         return f"{ROLE_NAME_PREFIX}project_{str(project.id)[:8]}{role_type}"
 
     @staticmethod
-    def is_admin_role(role_name: str) -> bool:
+    def domain_role_name(domain: "DomainData", is_admin: bool) -> str:
         """
-        Check if the role name indicates an admin role.
+        Generate a role name for a domain.
+
+        'role_domain_<domain_name>_admin' for admin roles.
+        'role_domain_<domain_name>_member' for member roles.
         """
-        return is_admin_role(role_name)
+        role_type = ADMIN_ROLE_NAME_SUFFIX if is_admin else "_member"
+        return f"{ROLE_NAME_PREFIX}domain_{domain.name}{role_type}"
+
+
+@dataclass
+class DomainData:
+    name: str
+
+    def role_name(self, is_admin: bool) -> str:
+        return RoleNameUtil.domain_role_name(self, is_admin)
+
+    @classmethod
+    def from_row(cls, domain_row: Row) -> Self:
+        return cls(name=domain_row.name)
 
 
 @dataclass
@@ -115,123 +108,167 @@ class UserData:
         )
 
 
-@dataclass
-class ProjectUserAssociationData:
-    project_id: uuid.UUID
-    user_id: uuid.UUID
-
-
-def create_user_self_role_and_permissions(user: UserData) -> PermissionCreateInputGroup:
+def get_user_self_role_creation_input(user: UserData) -> RoleCreateInput:
     """
     Create a self role and permissions for a user.
     This role allows the user to manage their own data.
     """
-    role_id = uuid.uuid4()
     role_input = RoleCreateInput(
         name=user.role_name(),
-        source=RoleSource.SYSTEM.to_original(),
-        id=role_id,
+        source=RoleSource.SYSTEM,
     )
-    scope_permission_inputs: list[ScopePermissionCreateInput] = [
-        ScopePermissionCreateInput(
-            role_id=role_id,
-            scope_type=ScopeType.USER.to_original(),
-            scope_id=str(user.id),
-            entity_type=EntityType.USER.to_original(),
-            operation=operation.to_original(),
-        )
-        for operation in USER_SELF_SCOPE_OPERATIONS
-    ]
-    user_role_input = UserRoleCreateInput(
-        user_id=user.id,
-        role_id=role_id,
-    )
-    return PermissionCreateInputGroup(
-        roles=[role_input],
-        user_roles=[user_role_input],
-        scope_permissions=scope_permission_inputs,
-    )
+    return role_input
 
 
-def create_project_admin_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+def get_project_admin_role_creation_input(project: ProjectData) -> RoleCreateInput:
     """
-    Create an admin role and permissions for a project.
+    Create an admin role for a project.
     This role allows the user to manage the project.
-
-    The admin role is created with SYSTEM source and has all operations.
     """
-    role_id = uuid.uuid4()
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=project.role_name(is_admin=True),
-        source=RoleSource.SYSTEM.to_original(),
-        id=role_id,
-    )
-    scope_permission_inputs: list[ScopePermissionCreateInput] = [
-        ScopePermissionCreateInput(
-            role_id=role_id,
-            scope_type=ScopeType.PROJECT.to_original(),
-            scope_id=str(project.id),
-            entity_type=EntityType.USER.to_original(),
-            operation=operation.to_original(),
-        )
-        for operation in ADMIN_OPERATIONS
-    ]
-    return PermissionCreateInputGroup(
-        roles=[role_input],
-        scope_permissions=scope_permission_inputs,
+        source=RoleSource.SYSTEM,
     )
 
 
-def create_project_member_role_and_permissions(project: ProjectData) -> PermissionCreateInputGroup:
+def get_project_member_role_creation_input(project: ProjectData) -> RoleCreateInput:
     """
-    Create a member role and permissions for a project.
+    Create a member role for a project.
     This role allows the user to read the project.
-
-    The member role is created with CUSTOM source and has only READ operation.
     """
-    role_id = uuid.uuid4()
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=project.role_name(is_admin=False),
-        source=RoleSource.CUSTOM.to_original(),
-        id=role_id,
-    )
-    scope_permission_inputs: list[ScopePermissionCreateInput] = [
-        ScopePermissionCreateInput(
-            role_id=role_id,
-            scope_type=ScopeType.PROJECT.to_original(),
-            scope_id=str(project.id),
-            entity_type=EntityType.USER.to_original(),
-            operation=OperationType.READ.to_original(),
-        )
-    ]
-    return PermissionCreateInputGroup(
-        roles=[role_input],
-        scope_permissions=scope_permission_inputs,
+        source=RoleSource.CUSTOM,
     )
 
 
-def map_user_to_project_role(
-    role_id: uuid.UUID, association: ProjectUserAssociationData
-) -> PermissionCreateInputGroup:
+def get_domain_admin_role_creation_input(domain: DomainData) -> RoleCreateInput:
     """
-    Map a user to a project role.
-    This is used when a user is assigned to a project.
+    Create an admin role for a domain.
+    This role allows the user to manage the domain.
     """
-    user_role_input = UserRoleCreateInput(
-        user_id=association.user_id,
-        role_id=role_id,
+    return RoleCreateInput(
+        name=domain.role_name(is_admin=True),
+        source=RoleSource.SYSTEM,
     )
-    association_input = AssociationScopesEntitiesCreateInput(
-        scope_id=ScopeId(
-            scope_type=ScopeType.PROJECT.to_original(),
-            scope_id=str(association.project_id),
-        ),
-        object_id=ObjectId(
-            entity_type=EntityType.USER.to_original(),
-            entity_id=str(association.user_id),
-        ),
+
+
+def get_domain_member_role_creation_input(domain: DomainData) -> RoleCreateInput:
+    """
+    Create an admin role for a domain.
+    This role allows the user to manage the domain.
+    """
+    return RoleCreateInput(
+        name=domain.role_name(is_admin=False),
+        source=RoleSource.CUSTOM,
     )
-    return PermissionCreateInputGroup(
-        user_roles=[user_role_input],
-        association_scopes_entities=[association_input],
-    )
+
+
+@dataclass
+class UserScopeRoleMappingArgs:
+    user_id: uuid.UUID
+    user_role: UserRole
+
+    scope_id: ScopeId
+    role_id: uuid.UUID
+    role_source: RoleSource
+
+
+def get_user_project_mapping_creation_input(
+    args: UserScopeRoleMappingArgs,
+) -> Optional[UserRoleMappingInputGroup]:
+    result: Optional[UserRoleMappingInputGroup] = None
+    match args.user_role:
+        case UserRole.SUPERADMIN | UserRole.MONITOR:
+            pass
+        case UserRole.ADMIN:
+            if args.role_source == RoleSource.SYSTEM:
+                user_role_mapping_input = UserRoleCreateInput(
+                    user_id=args.user_id, role_id=args.role_id
+                )
+                associtation_input = AssociationScopesEntitiesCreateInput(
+                    scope_id=ScopeId(
+                        scope_type=ScopeType.PROJECT.to_original(),
+                        scope_id=args.scope_id.scope_id,
+                    ),
+                    object_id=ObjectId(
+                        entity_type=EntityType.USER.to_original(),
+                        entity_id=str(args.user_id),
+                    ),
+                )
+                result = UserRoleMappingInputGroup(
+                    user_role_input=user_role_mapping_input,
+                    association_scopes_entities_input=associtation_input,
+                )
+        case UserRole.USER:
+            if args.role_source == RoleSource.CUSTOM:
+                user_role_mapping_input = UserRoleCreateInput(
+                    user_id=args.user_id, role_id=args.role_id
+                )
+                associtation_input = AssociationScopesEntitiesCreateInput(
+                    scope_id=ScopeId(
+                        scope_type=ScopeType.PROJECT.to_original(),
+                        scope_id=args.scope_id.scope_id,
+                    ),
+                    object_id=ObjectId(
+                        entity_type=EntityType.USER.to_original(),
+                        entity_id=str(args.user_id),
+                    ),
+                )
+                result = UserRoleMappingInputGroup(
+                    user_role_input=user_role_mapping_input,
+                    association_scopes_entities_input=associtation_input,
+                )
+    return result
+
+
+def get_user_domain_mapping_creation_input(
+    args: UserScopeRoleMappingArgs,
+) -> Optional[UserRoleMappingInputGroup]:
+    """
+    Map a user to a domain role and a domain scope.
+
+    """
+    result: Optional[UserRoleMappingInputGroup] = None
+    match args.user_role:
+        case UserRole.SUPERADMIN | UserRole.MONITOR:
+            pass
+        case UserRole.ADMIN:
+            if args.role_source == RoleSource.SYSTEM:
+                user_role_mapping_input = UserRoleCreateInput(
+                    user_id=args.user_id, role_id=args.role_id
+                )
+                associtation_input = AssociationScopesEntitiesCreateInput(
+                    scope_id=ScopeId(
+                        scope_type=ScopeType.DOMAIN.to_original(),
+                        scope_id=args.scope_id.scope_id,
+                    ),
+                    object_id=ObjectId(
+                        entity_type=EntityType.USER.to_original(),
+                        entity_id=str(args.user_id),
+                    ),
+                )
+                result = UserRoleMappingInputGroup(
+                    user_role_input=user_role_mapping_input,
+                    association_scopes_entities_input=associtation_input,
+                )
+        case UserRole.USER:
+            if args.role_source == RoleSource.CUSTOM:
+                user_role_mapping_input = UserRoleCreateInput(
+                    user_id=args.user_id, role_id=args.role_id
+                )
+                associtation_input = AssociationScopesEntitiesCreateInput(
+                    scope_id=ScopeId(
+                        scope_type=ScopeType.DOMAIN.to_original(),
+                        scope_id=args.scope_id.scope_id,
+                    ),
+                    object_id=ObjectId(
+                        entity_type=EntityType.USER.to_original(),
+                        entity_id=str(args.user_id),
+                    ),
+                )
+                result = UserRoleMappingInputGroup(
+                    user_role_input=user_role_mapping_input,
+                    association_scopes_entities_input=associtation_input,
+                )
+    return result
