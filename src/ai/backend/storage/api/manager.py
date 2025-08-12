@@ -1268,7 +1268,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
-
     return app
 
 
