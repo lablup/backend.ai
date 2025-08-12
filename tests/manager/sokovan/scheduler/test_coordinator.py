@@ -21,7 +21,9 @@ from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 def mock_scheduler():
     """Mock Scheduler for testing."""
     mock = MagicMock(spec=Scheduler)
+    # Create AsyncMock with support for side_effect
     mock._mark_sessions_for_termination = AsyncMock()
+    mock.terminate_sessions = AsyncMock()
     return mock
 
 
@@ -29,7 +31,7 @@ def mock_scheduler():
 def mock_valkey_schedule():
     """Mock ValkeyScheduleClient for testing."""
     mock = MagicMock(spec=ValkeyScheduleClient)
-    mock.produce = AsyncMock()
+    mock.mark_schedule_needed = AsyncMock()
     return mock
 
 
@@ -97,9 +99,8 @@ class TestScheduleCoordinator:
         )
 
         # Verify scheduling was requested since sessions were processed
-        mock_valkey_schedule.produce.assert_called_once_with(
-            ScheduleType.TERMINATE.value,
-            immediate=True,
+        mock_valkey_schedule.mark_schedule_needed.assert_called_once_with(
+            ScheduleType.TERMINATE.value
         )
 
     async def test_mark_sessions_no_scheduling_when_nothing_processed(
@@ -130,7 +131,7 @@ class TestScheduleCoordinator:
         assert not result.has_processed()
 
         # No scheduling should be requested
-        mock_valkey_schedule.produce.assert_not_called()
+        mock_valkey_schedule.mark_schedule_needed.assert_not_called()
 
     async def test_request_scheduling_direct(
         self,
@@ -144,11 +145,11 @@ class TestScheduleCoordinator:
         await schedule_coordinator.request_scheduling(ScheduleType.TERMINATE)
 
         # Verify
-        assert mock_valkey_schedule.produce.call_count == 3
-        calls = mock_valkey_schedule.produce.call_args_list
-        assert calls[0] == call(ScheduleType.SCHEDULE.value, immediate=True)
-        assert calls[1] == call(ScheduleType.START.value, immediate=True)
-        assert calls[2] == call(ScheduleType.TERMINATE.value, immediate=True)
+        assert mock_valkey_schedule.mark_schedule_needed.call_count == 3
+        calls = mock_valkey_schedule.mark_schedule_needed.call_args_list
+        assert calls[0] == call(ScheduleType.SCHEDULE.value)
+        assert calls[1] == call(ScheduleType.START.value)
+        assert calls[2] == call(ScheduleType.TERMINATE.value)
 
     async def test_mark_sessions_with_custom_reason(
         self,
@@ -176,7 +177,7 @@ class TestScheduleCoordinator:
             mock_scheduler._mark_sessions_for_termination.return_value = mock_result
 
             # Execute
-            result = await schedule_coordinator.mark_sessions_for_termination(
+            await schedule_coordinator.mark_sessions_for_termination(
                 [session_id],
                 reason=reason,
             )
@@ -211,7 +212,7 @@ class TestScheduleCoordinator:
 
         # Verify
         assert not result.has_processed()
-        mock_valkey_schedule.produce.assert_not_called()
+        mock_valkey_schedule.mark_schedule_needed.assert_not_called()
 
     async def test_mark_sessions_mixed_results(
         self,
@@ -244,9 +245,8 @@ class TestScheduleCoordinator:
         assert len(result.not_found_sessions) == 2
 
         # Scheduling should be requested for processed sessions
-        mock_valkey_schedule.produce.assert_called_once_with(
-            ScheduleType.TERMINATE.value,
-            immediate=True,
+        mock_valkey_schedule.mark_schedule_needed.assert_called_once_with(
+            ScheduleType.TERMINATE.value
         )
 
     async def test_coordinator_exception_handling(
@@ -271,7 +271,7 @@ class TestScheduleCoordinator:
         assert "Database connection failed" in str(exc_info.value)
 
         # No scheduling should be requested on error
-        mock_valkey_schedule.produce.assert_not_called()
+        mock_valkey_schedule.mark_schedule_needed.assert_not_called()
 
     async def test_coordinator_concurrent_marking(
         self,
@@ -312,4 +312,4 @@ class TestScheduleCoordinator:
             assert result.terminating_sessions == session_groups[i]
 
         # Should have requested scheduling 3 times
-        assert mock_valkey_schedule.produce.call_count == 3
+        assert mock_valkey_schedule.mark_schedule_needed.call_count == 3

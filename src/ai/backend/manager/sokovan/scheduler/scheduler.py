@@ -543,6 +543,7 @@ class Scheduler:
                 agent_id,
                 e,
             )
+
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 success=False,

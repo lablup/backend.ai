@@ -112,6 +112,7 @@ class ScheduleCoordinator:
 
         :param schedule_type: Type of scheduling to request
         """
+        # Use the actual ValkeyScheduleClient method
         await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
         log.debug("Requested scheduling for type: {}", schedule_type.value)
 

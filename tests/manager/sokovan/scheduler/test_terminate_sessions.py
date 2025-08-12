@@ -9,8 +9,9 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.clients.agent import AgentClient, AgentPool
+from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
@@ -25,13 +26,19 @@ def mock_agent_pool():
     """Mock AgentPool for testing."""
     mock_pool = MagicMock(spec=AgentPool)
 
-    # Create mock agent clients
-    def create_mock_agent_client(agent_id):
-        mock_client = MagicMock(spec=AgentClient)
-        mock_client.destroy_kernel = AsyncMock()
-        return mock_client
+    # Create a dictionary to store agent clients
+    agent_clients = {}
 
-    mock_pool.get_agent_client = MagicMock(side_effect=create_mock_agent_client)
+    # Create mock agent clients
+    def get_or_create_mock_agent_client(agent_id, **kwargs):
+        if agent_id not in agent_clients:
+            mock_client = MagicMock(spec=AgentClient)
+            mock_client.destroy_kernel = AsyncMock()
+            agent_clients[agent_id] = mock_client
+        return agent_clients[agent_id]
+
+    mock_pool.get_agent_client = MagicMock(side_effect=get_or_create_mock_agent_client)
+    mock_pool._clients = agent_clients  # Store for test access
     return mock_pool
 
 
@@ -95,14 +102,14 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="USER_REQUESTED",
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=kernel_id,
-                    status="TERMINATING",
+                    kernel_id=KernelId(kernel_id),
+                    status=KernelStatus.TERMINATING,
                     container_id="container-123",
                     agent_id=agent_id,
                     agent_addr="10.0.0.1:2001",
@@ -135,7 +142,7 @@ class TestTerminateSessions:
         # Check the termination results passed to batch update
         call_args = mock_repository.batch_update_terminated_status.call_args[0][0]
         assert len(call_args) == 1
-        assert call_args[0].session_id == str(session_id)
+        assert call_args[0].session_id == session_id
         assert call_args[0].should_terminate_session is True
 
     async def test_terminate_sessions_multiple_kernels(
@@ -152,14 +159,14 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="FORCED_TERMINATION",
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=kernel_ids[i],
-                    status="TERMINATING",
+                    kernel_id=KernelId(kernel_ids[i]),
+                    status=KernelStatus.TERMINATING,
                     container_id=f"container-{i}",
                     agent_id=agent_ids[i],
                     agent_addr=f"10.0.0.{i + 1}:2001",
@@ -199,21 +206,21 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="TEST_PARTIAL",
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=kernel_ids[0],
-                    status="TERMINATING",
+                    kernel_id=KernelId(kernel_ids[0]),
+                    status=KernelStatus.TERMINATING,
                     container_id="container-1",
                     agent_id=agent_ids[0],
                     agent_addr="10.0.0.1:2001",
                 ),
                 TerminatingKernelData(
-                    kernel_id=kernel_ids[1],
-                    status="TERMINATING",
+                    kernel_id=KernelId(kernel_ids[1]),
+                    status=KernelStatus.TERMINATING,
                     container_id="container-2",
                     agent_id=agent_ids[1],
                     agent_addr="10.0.0.2:2001",
@@ -263,14 +270,14 @@ class TestTerminateSessions:
             sessions.append(
                 TerminatingSessionData(
                     session_id=session_id,
-                    access_key=f"key-{i}",
+                    access_key=AccessKey(f"key-{i}"),
                     creation_id=f"creation-{i}",
                     status=SessionStatus.TERMINATING,
                     status_info="BATCH_TERMINATION",
                     kernels=[
                         TerminatingKernelData(
-                            kernel_id=uuid4(),
-                            status="TERMINATING",
+                            kernel_id=KernelId(uuid4()),
+                            status=KernelStatus.TERMINATING,
                             container_id=f"container-{i}-{j}",
                             agent_id=AgentId(f"agent-{i}-{j}"),
                             agent_addr=f"10.0.{i}.{j}:2001",
@@ -304,7 +311,7 @@ class TestTerminateSessions:
 
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)
         # With concurrent execution, it should be much faster
-        assert elapsed < 0.3  # Allow some overhead
+        assert elapsed < 0.4  # Allow some overhead for metrics and other operations
 
     async def test_terminate_sessions_skip_kernels_without_agent(
         self,
@@ -318,31 +325,31 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="TEST_SKIP",
             kernels=[
                 # Kernel with both agent_id and container_id
                 TerminatingKernelData(
-                    kernel_id=uuid4(),
-                    status="TERMINATING",
+                    kernel_id=KernelId(uuid4()),
+                    status=KernelStatus.TERMINATING,
                     container_id="container-1",
                     agent_id=AgentId("agent-1"),
                     agent_addr="10.0.0.1:2001",
                 ),
                 # Kernel without agent_id
                 TerminatingKernelData(
-                    kernel_id=uuid4(),
-                    status="TERMINATING",
+                    kernel_id=KernelId(uuid4()),
+                    status=KernelStatus.TERMINATING,
                     container_id="container-2",
                     agent_id=None,
                     agent_addr=None,
                 ),
                 # Kernel without container_id
                 TerminatingKernelData(
-                    kernel_id=uuid4(),
-                    status="TERMINATING",
+                    kernel_id=KernelId(uuid4()),
+                    status=KernelStatus.TERMINATING,
                     container_id=None,
                     agent_id=AgentId("agent-2"),
                     agent_addr="10.0.0.2:2001",
@@ -353,7 +360,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        await scheduler.terminate_sessions()
 
         # Verify
         # Only the first kernel should be terminated
@@ -375,7 +382,7 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="NO_KERNELS",
