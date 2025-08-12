@@ -19,7 +19,6 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import redis_helper
 from ai.backend.common.config import (
     ConfigurationError,
 )
@@ -187,12 +186,6 @@ async def server_main(
         else:
             watcher_client = None
 
-        redis_stream_conn = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.STREAM),
-            name="storage_proxy.stream",
-            db=REDIS_STREAM_DB,
-        )
-
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config.storage_proxy.node_id,
@@ -203,7 +196,6 @@ async def server_main(
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
             metric_registry=metric_registry,
-            redis_stream_conn=redis_stream_conn,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
