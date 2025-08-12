@@ -185,7 +185,6 @@ async def server_main(
             await watcher_client.init()
         else:
             watcher_client = None
-
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config.storage_proxy.node_id,
