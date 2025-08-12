@@ -9,7 +9,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
 )
 
-from ..base import (
+from ...base import (
     GUID,
     Base,
     IDColumn,
