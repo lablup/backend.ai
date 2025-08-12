@@ -4,7 +4,7 @@ from typing import Any
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 
-from .enums import EntityType, OperationType, RoleSource, RoleStatus, ScopeType
+from .enums import RoleSource, RoleStatus, ScopeType
 
 ROLE_NAME_PREFIX = "role_"
 ADMIN_ROLE_NAME_SUFFIX = "_admin"
@@ -23,35 +23,15 @@ class UserRoleCreateInput:
 
 
 @dataclass
-class ScopePermissionCreateInput:
-    role_id: uuid.UUID
+class PermissionCreateInput:
+    permission_group_id: uuid.UUID
     entity_type: str
     operation: str
-    scope_type: ScopeType
-    scope_id: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "role_id": self.role_id,
+            "permission_group_id": self.permission_group_id,
             "entity_type": self.entity_type,
-            "operation": self.operation,
-            "scope_type": self.scope_type,
-            "scope_id": self.scope_id,
-        }
-
-
-@dataclass
-class ObjectPermissionCreateInput:
-    role_id: uuid.UUID
-    entity_type: EntityType
-    entity_id: str
-    operation: OperationType
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "role_id": self.role_id,
-            "entity_type": self.entity_type,
-            "entity_id": self.entity_id,
             "operation": self.operation,
         }
 
@@ -85,49 +65,39 @@ class RoleCreateInput:
 
 
 @dataclass
-class UserRoleCreateInputBeforeRoleCreation:
-    user_id: uuid.UUID
-
-    def to_input(self, role_id: uuid.UUID) -> UserRoleCreateInput:
-        return UserRoleCreateInput(
-            user_id=self.user_id,
-            role_id=role_id,
-        )
-
-
-@dataclass
-class ScopePermissionCreateInputBeforeRoleCreation:
-    entity_type: str
-    operation: str
+class ScopePermissionGroupCreateInput:
+    role_id: uuid.UUID
     scope_type: ScopeType
     scope_id: str
 
-    def to_input(self, role_id: uuid.UUID) -> ScopePermissionCreateInput:
-        return ScopePermissionCreateInput(
-            role_id=role_id,
-            entity_type=self.entity_type,
-            operation=self.operation,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
-        )
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "type": "scope_permission_groups",
+            "scope_type": self.scope_type,
+            "scope_id": self.scope_id,
+        }
 
 
 @dataclass
-class ObjectPermissionCreateInputBeforeRoleCreation:
-    entity_type: EntityType
+class ObjectPermissionGroupCreateInput:
+    role_id: uuid.UUID
     entity_id: str
-    operation: OperationType
 
-    def to_input(self, role_id: uuid.UUID) -> ObjectPermissionCreateInput:
-        return ObjectPermissionCreateInput(
-            role_id=role_id,
-            entity_type=self.entity_type,
-            entity_id=self.entity_id,
-            operation=self.operation,
-        )
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "entity_id": self.entity_id,
+        }
 
 
 @dataclass
-class UserRoleMappingInputGroup:
+class UserRoleMappingCreateInput:
     user_role_input: UserRoleCreateInput
     association_scopes_entities_input: AssociationScopesEntitiesCreateInput
+
+
+@dataclass
+class ScopeUserAssociationData:
+    scope_id: ScopeId
+    user_id: uuid.UUID
