@@ -16,6 +16,7 @@ from .handlers import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.schedule.repository import MarkTerminatingResult
     from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -124,3 +125,30 @@ class ScheduleCoordinator:
         """
         await self._scheduler_dispatcher.check_precond("do_check_precond")
         log.debug("Checking preconditions for scheduling")
+
+    async def mark_sessions_for_termination(
+        self,
+        session_ids: list[str],
+        reason: str = "USER_REQUESTED",
+    ) -> "MarkTerminatingResult":
+        """
+        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
+        This provides fast response to users by only updating the status and returning immediately.
+        Also requests the TERMINATE scheduling operation for the next cycle.
+
+        :param session_ids: List of session IDs to terminate
+        :param reason: Reason for termination
+        :return: MarkTerminatingResult with categorized session statuses
+        """
+        # Use the internal scheduler method to mark sessions
+        result = await self._scheduler._mark_sessions_for_termination(session_ids, reason)
+
+        # Request termination scheduling for the next cycle if there are sessions to terminate
+        if result.has_processed():
+            await self.request_scheduling(ScheduleType.TERMINATE)
+            log.info(
+                "Marked {} sessions for termination and requested TERMINATE scheduling",
+                result.processed_count(),
+            )
+
+        return result

@@ -3,7 +3,7 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
@@ -279,6 +279,31 @@ class SchedulingContextData:
     system_snapshot: SystemSnapshot
     scheduling_config: SchedulingConfig
     agents: list[AgentInfo]
+
+
+@dataclass
+class KernelTerminationResult:
+    """Result of termination for a single kernel."""
+
+    kernel_id: str
+    success: bool
+    error: Optional[str] = None
+
+
+@dataclass
+class SessionTerminationResult:
+    """Result of termination for a session and its kernels."""
+
+    session_id: str
+    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
+    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
+
+    @property
+    def should_terminate_session(self) -> bool:
+        """Check if all kernels in the session were successfully terminated."""
+        if not self.kernel_results:
+            return False
+        return all(kernel.success for kernel in self.kernel_results)
 
 
 class ScheduleRepository:
@@ -2513,3 +2538,54 @@ class ScheduleRepository:
             max_container_count=int(max_countainer_count) if max_countainer_count else None,
         )
         return self._transform_to_scheduling_context(raw_scheduling_data)
+
+    @repository_decorator()
+    async def batch_update_terminated_status(
+        self,
+        session_results: list[SessionTerminationResult],
+    ) -> None:
+        """
+        Batch update kernel and session statuses to TERMINATED for successful terminations.
+
+        :param session_results: List of session termination results with nested kernel results
+        """
+        if not session_results:
+            return
+
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            # Process each session's results
+            for session_result in session_results:
+                # Collect successful kernel IDs for this session
+                successful_kernel_ids = [
+                    kernel.kernel_id for kernel in session_result.kernel_results if kernel.success
+                ]
+
+                # Update successful kernels to TERMINATED
+                if successful_kernel_ids:
+                    kernel_stmt = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id.in_(successful_kernel_ids))
+                        .values(
+                            status=KernelStatus.TERMINATED,
+                            status_info=session_result.reason,
+                            status_changed_at=now,
+                            terminated_at=now,
+                        )
+                    )
+                    await db_sess.execute(kernel_stmt)
+
+                # Update session if all kernels succeeded
+                if session_result.should_terminate_session:
+                    session_stmt = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_result.session_id)
+                        .values(
+                            status=SessionStatus.TERMINATED,
+                            status_info=session_result.reason,
+                            status_changed_at=now,
+                            terminated_at=now,
+                        )
+                    )
+                    await db_sess.execute(session_stmt)

@@ -649,6 +649,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
+                schedule_coordinator=root_ctx.sokovan_orchestrator.coordinator,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -942,14 +943,20 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .clients.agent import AgentPool
     from .sokovan.scheduler.factory import create_default_scheduler
     from .sokovan.sokovan import SokovanOrchestrator
+
+    # Create agent pool for scheduler
+    agent_pool = AgentPool(root_ctx.agent_cache)
 
     # Create scheduler with default components
     scheduler = create_default_scheduler(
         root_ctx.repositories.schedule.repository,
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
+        agent_pool,
+        root_ctx.valkey_stat,
     )
 
     # Create sokovan orchestrator with lock factory for timers

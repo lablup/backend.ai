@@ -50,7 +50,6 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
                     owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
                 ),
                 DestroySessionActionResult(
-                    destroyed_sessions=[SESSION_FIXTURE_DATA],
                     result=DESTROY_SESSION_RESPONSE_MOCK,
                 ),
             ),
