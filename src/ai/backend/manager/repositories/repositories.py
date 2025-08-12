@@ -9,6 +9,9 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
+from ai.backend.manager.repositories.huggingface_registry.repositories import (
+    HuggingFaceRegistryRepositories,
+)
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
@@ -50,6 +53,7 @@ class Repositories:
     vfolder: VfolderRepositories
     object_storage: ObjectStorageRepositories
     artifact: ArtifactRepositories
+    huggingface: HuggingFaceRegistryRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -71,6 +75,7 @@ class Repositories:
         vfolder_repositories = VfolderRepositories.create(args)
         object_storage_repositories = ObjectStorageRepositories.create(args)
         artifact_repositories = ArtifactRepositories.create(args)
+        huggingface_repositories = HuggingFaceRegistryRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -91,4 +96,5 @@ class Repositories:
             vfolder=vfolder_repositories,
             object_storage=object_storage_repositories,
             artifact=artifact_repositories,
+            huggingface=huggingface_repositories,
         )

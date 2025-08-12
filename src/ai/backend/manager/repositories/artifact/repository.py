@@ -3,10 +3,12 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -21,8 +23,15 @@ class ArtifactRepository:
         self._db = db
 
     @repository_decorator()
-    async def get_artifact_by_id(self, artifact_id: str) -> dict:
-        raise NotImplementedError("This method should be implemented in a subclass.")
+    async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Artifact with ID {artifact_id} not found")
+            return row.to_dataclass()
 
     @repository_decorator()
     async def associate_artifact_with_storage(
@@ -60,7 +69,7 @@ class ArtifactRepository:
                     )
                 )
             )
-            existing_row = select_result.fetchone()
+            existing_row: AssociationArtifactsStorageRow = select_result.fetchone()
             if existing_row is None:
                 # TODO: Make exception
                 raise ValueError(

@@ -1,5 +1,3 @@
-"""HuggingFace model scanner implementation for Backend.AI storage."""
-
 import logging
 import uuid
 from dataclasses import dataclass
@@ -10,6 +8,7 @@ import aiohttp
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
+    HuggingfaceConfig,
     ModelData,
     ModelSortKey,
     ModelTarget,
@@ -21,11 +20,9 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceClientArgs,
     HuggingFaceScanner,
 )
-from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
-    RegistryNotFoundError,
 )
 from ai.backend.storage.services.storages import StorageService
 
@@ -37,7 +34,6 @@ _DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in se
 
 @dataclass
 class HuggingFaceServiceArgs:
-    registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
     storage_service: StorageService
 
@@ -47,18 +43,12 @@ class HuggingFaceService:
 
     _storages_service: StorageService
     _background_task_manager: BackgroundTaskManager
-    _registry_configs: dict[str, HuggingfaceConfig]
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storages_service = args.storage_service
         self._background_task_manager = args.background_task_manager
-        self._registry_configs = args.registry_configs
 
-    def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
-        config = self._registry_configs.get(registry_name)
-        if not config:
-            raise RegistryNotFoundError(f"HuggingFace registry not found: {registry_name}")
-
+    def _make_scanner(self, config: HuggingfaceConfig) -> HuggingFaceScanner:
         client = HuggingFaceClient(
             HuggingFaceClientArgs(
                 token=config.token,
@@ -70,7 +60,7 @@ class HuggingFaceService:
 
     async def scan_models(
         self,
-        registry_name: str,
+        client_config: HuggingfaceConfig,
         limit: int,
         sort: ModelSortKey,
         search: Optional[str] = None,
@@ -78,7 +68,7 @@ class HuggingFaceService:
         """List HuggingFace models with metadata.
 
         Args:
-            registry_name: Name of the HuggingFace registry
+            client_config: Configuration for the HuggingFace client
             limit: Maximum number of models to retrieve
             search: Search query to filter models
             sort: Sort criteria ("downloads", "likes", "created", "modified")
@@ -91,17 +81,17 @@ class HuggingFaceService:
         """
         log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
 
-        models = await self._make_scanner(registry_name).scan_models(
+        models = await self._make_scanner(client_config).scan_models(
             limit=limit, search=search, sort=sort
         )
 
         return models
 
-    async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelData:
+    async def scan_model(self, client_config: HuggingfaceConfig, model: ModelTarget) -> ModelData:
         """Get detailed information about a specific model.
 
         Args:
-            registry_name: Name of the HuggingFace registry
+            client_config: Configuration for the HuggingFace client
             model: ModelTarget containing model_id and revision
 
         Returns:
@@ -112,15 +102,15 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
         log.info(f"Scanning HuggingFace model: model_id={model.model_id}@{model.revision}")
-        return await self._make_scanner(registry_name).scan_model(model)
+        return await self._make_scanner(client_config).scan_model(model)
 
     async def list_model_files(
-        self, registry_name: str, model: ModelTarget
+        self, client_config: HuggingfaceConfig, model: ModelTarget
     ) -> list[FileObjectData]:
         """List all files in a specific model.
 
         Args:
-            registry_name: Name of the HuggingFace registry
+            client_config: Configuration for the HuggingFace client
             model: ModelTarget containing model_id and revision
 
         Returns:
@@ -131,9 +121,11 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
         log.info(f"Listing model files: model_id={model.model_id}@{model.revision}")
-        return await self._make_scanner(registry_name).list_model_files_info(model)
+        return await self._make_scanner(client_config).list_model_files_info(model)
 
-    async def get_download_url(self, registry_name: str, model: ModelTarget, filename: str) -> str:
+    async def get_download_url(
+        self, client_config: HuggingfaceConfig, model: ModelTarget, filename: str
+    ) -> str:
         """Get download URL for a specific file.
 
         Args:
@@ -147,11 +139,11 @@ class HuggingFaceService:
         log.info(
             f"Getting download URL: model_id={model.model_id}@{model.revision}, filename={filename}"
         )
-        return self._make_scanner(registry_name).get_download_url(model, filename)
+        return self._make_scanner(client_config).get_download_url(model, filename)
 
     async def import_model(
         self,
-        registry_name: str,
+        client_config: HuggingfaceConfig,
         model: ModelTarget,
         storage_name: str,
         bucket_name: str,
@@ -159,7 +151,7 @@ class HuggingFaceService:
         """Import a HuggingFace model to storage.
 
         Args:
-            registry_name: Name of the HuggingFace registry
+            client_config: Configuration for the HuggingFace client
             model: HuggingFace model to import
             storage_name: Target storage name
             bucket_name: Target bucket name
@@ -174,7 +166,7 @@ class HuggingFaceService:
             revision = model.revision
             try:
                 log.info(f"Rescanning model for latest metadata: model_id={model_id}@{revision}")
-                scanner = self._make_scanner(registry_name)
+                scanner = self._make_scanner(client_config)
                 file_infos = await scanner.list_model_files_info(model)
 
                 file_count = len(file_infos)
@@ -231,9 +223,9 @@ class HuggingFaceService:
         bgtask_id = await self._background_task_manager.start(_import_model)
         return bgtask_id
 
-    async def import_models_batch(
+    async def import_models(
         self,
-        registry_name: str,
+        client_config: HuggingfaceConfig,
         models: list[ModelTarget],
         storage_name: str,
         bucket_name: str,
@@ -241,7 +233,7 @@ class HuggingFaceService:
         """Import multiple HuggingFace models to storage in batch.
 
         Args:
-            registry_name: Name of the HuggingFace registry
+            client_config: Configuration for the HuggingFace client
             models: List of HuggingFace models to import
             storage_name: Target storage name
             bucket_name: Target bucket name
@@ -250,7 +242,7 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
 
-        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
+        async def _import_models(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")
@@ -280,7 +272,7 @@ class HuggingFaceService:
 
                         # TODO: Batch import logic can be optimized further
                         await self.import_model(
-                            registry_name,
+                            client_config,
                             model=model,
                             storage_name=storage_name,
                             bucket_name=bucket_name,
@@ -326,7 +318,7 @@ class HuggingFaceService:
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
+        bgtask_id = await self._background_task_manager.start(_import_models)
         return bgtask_id
 
     async def _make_download_file_stream(

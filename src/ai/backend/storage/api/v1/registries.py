@@ -48,10 +48,10 @@ class HuggingFaceRegistryAPIHandler:
         """
         Scan HuggingFace registry and return metadata.
         """
-        await log_client_api_entry(log, "scan", body.parsed)
+        await log_client_api_entry(log, "scan_models", body.parsed)
 
         models = await self._huggingface_service.scan_models(
-            registry_name=body.parsed.registry_name,
+            client_config=body.parsed.client_config,
             limit=body.parsed.limit,
             search=body.parsed.search,
             sort=body.parsed.order,
@@ -74,10 +74,10 @@ class HuggingFaceRegistryAPIHandler:
         """
         Import multiple HuggingFace models to storage in batch.
         """
-        await log_client_api_entry(log, "import_models_batch", body.parsed)
+        await log_client_api_entry(log, "import_models", body.parsed)
 
-        task_id = await self._huggingface_service.import_models_batch(
-            registry_name=body.parsed.registry_name,
+        task_id = await self._huggingface_service.import_models(
+            client_config=body.parsed.client_config,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
             bucket_name=body.parsed.bucket_name,
@@ -100,17 +100,10 @@ def create_app(ctx: RootContext) -> web.Application:
 
     storage_service = StorageService([])
 
-    huggingface_registry_configs = dict(
-        (r.name, r.config)
-        for r in ctx.local_config.registries
-        if r.config.registry_type == "huggingface"
-    )
-
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
             storage_service=storage_service,
-            registry_configs=huggingface_registry_configs,
         )
     )
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)

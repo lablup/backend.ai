@@ -23,7 +23,7 @@ class ObjectStorageRepository:
         self._db = db
 
     @repository_decorator()
-    async def get(self, storage_name: str) -> ObjectStorageData:
+    async def get_by_name(self, storage_name: str) -> ObjectStorageData:
         """
         Get an existing object storage configuration from the database.
         """
@@ -102,7 +102,7 @@ class ObjectStorageRepository:
         List all object storage configurations from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow).order_by(ObjectStorageRow.name)
+            query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
             rows: list[ObjectStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]

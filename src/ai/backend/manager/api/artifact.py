@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, Self, Tuple
+from typing import TYPE_CHECKING, Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import (
     APIResponse,
     BodyParam,
-    MiddlewareParam,
     PathParam,
     api_handler,
 )
@@ -53,40 +51,26 @@ from .types import CORSOptions, WebMiddleware
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ProcessorsCtx(MiddlewareParam):
-    processors: Processors
-
-    # Allow strawberry.Schema to be used as a type
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        root_ctx: RootContext = request.app["_root.context"]
-
-        return cls(
-            processors=root_ctx.processors,
-        )
-
-
 class ArtifactHandler:
+    _processors: Processors
+
+    def __init__(self, processors: Processors):
+        self._processors = processors
+
     @api_handler
     async def import_artifact(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[ImportArtifactPathParam],
         body: BodyParam[ImportArtifactReq],
     ) -> APIResponse:
         """Import an artifact from external storage."""
-        processors = processor_ctx.processors
         artifact_id = path.parsed.artifact_id
-        storage_name = body.parsed.storage_name
-        bucket_name = body.parsed.bucket_name
+        storage_id = body.parsed.storage_id
 
         action = ImportArtifactAction(
             target=ImportArtifactTarget(
                 artifact_id=artifact_id,
-                storage_name=storage_name,
-                bucket_name=bucket_name,
+                storage_id=storage_id,
             )
         )
 
@@ -104,7 +88,6 @@ class ArtifactHandler:
     @api_handler
     async def update_artifact(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[UpdateArtifactPathParam],
         body: BodyParam[UpdateArtifactReq],
     ) -> APIResponse:
@@ -124,7 +107,6 @@ class ArtifactHandler:
     @api_handler
     async def delete_artifact(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[DeleteArtifactPathParam],
     ) -> APIResponse:
         """Delete an artifact."""
@@ -142,7 +124,6 @@ class ArtifactHandler:
     @api_handler
     async def associate_artifact_with_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         body: BodyParam[AssociateArtifactWithStorageReq],
     ) -> APIResponse:
         """Associate an artifact with a storage."""
@@ -172,7 +153,6 @@ class ArtifactHandler:
     @api_handler
     async def disassociate_artifact_with_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         body: BodyParam[DisassociateArtifactWithStorageReq],
     ) -> APIResponse:
         """Disassociate an artifact from a storage."""
@@ -207,7 +187,8 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "artifact"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    api_handlers = ArtifactHandler()
+    root_context: RootContext = app["_root.context"]
+    api_handlers = ArtifactHandler(root_context.processors)
 
     cors.add(app.router.add_route("POST", "/{artifact_id}/import", api_handlers.import_artifact))
     cors.add(app.router.add_route("PATCH", "/{artifact_id}", api_handlers.update_artifact))
