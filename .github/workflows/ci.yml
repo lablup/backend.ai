@@ -515,7 +515,7 @@ jobs:
         pip install -U -r tools/towncrier-requirements.txt
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=5.0' 'packaging>=21.3'
+        pip install -U 'twine~=6.0'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
