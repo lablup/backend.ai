@@ -23,7 +23,6 @@ from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
 from .api.client import init_client_app
@@ -132,7 +131,6 @@ class RootContext:
     service_context: ServiceContext
     metric_registry: CommonMetricRegistry
     background_task_manager: BackgroundTaskManager
-    redis_stream_conn: RedisConnectionInfo
 
     def __init__(
         self,
@@ -144,7 +142,6 @@ class RootContext:
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
-        redis_stream_conn: RedisConnectionInfo,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
@@ -177,7 +174,6 @@ class RootContext:
             self.event_producer,
             # TODO: Add `bgtask_observer`
         )
-        self.redis_stream_conn = redis_stream_conn
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.
