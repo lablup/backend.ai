@@ -22,6 +22,12 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class ScheduleHandler(ABC):
     """Base class for schedule operation handlers."""
 
+    @classmethod
+    @abstractmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        raise NotImplementedError("Subclasses must implement name()")
+
     @abstractmethod
     async def execute(self) -> ScheduleResult:
         """Execute the scheduling operation.
@@ -29,7 +35,7 @@ class ScheduleHandler(ABC):
         Returns:
             Result of the scheduling operation
         """
-        ...
+        raise NotImplementedError("Subclasses must implement execute()")
 
     @abstractmethod
     async def post_process(self, result: ScheduleResult) -> None:
@@ -38,7 +44,7 @@ class ScheduleHandler(ABC):
         Args:
             result: The result from execute()
         """
-        ...
+        raise NotImplementedError("Subclasses must implement post_process()")
 
     @final
     async def handle(self) -> ScheduleResult:
@@ -59,6 +65,11 @@ class ScheduleSessionsHandler(ScheduleHandler):
     ):
         self._scheduler = scheduler
         self._coordinator = coordinator
+
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "schedule-sessions"
 
     async def execute(self) -> ScheduleResult:
         """Schedule all pending sessions across scaling groups."""
@@ -85,6 +96,11 @@ class CheckPreconditionHandler(ScheduleHandler):
         self._coordinator = coordinator
         self._dispatcher = dispatcher
 
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "check-precondition"
+
     async def execute(self) -> ScheduleResult:
         """Check preconditions for scheduled sessions."""
         # TODO: Remove dispatcher
@@ -110,13 +126,17 @@ class StartSessionsHandler(ScheduleHandler):
         self._coordinator = coordinator
         self._dispatcher = dispatcher
 
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "start-sessions"
+
     async def execute(self) -> ScheduleResult:
         """Start sessions that passed precondition checks."""
         # TODO: Remove dispatcher
         await self._dispatcher.start("do_start_session")
         log.debug("Starting sessions")
         return ScheduleResult()
-        # return await self._scheduler.start_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of started sessions."""
@@ -134,12 +154,14 @@ class TerminateSessionsHandler(ScheduleHandler):
         self._scheduler = scheduler
         self._coordinator = coordinator
 
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "terminate-sessions"
+
     async def execute(self) -> ScheduleResult:
         """Terminate sessions marked for termination."""
-        # TODO: Implement when method is added to Scheduler
-        log.trace("Terminating sessions (not yet implemented)")
-        return ScheduleResult()
-        # return await self._scheduler.terminate_sessions()
+        return await self._scheduler.terminate_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""

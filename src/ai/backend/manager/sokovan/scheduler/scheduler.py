@@ -1,19 +1,30 @@
+import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import Optional
 
-from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.scheduler import (
-    SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
+)
+from ai.backend.manager.repositories.schedule.repository import (
+    KernelTerminationResult,
+    MarkTerminatingResult,
+    ScheduleRepository,
+    SchedulingContextData,
+    SessionTerminationResult,
+    TerminatingKernelData,
 )
 from ai.backend.manager.types import DistributedLockFactory
 
+from .allocators.allocator import SchedulingAllocator
 from .results import ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
@@ -38,15 +49,16 @@ from .types import (
 )
 from .validators.validator import SchedulingValidator
 
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.schedule.repository import (
-        ScheduleRepository,
-        SchedulingContextData,
-    )
-
-    from .allocators.allocator import SchedulingAllocator
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class AgentTerminationGroup:
+    """Groups kernels by agent for batch termination."""
+
+    agent_id: Optional[AgentId]
+    agent_addr: Optional[str]
+    kernels: list["TerminatingKernelData"] = field(default_factory=list)
 
 
 @dataclass
@@ -58,6 +70,8 @@ class SchedulerArgs:
     repository: "ScheduleRepository"
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
+    agent_pool: "AgentPool"
+    valkey_stat: "ValkeyStatClient"
 
 
 class Scheduler:
@@ -68,9 +82,10 @@ class Scheduler:
     _repository: "ScheduleRepository"
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
+    _agent_pool: "AgentPool"
+    _valkey_stat: "ValkeyStatClient"
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
-    _operation_metrics: SchedulerOperationMetricObserver
     _phase_metrics: SchedulerPhaseMetricObserver
 
     def __init__(self, args: SchedulerArgs) -> None:
@@ -81,11 +96,12 @@ class Scheduler:
         self._repository = args.repository
         self._config_provider = args.config_provider
         self._lock_factory = args.lock_factory
+        self._agent_pool = args.agent_pool
+        self._valkey_stat = args.valkey_stat
         self._sequencer_pool = self._make_sequencer_pool()
         self._agent_selector_pool = self._make_agent_selector_pool(
             args.config_provider.config.manager.agent_selection_resource_priority
         )
-        self._operation_metrics = SchedulerOperationMetricObserver.instance()
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
     @classmethod
@@ -128,35 +144,32 @@ class Scheduler:
         total_scheduled_count = 0
         # Acquire distributed lock before scheduling
         async with self._lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
-            with self._operation_metrics.measure_operation("schedule_all_scaling_groups"):
-                # Get all schedulable scaling groups from repository
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
-                for scaling_group in scaling_groups:
-                    try:
-                        log.trace("Scheduling sessions for scaling group: {}", scaling_group)
-                        # Schedule sessions for this scaling group
-                        with self._operation_metrics.measure_operation(
-                            f"schedule_scaling_group_{scaling_group}"
-                        ):
-                            scheduled_count = await self._schedule_scaling_group(scaling_group)
-                        total_scheduled_count += scheduled_count
-                        if scheduled_count > 0:
-                            log.info(
-                                "Scheduled {} sessions for scaling group: {}",
-                                scheduled_count,
-                                scaling_group,
-                            )
-                    except Exception as e:
-                        log.error(
-                            "Failed to schedule sessions for scaling group {}: {}",
+            # Get all schedulable scaling groups from repository
+            scaling_groups = await self._repository.get_schedulable_scaling_groups()
+            for scaling_group in scaling_groups:
+                try:
+                    log.trace("Scheduling sessions for scaling group: {}", scaling_group)
+                    # Schedule sessions for this scaling group
+                    with self._phase_metrics.measure_phase(scaling_group, "scheduling"):
+                        scheduled_count = await self._schedule_scaling_group(scaling_group)
+                    total_scheduled_count += scheduled_count
+                    if scheduled_count > 0:
+                        log.info(
+                            "Scheduled {} sessions for scaling group: {}",
+                            scheduled_count,
                             scaling_group,
-                            str(e),
-                            exc_info=True,
                         )
-                        # Continue with other scaling groups even if one fails
-                        continue
+                except Exception as e:
+                    log.error(
+                        "Failed to schedule sessions for scaling group {}: {}",
+                        scaling_group,
+                        str(e),
+                        exc_info=True,
+                    )
+                    # Continue with other scaling groups even if one fails
+                    continue
 
-                return ScheduleResult(succeeded_count=total_scheduled_count)
+            return ScheduleResult(succeeded_count=total_scheduled_count)
 
     async def _schedule_scaling_group(self, scaling_group: str) -> int:
         """
@@ -421,4 +434,143 @@ class Scheduler:
         )
 
         # Build session allocation from selections
-        return SessionAllocation.from_agent_selections(session_workload, selections, scaling_group)
+        return SessionAllocation.from_agent_selections(
+            session_workload,
+            selections,
+            scaling_group,
+        )
+
+    async def terminate_sessions(self) -> ScheduleResult:
+        """
+        Terminate all sessions marked with TERMINATING status.
+
+        This method:
+        1. Fetches all terminating sessions from the repository
+        2. Groups kernels by session for batch processing
+        3. Sends termination requests to agents concurrently
+        4. Updates session/kernel statuses to TERMINATED
+
+        Returns:
+            ScheduleResult with the count of terminated sessions
+        """
+        # Fetch all terminating sessions
+        terminating_sessions = await self._repository.get_terminating_sessions()
+
+        if not terminating_sessions:
+            log.debug("No sessions to terminate")
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Processing {} sessions for termination", len(terminating_sessions))
+
+        # Build session termination results
+        session_results: list[SessionTerminationResult] = []
+
+        for session in terminating_sessions:
+            # Create session result with reason from session's status_info
+            session_result = SessionTerminationResult(
+                session_id=session.session_id,
+                reason=session.status_info,
+                kernel_results=[],
+            )
+
+            # Create termination tasks for all kernels in this session
+            termination_tasks = []
+            for kernel in session.kernels:
+                if kernel.agent_id and kernel.container_id:
+                    # Create task to terminate this kernel
+                    task = self._terminate_kernel(
+                        kernel.agent_id,
+                        str(kernel.kernel_id),
+                        str(session.session_id),
+                        session_result.reason,
+                    )
+                    termination_tasks.append(task)
+
+            # Execute all termination tasks concurrently for this session
+            if termination_tasks:
+                # Use asyncio.gather to run all tasks concurrently
+                kernel_results = await asyncio.gather(*termination_tasks)
+                session_result.kernel_results.extend(kernel_results)
+
+            session_results.append(session_result)
+
+        # Batch update database with termination results
+        await self._repository.batch_update_terminated_status(session_results)
+
+        # Count successfully terminated sessions
+        terminated_session_count = sum(
+            1 for result in session_results if result.should_terminate_session
+        )
+
+        log.info(
+            "Terminated {} sessions (partial: {})",
+            terminated_session_count,
+            len(session_results) - terminated_session_count,
+        )
+
+        return ScheduleResult(succeeded_count=terminated_session_count)
+
+    async def _terminate_kernel(
+        self,
+        agent_id: AgentId,
+        kernel_id: str,
+        session_id: str,
+        reason: str,
+    ) -> KernelTerminationResult:
+        """
+        Terminate a single kernel on an agent.
+
+        :param agent_id: The agent ID where the kernel is running
+        :param kernel_id: The kernel ID to terminate
+        :param session_id: The session ID that owns the kernel
+        :param reason: The reason for termination
+        :return: KernelTerminationResult with success status
+        """
+        try:
+            agent_client = self._agent_pool.get_agent_client(agent_id)
+
+            # Call agent's destroy_kernel RPC method with correct parameters
+            await agent_client.destroy_kernel(kernel_id, session_id, reason)
+
+            return KernelTerminationResult(
+                kernel_id=kernel_id,
+                success=True,
+            )
+        except Exception as e:
+            log.warning(
+                "Failed to terminate kernel {} on agent {}: {}",
+                kernel_id,
+                agent_id,
+                e,
+            )
+
+            return KernelTerminationResult(
+                kernel_id=kernel_id,
+                success=False,
+                error=str(e),
+            )
+
+    async def _mark_sessions_for_termination(
+        self,
+        session_ids: list[str],
+        reason: str = "USER_REQUESTED",
+    ) -> "MarkTerminatingResult":
+        """
+        Internal method to mark sessions for termination.
+        Should only be called by ScheduleCoordinator.
+
+        :param session_ids: List of session IDs to terminate
+        :param reason: Reason for termination
+        :return: MarkTerminatingResult with categorized session statuses
+        """
+        result = await self._repository.mark_sessions_terminating(session_ids, reason)
+
+        if result.has_processed():
+            log.info(
+                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
+                result.processed_count(),
+                len(result.cancelled_sessions),
+                len(result.terminating_sessions),
+            )
+
+        return result

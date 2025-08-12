@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 
@@ -16,6 +17,7 @@ from .handlers import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.schedule.repository import MarkTerminatingResult
     from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -32,6 +34,7 @@ class ScheduleCoordinator:
     _event_producer: EventProducer
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _scheduler_dispatcher: SchedulerDispatcher
+    _operation_metrics: SchedulerOperationMetricObserver
 
     def __init__(
         self,
@@ -44,6 +47,7 @@ class ScheduleCoordinator:
         self._scheduler = scheduler
         self._event_producer = event_producer
         self._scheduler_dispatcher = scheduler_dispatcher
+        self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
@@ -77,7 +81,8 @@ class ScheduleCoordinator:
                 return False
 
             # Execute the handler (includes operation and post-processing)
-            await handler.handle()
+            with self._operation_metrics.measure_operation(handler.name()):
+                await handler.handle()
             return True
         except Exception as e:
             log.exception(
@@ -85,7 +90,6 @@ class ScheduleCoordinator:
                 schedule_type.value,
                 e,
             )
-            # No re-queueing as per user request
             raise
 
     async def process_if_needed(self, schedule_type: ScheduleType) -> bool:
@@ -108,19 +112,33 @@ class ScheduleCoordinator:
 
         :param schedule_type: Type of scheduling to request
         """
+        # Use the actual ValkeyScheduleClient method
         await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
         log.debug("Requested scheduling for type: {}", schedule_type.value)
 
-    async def start(self) -> None:
+    async def mark_sessions_for_termination(
+        self,
+        session_ids: list[str],
+        reason: str = "USER_REQUESTED",
+    ) -> "MarkTerminatingResult":
         """
-        Start the scheduling process.
-        """
-        await self._scheduler_dispatcher.start("do_start_session")
-        log.debug("Starting scheduling process")
+        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
+        This provides fast response to users by only updating the status and returning immediately.
+        Also requests the TERMINATE scheduling operation for the next cycle.
 
-    async def check_preconditions(self):
+        :param session_ids: List of session IDs to terminate
+        :param reason: Reason for termination
+        :return: MarkTerminatingResult with categorized session statuses
         """
-        Check preconditions for scheduling.
-        """
-        await self._scheduler_dispatcher.check_precond("do_check_precond")
-        log.debug("Checking preconditions for scheduling")
+        # Use the internal scheduler method to mark sessions
+        result = await self._scheduler._mark_sessions_for_termination(session_ids, reason)
+
+        # Request termination scheduling for the next cycle if there are sessions to terminate
+        if result.has_processed():
+            await self.request_scheduling(ScheduleType.TERMINATE)
+            log.info(
+                "Marked {} sessions for termination and requested TERMINATE scheduling",
+                result.processed_count(),
+            )
+
+        return result

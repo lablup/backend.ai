@@ -3,7 +3,7 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Optional, cast
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -218,6 +218,47 @@ class _AllSchedulingDatabaseData:
 
 
 @dataclass
+class TerminatingSessionData:
+    """Data for a session that needs to be terminated."""
+
+    session_id: SessionId
+    access_key: AccessKey
+    creation_id: str
+    status: SessionStatus
+    status_info: str
+    kernels: list["TerminatingKernelData"]
+
+
+@dataclass
+class TerminatingKernelData:
+    """Kernel data for termination processing."""
+
+    kernel_id: KernelId
+    status: KernelStatus
+    container_id: Optional[str]
+    agent_id: Optional[AgentId]
+    agent_addr: Optional[str]
+
+
+@dataclass
+class MarkTerminatingResult:
+    """Result of marking sessions for termination."""
+
+    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING/PULLING)
+    terminating_sessions: list[str]  # Sessions marked as TERMINATING
+    skipped_sessions: list[str]  # Sessions already TERMINATED/CANCELLED/TERMINATING
+    not_found_sessions: list[str]  # Sessions that don't exist
+
+    def has_processed(self) -> bool:
+        """Check if any sessions were actually processed (state changed)."""
+        return bool(self.cancelled_sessions or self.terminating_sessions)
+
+    def processed_count(self) -> int:
+        """Get count of sessions that were actually processed."""
+        return len(self.cancelled_sessions) + len(self.terminating_sessions)
+
+
+@dataclass
 class _RawSchedulingData:
     """Raw data fetched from database for scheduling operations."""
 
@@ -239,6 +280,31 @@ class SchedulingContextData:
     system_snapshot: SystemSnapshot
     scheduling_config: SchedulingConfig
     agents: list[AgentInfo]
+
+
+@dataclass
+class KernelTerminationResult:
+    """Result of termination for a single kernel."""
+
+    kernel_id: str
+    success: bool
+    error: Optional[str] = None
+
+
+@dataclass
+class SessionTerminationResult:
+    """Result of termination for a session and its kernels."""
+
+    session_id: str
+    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
+    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
+
+    @property
+    def should_terminate_session(self) -> bool:
+        """Check if all kernels in the session were successfully terminated."""
+        if not self.kernel_results:
+            return False
+        return all(kernel.success for kernel in self.kernel_results)
 
 
 class ScheduleRepository:
@@ -396,6 +462,269 @@ class ScheduleRepository:
         sess_row: SessionRow,
     ) -> None:
         await recalc_concurrency_used(session, sched_ctx.registry.valkey_stat, sess_row.access_key)
+
+    async def _fetch_session_statuses(
+        self,
+        db_sess: SASession,
+        session_ids: list[str],
+    ) -> dict[str, SessionStatus]:
+        """
+        Fetch current statuses of multiple sessions.
+
+        :param db_sess: Database session
+        :param session_ids: List of session IDs to fetch
+        :return: Dictionary mapping session ID to its current status
+        """
+        session_query = sa.select(SessionRow.id, SessionRow.status).where(
+            SessionRow.id.in_(session_ids)
+        )
+        rows = await db_sess.execute(session_query)
+        return {str(row.id): row.status for row in rows}
+
+    async def _categorize_sessions_by_status(
+        self,
+        session_ids: list[str],
+        existing_sessions: dict[str, SessionStatus],
+    ) -> MarkTerminatingResult:
+        """
+        Categorize sessions based on their current status.
+
+        :param session_ids: All requested session IDs
+        :param existing_sessions: Dictionary of existing session IDs to their status
+        :return: MarkTerminatingResult with categorized sessions
+        """
+        result = MarkTerminatingResult(
+            cancelled_sessions=[],
+            terminating_sessions=[],
+            skipped_sessions=[],
+            not_found_sessions=[],
+        )
+
+        for session_id in session_ids:
+            if session_id not in existing_sessions:
+                result.not_found_sessions.append(session_id)
+                log.warning("Session {} not found", session_id)
+                continue
+
+            status = existing_sessions[session_id]
+
+            if status in [
+                SessionStatus.TERMINATED,
+                SessionStatus.CANCELLED,
+                SessionStatus.TERMINATING,
+            ]:
+                result.skipped_sessions.append(session_id)
+                log.debug("Session {} is already {}", session_id, status)
+            elif status in [SessionStatus.PENDING, SessionStatus.PULLING]:
+                result.cancelled_sessions.append(session_id)
+            else:
+                result.terminating_sessions.append(session_id)
+
+        return result
+
+    async def _batch_cancel_sessions(
+        self,
+        db_sess: SASession,
+        session_ids: list[str],
+        reason: str,
+        now: datetime,
+    ) -> None:
+        """
+        Cancel multiple sessions and their kernels in batch.
+
+        :param db_sess: Database session
+        :param session_ids: List of session IDs to cancel
+        :param reason: Reason for cancellation
+        :param now: Current timestamp
+        """
+        if not session_ids:
+            return
+
+        await db_sess.execute(
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.CANCELLED,
+                status_info=reason,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {SessionStatus.CANCELLED.name: now.isoformat()},
+                ),
+            )
+            .where(SessionRow.id.in_(session_ids))
+        )
+
+        await db_sess.execute(
+            sa.update(KernelRow)
+            .values(
+                status=KernelStatus.CANCELLED,
+                status_info=reason,
+                status_changed=now,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    KernelRow.status_history,
+                    (),
+                    {KernelStatus.CANCELLED.name: now.isoformat()},
+                ),
+            )
+            .where(KernelRow.session_id.in_(session_ids))
+        )
+
+    async def _batch_mark_sessions_terminating(
+        self,
+        db_sess: SASession,
+        session_ids: list[str],
+        reason: str,
+        now: datetime,
+    ) -> None:
+        """
+        Mark multiple sessions and their kernels as TERMINATING in batch.
+
+        :param db_sess: Database session
+        :param session_ids: List of session IDs to mark for termination
+        :param reason: Reason for termination
+        :param now: Current timestamp
+        """
+        if not session_ids:
+            return
+
+        await db_sess.execute(
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.TERMINATING,
+                status_info=reason,
+                status_history=sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {SessionStatus.TERMINATING.name: now.isoformat()},
+                ),
+            )
+            .where(SessionRow.id.in_(session_ids))
+            .where(
+                SessionRow.status.not_in([
+                    SessionStatus.TERMINATED,
+                    SessionStatus.CANCELLED,
+                ])
+            )
+        )
+
+        await db_sess.execute(
+            sa.update(KernelRow)
+            .values(
+                status=KernelStatus.TERMINATING,
+                status_info=reason,
+                status_history=sql_json_merge(
+                    KernelRow.status_history,
+                    (),
+                    {KernelStatus.TERMINATING.name: now.isoformat()},
+                ),
+            )
+            .where(KernelRow.session_id.in_(session_ids))
+            .where(
+                KernelRow.status.not_in([
+                    KernelStatus.TERMINATED,
+                    KernelStatus.CANCELLED,
+                ])
+            )
+        )
+
+    @repository_decorator()
+    async def mark_sessions_terminating(
+        self,
+        session_ids: list[str],
+        reason: str = "USER_REQUESTED",
+    ) -> MarkTerminatingResult:
+        """
+        Mark multiple sessions and their kernels as TERMINATING.
+        This method provides fast response by only updating statuses.
+
+        :param session_ids: List of session IDs to mark for termination
+        :param reason: Reason for termination
+        :return: MarkTerminatingResult with categorized session IDs
+        """
+        now = datetime.now(tzutc())
+
+        if not session_ids:
+            return MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                skipped_sessions=[],
+                not_found_sessions=[],
+            )
+
+        async with self._db.begin_session() as db_sess:
+            # Fetch current statuses
+            existing_sessions = await self._fetch_session_statuses(db_sess, session_ids)
+
+            # Categorize sessions by status
+            categorization = await self._categorize_sessions_by_status(
+                session_ids, existing_sessions
+            )
+
+            # Batch cancel sessions
+            await self._batch_cancel_sessions(
+                db_sess, categorization.cancelled_sessions, reason, now
+            )
+
+            # Batch mark sessions as terminating
+            await self._batch_mark_sessions_terminating(
+                db_sess, categorization.terminating_sessions, reason, now
+            )
+
+        return categorization
+
+    @repository_decorator()
+    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
+        """
+        Fetch all sessions with TERMINATING status.
+        Returns dataclass objects with session and kernel information for termination processing.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == SessionStatus.TERMINATING)
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                        )
+                    )
+                )
+            )
+            result = await session.execute(query)
+            session_rows = list(result.scalars().all())
+
+            # Transform Row objects to dataclasses
+            terminating_sessions = []
+            for session_row in session_rows:
+                kernels = [
+                    TerminatingKernelData(
+                        kernel_id=kernel.id,
+                        status=kernel.status,
+                        container_id=kernel.container_id,
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                    )
+                    for kernel in session_row.kernels
+                ]
+
+                terminating_sessions.append(
+                    TerminatingSessionData(
+                        session_id=session_row.id,
+                        access_key=session_row.access_key,
+                        creation_id=session_row.creation_id,
+                        status=session_row.status,
+                        status_info=session_row.status_info or "UNKNOWN",
+                        kernels=kernels,
+                    )
+                )
+
+            return terminating_sessions
 
     @repository_decorator()
     async def get_schedulable_scaling_groups(self) -> list[str]:
@@ -1202,11 +1531,10 @@ class ScheduleRepository:
                     else:
                         concurrency_to_increment[allocation.access_key] += 1
                 except Exception as e:
-                    log.error(
+                    log.debug(
                         "Failed to allocate session {}: {}",
                         allocation.session_id,
-                        str(e),
-                        exc_info=True,
+                        e,
                     )
                     # Continue with next session allocation
 
@@ -2214,3 +2542,58 @@ class ScheduleRepository:
             max_container_count=int(max_countainer_count) if max_countainer_count else None,
         )
         return self._transform_to_scheduling_context(raw_scheduling_data)
+
+    @repository_decorator()
+    async def batch_update_terminated_status(
+        self,
+        session_results: list[SessionTerminationResult],
+    ) -> None:
+        """
+        Batch update kernel and session statuses to TERMINATED for successful terminations.
+
+        :param session_results: List of session termination results with nested kernel results
+        """
+        if not session_results:
+            return
+
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            # Process each session's results
+            for session_result in session_results:
+                # Collect successful kernel IDs for this session
+                successful_kernel_ids = [
+                    kernel.kernel_id for kernel in session_result.kernel_results if kernel.success
+                ]
+
+                # Update successful kernels to TERMINATED
+                if successful_kernel_ids:
+                    kernel_stmt = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id.in_(successful_kernel_ids))
+                        .values(
+                            status=KernelStatus.TERMINATED,
+                            status_info=session_result.reason,
+                            status_changed=now,
+                            terminated_at=now,
+                        )
+                    )
+                    await db_sess.execute(kernel_stmt)
+
+                # Update session if all kernels succeeded
+                if session_result.should_terminate_session:
+                    session_stmt = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_result.session_id)
+                        .values(
+                            status=SessionStatus.TERMINATED,
+                            status_info=session_result.reason,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {SessionStatus.TERMINATED.name: now.isoformat()},
+                            ),
+                            terminated_at=now,
+                        )
+                    )
+                    await db_sess.execute(session_stmt)
