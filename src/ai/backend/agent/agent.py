@@ -915,7 +915,6 @@ class AbstractAgent(
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
             log.exception("instance_heartbeat failure")
-            await self.produce_error_event()
 
     async def collect_logs(
         self,
