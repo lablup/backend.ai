@@ -18,7 +18,7 @@ from .types import (
     AssociationScopesEntitiesCreateInput,
     RoleCreateInput,
     UserRoleCreateInput,
-    UserRoleMappingInputGroup,
+    UserRoleMappingCreateInput,
 )
 
 
@@ -176,8 +176,8 @@ class UserScopeRoleMappingArgs:
 
 def get_user_project_mapping_creation_input(
     args: UserScopeRoleMappingArgs,
-) -> Optional[UserRoleMappingInputGroup]:
-    result: Optional[UserRoleMappingInputGroup] = None
+) -> Optional[UserRoleMappingCreateInput]:
+    result: Optional[UserRoleMappingCreateInput] = None
     match args.user_role:
         case UserRole.SUPERADMIN | UserRole.MONITOR:
             pass
@@ -196,7 +196,7 @@ def get_user_project_mapping_creation_input(
                         entity_id=str(args.user_id),
                     ),
                 )
-                result = UserRoleMappingInputGroup(
+                result = UserRoleMappingCreateInput(
                     user_role_input=user_role_mapping_input,
                     association_scopes_entities_input=associtation_input,
                 )
@@ -215,7 +215,7 @@ def get_user_project_mapping_creation_input(
                         entity_id=str(args.user_id),
                     ),
                 )
-                result = UserRoleMappingInputGroup(
+                result = UserRoleMappingCreateInput(
                     user_role_input=user_role_mapping_input,
                     association_scopes_entities_input=associtation_input,
                 )
@@ -224,12 +224,12 @@ def get_user_project_mapping_creation_input(
 
 def get_user_domain_mapping_creation_input(
     args: UserScopeRoleMappingArgs,
-) -> Optional[UserRoleMappingInputGroup]:
+) -> Optional[UserRoleMappingCreateInput]:
     """
     Map a user to a domain role and a domain scope.
 
     """
-    result: Optional[UserRoleMappingInputGroup] = None
+    result: Optional[UserRoleMappingCreateInput] = None
     match args.user_role:
         case UserRole.SUPERADMIN | UserRole.MONITOR:
             pass
@@ -248,7 +248,7 @@ def get_user_domain_mapping_creation_input(
                         entity_id=str(args.user_id),
                     ),
                 )
-                result = UserRoleMappingInputGroup(
+                result = UserRoleMappingCreateInput(
                     user_role_input=user_role_mapping_input,
                     association_scopes_entities_input=associtation_input,
                 )
@@ -267,7 +267,7 @@ def get_user_domain_mapping_creation_input(
                         entity_id=str(args.user_id),
                     ),
                 )
-                result = UserRoleMappingInputGroup(
+                result = UserRoleMappingCreateInput(
                     user_role_input=user_role_mapping_input,
                     association_scopes_entities_input=associtation_input,
                 )

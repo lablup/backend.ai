@@ -33,7 +33,7 @@ from ai.backend.manager.models.rbac_models.migration.models import (
 from ai.backend.manager.models.rbac_models.migration.types import (
     PermissionCreateInput,
     ScopePermissionGroupCreateInput,
-    UserRoleMappingInputGroup,
+    UserRoleMappingCreateInput,
 )
 from ai.backend.manager.models.rbac_models.migration.user import (
     ProjectData,
@@ -300,7 +300,7 @@ def _map_admin_users_to_project_role(db_conn: Connection) -> None:
         offset += page_size
         if not rows:
             break
-        input_groups: list[UserRoleMappingInputGroup] = []
+        input_groups: list[UserRoleMappingCreateInput] = []
         for row in rows:
             args = UserScopeRoleMappingArgs(
                 user_id=row.user_id,
@@ -366,7 +366,7 @@ def _map_member_users_to_project_role(db_conn: Connection) -> None:
         offset += page_size
         if not rows:
             break
-        input_groups: list[UserRoleMappingInputGroup] = []
+        input_groups: list[UserRoleMappingCreateInput] = []
         for row in rows:
             args = UserScopeRoleMappingArgs(
                 user_id=row.user_id,
