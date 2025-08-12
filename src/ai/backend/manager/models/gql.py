@@ -56,6 +56,8 @@ from .gql_models.container_registry_v2 import (
 
 set_input_object_type_default_value(Undefined)
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
+from ai.backend.common.clients.prometheus.device_util.client import DeviceUtilizationReader
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
@@ -318,6 +320,9 @@ class GraphQueryContext:
     idle_checker_host: IdleCheckerHost
     metric_observer: GraphQLMetricObserver
     processors: Processors
+
+    container_utilization_reader: ContainerUtilizationReader
+    device_utilization_reader: DeviceUtilizationReader
 
 
 class Mutations(graphene.ObjectType):

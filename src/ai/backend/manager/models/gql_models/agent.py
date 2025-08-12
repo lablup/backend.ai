@@ -19,6 +19,9 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.clients.prometheus.device_util.data.request import (
+    DeviceUtilizationQueryParameter,
+)
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
@@ -27,6 +30,7 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.services.metric.compat.device import transform_device_metrics
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -198,8 +202,18 @@ class AgentNode(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
-        return await loader.load(self.id)
+        fetch_redis = ctx.config_provider.config.api.fetch_live_stat_from_redis
+        if fetch_redis:
+            loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
+            return await loader.load(self.id)
+        else:
+            result = await ctx.device_utilization_reader.get_device_utilization(
+                DeviceUtilizationQueryParameter(
+                    agent_id=self.id,
+                    value_type=None,
+                )
+            )
+            return transform_device_metrics(result)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -344,16 +358,36 @@ class Agent(graphene.ObjectType):
     gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     # Legacy fields
-    mem_slots = graphene.Int()
-    cpu_slots = graphene.Float()
-    gpu_slots = graphene.Float()
-    tpu_slots = graphene.Float()
-    used_mem_slots = graphene.Int()
-    used_cpu_slots = graphene.Float()
-    used_gpu_slots = graphene.Float()
-    used_tpu_slots = graphene.Float()
-    cpu_cur_pct = graphene.Float()
-    mem_cur_bytes = graphene.Float()
+    mem_slots = graphene.Int(
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
+    )
+    cpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
+    )
+    gpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
+    )
+    tpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `available_slots` instead."
+    )
+    used_mem_slots = graphene.Int(
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
+    )
+    used_cpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
+    )
+    used_gpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
+    )
+    used_tpu_slots = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `occupied_slots` instead."
+    )
+    cpu_cur_pct = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `live_stat` instead."
+    )
+    mem_cur_bytes = graphene.Float(
+        deprecation_reason="Deprecated since 25.13.0. use `live_stat` instead."
+    )
 
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
@@ -405,18 +439,26 @@ class Agent(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
-        return await loader.load(self.id)
+        fetch_redis = ctx.config_provider.config.api.fetch_live_stat_from_redis
+        if fetch_redis:
+            loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
+            return await loader.load(self.id)
+        else:
+            result = await ctx.device_utilization_reader.get_device_utilization(
+                DeviceUtilizationQueryParameter(
+                    agent_id=self.id,
+                    value_type=None,
+                )
+            )
+            return transform_device_metrics(result)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
-        ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_cpu_cur_pct)
-        return await loader.load(self.id)
+        # Deprecated since 25.13.0, use live_stat instead
+        return None
 
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
-        ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_mem_cur_bytes)
-        return await loader.load(self.id)
+        # Deprecated since 25.13.0, use live_stat instead
+        return None
 
     async def resolve_hardware_metadata(
         self,
@@ -579,36 +621,6 @@ class Agent(graphene.ObjectType):
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
         return await ctx.valkey_stat.get_agent_statistics_batch(list(agent_ids))
-
-    @classmethod
-    async def batch_load_cpu_cur_pct(
-        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
-    ) -> Sequence[Any]:
-        ret = []
-        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
-                try:
-                    ret.append(float(stat["node"]["cpu_util"]["pct"]))
-                except (KeyError, TypeError, ValueError):
-                    ret.append(0.0)
-            else:
-                ret.append(0.0)
-        return ret
-
-    @classmethod
-    async def batch_load_mem_cur_bytes(
-        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
-    ) -> Sequence[Any]:
-        ret = []
-        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
-                try:
-                    ret.append(float(stat["node"]["mem"]["current"]))
-                except (KeyError, TypeError, ValueError):
-                    ret.append(0)
-            else:
-                ret.append(0)
-        return ret
 
     @classmethod
     async def batch_load_container_count(

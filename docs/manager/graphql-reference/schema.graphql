@@ -491,16 +491,16 @@ type Agent implements Item {
 
   """Added in 25.4.0."""
   gpu_alloc_map: UUIDFloatMap
-  mem_slots: Int
-  cpu_slots: Float
-  gpu_slots: Float
-  tpu_slots: Float
-  used_mem_slots: Int
-  used_cpu_slots: Float
-  used_gpu_slots: Float
-  used_tpu_slots: Float
-  cpu_cur_pct: Float
-  mem_cur_bytes: Float
+  mem_slots: Int @deprecated(reason: "Deprecated since 25.13.0. use `available_slots` instead.")
+  cpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `available_slots` instead.")
+  gpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `available_slots` instead.")
+  tpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `available_slots` instead.")
+  used_mem_slots: Int @deprecated(reason: "Deprecated since 25.13.0. use `occupied_slots` instead.")
+  used_cpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `occupied_slots` instead.")
+  used_gpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `occupied_slots` instead.")
+  used_tpu_slots: Float @deprecated(reason: "Deprecated since 25.13.0. use `occupied_slots` instead.")
+  cpu_cur_pct: Float @deprecated(reason: "Deprecated since 25.13.0. use `live_stat` instead.")
+  mem_cur_bytes: Float @deprecated(reason: "Deprecated since 25.13.0. use `live_stat` instead.")
   compute_containers(status: String): [ComputeContainer]
 }
 

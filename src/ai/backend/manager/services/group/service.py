@@ -5,15 +5,16 @@ from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 
+from ai.backend.common.clients.prometheus.container_util.client import ContainerUtilizationReader
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
-    parse_resource_usage_groups,
     parse_total_resource_group,
 )
+from ai.backend.manager.models.resource_usage_legacy import parse_resource_usage_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
@@ -55,6 +56,7 @@ class GroupService:
     _storage_manager: StorageSessionManager
     _group_repository: GroupRepository
     _admin_group_repository: AdminGroupRepository
+    _container_utilization_reader: ContainerUtilizationReader
 
     def __init__(
         self,
@@ -62,12 +64,15 @@ class GroupService:
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         group_repositories: GroupRepositories,
+        container_utilization_reader: ContainerUtilizationReader,
     ) -> None:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
         self._admin_group_repository = group_repositories.admin_repository
+
+        self._container_utilization_reader = container_utilization_reader
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         try:
@@ -146,9 +151,11 @@ class GroupService:
         kernels = await self._group_repository.fetch_project_resource_usage(
             start_date, end_date, project_ids=project_ids
         )
-        local_tz = self._config_provider.config.system.timezone
         usage_groups = await parse_resource_usage_groups(
-            kernels, self._valkey_stat_client, local_tz
+            self._container_utilization_reader,
+            kernels,
+            self._valkey_stat_client,
+            self._config_provider.config,
         )
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
