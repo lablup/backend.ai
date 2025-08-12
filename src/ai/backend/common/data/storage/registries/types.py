@@ -1,7 +1,16 @@
+import enum
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class ModelSortKey(enum.StrEnum):
+    LAST_MODIFIED = "last_modified"
+    TRENDING_SCORE = "trending_score"
+    CREATED_AT = "created_at"
+    DOWNLOADS = "downloads"
+    LIKES = "likes"
 
 
 class ModelTarget(BaseModel):

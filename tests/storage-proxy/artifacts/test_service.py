@@ -9,7 +9,12 @@ import pytest
 from aiohttp import ClientError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileObjectData, ModelData, ModelTarget
+from ai.backend.common.data.storage.registries.types import (
+    FileObjectData,
+    ModelData,
+    ModelSortKey,
+    ModelTarget,
+)
 from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
@@ -130,7 +135,7 @@ class TestHuggingFaceService:
         mock_list_models.return_value = [mock_hf_model]
 
         models = await hf_service.scan_models(
-            registry_name="test_registry", limit=5, search="DialoGPT", sort="downloads"
+            registry_name="test_registry", limit=5, search="DialoGPT", sort=ModelSortKey.DOWNLOADS
         )
 
         assert len(models) == 1
@@ -140,7 +145,11 @@ class TestHuggingFaceService:
         assert models[0].tags == ["pytorch", "text-generation"]
 
         mock_list_models.assert_called_once_with(
-            search="DialoGPT", sort="downloads", direction=-1, limit=5, token="test_token"
+            search="DialoGPT",
+            sort=ModelSortKey.DOWNLOADS,
+            direction=-1,
+            limit=5,
+            token="test_token",
         )
 
     @pytest.mark.asyncio
@@ -152,7 +161,9 @@ class TestHuggingFaceService:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service.scan_models(registry_name="test_registry", limit=10)
+            await hf_service.scan_models(
+                registry_name="test_registry", limit=10, sort=ModelSortKey.DOWNLOADS
+            )
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")

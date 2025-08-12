@@ -67,7 +67,7 @@ class ObjectMetaResponse(BaseResponseModel):
 # HuggingFace API Response Models
 
 
-class HuggingFaceScanResponse(BaseResponseModel):
+class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 
     models: list[ModelData] = Field(

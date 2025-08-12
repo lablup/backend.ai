@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import Field
 
 from ...api_handlers import BaseRequestModel
-from ...data.storage.registries.types import ModelTarget
+from ...data.storage.registries.types import ModelSortKey, ModelTarget
 from ...types import QuotaConfig, VFolderID
 
 
@@ -127,7 +127,7 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         """,
         examples=[10, 50, 100],
     )
-    order: str = Field(
+    order: ModelSortKey = Field(
         description="""
         Sort criteria for ordering the results.
         Available options: 'downloads', 'likes', 'created', 'modified'.
@@ -142,7 +142,6 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         """,
         examples=[None, "GPT", "microsoft", "text-generation"],
     )
-    # TODO: Add direction field if needed
 
 
 class HuggingFaceImportModelsReq(BaseRequestModel):

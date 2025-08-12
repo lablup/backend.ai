@@ -18,7 +18,6 @@ import more_itertools
 import tqdm
 import yarl
 
-from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
@@ -256,11 +255,6 @@ async def check_and_upgrade(
         redis_mq,
         log_events=local_config.debug.log_events,
     )
-    redis_stream_conn = redis_helper.get_redis_object(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="storage_proxy.stream",
-        db=REDIS_STREAM_DB,
-    )
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -271,7 +265,6 @@ async def check_and_upgrade(
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
-        redis_stream_conn=redis_stream_conn,
     )
 
     async with ctx:

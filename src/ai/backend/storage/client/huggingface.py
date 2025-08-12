@@ -1,7 +1,6 @@
 """HuggingFace client implementation for Backend.AI storage."""
 
 import asyncio
-import enum
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -10,19 +9,16 @@ from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, mod
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
-from ai.backend.common.data.storage.registries.types import FileObjectData, ModelData, ModelTarget
+from ai.backend.common.data.storage.registries.types import (
+    FileObjectData,
+    ModelData,
+    ModelSortKey,
+    ModelTarget,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class ModelSortKey(enum.StrEnum):
-    LAST_MODIFIED = "last_modified"
-    TRENDING_SCORE = "trending_score"
-    CREATED_AT = "created_at"
-    DOWNLOADS = "downloads"
-    LIKES = "likes"
 
 
 @dataclass
@@ -207,8 +203,8 @@ class HuggingFaceScanner:
 
             model_infos: list[ModelData] = []
             for model in models:
-                filename = model.id.split("/")[-1]
                 try:
+                    filename = model.id.split("/")[-1]
                     model_infos.append(
                         ModelData(
                             id=model.id,

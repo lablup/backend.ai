@@ -7,7 +7,7 @@ import pytest
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
-from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.storage.client.huggingface import (
     HuggingFaceClient,
     HuggingFaceClientArgs,
@@ -90,12 +90,18 @@ class TestHuggingFaceClient:
         """Test successful model scanning."""
         mock_list_models.return_value = [mock_hf_model_info]
 
-        models = await hf_client.scan_models(search="DialoGPT", sort="downloads", limit=5)
+        models = await hf_client.scan_models(
+            search="DialoGPT", sort=ModelSortKey.DOWNLOADS, limit=5
+        )
 
         assert len(models) == 1
         assert models[0].id == "microsoft/DialoGPT-medium"
         mock_list_models.assert_called_once_with(
-            search="DialoGPT", sort="downloads", direction=-1, limit=5, token="test_token"
+            search="DialoGPT",
+            sort=ModelSortKey.DOWNLOADS,
+            direction=-1,
+            limit=5,
+            token="test_token",
         )
 
     @pytest.mark.asyncio
@@ -107,7 +113,7 @@ class TestHuggingFaceClient:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_client.scan_models(limit=10)
+            await hf_client.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
@@ -265,7 +271,9 @@ class TestHuggingFaceScanner:
         """Test successful models scanning."""
         mock_list_models.return_value = [mock_hf_model_info]
 
-        model_infos = await hf_scanner.scan_models(limit=5, search="DialoGPT", sort="downloads")
+        model_infos = await hf_scanner.scan_models(
+            limit=5, search="DialoGPT", sort=ModelSortKey.DOWNLOADS
+        )
 
         assert len(model_infos) == 1
         assert model_infos[0].id == "microsoft/DialoGPT-medium"
@@ -274,7 +282,11 @@ class TestHuggingFaceScanner:
         assert model_infos[0].tags == ["pytorch", "text-generation"]
 
         mock_list_models.assert_called_once_with(
-            search="DialoGPT", sort="downloads", direction=-1, limit=5, token="test_token"
+            search="DialoGPT",
+            sort=ModelSortKey.DOWNLOADS,
+            direction=-1,
+            limit=5,
+            token="test_token",
         )
 
     @pytest.mark.asyncio
@@ -296,9 +308,8 @@ class TestHuggingFaceScanner:
 
         mock_list_models.return_value = [mock_good_model, mock_bad_model]
 
-        model_infos = await hf_scanner.scan_models(limit=2)
+        model_infos = await hf_scanner.scan_models(limit=2, sort=ModelSortKey.DOWNLOADS)
 
-        # Only the good model should be returned
         assert len(model_infos) == 1
         assert model_infos[0].id == "microsoft/DialoGPT-medium"
 
@@ -311,7 +322,7 @@ class TestHuggingFaceScanner:
         mock_list_models.side_effect = Exception("API Error")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_scanner.scan_models(limit=10)
+            await hf_scanner.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")

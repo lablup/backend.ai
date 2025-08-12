@@ -17,7 +17,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
-    HuggingFaceScanResponse,
+    HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.services.artifacts.huggingface import (
@@ -58,7 +58,7 @@ class HuggingFaceRegistryAPIHandler:
                 sort=body.parsed.order,
             )
 
-            response = HuggingFaceScanResponse(
+            response = HuggingFaceScanModelsResponse(
                 models=models,
             )
 
