@@ -283,7 +283,7 @@ async def login_handler(request: web.Request) -> web.Response:
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-bad-request",
                 "title": "You have already logged in.",
@@ -304,7 +304,7 @@ async def login_handler(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the username field.",
@@ -312,7 +312,7 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     if "password" not in creds or not creds["password"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the password field.",
@@ -370,7 +370,7 @@ async def login_handler(request: web.Request) -> web.Response:
             client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
-        return web.HTTPTooManyRequests(
+        raise web.HTTPTooManyRequests(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/too-many-requests",
                 "title": "Too many failed login attempts",
