@@ -46,6 +46,8 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
@@ -77,7 +79,7 @@ from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventH
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
-from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
@@ -94,7 +96,7 @@ from .reporters import EventLogger
 class DispatcherArgs:
     valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
-    sokovan_orchestrator: SokovanOrchestrator
+    schedule_coordinator: ScheduleCoordinator
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
@@ -130,7 +132,7 @@ class Dispatchers:
         )
         self._schedule_event_handler = ScheduleEventHandler(
             args.scheduler_dispatcher,
-            args.sokovan_orchestrator,
+            args.schedule_coordinator,
             args.use_sokovan,
         )
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
@@ -341,6 +343,19 @@ class Dispatchers:
             DoUpdateSessionStatusEvent,
             None,
             self._schedule_event_handler.handle_do_update_session_status,
+        )
+        # Sokovan scheduler events
+        event_dispatcher.consume(
+            DoSokovanProcessIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_if_needed,
+            name="sokovan.process_if_needed",
+        )
+        event_dispatcher.consume(
+            DoSokovanProcessScheduleEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_schedule,
+            name="sokovan.process_schedule",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

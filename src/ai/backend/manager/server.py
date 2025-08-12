@@ -47,6 +47,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
@@ -541,6 +542,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="stream",
         db_id=REDIS_STREAM_DB,
     )
+    root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
+        valkey_profile_target.profile_target(RedisRole.STREAM),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="schedule",  # scheduling marks and coordination
+    )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
@@ -550,6 +556,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_stat.close()
     await root_ctx.valkey_live.close()
     await root_ctx.valkey_stream.close()
+    await root_ctx.valkey_schedule.close()
 
 
 @actxmgr
@@ -642,6 +649,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
+                schedule_coordinator=root_ctx.sokovan_orchestrator.coordinator,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -739,7 +747,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         DispatcherArgs(
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
-            root_ctx.sokovan_orchestrator,
+            root_ctx.sokovan_orchestrator.coordinator,
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
@@ -935,22 +943,39 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .clients.agent import AgentPool
     from .sokovan.scheduler.factory import create_default_scheduler
     from .sokovan.sokovan import SokovanOrchestrator
+
+    # Create agent pool for scheduler
+    agent_pool = AgentPool(root_ctx.agent_cache)
 
     # Create scheduler with default components
     scheduler = create_default_scheduler(
         root_ctx.repositories.schedule.repository,
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
+        agent_pool,
+        root_ctx.valkey_stat,
     )
 
-    # Create sokovan orchestrator
+    # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
         scheduler=scheduler,
         event_producer=root_ctx.event_producer,
+        valkey_schedule=root_ctx.valkey_schedule,
+        lock_factory=root_ctx.distributed_lock_factory,
+        scheduler_dispatcher=root_ctx.scheduler_dispatcher,
     )
-    yield
+
+    # Initialize the GlobalTimers for scheduling operations
+    await root_ctx.sokovan_orchestrator.init_timers()
+
+    try:
+        yield
+    finally:
+        # Shutdown timers gracefully
+        await root_ctx.sokovan_orchestrator.shutdown_timers()
 
 
 @actxmgr
