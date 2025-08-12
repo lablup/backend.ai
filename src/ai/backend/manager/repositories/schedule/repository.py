@@ -246,7 +246,7 @@ class MarkTerminatingResult:
 
     cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING/PULLING)
     terminating_sessions: list[str]  # Sessions marked as TERMINATING
-    already_terminated: list[str]  # Sessions already TERMINATED or CANCELLED
+    skipped_sessions: list[str]  # Sessions already TERMINATED/CANCELLED/TERMINATING
     not_found_sessions: list[str]  # Sessions that don't exist
 
     def has_processed(self) -> bool:
@@ -496,7 +496,7 @@ class ScheduleRepository:
         result = MarkTerminatingResult(
             cancelled_sessions=[],
             terminating_sessions=[],
-            already_terminated=[],
+            skipped_sessions=[],
             not_found_sessions=[],
         )
 
@@ -508,8 +508,12 @@ class ScheduleRepository:
 
             status = existing_sessions[session_id]
 
-            if status in [SessionStatus.TERMINATED, SessionStatus.CANCELLED]:
-                result.already_terminated.append(session_id)
+            if status in [
+                SessionStatus.TERMINATED,
+                SessionStatus.CANCELLED,
+                SessionStatus.TERMINATING,
+            ]:
+                result.skipped_sessions.append(session_id)
                 log.debug("Session {} is already {}", session_id, status)
             elif status in [SessionStatus.PENDING, SessionStatus.PULLING]:
                 result.cancelled_sessions.append(session_id)
@@ -645,7 +649,7 @@ class ScheduleRepository:
             return MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
-                already_terminated=[],
+                skipped_sessions=[],
                 not_found_sessions=[],
             )
 
