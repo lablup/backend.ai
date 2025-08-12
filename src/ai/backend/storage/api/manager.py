@@ -1269,7 +1269,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
 
-    app.add_subapp("/v1/registries", create_registries_app(ctx))
     return app
 
 
