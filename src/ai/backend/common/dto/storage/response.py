@@ -3,9 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.data.bgtask.types import BgTaskProgressData
-from ai.backend.common.data.storage.registries.types import ModelInfo
+from ai.backend.common.data.storage.registries.types import ModelData
 
 from ...api_handlers import BaseResponseModel
 from .field import VFolderMetaField, VolumeMetaField
@@ -72,7 +70,7 @@ class ObjectMetaResponse(BaseResponseModel):
 class HuggingFaceScanResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 
-    models: list[ModelInfo] = Field(
+    models: list[ModelData] = Field(
         default_factory=list,
         description="""
         List of HuggingFace models scanned and retrieved.
@@ -81,53 +79,7 @@ class HuggingFaceScanResponse(BaseResponseModel):
     )
 
 
-class HuggingFaceScanJobStatusResponse(BaseResponseModel):
-    """Response for HuggingFace scan job status."""
-
-    task_id: uuid.UUID = Field(
-        description="""
-        Unique identifier for the scan job.
-        Used to track and query the status of the scan operation.
-        """,
-        examples=["550e8400-e29b-41d4-a716-446655440000"],
-    )
-    status: BgtaskStatus = Field(
-        description="""
-        Current status of the job.
-        Possible values: pending, running, completed, failed.
-        """,
-        examples=[status.value for status in BgtaskStatus],
-    )
-    progress: BgTaskProgressData = Field(
-        description="""
-        Indicates how much of the scan operation has been completed.
-        """,
-        examples=[{"current": 50, "total": 100}, {"current": 100, "total": 100}],
-    )
-    message: str = Field(
-        description="""
-        Status message or error description.
-        Provides additional information about the current job status.
-        """,
-        examples=[
-            "Scanning in progress",
-        ],
-    )
-
-
-class HuggingFaceImportResponse(BaseResponseModel):
-    """Response for HuggingFace model import operation."""
-
-    task_id: uuid.UUID = Field(
-        description="""
-        Unique identifier for the import job.
-        Used to track the progress of the model import operation.
-        """,
-        examples=["550e8400-e29b-41d4-a716-446655440000"],
-    )
-
-
-class HuggingFaceImportBatchResponse(BaseResponseModel):
+class HuggingFaceImportModelsResponse(BaseResponseModel):
     """Response for HuggingFace batch model import operation."""
 
     task_id: uuid.UUID = Field(

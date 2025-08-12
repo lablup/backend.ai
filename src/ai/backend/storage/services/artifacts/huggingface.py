@@ -8,7 +8,7 @@ from typing import AsyncIterator, Optional
 import aiohttp
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileObjectData, ModelInfo, ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelData, ModelTarget
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -69,7 +69,7 @@ class HuggingFaceService:
         limit: int,
         search: Optional[str] = None,
         sort: str = "downloads",
-    ) -> list[ModelInfo]:
+    ) -> list[ModelData]:
         """List HuggingFace models with metadata.
 
         Args:
@@ -92,7 +92,7 @@ class HuggingFaceService:
 
         return models
 
-    async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelInfo:
+    async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelData:
         """Get detailed information about a specific model.
 
         Args:
@@ -237,7 +237,7 @@ class HuggingFaceService:
 
         Args:
             registry_name: Name of the HuggingFace registry
-            model_ids: List of HuggingFace model IDs to import
+            models: List of HuggingFace models to import
             storage_name: Target storage name
             bucket_name: Target bucket name
 

@@ -9,7 +9,7 @@ from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, mod
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
-from ai.backend.common.data.storage.registries.types import FileObjectData, ModelInfo, ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelData, ModelTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
@@ -181,7 +181,7 @@ class HuggingFaceScanner:
         limit: int,
         search: Optional[str] = None,
         sort: str = "downloads",
-    ) -> list[ModelInfo]:
+    ) -> list[ModelData]:
         """Scan HuggingFace models and retrieve metadata.
 
         Args:
@@ -196,11 +196,11 @@ class HuggingFaceScanner:
             log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
             models = await self._client.scan_models(search=search, sort=sort, limit=limit)
 
-            model_infos: list[ModelInfo] = []
+            model_infos: list[ModelData] = []
             for model in models:
                 try:
                     model_infos.append(
-                        ModelInfo(
+                        ModelData(
                             id=model.id,
                             name=model.id.split("/")[-1],
                             author=model.author,
@@ -222,7 +222,7 @@ class HuggingFaceScanner:
             log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
 
-    async def scan_model(self, model: ModelTarget) -> ModelInfo:
+    async def scan_model(self, model: ModelTarget) -> ModelData:
         """Scan a specific model by ID.
 
         Args:
@@ -238,7 +238,7 @@ class HuggingFaceScanner:
             log.info(f"Scanning specific HuggingFace model: model_id={model_id}@{revision}")
             model_info = await self._client.scan_model(model)
 
-            result = ModelInfo(
+            result = ModelData(
                 id=model_id,
                 name=model_id.split("/")[-1],
                 author=model_info.author,

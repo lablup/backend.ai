@@ -57,7 +57,7 @@ class FileObjectData(BaseModel):
     )
 
 
-class ModelInfo(BaseModel):
+class ModelData(BaseModel):
     """
     Model Artifact information.
     """

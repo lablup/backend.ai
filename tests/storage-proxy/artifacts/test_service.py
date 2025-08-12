@@ -9,7 +9,7 @@ import pytest
 from aiohttp import ClientError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileInfo, ModelInfo, ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelData, ModelTarget
 from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
@@ -71,9 +71,9 @@ def hf_service(
 
 
 @pytest.fixture
-def mock_model_info() -> ModelInfo:
-    """Mock ModelInfo object."""
-    return ModelInfo(
+def mock_model_info() -> ModelData:
+    """Mock ModelData object."""
+    return ModelData(
         id="microsoft/DialoGPT-medium",
         name="DialoGPT-medium",
         author="microsoft",
@@ -84,9 +84,9 @@ def mock_model_info() -> ModelInfo:
 
 
 @pytest.fixture
-def mock_file_info() -> FileInfo:
-    """Mock FileInfo object."""
-    return FileInfo(
+def mock_file_info() -> FileObjectData:
+    """Mock FileObjectData object."""
+    return FileObjectData(
         path="config.json",
         size=285,
         type="file",
@@ -117,7 +117,7 @@ class TestHuggingFaceService:
         self,
         mock_list_models: MagicMock,
         hf_service: HuggingFaceService,
-        mock_model_info: ModelInfo,
+        mock_model_info: ModelData,
     ) -> None:
         """Test successful models scanning."""
         # Mock the HuggingFace API response
@@ -211,7 +211,7 @@ class TestHuggingFaceService:
         self,
         mock_list_repo_files: MagicMock,
         hf_service: HuggingFaceService,
-        mock_file_info: FileInfo,
+        mock_file_info: FileObjectData,
     ) -> None:
         """Test successful model files listing."""
         mock_list_repo_files.return_value = ["config.json"]
@@ -383,7 +383,7 @@ class TestHuggingFaceService:
     async def test_upload_model_file_success(
         self,
         hf_service: HuggingFaceService,
-        mock_file_info: FileInfo,
+        mock_file_info: FileObjectData,
         mock_storage_service: MagicMock,
     ) -> None:
         """Test successful model file upload."""
@@ -410,7 +410,7 @@ class TestHuggingFaceService:
     async def test_upload_model_file_upload_failure(
         self,
         hf_service: HuggingFaceService,
-        mock_file_info: FileInfo,
+        mock_file_info: FileObjectData,
         mock_storage_service: MagicMock,
     ) -> None:
         """Test model file upload with upload failure."""
@@ -436,7 +436,7 @@ class TestHuggingFaceService:
         self,
         mock_registry_configs: dict[str, HuggingfaceConfig],
         mock_background_task_manager: MagicMock,
-        mock_file_info: FileInfo,
+        mock_file_info: FileObjectData,
     ) -> None:
         """Test model file upload with no storage service configured."""
         # Create service without storage service
@@ -459,7 +459,7 @@ class TestHuggingFaceService:
     async def test_upload_model_file_exception(
         self,
         hf_service: HuggingFaceService,
-        mock_file_info: FileInfo,
+        mock_file_info: FileObjectData,
         mock_storage_service: MagicMock,
     ) -> None:
         """Test model file upload with exception."""
