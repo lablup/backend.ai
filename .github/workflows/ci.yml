@@ -465,7 +465,7 @@ jobs:
     if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
 
-    build-isla-sorna-image:
+  build-isla-sorna-image:
     needs: [build-scies, build-wheels, build-sbom, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
