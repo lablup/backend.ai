@@ -137,7 +137,6 @@ class StartSessionsHandler(ScheduleHandler):
         await self._dispatcher.start("do_start_session")
         log.debug("Starting sessions")
         return ScheduleResult()
-        # return await self._scheduler.start_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of started sessions."""

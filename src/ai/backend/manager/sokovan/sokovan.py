@@ -63,26 +63,14 @@ class SokovanOrchestrator:
         """Initialize GlobalTimers for scheduled operations."""
         # Mapping of ScheduleType to LockIDs
         lock_id_map = {
-            ScheduleType.SCHEDULE: (
-                LockID.LOCKID_SOKOVAN_SCHEDULE_IF_NEEDED_TIMER,
-                LockID.LOCKID_SOKOVAN_SCHEDULE_PROCESS_TIMER,
-            ),
-            ScheduleType.CHECK_PRECONDITION: (
-                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_IF_NEEDED_TIMER,
-                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_PROCESS_TIMER,
-            ),
-            ScheduleType.START: (
-                LockID.LOCKID_SOKOVAN_START_IF_NEEDED_TIMER,
-                LockID.LOCKID_SOKOVAN_START_PROCESS_TIMER,
-            ),
-            ScheduleType.TERMINATE: (
-                LockID.LOCKID_SOKOVAN_TERMINATE_IF_NEEDED_TIMER,
-                LockID.LOCKID_SOKOVAN_TERMINATE_PROCESS_TIMER,
-            ),
+            ScheduleType.SCHEDULE: LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER,
+            ScheduleType.CHECK_PRECONDITION: LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER,
+            ScheduleType.START: LockID.LOCKID_SOKOVAN_START_TIMER,
+            ScheduleType.TERMINATE: LockID.LOCKID_SOKOVAN_TERMINATE_TIMER,
         }
 
         # Create timers for each ScheduleType
-        for schedule_type, (if_needed_lock_id, process_lock_id) in lock_id_map.items():
+        for schedule_type, lock_id in lock_id_map.items():
             # Create closures to capture the schedule_type value
             def create_if_needed_event(
                 st: ScheduleType = schedule_type,
@@ -96,7 +84,7 @@ class SokovanOrchestrator:
 
             # Short cycle timer (2s) - checks marks before execution
             process_if_needed_timer = GlobalTimer(
-                self._lock_factory(if_needed_lock_id, 10.0),
+                self._lock_factory(lock_id, 10.0),
                 self._event_producer,
                 create_if_needed_event,
                 interval=2.0,
@@ -106,7 +94,7 @@ class SokovanOrchestrator:
 
             # Long cycle timer (60s) - forced execution
             process_schedule_timer = GlobalTimer(
-                self._lock_factory(process_lock_id, 10.0),
+                self._lock_factory(lock_id, 10.0),
                 self._event_producer,
                 create_process_event,
                 interval=60.0,

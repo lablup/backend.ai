@@ -116,20 +116,6 @@ class ScheduleCoordinator:
         await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
         log.debug("Requested scheduling for type: {}", schedule_type.value)
 
-    async def start(self) -> None:
-        """
-        Start the scheduling process.
-        """
-        await self._scheduler_dispatcher.start("do_start_session")
-        log.debug("Starting scheduling process")
-
-    async def check_preconditions(self):
-        """
-        Check preconditions for scheduling.
-        """
-        await self._scheduler_dispatcher.check_precond("do_check_precond")
-        log.debug("Checking preconditions for scheduling")
-
     async def mark_sessions_for_termination(
         self,
         session_ids: list[str],
