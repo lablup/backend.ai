@@ -2,6 +2,8 @@ from decimal import Decimal
 from pprint import pprint
 from typing import Sequence
 
+import pytest
+
 from ai.backend.agent.affinity_map import AffinityHint, AffinityMap, AffinityPolicy
 from ai.backend.agent.alloc_map import (
     AllocationStrategy,
@@ -129,7 +131,10 @@ def test_affinity_map_first_allocation():
     assert _devid(primary[0]) == {"a0", "a1"}
 
 
-def test_affinity_map_prefer_larger_chunks():
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_prefer_larger_chunks(allocation_strategy):
     device_init_args = {
         "memory_size": 0,
         "processing_units": 1,
@@ -150,7 +155,7 @@ def test_affinity_map_prefer_larger_chunks():
             DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
             DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
         },
-        allocation_strategy=AllocationStrategy.FILL,
+        allocation_strategy=allocation_strategy,
     )
     primary, secondary = affinity_map.get_distance_ordered_neighbors(None, DeviceName("x"))
     assert _devid(primary[0]) == {"a0", "a1"}
