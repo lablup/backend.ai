@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, Self, Tuple
+from typing import TYPE_CHECKING, Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import (
     APIResponse,
     BodyParam,
-    MiddlewareParam,
     PathParam,
     api_handler,
 )
@@ -43,29 +41,17 @@ from .types import CORSOptions, WebMiddleware
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ProcessorsCtx(MiddlewareParam):
+class ObjectStorageHandler:
     processors: Processors
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    def __init__(self, processors: Processors) -> None:
+        self.processors = processors
 
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        root_ctx: RootContext = request.app["_root.context"]
-
-        return cls(
-            processors=root_ctx.processors,
-        )
-
-
-class ObjectStorageHandler:
     @api_handler
     async def create_object_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         body: BodyParam[CreateObjectStorageReq],
     ) -> APIResponse:
-        processors = processor_ctx.processors
-
         creator = ObjectStorageCreator(
             name=body.parsed.name,
             host=body.parsed.host,
@@ -76,7 +62,7 @@ class ObjectStorageHandler:
             buckets=body.parsed.buckets,
         )
 
-        action_result = await processors.object_storage.create.wait_for_complete(
+        action_result = await self.processors.object_storage.create.wait_for_complete(
             CreateObjectStorageAction(creator=creator)
         )
 
@@ -86,12 +72,9 @@ class ObjectStorageHandler:
     @api_handler
     async def list_object_storages(
         self,
-        processor_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """List all object storage configurations."""
-        processors = processor_ctx.processors
-
-        action_result = await processors.object_storage.list_.wait_for_complete(
+        action_result = await self.processors.object_storage.list_.wait_for_complete(
             ListObjectStorageAction()
         )
 
@@ -105,13 +88,11 @@ class ObjectStorageHandler:
     @api_handler
     async def get_object_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[ObjectStoragePathParam],
     ) -> APIResponse:
-        processors = processor_ctx.processors
         storage_id = path.parsed.storage_id
 
-        action_result = await processors.object_storage.get.wait_for_complete(
+        action_result = await self.processors.object_storage.get.wait_for_complete(
             GetObjectStorageAction(storage_id=storage_id)
         )
 
@@ -121,11 +102,9 @@ class ObjectStorageHandler:
     @api_handler
     async def update_object_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[ObjectStoragePathParam],
         body: BodyParam[UpdateObjectStorageReq],
     ) -> APIResponse:
-        processors = processor_ctx.processors
         storage_id = path.parsed.storage_id
         req = body.parsed
 
@@ -143,7 +122,7 @@ class ObjectStorageHandler:
             buckets=_to_optional_state(req.buckets),
         )
 
-        action_result = await processors.object_storage.update.wait_for_complete(
+        action_result = await self.processors.object_storage.update.wait_for_complete(
             UpdateObjectStorageAction(id=storage_id, modifier=modifier)
         )
 
@@ -153,13 +132,11 @@ class ObjectStorageHandler:
     @api_handler
     async def delete_object_storage(
         self,
-        processor_ctx: ProcessorsCtx,
         path: PathParam[ObjectStoragePathParam],
     ) -> APIResponse:
-        processors = processor_ctx.processors
         storage_id = path.parsed.storage_id
 
-        await processors.object_storage.delete.wait_for_complete(
+        await self.processors.object_storage.delete.wait_for_complete(
             DeleteObjectStorageAction(storage_id=storage_id)
         )
 
@@ -175,7 +152,8 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "storages"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    api_handlers = ObjectStorageHandler()
+    root_ctx: RootContext = app["_root.context"]
+    api_handlers = ObjectStorageHandler(root_ctx.processors)
 
     cors.add(app.router.add_route("POST", "", api_handlers.create_object_storage))
     cors.add(app.router.add_route("GET", "", api_handlers.list_object_storages))
