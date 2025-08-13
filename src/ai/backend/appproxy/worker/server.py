@@ -30,6 +30,7 @@ from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
@@ -266,9 +267,10 @@ async def last_used_time_marker_redispy(root_ctx: RootContext) -> None:
             redis_keys, target_time = await root_ctx.last_used_time_marker_redis_queue.get()
 
             async def _pipe(r: Redis) -> Pipeline:
-                pipe = r.pipeline()
+                pipe = r.pipeline(transaction=False)
+                ttl = get_default_redis_key_ttl()
                 for key in redis_keys:
-                    pipe.set(key, target_time)
+                    pipe.set(key, target_time, ex=ttl)
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_live, _pipe)

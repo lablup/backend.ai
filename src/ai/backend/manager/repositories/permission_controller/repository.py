@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.permission.id import (
+
+from ...data.permission.id import (
     ObjectId,
 )
-from ai.backend.manager.data.permission.role import (
+from ...data.permission.role import (
     PermissionCheckInput,
     RoleCreateInput,
     RoleData,
@@ -18,19 +19,18 @@ from ai.backend.manager.data.permission.role import (
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
-from ai.backend.manager.data.permission.status import (
+from ...data.permission.status import (
     RoleStatus,
 )
-from ai.backend.manager.decorators.repository_decorator import (
+from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
+from ...errors.common import ObjectNotFound
 from ...models.rbac_models.object_permission import ObjectPermissionRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.scope_permission import ScopePermissionRow
 from ...models.rbac_models.user_role import UserRoleRow
+from ...models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)

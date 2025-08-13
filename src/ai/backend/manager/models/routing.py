@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
@@ -84,7 +86,7 @@ class RoutingRow(Base):
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> "RoutingRow":
+    ) -> RoutingRow:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -114,7 +116,7 @@ class RoutingRow(Base):
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> list["RoutingRow"]:
+    ) -> list[RoutingRow]:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -148,7 +150,7 @@ class RoutingRow(Base):
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> "RoutingRow":
+    ) -> RoutingRow:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -240,8 +242,8 @@ class Routing(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: RoutingRow,
-        endpoint: Optional["EndpointRow"] = None,
-    ) -> "Routing":
+        endpoint: Optional[EndpointRow] = None,
+    ) -> Routing:
         ret = cls(
             routing_id=row.id,
             endpoint=(endpoint or row.endpoint_row).url,
@@ -290,7 +292,7 @@ class Routing(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["Routing"]:
+    ) -> Sequence[Routing]:
         query = (
             sa.select(RoutingRow)
             .limit(limit)
@@ -326,7 +328,7 @@ class Routing(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["Routing"]:
+    ) -> Sequence[Routing]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await RoutingRow.list(
                 session,
@@ -346,7 +348,7 @@ class Routing(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> "Routing":
+    ) -> Routing:
         try:
             async with ctx.db.begin_readonly_session() as session:
                 row = await RoutingRow.get(

@@ -306,7 +306,7 @@ async def create_valkey_client(
         credentials=credentials,
         database_id=db,
         client_name=name,
-        request_timeout=1_000,  # 1 second
+        request_timeout=valkey_target.request_timeout or 1_000,  # default to 1 second
         pubsub_subscriptions=pubsub_subscriptions,
     )
     return await GlideClient.create(config)

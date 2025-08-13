@@ -1,4 +1,5 @@
 import strawberry
+from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from .artifact_registry import (
@@ -31,7 +32,7 @@ from .model_deployment.model_revision import (
 
 
 @strawberry.type
-class Query:
+class Queries:
     artifact = artifact
     artifacts = artifacts
     artifact_group = artifact_group
@@ -63,8 +64,21 @@ class Subscription:
     replica_status_changed = replica_status_changed
 
 
-schema = strawberry.federation.Schema(
-    query=Query,
+class CustomizedSchema(Schema):
+    def as_str(self) -> str:
+        sdl = super().as_str()
+        sdl = (
+            sdl.replace("type Query", "type Queries")
+            .replace("query: Query", "query: Queries")
+            .replace("type PageInfo", "type PageInfo @shareable")
+            .replace('import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]')
+        )
+
+        return sdl
+
+
+schema = CustomizedSchema(
+    query=Queries,
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),

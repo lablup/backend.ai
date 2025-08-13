@@ -1542,6 +1542,9 @@ type ComputeSessionNode implements Node {
   domain_name: String
   project_id: UUID
   user_id: UUID
+
+  """Added in 25.13.0."""
+  owner: UserNode
   access_key: String
 
   """

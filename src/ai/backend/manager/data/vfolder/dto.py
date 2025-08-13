@@ -56,7 +56,7 @@ class VFolderItemToCreate:
     unmanaged_path: Optional[str]
 
     @classmethod
-    def from_request(cls, request: VFolderCreateReq) -> Self:
+    async def from_request(cls, request: VFolderCreateReq) -> Self:
         return cls(
             name=request.name,
             folder_host=request.folder_host,

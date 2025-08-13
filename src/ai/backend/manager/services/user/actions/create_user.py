@@ -23,9 +23,8 @@ class CreateUserAction(UserAction):
 
 @dataclass
 class CreateUserActionResult(BaseActionResult):
-    data: Optional[UserData]
-    success: bool
+    data: UserData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data else None
+        return str(self.data.id)

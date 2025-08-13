@@ -126,15 +126,31 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
-        if affinity_hint is None or not affinity_hint.devices:  # for legacy
+
+        if affinity_hint is None:  # for legacy
             return sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
-        primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
-            affinity_hint.devices, device_name
-        )
+
+        def sort_to_prefer_remaining_alloc_per_node(device_set: Sequence[AbstractComputeDevice]):
+            # the device set is already a set within a numa node.
+            alloc_per_numa_node = Decimal(0)
+            for device in device_set:
+                alloc_per_numa_node += self.allocations[slot_name][device.device_id]
+            return alloc_per_numa_node
+
+        if not affinity_hint.devices:
+            primary_sets = affinity_hint.affinity_map.get_device_clusters_with_lowest_distance(
+                device_name
+            )
+            secondary_set: Sequence[AbstractComputeDevice] = []
+        else:
+            primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+                affinity_hint.devices, device_name
+            )
+        primary_sets = sorted(primary_sets, key=sort_to_prefer_remaining_alloc_per_node)
 
         def convert_to_sorted_dev_alloc(device_set: Iterable[AbstractComputeDevice]):
             device_ids = {d.device_id for d in device_set}

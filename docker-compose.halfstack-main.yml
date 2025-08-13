@@ -171,12 +171,32 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./src/ai/backend/manager/api/gql/supergraph.graphql:/etc/router/supergraph.graphql
+      - ./docs/manager/graphql-reference:/etc/schemas
     command:
       - "--supergraph"
-      - "/etc/router/supergraph.graphql"
+      - "/etc/schemas/supergraph.graphql"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  backendai-half-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - half-minio:/data:rw
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 networks:
   half:
@@ -185,3 +205,4 @@ volumes:
   half-grafana:
   half-pyroscope:
   half-tempo:
+  half-minio:

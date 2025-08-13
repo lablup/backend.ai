@@ -1,4 +1,5 @@
 import secrets
+from collections.abc import Iterator
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -8,6 +9,7 @@ from uuid import UUID
 import pytest
 from aioresponses import aioresponses
 from aiotusclient import client
+from yarl import URL
 
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.request import Request, Response
@@ -15,7 +17,7 @@ from ai.backend.client.session import AsyncSession
 from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(config, path: str):
+def build_url(config, path: str) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = "{0}/{1}".format(base_url, query_path)
@@ -24,7 +26,7 @@ def build_url(config, path: str):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api_version():
+def api_version() -> Iterator[None]:
     mock_nego_func = AsyncMock()
     mock_nego_func.return_value = API_VERSION
     with mock.patch("ai.backend.client.session._negotiate_api_version", mock_nego_func):
@@ -32,7 +34,7 @@ def api_version():
 
 
 @pytest.mark.asyncio
-async def test_upload_jwt_generation(tmp_path):
+async def test_upload_jwt_generation(tmp_path) -> None:
     with aioresponses() as m:
         async with AsyncSession() as session:
             mock_file = tmp_path / "example.bin"
@@ -71,7 +73,7 @@ async def test_upload_jwt_generation(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_tus_upload(tmp_path: Path):
+async def test_tus_upload(tmp_path: Path) -> None:
     basedir = tmp_path / "example.bin"
     mock_file = basedir
     mock_file.write_bytes(secrets.token_bytes(1024))
@@ -139,7 +141,7 @@ async def test_tus_upload(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_vfolder_download(mocker):
+async def test_vfolder_download(mocker) -> None:
     mock_reader = AsyncMock()
     mock_reader.next = AsyncMock()
     mock_reader.next.return_value = None

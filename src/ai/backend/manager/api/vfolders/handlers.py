@@ -69,7 +69,7 @@ class VFolderHandler:
         user_identity_ctx: UserIdentityCtx,
         body: BodyParam[VFolderCreateReq],
     ) -> APIResponse:
-        vfolder_info = VFolderItemToCreate.from_request(body.parsed)
+        vfolder_info = await VFolderItemToCreate.from_request(body.parsed)
         user_identity = UserIdentity.from_ctx(user_identity_ctx)
         keypair = Keypair.from_ctx(keypair_ctx)
         created_vfolder: VFolderItem

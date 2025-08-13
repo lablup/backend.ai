@@ -16,6 +16,7 @@ from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionData,
 )
 from ai.backend.manager.data.permission.status import PermissionStatus
+from ai.backend.manager.data.permission.types import EntityType, OperationType
 
 from ..base import (
     GUID,
@@ -30,12 +31,7 @@ if TYPE_CHECKING:
 
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
-    __table_args__ = (
-        sa.Index("ix_role_id_entity_id", "status", "role_id", "entity_id"),
-        sa.UniqueConstraint(
-            "entity_id", "operation", name="uq_object_permissions_entity_id_operation"
-        ),
-    )
+    __table_args__ = (sa.Index("ix_role_id_entity_id", "status", "role_id", "entity_id"),)
 
     id: uuid.UUID = IDColumn()
     status: PermissionStatus = sa.Column(
@@ -46,15 +42,15 @@ class ObjectPermissionRow(Base):
         server_default=PermissionStatus.ACTIVE,
     )
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
+    entity_type: EntityType = sa.Column(
+        "entity_type", StrEnumType(EntityType, length=32), nullable=False
+    )
     entity_id: str = sa.Column(
         "entity_id", sa.String(64), nullable=False
     )  # e.g., "session_id", "vfolder_id" etc.
-    operation: str = sa.Column(
-        "operation", sa.String(32), nullable=False
-    )  # e.g., "create", "read", "delete", "grant:create", "grant:read" etc.
+    operation: OperationType = sa.Column(
+        "operation", StrEnumType(OperationType, length=32), nullable=False
+    )
     created_at: datetime = sa.Column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )

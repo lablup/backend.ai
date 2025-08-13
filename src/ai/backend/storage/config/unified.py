@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
@@ -563,6 +563,99 @@ class StorageProxyConfig(BaseModel):
     )
 
 
+# TODO: Remove this after migrating this to database
+class ObjectStorageConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the storage configuration.
+        """,
+    )
+    endpoint: str = Field(
+        description="""
+        Endpoint URL for the object storage service.
+        Should include the protocol (http or https) and port if non-standard.
+        """,
+        examples=["http://localhost:9000", "https://storage.example.com"],
+    )
+    access_key: str = Field(
+        description="""
+        Access key for authenticating with the object storage service.
+        Required for services that use access keys for authentication.
+        """,
+        examples=["my-access-key"],
+        validation_alias=AliasChoices("access-key", "access_key"),
+        serialization_alias="access-key",
+    )
+    secret_key: str = Field(
+        description="""
+        Secret key for authenticating with the object storage service.
+        Required for services that use secret keys for authentication.
+        """,
+        examples=["my-secret-key"],
+        validation_alias=AliasChoices("secret-key", "secret_key"),
+        serialization_alias="secret-key",
+    )
+    buckets: list[str] = Field(
+        default_factory=list,
+        description="""
+        List of bucket names managed by this storage configuration.
+        """,
+        examples=["my-bucket"],
+    )
+    region: str = Field(
+        description="""
+        Region where the object storage service is located.
+        Required for services that require region specification.
+        """,
+        examples=["us-west-1", "eu-central-1"],
+    )
+
+
+class HuggingfaceConfig(BaseModel):
+    registry_type: Literal["huggingface"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    endpoint: str = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for HuggingFace API.
+        If not provided, defaults to the official HuggingFace API endpoint.
+        Useful for connecting to self-hosted HuggingFace instances.
+        """,
+        examples=["https://huggingface.co"],
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="""
+        HuggingFace API token for authentication.
+        You cannot access the gated repositories without this token.
+        """,
+    )
+
+
+RegistrySpecificConfig = Union[HuggingfaceConfig]
+
+
+class ArtifactRegistryConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the artifact registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["huggingface"],
+    )
+    config: RegistrySpecificConfig = Field(
+        discriminator="registry_type",
+        description="""
+        Configuration for the artifact registry.
+        """,
+    )
+
+
 class StorageProxyUnifiedConfig(BaseModel):
     storage_proxy: StorageProxyConfig = Field(
         description="""
@@ -626,6 +719,13 @@ class StorageProxyUnifiedConfig(BaseModel):
         description="""
         Etcd configuration settings.
         Used for distributed coordination.
+        """,
+    )
+    registries: list[ArtifactRegistryConfig] = Field(
+        default_factory=list,
+        description="""
+        Configuration for external registries.
+        Defines how to connect and interact with external model registries.
         """,
     )
 

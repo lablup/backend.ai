@@ -70,14 +70,7 @@ def generate_supergraph_schema(
     config_path = Path(supergraph_config_path)
     output_dir = Path(output_dir) if output_dir else schema_path.parent
 
-    # Post-process schema file
     content = schema_path.read_text(encoding="utf-8")
-    original_content = content
-    content = content.replace("type PageInfo {", "type PageInfo @shareable {").replace(
-        'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
-    )
-    schema_path.write_text(content, encoding="utf-8")
-    print(f"Schema post-processed at: {schema_path}")
 
     try:
         # Generate supergraph
@@ -98,10 +91,17 @@ def generate_supergraph_schema(
         )
 
         supergraph_path.write_text(result.stdout, encoding="utf-8")
+
+        # Post-process the supergraph file
+        supergraph_content = supergraph_path.read_text(encoding="utf-8")
+        supergraph_content = supergraph_content.replace("type Query", "type Queries").replace(
+            "query: Query", "query: Queries"
+        )
+        supergraph_path.write_text(supergraph_content, encoding="utf-8")
         print(f"Supergraph generated at: {supergraph_path}")
     except subprocess.CalledProcessError:
         # Restore original schema file on error
-        schema_path.write_text(original_content, encoding="utf-8")
+        schema_path.write_text(content, encoding="utf-8")
         raise
 
 

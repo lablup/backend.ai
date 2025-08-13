@@ -8,7 +8,7 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.image.repositories import ImageRepositories, RepositoryArgs
+from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
 )
@@ -20,6 +20,7 @@ from ai.backend.manager.repositories.project_resource_policy.repositories import
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
+from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
 from ai.backend.manager.repositories.user_resource_policy.repositories import (
     UserResourcePolicyRepositories,

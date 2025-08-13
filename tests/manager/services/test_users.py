@@ -11,6 +11,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
     GroupRow,
@@ -205,8 +206,6 @@ async def test_create_user(
 
     result = await processors.create_user.wait_for_complete(action)
 
-    assert result.success is True
-    assert result.data is not None
     assert result.data.username == "testuser"
     assert result.data.email == "test_user@test.com"
     assert result.data.need_password_change is False
@@ -229,7 +228,7 @@ async def test_create_user(
 async def test_create_user_non_existing_domain(
     processors: UserProcessors,
 ) -> None:
-    """Test user creation with non-existing domain returns failure"""
+    """Test user creation with non-existing domain"""
     action = CreateUserAction(
         creator=UserCreator(
             username="test_user_not_existing_domain",
@@ -253,10 +252,80 @@ async def test_create_user_non_existing_domain(
         group_ids=None,
     )
 
-    result = await processors.create_user.wait_for_complete(action)
+    with pytest.raises(UserCreationBadRequest):
+        await processors.create_user.wait_for_complete(action)
 
-    assert result.success is False
-    assert result.data is None
+
+async def test_create_user_duplicate_email(
+    processors: UserProcessors,
+    database_fixture,
+    create_user,
+) -> None:
+    """Test user creation with duplicate email"""
+    user_email = "duplicate@test.com"
+    async with create_user(email=user_email, name="existing_user", domain_name="default"):
+        # Try to create another user with the same email
+        action = CreateUserAction(
+            creator=UserCreator(
+                username="new_user",
+                password="password123",
+                email=user_email,  # Same email as existing user
+                need_password_change=False,
+                domain_name="default",
+                full_name="New User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            ),
+            group_ids=None,
+        )
+
+        with pytest.raises(UserConflict):
+            await processors.create_user.wait_for_complete(action)
+
+
+async def test_create_user_duplicate_username(
+    processors: UserProcessors,
+    database_fixture,
+    create_user,
+) -> None:
+    """Test user creation with duplicate username"""
+    username = "duplicate_username"
+    async with create_user(email="existing@test.com", name=username, domain_name="default"):
+        # Try to create another user with the same username
+        action = CreateUserAction(
+            creator=UserCreator(
+                username=username,  # Same username as existing user
+                password="password123",
+                email="new_user@test.com",
+                need_password_change=False,
+                domain_name="default",
+                full_name="New User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            ),
+            group_ids=None,
+        )
+
+        with pytest.raises(UserConflict):
+            await processors.create_user.wait_for_complete(action)
 
 
 async def test_create_default_keypair_after_create_user(
@@ -327,9 +396,6 @@ async def test_modify_user(
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
-
         # Check if the user data is modified correctly
         assert result.data.full_name == "Modified User"
         assert result.data.totp_activated is True
@@ -361,9 +427,6 @@ async def test_modify_user_role_to_admin(
             ),
         )
         result = await processors.modify_user.wait_for_complete(action)
-
-        assert result.success is True
-        assert result.data is not None
 
         # Check if the user data is modified correctly
         assert result.data.role == UserRole.ADMIN
@@ -399,9 +462,6 @@ async def test_modify_admin_user_to_normal_user(
         )
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
-
         # Check if the user data is modified correctly
         assert result.data.role == UserRole.USER
 
@@ -426,7 +486,6 @@ async def test_delete_user_success(
     ) as user_id:
         delete_action = DeleteUserAction(email=delete_user_email)
         result = await processors.delete_user.wait_for_complete(delete_action)
-        assert result.success is True
 
         # Check if the user and user keypair both deleted
         async with database_engine.begin_session() as session:

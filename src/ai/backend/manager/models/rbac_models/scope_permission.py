@@ -17,6 +17,11 @@ from ai.backend.manager.data.permission.scope_permission import (
     ScopePermissionDataWithEntity,
 )
 from ai.backend.manager.data.permission.status import PermissionStatus
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
 
 from ..base import (
     GUID,
@@ -34,12 +39,6 @@ class ScopePermissionRow(Base):
     __tablename__ = "scope_permissions"
     __table_args__ = (
         sa.Index("ix_role_id_entity_type_scope_id", "status", "role_id", "entity_type", "scope_id"),
-        sa.UniqueConstraint(
-            "entity_type",
-            "operation",
-            "scope_id",
-            name="uq_scope_permissions_entity_operation_scope_id",
-        ),
     )
 
     id: uuid.UUID = IDColumn()
@@ -51,15 +50,15 @@ class ScopePermissionRow(Base):
         server_default=PermissionStatus.ACTIVE,
     )
     role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: str = sa.Column(
-        "entity_type", sa.String(32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
-    operation: str = sa.Column(
-        "operation", sa.String(32), nullable=False
-    )  # e.g., "create", "read", "delete", "grant:create", "grant:read" etc.
-    scope_type: str = sa.Column(
-        "scope_type", sa.String(32), nullable=False
-    )  # e.g., "global", "domain", "project", "user" etc.
+    entity_type: EntityType = sa.Column(
+        "entity_type", StrEnumType(EntityType, length=32), nullable=False
+    )
+    operation: OperationType = sa.Column(
+        "operation", StrEnumType(OperationType, length=32), nullable=False
+    )
+    scope_type: ScopeType = sa.Column(
+        "scope_type", StrEnumType(ScopeType, length=32), nullable=False
+    )
     scope_id: str = sa.Column(
         "scope_id", sa.String(64), nullable=False
     )  # e.g., "global", "domain_id", "project_id", "user_id" etc.

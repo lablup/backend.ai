@@ -1,5 +1,6 @@
 import time
 import uuid
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -19,11 +20,16 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceMetadata,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import RedisHelperConfig, RedisTarget, ValkeyTarget
+from ai.backend.common.types import (
+    RedisConnectionInfo,
+    RedisHelperConfig,
+    RedisTarget,
+    ValkeyTarget,
+)
 
 
 @pytest.fixture
-async def etcd_discovery(etcd: AsyncEtcd):
+async def etcd_discovery(etcd: AsyncEtcd) -> AsyncIterator[ETCDServiceDiscovery]:
     prefix = "/ai/backend/test/service_discovery"
     yield ETCDServiceDiscovery(
         args=ETCDServiceDiscoveryArgs(
@@ -36,7 +42,7 @@ async def etcd_discovery(etcd: AsyncEtcd):
 
 
 @pytest.fixture
-async def redis_conn(redis_container):
+async def redis_conn(redis_container) -> AsyncIterator[RedisConnectionInfo]:
     # Configure test Redis connection
     conn = redis_helper.get_redis_object(
         RedisTarget(
@@ -58,7 +64,7 @@ async def redis_conn(redis_container):
 
 
 @pytest.fixture
-async def redis_discovery(redis_container):
+async def redis_discovery(redis_container) -> AsyncIterator[RedisServiceDiscovery]:
     # Create a proper RedisTarget for the service discovery
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
@@ -80,7 +86,7 @@ async def redis_discovery(redis_container):
 
 
 @pytest.fixture
-async def default_service_metadata():
+async def default_service_metadata() -> AsyncIterator[ServiceMetadata]:
     yield ServiceMetadata(
         id=uuid.uuid4(),
         display_name="test_service",
@@ -97,7 +103,7 @@ async def default_service_metadata():
 
 
 @pytest.fixture
-async def unhealthy_service_metadata():
+async def unhealthy_service_metadata() -> AsyncIterator[ServiceMetadata]:
     before_10_minutes = time.time() - 60 * 10
     print(f"Unhealthy service metadata: {before_10_minutes}")
     yield ServiceMetadata(

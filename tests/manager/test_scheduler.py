@@ -551,7 +551,7 @@ async def test_pending_timeout() -> None:
     )
     from unittest.mock import Mock
 
-    repository = ScheduleRepository(db=Mock(), valkey_stat=Mock())
+    repository = ScheduleRepository(db=Mock(), valkey_stat=Mock(), config_provider=Mock())
     _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",
