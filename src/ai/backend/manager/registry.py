@@ -3725,7 +3725,7 @@ class AgentRegistry:
                 load_image=True,
                 load_routes=True,
             )
-            connection_info = await endpoint.generate_redis_route_info(db_sess)
+            connection_info = await endpoint.generate_route_info(db_sess)
             model = await VFolderRow.get(db_sess, endpoint.model)
             endpoint_data = endpoint.to_data()
 
