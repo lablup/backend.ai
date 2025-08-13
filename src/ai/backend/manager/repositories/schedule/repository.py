@@ -924,6 +924,7 @@ class ScheduleRepository:
             sa.update(SessionRow)
             .where(SessionRow.id == failure.session_id)
             .values(
+                status_info=failure.msg,
                 status_data=sql_json_merge(
                     SessionRow.status_data,
                     ("scheduler",),
