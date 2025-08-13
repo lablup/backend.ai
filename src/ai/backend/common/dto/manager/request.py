@@ -42,3 +42,28 @@ class GraphQLReq(BaseRequestModel):
         default=None,
         alias="operationName",
     )
+
+
+# ObjectStorage API Request Models
+class CreateObjectStorageReq(BaseRequestModel):
+    name: str = Field(description="Name of the object storage")
+    host: str = Field(description="Host address of the object storage")
+    access_key: str = Field(description="Access key for authentication")
+    secret_key: str = Field(description="Secret key for authentication")
+    endpoint: str = Field(description="Endpoint URL of the object storage")
+    region: str = Field(description="Region of the object storage")
+    buckets: list[str] = Field(description="List of available buckets")
+
+
+class ObjectStoragePathParam(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage.")
+
+
+class UpdateObjectStorageReq(BaseRequestModel):
+    name: Optional[str] = Field(default=None, description="Updated name of the object storage")
+    host: Optional[str] = Field(default=None, description="Updated host address")
+    access_key: Optional[str] = Field(default=None, description="Updated access key")
+    secret_key: Optional[str] = Field(default=None, description="Updated secret key")
+    endpoint: Optional[str] = Field(default=None, description="Updated endpoint URL")
+    region: Optional[str] = Field(default=None, description="Updated region")
+    buckets: Optional[list[str]] = Field(default=None, description="Updated list of buckets")

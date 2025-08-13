@@ -14,6 +14,7 @@ from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
 from . import network as _network
+from . import object_storage as _object_storage
 from . import rbac as _rbac
 from . import rbac_models as _rbac_models
 from . import resource_policy as _rpolicy
@@ -46,6 +47,7 @@ __all__ = (
     *_kernel.__all__,
     *_keypair.__all__,
     *_network.__all__,
+    *_object_storage.__all__,
     *_user.__all__,
     *_vfolder.__all__,
     *_dotfile.__all__,
@@ -82,6 +84,7 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
+from .object_storage import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
