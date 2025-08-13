@@ -74,7 +74,7 @@ class ArtifactHandler:
             )
         )
 
-        result = await processors.artifact.import_.wait_for_complete(action)
+        result = await self._processors.artifact.import_.wait_for_complete(action)
 
         response = ImportArtifactResponse(
             artifact_id=str(result.result.id),
@@ -127,7 +127,6 @@ class ArtifactHandler:
         body: BodyParam[AssociateArtifactWithStorageReq],
     ) -> APIResponse:
         """Associate an artifact with a storage."""
-        processors = processor_ctx.processors
         artifact_id = body.parsed.artifact_id
         storage_id = body.parsed.storage_id
 
@@ -136,7 +135,7 @@ class ArtifactHandler:
             storage_id=storage_id,
         )
 
-        result = await processors.artifact.associate_with_storage.wait_for_complete(action)
+        result = await self._processors.artifact.associate_with_storage.wait_for_complete(action)
 
         association = AssociationArtifactStorageResponse(
             id=str(result.result.id),
@@ -156,7 +155,6 @@ class ArtifactHandler:
         body: BodyParam[DisassociateArtifactWithStorageReq],
     ) -> APIResponse:
         """Disassociate an artifact from a storage."""
-        processors = processor_ctx.processors
         artifact_id = body.parsed.artifact_id
         storage_id = body.parsed.storage_id
 
@@ -165,7 +163,7 @@ class ArtifactHandler:
             storage_id=storage_id,
         )
 
-        result = await processors.artifact.disassociate_with_storage.wait_for_complete(action)
+        result = await self._processors.artifact.disassociate_with_storage.wait_for_complete(action)
 
         association = AssociationArtifactStorageResponse(
             id=str(result.result.id),

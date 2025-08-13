@@ -58,7 +58,7 @@ class ArtifactRegistryHandler:
             )
         )
 
-        result = await processors.artifact.import_.wait_for_complete(action)
+        result = await self._processors.artifact.import_.wait_for_complete(action)
 
         response = ImportArtifactResponse(
             artifact_id=str(result.result.id),

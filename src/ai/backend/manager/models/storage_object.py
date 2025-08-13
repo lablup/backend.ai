@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime
+from typing import Self
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -79,3 +83,19 @@ class StorageObjectRow(Base):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    @classmethod
+    def from_file_object_data(
+        cls,
+        artifact_id: uuid.UUID,
+        file_data: FileObjectData,
+    ) -> Self:
+        return cls(
+            artifact_id=artifact_id,
+            object_key=file_data.path,
+            size_bytes=file_data.size,
+            # TODO: Handle this.
+            checksum="",
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )

@@ -23,6 +23,17 @@ class HuggingFaceRepository:
         self._db = db
 
     @repository_decorator()
+    async def get_registry_data_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.id == registry_id)
+            )
+            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Registry with ID {registry_id} not found")
+            return row.to_dataclass()
+
+    @repository_decorator()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> HuggingFaceRegistryData:

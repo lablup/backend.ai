@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Literal, Optional, Union
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -121,50 +121,5 @@ class ModelData(BaseModel):
         description="""
         ISO timestamp when the model was last updated or modified.
         Indicates the freshness and maintenance status of the model.
-        """,
-    )
-
-
-class HuggingfaceConfig(BaseModel):
-    registry_type: Literal["huggingface"] = Field(
-        description="""
-        Type of the registry configuration.
-        This is used to identify the specific registry type.
-        """,
-        alias="type",
-    )
-    endpoint: str = Field(
-        default="https://huggingface.co",
-        description="""
-        Custom endpoint for HuggingFace API.
-        If not provided, defaults to the official HuggingFace API endpoint.
-        Useful for connecting to self-hosted HuggingFace instances.
-        """,
-        examples=["https://huggingface.co"],
-    )
-    token: Optional[str] = Field(
-        default=None,
-        description="""
-        HuggingFace API token for authentication.
-        You cannot access the gated repositories without this token.
-        """,
-    )
-
-
-RegistrySpecificConfig = Union[HuggingfaceConfig]
-
-
-class ArtifactRegistryConfig(BaseModel):
-    name: str = Field(
-        description="""
-        Name of the artifact registry configuration.
-        Used to identify this registry in the system.
-        """,
-        examples=["huggingface"],
-    )
-    config: RegistrySpecificConfig = Field(
-        discriminator="registry_type",
-        description="""
-        Configuration for the artifact registry.
         """,
     )

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import enum
 import logging
+import uuid
+from typing import Optional, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactData
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRegistryType, ArtifactType
 
 from .base import (
     GUID,
@@ -20,10 +22,18 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ArtifactRow",)
 
 
-class ArtifactType(enum.StrEnum):
-    MODEL = "MODEL"
-    PACKAGE = "PACKAGE"
-    IMAGE = "IMAGE"
+def _get_artifact_association_join_condition():
+    from ai.backend.manager.models.association_artifacts_storages import (
+        AssociationArtifactsStorageRow,
+    )
+
+    return ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id)
+
+
+def _get_huggingface_registry_join_condition():
+    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+
+    return HuggingFaceRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
 class ArtifactRow(Base):
@@ -60,17 +70,19 @@ class ArtifactRow(Base):
         nullable=False,
         index=True,
     )
+    # User Only authorized artifacts can be downloaded
+    authorized = sa.Column("authorized", sa.Boolean, nullable=False, default=False)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
+        primaryjoin=_get_artifact_association_join_condition,
         back_populates="artifact_row",
-        primaryjoin="ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id)",
     )
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
+        primaryjoin=_get_huggingface_registry_join_condition,
         back_populates="artifacts",
-        primaryjoin="ArtifactRow.registry_id == foreign(HuggingFaceRegistryRow.id)",
     )
 
     def __str__(self) -> str:
@@ -105,4 +117,26 @@ class ArtifactRow(Base):
             created_at=self.created_at,
             updated_at=self.updated_at,
             version=self.version,
+        )
+
+    @classmethod
+    def from_huggingface_model_data(
+        cls,
+        model_data: ModelData,
+        registry_id: uuid.UUID,
+        source_registry_id: Optional[uuid.UUID] = None,
+    ) -> Self:
+        return cls(
+            type=ArtifactType.MODEL,
+            name=model_data.name,
+            # TODO: How to handle this?
+            size=0,
+            source_registry_id=source_registry_id,
+            registry_id=registry_id,
+            registry_type=ArtifactRegistryType.HUGGING_FACE,
+            # TODO: How to handle this?
+            description="",
+            created_at=model_data.created_at,
+            updated_at=model_data.modified_at,
+            version=model_data.revision,
         )

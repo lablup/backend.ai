@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -24,6 +25,7 @@ class ImportArtifactAction(ArtifactAction):
 @dataclass
 class ImportArtifactActionResult(BaseActionResult):
     result: ArtifactData
+    task_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -648,7 +648,7 @@ class StorageProxyManagerFacingClient:
         Scan HuggingFace models in the specified registry.
         """
         resp = await self._client.request_with_response(
-            "GET",
+            "POST",
             "v1/registries/huggingface/scan",
             body=req.model_dump(by_alias=True),
         )

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import Field
 
 from ...api_handlers import BaseRequestModel
-from ...data.storage.registries.types import HuggingfaceConfig, ModelSortKey, ModelTarget
+from ...data.storage.registries.types import ModelSortKey, ModelTarget
 from ...types import QuotaConfig, VFolderID
 
 
@@ -112,9 +112,12 @@ class DeleteObjectReq(BaseRequestModel):
 class HuggingFaceScanModelsReq(BaseRequestModel):
     """Request for scanning HuggingFace models."""
 
-    client_config: HuggingfaceConfig = Field(
-        description="Configuration for the HuggingFace client",
-        examples=[{"token": "your_huggingface_token", "endpoint": "https://api.huggingface.co"}],
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to scan.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
     )
     limit: int = Field(
         ge=1,
@@ -144,10 +147,6 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
-    client_config: HuggingfaceConfig = Field(
-        description="Configuration for the HuggingFace client",
-        examples=[{"token": "your_huggingface_token", "endpoint": "https://api.huggingface.co"}],
-    )
     models: list[ModelTarget] = Field(
         description="""
         List of models to import from HuggingFace.
@@ -159,6 +158,13 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
                 {"model_id": "openai/gpt-2", "revision": "v1.0"},
             ]
         ],
+    )
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to import from.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface"],
     )
     storage_name: str = Field(
         description="""

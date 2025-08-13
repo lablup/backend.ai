@@ -9,11 +9,12 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.models.artifact import ArtifactType
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
 from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
+from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.types import ImportArtifactTarget
 
 
@@ -60,6 +61,16 @@ class ArtifactOrderBy:
 class ImportArtifactInput:
     artifact_id: ID
     storage_id: ID
+
+
+@strawberry.input
+class ScanArtifactInput:
+    registry_id: ID
+    storage_id: ID
+    limit: int
+    # TODO: Make it enum
+    order: str
+    search: Optional[str] = None
 
 
 @strawberry.input
@@ -183,6 +194,11 @@ class ImportArtifactPayload:
 
 
 @strawberry.type
+class ScanArtifactsPayload:
+    artifacts: list[Artifact]
+
+
+@strawberry.type
 class UpdateArtifactPayload:
     artifact: Artifact
 
@@ -260,6 +276,27 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
 
 
 # Mutations
+
+
+@strawberry.mutation
+async def scan_artifacts(
+    input: ScanArtifactInput, info: Info[StrawberryGQLContext]
+) -> ScanArtifactsPayload:
+    # TODO: 여기서 타입 별로 호출해야...
+    action_result = await info.context.processors.artifact.scan.wait_for_complete(
+        ScanArtifactsAction(
+            registry_id=uuid.UUID(input.registry_id),
+            storage_id=uuid.UUID(input.storage_id),
+            limit=input.limit,
+            order=ModelSortKey(input.order),
+            search=input.search,
+        )
+    )
+
+    artifacts = [Artifact.from_dataclass(item) for item in action_result.result]
+    return ScanArtifactsPayload(artifacts=artifacts)
+
+
 @strawberry.mutation
 async def import_artifact(
     input: ImportArtifactInput, info: Info[StrawberryGQLContext]

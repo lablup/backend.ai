@@ -1,0 +1,21 @@
+{
+    "huggingface_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce05",
+            "url": "https://huggingface.co",
+            "name": "huggingface-hub"
+        }
+    ],
+    "object_storages": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce07",
+            "name": "minio-storage",
+            "host": "local",
+            "access_key": "c8YPhBto8x6ouzK0tpun",
+            "secret_key": "5A0y7ZguWI2JnZufaPHAADsqbBQAw9Y0y4uv4Cfr",
+            "endpoint": "http://127.0.0.1:9000",
+            "region": "us-east-1",
+            "buckets": []
+        }
+    ]
+}

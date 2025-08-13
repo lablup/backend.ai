@@ -313,7 +313,7 @@ class TestHuggingFaceService:
             ModelTarget(model_id="microsoft/DialoGPT-medium"),
             ModelTarget(model_id="microsoft/DialoGPT-small"),
         ]
-        task_id = await hf_service.import_models_batch(
+        task_id = await hf_service.import_models(
             registry_name="test_registry",
             models=models,
             storage_name="test_storage",

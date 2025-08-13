@@ -1,7 +1,9 @@
 import uuid
+from typing import Optional
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
@@ -32,6 +34,29 @@ class ArtifactRepository:
             if row is None:
                 raise ValueError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
+
+    @repository_decorator()
+    async def insert_huggingface_model_artifacts(
+        self,
+        model_list: list[ModelData],
+        registry_id: uuid.UUID,
+        source_registry_id: Optional[uuid.UUID],
+    ) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            models = [
+                ArtifactRow.from_huggingface_model_data(
+                    model, registry_id=registry_id, source_registry_id=source_registry_id
+                )
+                for model in model_list
+            ]
+            db_sess.add_all(models)
+            await db_sess.flush()
+
+            for m in models:
+                await db_sess.refresh(m, attribute_names=["id", "created_at", "updated_at"])
+
+            result = [model.to_dataclass() for model in models]
+        return result
 
     @repository_decorator()
     async def associate_artifact_with_storage(

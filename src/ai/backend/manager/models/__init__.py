@@ -12,6 +12,7 @@ from . import error_logs as _errorlogs
 from . import event_log as _eventlog
 from . import group as _group
 from . import health as _health
+from . import huggingface_registry as _huggingface_registry
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
@@ -69,6 +70,7 @@ __all__ = (
     *_storage.__all__,
     *_errorlogs.__all__,
     *_eventlog.__all__,
+    *_huggingface_registry.__all__,
     *_relay_agent.__all__,
     *_relay_kernel.__all__,
     *_relay_session.__all__,
@@ -105,6 +107,7 @@ from .storage import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
 from .rbac_models import *  # noqa
+from .huggingface_registry import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa

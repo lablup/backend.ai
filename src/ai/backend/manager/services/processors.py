@@ -225,6 +225,8 @@ class Services:
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
+            object_storage_repository=repositories.object_storage.repository,
+            huggingface_repository=repositories.huggingface.repository,
             storage_manager=args.storage_manager,
         )
 

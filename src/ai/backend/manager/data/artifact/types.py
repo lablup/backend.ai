@@ -3,7 +3,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.manager.models.artifact import ArtifactType
+
+class ArtifactType(enum.StrEnum):
+    MODEL = "MODEL"
+    PACKAGE = "PACKAGE"
+    IMAGE = "IMAGE"
 
 
 class ArtifactRegistryType(enum.StrEnum):

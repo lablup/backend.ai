@@ -1,5 +1,8 @@
-from ai.backend.common.data.storage.registries.types import HuggingfaceConfig, ModelTarget
-from ai.backend.common.dto.storage.request import HuggingFaceImportModelsReq
+from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.dto.storage.request import (
+    HuggingFaceImportModelsReq,
+    HuggingFaceScanModelsReq,
+)
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -16,12 +19,17 @@ from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
     ImportArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.import_batch import (
+    ImportArtifactBatchAction,
+    ImportArtifactBatchActionResult,
+)
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
 )
 
 
+# TODO: 허깅페이스 하드 코딩된 부분 인터페이스화, 공통으로 묶어 뺄 것.
 class ArtifactService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
@@ -41,40 +49,51 @@ class ArtifactService:
         self._storage_manager = storage_manager
 
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
-        raise NotImplementedError
+        storage = await self._object_storage_repository.get_by_id(action.storage_id)
+        registry_data = await self._huggingface_repository.get_registry_data_by_id(
+            action.registry_id
+        )
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+
+        scan_result = await storage_proxy_client.scan_huggingface_models(
+            HuggingFaceScanModelsReq(
+                registry_name=registry_data.name,
+                limit=action.limit,
+                order=action.order,
+                search=action.search,
+            )
+        )
+
+        scanned_models = await self._artifact_repository.insert_huggingface_model_artifacts(
+            scan_result.models, registry_id=registry_data.id, source_registry_id=registry_data.id
+        )
+
+        return ScanArtifactsActionResult(result=scanned_models)
 
     async def import_(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
         artifact = await self._artifact_repository.get_artifact_by_id(action.target.artifact_id)
         storage = await self._object_storage_repository.get_by_id(action.target.storage_id)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
-
-        artifact.registry_type
-
-        client_config = HuggingfaceConfig(
-            token=storage.token,
-            endpoint=storage.endpoint,
+        registry_data = await self._huggingface_repository.get_registry_data_by_artifact_id(
+            artifact.id
         )
 
-        resp = await storage_proxy_client.import_huggingface_model(
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        result = await storage_proxy_client.import_huggingface_models(
             HuggingFaceImportModelsReq(
                 models=[ModelTarget(model_id=artifact.name, revision=artifact.version)],
-                # bucket=storage.bucket_name,
-                # registry_name=storage.registry_name
+                registry_name=registry_data.name,
+                storage_name=storage.name,
+                # TODO: 이건 사용되지 않을 듯.
+                bucket_name="",
             )
         )
-        raise NotImplementedError
 
-    async def import_batch(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(action.storage_name)
-        # 우선은 DB에서 artifact에 해당하는 model name, version을 가져와야 한다.
+        return ImportArtifactActionResult(result=artifact, task_id=result.task_id)
 
-        # resp = await storage_proxy_client.import_huggingface_model(HuggingFaceImportModelReq(
-        #     model=ModelTarget(),
-        #     bucket=action.bucket_name,
-        #     artifact_id=action.artifact_id,
-        #     storage_name=action.storage_name,
-        # ))
-        raise NotImplementedError
+    async def import_batch(
+        self, action: ImportArtifactBatchAction
+    ) -> ImportArtifactBatchActionResult:
+        raise NotImplementedError("Batch import is not implemented yet.")
 
     async def associate_with_storage(
         self, action: AssociateWithStorageAction
