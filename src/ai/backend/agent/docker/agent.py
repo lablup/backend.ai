@@ -118,6 +118,7 @@ from ..utils import (
     closing_async,
     container_pid_to_host_pid,
     get_kernel_id_from_container,
+    get_safe_ulimit,
     host_pid_to_container_pid,
     update_nested_dict,
 )
@@ -1038,8 +1039,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     "SYS_NICE",  # for NFS based GPUDirect Storage
                 ],
                 "Ulimits": [
-                    {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
-                    {"Name": "memlock", "Soft": -1, "Hard": -1},
+                    get_safe_ulimit("nofile", 1048576, 1048576),
+                    get_safe_ulimit("memlock", -1, -1),
                 ],
                 "LogConfig": {
                     "Type": "local",  # for efficient docker-specific storage
