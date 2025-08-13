@@ -490,10 +490,10 @@ class EndpointRow(Base):
         )
         if num_routes_without_session := (len(active_routes) - len(running_main_kernels)) > 0:
             log.info(
-                "generate_route_info(): There are {count} active routes without corresponding RUNNING sessions, "
-                "which may be still provisioning or being terminated. (Endpoint: {endpoint_id})",
-                count=num_routes_without_session,
-                endpoint_id=self.id,
+                "generate_route_info(): There are {} active routes without corresponding RUNNING sessions, "
+                "which may be still provisioning or being terminated. (Endpoint: {})",
+                num_routes_without_session,
+                self.id,
             )
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -501,10 +501,10 @@ class EndpointRow(Base):
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(
-                    "generate_route_info(): Multiple ({count}) inference ports found. "
-                    "Currently only the first-seen inference port is used. (Endpoint: {endpoint_id})",
-                    count=num_inference_ports,
-                    endpoint_id=self.id,
+                    "generate_route_info(): Multiple ({}) inference ports found. "
+                    "Currently only the first-seen inference port is used. (Endpoint: {})",
+                    num_inference_ports,
+                    self.id,
                 )
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
@@ -531,9 +531,9 @@ class EndpointRow(Base):
             model_definition_path=self.model_definition_path,
             model_mount_destination=self.model_mount_destination,
             created_user_id=self.created_user,
-            created_user_email=self.created_user_row.email
-            if self.created_user_row is not None
-            else None,
+            created_user_email=(
+                self.created_user_row.email if self.created_user_row is not None else None
+            ),
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
             tag=self.tag,
