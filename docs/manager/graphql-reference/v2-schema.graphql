@@ -163,6 +163,20 @@ type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
 
+input CreateObjectStorageInput {
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  buckets: [String!]!
+}
+
+type CreateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
 """Date with time (isoformat)"""
 scalar DateTime
 
@@ -180,6 +194,14 @@ input DeleteModelDeploymentInput {
 
 type DeleteModelDeploymentPayload {
   deployment: ModelDeployment
+}
+
+input DeleteObjectStorageInput {
+  id: ID!
+}
+
+type DeleteObjectStoragePayload {
+  id: ID!
 }
 
 input DeploymentFilter {
@@ -419,12 +441,45 @@ type Mutation {
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
+  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 }
 
 """An object with a Globally Unique ID"""
 interface Node {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+type ObjectStorage implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  buckets: [String!]!
+}
+
+type ObjectStorageConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorage!
 }
 
 enum OrderDirection {
@@ -489,6 +544,8 @@ type Queries {
   ): ModelRevisionConnection!
   revision(id: ID!): ModelRevision
   replica(id: ID!): ModelReplica
+  objectStorage(id: ID!): ObjectStorage
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null): ObjectStorageConnection!
 }
 
 type RawServiceConfig {
@@ -594,6 +651,21 @@ input UpdateModelDeploymentInput {
 
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment
+}
+
+input UpdateObjectStorageInput {
+  id: ID!
+  name: String
+  host: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
+  region: String
+  buckets: [String!]
+}
+
+type UpdateObjectStoragePayload {
+  objectStorage: ObjectStorage!
 }
 
 extend type UserNode @key(fields: "id") {
