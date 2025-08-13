@@ -4,12 +4,20 @@ Tests the batch termination of sessions marked with TERMINATING status.
 """
 
 import asyncio
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.clients.agent import AgentClient, AgentPool
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
@@ -106,6 +114,7 @@ class TestTerminateSessions:
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="USER_REQUESTED",
+            session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
                     kernel_id=KernelId(kernel_id),
@@ -113,6 +122,7 @@ class TestTerminateSessions:
                     container_id="container-123",
                     agent_id=agent_id,
                     agent_addr="10.0.0.1:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 )
             ],
         )
@@ -163,6 +173,7 @@ class TestTerminateSessions:
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="FORCED_TERMINATION",
+            session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
                     kernel_id=KernelId(kernel_ids[i]),
@@ -170,6 +181,7 @@ class TestTerminateSessions:
                     container_id=f"container-{i}",
                     agent_id=agent_ids[i],
                     agent_addr=f"10.0.0.{i + 1}:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 )
                 for i in range(3)
             ],
@@ -210,6 +222,7 @@ class TestTerminateSessions:
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="TEST_PARTIAL",
+            session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
                     kernel_id=KernelId(kernel_ids[0]),
@@ -217,6 +230,7 @@ class TestTerminateSessions:
                     container_id="container-1",
                     agent_id=agent_ids[0],
                     agent_addr="10.0.0.1:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 ),
                 TerminatingKernelData(
                     kernel_id=KernelId(kernel_ids[1]),
@@ -224,6 +238,7 @@ class TestTerminateSessions:
                     container_id="container-2",
                     agent_id=agent_ids[1],
                     agent_addr="10.0.0.2:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 ),
             ],
         )
@@ -274,6 +289,7 @@ class TestTerminateSessions:
                     creation_id=f"creation-{i}",
                     status=SessionStatus.TERMINATING,
                     status_info="BATCH_TERMINATION",
+                    session_type=SessionTypes.INTERACTIVE,
                     kernels=[
                         TerminatingKernelData(
                             kernel_id=KernelId(uuid4()),
@@ -281,6 +297,10 @@ class TestTerminateSessions:
                             container_id=f"container-{i}-{j}",
                             agent_id=AgentId(f"agent-{i}-{j}"),
                             agent_addr=f"10.0.{i}.{j}:2001",
+                            occupied_slots=ResourceSlot({
+                                "cpu": Decimal("1"),
+                                "mem": Decimal("2048"),
+                            }),
                         )
                         for j in range(2)  # 2 kernels per session
                     ],
@@ -329,6 +349,7 @@ class TestTerminateSessions:
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="TEST_SKIP",
+            session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 # Kernel with both agent_id and container_id
                 TerminatingKernelData(
@@ -337,6 +358,7 @@ class TestTerminateSessions:
                     container_id="container-1",
                     agent_id=AgentId("agent-1"),
                     agent_addr="10.0.0.1:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 ),
                 # Kernel without agent_id
                 TerminatingKernelData(
@@ -344,6 +366,7 @@ class TestTerminateSessions:
                     status=KernelStatus.TERMINATING,
                     container_id="container-2",
                     agent_id=None,
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                     agent_addr=None,
                 ),
                 # Kernel without container_id
@@ -353,6 +376,7 @@ class TestTerminateSessions:
                     container_id=None,
                     agent_id=AgentId("agent-2"),
                     agent_addr="10.0.0.2:2001",
+                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 ),
             ],
         )
@@ -386,6 +410,7 @@ class TestTerminateSessions:
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="NO_KERNELS",
+            session_type=SessionTypes.INTERACTIVE,
             kernels=[],  # No kernels
         )
 

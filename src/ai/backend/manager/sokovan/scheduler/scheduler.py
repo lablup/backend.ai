@@ -485,6 +485,7 @@ class Scheduler:
                         str(kernel.kernel_id),
                         str(session.session_id),
                         session_result.reason,
+                        kernel.occupied_slots,
                     )
                     termination_tasks.append(task)
                 else:
@@ -499,6 +500,8 @@ class Scheduler:
                     session_result.kernel_results.append(
                         KernelTerminationResult(
                             kernel_id=str(kernel.kernel_id),
+                            agent_id=kernel.agent_id,
+                            occupied_slots=kernel.occupied_slots,
                             success=True,
                         )
                     )
@@ -533,6 +536,7 @@ class Scheduler:
         kernel_id: str,
         session_id: str,
         reason: str,
+        occupied_slots: ResourceSlot,
     ) -> KernelTerminationResult:
         """
         Terminate a single kernel on an agent.
@@ -551,6 +555,8 @@ class Scheduler:
 
             return KernelTerminationResult(
                 kernel_id=kernel_id,
+                agent_id=agent_id,
+                occupied_slots=occupied_slots,
                 success=True,
             )
         except Exception as e:
@@ -563,17 +569,19 @@ class Scheduler:
 
             return KernelTerminationResult(
                 kernel_id=kernel_id,
+                agent_id=agent_id,
+                occupied_slots=occupied_slots,
                 success=False,
                 error=str(e),
             )
 
-    async def _mark_sessions_for_termination(
+    async def mark_sessions_for_termination(
         self,
         session_ids: list[str],
         reason: str = "USER_REQUESTED",
     ) -> "MarkTerminatingResult":
         """
-        Internal method to mark sessions for termination.
+        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
         Should only be called by ScheduleCoordinator.
 
         :param session_ids: List of session IDs to terminate
@@ -612,7 +620,7 @@ class Scheduler:
             )
 
             # Mark them for termination using existing method
-            await self._mark_sessions_for_termination(
+            await self.mark_sessions_for_termination(
                 session_ids,
                 reason="PENDING_TIMEOUT",
             )
