@@ -138,7 +138,6 @@ class SokovanOrchestrator:
 
         # Create timers based on specifications
         for spec in timer_specs:
-            # Create short-cycle timer if configured
             if spec.short_interval is not None:
                 process_if_needed_timer = GlobalTimer(
                     self._lock_factory(spec.lock_id, 10.0),
@@ -148,8 +147,6 @@ class SokovanOrchestrator:
                     task_name=spec.short_timer_name,
                 )
                 self.timers.append(process_if_needed_timer)
-
-            # Always create long-cycle timer
             process_schedule_timer = GlobalTimer(
                 self._lock_factory(spec.lock_id, 10.0),
                 self._event_producer,
