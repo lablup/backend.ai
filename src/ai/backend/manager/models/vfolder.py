@@ -1360,17 +1360,6 @@ async def initiate_vfolder_clone(
         except aiohttp.ClientResponseError:
             raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
 
-        async def _update_source_vfolder() -> None:
-            async with db_engine.begin_session() as db_session:
-                query = (
-                    sa.update(vfolders)
-                    .values(status=VFolderOperationStatus.READY)
-                    .where(source_vf_cond)
-                )
-                await db_session.execute(query)
-
-        await execute_with_retry(_update_source_vfolder)
-
     task_id = await background_task_manager.start(_clone)
     return task_id, target_folder_id.folder_id
 

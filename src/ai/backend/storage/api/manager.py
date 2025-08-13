@@ -34,6 +34,8 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.events.event_types.vfolder.anycast import (
+    VFolderCloneFailureEvent,
+    VFolderCloneSuccessEvent,
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -499,10 +501,29 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         async with ctx.get_volume(params["src_volume"]) as src_volume:
-            await src_volume.clone_vfolder(
-                params["src_vfid"],
-                params["dst_vfid"],
-            )
+            try:
+                await src_volume.clone_vfolder(
+                    params["src_vfid"],
+                    params["dst_vfid"],
+                )
+            except Exception as e:
+                log.exception(
+                    f"VFolder cloning task failed. (src_vfid:{params['src_vfid']}, dst_vfid:{params['dst_vfid']}, e:{str(e)})"
+                )
+                await ctx.event_producer.anycast_event(
+                    VFolderCloneFailureEvent(
+                        params["src_vfid"],
+                        params["dst_vfid"],
+                        str(e),
+                    )
+                )
+            else:
+                await ctx.event_producer.anycast_event(
+                    VFolderCloneSuccessEvent(
+                        params["src_vfid"],
+                        params["dst_vfid"],
+                    )
+                )
         return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
