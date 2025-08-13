@@ -51,7 +51,7 @@ class ValkeyStandaloneTarget:
         return cls(
             address=valkey_target.addr,
             password=valkey_target.password,
-            request_timeout=1_000,  # Default request timeout
+            request_timeout=valkey_target.request_timeout,
         )
 
 
@@ -77,7 +77,7 @@ class ValkeySentinelTarget:
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
             password=valkey_target.password,
-            request_timeout=1_000,  # Default request timeout
+            request_timeout=valkey_target.request_timeout,
         )
 
 
@@ -199,7 +199,10 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             return False
         except Exception as e:
             log.debug(
-                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.address,
+                self._human_readable_name,
+                e,
             )
             return True
 
@@ -379,7 +382,10 @@ class ValkeySentinelClient(AbstractValkeyClient):
             return False
         except Exception as e:
             log.debug(
-                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.service_name,
+                self._human_readable_name,
+                e,
             )
             return True
 
