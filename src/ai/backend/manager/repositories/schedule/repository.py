@@ -2563,7 +2563,7 @@ class ScheduleRepository:
 
         :return: List of SweptSessionInfo for timed-out sessions
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         from dateutil.tz import tzutc
 
@@ -2594,15 +2594,19 @@ class ScheduleRepository:
                 session_id = row.id
                 creation_id = row.creation_id
                 created_at = row.created_at
-                scheduler_opts = row.scheduler_opts or {}
+                scheduler_opts = row.scheduler_opts
 
-                # Get pending_timeout from scheduler options (in seconds)
-                pending_timeout_seconds = scheduler_opts.get("pending_timeout", 0)
-                if pending_timeout_seconds <= 0:
-                    # No timeout configured for this scaling group
+                # Skip if scheduler_opts is None
+                if not scheduler_opts:
                     continue
 
-                pending_timeout = timedelta(seconds=pending_timeout_seconds)
+                # Get pending_timeout (it's already a timedelta in ScalingGroupOpts)
+                pending_timeout = scheduler_opts.pending_timeout
+
+                # Skip if no timeout configured
+                if pending_timeout.total_seconds() <= 0:
+                    continue
+
                 elapsed_time = now - created_at
 
                 if elapsed_time >= pending_timeout:
