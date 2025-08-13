@@ -153,3 +153,27 @@ async def log_manager_api_entry_new(
             name.upper(),
             str(params),
         )
+
+
+async def log_client_api_entry(
+    log: Union[logging.Logger, BraceStyleAdapter],
+    name: str,
+    params: Any,
+) -> None:
+    if params is None:
+        log.info(
+            "ClientFacingAPI::{}()",
+            name.upper(),
+        )
+    elif isinstance(params, LoggingInternalMeta):
+        log.info(
+            "ClientFacingAPI::{}({})",
+            name.upper(),
+            params.to_logging_str(),
+        )
+    else:
+        log.info(
+            "ClientFacingAPI::{}({})",
+            name.upper(),
+            str(params),
+        )

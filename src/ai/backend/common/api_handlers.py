@@ -2,7 +2,8 @@ import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import AsyncIterable, Mapping
+from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
@@ -157,7 +158,7 @@ class PathParam(Generic[TRequestModel]):
 class MiddlewareParam(ABC, BaseModel):
     @classmethod
     @abstractmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         pass
 
 
@@ -186,6 +187,13 @@ class APIResponse:
         return self._status_code
 
 
+@dataclass
+class APIStreamResponse:
+    body: AsyncIterable[bytes]
+    status: int
+    headers: Mapping[str, str] = field(default_factory=dict)
+
+
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
 _ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
@@ -195,7 +203,7 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
             try:
-                return input_param_type.from_request(request)
+                return await input_param_type.from_request(request)
             except ValidationError:
                 raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}")
 
@@ -253,6 +261,11 @@ HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
 BaseHandler: TypeAlias = Callable[..., HandlerReturn]
 ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
+
+StreamHandlerReturn: TypeAlias = (
+    Awaitable[APIStreamResponse] | Coroutine[Any, Any, APIStreamResponse]
+)
+StreamBaseHandler: TypeAlias = Callable[..., StreamHandlerReturn]
 
 
 async def _parse_and_execute_handler(
@@ -348,7 +361,7 @@ async def _serialize_parameter(
             return param_instance_or_class.from_path(request.match_info)
         case _:
             try:
-                param_instance = param_instance_or_class.from_request(request)
+                param_instance = await param_instance_or_class.from_request(request)
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
                     f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
@@ -399,7 +412,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             user_id: str
             user_email: str
             @classmethod
-            def from_request(cls, request: web.Request) -> Self:
+            async def from_request(cls, request: web.Request) -> Self:
                 # Extract and validate data from request
                 user_id = request["user"]["uuid"]
                 user_email = request["user"]["email"]
@@ -452,5 +465,52 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
         return _parse_response(response)
+
+    return wrapped
+
+
+def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
+    """
+    This decorator processes HTTP request parameters using Pydantic models and returns a streaming response.
+    NOTICE: API handler methods must be instance methods. If handlers are not instance methods, it may not work as expected.
+    """
+
+    original_signature = inspect.signature(handler, eval_str=True)
+    sanitized_signature = original_signature.replace(
+        parameters=list(original_signature.parameters.values())[1:]
+    )
+    signature_parser_map = _register_parameter_parser(
+        sanitized_signature, handler_name=str(handler)
+    )
+
+    @functools.wraps(handler)
+    async def wrapped(first_arg: Any, request: web.Request) -> web.StreamResponse:
+        kwargs: dict[str, _ParamType] = {}
+        for name, param_instance_or_class in signature_parser_map.items():
+            param_instance = await _serialize_parameter(request, param_instance_or_class)
+            kwargs[name] = param_instance
+
+        result: APIStreamResponse = await handler(first_arg, **kwargs)
+
+        body = result.body
+        status = result.status
+        resp = web.StreamResponse(status=status, headers=result.headers)
+
+        body_iter = body.__aiter__()
+        # Send first chunk, and check if it raises an exception
+        try:
+            first_chunk = await body_iter.__anext__()
+            await resp.prepare(request)
+            await resp.write(first_chunk)
+        except Exception as e:
+            raise web.HTTPInternalServerError(
+                reason=f"Failed to send first chunk from stream: {repr(e)}"
+            ) from e
+
+        async for chunk in body_iter:
+            await resp.write(chunk)
+
+        await resp.write_eof()
+        return resp
 
     return wrapped

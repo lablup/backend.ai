@@ -251,7 +251,7 @@ def session_middleware(storage: "AbstractStorage") -> Middleware:
         if response.prepared:
             raise RuntimeError("Cannot save session data into prepared response")
         session = request.get(SESSION_KEY)
-        if session is not None:
+        if (session is not None) and (raise_response is False):
             if session._changed:
                 await storage.save_session(request=request, response=response, session=session)
         if raise_response:

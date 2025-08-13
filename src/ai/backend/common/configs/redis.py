@@ -93,6 +93,17 @@ class SingleRedisConfig(BaseModel):
         """,
         examples=[None, "REDIS_PASSWORD"],
     )
+    request_timeout: Optional[int] = Field(
+        default=None,
+        description="""
+        Timeout in milliseconds for Redis requests.
+        Controls how long operations wait before timing out.
+        If None, uses the default timeout configured in the Redis client.
+        """,
+        examples=[None, 1000],
+        validation_alias=AliasChoices("request_timeout", "request-timeout"),
+        serialization_alias="request-timeout",
+    )
     redis_helper_config: RedisHelperConfig = Field(
         default_factory=RedisHelperConfig,
         description="""
@@ -164,6 +175,7 @@ class SingleRedisConfig(BaseModel):
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            request_timeout=self.request_timeout,
         )
 
 
@@ -231,4 +243,5 @@ class RedisConfig(SingleRedisConfig):
             service_name=self.service_name,
             password=self.password,
             override_targets=override_targets,
+            request_timeout=self.request_timeout,
         )

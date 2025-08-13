@@ -1,3 +1,4 @@
+aioboto3~=15.0.0
 aiodataloader~=0.4.2
 aiodocker==0.24.0
 aiofiles~=24.1.0
@@ -72,6 +73,7 @@ PyYAML~=6.0
 pydantic[email]~=2.11.3
 packaging>=24.1
 hiredis>=3.0.0
+huggingface-hub~=0.34.3
 redis[hiredis]==4.5.5
 rich~=13.6
 ruamel.yaml~=0.18.10

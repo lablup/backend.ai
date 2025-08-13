@@ -45,21 +45,18 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
-from ai.backend.manager.data.model_serving.types import (
+from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ..data.model_serving.creator import EndpointCreator
+from ..data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
     EndpointLifecycle,
     EndpointTokenData,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.types import MountOptionModel, UserScope
-
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
+from ..models.storage import StorageSessionManager
+from ..types import MountOptionModel, UserScope
 from .base import (
     GUID,
     Base,
@@ -80,6 +77,8 @@ from .user import UserRow
 from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -472,14 +471,14 @@ class EndpointRow(Base):
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
-    async def generate_redis_route_info(
+    async def generate_route_info(
         self, db_sess: AsyncSession
     ) -> ModelServiceSerializableConnectionInfo:
         from .kernel import KernelRow
         from .routing import RoutingRow
 
         active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
-        target_kernels = await KernelRow.batch_load_by_session_id(
+        running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
             [
                 r.session
@@ -489,9 +488,24 @@ class EndpointRow(Base):
                 and r.session_row.status == SessionStatus.RUNNING
             ],
         )
+        if (num_routes_without_session := len(active_routes) - len(running_main_kernels)) > 0:
+            log.info(
+                "generate_route_info(): There are {} active routes without corresponding RUNNING sessions, "
+                "which may be still provisioning or being terminated. (Endpoint: {})",
+                num_routes_without_session,
+                self.id,
+            )
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        for kernel in target_kernels:
+        for kernel in running_main_kernels:
+            num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
+            if num_inference_ports > 1:
+                log.warning(
+                    "generate_route_info(): Multiple ({}) inference ports found. "
+                    "Currently only the first-seen inference port is used. (Endpoint: {})",
+                    num_inference_ports,
+                    self.id,
+                )
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
                     connection_info[port_info["name"]].append({
@@ -500,6 +514,7 @@ class EndpointRow(Base):
                         "kernel_host": kernel.kernel_host,
                         "kernel_port": port_info["host_ports"][0],
                     })
+                    break
         return connection_info
 
     def to_data(self) -> EndpointData:
@@ -516,9 +531,9 @@ class EndpointRow(Base):
             model_definition_path=self.model_definition_path,
             model_mount_destination=self.model_mount_destination,
             created_user_id=self.created_user,
-            created_user_email=self.created_user_row.email
-            if self.created_user_row is not None
-            else None,
+            created_user_email=(
+                self.created_user_row.email if self.created_user_row is not None else None
+            ),
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
             tag=self.tag,

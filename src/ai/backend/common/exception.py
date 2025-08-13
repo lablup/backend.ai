@@ -181,8 +181,10 @@ class ErrorOperation(enum.StrEnum):
     REQUEST = "request"
     PARSING = "parsing"
     EXECUTE = "execute"
+    SCHEDULE = "schedule"
     SETUP = "setup"
     GRANT = "grant"
+    CHECK_LIMIT = "check-limit"
 
 
 class ErrorDetail(enum.StrEnum):

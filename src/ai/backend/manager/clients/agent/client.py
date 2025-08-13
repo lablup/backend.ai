@@ -338,7 +338,7 @@ class AgentClient:
     @client_decorator()
     async def push_image(
         self,
-        image_ref: str,
+        image_ref: ImageRef,
         registry: Any,
     ) -> Mapping[str, Any]:
         """Push an image from the agent."""

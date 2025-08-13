@@ -1,0 +1,89 @@
+"""Factory functions for creating scheduler components."""
+
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
+from ai.backend.manager.sokovan.scheduler.scheduler import (
+    Scheduler,
+    SchedulerArgs,
+)
+from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
+from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
+from ai.backend.manager.sokovan.scheduler.validators.concurrency import ConcurrencyValidator
+from ai.backend.manager.sokovan.scheduler.validators.dependencies import DependenciesValidator
+from ai.backend.manager.sokovan.scheduler.validators.domain_resource_limit import (
+    DomainResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.group_resource_limit import (
+    GroupResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.keypair_resource_limit import (
+    KeypairResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.pending_session_count_limit import (
+    PendingSessionCountLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.pending_session_resource_limit import (
+    PendingSessionResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.reserved_batch import (
+    ReservedBatchSessionValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.user_resource_limit import (
+    UserResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
+from ai.backend.manager.types import DistributedLockFactory
+
+
+def create_default_scheduler(
+    repository: ScheduleRepository,
+    config_provider: ManagerConfigProvider,
+    lock_factory: DistributedLockFactory,
+    agent_pool: AgentPool,
+    valkey_stat: ValkeyStatClient,
+) -> Scheduler:
+    """
+    Create a scheduler with default components.
+
+    Args:
+        repository: The repository for accessing system data
+        config_provider: The manager configuration provider
+        lock_factory: Factory for creating distributed locks
+        agent_pool: Pool for managing agent clients
+        valkey_stat: Valkey client for statistics
+
+    Returns:
+        A configured Scheduler instance
+    """
+    sequencer = FIFOSequencer()
+    validator = SchedulingValidator([
+        ConcurrencyValidator(),
+        DependenciesValidator(),
+        DomainResourceLimitValidator(),
+        GroupResourceLimitValidator(),
+        KeypairResourceLimitValidator(),
+        PendingSessionCountLimitValidator(),
+        PendingSessionResourceLimitValidator(),
+        ReservedBatchSessionValidator(),
+        UserResourceLimitValidator(),
+    ])
+    resource_priority = config_provider.config.manager.agent_selection_resource_priority
+    agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
+    allocator = RepositoryAllocator(repository)
+    args = SchedulerArgs(
+        validator=validator,
+        sequencer=sequencer,
+        agent_selector=agent_selector,
+        allocator=allocator,
+        repository=repository,
+        config_provider=config_provider,
+        lock_factory=lock_factory,
+        agent_pool=agent_pool,
+        valkey_stat=valkey_stat,
+    )
+
+    return Scheduler(args)

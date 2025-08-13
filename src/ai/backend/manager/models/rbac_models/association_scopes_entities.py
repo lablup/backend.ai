@@ -13,10 +13,7 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 
 from ..base import (
     Base,
@@ -38,10 +35,8 @@ class AssociationScopesEntitiesRow(Base):
     id: uuid.UUID = IDColumn()
 
     scope_type: ScopeType = sa.Column(
-        "scope_type",
-        StrEnumType(ScopeType, length=32),
-        nullable=False,
-    )  # e.g., "global", "domain", "project", "user" etc.
+        "scope_type", StrEnumType(ScopeType, length=32), nullable=False
+    )
     scope_id: str = sa.Column(
         "scope_id",
         sa.String(64),
@@ -49,7 +44,7 @@ class AssociationScopesEntitiesRow(Base):
     )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
     entity_type: EntityType = sa.Column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
-    )  # e.g., "session", "vfolder", "image" etc.
+    )
     entity_id: str = sa.Column(
         "entity_id",
         sa.String(64),

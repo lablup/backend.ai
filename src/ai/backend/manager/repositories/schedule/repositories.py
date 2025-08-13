@@ -11,7 +11,7 @@ class ScheduleRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ScheduleRepository(args.db, args.valkey_stat_client)
+        repository = ScheduleRepository(args.db, args.valkey_stat_client, args.config_provider)
 
         return cls(
             repository=repository,

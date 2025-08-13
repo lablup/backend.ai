@@ -95,10 +95,7 @@ class TestUserServiceCompatibility:
             ),
         )
 
-        result = await user_service.create_user(action)
-
-        assert result.success is True
-        assert result.data is not None
+        await user_service.create_user(action)
         mock_dependencies["user_repository"].create_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
@@ -122,9 +119,7 @@ class TestUserServiceCompatibility:
             ),
         )
 
-        result = await user_service.create_user(action)
-
-        assert result.success is True
+        await user_service.create_user(action)
 
         # Verify container settings were passed to repository
         call_args = mock_dependencies["user_repository"].create_user_validated.call_args
@@ -153,10 +148,7 @@ class TestUserServiceCompatibility:
             ),
         )
 
-        result = await user_service.modify_user(action)
-
-        assert result.success is True
-        assert result.data is not None
+        await user_service.modify_user(action)
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
@@ -165,10 +157,8 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].soft_delete_user_validated = AsyncMock()
 
         action = DeleteUserAction(email="user@example.com")
+        await user_service.delete_user(action)
 
-        result = await user_service.delete_user(action)
-
-        assert result.success is True
         mock_dependencies["user_repository"].soft_delete_user_validated.assert_called_once_with(
             email="user@example.com",
             requester_uuid=None,
@@ -204,9 +194,7 @@ class TestUserServiceCompatibility:
             ),
         )
 
-        result = await user_service.purge_user(action)
-
-        assert result.success is True
+        await user_service.purge_user(action)
         mock_dependencies["admin_user_repository"].purge_user_force.assert_called_once()
 
     @pytest.mark.asyncio

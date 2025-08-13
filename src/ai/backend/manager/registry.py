@@ -205,8 +205,6 @@ from .models import (
     prepare_vfolder_mounts,
     query_allowed_sgroups,
     query_bootstrap_script,
-    recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
 )
@@ -3466,23 +3464,6 @@ class AgentRegistry:
 
         if result is None:
             return
-
-        access_key = cast(AccessKey, result.access_key)
-        agent = cast(AgentId, result.agent)
-
-        async def _recalc(db_session: AsyncSession) -> None:
-            log.debug(
-                "recalculate concurrency used in kernel termination (ak: {})",
-                access_key,
-            )
-            await recalc_concurrency_used(db_session, self.valkey_stat, access_key)
-            log.debug(
-                "recalculate agent resource occupancy in kernel termination (agent: {})",
-                agent,
-            )
-            await recalc_agent_resource_occupancy(db_session, agent)
-
-        await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
@@ -3553,7 +3534,7 @@ class AgentRegistry:
         """
         agent_client = self._get_agent_client(agent)
         return await agent_client.push_image(
-            str(image_ref),
+            image_ref,
             {**registry, "url": str(registry["url"])},
         )
 
@@ -3729,7 +3710,7 @@ class AgentRegistry:
                 load_image=True,
                 load_routes=True,
             )
-            connection_info = await endpoint.generate_redis_route_info(db_sess)
+            connection_info = await endpoint.generate_route_info(db_sess)
             model = await VFolderRow.get(db_sess, endpoint.model)
             endpoint_data = endpoint.to_data()
 
