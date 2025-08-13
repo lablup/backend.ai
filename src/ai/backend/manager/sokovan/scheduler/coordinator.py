@@ -133,7 +133,7 @@ class ScheduleCoordinator:
         :return: MarkTerminatingResult with categorized session statuses
         """
         # Use the internal scheduler method to mark sessions
-        result = await self._scheduler._mark_sessions_for_termination(session_ids, reason)
+        result = await self._scheduler.mark_sessions_for_termination(session_ids, reason)
 
         # Request termination scheduling for the next cycle if there are sessions to terminate
         if result.has_processed():

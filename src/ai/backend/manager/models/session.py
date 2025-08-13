@@ -221,7 +221,6 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     for e in SessionStatus
     if e
     not in (
-        SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
         SessionStatus.PENDING,
         SessionStatus.CANCELLED,
