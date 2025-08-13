@@ -307,6 +307,14 @@ class SessionTerminationResult:
         return all(kernel.success for kernel in self.kernel_results)
 
 
+@dataclass
+class SweptSessionInfo:
+    """Information about a session that was swept during cleanup."""
+
+    session_id: SessionId
+    creation_id: str
+
+
 class ScheduleRepository:
     _db: ExtendedAsyncSAEngine
     _valkey_stat: ValkeyStatClient
@@ -2542,6 +2550,75 @@ class ScheduleRepository:
             max_container_count=int(max_countainer_count) if max_countainer_count else None,
         )
         return self._transform_to_scheduling_context(raw_scheduling_data)
+
+    @repository_decorator()
+    async def get_pending_timeout_sessions(self) -> list["SweptSessionInfo"]:
+        """
+        Get sessions that have exceeded their pending timeout.
+
+        This method:
+        1. Fetches all pending sessions across scaling groups
+        2. Checks against each scaling group's pending_timeout setting
+        3. Returns list of sessions that have exceeded their timeout
+
+        :return: List of SweptSessionInfo for timed-out sessions
+        """
+        from datetime import datetime
+
+        from dateutil.tz import tzutc
+
+        from ai.backend.manager.models.session import SessionStatus
+
+        timed_out_sessions: list["SweptSessionInfo"] = []
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_readonly_session() as db_sess:
+            # Fetch all pending sessions with their scaling group info
+            query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.created_at,
+                    SessionRow.scaling_group_name,
+                    ScalingGroupRow.scheduler_opts,
+                )
+                .select_from(SessionRow)
+                .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
+                .where(SessionRow.status == SessionStatus.PENDING)
+            )
+
+            result = await db_sess.execute(query)
+            pending_sessions = result.fetchall()
+
+            for row in pending_sessions:
+                session_id = row.id
+                creation_id = row.creation_id
+                created_at = row.created_at
+                scheduler_opts = row.scheduler_opts
+
+                # Skip if scheduler_opts is None
+                if not scheduler_opts:
+                    continue
+
+                # Get pending_timeout (it's already a timedelta in ScalingGroupOpts)
+                pending_timeout = scheduler_opts.pending_timeout
+
+                # Skip if no timeout configured
+                if pending_timeout.total_seconds() <= 0:
+                    continue
+
+                elapsed_time = now - created_at
+
+                if elapsed_time >= pending_timeout:
+                    # This session has exceeded its pending timeout
+                    timed_out_sessions.append(
+                        SweptSessionInfo(
+                            session_id=session_id,
+                            creation_id=creation_id,
+                        )
+                    )
+
+        return timed_out_sessions
 
     @repository_decorator()
     async def batch_update_terminated_status(

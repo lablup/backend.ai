@@ -1,5 +1,6 @@
 import logging
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
 
 import aiotools
 
@@ -21,6 +22,35 @@ if TYPE_CHECKING:
     from ai.backend.manager.types import DistributedLockFactory
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+@dataclass
+class SchedulerTimerSpec:
+    """Specification and behavior for a scheduler's periodic operation."""
+
+    schedule_type: ScheduleType
+    lock_id: LockID
+    short_interval: Optional[float] = 2.0  # None means no short-cycle timer
+    long_interval: float = 60.0
+    initial_delay: float = 30.0
+
+    def create_if_needed_event(self) -> DoSokovanProcessIfNeededEvent:
+        """Create event for checking if processing is needed."""
+        return DoSokovanProcessIfNeededEvent(self.schedule_type.value)
+
+    def create_process_event(self) -> DoSokovanProcessScheduleEvent:
+        """Create event for forced processing."""
+        return DoSokovanProcessScheduleEvent(self.schedule_type.value)
+
+    @property
+    def short_timer_name(self) -> str:
+        """Name for the short-cycle timer."""
+        return f"sokovan_process_if_needed_{self.schedule_type.value}"
+
+    @property
+    def long_timer_name(self) -> str:
+        """Name for the long-cycle timer."""
+        return f"sokovan_process_schedule_{self.schedule_type.value}"
 
 
 class SokovanOrchestrator:
@@ -59,47 +89,71 @@ class SokovanOrchestrator:
         """Get the schedule coordinator."""
         return self._coordinator
 
+    @staticmethod
+    def _create_timer_specs() -> list[SchedulerTimerSpec]:
+        """Create timer specifications for all schedule types."""
+        return [
+            # Regular scheduling operations with both short and long cycle timers
+            SchedulerTimerSpec(
+                ScheduleType.SCHEDULE,
+                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTimerSpec(
+                ScheduleType.CHECK_PRECONDITION,
+                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTimerSpec(
+                ScheduleType.START,
+                LockID.LOCKID_SOKOVAN_START_TIMER,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTimerSpec(
+                ScheduleType.TERMINATE,
+                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Sweep is a maintenance task - only needs long cycle timer
+            SchedulerTimerSpec(
+                ScheduleType.SWEEP,
+                LockID.LOCKID_SOKOVAN_SWEEP_TIMER,
+                short_interval=None,  # No short-cycle timer for maintenance tasks
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+        ]
+
     async def init_timers(self) -> None:
         """Initialize GlobalTimers for scheduled operations."""
-        # Mapping of ScheduleType to LockIDs
-        lock_id_map = {
-            ScheduleType.SCHEDULE: LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER,
-            ScheduleType.CHECK_PRECONDITION: LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER,
-            ScheduleType.START: LockID.LOCKID_SOKOVAN_START_TIMER,
-            ScheduleType.TERMINATE: LockID.LOCKID_SOKOVAN_TERMINATE_TIMER,
-        }
+        timer_specs = self._create_timer_specs()
 
-        # Create timers for each ScheduleType
-        for schedule_type, lock_id in lock_id_map.items():
-            # Create closures to capture the schedule_type value
-            def create_if_needed_event(
-                st: ScheduleType = schedule_type,
-            ) -> DoSokovanProcessIfNeededEvent:
-                return DoSokovanProcessIfNeededEvent(st.value)
-
-            def create_process_event(
-                st: ScheduleType = schedule_type,
-            ) -> DoSokovanProcessScheduleEvent:
-                return DoSokovanProcessScheduleEvent(st.value)
-
-            # Short cycle timer (2s) - checks marks before execution
-            process_if_needed_timer = GlobalTimer(
-                self._lock_factory(lock_id, 10.0),
-                self._event_producer,
-                create_if_needed_event,
-                interval=2.0,
-                task_name=f"sokovan_process_if_needed_{schedule_type.value}",
-            )
-            self.timers.append(process_if_needed_timer)
-
-            # Long cycle timer (60s) - forced execution
+        # Create timers based on specifications
+        for spec in timer_specs:
+            if spec.short_interval is not None:
+                process_if_needed_timer = GlobalTimer(
+                    self._lock_factory(spec.lock_id, 10.0),
+                    self._event_producer,
+                    spec.create_if_needed_event,
+                    interval=spec.short_interval,
+                    task_name=spec.short_timer_name,
+                )
+                self.timers.append(process_if_needed_timer)
             process_schedule_timer = GlobalTimer(
-                self._lock_factory(lock_id, 10.0),
+                self._lock_factory(spec.lock_id, 10.0),
                 self._event_producer,
-                create_process_event,
-                interval=60.0,
-                initial_delay=30.0,
-                task_name=f"sokovan_process_schedule_{schedule_type.value}",
+                spec.create_process_event,
+                interval=spec.long_interval,
+                initial_delay=spec.initial_delay,
+                task_name=spec.long_timer_name,
             )
             self.timers.append(process_schedule_timer)
 

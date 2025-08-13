@@ -13,6 +13,7 @@ from .handlers import (
     ScheduleHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
+    SweepSessionsHandler,
     TerminateSessionsHandler,
 )
 
@@ -57,6 +58,7 @@ class ScheduleCoordinator:
             ),
             ScheduleType.START: StartSessionsHandler(scheduler, self, self._scheduler_dispatcher),
             ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self),
+            ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
         }
 
     async def process_schedule(
