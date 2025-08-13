@@ -1,6 +1,9 @@
+import uuid
 from typing import Optional
 
 from pydantic import Field
+
+from ai.backend.common.data.storage.registries.types import ModelData
 
 from ...api_handlers import BaseResponseModel
 from .field import VFolderMetaField, VolumeMetaField
@@ -59,3 +62,30 @@ class ObjectMetaResponse(BaseResponseModel):
     last_modified: Optional[str]
     etag: Optional[str]
     metadata: dict[str, str]
+
+
+# HuggingFace API Response Models
+
+
+class HuggingFaceScanModelsResponse(BaseResponseModel):
+    """Response for HuggingFace scan operation."""
+
+    models: list[ModelData] = Field(
+        default_factory=list,
+        description="""
+        List of HuggingFace models scanned and retrieved.
+        Each model includes comprehensive metadata and file information.
+        """,
+    )
+
+
+class HuggingFaceImportModelsResponse(BaseResponseModel):
+    """Response for HuggingFace batch model import operation."""
+
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the batch import task.
+        Used to track the progress of the batch model import operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )
