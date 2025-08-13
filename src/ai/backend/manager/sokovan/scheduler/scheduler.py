@@ -574,3 +574,30 @@ class Scheduler:
             )
 
         return result
+
+    async def sweep_stale_sessions(self) -> ScheduleResult:
+        """
+        Sweep stale sessions including those with pending timeout.
+        This is a maintenance operation, not a scheduling operation.
+
+        :return: ScheduleResult with the count of swept sessions
+        """
+        # Get sessions that have exceeded their pending timeout
+        timed_out_sessions = await self._repository.get_pending_timeout_sessions()
+
+        if timed_out_sessions:
+            # Extract session IDs
+            session_ids = [str(session.session_id) for session in timed_out_sessions]
+
+            log.info(
+                "Sweeping {} sessions due to pending timeout",
+                len(session_ids),
+            )
+
+            # Mark them for termination using existing method
+            await self._mark_sessions_for_termination(
+                session_ids,
+                reason="PENDING_TIMEOUT",
+            )
+
+        return ScheduleResult(succeeded_count=len(timed_out_sessions))

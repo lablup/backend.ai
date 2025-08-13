@@ -166,3 +166,26 @@ class TerminateSessionsHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
         log.trace("Terminated {} sessions", result.succeeded_count)
+
+
+class SweepSessionsHandler(ScheduleHandler):
+    """Handler for sweeping stale sessions (maintenance operation)."""
+
+    def __init__(
+        self,
+        scheduler: "Scheduler",
+    ):
+        self._scheduler = scheduler
+
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "sweep-sessions"
+
+    async def execute(self) -> ScheduleResult:
+        """Sweep stale sessions including those with pending timeout."""
+        return await self._scheduler.sweep_stale_sessions()
+
+    async def post_process(self, result: ScheduleResult) -> None:
+        """Log the number of swept sessions."""
+        log.info("Swept {} stale sessions", result.succeeded_count)
