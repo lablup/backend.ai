@@ -469,6 +469,8 @@ class Scheduler:
             # Create session result with reason from session's status_info
             session_result = SessionTerminationResult(
                 session_id=session.session_id,
+                access_key=session.access_key,
+                session_type=session.session_type,
                 reason=session.status_info,
                 kernel_results=[],
             )

@@ -226,6 +226,7 @@ class TerminatingSessionData:
     creation_id: str
     status: SessionStatus
     status_info: str
+    session_type: SessionTypes
     kernels: list["TerminatingKernelData"]
 
 
@@ -295,7 +296,9 @@ class KernelTerminationResult:
 class SessionTerminationResult:
     """Result of termination for a session and its kernels."""
 
-    session_id: str
+    session_id: SessionId
+    access_key: AccessKey
+    session_type: SessionTypes
     reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
     kernel_results: list[KernelTerminationResult] = field(default_factory=list)
 
@@ -728,6 +731,7 @@ class ScheduleRepository:
                         creation_id=session_row.creation_id,
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
+                        session_type=session_row.session_type,
                         kernels=kernels,
                     )
                 )
@@ -2627,7 +2631,8 @@ class ScheduleRepository:
         session_results: list[SessionTerminationResult],
     ) -> None:
         """
-        Batch update kernel and session statuses to TERMINATED for successful terminations.
+        Batch update kernel and session statuses to TERMINATED for successful terminations
+        and decrement keypair concurrency counters.
 
         :param session_results: List of session termination results with nested kernel results
         """
@@ -2635,6 +2640,10 @@ class ScheduleRepository:
             return
 
         now = datetime.now(tzutc())
+
+        # Build maps for concurrency tracking
+        concurrency_to_decrement: dict[str, int] = defaultdict(int)
+        sftp_concurrency_to_decrement: dict[str, int] = defaultdict(int)
 
         async with self._db.begin_session() as db_sess:
             # Process each session's results
@@ -2660,6 +2669,12 @@ class ScheduleRepository:
 
                 # Update session if all kernels succeeded
                 if session_result.should_terminate_session:
+                    # Track concurrency decrements for successfully terminated sessions
+                    if session_result.session_type in PRIVATE_SESSION_TYPES:
+                        sftp_concurrency_to_decrement[session_result.access_key] += 1
+                    else:
+                        concurrency_to_decrement[session_result.access_key] += 1
+
                     session_stmt = (
                         sa.update(SessionRow)
                         .where(SessionRow.id == session_result.session_id)
@@ -2675,3 +2690,9 @@ class ScheduleRepository:
                         )
                     )
                     await db_sess.execute(session_stmt)
+
+        # Decrement concurrency counters after database updates
+        if concurrency_to_decrement or sftp_concurrency_to_decrement:
+            await self._valkey_stat.decrement_keypair_concurrencies(
+                concurrency_to_decrement, sftp_concurrency_to_decrement
+            )
