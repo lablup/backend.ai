@@ -8,7 +8,7 @@ from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.types import Circuit, TCircuitKey
 
-from ..abc import BaseFrontend
+from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
