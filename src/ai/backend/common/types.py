@@ -1473,6 +1473,7 @@ class ValkeyTarget:
     sentinel: Optional[list[str]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
+    request_timeout: Optional[int] = None
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1534,6 +1535,7 @@ class RedisTarget:
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            request_timeout=None,
         )
 
 
@@ -1549,6 +1551,7 @@ class ValkeyProfileTarget:
         sentinel: Optional[list[str]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
+        request_timeout: Optional[int] = None,
         override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
     ) -> None:
         self._base_target = ValkeyTarget(
@@ -1556,6 +1559,7 @@ class ValkeyProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            request_timeout=request_timeout,
         )
         self._override_targets = override_targets
 
