@@ -702,14 +702,13 @@ class ValkeyStatClient:
             return
 
         batch = self._create_batch()
-
         for access_key, delta in concurrency_to_increment.items():
             key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.incrby(key, int(delta))
+            batch.incrby(key, delta)
 
         for access_key, delta in sftp_concurrency_to_increment.items():
             key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.incrby(key, int(delta))
+            batch.incrby(key, delta)
 
         await self._client.client.exec(batch, raise_on_error=True)
 
@@ -732,11 +731,11 @@ class ValkeyStatClient:
 
         for access_key, delta in concurrency_to_decrement.items():
             key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.decrby(key, int(delta))
+            batch.decrby(key, delta)
 
         for access_key, delta in sftp_concurrency_to_decrement.items():
             key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.decrby(key, int(delta))
+            batch.decrby(key, delta)
 
         await self._client.client.exec(batch, raise_on_error=True)
 

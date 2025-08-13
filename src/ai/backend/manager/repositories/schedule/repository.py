@@ -2640,11 +2640,9 @@ class ScheduleRepository:
             return
 
         now = datetime.now(tzutc())
-
         # Build maps for concurrency tracking
         concurrency_to_decrement: dict[str, int] = defaultdict(int)
         sftp_concurrency_to_decrement: dict[str, int] = defaultdict(int)
-
         async with self._db.begin_session() as db_sess:
             # Process each session's results
             for session_result in session_results:
@@ -2692,7 +2690,6 @@ class ScheduleRepository:
                     await db_sess.execute(session_stmt)
 
         # Decrement concurrency counters after database updates
-        if concurrency_to_decrement or sftp_concurrency_to_decrement:
-            await self._valkey_stat.decrement_keypair_concurrencies(
-                concurrency_to_decrement, sftp_concurrency_to_decrement
-            )
+        await self._valkey_stat.decrement_keypair_concurrencies(
+            concurrency_to_decrement, sftp_concurrency_to_decrement
+        )
