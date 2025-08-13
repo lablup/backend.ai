@@ -184,6 +184,7 @@ class ErrorOperation(enum.StrEnum):
     SCHEDULE = "schedule"
     SETUP = "setup"
     GRANT = "grant"
+    CHECK_LIMIT = "check-limit"
 
 
 class ErrorDetail(enum.StrEnum):

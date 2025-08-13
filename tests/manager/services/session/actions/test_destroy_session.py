@@ -32,7 +32,7 @@ def mock_agent_destroy_session_rpc(mocker, mock_agent_response_result):
     return mock
 
 
-DESTROY_SESSION_MOCK = {"destroyed": True}
+DESTROY_SESSION_MOCK = {"status": "cancelled"}
 DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 
 
@@ -50,7 +50,6 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
                     owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
                 ),
                 DestroySessionActionResult(
-                    destroyed_sessions=[SESSION_FIXTURE_DATA],
                     result=DESTROY_SESSION_RESPONSE_MOCK,
                 ),
             ),

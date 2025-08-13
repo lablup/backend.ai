@@ -31,6 +31,18 @@ class LegacyAgentSelector(AbstractAgentSelector):
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "LegacyAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using legacy priority-based strategy"
+
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],
@@ -50,7 +62,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
 
         # Choose the best tracker
         def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
-            occupied_slots, _ = tracker.get_current_state()
+            occupied_slots = tracker.get_current_occupied_slots()
             return [
                 -count_unutilized_capabilities(
                     tracker.original_agent, resource_req.requested_slots

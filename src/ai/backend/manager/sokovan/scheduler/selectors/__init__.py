@@ -1,12 +1,13 @@
 """Agent selector interfaces and implementations for sokovan scheduler."""
 
+# Import exceptions first (they don't have dependencies)
 from .exceptions import (
     AgentSelectionError,
-    DesignatedAgentIncompatibleError,
-    DesignatedAgentNotFoundError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
+
+# Then import selector which depends on exceptions
 from .selector import (
     AbstractAgentSelector,
     AgentInfo,
@@ -22,8 +23,6 @@ from .selector import (
 __all__ = [
     # Exceptions
     "AgentSelectionError",
-    "DesignatedAgentIncompatibleError",
-    "DesignatedAgentNotFoundError",
     "NoAvailableAgentError",
     "NoCompatibleAgentError",
     # Core interfaces

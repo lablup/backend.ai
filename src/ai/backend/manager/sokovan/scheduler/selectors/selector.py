@@ -46,12 +46,13 @@ class AgentStateTracker:
     additional_slots: ResourceSlot = field(default_factory=ResourceSlot)
     additional_containers: int = 0
 
-    def get_current_state(self) -> tuple[ResourceSlot, int]:
-        """Get current state (original + diff)."""
-        return (
-            self.original_agent.occupied_slots + self.additional_slots,
-            self.original_agent.container_count + self.additional_containers,
-        )
+    def get_current_occupied_slots(self) -> ResourceSlot:
+        """Get current occupied slots (original + additional)."""
+        return self.original_agent.occupied_slots + self.additional_slots
+
+    def get_current_container_count(self) -> int:
+        """Get current container count (original + additional)."""
+        return self.original_agent.container_count + self.additional_containers
 
     def apply_diff(self, slots: ResourceSlot, containers: int) -> None:
         """Apply additional resource allocation."""
@@ -192,6 +193,20 @@ class AbstractAgentSelector(ABC):
     """
 
     @abstractmethod
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],
@@ -255,8 +270,6 @@ class AgentSelector:
 
         Raises:
             NoAvailableAgentError: If no agents are available
-            DesignatedAgentNotFoundError: If designated agent is not found
-            DesignatedAgentIncompatibleError: If designated agent doesn't meet requirements
             NoCompatibleAgentError: If no compatible agents are found
             ValueError: If architecture mismatch in single-node session
         """
@@ -357,7 +370,8 @@ class AgentSelector:
             return False
 
         # Get current state with tracked changes
-        occupied_slots, container_count = tracker.get_current_state()
+        occupied_slots = tracker.get_current_occupied_slots()
+        container_count = tracker.get_current_container_count()
 
         # Check resource availability
         available_slots = agent.available_slots - occupied_slots

@@ -13,6 +13,14 @@ class KeypairResourceLimitValidator(ValidatorRule):
     This corresponds to check_keypair_resource_limit predicate.
     """
 
+    def name(self) -> str:
+        """Return the validator name for predicates."""
+        return "KeypairResourceLimitValidator"
+
+    def success_message(self) -> str:
+        """Return a message describing successful validation."""
+        return "Keypair has sufficient resource quota for the requested session"
+
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
@@ -28,8 +36,7 @@ class KeypairResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = key_occupied + workload.requested_slots
         if not (total_after <= policy.total_resource_slots):
-            # Format the limit for human-readable output
-            limit_str = " ".join(f"{k}={v}" for k, v in policy.total_resource_slots.items() if v)
+            exceeded_msg = " ".join(f"{k}={v}" for k, v in policy.total_resource_slots.items() if v)
             raise KeypairResourceQuotaExceeded(
-                f"Your keypair resource quota is exceeded. ({limit_str})"
+                f"Your keypair resource quota is exceeded. ({exceeded_msg})"
             )

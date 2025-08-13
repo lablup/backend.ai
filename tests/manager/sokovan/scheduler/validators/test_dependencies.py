@@ -49,6 +49,7 @@ class TestDependenciesValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise

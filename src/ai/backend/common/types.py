@@ -420,6 +420,20 @@ class SessionTypes(CIStrEnum):
     INFERENCE = "inference"
     SYSTEM = "system"
 
+    @classmethod
+    def private_types(cls) -> tuple[SessionTypes]:
+        """
+        Returns a set of private session types.
+        """
+        return (cls.SYSTEM,)
+
+    def is_private(self) -> bool:
+        """
+        Returns True if the session type is private.
+        Private session types are INTERACTIVE and BATCH.
+        """
+        return self in self.private_types()
+
 
 class SessionResult(CIStrEnum):
     UNDEFINED = "undefined"
@@ -1459,6 +1473,7 @@ class ValkeyTarget:
     sentinel: Optional[list[str]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
+    request_timeout: Optional[int] = None
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1520,6 +1535,7 @@ class RedisTarget:
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            request_timeout=None,
         )
 
 
@@ -1535,6 +1551,7 @@ class ValkeyProfileTarget:
         sentinel: Optional[list[str]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
+        request_timeout: Optional[int] = None,
         override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
     ) -> None:
         self._base_target = ValkeyTarget(
@@ -1542,6 +1559,7 @@ class ValkeyProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            request_timeout=request_timeout,
         )
         self._override_targets = override_targets
 
@@ -1581,6 +1599,19 @@ class RedisProfileTarget:
             return self._override_targets[role]
         return self._base_target
 
+    @staticmethod
+    def _parse_addr(addr_data) -> HostPortPair:
+        match addr_data:
+            case HostPortPair(host=host, port=port):
+                return HostPortPair(host, port)
+            case {"host": host, "port": port}:
+                return HostPortPair(host, port)
+            case (host, port):
+                return HostPortPair(host, port)
+            case _:
+                addr_data_parts = addr_data.split(":")
+                return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         override_targets = None
@@ -1589,16 +1620,11 @@ class RedisProfileTarget:
                 target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
             }
 
-        addr = None
-        # TODO: Remove this match statement after pydantic migration done.
-        if addr_data := data.get("addr"):
-            if isinstance(addr_data, HostPortPair):
-                addr = HostPortPair(addr_data.host, addr_data.port)
-            elif isinstance(addr_data, Mapping):
-                addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
-                addr_data = addr_data.split(":")
-                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+            for key in override_targets.keys():
+                target = override_targets[key]
+                target.addr = RedisProfileTarget._parse_addr(target.addr)
+
+        addr = RedisProfileTarget._parse_addr(data.get("addr"))
 
         sentinel = data.get("sentinel")
         if sentinel:

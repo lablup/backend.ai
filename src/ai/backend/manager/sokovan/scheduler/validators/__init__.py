@@ -12,7 +12,6 @@ from .exceptions import (
     PendingSessionCountLimitExceeded,
     PendingSessionResourceLimitExceeded,
     SchedulingValidationError,
-    UserResourcePolicyNotFound,
     UserResourceQuotaExceeded,
 )
 from .group_resource_limit import GroupResourceLimitValidator
@@ -44,5 +43,4 @@ __all__ = [
     "DomainResourceQuotaExceeded",
     "PendingSessionCountLimitExceeded",
     "PendingSessionResourceLimitExceeded",
-    "UserResourcePolicyNotFound",
 ]

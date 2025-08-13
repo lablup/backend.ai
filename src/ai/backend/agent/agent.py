@@ -69,10 +69,14 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
+    REDIS_CONTAINER_LOG,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     UNKNOWN_CONTAINER_ID,
@@ -149,6 +153,10 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.lock import FileLock
+from ai.backend.common.log.types import (
+    ContainerLogData,
+    ContainerLogType,
+)
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -820,6 +828,11 @@ class AbstractAgent(
             log_events=self.local_config.debug.log_events,
             event_observer=self._metric_registry.event,
         )
+        self.valkey_container_log_client = await ValkeyContainerLogClient.create(
+            redis_profile_target.profile_target(RedisRole.CONTAINER_LOG).to_valkey_target(),
+            human_readable_name="agent.container_log",
+            db_id=REDIS_CONTAINER_LOG,
+        )
         self.valkey_stream_client = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
             human_readable_name="event_producer.stream",
@@ -988,6 +1001,7 @@ class AbstractAgent(
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
         await self.event_dispatcher.close()
+        await self.valkey_container_log_client.close()
         await self.valkey_stream_client.close()
         await self.valkey_stat_client.close()
 
@@ -1112,7 +1126,6 @@ class AbstractAgent(
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
             log.exception("instance_heartbeat failure")
-            await self.produce_error_event()
 
     async def collect_logs(
         self,
@@ -1133,10 +1146,12 @@ class AbstractAgent(
                     log_length += fragment_length
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
-                        stored_chunk = bytes(cb[:chunk_size])
-                        await self.valkey_stream_client.enqueue_container_logs(
+                        chunk_log_item = ContainerLogData.from_log(
+                            ContainerLogType.ZLIB, bytes(cb[:chunk_size])
+                        )
+                        await self.valkey_container_log_client.enqueue_container_logs(
                             container_id,
-                            stored_chunk,
+                            chunk_log_item,
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1145,15 +1160,23 @@ class AbstractAgent(
                         del remaining, cb
                         chunk_buffer.close()
                         chunk_buffer = next_chunk_buffer
+
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await self.valkey_stream_client.enqueue_container_logs(
-                    container_id,
-                    chunk_buffer.getvalue(),
+                chunk_log_item = ContainerLogData.from_log(
+                    ContainerLogType.ZLIB, chunk_buffer.getvalue()
                 )
+                await self.valkey_container_log_client.enqueue_container_logs(
+                    container_id,
+                    chunk_log_item,
+                )
+
+            await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
+        except Exception:
+            # skip all exception in collect_logs
+            pass
         finally:
             chunk_buffer.close()
-        await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):

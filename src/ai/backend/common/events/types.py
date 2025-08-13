@@ -63,7 +63,7 @@ class AbstractEvent(ABC):
 
     @classmethod
     @abstractmethod
-    def event_domain(self) -> EventDomain:
+    def event_domain(cls) -> EventDomain:
         """
         Return the event domain.
         """

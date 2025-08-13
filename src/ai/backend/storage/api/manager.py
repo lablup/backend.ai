@@ -74,6 +74,7 @@ from ..exception import (
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
+from .v1.registries import create_app as create_registries_app
 from .v1.storages import create_app as create_storages_app
 from .vfolder.handler import VFolderHandler
 
@@ -1259,6 +1260,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
 
     app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     app.add_subapp("/v1/storages", create_storages_app(ctx))
+    app.add_subapp("/v1/registries", create_registries_app(ctx))
 
     # passive events
     evd = ctx.event_dispatcher

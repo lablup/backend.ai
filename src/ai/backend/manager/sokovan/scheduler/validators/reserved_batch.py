@@ -17,6 +17,14 @@ class ReservedBatchSessionValidator(ValidatorRule):
     This corresponds to check_reserved_batch_session predicate.
     """
 
+    def name(self) -> str:
+        """Return the validator name for predicates."""
+        return "ReservedBatchSessionValidator"
+
+    def success_message(self) -> str:
+        """Return a message describing successful validation."""
+        return "Batch session has reached its scheduled start time"
+
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Check if this is a batch session with a scheduled start time
         if workload.session_type == SessionTypes.BATCH and workload.starts_at is not None:

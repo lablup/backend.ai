@@ -1,9 +1,10 @@
 import asyncio
+import functools
 import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar
+from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
 
 import glide
 from glide import (
@@ -51,7 +52,7 @@ class ValkeyStandaloneTarget:
         return cls(
             address=valkey_target.addr,
             password=valkey_target.password,
-            request_timeout=1_000,  # Default request timeout
+            request_timeout=valkey_target.request_timeout,
         )
 
 
@@ -77,7 +78,7 @@ class ValkeySentinelTarget:
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
             password=valkey_target.password,
-            request_timeout=1_000,  # Default request timeout
+            request_timeout=valkey_target.request_timeout,
         )
 
 
@@ -199,7 +200,10 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             return False
         except Exception as e:
             log.debug(
-                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.address,
+                self._human_readable_name,
+                e,
             )
             return True
 
@@ -379,7 +383,10 @@ class ValkeySentinelClient(AbstractValkeyClient):
             return False
         except Exception as e:
             log.debug(
-                "Failed to ping to redis server, but cannot check if the connection is alive: {}", e
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.service_name,
+                self._human_readable_name,
+                e,
             )
             return True
 
@@ -586,6 +593,105 @@ def create_layer_aware_valkey_decorator(
                 raise UnreachableError(
                     f"Reached unreachable code in {operation} after {retry_count} attempts"
                 )
+
+            return wrapper
+
+        return decorator
+
+    return valkey_decorator
+
+
+def create_layer_aware_valkey_decorator_with_default(
+    layer: LayerType,
+):
+    """
+    Factory function to create layer-aware valkey decorators.
+
+    Args:
+        layer: The layer type for metric observation
+
+    Returns:
+        A valkey_decorator function configured for the specified layer
+    """
+
+    def valkey_decorator(
+        *,
+        retry_count: int = 1,
+        retry_delay: float = 0.1,
+        default_return: R,
+    ) -> Callable[
+        [Callable[P, Awaitable[R]]],
+        Callable[P, Awaitable[R]],
+    ]:
+        """
+        Decorator for Valkey client operations that adds retry logic and metrics.
+        If `default_return` is set (even to None), it will be returned on final failure.
+        """
+
+        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+            observer = LayerMetricObserver.instance()
+
+            @functools.wraps(func)
+            async def wrapper(*args, **kwargs) -> R:
+                log.trace("Calling {}", func.__name__)
+                start = time.perf_counter()
+
+                for attempt in range(retry_count):
+                    try:
+                        observer.observe_layer_operation_triggered(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                        )
+                        res = await func(*args, **kwargs)
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=True,
+                            duration=time.perf_counter() - start,
+                        )
+                        return res
+                    except BackendAIError as e:
+                        log.exception(
+                            "Handled BackendAIError in {}, args: {}, kwargs: {}, retry: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
+                        break
+                    except Exception as e:
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        log.exception(
+                            "Unhandled error in {}, args: {}, kwargs: {}, retry: {}, error: {}",
+                            func.__name__,
+                            args,
+                            kwargs,
+                            retry_count,
+                            e,
+                        )
+                        observer.observe_layer_operation(
+                            domain=DomainType.VALKEY,
+                            layer=layer,
+                            operation=func.__name__,
+                            success=False,
+                            duration=time.perf_counter() - start,
+                        )
+                        break
+
+                log.warning("Returning default value from {} after failure", func.__name__)
+                return cast(R, default_return)
 
             return wrapper
 

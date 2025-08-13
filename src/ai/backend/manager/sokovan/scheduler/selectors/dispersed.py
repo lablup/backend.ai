@@ -37,6 +37,18 @@ class DispersedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    def name(self) -> str:
+        """
+        Return the selector name for predicates.
+        """
+        return "DispersedAgentSelector"
+
+    def success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return "Agent selected using dispersed strategy for balanced workload distribution"
+
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],
@@ -56,7 +68,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
 
         # Choose the tracker with maximum available resources (to disperse workloads)
         def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
-            occupied_slots, _ = tracker.get_current_state()
+            occupied_slots = tracker.get_current_occupied_slots()
             return [
                 # First, prefer agents with fewer unutilized capabilities
                 -count_unutilized_capabilities(

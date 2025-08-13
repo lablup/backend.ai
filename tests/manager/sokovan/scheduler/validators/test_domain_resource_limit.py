@@ -50,6 +50,7 @@ class TestDomainResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (3 + 2 <= 10)
@@ -80,6 +81,7 @@ class TestDomainResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         with pytest.raises(DomainResourceQuotaExceeded) as exc_info:
@@ -111,6 +113,7 @@ class TestDomainResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise when no limit is defined
@@ -141,6 +144,7 @@ class TestDomainResourceLimitValidator:
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
             pending_sessions=PendingSessionSnapshot(by_keypair={}),
             session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
         )
 
         # Should not raise (0 + 5 <= 10)

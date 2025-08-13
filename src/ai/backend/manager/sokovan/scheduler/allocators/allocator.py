@@ -1,18 +1,32 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
 
-from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
+from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
 
 
 class SchedulingAllocator(ABC):
     @abstractmethod
-    async def allocate(self, session_allocations: Iterable[SessionAllocation]) -> None:
+    def name(self) -> str:
         """
-        Allocate resources based on the provided session allocations.
+        Return the allocator name for predicates.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def success_message(self) -> str:
+        """
+        Return a message describing successful allocation.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def allocate(self, batch: AllocationBatch) -> None:
+        """
+        Allocate resources based on the provided allocation batch.
         This method should handle the actual resource allocation logic,
         ensuring that all allocations are performed atomically and consistently.
+        It also updates session status for both successful allocations and failures.
 
         Args:
-            session_allocations: Iterable of SessionAllocation objects
+            batch: AllocationBatch containing successful allocations and failures to process
         """
         raise NotImplementedError("Subclasses must implement this method.")

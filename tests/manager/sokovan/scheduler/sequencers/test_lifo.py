@@ -47,17 +47,18 @@ class TestLIFOSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
     @pytest.mark.asyncio
     async def test_name(self, sequencer: LIFOSequencer) -> None:
-        assert sequencer.name == "LIFO-scheduling-sequencer"
+        assert sequencer.name == "LIFOSequencer"
 
     @pytest.mark.asyncio
     async def test_empty_workload(
         self, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
-        result = await sequencer.sequence(system_snapshot, [])
+        result = sequencer.sequence(system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
@@ -97,7 +98,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(system_snapshot, workloads)
+        result = sequencer.sequence(system_snapshot, workloads)
 
         # LIFO should reverse the order
         assert len(result) == 3
@@ -122,7 +123,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(system_snapshot, workloads)
+        result = sequencer.sequence(system_snapshot, workloads)
 
         # Single item should remain the same
         assert len(result) == 1
@@ -158,6 +159,7 @@ class TestLIFOSequencer:
             session_dependencies=SessionDependencySnapshot(
                 by_session={},
             ),
+            known_slot_types={},
         )
 
         workloads = [
@@ -193,7 +195,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(snapshot_with_allocations, workloads)
+        result = sequencer.sequence(snapshot_with_allocations, workloads)
 
         # Should still reverse order despite different allocations
         assert len(result) == 3
