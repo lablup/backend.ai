@@ -1,9 +1,17 @@
+from decimal import Decimal
 from pprint import pprint
 from typing import Sequence
 
-from ai.backend.agent.affinity_map import AffinityMap
+import pytest
+
+from ai.backend.agent.affinity_map import AffinityHint, AffinityMap, AffinityPolicy
+from ai.backend.agent.alloc_map import (
+    AllocationStrategy,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
 from ai.backend.agent.resources import AbstractComputeDevice
-from ai.backend.common.types import DeviceId, DeviceName
+from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 
 
 class DummyDevice(AbstractComputeDevice):
@@ -121,6 +129,69 @@ def test_affinity_map_first_allocation():
     m = AffinityMap.build(devices)
     primary, secondary = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
     assert _devid(primary[0]) == {"a0", "a1"}
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_prefer_larger_chunks(allocation_strategy):
+    device_init_args = {
+        "memory_size": 0,
+        "processing_units": 1,
+        "hw_location": "",
+        "device_name": "x",
+    }
+    devices = [
+        DummyDevice(device_id=DeviceId("a0"), numa_node=0, **device_init_args),
+        DummyDevice(device_id=DeviceId("a1"), numa_node=0, **device_init_args),
+        DummyDevice(device_id=DeviceId("a2"), numa_node=1, **device_init_args),
+        DummyDevice(device_id=DeviceId("a3"), numa_node=1, **device_init_args),
+    ]
+    affinity_map = AffinityMap.build(devices)
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+            DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    primary, secondary = affinity_map.get_distance_ordered_neighbors(None, DeviceName("x"))
+    assert _devid(primary[0]) == {"a0", "a1"}
+    assert _devid(primary[1]) == {"a2", "a3"}
+
+    # The first-time allocation will happen in the first-seen neighbor component.
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+    result = alloc_map.allocate(
+        {SlotName("x"): Decimal("1")},
+        affinity_hint=affinity_hint,
+    )
+    assert result[SlotName("x")][DeviceId("a0")] == 1
+    assert DeviceId("a1") not in result[SlotName("x")]
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a0")] == 1
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == 0
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 0
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 0
+
+    # The second-time allocation with 2 devices should happen in the largest neighbor component.
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+    result = alloc_map.allocate(
+        {SlotName("x"): Decimal("2")},
+        affinity_hint=affinity_hint,
+    )
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a0")] == 1
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == 0
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 1
+    assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 1
 
 
 def test_affinity_map_secondary_allocation():
