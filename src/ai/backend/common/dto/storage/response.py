@@ -64,6 +64,10 @@ class ObjectMetaResponse(BaseResponseModel):
     metadata: dict[str, str]
 
 
+class VFolderCloneResponse(BaseResponseModel):
+    bgtask_id: uuid.UUID
+
+
 # HuggingFace API Response Models
 
 
