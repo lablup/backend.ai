@@ -110,7 +110,7 @@ class CheckPreconditionHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if preconditions are met."""
-        log.trace("Checked {} sessions, requesting start", result.succeeded_count)
+        await self._coordinator.request_scheduling(ScheduleType.START)
 
 
 class StartSessionsHandler(ScheduleHandler):
