@@ -488,7 +488,7 @@ class EndpointRow(Base):
                 and r.session_row.status == SessionStatus.RUNNING
             ],
         )
-        if num_routes_without_session := (len(active_routes) - len(running_main_kernels)) > 0:
+        if (num_routes_without_session := len(active_routes) - len(running_main_kernels)) > 0:
             log.info(
                 "generate_route_info(): There are {} active routes without corresponding RUNNING sessions, "
                 "which may be still provisioning or being terminated. (Endpoint: {})",
