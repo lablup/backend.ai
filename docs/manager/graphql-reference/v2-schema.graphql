@@ -637,7 +637,7 @@ input ScanArtifactInput {
   storageId: ID!
   limit: Int!
   order: String!
-  search: String
+  search: String = null
 }
 
 type ScanArtifactsPayload {
