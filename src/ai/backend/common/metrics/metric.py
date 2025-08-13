@@ -419,6 +419,7 @@ class LayerType(enum.StrEnum):
     PERMISSION_CONTROL = "permission_control"
 
     # Valkey client layers
+    VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"

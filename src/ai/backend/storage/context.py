@@ -15,7 +15,12 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_bgtask import ValkeyBgtaskClient
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.bgtask.types import (
+    ServerComponentID,
+    ServerType,
+)
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -171,8 +176,14 @@ class RootContext:
         )
         self.metric_registry = metric_registry
         self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            # TODO: Add `bgtask_observer`
+            BackgroundTaskManagerArgs(
+                server_id=ServerComponentID(
+                    server_type=ServerType.STORAGE_PROXY, server_id=self.node_id
+                ),
+                event_producer=self.event_producer,
+                valkey_client=ValkeyBgtaskClient(),
+                # TODO: Add `bgtask_observer`
+            ),
         )
 
     async def __aenter__(self) -> None:
