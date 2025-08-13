@@ -485,6 +485,21 @@ class Scheduler:
                         session_result.reason,
                     )
                     termination_tasks.append(task)
+                else:
+                    log.warning(
+                        "Kernel {} in session {} has no agent or container ID, skipping termination",
+                        kernel.kernel_id,
+                        session.session_id,
+                    )
+                    # If no agent/container, just mark as successful termination
+                    # This is a fallback for kernels that might not have been scheduled properly
+                    # or were already terminated
+                    session_result.kernel_results.append(
+                        KernelTerminationResult(
+                            kernel_id=str(kernel.kernel_id),
+                            success=True,
+                        )
+                    )
 
             # Execute all termination tasks concurrently for this session
             if termination_tasks:
