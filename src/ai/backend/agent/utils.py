@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import io
@@ -5,6 +7,7 @@ import ipaddress
 import logging
 import platform
 import re
+import resource
 from decimal import Decimal
 from pathlib import Path
 from typing import (
@@ -18,6 +21,7 @@ from typing import (
     Protocol,
     Tuple,
     Type,
+    TypedDict,
     TypeVar,
     Union,
     overload,
@@ -367,3 +371,65 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
         return NotHostPID
     except (ValueError, KeyError, IOError):
         return NotHostPID
+
+
+class DockerUlimitEntry(TypedDict):
+    Name: str
+    Soft: int
+    Hard: int
+
+
+def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUlimitEntry:
+    """
+    Get ulimit values that don't exceed the host's system limits to avoid
+    'operation not permitted' errors from Docker.
+    """
+    try:
+        # Map ulimit names to resource constants
+        ulimit_map = {
+            "nofile": resource.RLIMIT_NOFILE,
+            "memlock": resource.RLIMIT_MEMLOCK,
+            "nproc": resource.RLIMIT_NPROC,
+            "fsize": resource.RLIMIT_FSIZE,
+            "core": resource.RLIMIT_CORE,
+            "stack": resource.RLIMIT_STACK,
+            "data": resource.RLIMIT_DATA,
+            "rss": resource.RLIMIT_RSS,
+        }
+
+        if name not in ulimit_map:
+            # If we don't know how to check this limit, use desired values
+            return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
+
+        current_soft_limit, current_hard_limit = resource.getrlimit(ulimit_map[name])
+        infinity_val = resource.RLIM_INFINITY
+
+        if desired_soft == -1:
+            safe_soft = current_soft_limit if current_soft_limit != infinity_val else -1
+        else:
+            if current_soft_limit == infinity_val:
+                safe_soft = desired_soft
+            else:
+                safe_soft = min(desired_soft, current_soft_limit)
+
+        if desired_hard == -1:
+            safe_hard = current_hard_limit if current_hard_limit != infinity_val else -1
+        else:
+            if current_hard_limit == infinity_val:
+                safe_hard = desired_hard
+            else:
+                safe_hard = min(desired_hard, current_hard_limit)
+
+        # Log if we had to adjust the limits
+        if safe_soft != desired_soft or safe_hard != desired_hard:
+            log.debug(
+                f"Adjusted ulimit {name}: desired=({desired_soft}, {desired_hard}) "
+                f"-> safe=({safe_soft}, {safe_hard}) (system limits: {current_soft_limit}, {current_hard_limit})"
+            )
+
+        return {"Name": name, "Soft": safe_soft, "Hard": safe_hard}
+
+    except (OSError, ValueError, AttributeError) as e:
+        # If we can't get system limits, log and use desired values
+        log.warning(f"Could not get system ulimit for {name}: {e}")
+        return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
