@@ -721,11 +721,18 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
+    storages: list[ObjectStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        List of object storage configurations.
+        Each configuration defines how to connect to and use an object storage service.
+        """,
+    )
     registries: list[ArtifactRegistryConfig] = Field(
         default_factory=list,
         description="""
-        Configuration for external registries.
-        Defines how to connect and interact with external model registries.
+        List of artifact registry configurations.
+        Each configuration defines how to connect to and use an artifact registry service.
         """,
     )
 
