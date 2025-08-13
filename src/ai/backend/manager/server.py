@@ -45,6 +45,9 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -53,6 +56,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
+    REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
@@ -522,6 +526,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
     root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
+        valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
+        db_id=REDIS_CONTAINER_LOG,
+        human_readable_name="container_log",  # saving container_log queue
+    )
     root_ctx.valkey_live = await ValkeyLiveClient.create(
         valkey_profile_target.profile_target(RedisRole.LIVE),
         db_id=REDIS_LIVE_DB,
@@ -552,6 +561,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
     yield
+    await root_ctx.valkey_container_log.close()
     await root_ctx.valkey_image.close()
     await root_ctx.valkey_stat.close()
     await root_ctx.valkey_live.close()
@@ -745,6 +755,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.valkey_container_log,
+            root_ctx.valkey_stat,
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
