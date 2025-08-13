@@ -478,7 +478,7 @@ class EndpointRow(Base):
         from .routing import RoutingRow
 
         active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
-        main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
+        running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
             [
                 r.session
@@ -488,21 +488,23 @@ class EndpointRow(Base):
                 and r.session_row.status == SessionStatus.RUNNING
             ],
         )
-        if len(main_kernels) < len(active_routes):
-            log.warning(
-                "generate_route_info(): There are some active routes without corresponding RUNNING sessions, "
-                "which may be still provisioning or being terminated. (Endpoint: {})",
-                self.id,
+        if num_routes_without_session := (len(active_routes) - len(running_main_kernels)) > 0:
+            log.info(
+                "generate_route_info(): There are {count} active routes without corresponding RUNNING sessions, "
+                "which may be still provisioning or being terminated. (Endpoint: {endpoint_id})",
+                count=num_routes_without_session,
+                endpoint_id=self.id,
             )
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        for kernel in main_kernels:
+        for kernel in running_main_kernels:
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(
-                    "generate_route_info(): Multiple inference ports found. "
-                    "Currently only the first-seen inference port is used. (Endpoint: {})",
-                    self.id,
+                    "generate_route_info(): Multiple ({count}) inference ports found. "
+                    "Currently only the first-seen inference port is used. (Endpoint: {endpoint_id})",
+                    count=num_inference_ports,
+                    endpoint_id=self.id,
                 )
             for port_info in kernel.service_ports:
                 if port_info["is_inference"]:
