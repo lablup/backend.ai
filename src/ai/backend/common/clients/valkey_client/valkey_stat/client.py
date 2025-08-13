@@ -714,6 +714,33 @@ class ValkeyStatClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
+    async def decrement_keypair_concurrencies(
+        self,
+        concurrency_to_decrement: Mapping[str, int],
+        sftp_concurrency_to_decrement: Mapping[str, int],
+    ) -> None:
+        """
+        Decrement keypair concurrency counters.
+
+        :param concurrency_to_decrement: Mapping of access keys to concurrency decrements.
+        :param sftp_concurrency_to_decrement: Mapping of access keys to SFTP concurrency decrements.
+        """
+        if not concurrency_to_decrement and not sftp_concurrency_to_decrement:
+            return
+
+        batch = self._create_batch()
+
+        for access_key, delta in concurrency_to_decrement.items():
+            key = self._get_keypair_concurrency_key(access_key, is_private=False)
+            batch.decrby(key, int(delta))
+
+        for access_key, delta in sftp_concurrency_to_decrement.items():
+            key = self._get_keypair_concurrency_key(access_key, is_private=True)
+            batch.decrby(key, int(delta))
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
     async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
         """
         Decrement keypair concurrency counter.
