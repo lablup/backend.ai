@@ -92,6 +92,7 @@ class ArtifactService:
             )
         )
 
+        await self.associate_with_storage(AssociateWithStorageAction(artifact.id, storage.id))
         return ImportArtifactActionResult(result=artifact, task_id=result.task_id)
 
     async def import_batch(self, action: ImportArtifactAction) -> ImportArtifactActionResult:

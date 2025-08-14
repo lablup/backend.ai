@@ -69,15 +69,13 @@ class ArtifactRepository:
         self, artifact_id: uuid.UUID, storage_id: uuid.UUID
     ) -> AssociationArtifactsStoragesData:
         async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
+            stmt = (
                 sa.insert(AssociationArtifactsStorageRow)
-                .values(
-                    artifact_id=artifact_id,
-                    storage_id=storage_id,
-                )
+                .values(artifact_id=artifact_id, storage_id=storage_id)
                 .returning(AssociationArtifactsStorageRow.id)
             )
-            inserted_id = (await db_sess.execute(result)).scalar_one_or_none()
+            result = await db_sess.execute(stmt)
+            inserted_id = result.scalar_one_or_none()
             if inserted_id is None:
                 raise ArtifactAssociationCreationError("Failed to create association")
 
@@ -100,7 +98,7 @@ class ArtifactRepository:
                     )
                 )
             )
-            existing_row: AssociationArtifactsStorageRow = select_result.fetchone()
+            existing_row: AssociationArtifactsStorageRow = select_result.scalar_one_or_none()
             if existing_row is None:
                 # TODO: Make exception
                 raise ArtifactAssociationNotFoundError(
