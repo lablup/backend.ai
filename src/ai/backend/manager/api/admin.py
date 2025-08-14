@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.dto.context import ProcessorsCtx
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -170,6 +171,7 @@ class V2APIHandler:
         self,
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
+        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         rules = []
 
@@ -201,9 +203,7 @@ class V2APIHandler:
                 text="Unauthorized: User identity is required for GraphQL v2 API."
             )
 
-        strawberry_ctx = StrawberryGQLContext(
-            user=user,
-        )
+        strawberry_ctx = StrawberryGQLContext(user=user, processors=processors_ctx.processors)
 
         query, variables, operation_name = (
             body.parsed.query,
