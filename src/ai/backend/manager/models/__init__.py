@@ -10,6 +10,7 @@ from . import error_logs as _errorlogs
 from . import event_log as _eventlog
 from . import group as _group
 from . import health as _health
+from . import huggingface_registry as _huggingface_registry
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
@@ -44,6 +45,7 @@ __all__ = (
     *_group.__all__,
     *_health.__all__,
     *_image.__all__,
+    *_huggingface_registry.__all__,
     *_kernel.__all__,
     *_keypair.__all__,
     *_network.__all__,
@@ -90,6 +92,7 @@ from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
 from .routing import *  # noqa
 from .scaling_group import *  # noqa
+from .huggingface_registry import *  # noqa
 from .session import *  # noqa
 from .session_template import *  # noqa
 from .storage import *  # noqa
