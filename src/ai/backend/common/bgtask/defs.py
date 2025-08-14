@@ -4,7 +4,7 @@ DEFAULT_TTL_SECONDS = 86400  # 24 hours
 DEFAULT_HEARTBEAT_INTERVAL = 600  # 10 minutes
 DEFAULT_HEARTBEAT_THRESHOLD = 1800  # 30 minutes
 DEFAULT_HEARTBEAT_TTL = 3600  # 1 hour
-
+DEFAULT_TASK_RETRY_TTL = 3600  # 1 hour
 
 # Key prefixes for key-value storage
 KEY_PREFIX = "bgtask"

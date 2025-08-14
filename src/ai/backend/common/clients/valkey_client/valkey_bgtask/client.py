@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Optional, Self, Set
+from collections.abc import Sequence,Iterable
 
 from glide import ExpirySet, ExpiryType
 
@@ -13,6 +14,7 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.defs import REDIS_BGTASK_DB
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -42,8 +44,8 @@ class ValkeyBgtaskClient:
         cls,
         valkey_target: ValkeyTarget,
         *,
-        db_id: int,
-        human_readable_name: str,
+        db_id: int = REDIS_BGTASK_DB,
+        human_readable_name: str = "bgtask",
     ) -> Self:
         """
         Create a ValkeyBgtaskClient instance.
@@ -83,6 +85,15 @@ class ValkeyBgtaskClient:
         if result:
             return result.decode() if isinstance(result, bytes) else result
         return None
+    
+    @valkey_decorator()
+    async def get_tasks(self, keys: Sequence[str]) -> dict[str, str]:
+        """Get multiple task metadata"""
+        results = await self._client.client.mget(list(keys))
+        return {
+            key: (result.decode() if isinstance(result, bytes) else result)
+            for key, result in zip(keys, results) if result is not None
+        }
 
     @valkey_decorator()
     async def delete_task(self, keys: list[str]) -> None:
@@ -122,10 +133,19 @@ class ValkeyBgtaskClient:
         await self._client.client.expire(key, ttl_seconds)
 
     @valkey_decorator()
-    async def get_heartbeat(self, key: str) -> Optional[dict]:
+    async def set_heartbeats(self, keys: Sequence[str], value: float, ttl_seconds: int) -> None:
+        """Set heartbeat data with TTL"""
+        await self._client.client.mset(
+            {key: str(value) for key in keys},
+        )
+        for key in keys:
+            await self._client.client.expire(key, ttl_seconds)
+
+    @valkey_decorator()
+    async def get_heartbeats(self, key: Sequence[str]) -> list[float]:
         """Get heartbeat data"""
-        result = await self._client.client.get(key)
-        if result:
-            data = result.decode() if isinstance(result, bytes) else result
-            return json.loads(data)
-        return None
+        result = await self._client.client.mget(list(key))
+        return [
+            float(value.decode())
+            for value in result if value is not None
+        ]

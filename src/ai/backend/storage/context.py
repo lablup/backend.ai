@@ -15,12 +15,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-from ai.backend.common.clients.valkey_client.valkey_bgtask import ValkeyBgtaskClient
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
-from ai.backend.common.bgtask.types import (
-    ServerComponentID,
-    ServerType,
-)
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -147,6 +142,7 @@ class RootContext:
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
+        background_task_manager: BackgroundTaskManager,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
@@ -175,16 +171,7 @@ class RootContext:
             event_producer=self.event_producer,
         )
         self.metric_registry = metric_registry
-        self.background_task_manager = BackgroundTaskManager(
-            BackgroundTaskManagerArgs(
-                server_id=ServerComponentID(
-                    server_type=ServerType.STORAGE_PROXY, server_id=self.node_id
-                ),
-                event_producer=self.event_producer,
-                valkey_client=ValkeyBgtaskClient(),
-                # TODO: Add `bgtask_observer`
-            ),
-        )
+        self.background_task_manager = background_task_manager
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.

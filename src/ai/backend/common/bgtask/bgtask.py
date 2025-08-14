@@ -193,7 +193,6 @@ class BackgroundTaskManager:
     _bgtask_recovery: BackgroundTaskRecovery
 
     _bgtask_heartbeat_task: asyncio.Task
-    _bgtask_handlers: dict[str, BackgroundTask]
 
     def __init__(
         self,
@@ -218,8 +217,6 @@ class BackgroundTaskManager:
             )
         )
         self._bgtask_heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-
-        self._bgtask_handlers = {}
 
     async def start(
         self,
@@ -379,8 +376,10 @@ class BackgroundTaskManager:
                 await asyncio.sleep(DEFAULT_HEARTBEAT_INTERVAL)
 
                 # Update heartbeat for all ongoing background tasks
+                alive_task_ids: list[uuid.UUID] = []
                 for task_id, bg_task in self._bgtask_ongoing_tasks.items():
                     if not bg_task.done():
-                        await self._bgtask_registry.update_heartbeat(task_id)
+                        alive_task_ids.append(task_id)
+                await self._bgtask_registry.update_heartbeats(alive_task_ids)
             except Exception as e:
                 log.exception("Error in heartbeat loop: {}", e)

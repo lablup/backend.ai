@@ -12,7 +12,6 @@ from .defs import (
     DEFAULT_HEARTBEAT_INTERVAL,
     DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_RETRIES,
-    DEFAULT_TTL_SECONDS,
 )
 
 
@@ -54,18 +53,15 @@ class BackgroundTaskMetadata(BaseModel):
     task_id: uuid.UUID
     task_name: str
     body: dict[str, Any]  # Original request data for retry
-    status: BgtaskStatus
     created_at: float
-    updated_at: float
     retried_at: Optional[float]
     server_id: str
     server_type: ServerType
-    allow_any_server: bool = False  # If True, task can be retried by any server
+    allow_any_server: bool = False  # If True, task can be processed by any server
     retry_count: int = 0
     max_retries: int = DEFAULT_MAX_RETRIES
     checkpoint: Optional[dict[str, Any]] = None  # For resumable tasks
     error_message: Optional[str] = None
-    ttl_seconds: int = DEFAULT_TTL_SECONDS
 
     @classmethod
     def create(
@@ -82,9 +78,7 @@ class BackgroundTaskMetadata(BaseModel):
             task_id=task_id,
             task_name=task_name,
             body=body,
-            status=BgtaskStatus.STARTED,
             created_at=now,
-            updated_at=now,
             retried_at=None,
             server_id=server_id.server_id,
             server_type=server_id.server_type,

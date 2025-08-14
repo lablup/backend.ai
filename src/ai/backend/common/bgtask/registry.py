@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Optional
 
@@ -51,23 +52,29 @@ class BackgroundTaskRegistry:
         """Key for individual task metadata"""
         return f"{TASK_KEY_PREFIX}:{task_id}"
 
-    async def save_task(self, metadata: BackgroundTaskMetadata) -> None:
+    def _heartbeat_key(self, task_id: uuid.UUID) -> str:
+        """Key for task heartbeat"""
+        return f"{TASK_KEY_PREFIX}:{task_id}:heartbeat"
+
+    async def save_task(
+        self, metadata: BackgroundTaskMetadata, ttl_seconds: int = DEFAULT_TTL_SECONDS
+    ) -> None:
         """Save task metadata to store"""
         task_key = self._task_metadata_key(metadata.task_id)
 
         # Store task metadata as JSON
-        await self._valkey.save_task(task_key, metadata.to_json(), metadata.ttl_seconds)
-        await self._valkey.set_ttl(task_key, metadata.ttl_seconds)
+        await self._valkey.save_task(task_key, metadata.to_json(), ttl_seconds)
+        await self._valkey.set_ttl(task_key, ttl_seconds)
 
         # Add to server type set if specified
         group_key = self._server_group_key(metadata.server_type)
         await self._valkey.add_to_set(group_key, [str(metadata.task_id)])
-        await self._valkey.set_ttl(group_key, metadata.ttl_seconds)
+        await self._valkey.set_ttl(group_key, ttl_seconds)
 
         # Add to server-specific set if specified
         server_key = self._server_id_key(metadata.server_id)
         await self._valkey.add_to_set(server_key, [str(metadata.task_id)])
-        await self._valkey.set_ttl(server_key, metadata.ttl_seconds)
+        await self._valkey.set_ttl(server_key, ttl_seconds)
 
         log.debug(
             "Registered task {} (task: {}, server_id: {}, server_type: {})",
@@ -87,12 +94,30 @@ class BackgroundTaskRegistry:
 
         return BackgroundTaskMetadata.from_json(data)
 
-    async def update_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def get_tasks(self, task_ids: set[uuid.UUID]) -> dict[uuid.UUID, BackgroundTaskMetadata]:
+        """Retrieve multiple task metadata from store"""
+        if not task_ids:
+            return {}
+
+        keys = [self._task_metadata_key(tid) for tid in task_ids]
+        results = await self._valkey.get_tasks(keys)
+
+        tasks = {}
+        for key, data in results.items():
+            if data:
+                task_id = uuid.UUID(key.split(":")[-1])
+                tasks[task_id] = BackgroundTaskMetadata.from_json(data)
+
+        return tasks
+
+    async def update_task(
+        self, metadata: BackgroundTaskMetadata, ttl_seconds: int = DEFAULT_TTL_SECONDS
+    ) -> None:
         """Update existing task metadata"""
         task_key = self._task_metadata_key(metadata.task_id)
 
         # Update metadata
-        await self._valkey.save_task(task_key, metadata.to_json(), metadata.ttl_seconds)
+        await self._valkey.save_task(task_key, metadata.to_json(), ttl_seconds)
 
         log.debug(
             "Updated task {} status: {}, retry: {}/{}",
@@ -145,15 +170,26 @@ class BackgroundTaskRegistry:
 
         return {uuid.UUID(tid) for tid in task_ids}
 
-    async def update_heartbeat(
-        self, task_id: uuid.UUID, ttl_seconds: int = DEFAULT_TTL_SECONDS
+    async def update_heartbeats(
+        self,
+        task_ids: Sequence[uuid.UUID],
+        current_time: Optional[float] = None,
+        ttl_seconds: int = DEFAULT_TTL_SECONDS,
     ) -> None:
         """Update task heartbeat timestamp"""
-        task_key = self._task_metadata_key(task_id)
-        task = await self.get_task(task_id)
-        if task is None:
-            log.warning("Cannot update heartbeat for non-existent task {}", task_id)
-            return
-        task.updated_at = time.time()
-        await self._valkey.save_task(task_key, task.to_json(), ttl_seconds)
-        await self._valkey.set_ttl(task_key, ttl_seconds)
+        timestamp = current_time or time.time()
+        keys = [self._heartbeat_key(task_id) for task_id in task_ids]
+        await self._valkey.set_heartbeats(
+            keys,
+            timestamp,
+            ttl_seconds=ttl_seconds,
+        )
+
+    async def get_heartbeats(self, task_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, float]:
+        """Get heartbeats for multiple tasks"""
+        if not task_ids:
+            return {}
+
+        keys = [self._heartbeat_key(tid) for tid in task_ids]
+        results = await self._valkey.get_heartbeats(keys)
+        return {task_id: timestamp for task_id, timestamp in zip(task_ids, results)}

@@ -43,8 +43,13 @@ from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.bgtask.types import (
+    ServerComponentID,
+    ServerType,
+)
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_bgtask import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
@@ -1047,9 +1052,19 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
+        redis_profile_target = self.root_ctx.config_provider.config.redis.to_valkey_profile_target()
+        valkey_target = redis_profile_target.profile_target(RedisRole.BGTASK)
+        valkey_client = await ValkeyBgtaskClient.create(valkey_target)
         self.root_ctx.background_task_manager = BackgroundTaskManager(
-            self.root_ctx.event_producer,
-            bgtask_observer=self.root_ctx.metrics.bgtask,
+            BackgroundTaskManagerArgs(
+                server_id=ServerComponentID(
+                    server_id=self.root_ctx.config_provider.config.manager.id,
+                    server_type=ServerType.MANAGER,
+                ),
+                event_producer=self.root_ctx.event_producer,
+                bgtask_observer=self.root_ctx.metrics.bgtask,
+                valkey_client=valkey_client,
+            )
         )
 
     async def __aexit__(self, *exc_info) -> None:
