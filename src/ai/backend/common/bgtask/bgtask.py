@@ -4,24 +4,24 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
     Awaitable,
     Callable,
     Concatenate,
     Final,
-    Mapping,
     Optional,
     Protocol,
     Self,
     TypeAlias,
-    Union,
 )
 
 from ai.backend.common.bgtask.types import (
     BackgroundTaskMetadata,
     BgtaskStatus,
     TaskID,
+    TaskName,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.events.types import EventCacheDomain
@@ -46,6 +46,8 @@ from ..events.event_types.bgtask.broadcast import (
     BgtaskUpdatedEvent,
 )
 from ..types import DispatchResult, Sentinel
+from .reporter import ProgressReporter
+from .task.base import BaseBackgroundTask
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -108,45 +110,6 @@ class BgTaskInfo:
         }
 
 
-class ProgressReporter:
-    total_progress: Union[int, float]
-    current_progress: Union[int, float]
-
-    _event_producer: Final[EventProducer]
-    _task_id: Final[uuid.UUID]
-
-    def __init__(
-        self,
-        event_producer: EventProducer,
-        task_id: uuid.UUID,
-        current_progress: int = 0,
-        total_progress: int = 0,
-    ) -> None:
-        self._event_producer = event_producer
-        self._task_id = task_id
-        self.current_progress = current_progress
-        self.total_progress = total_progress
-
-    async def update(
-        self,
-        increment: Union[int, float] = 0,
-        message: str | None = None,
-    ) -> None:
-        self.current_progress += increment
-        # keep the state as local variables because they might be changed
-        # due to interleaving at await statements below.
-        current, total = self.current_progress, self.total_progress
-        await self._event_producer.broadcast_event_with_cache(
-            EventCacheDomain.BGTASK.cache_id(self._task_id),
-            BgtaskUpdatedEvent(
-                self._task_id,
-                message=message,
-                current_progress=current,
-                total_progress=total,
-            ),
-        )
-
-
 BackgroundTask = Callable[
     Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult | None]
 ]
@@ -177,6 +140,8 @@ class BackgroundTaskManager:
 
     _valkey_client: ValkeyBgtaskClient
     _server_id: str
+    _tags: set[str]
+    _task_registry: Mapping[TaskName, type[BaseBackgroundTask]]
 
     def __init__(
         self,
@@ -184,6 +149,8 @@ class BackgroundTaskManager:
         *,
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
+        task_registry: Optional[Mapping[TaskName, type[BaseBackgroundTask]]] = None,
+        tags: Optional[Iterable[str]] = None,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
         self._event_producer = event_producer
@@ -193,7 +160,11 @@ class BackgroundTaskManager:
 
         self._valkey_client = valkey_client
         self._server_id = server_id
-        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        self._tags = set(tags) if tags is not None else set()
+        self._task_registry = task_registry or {}
+
+        self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
+        self._retry_loop_task = asyncio.create_task(self._retry_loop())
 
     async def start(
         self,
@@ -225,8 +196,13 @@ class BackgroundTaskManager:
             except asyncio.CancelledError:
                 pass
         try:
-            self._heartbeat_task.cancel()
-            await self._heartbeat_task
+            self._heartbeat_loop_task.cancel()
+            await self._heartbeat_loop_task
+        except asyncio.CancelledError:
+            pass
+        try:
+            self._retry_loop_task.cancel()
+            await self._retry_loop_task
         except asyncio.CancelledError:
             pass
 
@@ -363,3 +339,45 @@ class BackgroundTaskManager:
             except Exception as e:
                 log.exception("Exception in heartbeat loop: {}", e)
             await asyncio.sleep(_HEARTBEAT_INTERVAL)
+
+    async def _retry_loop(self) -> None:
+        """Main recovery loop that checks for failed/stale tasks"""
+        while True:
+            try:
+                await self._check_server_tasks()
+                await self._check_tagged_tasks()
+            except Exception as e:
+                log.exception("Exception in retry loop: {}", e)
+            await asyncio.sleep(_HEARTBEAT_CHECK_INTERVAL)
+
+    async def _check_server_tasks(self) -> None:
+        timeout_task_metadata = await self._valkey_client.list_timeout_tasks_by_server_id(
+            self._server_id
+        )
+
+        for metadata in timeout_task_metadata:
+            await self._retry_bgtask(metadata)
+
+    async def _check_tagged_tasks(self) -> None:
+        """Check tasks for a specific server type"""
+        timeout_task_metadata = await self._valkey_client.list_timeout_tasks_by_tags(self._tags)
+
+        for metadata in timeout_task_metadata:
+            await self._retry_bgtask(metadata)
+
+    async def _retry_bgtask(self, metadata: BackgroundTaskMetadata) -> None:
+        """Retry a background task"""
+
+        metadata.server_id = self._server_id  # Claim the task
+        try:
+            task_func = self._task_registry[TaskName(metadata.task_name)]
+        except KeyError:
+            log.warning(
+                "Task {} ({}) is not registered in the task registry. Cannot retry.",
+                metadata.task_id,
+                metadata.task_name,
+            )
+            return
+        args = task_func.get_args_from_metadata(metadata.body)
+        retried_task = self._wrapper_task(task_func.execute, metadata.task_id, **args.to_dict())
+        asyncio.create_task(retried_task)
