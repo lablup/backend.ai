@@ -5,6 +5,10 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
+    GetDownloadPresignedURLAction,
+)
+
 from ...data.object_storage.creator import ObjectStorageCreator
 from ...data.object_storage.modifier import ObjectStorageModifier
 from ...data.object_storage.types import ObjectStorageData
@@ -137,6 +141,13 @@ class DeleteObjectStorageInput:
     id: ID
 
 
+@strawberry.input
+class GetPresignedDownloadURLInput:
+    storage_id: ID
+    bucket_name: str
+    key: str
+
+
 @strawberry.type
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
@@ -150,6 +161,11 @@ class UpdateObjectStoragePayload:
 @strawberry.type
 class DeleteObjectStoragePayload:
     id: ID
+
+
+@strawberry.type
+class GetPresignedDownloadURLPayload:
+    presigned_url: str
 
 
 @strawberry.mutation
@@ -200,3 +216,20 @@ async def delete_object_storage(
     )
 
     return DeleteObjectStoragePayload(id=ID(str(action_result.deleted_storage_id)))
+
+
+@strawberry.mutation
+async def get_presigned_download_url(
+    input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
+) -> GetPresignedDownloadURLPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
+        GetDownloadPresignedURLAction(
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
+            key=input.key,
+        )
+    )
+
+    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
