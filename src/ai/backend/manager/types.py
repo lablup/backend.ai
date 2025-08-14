@@ -18,6 +18,7 @@ import attr
 from graphql import UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from strawberry.types.unset import UnsetType
 
 from ai.backend.common.types import MountPermission, MountTypes
 
@@ -200,8 +201,8 @@ class OptionalState(Generic[TVal]):
         self._value = value
 
     @classmethod
-    def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> OptionalState[TVal]:
-        if isinstance(value, UndefinedType):
+    def from_graphql(cls, value: Optional[TVal] | UndefinedType | UnsetType) -> OptionalState[TVal]:
+        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
             return OptionalState.nop()
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")

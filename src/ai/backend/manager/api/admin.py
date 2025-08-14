@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.dto.context import ProcessorsCtx
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -165,17 +165,13 @@ class GQLInspectionConfigCtx(MiddlewareParam):
 
 
 class V2APIHandler:
-    _processors: Processors
-
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
-
     @auth_required_for_method
     @api_handler
     async def handle_gql_v2(
         self,
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
+        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         rules = []
 
@@ -207,7 +203,7 @@ class V2APIHandler:
                 text="Unauthorized: User identity is required for GraphQL v2 API."
             )
 
-        strawberry_ctx = StrawberryGQLContext(user=user, processors=self._processors)
+        strawberry_ctx = StrawberryGQLContext(user=user, processors=processors_ctx.processors)
 
         query, variables, operation_name = (
             body.parsed.query,
@@ -300,7 +296,6 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))
 
-    root_ctx: RootContext = app["_root.context"]
-    v2_api_handler = V2APIHandler(processors=root_ctx.processors)
+    v2_api_handler = V2APIHandler()
     cors.add(app.router.add_route("POST", r"/gql/v2", v2_api_handler.handle_gql_v2))
     return app, []
