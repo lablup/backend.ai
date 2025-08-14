@@ -28,6 +28,7 @@ from . import scaling_group as _sgroup
 from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
+from . import storage_object as _storage_object
 from . import user as _user
 from . import vfolder as _vfolder
 from .base import metadata
@@ -54,6 +55,7 @@ __all__ = (
     *_keypair.__all__,
     *_network.__all__,
     *_object_storage.__all__,
+    *_storage_object.__all__,
     *_user.__all__,
     *_vfolder.__all__,
     *_dotfile.__all__,
@@ -93,6 +95,7 @@ from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
 from .object_storage import *  # noqa
+from .storage_object import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
