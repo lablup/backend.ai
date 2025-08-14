@@ -4,7 +4,6 @@ import asyncio
 import logging
 import time
 import uuid
-import weakref
 from dataclasses import dataclass
 from typing import (
     Awaitable,
@@ -19,7 +18,12 @@ from typing import (
     Union,
 )
 
-from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.bgtask.types import (
+    BackgroundTaskMetadata,
+    BgtaskStatus,
+    TaskID,
+)
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.events.types import EventCacheDomain
 from ai.backend.common.exception import (
     BackendAIError,
@@ -167,20 +171,29 @@ class NopBackgroundTaskObserver:
 
 class BackgroundTaskManager:
     _event_producer: EventProducer
-    _ongoing_tasks: weakref.WeakSet[asyncio.Task]
+    _ongoing_tasks: dict[TaskID, asyncio.Task]
     _metric_observer: BackgroundTaskObserver
     _dict_lock: asyncio.Lock
+
+    _valkey_client: ValkeyBgtaskClient
+    _server_id: str
 
     def __init__(
         self,
         event_producer: EventProducer,
         *,
+        valkey_client: ValkeyBgtaskClient,
+        server_id: str,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
         self._event_producer = event_producer
-        self._ongoing_tasks = weakref.WeakSet()
+        self._ongoing_tasks = {}
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
+
+        self._valkey_client = valkey_client
+        self._server_id = server_id
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
     async def start(
         self,
@@ -198,13 +211,12 @@ class BackgroundTaskManager:
                 total_progress=0,
             ),
         )
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self._ongoing_tasks.add(task)
+        asyncio.create_task(self._wrapper_task(func, TaskID(task_id), name, **kwargs))
         return task_id
 
     async def shutdown(self) -> None:
         log.info("Cancelling remaining background tasks...")
-        for task in self._ongoing_tasks.copy():
+        for task in self._ongoing_tasks.values():
             if task.done():
                 continue
             try:
@@ -212,6 +224,11 @@ class BackgroundTaskManager:
                 await task
             except asyncio.CancelledError:
                 pass
+        try:
+            self._heartbeat_task.cancel()
+            await self._heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None
@@ -292,16 +309,57 @@ class BackgroundTaskManager:
 
         return bgtask_result_event
 
+    async def _process_bgtask(
+        self,
+        func: BackgroundTask,
+        metadata: BackgroundTaskMetadata,
+        **kwargs,
+    ) -> None:
+        bgtask_result_event = await self._observe_bgtask(
+            func, metadata.task_id, metadata.task_name, **kwargs
+        )
+        cache_id = EventCacheDomain.BGTASK.cache_id(metadata.task_id)
+        await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
+        log.info(
+            "Task {} ({}): {}",
+            metadata.task_id,
+            metadata.task_name or "",
+            bgtask_result_event.__class__.__name__,
+        )
+
     async def _wrapper_task(
         self,
         func: BackgroundTask,
-        task_id: uuid.UUID,
+        task_id: TaskID,
         task_name: Optional[str],
         **kwargs,
     ) -> None:
-        bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-        cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
-        await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
-        log.info(
-            "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            self._ongoing_tasks[task_id] = current_task
+        task_metadata = BackgroundTaskMetadata.create(
+            task_id=task_id,
+            task_name=task_name or func.__name__,
+            body=kwargs,
+            server_id=self._server_id,
         )
+        await self._valkey_client.register_task(task_metadata)
+        try:
+            await self._process_bgtask(func, task_metadata, **kwargs)
+        finally:
+            self._ongoing_tasks.pop(task_id, None)
+            await self._valkey_client.unregister_task(task_metadata)
+
+    async def _heartbeat_loop(self) -> None:
+        """Periodically update heartbeat for running background tasks"""
+        while True:
+            try:
+                # Update heartbeat for all ongoing background tasks
+                alive_task_ids: list[TaskID] = []
+                for task_id, bg_task in self._ongoing_tasks.items():
+                    if not bg_task.done():
+                        alive_task_ids.append(task_id)
+                await self._valkey_client.heartbeat(alive_task_ids)
+            except Exception as e:
+                log.exception("Exception in heartbeat loop: {}", e)
+            await asyncio.sleep(_HEARTBEAT_INTERVAL)

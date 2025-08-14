@@ -29,7 +29,7 @@ TaskID = NewType("TaskID", uuid.UUID)
 
 class BackgroundTaskMetadata(BaseModel):
     task_id: TaskID
-    task_name: TaskName
+    task_name: str
     body: Mapping[str, Any]
     server_id: str = Field(description="Server ID where the task is running")
     tags: set[str] = Field(default_factory=set, description="Optional tags to group tasks")
@@ -45,7 +45,7 @@ class BackgroundTaskMetadata(BaseModel):
     ) -> Self:
         return cls(
             task_id=task_id,
-            task_name=TaskName(task_name),
+            task_name=task_name,
             body=body,
             server_id=server_id,
             tags=set(tags) if tags is not None else set(),
