@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilt
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
 from ai.backend.manager.services.artifact.actions.authorize import AuthorizeArtifactAction
+from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
@@ -343,16 +344,13 @@ def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
 async def delete_artifact(
     input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactPayload:
-    # action_result = await info.context.processors.artifact.delete.wait_for_complete(
-    #     DeleteArtifactAction(
-    #         artifact_id=uuid.UUID(input.artifact_id),
-    #         storage_id=uuid.UUID(input.storage_id),
-    #         bucket_name=input.bucket_name,
-    #     )
-    # )
+    action_result = await info.context.processors.artifact.delete.wait_for_complete(
+        DeleteArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
 
-    # return ImportArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
-    raise NotImplementedError("Delete artifact functionality is not implemented yet.")
+    return DeleteArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 @strawberry.mutation
