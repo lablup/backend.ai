@@ -9,10 +9,12 @@ import aiohttp
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
+    PresignedDownloadObjectReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
+    PresignedDownloadObjectResponse,
 )
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
@@ -668,3 +670,20 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return HuggingFaceImportModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def get_s3_presigned_download_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PresignedDownloadObjectReq,
+    ) -> PresignedDownloadObjectResponse:
+        """
+        Get a presigned URL for downloading an object from storage.
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
+            body=req.model_dump(by_alias=True),
+        )
+        return PresignedDownloadObjectResponse.model_validate(resp)

@@ -181,7 +181,6 @@ input CreateObjectStorageInput {
   secretKey: String!
   endpoint: String!
   region: String!
-  buckets: [String!]!
 }
 
 type CreateObjectStoragePayload {
@@ -273,6 +272,16 @@ extend type EndpointAutoScalingRuleNode @key(fields: "id") {
 
 extend type EndpointToken @key(fields: "token") {
   token: String! @external
+}
+
+input GetPresignedDownloadURLInput {
+  storageId: ID!
+  bucketName: String!
+  key: String!
+}
+
+type GetPresignedDownloadURLPayload {
+  presignedUrl: String!
 }
 
 type HuggingFaceRegistry implements Node {
@@ -495,6 +504,7 @@ type Mutation {
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
   updateHuggingfaceRegistry(id: ID!, input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
+  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -735,7 +745,6 @@ input UpdateObjectStorageInput {
   secretKey: String
   endpoint: String
   region: String
-  buckets: [String!]
 }
 
 type UpdateObjectStoragePayload {

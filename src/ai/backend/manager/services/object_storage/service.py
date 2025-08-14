@@ -1,6 +1,8 @@
 import logging
 
+from ai.backend.common.dto.storage.request import PresignedDownloadObjectReq
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
@@ -13,6 +15,10 @@ from ai.backend.manager.services.object_storage.actions.delete import (
 from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
+    GetDownloadPresignedURLAction,
+    GetDownloadPresignedURLActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
@@ -28,9 +34,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 class ObjectStorageService:
     _object_storage_repository: ObjectStorageRepository
+    _storage_manager: StorageSessionManager
 
-    def __init__(self, object_storage_repository: ObjectStorageRepository) -> None:
+    def __init__(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+        storage_manager: StorageSessionManager,
+    ) -> None:
         self._object_storage_repository = object_storage_repository
+        self._storage_manager = storage_manager
 
     async def create(self, action: CreateObjectStorageAction) -> CreateObjectStorageActionResult:
         """
@@ -72,3 +84,22 @@ class ObjectStorageService:
         log.info("Listing object storages")
         storage_data_list = await self._object_storage_repository.list()
         return ListObjectStorageActionResult(data=storage_data_list)
+
+    async def get_presigned_download_url(
+        self, action: GetDownloadPresignedURLAction
+    ) -> GetDownloadPresignedURLActionResult:
+        """
+        Get a presigned download URL for an existing object storage.
+        """
+        log.info("Getting presigned download URL for object storage with id: {}", action.storage_id)
+        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+
+        result = await storage_proxy_client.get_s3_presigned_download_url(
+            storage_data.name, action.bucket_name, PresignedDownloadObjectReq(key=action.key)
+        )
+
+        return GetDownloadPresignedURLActionResult(
+            storage_id=storage_data.id, presigned_url=result.url
+        )

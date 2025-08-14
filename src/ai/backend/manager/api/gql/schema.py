@@ -40,6 +40,7 @@ from .model_deployment.model_revision import (
 from .object_storage import (
     create_object_storage,
     delete_object_storage,
+    get_presigned_download_url,
     object_storage,
     object_storages,
     update_object_storage,
@@ -80,6 +81,7 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    get_presigned_download_url = get_presigned_download_url
 
 
 @strawberry.type
