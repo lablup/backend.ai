@@ -53,7 +53,6 @@ class ObjectStorageResponse(BaseResponseModel):
     secret_key: str = Field(description="Secret key for authentication")
     endpoint: str = Field(description="Endpoint URL of the object storage")
     region: str = Field(description="Region of the object storage")
-    buckets: list[str] = Field(description="List of available buckets")
 
 
 class ObjectStorageListResponse(BaseResponseModel):

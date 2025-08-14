@@ -461,7 +461,6 @@ type ObjectStorage implements Node {
   secretKey: String!
   endpoint: String!
   region: String!
-  buckets: [String!]!
 }
 
 type ObjectStorageConnection {

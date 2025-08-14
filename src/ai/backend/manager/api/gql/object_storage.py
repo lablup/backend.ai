@@ -26,7 +26,6 @@ class ObjectStorage(Node):
     secret_key: str
     endpoint: str
     region: str
-    buckets: list[str]
 
     @classmethod
     def from_dataclass(cls, data: ObjectStorageData) -> Self:
@@ -38,7 +37,6 @@ class ObjectStorage(Node):
             secret_key=data.secret_key,
             endpoint=data.endpoint,
             region=data.region,
-            buckets=data.buckets,
         )
 
 

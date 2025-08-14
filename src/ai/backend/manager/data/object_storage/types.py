@@ -13,7 +13,6 @@ class ObjectStorageData:
     secret_key: str
     endpoint: str
     region: str
-    buckets: list[str]
 
     def to_dto(self) -> ObjectStorageResponse:
         return ObjectStorageResponse(
@@ -24,5 +23,4 @@ class ObjectStorageData:
             secret_key=self.secret_key,
             endpoint=self.endpoint,
             region=self.region,
-            buckets=self.buckets,
         )
