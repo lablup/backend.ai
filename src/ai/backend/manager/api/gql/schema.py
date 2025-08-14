@@ -14,6 +14,13 @@ from .artifact_registry import (
     import_artifact,
     update_artifact,
 )
+from .huggingface_registry import (
+    create_huggingface_registry,
+    delete_huggingface_registry,
+    huggingface_registries,
+    huggingface_registry,
+    update_huggingface_registry,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
@@ -51,6 +58,8 @@ class Queries:
     replica = replica
     object_storage = object_storage
     object_storages = object_storages
+    huggingface_registry = huggingface_registry
+    huggingface_registries = huggingface_registries
 
 
 @strawberry.type
@@ -66,6 +75,9 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
+    create_huggingface_registry = create_huggingface_registry
+    update_huggingface_registry = update_huggingface_registry
+    delete_huggingface_registry = delete_huggingface_registry
 
 
 @strawberry.type

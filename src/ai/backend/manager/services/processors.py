@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self, override
 
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 
@@ -117,6 +119,7 @@ class Services:
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
     object_storage: ObjectStorageService
+    artifact_registry: ArtifactRegistryService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -221,6 +224,7 @@ class Services:
         object_storage_service = ObjectStorageService(
             object_storage_repository=repositories.object_storage.repository,
         )
+        artifact_registry = ArtifactRegistryService(repositories.huggingface_registry.repository)
 
         return cls(
             agent=agent_service,
@@ -242,6 +246,7 @@ class Services:
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
             object_storage=object_storage_service,
+            artifact_registry=artifact_registry,
         )
 
 
@@ -271,6 +276,7 @@ class Processors(AbstractProcessorPackage):
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
     object_storage: ObjectStorageProcessors
+    artifact_registry: ArtifactRegistryProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -310,6 +316,7 @@ class Processors(AbstractProcessorPackage):
         )
         auth = AuthProcessors(services.auth, action_monitors)
         object_storage = ObjectStorageProcessors(services.object_storage, action_monitors)
+        artifact_registry = ArtifactRegistryProcessors(services.artifact_registry, action_monitors)
 
         return cls(
             agent=agent_processors,
@@ -331,6 +338,7 @@ class Processors(AbstractProcessorPackage):
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
             auth=auth,
             object_storage=object_storage,
+            artifact_registry=artifact_registry,
         )
 
     @override
@@ -354,4 +362,5 @@ class Processors(AbstractProcessorPackage):
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
             *self.object_storage.supported_actions(),
+            *self.artifact_registry.supported_actions(),
         ]
