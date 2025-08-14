@@ -2,9 +2,9 @@ import enum
 import uuid
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
-from pydantic import BaseModel, GetCoreSchemaHandler
+from pydantic import BaseModel, Field, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 
@@ -48,10 +48,6 @@ class ServerType(enum.StrEnum):
     AGENT = "agent"
     STORAGE_PROXY = "storage_proxy"
 
-    @classmethod
-    def all_types(cls) -> set["ServerType"]:
-        return {type_ for type_ in cls}
-
 
 @dataclass
 class ServerComponentID:
@@ -63,8 +59,10 @@ class BackgroundTaskMetadata(BaseModel):
     task_id: TaskID
     task_name: str
     body: Mapping[str, Any]
-    server_id: str
-    server_types: Collection[ServerType]
+    server_id: str = Field(exclude=True, description="Server ID where the task is running")
+    server_types: Collection[ServerType] = Field(
+        exclude=True, description="Server types that can run this task"
+    )
 
     @classmethod
     def create(
@@ -73,15 +71,15 @@ class BackgroundTaskMetadata(BaseModel):
         task_name: str,
         body: Mapping[str, Any],
         server_id: ServerComponentID,
-        allow_any_server: bool = False,
+        allowed_server_types: Optional[Collection[ServerType]] = None,
     ) -> "BackgroundTaskMetadata":
-        server_types = ServerType.all_types() if allow_any_server else {server_id.server_type}
+        server_types = allowed_server_types or set()
         return cls(
             task_id=TaskID(task_id),
             task_name=task_name,
             body=body,
             server_id=server_id.server_id,
-            server_types=server_types,
+            server_types={*server_types, server_id.server_type},
         )
 
     def to_json(self) -> str:
@@ -94,7 +92,4 @@ class BackgroundTaskMetadata(BaseModel):
         return cls.model_validate_json(data)
 
 
-@dataclass
-class BackgroundTaskMetadataTTL:
-    metadata: BackgroundTaskMetadata
-    ttl_seconds: int
+type TTL_SECOND = int
