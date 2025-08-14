@@ -138,6 +138,16 @@ enum ClusterMode {
   MULTI_NODE
 }
 
+input CreateHuggingFaceRegistryInput {
+  url: String!
+  name: String!
+  token: String
+}
+
+type CreateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
+}
+
 input CreateModelDeploymentInput {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
@@ -185,6 +195,14 @@ input DeleteArtifactInput {
 
 type DeleteArtifactPayload {
   artifact: Artifact!
+}
+
+input DeleteHuggingFaceRegistryInput {
+  id: ID!
+}
+
+type DeleteHuggingFaceRegistryPayload {
+  id: ID!
 }
 
 input DeleteModelDeploymentInput {
@@ -253,6 +271,32 @@ extend type EndpointAutoScalingRuleNode @key(fields: "id") {
 
 extend type EndpointToken @key(fields: "token") {
   token: String! @external
+}
+
+type HuggingFaceRegistry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  url: String!
+  name: String!
+  token: String
+}
+
+type HuggingFaceRegistryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [HuggingFaceRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type HuggingFaceRegistryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: HuggingFaceRegistry!
 }
 
 input ImageInput {
@@ -443,6 +487,9 @@ type Mutation {
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+  createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
+  updateHuggingfaceRegistry(id: ID!, input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -637,6 +684,16 @@ input UpdateArtifactInput {
 
 type UpdateArtifactPayload {
   artifact: Artifact!
+}
+
+input UpdateHuggingFaceRegistryInput {
+  url: String
+  name: String
+  token: String
+}
+
+type UpdateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
 }
 
 input UpdateModelDeploymentInput {
