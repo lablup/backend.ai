@@ -115,6 +115,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
+from .bgtask.image import PushImage, PushImageArgs
 from .config.unified import (
     AgentUnifiedConfig,
     APIConfig,
@@ -995,14 +996,12 @@ class AgentRPCServer(aobject):
 
         image_push_timeout = cast(Optional[float], self.local_config.api.push_timeout)
 
-        async def _push_image(reporter: ProgressReporter) -> None:
-            await self.agent.push_image(
-                image_ref,
-                registry_conf,
-                timeout=image_push_timeout,
-            )
-
-        task_id = await bgtask_mgr.start(_push_image)
+        args = PushImageArgs(
+            image_ref=image_ref,
+            registry_conf=registry_conf,
+            timeout=image_push_timeout,
+        )
+        task_id = await bgtask_mgr.start(PushImage.name(), args)
         return {
             "bgtask_id": str(task_id),
             "canonical": image_ref.canonical,

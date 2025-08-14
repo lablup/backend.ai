@@ -7,9 +7,6 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
-    Concatenate,
     Final,
     Optional,
     Protocol,
@@ -111,11 +108,6 @@ class BgTaskInfo:
         }
 
 
-BackgroundTask = Callable[
-    Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult | None]
-]
-
-
 class BackgroundTaskObserver(Protocol):
     def observe_bgtask_started(self, *, task_name: str) -> None: ...
     def observe_bgtask_done(
@@ -146,6 +138,7 @@ class BackgroundTaskManager:
 
     def __init__(
         self,
+        task_registry: Mapping[TaskName, BaseBackgroundTask],
         event_producer: EventProducer,
         *,
         valkey_client: ValkeyBgtaskClient,
@@ -153,6 +146,7 @@ class BackgroundTaskManager:
         tags: Optional[Iterable[str]] = None,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
+        self._task_registry = task_registry
         self._event_producer = event_producer
         self._ongoing_tasks = {}
         self._metric_observer = bgtask_observer
@@ -161,16 +155,16 @@ class BackgroundTaskManager:
         self._valkey_client = valkey_client
         self._server_id = server_id
         self._tags = set(tags) if tags is not None else set()
-        self._task_registry = {}
 
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
 
     async def start(
         self,
-        func: BackgroundTask,
-        name: Optional[str] = None,
-        **kwargs,
+        task_name: TaskName,
+        args: BaseBackgroundTaskArgs,
+        *,
+        task_tags: Optional[Iterable[str]] = None,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
         await self._event_producer.broadcast_event_with_cache(
@@ -224,29 +218,28 @@ class BackgroundTaskManager:
 
     async def _run_bgtask(
         self,
-        func: BackgroundTask,
+        func: BaseBackgroundTask,
+        args: BaseBackgroundTaskArgs,
         task_id: uuid.UUID,
-        **kwargs,
     ) -> BaseBgtaskDoneEvent:
         reporter = ProgressReporter(self._event_producer, task_id)
-        bgtask_result = await func(reporter, **kwargs)
+        bgtask_result = await func.execute(reporter, args)
         return self._convert_bgtask_to_event(task_id, bgtask_result)
 
     async def _observe_bgtask(
         self,
-        func: BackgroundTask,
+        func: BaseBackgroundTask,
+        args: BaseBackgroundTaskArgs,
         task_id: uuid.UUID,
-        task_name: Optional[str],
-        **kwargs,
+        task_name: TaskName,
     ) -> BaseBgtaskDoneEvent:
-        self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
+        self._metric_observer.observe_bgtask_started(task_name=task_name)
         start_time = time.perf_counter()
-        task_name = task_name or func.__name__
         status = BgtaskStatus.STARTED
         error_code: Optional[ErrorCode] = None
         msg = "no message"
         try:
-            bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
+            bgtask_result_event = await self._run_bgtask(func, args, task_id)
             status = bgtask_result_event.status()
             msg = bgtask_result_event.message or msg
         except asyncio.CancelledError:

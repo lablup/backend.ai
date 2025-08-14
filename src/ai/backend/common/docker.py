@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
+    Any,
     Final,
     Iterable,
     Literal,
@@ -441,6 +442,33 @@ class ImageRef:
     registry: str
     architecture: str
     is_local: bool
+
+    def to_serializable_dict(self) -> dict[str, Any]:
+        """
+        Convert the ImageRef to a serializable dictionary.
+        """
+        return {
+            "name": self.name,
+            "project": self.project,
+            "tag": self.tag,
+            "registry": self.registry,
+            "architecture": self.architecture,
+            "is_local": self.is_local,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """
+        Create an ImageRef instance from a dictionary.
+        """
+        return cls(
+            name=data["name"],
+            project=data["project"],
+            tag=data["tag"],
+            registry=data["registry"],
+            architecture=data["architecture"],
+            is_local=data["is_local"],
+        )
 
     @classmethod
     def from_image_config(cls, config: ImageConfig) -> Self:

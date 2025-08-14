@@ -71,6 +71,8 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.task.base import BaseBackgroundTask
+from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -218,6 +220,7 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
+from .bgtask.image import PushImage
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
@@ -910,7 +913,9 @@ class AbstractAgent(
             db_id=REDIS_BGTASK_DB,
         )
 
+        bgtask_registry = self._make_bgtask_registry()
         self.background_task_manager = BackgroundTaskManager(
+            bgtask_registry,
             self.event_producer,
             valkey_client=self.valkey_bgtask_client,
             server_id=self.id,
@@ -1003,6 +1008,11 @@ class AbstractAgent(
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
+
+    def _make_bgtask_registry(self) -> dict[TaskName, BaseBackgroundTask]:
+        return {
+            PushImage.name(): PushImage(None),
+        }
 
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """
