@@ -141,7 +141,7 @@ enum ClusterMode {
 input CreateHuggingFaceRegistryInput {
   url: String!
   name: String!
-  token: String
+  token: String = null
 }
 
 type CreateHuggingFaceRegistryPayload {
