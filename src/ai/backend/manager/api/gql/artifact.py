@@ -264,6 +264,16 @@ class UnauthorizeArtifactPayload:
 
 
 @strawberry.type
+class AuthorizeArtifactPayload:
+    artifact: Artifact
+
+
+@strawberry.type
+class UnauthorizeArtifactPayload:
+    artifact: Artifact
+
+
+@strawberry.type
 class CancelImportArtifactPayload:
     artifact_id: ID
 
@@ -413,6 +423,32 @@ async def cancel_import_artifact(
     )
 
     return CancelImportArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
+
+
+@strawberry.mutation
+async def authorize_artifact(
+    input: AuthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> AuthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.authorize.wait_for_complete(
+        AuthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return AuthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+
+
+@strawberry.mutation
+async def unauthorize_artifact(
+    input: UnauthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> UnauthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.unauthorize.wait_for_complete(
+        UnauthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return UnauthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 @strawberry.mutation
