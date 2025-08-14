@@ -2,34 +2,29 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class ScanArtifactsAction(ArtifactAction):
-    registry_id: uuid.UUID
-    storage_id: uuid.UUID
-    limit: int
-    order: ModelSortKey
-    search: Optional[str]
+class AuthorizeArtifactAction(ArtifactAction):
+    artifact_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.artifact_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "scan"
+        return "authorize"
 
 
 @dataclass
-class ScanArtifactsActionResult(BaseActionResult):
-    result: list[ArtifactData]
+class AuthorizeArtifactActionResult(BaseActionResult):
+    result: ArtifactData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.result.id)

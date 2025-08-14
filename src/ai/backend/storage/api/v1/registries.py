@@ -98,7 +98,7 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries"
 
-    storage_service = StorageService([])
+    storage_service = StorageService(storage_configs=ctx.local_config.storages)
 
     huggingface_registry_configs = dict(
         (r.name, r.config)

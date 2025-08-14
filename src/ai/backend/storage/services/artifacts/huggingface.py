@@ -31,7 +31,7 @@ from ai.backend.storage.services.storages import StorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_CHUNK_SIZE = 8192  # Default chunk size for streaming downloads
+# TODO: Move to config
 _DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in seconds
 
 
@@ -169,6 +169,11 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
 
+        registry_config = self._registry_configs.get(registry_name)
+        if not registry_config:
+            raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
+        chunk_size = registry_config.download_chunk_size
+
         async def _import_model(reporter: ProgressReporter) -> None:
             model_id = model.model_id
             revision = model.revision
@@ -190,12 +195,13 @@ class HuggingFaceService:
 
                 for file_info in file_infos:
                     try:
-                        await self._upload_single_file_to_storage(
+                        await self._pipe_single_file_to_storage(
                             file_info=file_info,
                             model_id=model_id,
                             revision=revision,
                             storage_name=storage_name,
                             bucket_name=bucket_name,
+                            download_chunk_size=chunk_size,
                         )
 
                         successful_uploads += 1
@@ -330,12 +336,13 @@ class HuggingFaceService:
         return bgtask_id
 
     async def _make_download_file_stream(
-        self, url: str, timeout: int = _DEFAULT_FILE_DOWNLOAD_TIMEOUT
+        self, url: str, download_chunk_size: int, timeout: int = _DEFAULT_FILE_DOWNLOAD_TIMEOUT
     ) -> AsyncIterator[bytes]:
         """Download file from URL as async byte stream.
 
         Args:
             url: URL to download from
+            download_chunk_size: Chunk size for file download
             timeout: Request timeout in seconds
 
         Yields:
@@ -354,18 +361,20 @@ class HuggingFaceService:
                             f"Download failed with status {response.status}: {url}"
                         )
 
-                    async for chunk in response.content.iter_chunked(_DEFAULT_CHUNK_SIZE):
+                    async for chunk in response.content.iter_chunked(download_chunk_size):
                         yield chunk
         except aiohttp.ClientError as e:
             raise HuggingFaceAPIError(f"HTTP client error downloading {url}: {str(e)}") from e
         except Exception as e:
             raise HuggingFaceAPIError(f"Unexpected error downloading {url}: {str(e)}") from e
 
-    async def _upload_single_file_to_storage(
+    async def _pipe_single_file_to_storage(
         self,
+        *,
         file_info: FileObjectData,
         model_id: str,
         revision: str,
+        download_chunk_size: int,
         storage_name: str,
         bucket_name: str,
     ) -> None:
@@ -375,6 +384,7 @@ class HuggingFaceService:
             file_info: File information with download URL
             model_id: HuggingFace model ID
             revision: Git revision (branch, tag, or commit hash)
+            download_chunk_size: Chunk size for file download
             storage_name: Target storage name
             bucket_name: Target bucket name
         """
@@ -393,7 +403,9 @@ class HuggingFaceService:
             )
 
             # Download from HuggingFace and stream directly to storage
-            download_stream = self._make_download_file_stream(file_info.download_url)
+            download_stream = self._make_download_file_stream(
+                file_info.download_url, download_chunk_size
+            )
 
             # Upload to storage using existing service
             await self._storages_service.stream_upload(
@@ -402,7 +414,6 @@ class HuggingFaceService:
                 filepath=storage_key,
                 data_stream=download_stream,
                 content_type=None,
-                content_length=None,
             )
 
             log.info(

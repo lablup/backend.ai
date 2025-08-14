@@ -1,9 +1,17 @@
+import json
 import uuid
 from typing import Optional, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
+    GetDownloadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
+    GetUploadPresignedURLAction,
+)
 
 from ...data.object_storage.creator import ObjectStorageCreator
 from ...data.object_storage.modifier import ObjectStorageModifier
@@ -97,7 +105,6 @@ class CreateObjectStorageInput:
     secret_key: str
     endpoint: str
     region: str
-    buckets: list[str]
 
     def to_creator(self) -> ObjectStorageCreator:
         return ObjectStorageCreator(
@@ -107,7 +114,6 @@ class CreateObjectStorageInput:
             secret_key=self.secret_key,
             endpoint=self.endpoint,
             region=self.region,
-            buckets=self.buckets,
         )
 
 
@@ -120,7 +126,6 @@ class UpdateObjectStorageInput:
     secret_key: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
     region: Optional[str] = UNSET
-    buckets: Optional[list[str]] = UNSET
 
     def to_modifier(self) -> ObjectStorageModifier:
         return ObjectStorageModifier(
@@ -130,13 +135,30 @@ class UpdateObjectStorageInput:
             secret_key=OptionalState[str].from_graphql(self.secret_key),
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             region=OptionalState[str].from_graphql(self.region),
-            buckets=OptionalState[list[str]].from_graphql(self.buckets),
         )
 
 
 @strawberry.input
 class DeleteObjectStorageInput:
     id: ID
+
+
+@strawberry.input
+class GetPresignedDownloadURLInput:
+    storage_id: ID
+    bucket_name: str
+    key: str
+
+
+@strawberry.input
+class GetPresignedUploadURLInput:
+    storage_id: ID
+    bucket_name: str
+    key: str
+    content_type: Optional[str] = None
+    expiration: Optional[int] = None
+    min_size: Optional[int] = None
+    max_size: Optional[int] = None
 
 
 @strawberry.type
@@ -152,6 +174,17 @@ class UpdateObjectStoragePayload:
 @strawberry.type
 class DeleteObjectStoragePayload:
     id: ID
+
+
+@strawberry.type
+class GetPresignedDownloadURLPayload:
+    presigned_url: str
+
+
+@strawberry.type
+class GetPresignedUploadURLPayload:
+    presigned_url: str
+    fields: str  # JSON string containing the form fields
 
 
 @strawberry.mutation
@@ -202,3 +235,43 @@ async def delete_object_storage(
     )
 
     return DeleteObjectStoragePayload(id=ID(str(action_result.deleted_storage_id)))
+
+
+@strawberry.mutation
+async def get_presigned_download_url(
+    input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
+) -> GetPresignedDownloadURLPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
+        GetDownloadPresignedURLAction(
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
+            key=input.key,
+        )
+    )
+
+    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+
+
+@strawberry.mutation
+async def get_presigned_upload_url(
+    input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
+) -> GetPresignedUploadURLPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
+        GetUploadPresignedURLAction(
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
+            key=input.key,
+            content_type=input.content_type,
+            expiration=input.expiration,
+            min_size=input.min_size,
+            max_size=input.max_size,
+        )
+    )
+
+    return GetPresignedUploadURLPayload(
+        presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
+    )

@@ -1051,6 +1051,14 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+  
+  # Populate artifact registries with substituted MinIO credentials
+  TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
+  cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
+  rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
 
   show_info "Setting up databases... (account-manager)"
   # TODO: add "schema oneshot" command for account-manager

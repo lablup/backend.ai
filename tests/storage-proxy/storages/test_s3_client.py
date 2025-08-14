@@ -3,6 +3,9 @@ from botocore.exceptions import ClientError
 
 from ai.backend.storage.client.s3 import S3Client
 
+_DEFAULT_UPLOAD_STREAM_CHUNK_SIZE = 5 * 1024 * 1024  # 5 MiB
+_DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE = 8192
+
 
 @pytest.mark.asyncio
 async def test_upload_stream_success(s3_client: S3Client):
@@ -13,11 +16,18 @@ async def test_upload_stream_success(s3_client: S3Client):
         yield b"chunk2"
         yield b"chunk3"
 
-    await s3_client.upload_stream(data_stream(), "test/key.txt", content_type="text/plain")
+    await s3_client.upload_stream(
+        data_stream(),
+        "test/key.txt",
+        part_size=_DEFAULT_UPLOAD_STREAM_CHUNK_SIZE,
+        content_type="text/plain",
+    )
 
     # Verify the file was uploaded by downloading it
     chunks = []
-    async for chunk in s3_client.download_stream("test/key.txt"):
+    async for chunk in s3_client.download_stream(
+        "test/key.txt", _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE
+    ):
         chunks.append(chunk)
 
     assert b"".join(chunks) == b"chunk1chunk2chunk3"
@@ -32,11 +42,15 @@ async def test_download_stream_success(s3_client: S3Client):
     async def data_stream():
         yield test_data
 
-    await s3_client.upload_stream(data_stream(), "test/download.txt")
+    await s3_client.upload_stream(
+        data_stream(), "test/download.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+    )
 
     # Now download and verify
     chunks = []
-    async for chunk in s3_client.download_stream("test/download.txt"):
+    async for chunk in s3_client.download_stream(
+        "test/download.txt", _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE
+    ):
         chunks.append(chunk)
 
     assert b"".join(chunks) == test_data
@@ -46,7 +60,9 @@ async def test_download_stream_success(s3_client: S3Client):
 async def test_download_stream_not_found(s3_client: S3Client):
     """Test download stream with object not found"""
     with pytest.raises(ClientError) as exc_info:
-        async for chunk in s3_client.download_stream("nonexistent/key.txt"):
+        async for chunk in s3_client.download_stream(
+            "nonexistent/key.txt", _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE
+        ):
             pass
 
     assert exc_info.value.response["Error"]["Code"] in ["NoSuchKey", "404"]
@@ -80,7 +96,9 @@ async def test_generate_presigned_download_url_success(s3_client: S3Client):
     async def data_stream():
         yield test_data
 
-    await s3_client.upload_stream(data_stream(), "test/presigned_download.txt")
+    await s3_client.upload_stream(
+        data_stream(), "test/presigned_download.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+    )
 
     # Generate presigned download URL
     result = await s3_client.generate_presigned_download_url(
@@ -102,7 +120,9 @@ async def test_get_object_info_success(s3_client: S3Client):
     async def data_stream():
         yield test_data
 
-    await s3_client.upload_stream(data_stream(), "test/info.txt", content_type="text/plain")
+    await s3_client.upload_stream(
+        data_stream(), "test/info.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE, content_type="text/plain"
+    )
 
     # Get object info
     result = await s3_client.get_object_meta("test/info.txt")
@@ -130,7 +150,9 @@ async def test_delete_object_success(s3_client: S3Client):
     async def data_stream():
         yield test_data
 
-    await s3_client.upload_stream(data_stream(), "test/delete_me.txt")
+    await s3_client.upload_stream(
+        data_stream(), "test/delete_me.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+    )
 
     # Verify file exists
     info = await s3_client.get_object_meta("test/delete_me.txt")
@@ -176,7 +198,9 @@ async def test_create_bucket_success(s3_client: S3Client):
         )
 
         # This should succeed if bucket was created
-        await test_client.upload_stream(data_stream(), "test-key.txt")
+        await test_client.upload_stream(
+            data_stream(), "test-key.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+        )
 
         # Clean up the uploaded object first
         await test_client.delete_object("test-key.txt")
@@ -203,7 +227,9 @@ async def test_create_bucket_already_exists(s3_client: S3Client):
     async def data_stream():
         yield b"test data for existing bucket"
 
-    await s3_client.upload_stream(data_stream(), "test-existing-bucket.txt")
+    await s3_client.upload_stream(
+        data_stream(), "test-existing-bucket.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+    )
 
 
 @pytest.mark.asyncio
@@ -231,7 +257,9 @@ async def test_delete_bucket_success(s3_client: S3Client):
 
     # This should raise an exception since bucket doesn't exist
     with pytest.raises(ClientError):
-        await test_client.upload_stream(data_stream(), "test-key.txt")
+        await test_client.upload_stream(
+            data_stream(), "test-key.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE
+        )
 
 
 @pytest.mark.asyncio

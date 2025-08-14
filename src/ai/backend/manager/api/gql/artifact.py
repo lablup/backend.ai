@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Self
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
-
-
-# Enums
-@strawberry.enum
-class ArtifactType(StrEnum):
-    MODEL = "MODEL"
-    PACKAGE = "PACKAGE"
-    IMAGE = "IMAGE"
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
+from ai.backend.manager.services.artifact.actions.authorize import AuthorizeArtifactAction
+from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
+from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
+from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
 
 
 @strawberry.enum
@@ -38,7 +39,6 @@ class ArtifactOrderField(StrEnum):
     LATEST_VERSION = "LATEST_VERSION"
 
 
-# Input Types
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
@@ -60,8 +60,20 @@ class ArtifactOrderBy:
 
 
 @strawberry.input
+class ScanArtifactInput:
+    registry_id: ID
+    storage_id: ID
+    limit: int
+    # TODO: Make it enum
+    order: str
+    search: Optional[str] = None
+
+
+@strawberry.input
 class ImportArtifactInput:
     artifact_id: ID
+    storage_id: ID
+    bucket_name: str
 
 
 @strawberry.input
@@ -71,6 +83,16 @@ class UpdateArtifactInput:
 
 @strawberry.input
 class DeleteArtifactInput:
+    artifact_id: ID
+
+
+@strawberry.input
+class AuthorizeArtifactInput:
+    artifact_id: ID
+
+
+@strawberry.input
+class UnauthorizeArtifactInput:
     artifact_id: ID
 
 
@@ -95,6 +117,26 @@ class Artifact(Node):
     updated_at: datetime
     version: str
     authorized: bool
+
+    @classmethod
+    def from_dataclass(cls, data: ArtifactData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            name=data.name,
+            type=ArtifactType(data.type),
+            # TODO: Fetch status from the actual data source
+            # status=ArtifactStatus(data.status),
+            status=ArtifactStatus.AVAILABLE,
+            description=data.description,
+            # TODO: Fill these with actual data
+            registry=SourceInfo(name=None, url=None),
+            source=SourceInfo(name=None, url=None),
+            size=ByteSize(data.size),
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+            version=data.version,
+            authorized=data.authorized,
+        )
 
 
 ArtifactEdge = Edge[Artifact]
@@ -126,7 +168,6 @@ class ArtifactGroup(Node):
         first: Optional[int] = None,
         last: Optional[int] = None,
     ) -> ArtifactConnection:
-        # Mock implementation - filter artifacts by group type
         all_mock_artifacts: list = []
 
         # Filter artifacts to match the group's type
@@ -161,6 +202,11 @@ class ArtifactImportProgressUpdatedPayload:
     status: ArtifactStatus
 
 
+@strawberry.type
+class ScanArtifactsPayload:
+    artifacts: list[Artifact]
+
+
 # Mutation Payloads
 @strawberry.type
 class ImportArtifactPayload:
@@ -174,6 +220,16 @@ class UpdateArtifactPayload:
 
 @strawberry.type
 class DeleteArtifactPayload:
+    artifact_id: ID
+
+
+@strawberry.type
+class AuthorizeArtifactPayload:
+    artifact: Artifact
+
+
+@strawberry.type
+class UnauthorizeArtifactPayload:
     artifact: Artifact
 
 
@@ -244,25 +300,88 @@ def artifact_group(id: ID) -> Optional[ArtifactGroup]:
     return None
 
 
+@strawberry.mutation
+async def scan_artifacts(
+    input: ScanArtifactInput, info: Info[StrawberryGQLContext]
+) -> ScanArtifactsPayload:
+    # TODO: 여기서 타입 별로 호출해야...
+    action_result = await info.context.processors.artifact.scan.wait_for_complete(
+        ScanArtifactsAction(
+            registry_id=uuid.UUID(input.registry_id),
+            storage_id=uuid.UUID(input.storage_id),
+            limit=input.limit,
+            order=ModelSortKey(input.order),
+            search=input.search,
+        )
+    )
+
+    artifacts = [Artifact.from_dataclass(item) for item in action_result.result]
+    return ScanArtifactsPayload(artifacts=artifacts)
+
+
 # Mutations
 @strawberry.mutation
-def import_artifact(input: ImportArtifactInput) -> ImportArtifactPayload:
-    raise NotImplementedError()
+async def import_artifact(
+    input: ImportArtifactInput, info: Info[StrawberryGQLContext]
+) -> ImportArtifactPayload:
+    action_result = await info.context.processors.artifact.import_.wait_for_complete(
+        ImportArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
+        )
+    )
+
+    return ImportArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 @strawberry.mutation
 def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
-    raise NotImplementedError()
+    raise NotImplementedError("Update artifact functionality is not implemented yet.")
 
 
 @strawberry.mutation
-def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
-    raise NotImplementedError()
+async def delete_artifact(
+    input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
+) -> DeleteArtifactPayload:
+    action_result = await info.context.processors.artifact.delete.wait_for_complete(
+        DeleteArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return DeleteArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
 
 
 @strawberry.mutation
 def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
-    raise NotImplementedError()
+    raise NotImplementedError("Cancel import artifact functionality is not implemented yet.")
+
+
+@strawberry.mutation
+async def authorize_artifact(
+    input: AuthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> AuthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.authorize.wait_for_complete(
+        AuthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return AuthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+
+
+@strawberry.mutation
+async def unauthorize_artifact(
+    input: UnauthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> UnauthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.unauthorize.wait_for_complete(
+        UnauthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return UnauthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 # Subscriptions

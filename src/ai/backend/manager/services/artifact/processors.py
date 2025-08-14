@@ -7,6 +7,14 @@ from ai.backend.manager.services.artifact.actions.associate_with_storage import 
     AssociateWithStorageAction,
     AssociateWithStorageActionResult,
 )
+from ai.backend.manager.services.artifact.actions.authorize import (
+    AuthorizeArtifactAction,
+    AuthorizeArtifactActionResult,
+)
+from ai.backend.manager.services.artifact.actions.delete import (
+    DeleteArtifactAction,
+    DeleteArtifactActionResult,
+)
 from ai.backend.manager.services.artifact.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
@@ -18,6 +26,10 @@ from ai.backend.manager.services.artifact.actions.import_ import (
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.unauthorize import (
+    UnauthorizeArtifactAction,
+    UnauthorizeArtifactActionResult,
 )
 
 from .service import ArtifactService
@@ -32,6 +44,9 @@ class ArtifactProcessors(AbstractProcessorPackage):
     disassociate_with_storage: ActionProcessor[
         DisassociateWithStorageAction, DisassociateWithStorageActionResult
     ]
+    authorize: ActionProcessor[AuthorizeArtifactAction, AuthorizeArtifactActionResult]
+    unauthorize: ActionProcessor[UnauthorizeArtifactAction, UnauthorizeArtifactActionResult]
+    delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.import_ = ActionProcessor(service.import_, action_monitors)
@@ -42,6 +57,9 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.disassociate_with_storage = ActionProcessor(
             service.disassociate_with_storage, action_monitors
         )
+        self.authorize = ActionProcessor(service.authorize, action_monitors)
+        self.unauthorize = ActionProcessor(service.unauthorize, action_monitors)
+        self.delete = ActionProcessor(service.delete, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -50,4 +68,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
             ScanArtifactsAction.spec(),
             AssociateWithStorageAction.spec(),
             DisassociateWithStorageAction.spec(),
+            AuthorizeArtifactAction.spec(),
+            UnauthorizeArtifactAction.spec(),
+            DeleteArtifactAction.spec(),
         ]

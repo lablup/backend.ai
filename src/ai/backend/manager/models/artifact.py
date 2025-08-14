@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from typing import Optional, Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.artifact_registry import ArtifactType
-from ai.backend.manager.data.artifact.types import ArtifactData
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRegistryType, ArtifactType
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 
@@ -103,4 +105,26 @@ class ArtifactRow(Base):
             updated_at=self.updated_at,
             authorized=self.authorized,
             version=self.version,
+        )
+
+    @classmethod
+    def from_huggingface_model_data(
+        cls,
+        model_data: ModelData,
+        registry_id: uuid.UUID,
+        source_registry_id: Optional[uuid.UUID] = None,
+    ) -> Self:
+        return cls(
+            type=ArtifactType.MODEL,
+            name=model_data.id,
+            # TODO: How to handle this?
+            size=0,
+            source_registry_id=source_registry_id,
+            registry_id=registry_id,
+            registry_type=ArtifactRegistryType.HUGGINGFACE,
+            # TODO: How to handle this?
+            description="",
+            created_at=model_data.created_at,
+            updated_at=model_data.modified_at,
+            version=model_data.revision,
         )

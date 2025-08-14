@@ -27,6 +27,8 @@ from ai.backend.storage.services.artifacts.huggingface import (
 )
 from ai.backend.storage.services.storages import StorageService
 
+_DEFAULT_CHUNK_SIZE = 8192
+
 
 @pytest.fixture
 def mock_huggingface_config() -> HuggingfaceConfig:
@@ -353,7 +355,9 @@ class TestHuggingFaceService:
         mock_client_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
         chunks = []
-        async for chunk in hf_service._make_download_file_stream("http://test.com/file"):
+        async for chunk in hf_service._make_download_file_stream(
+            "http://test.com/file", _DEFAULT_CHUNK_SIZE
+        ):
             chunks.append(chunk)
 
         assert chunks == [b"chunk1", b"chunk2"]
@@ -375,7 +379,9 @@ class TestHuggingFaceService:
         mock_client_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
         with pytest.raises(HuggingFaceAPIError):
-            async for chunk in hf_service._make_download_file_stream("http://test.com/file"):
+            async for chunk in hf_service._make_download_file_stream(
+                "http://test.com/file", _DEFAULT_CHUNK_SIZE
+            ):
                 pass
 
     @pytest.mark.asyncio
@@ -387,7 +393,9 @@ class TestHuggingFaceService:
         mock_client_session.side_effect = ClientError("Connection error")
 
         with pytest.raises(HuggingFaceAPIError):
-            async for chunk in hf_service._make_download_file_stream("http://test.com/file"):
+            async for chunk in hf_service._make_download_file_stream(
+                "http://test.com/file", _DEFAULT_CHUNK_SIZE
+            ):
                 pass
 
     @pytest.mark.asyncio
@@ -407,12 +415,13 @@ class TestHuggingFaceService:
         with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
-            await hf_service._upload_single_file_to_storage(
+            await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
+                download_chunk_size=_DEFAULT_CHUNK_SIZE,
             )
 
             mock_storage_service.stream_upload.assert_called_once()
@@ -434,12 +443,13 @@ class TestHuggingFaceService:
         with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
-            await hf_service._upload_single_file_to_storage(
+            await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
+                download_chunk_size=_DEFAULT_CHUNK_SIZE,
             )
 
     @pytest.mark.asyncio
@@ -458,12 +468,13 @@ class TestHuggingFaceService:
             service._storages_service = None  # type: ignore
 
         with pytest.raises(HuggingFaceAPIError):
-            await service._upload_single_file_to_storage(
+            await service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
+                download_chunk_size=_DEFAULT_CHUNK_SIZE,
             )
 
     @pytest.mark.asyncio
@@ -481,10 +492,11 @@ class TestHuggingFaceService:
             mock_download_stream.return_value = AsyncIterator[bytes]
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service._upload_single_file_to_storage(
+            await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model_id="microsoft/DialoGPT-medium",
                 revision="main",
                 storage_name="test_storage",
                 bucket_name="test_bucket",
+                download_chunk_size=_DEFAULT_CHUNK_SIZE,
             )

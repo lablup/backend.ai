@@ -118,6 +118,14 @@ enum ArtifactType {
   IMAGE
 }
 
+input AuthorizeArtifactInput {
+  artifactId: ID!
+}
+
+type AuthorizeArtifactPayload {
+  artifact: Artifact!
+}
+
 scalar ByteSize
 
 type CancelImportArtifactPayload {
@@ -181,7 +189,6 @@ input CreateObjectStorageInput {
   secretKey: String!
   endpoint: String!
   region: String!
-  buckets: [String!]!
 }
 
 type CreateObjectStoragePayload {
@@ -196,7 +203,7 @@ input DeleteArtifactInput {
 }
 
 type DeleteArtifactPayload {
-  artifact: Artifact!
+  artifactId: ID!
 }
 
 input DeleteHuggingFaceRegistryInput {
@@ -275,6 +282,31 @@ extend type EndpointToken @key(fields: "token") {
   token: String! @external
 }
 
+input GetPresignedDownloadURLInput {
+  storageId: ID!
+  bucketName: String!
+  key: String!
+}
+
+type GetPresignedDownloadURLPayload {
+  presignedUrl: String!
+}
+
+input GetPresignedUploadURLInput {
+  storageId: ID!
+  bucketName: String!
+  key: String!
+  contentType: String = null
+  expiration: Int = null
+  minSize: Int = null
+  maxSize: Int = null
+}
+
+type GetPresignedUploadURLPayload {
+  presignedUrl: String!
+  fields: String!
+}
+
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -312,6 +344,8 @@ extend type ImageNode @key(fields: "id") {
 
 input ImportArtifactInput {
   artifactId: ID!
+  storageId: ID!
+  bucketName: String!
 }
 
 type ImportArtifactPayload {
@@ -478,6 +512,7 @@ input ModelRuntimeConfigInput {
 }
 
 type Mutation {
+  scanArtifacts(input: ScanArtifactInput!): ScanArtifactsPayload!
   importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
@@ -492,6 +527,10 @@ type Mutation {
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
   updateHuggingfaceRegistry(id: ID!, input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
+  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
+  authorizeArtifact(input: AuthorizeArtifactInput!): AuthorizeArtifactPayload!
+  unauthorizeArtifact(input: UnauthorizeArtifactInput!): UnauthorizeArtifactPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -652,6 +691,18 @@ type ScalingRule {
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
+input ScanArtifactInput {
+  registryId: ID!
+  storageId: ID!
+  limit: Int!
+  order: String!
+  search: String = null
+}
+
+type ScanArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
 """Different service configurations for model runtime"""
 union ServiceConfig = RawServiceConfig
 
@@ -681,6 +732,14 @@ type Subscription {
 }
 
 scalar UUID
+
+input UnauthorizeArtifactInput {
+  artifactId: ID!
+}
+
+type UnauthorizeArtifactPayload {
+  artifact: Artifact!
+}
 
 input UpdateArtifactInput {
   artifactId: ID!
@@ -720,7 +779,6 @@ input UpdateObjectStorageInput {
   secretKey: String
   endpoint: String
   region: String
-  buckets: [String!]
 }
 
 type UpdateObjectStoragePayload {

@@ -56,7 +56,6 @@ async def test_stream_upload_success(s3_client, storages_service: StorageService
         _BUCKET_FIXTURE_NAME,
         _TEST_KEY,
         _TEST_CONTENT_TYPE,
-        None,
         mock_data_stream(),
     )
 
@@ -74,7 +73,6 @@ async def test_stream_upload_invalid_storage(storages_service: StorageService):
             _BUCKET_FIXTURE_NAME,
             _TEST_KEY,
             _TEST_CONTENT_TYPE,
-            None,
             mock_data_stream(),
         )
 
@@ -92,7 +90,6 @@ async def test_stream_upload_invalid_bucket(storages_service: StorageService):
             "invalid-bucket",
             _TEST_KEY,
             _TEST_CONTENT_TYPE,
-            None,
             mock_data_stream(),
         )
 
@@ -107,7 +104,7 @@ async def test_stream_download_success(s3_client, storages_service: StorageServi
         yield b"test chunk 2"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Now download it
@@ -233,7 +230,6 @@ async def test_generate_presigned_download_url_success(s3_client, storages_servi
         _BUCKET_FIXTURE_NAME,
         _PRESIGNED_TEST_KEY,
         "text/plain",
-        None,
         upload_stream(),
     )
 
@@ -282,7 +278,7 @@ async def test_get_object_info_success(s3_client, storages_service: StorageServi
         yield b"test data for object info"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Get object info
@@ -327,7 +323,7 @@ async def test_delete_object_success(s3_client, storages_service: StorageService
         yield b"test data for deletion"
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, None, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
     )
 
     # Delete the object
