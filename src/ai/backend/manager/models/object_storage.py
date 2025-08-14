@@ -48,12 +48,6 @@ class ObjectStorageRow(Base):
         sa.String,
         nullable=True,
     )
-    buckets = sa.Column(
-        "buckets",
-        sa.ARRAY(sa.String),
-        nullable=False,
-        index=True,
-    )
 
     def __str__(self) -> str:
         return (
@@ -62,8 +56,7 @@ class ObjectStorageRow(Base):
             f"access_key={self.access_key}, "
             f"secret_key={self.secret_key}, "
             f"endpoint={self.endpoint}, "
-            f"region={self.region}, "
-            f"buckets={self.buckets})"
+            f"region={self.region})"
         )
 
     def __repr__(self) -> str:
@@ -78,5 +71,4 @@ class ObjectStorageRow(Base):
             secret_key=self.secret_key,
             endpoint=self.endpoint,
             region=self.region,
-            buckets=self.buckets,
         )

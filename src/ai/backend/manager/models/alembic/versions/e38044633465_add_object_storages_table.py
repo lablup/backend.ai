@@ -29,11 +29,7 @@ def upgrade() -> None:
         sa.Column("secret_key", sa.String(), nullable=False),
         sa.Column("endpoint", sa.String(), nullable=False),
         sa.Column("region", sa.String(), nullable=True),
-        sa.Column("buckets", sa.ARRAY(sa.String()), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_object_storages")),
-    )
-    op.create_index(
-        op.f("ix_object_storages_buckets"), "object_storages", ["buckets"], unique=False
     )
     op.create_index(op.f("ix_object_storages_host"), "object_storages", ["host"], unique=False)
     op.create_index(op.f("ix_object_storages_name"), "object_storages", ["name"], unique=True)
