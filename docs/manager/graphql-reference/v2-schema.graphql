@@ -262,6 +262,21 @@ type GetPresignedDownloadURLPayload {
   presignedUrl: String!
 }
 
+input GetPresignedUploadURLInput {
+  storageId: ID!
+  bucketName: String!
+  key: String!
+  contentType: String = null
+  expiration: Int = null
+  minSize: Int = null
+  maxSize: Int = null
+}
+
+type GetPresignedUploadURLPayload {
+  presignedUrl: String!
+  fields: String!
+}
+
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -483,6 +498,7 @@ type Mutation {
   updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
   authorizeArtifact(input: AuthorizeArtifactInput!): AuthorizeArtifactPayload!
   unauthorizeArtifact(input: UnauthorizeArtifactInput!): UnauthorizeArtifactPayload!
 }

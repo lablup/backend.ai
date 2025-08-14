@@ -1,6 +1,9 @@
 import logging
 
-from ai.backend.common.dto.storage.request import PresignedDownloadObjectReq
+from ai.backend.common.dto.storage.request import (
+    PresignedDownloadObjectReq,
+    PresignedUploadObjectReq,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -19,6 +22,10 @@ from ai.backend.manager.services.object_storage.actions.get import (
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
     GetDownloadPresignedURLActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
+    GetUploadPresignedURLAction,
+    GetUploadPresignedURLActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
@@ -102,4 +109,31 @@ class ObjectStorageService:
 
         return GetDownloadPresignedURLActionResult(
             storage_id=storage_data.id, presigned_url=result.url
+        )
+
+    async def get_presigned_upload_url(
+        self, action: GetUploadPresignedURLAction
+    ) -> GetUploadPresignedURLActionResult:
+        """
+        Get a presigned upload URL for an existing object storage.
+        """
+        log.info("Getting presigned upload URL for object storage with id: {}", action.storage_id)
+        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+
+        result = await storage_proxy_client.get_s3_presigned_upload_url(
+            storage_data.name,
+            action.bucket_name,
+            PresignedUploadObjectReq(
+                key=action.key,
+                content_type=action.content_type,
+                expiration=action.expiration,
+                min_size=action.min_size,
+                max_size=action.max_size,
+            ),
+        )
+
+        return GetUploadPresignedURLActionResult(
+            storage_id=storage_data.id, presigned_url=result.url, fields=result.fields
         )
