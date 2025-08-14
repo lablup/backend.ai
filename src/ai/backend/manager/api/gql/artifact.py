@@ -182,6 +182,26 @@ class ArtifactRevision(Node):
             revisions.extend(action_result.revisions)
         return [ArtifactRevision.from_dataclass(r) for r in revisions]
 
+    @classmethod
+    def from_dataclass(cls, data: ArtifactData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            name=data.name,
+            type=ArtifactType(data.type),
+            # TODO: Fetch status from the actual data source
+            # status=ArtifactStatus(data.status),
+            status=ArtifactStatus.AVAILABLE,
+            description=data.description,
+            # TODO: Fill these with actual data
+            registry=SourceInfo(name=None, url=None),
+            source=SourceInfo(name=None, url=None),
+            size=ByteSize(data.size),
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+            version=data.version,
+            authorized=data.authorized,
+        )
+
 
 ArtifactEdge = Edge[Artifact]
 ArtifactRevisionEdge = Edge[ArtifactRevision]
