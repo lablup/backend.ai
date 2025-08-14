@@ -6,6 +6,14 @@ from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
+from ai.backend.common.dto.storage.request import (
+    HuggingFaceImportModelsReq,
+    HuggingFaceScanModelsReq,
+)
+from ai.backend.common.dto.storage.response import (
+    HuggingFaceImportModelsResponse,
+    HuggingFaceScanModelsResponse,
+)
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
@@ -630,3 +638,33 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
             },
         )
+
+    @client_decorator()
+    async def scan_huggingface_models(
+        self,
+        req: HuggingFaceScanModelsReq,
+    ) -> HuggingFaceScanModelsResponse:
+        """
+        Scan HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/scan",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceScanModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def import_huggingface_models(
+        self,
+        req: HuggingFaceImportModelsReq,
+    ) -> HuggingFaceImportModelsResponse:
+        """
+        Import multiple HuggingFace models into the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/import",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceImportModelsResponse.model_validate(resp)

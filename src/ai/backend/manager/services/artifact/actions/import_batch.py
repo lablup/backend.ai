@@ -1,16 +1,18 @@
+import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
-from ai.backend.manager.services.artifact.actions.types import ImportArtifactTarget
 
 
 # TODO: Make this a batch action.
 @dataclass
 class ImportArtifactBatchAction(ArtifactAction):
-    target: list[ImportArtifactTarget]
+    artifact_ids: list[uuid.UUID]
+    storage_id: uuid.UUID
+    bucket_name: str
 
     @override
     def entity_id(self) -> Optional[str]:

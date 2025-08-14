@@ -131,6 +131,8 @@ class ErrorDomain(enum.StrEnum):
 
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
+    ARTIFACT = "artifact"
+    ARTIFACT_ASSOCIATION = "artifact-association"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
     KERNEL = "kernel"
@@ -492,4 +494,56 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-not-found"
+    error_title = "Artifact Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-association-not-found"
+    error_title = "Artifact Association Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ArtifactAssociationCreationError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-association-creation-failed"
+    error_title = "Artifact Association Creation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-association-deletion-failed"
+    error_title = "Artifact Association Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

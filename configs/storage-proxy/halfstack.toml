@@ -115,7 +115,7 @@ endpoint = "https://huggingface.co"
 
 [[storages]]
 name = "minio-storage"
-bucket = "enter_bucket_name"
+buckets = ["enter_bucket_name"]
 endpoint = "http://minio.example.com:9000"
 region = "us-east-1"
 access-key = "<minio-access-key>"

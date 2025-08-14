@@ -97,7 +97,6 @@ class CreateObjectStorageInput:
     secret_key: str
     endpoint: str
     region: str
-    buckets: list[str]
 
     def to_creator(self) -> ObjectStorageCreator:
         return ObjectStorageCreator(
@@ -107,7 +106,6 @@ class CreateObjectStorageInput:
             secret_key=self.secret_key,
             endpoint=self.endpoint,
             region=self.region,
-            buckets=self.buckets,
         )
 
 
@@ -120,7 +118,6 @@ class UpdateObjectStorageInput:
     secret_key: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
     region: Optional[str] = UNSET
-    buckets: Optional[list[str]] = UNSET
 
     def to_modifier(self) -> ObjectStorageModifier:
         return ObjectStorageModifier(
@@ -130,7 +127,6 @@ class UpdateObjectStorageInput:
             secret_key=OptionalState[str].from_graphql(self.secret_key),
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             region=OptionalState[str].from_graphql(self.region),
-            buckets=OptionalState[list[str]].from_graphql(self.buckets),
         )
 
 

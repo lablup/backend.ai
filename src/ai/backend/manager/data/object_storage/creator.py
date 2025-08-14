@@ -12,7 +12,6 @@ class ObjectStorageCreator(Creator):
     secret_key: str
     endpoint: str
     region: str
-    buckets: list[str]
 
     @override
     def fields_to_store(self) -> dict[str, Any]:
@@ -23,5 +22,4 @@ class ObjectStorageCreator(Creator):
             "secret_key": self.secret_key,
             "endpoint": self.endpoint,
             "region": self.region,
-            "buckets": self.buckets,
         }

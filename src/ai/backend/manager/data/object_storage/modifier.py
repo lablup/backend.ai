@@ -12,7 +12,6 @@ class ObjectStorageModifier(PartialModifier):
     secret_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     endpoint: OptionalState[str] = field(default_factory=OptionalState.nop)
     region: OptionalState[str] = field(default_factory=OptionalState.nop)
-    buckets: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -23,5 +22,4 @@ class ObjectStorageModifier(PartialModifier):
         self.secret_key.update_dict(to_update, "secret_key")
         self.endpoint.update_dict(to_update, "endpoint")
         self.region.update_dict(to_update, "region")
-        self.buckets.update_dict(to_update, "buckets")
         return to_update
