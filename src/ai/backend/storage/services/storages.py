@@ -51,7 +51,6 @@ class StorageService:
         bucket_name: str,
         filepath: str,
         content_type: Optional[str],
-        content_length: Optional[int],
         data_stream: AsyncIterable[bytes],
     ) -> UploadObjectResponse:
         """
@@ -62,19 +61,19 @@ class StorageService:
             bucket_name: Name of the S3 bucket
             filepath: Path to the file to upload
             content_type: Content type of the file
-            content_length: Length of the file in bytes
             data_stream: Async iterator of file data chunks
 
         Returns:
             UploadObjectResponse
         """
         try:
+            part_size = self._storage_configs[storage_name].upload_chunk_size
             s3_client = self._get_s3_client(storage_name, bucket_name)
             await s3_client.upload_stream(
                 data_stream,
                 filepath,
                 content_type=content_type,
-                content_length=content_length,
+                part_size=part_size,
             )
 
             return UploadObjectResponse()
@@ -98,8 +97,8 @@ class StorageService:
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
-
-            async for chunk in s3_client.download_stream(filepath):
+            chunk_size = self._storage_configs[storage_name].download_chunk_size
+            async for chunk in s3_client.download_stream(filepath, chunk_size=chunk_size):
                 yield chunk
 
         except Exception as e:

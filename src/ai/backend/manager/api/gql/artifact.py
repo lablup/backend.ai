@@ -220,7 +220,7 @@ class UpdateArtifactPayload:
 
 @strawberry.type
 class DeleteArtifactPayload:
-    artifact: Artifact
+    artifact_id: ID
 
 
 @strawberry.type
@@ -350,7 +350,7 @@ async def delete_artifact(
         )
     )
 
-    return DeleteArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+    return DeleteArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
 
 
 @strawberry.mutation
