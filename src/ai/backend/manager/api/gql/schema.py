@@ -10,6 +10,7 @@ from .artifact import (
     cancel_import_artifact,
     delete_artifact,
     import_artifact,
+    scan_artifacts,
     update_artifact,
 )
 from .huggingface_registry import (
@@ -60,6 +61,7 @@ class Queries:
 
 @strawberry.type
 class Mutation:
+    scan_artifacts = scan_artifacts
     import_artifact = import_artifact
     update_artifact = update_artifact
     delete_artifact = delete_artifact

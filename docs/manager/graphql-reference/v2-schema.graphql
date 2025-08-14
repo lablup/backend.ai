@@ -281,6 +281,8 @@ extend type ImageNode @key(fields: "id") {
 
 input ImportArtifactInput {
   artifactId: ID!
+  storageId: ID!
+  bucketName: String!
 }
 
 type ImportArtifactPayload {
@@ -447,6 +449,7 @@ input ModelRuntimeConfigInput {
 }
 
 type Mutation {
+  scanArtifacts(input: ScanArtifactInput!): ScanArtifactsPayload!
   importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
@@ -617,6 +620,18 @@ extend type ScalingGroupNode @key(fields: "id") {
 
 type ScalingRule {
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
+input ScanArtifactInput {
+  registryId: ID!
+  storageId: ID!
+  limit: Int!
+  order: String!
+  search: String = null
+}
+
+type ScanArtifactsPayload {
+  artifacts: [Artifact!]!
 }
 
 """Different service configurations for model runtime"""
