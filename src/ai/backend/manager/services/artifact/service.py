@@ -11,6 +11,10 @@ from ai.backend.manager.services.artifact.actions.associate_with_storage import 
     AssociateWithStorageAction,
     AssociateWithStorageActionResult,
 )
+from ai.backend.manager.services.artifact.actions.authorize import (
+    AuthorizeArtifactAction,
+    AuthorizeArtifactActionResult,
+)
 from ai.backend.manager.services.artifact.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
@@ -22,6 +26,10 @@ from ai.backend.manager.services.artifact.actions.import_ import (
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.unauthorize import (
+    UnauthorizeArtifactAction,
+    UnauthorizeArtifactActionResult,
 )
 
 
@@ -104,3 +112,13 @@ class ArtifactService:
             action.artifact_id, action.storage_id
         )
         return DisassociateWithStorageActionResult(result=result)
+
+    async def authorize(self, action: AuthorizeArtifactAction) -> AuthorizeArtifactActionResult:
+        result = await self._artifact_repository.authorize_artifact(action.artifact_id)
+        return AuthorizeArtifactActionResult(result=result)
+
+    async def unauthorize(
+        self, action: UnauthorizeArtifactAction
+    ) -> UnauthorizeArtifactActionResult:
+        result = await self._artifact_repository.unauthorize_artifact(action.artifact_id)
+        return UnauthorizeArtifactActionResult(result=result)

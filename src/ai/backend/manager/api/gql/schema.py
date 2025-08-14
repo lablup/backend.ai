@@ -9,10 +9,12 @@ from .artifact import (
     artifact_import_progress_updated,
     artifact_status_changed,
     artifacts,
+    authorize_artifact,
     cancel_import_artifact,
     delete_artifact,
     import_artifact,
     scan_artifacts,
+    unauthorize_artifact,
     update_artifact,
 )
 from .huggingface_registry import (
@@ -82,6 +84,8 @@ class Mutation:
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
     get_presigned_download_url = get_presigned_download_url
+    authorize_artifact = authorize_artifact
+    unauthorize_artifact = unauthorize_artifact
 
 
 @strawberry.type

@@ -13,8 +13,10 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
+from ai.backend.manager.services.artifact.actions.authorize import AuthorizeArtifactAction
 from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
 
 
 @strawberry.enum
@@ -80,6 +82,16 @@ class UpdateArtifactInput:
 
 @strawberry.input
 class DeleteArtifactInput:
+    artifact_id: ID
+
+
+@strawberry.input
+class AuthorizeArtifactInput:
+    artifact_id: ID
+
+
+@strawberry.input
+class UnauthorizeArtifactInput:
     artifact_id: ID
 
 
@@ -211,6 +223,16 @@ class DeleteArtifactPayload:
 
 
 @strawberry.type
+class AuthorizeArtifactPayload:
+    artifact: Artifact
+
+
+@strawberry.type
+class UnauthorizeArtifactPayload:
+    artifact: Artifact
+
+
+@strawberry.type
 class CancelImportArtifactPayload:
     artifact: Artifact
 
@@ -318,13 +340,50 @@ def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
 
 
 @strawberry.mutation
-def delete_artifact(input: DeleteArtifactInput) -> DeleteArtifactPayload:
+async def delete_artifact(
+    input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
+) -> DeleteArtifactPayload:
+    # action_result = await info.context.processors.artifact.delete.wait_for_complete(
+    #     DeleteArtifactAction(
+    #         artifact_id=uuid.UUID(input.artifact_id),
+    #         storage_id=uuid.UUID(input.storage_id),
+    #         bucket_name=input.bucket_name,
+    #     )
+    # )
+
+    # return ImportArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
     raise NotImplementedError("Delete artifact functionality is not implemented yet.")
 
 
 @strawberry.mutation
 def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
     raise NotImplementedError("Cancel import artifact functionality is not implemented yet.")
+
+
+@strawberry.mutation
+async def authorize_artifact(
+    input: AuthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> AuthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.authorize.wait_for_complete(
+        AuthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return AuthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+
+
+@strawberry.mutation
+async def unauthorize_artifact(
+    input: UnauthorizeArtifactInput, info: Info[StrawberryGQLContext]
+) -> UnauthorizeArtifactPayload:
+    action_result = await info.context.processors.artifact.unauthorize.wait_for_complete(
+        UnauthorizeArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+        )
+    )
+
+    return UnauthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 # Subscriptions

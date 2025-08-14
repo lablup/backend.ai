@@ -118,6 +118,14 @@ enum ArtifactType {
   IMAGE
 }
 
+input AuthorizeArtifactInput {
+  artifactId: ID!
+}
+
+type AuthorizeArtifactPayload {
+  artifact: Artifact!
+}
+
 scalar ByteSize
 
 type CancelImportArtifactPayload {
@@ -505,6 +513,8 @@ type Mutation {
   updateHuggingfaceRegistry(id: ID!, input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+  authorizeArtifact(input: AuthorizeArtifactInput!): AuthorizeArtifactPayload!
+  unauthorizeArtifact(input: UnauthorizeArtifactInput!): UnauthorizeArtifactPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -706,6 +716,14 @@ type Subscription {
 }
 
 scalar UUID
+
+input UnauthorizeArtifactInput {
+  artifactId: ID!
+}
+
+type UnauthorizeArtifactPayload {
+  artifact: Artifact!
+}
 
 input UpdateArtifactInput {
   artifactId: ID!

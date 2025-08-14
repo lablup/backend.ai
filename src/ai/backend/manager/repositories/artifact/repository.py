@@ -129,3 +129,33 @@ class ArtifactRepository:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
             return association_data
+
+    @repository_decorator()
+    async def authorize_artifact(self, artifact_id: uuid.UUID) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError()
+
+            row.authorized = True
+            await db_sess.flush()
+            await db_sess.refresh(row, attribute_names=["updated_at"])
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def unauthorize_artifact(self, artifact_id: uuid.UUID) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError()
+
+            row.authorized = False
+            await db_sess.flush()
+            await db_sess.refresh(row, attribute_names=["updated_at"])
+            return row.to_dataclass()
