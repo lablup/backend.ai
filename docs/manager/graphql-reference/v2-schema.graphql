@@ -203,7 +203,7 @@ input DeleteArtifactInput {
 }
 
 type DeleteArtifactPayload {
-  artifact: Artifact!
+  artifactId: ID!
 }
 
 input DeleteHuggingFaceRegistryInput {
