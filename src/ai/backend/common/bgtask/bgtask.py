@@ -55,7 +55,9 @@ BgtaskEvents: TypeAlias = (
     | BgtaskPartialSuccessEvent
 )
 
-_MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
+
+_HEARTBEAT_INTERVAL = 60  # 1 minute
+_HEARTBEAT_CHECK_INTERVAL = 300  # 5 minutes
 
 
 @dataclass
