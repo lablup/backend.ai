@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Optional, Self
 
@@ -7,6 +8,9 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
+    GetUploadPresignedURLAction,
 )
 
 from ...data.object_storage.creator import ObjectStorageCreator
@@ -146,6 +150,17 @@ class GetPresignedDownloadURLInput:
     key: str
 
 
+@strawberry.input
+class GetPresignedUploadURLInput:
+    storage_id: ID
+    bucket_name: str
+    key: str
+    content_type: Optional[str] = None
+    expiration: Optional[int] = None
+    min_size: Optional[int] = None
+    max_size: Optional[int] = None
+
+
 @strawberry.type
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
@@ -164,6 +179,12 @@ class DeleteObjectStoragePayload:
 @strawberry.type
 class GetPresignedDownloadURLPayload:
     presigned_url: str
+
+
+@strawberry.type
+class GetPresignedUploadURLPayload:
+    presigned_url: str
+    fields: str  # JSON string containing the form fields
 
 
 @strawberry.mutation
@@ -231,3 +252,26 @@ async def get_presigned_download_url(
     )
 
     return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+
+
+@strawberry.mutation
+async def get_presigned_upload_url(
+    input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
+) -> GetPresignedUploadURLPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
+        GetUploadPresignedURLAction(
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
+            key=input.key,
+            content_type=input.content_type,
+            expiration=input.expiration,
+            min_size=input.min_size,
+            max_size=input.max_size,
+        )
+    )
+
+    return GetPresignedUploadURLPayload(
+        presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
+    )

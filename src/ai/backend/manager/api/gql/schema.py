@@ -43,6 +43,7 @@ from .object_storage import (
     create_object_storage,
     delete_object_storage,
     get_presigned_download_url,
+    get_presigned_upload_url,
     object_storage,
     object_storages,
     update_object_storage,
@@ -84,6 +85,7 @@ class Mutation:
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
     get_presigned_download_url = get_presigned_download_url
+    get_presigned_upload_url = get_presigned_upload_url
     authorize_artifact = authorize_artifact
     unauthorize_artifact = unauthorize_artifact
 
