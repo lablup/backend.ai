@@ -17,6 +17,7 @@ type Artifact implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
   version: String!
+  authorized: Boolean!
 }
 
 type ArtifactConnection {
