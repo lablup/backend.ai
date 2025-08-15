@@ -19,6 +19,12 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.bgtask.types import (
+    ServerComponentID,
+    ServerType,
+)
+from ai.backend.common.clients.valkey_client.valkey_bgtask import ValkeyBgtaskClient
 from ai.backend.common.config import (
     ConfigurationError,
 )
@@ -167,6 +173,18 @@ async def server_main(
             pidx,
             safe_print_redis_config(redis_config),
         )
+        valkey_client = await _make_valkey_bgtask_client(redis_profile_target)
+        node_id = local_config.storage_proxy.node_id
+        background_task_manager = BackgroundTaskManager(
+            BackgroundTaskManagerArgs(
+                server_id=ServerComponentID(
+                    server_type=ServerType.STORAGE_PROXY, server_id=node_id
+                ),
+                event_producer=event_producer,
+                valkey_client=valkey_client,
+                # TODO: Add `bgtask_observer`
+            ),
+        )
         if local_config.storage_proxy.use_watcher:
             if not _is_root():
                 raise ValueError(
@@ -195,6 +213,7 @@ async def server_main(
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
             metric_registry=metric_registry,
+            background_task_manager=background_task_manager,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
@@ -337,6 +356,16 @@ async def server_main(
             m.close()
 
 
+async def _make_valkey_bgtask_client(
+    redis_profile_target: RedisProfileTarget,
+) -> ValkeyBgtaskClient:
+    redis_target = redis_profile_target.profile_target(RedisRole.BGTASK)
+    client = await ValkeyBgtaskClient.create(
+        redis_target.to_valkey_target(),
+    )
+    return client
+
+
 async def _make_message_queue(
     local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
@@ -362,7 +391,7 @@ async def _make_message_queue(
             args,
         )
     return await RedisQueue.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
+        stream_redis_target,
         args,
     )
 

@@ -265,6 +265,8 @@ async def check_and_upgrade(
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
+        # Background tasks are not needed for migration
+        background_task_manager=None,  # type: ignore[arg-type]
     )
 
     async with ctx:

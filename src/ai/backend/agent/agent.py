@@ -68,7 +68,12 @@ from ai.backend.agent.metrics.metric import (
     SyncContainerLifecycleObserver,
 )
 from ai.backend.common import msgpack
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.bgtask.types import (
+    ServerComponentID,
+    ServerType,
+)
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
@@ -844,9 +849,18 @@ class AbstractAgent(
             db_id=REDIS_STATISTICS_DB,
         )
 
+        valkey_target = redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target()
+        valkey_client = await ValkeyBgtaskClient.create(valkey_target)
         self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            bgtask_observer=self._metric_registry.bgtask,
+            BackgroundTaskManagerArgs(
+                server_id=ServerComponentID(
+                    server_id=self.id,
+                    server_type=ServerType.MANAGER,
+                ),
+                event_producer=self.event_producer,
+                bgtask_observer=self._metric_registry.bgtask,
+                valkey_client=valkey_client,
+            ),
         )
 
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map

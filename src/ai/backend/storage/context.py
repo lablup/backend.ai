@@ -142,6 +142,7 @@ class RootContext:
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
+        background_task_manager: BackgroundTaskManager,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
@@ -170,10 +171,7 @@ class RootContext:
             event_producer=self.event_producer,
         )
         self.metric_registry = metric_registry
-        self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            # TODO: Add `bgtask_observer`
-        )
+        self.background_task_manager = background_task_manager
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.
