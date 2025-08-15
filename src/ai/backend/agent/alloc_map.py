@@ -22,6 +22,7 @@ from typing import (
 import attr
 import more_itertools
 
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 from ai.backend.logging import BraceStyleAdapter
 
@@ -134,25 +135,54 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 reverse=True,
             )
 
-        def sort_to_prefer_remaining_alloc_per_node(device_set: Sequence[AbstractComputeDevice]):
-            # the device set is already a set within a numa node.
-            alloc_per_numa_node = Decimal(0)
-            for device in device_set:
-                alloc_per_numa_node += self.allocations[slot_name][device.device_id]
-            return alloc_per_numa_node
-
+        # Use the affinity hint to reorder the device sets to prioritize allocation.
         if not affinity_hint.devices:
+            # In the first resource slot during allocation,
+            # we extract the device clusters based on the logical distances between each pair.
             primary_sets = affinity_hint.affinity_map.get_device_clusters_with_lowest_distance(
                 device_name
             )
             secondary_set: Sequence[AbstractComputeDevice] = []
         else:
+            # In the subsequent resource slots during allocation,
+            # we build the device clusters based on the device sets allocated for the previous resource slot.
+            # This logic is particularly important to seamlessly support specific GDS solutions like WEKA,
+            # as it requires alignment of CPU cores and GPU devices to have consistent NUMA nodes.
             primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
                 affinity_hint.devices, device_name
             )
-        primary_sets = sorted(primary_sets, key=sort_to_prefer_remaining_alloc_per_node)
 
-        def convert_to_sorted_dev_alloc(device_set: Iterable[AbstractComputeDevice]):
+        if not primary_sets:
+            # In normal conditions, we should have at least one primary set.
+            # The errorneous case may happen when:
+            # - the device_name is not explicitly set, and
+            # - auto-generated device_name differs from the reported resource slot name.
+            #   (e.g., "NPUPlusDevice" -> "npuplus" while the slot name is "npu-plus.device")
+            # Here, we report this failure explicitly so that we could check the
+            # potentially missing explicit device_name in the accelerator plugins.
+            detected_device_names = {
+                device.device_name for device in affinity_hint.affinity_map.nodes.keys()
+            }
+            raise ConfigurationError({
+                "AbstractAllocMap.get_current_allocation()": (
+                    f"No suitable devices found "
+                    f"(searched: {device_name}, found: {', '.join(detected_device_names)})"
+                )
+            })
+
+        # Let it prefer the largest primary set based on the remaining capacity per NUMA node.
+        # Note that each primary device set is already included within the same numa node.
+        primary_sets = sorted(
+            primary_sets,
+            key=lambda device_set: sum(
+                (self.allocations[slot_name][device.device_id] for device in device_set),
+                start=Decimal(0),
+            ),
+        )
+
+        def convert_to_sorted_dev_alloc(
+            device_set: Iterable[AbstractComputeDevice],
+        ) -> list[tuple[DeviceId, Decimal]]:
             device_ids = {d.device_id for d in device_set}
             return sorted(
                 (
@@ -164,6 +194,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 reverse=True,
             )
 
+        # Inside each device cluster, let it prefer the devices with most remaining capacity.
         primary_sorted_dev_allocs = [
             convert_to_sorted_dev_alloc(primary_set) for primary_set in primary_sets
         ]
@@ -173,26 +204,16 @@ class AbstractAllocMap(metaclass=ABCMeta):
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
                     return [
-                        (device_id, alloc)
-                        for device_id, alloc in itertools.chain(*primary_sorted_dev_allocs)
-                    ]
+                        *itertools.chain(*primary_sorted_dev_allocs)
+                    ] + secondary_sorted_dev_alloc
                 case AffinityPolicy.INTERLEAVED:
                     return [
-                        (device_id, alloc)
-                        for device_id, alloc in more_itertools.interleave_longest(
-                            *primary_sorted_dev_allocs
-                        )
-                    ]
+                        *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
+                    ] + secondary_sorted_dev_alloc
         else:
             return [
-                *(
-                    (device_id, alloc)
-                    for device_id, alloc in more_itertools.interleave_longest(
-                        *primary_sorted_dev_allocs
-                    )
-                ),
-                *((device_id, alloc) for device_id, alloc in secondary_sorted_dev_alloc),
-            ]
+                *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
+            ] + secondary_sorted_dev_alloc
 
     @abstractmethod
     def allocate(
@@ -314,7 +335,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             total_allocatable = int(0)
             remaining_alloc = Decimal(requested_alloc).normalize()
 
-            # fill up starting from the most free devices
+            # fill up starting from the most free devices considering affinity hint
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
                 assert slot_name == self.device_slots[dev_id].slot_name
@@ -365,6 +386,13 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if repeats >= 100:
                     raise ResourceError("too many repeats until allocation")
 
+                # sort the devices by the affinity hint
+                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+                if log_alloc_map and repeats == 0:
+                    log.debug(
+                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
+                    )
+
                 # calculate remaining slots per device
                 total_allocatable = int(
                     sum(
@@ -381,12 +409,6 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                         requested_alloc=requested_alloc,
                         total_allocatable=total_allocatable,
                         allocation=allocation,
-                    )
-
-                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
-                if log_alloc_map and repeats == 0:
-                    log.debug(
-                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
                     )
 
                 # calculate the amount to spread out
