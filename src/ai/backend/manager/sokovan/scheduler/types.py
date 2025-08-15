@@ -81,6 +81,15 @@ class SessionDependencyInfo:
 
 
 @dataclass
+class KeypairOccupancy:
+    """Keypair occupancy information including resources and session counts."""
+
+    occupied_slots: ResourceSlot
+    session_count: int
+    sftp_session_count: int
+
+
+@dataclass
 class AgentOccupancy:
     """Agent occupancy information including resources and container count."""
 
@@ -92,7 +101,7 @@ class AgentOccupancy:
 class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
-    by_keypair: MutableMapping[AccessKey, ResourceSlot]
+    by_keypair: MutableMapping[AccessKey, KeypairOccupancy]
     by_user: MutableMapping[UUID, ResourceSlot]
     by_group: MutableMapping[UUID, ResourceSlot]
     by_domain: MutableMapping[str, ResourceSlot]

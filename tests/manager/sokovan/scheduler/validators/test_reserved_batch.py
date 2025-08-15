@@ -20,7 +20,9 @@ def create_empty_snapshot() -> SystemSnapshot:
     """Create an empty system snapshot for testing."""
     return SystemSnapshot(
         total_capacity=ResourceSlot({"cpu": 100, "memory": 1024}),
-        resource_occupancy=ResourceOccupancySnapshot({}, {}, {}, {}),
+        resource_occupancy=ResourceOccupancySnapshot(
+            by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
+        ),
         resource_policy=ResourcePolicySnapshot({}, {}, {}, {}),
         concurrency=ConcurrencySnapshot({}, {}),
         pending_sessions=PendingSessionSnapshot({}),

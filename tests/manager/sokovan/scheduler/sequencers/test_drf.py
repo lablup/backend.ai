@@ -7,6 +7,7 @@ from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
+    KeypairOccupancy,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
@@ -30,6 +31,7 @@ class TestDRFSequencer:
                 by_user={},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -56,19 +58,26 @@ class TestDRFSequencer:
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
-                    AccessKey("user1"): ResourceSlot(
-                        cpu=Decimal("20"), mem=Decimal("10")
+                    AccessKey("user1"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("10")),
+                        session_count=1,
+                        sftp_session_count=0,
                     ),  # dominant share: 20%
-                    AccessKey("user2"): ResourceSlot(
-                        cpu=Decimal("10"), mem=Decimal("30")
+                    AccessKey("user2"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("30")),
+                        session_count=1,
+                        sftp_session_count=0,
                     ),  # dominant share: 30%
-                    AccessKey("user3"): ResourceSlot(
-                        cpu=Decimal("5"), mem=Decimal("5")
+                    AccessKey("user3"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+                        session_count=1,
+                        sftp_session_count=0,
                     ),  # dominant share: 5%
                 },
                 by_user={},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -274,11 +283,16 @@ class TestDRFSequencer:
             ),  # Zero memory capacity
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
-                    AccessKey("user1"): ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                    AccessKey("user1"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                        session_count=1,
+                        sftp_session_count=0,
+                    ),
                 },
                 by_user={},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},

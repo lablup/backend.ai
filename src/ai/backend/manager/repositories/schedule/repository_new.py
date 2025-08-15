@@ -15,10 +15,10 @@ from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
-from .db_source.types import SchedulingSpec
-from .entity import (
+from .types import (
     MarkTerminatingResult,
-    SchedulingContextData,
+    SchedulingData,
+    SchedulingSpec,
     SessionTerminationResult,
     SweptSessionInfo,
 )
@@ -45,11 +45,9 @@ class ScheduleRepository:
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider
 
-    async def get_scheduling_context_data(
-        self, scaling_group: str
-    ) -> Optional[SchedulingContextData]:
+    async def get_scheduling_data(self, scaling_group: str) -> Optional[SchedulingData]:
         """
-        Get scheduling context data by combining DB and cache sources.
+        Get scheduling data from database.
         Returns None if no pending sessions exist.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
@@ -62,12 +60,11 @@ class ScheduleRepository:
         )
 
         # Fetch data from DB (will raise ScalingGroupNotFound if not found)
-        db_data = await self._db_source.get_scheduling_data(scaling_group, spec)
-        if not db_data.pending_sessions.sessions:
+        scheduling_data = await self._db_source.get_scheduling_data(scaling_group, spec)
+        if not scheduling_data.pending_sessions.sessions:
             return None
 
-        # Transform to entity using the data class's transformation method
-        return db_data.to_scheduling_context()
+        return scheduling_data
 
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
         """
@@ -100,10 +97,7 @@ class ScheduleRepository:
         default_timeout = timedelta(seconds=0)  # Or fetch from config if needed
 
         # Fetch from DB source
-        db_swept_sessions = await self._db_source.get_pending_timeout_sessions(default_timeout)
-
-        # Transform to entities
-        return [s.to_swept_session_info() for s in db_swept_sessions]
+        return await self._db_source.get_pending_timeout_sessions(default_timeout)
 
     async def batch_update_terminated_status(
         self,
@@ -149,9 +143,7 @@ class ScheduleRepository:
         Mark sessions for termination.
         """
         # Delegate to DB source
-        db_result = await self._db_source.mark_sessions_terminating(session_ids, reason)
-        # Transform to entity
-        return db_result.to_mark_terminating_result()
+        return await self._db_source.mark_sessions_terminating(session_ids, reason)
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """

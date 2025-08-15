@@ -81,7 +81,6 @@ class TestScheduleCoordinator:
             cancelled_sessions=[session_ids[0]],
             terminating_sessions=[session_ids[1], session_ids[2]],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -116,7 +115,6 @@ class TestScheduleCoordinator:
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=session_ids,  # All skipped
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -172,7 +170,6 @@ class TestScheduleCoordinator:
                 cancelled_sessions=[],
                 terminating_sessions=[session_id],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
             mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -200,7 +197,6 @@ class TestScheduleCoordinator:
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -230,7 +226,6 @@ class TestScheduleCoordinator:
             cancelled_sessions=[existing_sessions[0]],
             terminating_sessions=[existing_sessions[1], existing_sessions[2]],
             skipped_sessions=[],
-            not_found_sessions=non_existing,
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -242,7 +237,8 @@ class TestScheduleCoordinator:
 
         # Verify
         assert result.processed_count() == 3  # Only existing sessions processed
-        assert len(result.not_found_sessions) == 2
+        # Non-existing sessions are now in skipped_sessions
+        assert result.skipped_sessions == non_existing
 
         # Scheduling should be requested for processed sessions
         mock_valkey_schedule.mark_schedule_needed.assert_called_once_with(
@@ -290,7 +286,6 @@ class TestScheduleCoordinator:
                 cancelled_sessions=[],
                 terminating_sessions=session_ids,
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
 
         mock_scheduler.mark_sessions_for_termination.side_effect = setup_mock_result
