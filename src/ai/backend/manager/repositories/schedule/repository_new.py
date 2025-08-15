@@ -11,14 +11,14 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models import PRIVATE_SESSION_TYPES
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
-from .types import (
+from .types.allocation import AllocationBatch
+from .types.base import SchedulingSpec
+from .types.scheduling import SchedulingData
+from .types.session import (
     MarkTerminatingResult,
-    SchedulingData,
-    SchedulingSpec,
     SessionTerminationResult,
     SweptSessionInfo,
 )
