@@ -17,7 +17,9 @@ REQUEST_ID_HEADER = "X-BackendAI-RequestID"
 async def request_id_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     _handler = handler
     request_id: Optional[str] = request.headers.get(REQUEST_ID_HEADER, None)
-    with with_request_id(request_id):
-        with with_log_context_fields({"request_id": request_id}):
-            resp = await _handler(request)
+    with (
+        with_request_id(request_id),
+        with_log_context_fields({"request_id": request_id}),
+    ):
+        resp = await _handler(request)
     return resp
