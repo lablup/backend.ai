@@ -113,7 +113,10 @@ class AffinityMap(nx.Graph):
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
         """
-        assert next(iter(src_devices)).device_name != device_name
+        if next(iter(src_devices)).device_name == device_name:
+            raise RuntimeError(
+                "This is a logic error trying to allocate the same resource slots twice in a single allocation run."
+            )
         src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
         primary_sets = []
         secondary_set = set()
