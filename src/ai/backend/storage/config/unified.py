@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional, Union
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
     FilePath,
 )
@@ -730,5 +731,6 @@ class StorageProxyUnifiedConfig(BaseModel):
     )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )
