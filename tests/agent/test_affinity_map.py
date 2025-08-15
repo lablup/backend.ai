@@ -1,6 +1,6 @@
 from decimal import Decimal
 from pprint import pprint
-from typing import Sequence
+from typing import Any, Sequence
 
 import pytest
 
@@ -139,17 +139,17 @@ def test_affinity_map_first_allocation() -> None:
     "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
 )
 def test_affinity_map_prefer_larger_chunks(allocation_strategy) -> None:
-    device_init_args = {
+    device_init_args: dict[str, Any] = {
+        "hw_location": "",
         "memory_size": 0,
         "processing_units": 1,
-        "hw_location": "",
-        "device_name": "x",
+        "device_name": DeviceName("x"),
     }
     devices = [
-        DummyDevice(device_id=DeviceId("a0"), numa_node=0, **device_init_args),
-        DummyDevice(device_id=DeviceId("a1"), numa_node=0, **device_init_args),
-        DummyDevice(device_id=DeviceId("a2"), numa_node=1, **device_init_args),
-        DummyDevice(device_id=DeviceId("a3"), numa_node=1, **device_init_args),
+        DummyDevice(DeviceId("a0"), numa_node=0, **device_init_args),
+        DummyDevice(DeviceId("a1"), numa_node=0, **device_init_args),
+        DummyDevice(DeviceId("a2"), numa_node=1, **device_init_args),
+        DummyDevice(DeviceId("a3"), numa_node=1, **device_init_args),
     ]
     affinity_map = AffinityMap.build(devices)
     alloc_map = DiscretePropertyAllocMap(
@@ -182,6 +182,7 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy) -> None:
     assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 0
     assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 0
 
+    # Test if it raises explicit configuration error when there are no matching device names.
     affinity_hint = AffinityHint(
         None,
         affinity_map,
