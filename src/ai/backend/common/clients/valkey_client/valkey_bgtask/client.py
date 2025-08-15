@@ -99,21 +99,13 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def register_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Save background task metadata to Valkey with automatic expiration.
+        Register a background task with automatic expiration.
 
-        This method performs three operations atomically:
-        1. Stores the task metadata JSON with a 24-hour TTL
-        2. Adds the task ID to server type sets for task discovery by type
-        3. Adds the task ID to the server-specific set for server-level tracking
+        Stores task metadata with 24-hour TTL and indexes it by server type
+        and server ID for efficient lookup.
 
         Args:
-            metadata: The background task metadata containing task ID, server info,
-                    and task configuration
-
-        Note:
-            - Task metadata automatically expires after 24 hours unless refreshed
-            - Tasks are indexed by both server type and server ID for efficient lookup
-            - All operations are executed as an atomic batch to ensure consistency
+            metadata: Task metadata with ID, server info, and configuration
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -133,21 +125,13 @@ class ValkeyBgtaskClient:
         self, task_id: TaskID
     ) -> Optional[tuple[BackgroundTaskMetadata, TTL_SECOND]]:
         """
-        Retrieve background task metadata with remaining TTL information.
-
-        Fetches both the task metadata and its remaining time-to-live in a single
-        atomic operation to ensure consistency between data and expiration status.
+        Retrieve task metadata with remaining TTL.
 
         Args:
-            task_id: Unique identifier of the background task
+            task_id: Task identifier
 
         Returns:
-            The task metadata and TTL in seconds,
-            or None if the task doesn't exist or has expired
-
-        Note:
-            - TTL is returned as seconds remaining until expiration
-            - Expired tasks (TTL < 0) are treated as having default TTL for consistency
+            Tuple of (metadata, ttl_seconds) or None if not found
         """
         batch = self._create_batch()
         key = self._get_task_key(task_id)
@@ -170,22 +154,13 @@ class ValkeyBgtaskClient:
         self, task_ids: Sequence[TaskID]
     ) -> dict[TaskID, tuple[BackgroundTaskMetadata, TTL_SECOND]]:
         """
-        Retrieve metadata for multiple background tasks in a single batch operation.
-
-        Efficiently fetches metadata and TTL information for multiple tasks using
-        pipelined commands to minimize network round-trips.
+        Batch retrieve multiple tasks with TTL.
 
         Args:
-            task_ids: Sequence of task IDs to retrieve metadata for
+            task_ids: Task IDs to retrieve
 
         Returns:
-            Dictionary mapping task IDs to their metadata with TTL information.
-            Missing or expired tasks are excluded from the result.
-
-        Note:
-            - Uses batch operations for optimal performance with large task sets
-            - Non-existent tasks are silently omitted from the result
-            - Results maintain order correspondence with input task IDs
+            Dict mapping task IDs to (metadata, ttl_seconds). Missing tasks excluded.
         """
         task_metadata_dict: dict[TaskID, tuple[BackgroundTaskMetadata, TTL_SECOND]] = {}
         batch = self._create_batch()
@@ -209,21 +184,13 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def unregister_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Remove a background task and clean up all its references.
+        Remove task and all its index references.
 
-        Performs complete cleanup by:
-        1. Deleting the task metadata key
-        2. Removing task ID from all associated server type sets
-        3. Removing task ID from the server-specific set
+        Atomically deletes task metadata and removes from all server indexes.
+        Safe to call even if already deleted (idempotent).
 
         Args:
-            metadata: The task metadata containing the task ID and server associations
-                    to be cleaned up
-
-        Note:
-            - All cleanup operations are atomic to prevent partial deletion
-            - Removes task from all index sets to prevent orphaned references
-            - Safe to call even if task is already deleted (idempotent)
+            metadata: Task metadata with ID and server associations
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -240,21 +207,13 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def list_tasks_by_server_type(self, server_type: ServerType) -> set[TaskID]:
         """
-        Retrieve all task IDs associated with a specific server type.
-
-        Useful for discovering tasks that can be handled by servers of a particular
-        type (e.g., all tasks for GPU servers or CPU servers).
+        List task IDs for a specific server type.
 
         Args:
-            server_type: The server type to filter tasks by
+            server_type: Server type to filter by
 
         Returns:
-            Set of task IDs registered for the specified server type.
-            Returns empty set if no tasks exist for the type.
-
-        Note:
-            - Returns task IDs only; use get_tasks() to fetch details
-            - Task IDs may reference expired tasks until cleanup occurs
+            Set of task IDs; use get_tasks() for details
         """
         group_key = self._get_server_type_key(server_type)
         raw_task_ids = await self._client.client.smembers(group_key)
@@ -263,21 +222,13 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def list_tasks_by_server(self, server_id: str) -> set[TaskID]:
         """
-        Retrieve all task IDs owned by a specific server instance.
-
-        Useful for server-level task management, such as listing all tasks
-        running on a particular server or cleaning up tasks when a server shuts down.
+        List task IDs owned by a specific server.
 
         Args:
-            server_id: Unique identifier of the server instance
+            server_id: Server instance identifier
 
         Returns:
-            Set of task IDs associated with the specified server.
-            Returns empty set if no tasks exist for the server.
-
-        Note:
-            - Each task belongs to exactly one server at a time
-            - Task IDs may reference expired tasks until cleanup occurs
+            Set of task IDs for the server
         """
         server_key = self._get_server_key(server_id)
         raw_task_ids = await self._client.client.smembers(server_key)
@@ -286,20 +237,13 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def refresh_tasks(self, task_ids: Iterable[TaskID]) -> None:
         """
-        Refresh TTL for multiple tasks to indicate they are still active.
+        Extend TTL for active tasks (heartbeat).
 
-        Acts as a heartbeat mechanism by extending the expiration time of tasks,
-        preventing them from being automatically deleted due to inactivity.
-        Commonly used by task workers to signal ongoing processing.
+        Resets TTL to 24 hours. Non-existent tasks ignored.
+        Call periodically for long-running tasks.
 
         Args:
-            task_ids: Collection of task IDs to refresh
-
-        Note:
-            - Resets TTL to 24 hours for all specified tasks
-            - Tasks that don't exist are silently ignored
-            - Batch operation for efficiency when updating multiple tasks
-            - Should be called periodically for long-running tasks
+            task_ids: Task IDs to refresh
         """
         batch = self._create_batch()
         keys = [self._get_task_key(task_id) for task_id in task_ids]
