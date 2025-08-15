@@ -152,8 +152,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 affinity_hint.devices, device_name
             )
 
-        if not primary_sets or not primary_sets[0]:
-            # In normal conditions, we should have at least one primary set with at least one device.
+        if not primary_sets:
+            # In normal conditions, we should have at least one primary set.
             # The errorneous case may happen when:
             # - the device_name is not explicitly set, and
             # - auto-generated device_name differs from the reported resource slot name.
