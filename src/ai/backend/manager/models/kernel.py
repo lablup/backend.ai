@@ -150,7 +150,6 @@ USER_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
     for e in KernelStatus
     if e
     not in (
-        KernelStatus.TERMINATING,
         KernelStatus.TERMINATED,
         KernelStatus.PENDING,
         KernelStatus.CANCELLED,

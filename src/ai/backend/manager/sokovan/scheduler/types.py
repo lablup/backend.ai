@@ -81,6 +81,14 @@ class SessionDependencyInfo:
 
 
 @dataclass
+class AgentOccupancy:
+    """Agent occupancy information including resources and container count."""
+
+    occupied_slots: ResourceSlot
+    container_count: int
+
+
+@dataclass
 class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
@@ -88,6 +96,7 @@ class ResourceOccupancySnapshot:
     by_user: MutableMapping[UUID, ResourceSlot]
     by_group: MutableMapping[UUID, ResourceSlot]
     by_domain: MutableMapping[str, ResourceSlot]
+    by_agent: MutableMapping[AgentId, AgentOccupancy]  # Agent-level occupancy from actual kernels
 
 
 @dataclass(frozen=True)
