@@ -216,6 +216,8 @@ AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
+# statuses that occupy user resources
+# these statuses are used to calculate user resource usage
 USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     e
     for e in SessionStatus

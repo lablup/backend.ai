@@ -2290,6 +2290,7 @@ class ScheduleRepository:
             by_user=dict(occupancy_by_user),
             by_group=dict(occupancy_by_group),
             by_domain=dict(occupancy_by_domain),
+            by_agent={},  # TODO: Add agent-level occupancy calculation
         )
 
         # Get session resource policies and limits for active sessions
@@ -2507,7 +2508,7 @@ class ScheduleRepository:
             system_snapshot = SystemSnapshot(
                 total_capacity=ResourceSlot(),
                 resource_occupancy=ResourceOccupancySnapshot(
-                    by_keypair={}, by_user={}, by_group={}, by_domain={}
+                    by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
                 ),
                 resource_policy=ResourcePolicySnapshot(
                     keypair_policies={}, user_policies={}, group_limits={}, domain_limits={}
