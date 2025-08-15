@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar, override
+from typing import Generic, Optional, Protocol, TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -143,3 +143,28 @@ class ArgsSpecGenerator(SpecGenerator[TSpec]):
         Returns the provided arguments as the spec.
         """
         return self._args
+
+
+TResourceSpec = TypeVar("TResourceSpec", covariant=True)
+
+
+class ProvisionerProtocol(Protocol, Generic[TResourceSpec]):
+    async def wait_for_resource(self) -> TResourceSpec: ...
+
+
+class ProvisionerSpecGenerator(SpecGenerator[TSpec]):
+    """
+    A spec generator that uses a provisioner to generate the spec.
+    """
+
+    _provisioner: ProvisionerProtocol[TSpec]
+
+    def __init__(self, provisioner: ProvisionerProtocol[TSpec]):
+        self._provisioner = provisioner
+
+    @override
+    async def wait_for_spec(self) -> TSpec:
+        """
+        Waits for the provisioner to generate the spec.
+        """
+        return await self._provisioner.wait_for_resource()
