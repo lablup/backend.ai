@@ -73,6 +73,8 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.vfolder.anycast import (
+    VFolderCloneFailureEvent,
+    VFolderCloneSuccessEvent,
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -458,6 +460,16 @@ class Dispatchers:
             VFolderDeletionFailureEvent,
             None,
             self._vfolder_event_handler.handle_vfolder_deletion_failure,
+        )
+        evd.consume(
+            VFolderCloneSuccessEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_clone_success,
+        )
+        evd.consume(
+            VFolderCloneFailureEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_clone_failure,
         )
 
     def _dispatch_idle_check_events(

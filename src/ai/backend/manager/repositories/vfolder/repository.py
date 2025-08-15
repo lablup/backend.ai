@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import VFolderHostPermission, VFolderID
 from ai.backend.manager.data.vfolder.types import (
@@ -1051,55 +1051,41 @@ class VfolderRepository:
         #       vfolder.  After done, we need to make another transaction to clear the unusable state.
         target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
-        async def _clone(reporter: ProgressReporter) -> None:
-            async def _insert_vfolder() -> None:
-                async with self._db.begin_session() as db_session:
-                    insert_values = {
-                        "id": target_folder_id.folder_id,
-                        "name": vfolder_info.target_vfolder_name,
-                        "domain_name": vfolder_info.domain_name,
-                        "usage_mode": vfolder_info.usage_mode,
-                        "permission": vfolder_info.permission,
-                        "last_used": None,
-                        "host": vfolder_info.target_host,
-                        # TODO: add quota_scope_id
-                        "creator": vfolder_info.email,
-                        "ownership_type": VFolderOwnershipType("user"),
-                        "user": vfolder_info.user_id,
-                        "group": None,
-                        "unmanaged_path": None,
-                        "cloneable": vfolder_info.cloneable,
-                        "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
-                    }
-                    query = sa.insert(vfolders).values(**insert_values)
-                    await db_session.execute(query)
+        # Clone the vfolder contents
+        manager_client = storage_manager.get_manager_facing_client(source_proxy)
+        clone_response = await manager_client.clone_folder(
+            source_volume,
+            str(vfolder_info.source_vfolder_id),
+            target_volume,
+            str(target_folder_id),
+        )
+        task_id = clone_response.bgtask_id
 
-            # Clone the vfolder contents
-            manager_client = storage_manager.get_manager_facing_client(source_proxy)
-            await manager_client.clone_folder(
-                source_volume,
-                str(vfolder_info.source_vfolder_id),
-                target_volume,
-                str(target_folder_id),
-            )
+        async def _insert_vfolder() -> None:
+            async with self._db.begin_session() as db_session:
+                insert_values = {
+                    "id": target_folder_id.folder_id,
+                    "name": vfolder_info.target_vfolder_name,
+                    "domain_name": vfolder_info.domain_name,
+                    "usage_mode": vfolder_info.usage_mode,
+                    "permission": vfolder_info.permission,
+                    "last_used": None,
+                    "host": vfolder_info.target_host,
+                    # TODO: add quota_scope_id
+                    "creator": vfolder_info.email,
+                    "ownership_type": VFolderOwnershipType("user"),
+                    "user": vfolder_info.user_id,
+                    "group": None,
+                    "unmanaged_path": None,
+                    "cloneable": vfolder_info.cloneable,
+                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+                }
+                query = sa.insert(vfolders).values(**insert_values)
+                await db_session.execute(query)
 
-            # Insert the new vfolder record
-            await execute_with_retry(_insert_vfolder)
+        # Insert the new vfolder record
+        await execute_with_retry(_insert_vfolder)
 
-            # Update source vfolder status back to READY
-            async def _update_source_status_ready() -> None:
-                async with self._db.begin_session() as db_session:
-                    query = (
-                        sa.update(vfolders)
-                        .values(status=VFolderOperationStatus.READY)
-                        .where(source_vf_cond)
-                    )
-                    await db_session.execute(query)
-
-            await execute_with_retry(_update_source_status_ready)
-
-        # Start background task for cloning
-        task_id = await background_task_manager.start(_clone)
         return task_id, target_folder_id.folder_id
 
     @repository_decorator()
