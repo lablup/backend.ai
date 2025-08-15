@@ -24,6 +24,7 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
     PRIVATE_SESSION_TYPES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
     DefaultForUnspecified,
@@ -46,6 +47,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     AllocationBatch,
+    KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
     SessionDependencyInfo,
@@ -53,20 +55,20 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from .types import (
+from ..types import (
     AgentMeta,
-    DBKernelData,
-    DBMarkTerminatingResult,
-    DBPendingSessionData,
-    DBPendingSessions,
-    DBResourcePolicies,
-    DBSchedulingData,
-    DBSnapshotData,
-    DBSweptSessionInfo,
-    DBTerminatingKernelData,
-    DBTerminatingSessionData,
+    KernelData,
+    MarkTerminatingResult,
+    PendingSessionData,
+    PendingSessions,
+    ResourcePolicies,
     ScalingGroupMeta,
+    SchedulingData,
     SchedulingSpec,
+    SnapshotData,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -96,9 +98,7 @@ class ScheduleDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine):
         self._db = db
 
-    async def get_scheduling_data(
-        self, scaling_group: str, spec: SchedulingSpec
-    ) -> DBSchedulingData:
+    async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:
         """
         Fetch all scheduling data from database in a single session.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
@@ -110,7 +110,7 @@ class ScheduleDBSource:
             # 2. Get pending sessions
             pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group)
             if not pending_sessions.sessions:
-                return DBSchedulingData(
+                return SchedulingData(
                     scaling_group=scaling_group_meta,
                     pending_sessions=pending_sessions,
                     agents=[],
@@ -126,7 +126,7 @@ class ScheduleDBSource:
                 db_sess, scaling_group, pending_sessions, spec.known_slot_types
             )
 
-            return DBSchedulingData(
+            return SchedulingData(
                 scaling_group=scaling_group_meta,
                 pending_sessions=pending_sessions,
                 agents=agents,
@@ -160,7 +160,7 @@ class ScheduleDBSource:
 
     async def _fetch_pending_sessions(
         self, db_sess: SASession, scaling_group: str
-    ) -> DBPendingSessions:
+    ) -> PendingSessions:
         """Fetch pending sessions with kernels using single JOIN query."""
         query = (
             sa.select(
@@ -192,11 +192,11 @@ class ScheduleDBSource:
         )
         result = await db_sess.execute(query)
 
-        sessions_map: dict[SessionId, DBPendingSessionData] = {}
+        sessions_map: dict[SessionId, PendingSessionData] = {}
         for row in result:
             session_id = row.id
             if session_id not in sessions_map:
-                sessions_map[session_id] = DBPendingSessionData(
+                sessions_map[session_id] = PendingSessionData(
                     id=session_id,
                     access_key=row.access_key,
                     requested_slots=row.requested_slots,
@@ -213,7 +213,7 @@ class ScheduleDBSource:
                 )
 
             if row.kernel_id:
-                kernel = DBKernelData(
+                kernel = KernelData(
                     id=row.kernel_id,
                     image=row.kernel_image,
                     architecture=row.kernel_arch,
@@ -222,7 +222,7 @@ class ScheduleDBSource:
                 )
                 sessions_map[session_id].kernels.append(kernel)
 
-        return DBPendingSessions(sessions=list(sessions_map.values()))
+        return PendingSessions(sessions=list(sessions_map.values()))
 
     async def _fetch_agents(self, db_sess: SASession, scaling_group: str) -> list[AgentMeta]:
         """Fetch schedulable agent metadata in the scaling group."""
@@ -259,9 +259,9 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         scaling_group: str,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> DBSnapshotData:
+    ) -> SnapshotData:
         """Fetch all snapshot data for system state."""
         resource_occupancy = await self._fetch_kernel_occupancy(db_sess, scaling_group)
 
@@ -276,7 +276,7 @@ class ScheduleDBSource:
         session_ids = [s.id for s in pending_sessions.sessions]
         session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
 
-        return DBSnapshotData(
+        return SnapshotData(
             resource_occupancy=resource_occupancy,
             resource_policies=resource_policies,
             session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
@@ -285,25 +285,35 @@ class ScheduleDBSource:
     async def _fetch_kernel_occupancy(
         self, db_sess: SASession, scaling_group: str
     ) -> ResourceOccupancySnapshot:
-        """Fetch kernel occupancy data from active kernels."""
+        """Fetch kernel occupancy data from active kernels and session counts."""
+        # First, fetch kernel occupancy data
         occupancy_result = await db_sess.execute(
             sa.select(
+                KernelRow.session_id,
                 KernelRow.access_key,
                 KernelRow.user_uuid,
                 KernelRow.group_id,
                 KernelRow.domain_name,
                 KernelRow.agent,
                 KernelRow.occupied_slots,
+                KernelRow.session_type,
             ).where(
                 sa.and_(
                     KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
-                    KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES),
                     KernelRow.scaling_group == scaling_group,
                 )
             )
         )
 
-        occupancy_by_keypair: dict[AccessKey, ResourceSlot] = defaultdict(ResourceSlot)
+        # Keypair occupancy with both slots and session counts
+        def keypair_occupancy_factory() -> KeypairOccupancy:
+            return KeypairOccupancy(
+                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+            )
+
+        occupancy_by_keypair: dict[AccessKey, KeypairOccupancy] = defaultdict(
+            keypair_occupancy_factory
+        )
         occupancy_by_user: dict[UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_group: dict[UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_domain: dict[str, ResourceSlot] = defaultdict(ResourceSlot)
@@ -314,14 +324,34 @@ class ScheduleDBSource:
 
         occupancy_by_agent: dict[AgentId, AgentOccupancy] = defaultdict(agent_occupancy_factory)
 
+        # Track unique sessions per keypair to count correctly
+        sessions_by_keypair: dict[AccessKey, set[SessionId]] = defaultdict(set)
+        sftp_sessions_by_keypair: dict[AccessKey, set[SessionId]] = defaultdict(set)
+
         for row in occupancy_result:
-            occupancy_by_keypair[row.access_key] += row.occupied_slots
-            occupancy_by_user[row.user_uuid] += row.occupied_slots
-            occupancy_by_group[row.group_id] += row.occupied_slots
-            occupancy_by_domain[row.domain_name] += row.occupied_slots
+            # Only accumulate resource slots for non-private sessions
+            if row.session_type not in PRIVATE_SESSION_TYPES:
+                occupancy_by_keypair[row.access_key].occupied_slots += row.occupied_slots
+                occupancy_by_user[row.user_uuid] += row.occupied_slots
+                occupancy_by_group[row.group_id] += row.occupied_slots
+                occupancy_by_domain[row.domain_name] += row.occupied_slots
+
+                # Track regular sessions
+                sessions_by_keypair[row.access_key].add(row.session_id)
+            else:
+                # Track SFTP sessions
+                sftp_sessions_by_keypair[row.access_key].add(row.session_id)
+
             if row.agent:
                 occupancy_by_agent[row.agent].occupied_slots += row.occupied_slots
                 occupancy_by_agent[row.agent].container_count += 1
+
+        # Update session counts in keypair occupancy
+        for access_key, sessions in sessions_by_keypair.items():
+            occupancy_by_keypair[access_key].session_count = len(sessions)
+
+        for access_key, sessions in sftp_sessions_by_keypair.items():
+            occupancy_by_keypair[access_key].sftp_session_count = len(sessions)
 
         return ResourceOccupancySnapshot(
             by_keypair=occupancy_by_keypair,
@@ -334,9 +364,9 @@ class ScheduleDBSource:
     async def _fetch_resource_policies(
         self,
         db_sess: SASession,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> DBResourcePolicies:
+    ) -> ResourcePolicies:
         """Fetch resource policies for entities in pending sessions."""
         keypair_policies = await self._fetch_keypair_policies(
             db_sess, pending_sessions, known_slot_types
@@ -345,7 +375,7 @@ class ScheduleDBSource:
         group_limits = await self._fetch_group_limits(db_sess, pending_sessions, known_slot_types)
         domain_limits = await self._fetch_domain_limits(db_sess, pending_sessions, known_slot_types)
 
-        return DBResourcePolicies(
+        return ResourcePolicies(
             keypair_policies=keypair_policies,
             user_policies=user_policies,
             group_limits=group_limits,
@@ -355,7 +385,7 @@ class ScheduleDBSource:
     async def _fetch_keypair_policies(
         self,
         db_sess: SASession,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> dict[AccessKey, KeyPairResourcePolicy]:
         """Fetch keypair resource policies."""
@@ -405,7 +435,7 @@ class ScheduleDBSource:
     async def _fetch_group_limits(
         self,
         db_sess: SASession,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> dict[UUID, ResourceSlot]:
         """Fetch group resource limits."""
@@ -434,7 +464,7 @@ class ScheduleDBSource:
     async def _fetch_domain_limits(
         self,
         db_sess: SASession,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> dict[str, ResourceSlot]:
         """Fetch domain resource limits."""
@@ -463,7 +493,7 @@ class ScheduleDBSource:
     async def _fetch_user_policies(
         self,
         db_sess: SASession,
-        pending_sessions: DBPendingSessions,
+        pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> dict[UUID, UserResourcePolicy]:
         """Fetch user resource policies for users in pending sessions."""
@@ -537,120 +567,128 @@ class ScheduleDBSource:
 
     async def mark_sessions_terminating(
         self, session_ids: list[str], reason: str = "USER_REQUESTED"
-    ) -> DBMarkTerminatingResult:
+    ) -> MarkTerminatingResult:
         """
         Mark sessions and their kernels as TERMINATING.
+        Uses UPDATE ... WHERE ... RETURNING for atomic status transitions.
         Returns categorized session IDs based on their current status.
         """
         now = datetime.now(tzutc())
 
-        if not session_ids:
-            return DBMarkTerminatingResult(
-                cancelled_sessions=[],
-                terminating_sessions=[],
-                skipped_sessions=[],
-                not_found_sessions=[],
-            )
+        result = MarkTerminatingResult(
+            cancelled_sessions=[],
+            terminating_sessions=[],
+            skipped_sessions=[],
+        )
 
         async with self._db.begin_session() as db_sess:
-            # Fetch current statuses
-            session_query = sa.select(SessionRow.id, SessionRow.status).where(
-                SessionRow.id.in_(session_ids)
-            )
-            rows = await db_sess.execute(session_query)
-            existing_sessions = {str(row.id): row.status for row in rows}
-
-            # Categorize sessions
-            result = DBMarkTerminatingResult(
-                cancelled_sessions=[],
-                terminating_sessions=[],
-                skipped_sessions=[],
-                not_found_sessions=[],
+            # 1. Cancel pending sessions
+            result.cancelled_sessions = await self._cancel_pending_sessions(
+                db_sess, session_ids, reason, now
             )
 
-            for session_id in session_ids:
-                if session_id not in existing_sessions:
-                    result.not_found_sessions.append(session_id)
-                    continue
+            # 2. Mark resource-occupying sessions as terminating
+            result.terminating_sessions = await self._mark_sessions_as_terminating(
+                db_sess, session_ids, reason, now
+            )
 
-                status = existing_sessions[session_id]
-                if status in [
-                    SessionStatus.TERMINATED,
-                    SessionStatus.CANCELLED,
-                    SessionStatus.TERMINATING,
-                ]:
-                    result.skipped_sessions.append(session_id)
-                elif status in [SessionStatus.PENDING, SessionStatus.PULLING]:
-                    result.cancelled_sessions.append(session_id)
-                else:
-                    result.terminating_sessions.append(session_id)
-
-            # Cancel pending/pulling sessions
-            if result.cancelled_sessions:
-                await db_sess.execute(
-                    sa.update(SessionRow)
-                    .values(
-                        status=SessionStatus.CANCELLED,
-                        status_info=reason,
-                        terminated_at=now,
-                        status_history=sql_json_merge(
-                            SessionRow.status_history,
-                            (),
-                            {SessionStatus.CANCELLED.name: now.isoformat()},
-                        ),
-                    )
-                    .where(SessionRow.id.in_(result.cancelled_sessions))
-                )
-
-                await db_sess.execute(
-                    sa.update(KernelRow)
-                    .values(
-                        status=KernelStatus.CANCELLED,
-                        status_info=reason,
-                        status_changed=now,
-                        terminated_at=now,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {KernelStatus.CANCELLED.name: now.isoformat()},
-                        ),
-                    )
-                    .where(KernelRow.session_id.in_(result.cancelled_sessions))
-                )
-
-            # Mark sessions as terminating
-            if result.terminating_sessions:
-                await db_sess.execute(
-                    sa.update(SessionRow)
-                    .values(
-                        status=SessionStatus.TERMINATING,
-                        status_info=reason,
-                        status_history=sql_json_merge(
-                            SessionRow.status_history,
-                            (),
-                            {SessionStatus.TERMINATING.name: now.isoformat()},
-                        ),
-                    )
-                    .where(SessionRow.id.in_(result.terminating_sessions))
-                )
-
-                await db_sess.execute(
-                    sa.update(KernelRow)
-                    .values(
-                        status=KernelStatus.TERMINATING,
-                        status_info=reason,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {KernelStatus.TERMINATING.name: now.isoformat()},
-                        ),
-                    )
-                    .where(KernelRow.session_id.in_(result.terminating_sessions))
-                )
+            # 3. Mark unprocessed sessions as skipped
+            processed_ids = set(result.cancelled_sessions) | set(result.terminating_sessions)
+            result.skipped_sessions = [sid for sid in session_ids if sid not in processed_ids]
 
             return result
 
-    async def get_terminating_sessions(self) -> list[DBTerminatingSessionData]:
+    async def _cancel_pending_sessions(
+        self, db_sess: SASession, session_ids: list[str], reason: str, now: datetime
+    ) -> list[str]:
+        """Cancel pending sessions and their kernels."""
+        # Cancel pending sessions
+        cancel_stmt = (
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.CANCELLED,
+                status_info=reason,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {SessionStatus.CANCELLED.name: now.isoformat()},
+                ),
+            )
+            .where(
+                sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+            )
+            .returning(SessionRow.id)
+        )
+        cancelled_result = await db_sess.execute(cancel_stmt)
+        cancelled_sessions = [str(row.id) for row in cancelled_result]
+
+        # Cancel kernels for cancelled sessions
+        if cancelled_sessions:
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.CANCELLED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.CANCELLED.name: now.isoformat()},
+                    ),
+                )
+                .where(KernelRow.session_id.in_(cancelled_sessions))
+            )
+
+        return cancelled_sessions
+
+    async def _mark_sessions_as_terminating(
+        self, db_sess: SASession, session_ids: list[str], reason: str, now: datetime
+    ) -> list[str]:
+        """Mark resource-occupying sessions and their kernels as terminating."""
+        # Mark sessions as terminating
+        terminating_stmt = (
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.TERMINATING,
+                status_info=reason,
+                status_history=sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {SessionStatus.TERMINATING.name: now.isoformat()},
+                ),
+            )
+            .where(
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                )
+            )
+            .returning(SessionRow.id)
+        )
+        terminating_result = await db_sess.execute(terminating_stmt)
+        terminating_sessions = [str(row.id) for row in terminating_result]
+
+        # Mark kernels as terminating
+        if terminating_sessions:
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.TERMINATING,
+                    status_info=reason,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.TERMINATING.name: now.isoformat()},
+                    ),
+                )
+                .where(KernelRow.session_id.in_(terminating_sessions))
+            )
+
+        return terminating_sessions
+
+    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
         """Fetch all sessions with TERMINATING status."""
         async with self._db.begin_readonly_session() as session:
             query = (
@@ -675,7 +713,7 @@ class ScheduleDBSource:
             terminating_sessions = []
             for session_row in session_rows:
                 kernels = [
-                    DBTerminatingKernelData(
+                    TerminatingKernelData(
                         kernel_id=str(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
@@ -687,7 +725,7 @@ class ScheduleDBSource:
                 ]
 
                 terminating_sessions.append(
-                    DBTerminatingSessionData(
+                    TerminatingSessionData(
                         session_id=session_row.id,
                         access_key=session_row.access_key,
                         creation_id=session_row.creation_id,
@@ -702,10 +740,10 @@ class ScheduleDBSource:
 
     async def get_pending_timeout_sessions(
         self, pending_timeout: timedelta
-    ) -> list[DBSweptSessionInfo]:
+    ) -> list[SweptSessionInfo]:
         """Get sessions that have exceeded their pending timeout."""
         now = datetime.now(tzutc())
-        timed_out_sessions: list[DBSweptSessionInfo] = []
+        timed_out_sessions: list[SweptSessionInfo] = []
 
         async with self._db.begin_readonly_session() as db_sess:
             query = (
@@ -736,7 +774,7 @@ class ScheduleDBSource:
                 elapsed_time = now - row.created_at
                 if elapsed_time >= timeout:
                     timed_out_sessions.append(
-                        DBSweptSessionInfo(
+                        SweptSessionInfo(
                             session_id=row.id,
                             creation_id=row.creation_id,
                         )

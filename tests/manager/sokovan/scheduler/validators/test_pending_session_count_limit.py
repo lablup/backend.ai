@@ -36,7 +36,7 @@ class TestPendingSessionCountLimitValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -84,7 +84,7 @@ class TestPendingSessionCountLimitValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -133,7 +133,7 @@ class TestPendingSessionCountLimitValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -177,7 +177,7 @@ class TestPendingSessionCountLimitValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},  # No policy for user1

@@ -246,10 +246,9 @@ class TerminatingKernelData:
 class MarkTerminatingResult:
     """Result of marking sessions for termination."""
 
-    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING/PULLING)
+    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING)
     terminating_sessions: list[str]  # Sessions marked as TERMINATING
-    skipped_sessions: list[str]  # Sessions already TERMINATED/CANCELLED/TERMINATING
-    not_found_sessions: list[str]  # Sessions that don't exist
+    skipped_sessions: list[str]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
@@ -511,12 +510,11 @@ class ScheduleRepository:
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
 
         for session_id in session_ids:
             if session_id not in existing_sessions:
-                result.not_found_sessions.append(session_id)
+                result.skipped_sessions.append(session_id)
                 log.warning("Session {} not found", session_id)
                 continue
 
@@ -664,7 +662,6 @@ class ScheduleRepository:
                 cancelled_sessions=[],
                 terminating_sessions=[],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
 
         async with self._db.begin_session() as db_sess:
@@ -2274,13 +2271,22 @@ class ScheduleRepository:
         )
 
         # Process occupancy data
-        occupancy_by_keypair: dict[AccessKey, ResourceSlot] = defaultdict(ResourceSlot)
+        from ai.backend.manager.sokovan.scheduler.types import KeypairOccupancy
+
+        def keypair_occupancy_factory() -> KeypairOccupancy:
+            return KeypairOccupancy(
+                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+            )
+
+        occupancy_by_keypair: dict[AccessKey, KeypairOccupancy] = defaultdict(
+            keypair_occupancy_factory
+        )
         occupancy_by_user: dict[uuid.UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_group: dict[uuid.UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_domain: dict[str, ResourceSlot] = defaultdict(ResourceSlot)
 
         for row in occupancy_result:
-            occupancy_by_keypair[row.access_key] += row.occupied_slots
+            occupancy_by_keypair[row.access_key].occupied_slots += row.occupied_slots
             occupancy_by_user[row.user_uuid] += row.occupied_slots
             occupancy_by_group[row.group_id] += row.occupied_slots
             occupancy_by_domain[row.domain_name] += row.occupied_slots

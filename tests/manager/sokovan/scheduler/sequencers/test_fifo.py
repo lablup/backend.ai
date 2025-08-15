@@ -7,6 +7,7 @@ from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
+    KeypairOccupancy,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
@@ -30,6 +31,7 @@ class TestFIFOSequencer:
                 by_user={},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -113,12 +115,21 @@ class TestFIFOSequencer:
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
-                    AccessKey("user1"): ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
-                    AccessKey("user2"): ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                    AccessKey("user1"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        session_count=1,
+                        sftp_session_count=0,
+                    ),
+                    AccessKey("user2"): KeypairOccupancy(
+                        occupied_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                        session_count=1,
+                        sftp_session_count=0,
+                    ),
                 },
                 by_user={},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},

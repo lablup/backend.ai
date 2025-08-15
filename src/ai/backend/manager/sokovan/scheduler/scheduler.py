@@ -366,12 +366,22 @@ class Scheduler:
 
         # 1. Update resource occupancy - add the session's allocated slots
         # Update keypair occupancy
-        current_keypair = snapshot.resource_occupancy.by_keypair.get(
-            workload.access_key, ResourceSlot()
-        )
-        snapshot.resource_occupancy.by_keypair[workload.access_key] = (
-            current_keypair + total_allocated_slots
-        )
+        from ai.backend.manager.sokovan.scheduler.types import KeypairOccupancy
+
+        current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
+        if current_keypair is None:
+            current_keypair = KeypairOccupancy(
+                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+            )
+
+        # Update occupied slots and session counts
+        current_keypair.occupied_slots += total_allocated_slots
+        if workload.is_private:
+            current_keypair.sftp_session_count += 1
+        else:
+            current_keypair.session_count += 1
+
+        snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
 
         # Update user occupancy
         current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, ResourceSlot())
