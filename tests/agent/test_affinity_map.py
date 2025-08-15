@@ -11,6 +11,7 @@ from ai.backend.agent.alloc_map import (
     DiscretePropertyAllocMap,
 )
 from ai.backend.agent.resources import AbstractComputeDevice
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 
 
@@ -48,7 +49,7 @@ def _devid(value: Sequence[AbstractComputeDevice]) -> set[DeviceId]:
     return {d.device_id for d in value}
 
 
-def test_custom_device_class():
+def test_custom_device_class() -> None:
     # should be hashable
     device0 = CPUDevice(DeviceId("1"), "", 0, 0, 1)
     hash(device0)
@@ -77,7 +78,7 @@ def test_custom_device_class():
     assert g.size() == 6
 
 
-def test_affinity_map_first_allocation():
+def test_affinity_map_first_allocation() -> None:
     # only a single device
     devices = [
         CPUDevice(
@@ -85,8 +86,11 @@ def test_affinity_map_first_allocation():
         ),
     ]
     m = AffinityMap.build(devices)
-    primary, secondary = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    primary = m.get_device_clusters_with_lowest_distance(DeviceName("cpu"))
     assert _devid(primary[0]) == {"a0"}
+
+    primary = m.get_device_clusters_with_lowest_distance(DeviceName("xpu"))
+    assert not primary, "non-existent device name should return the empty list of primary sets"
 
     # numa_node is None
     devices = [
@@ -106,7 +110,7 @@ def test_affinity_map_first_allocation():
         ),
     ]
     m = AffinityMap.build(devices)
-    primary, secondary = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    primary = m.get_device_clusters_with_lowest_distance(DeviceName("cpu"))
     assert _devid(primary[0]) == {"a0", "a1"}
 
     # numa_node is -1 (cloud instances)
@@ -127,14 +131,14 @@ def test_affinity_map_first_allocation():
         ),
     ]
     m = AffinityMap.build(devices)
-    primary, secondary = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    primary = m.get_device_clusters_with_lowest_distance(DeviceName("cpu"))
     assert _devid(primary[0]) == {"a0", "a1"}
 
 
 @pytest.mark.parametrize(
     "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
 )
-def test_affinity_map_prefer_larger_chunks(allocation_strategy):
+def test_affinity_map_prefer_larger_chunks(allocation_strategy) -> None:
     device_init_args = {
         "memory_size": 0,
         "processing_units": 1,
@@ -157,7 +161,7 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy):
         },
         allocation_strategy=allocation_strategy,
     )
-    primary, secondary = affinity_map.get_distance_ordered_neighbors(None, DeviceName("x"))
+    primary = affinity_map.get_device_clusters_with_lowest_distance(DeviceName("x"))
     assert _devid(primary[0]) == {"a0", "a1"}
     assert _devid(primary[1]) == {"a2", "a3"}
 
@@ -178,6 +182,17 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy):
     assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 0
     assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 0
 
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+    with pytest.raises(ConfigurationError):
+        alloc_map.allocate(
+            {SlotName("y"): Decimal("1")},
+            affinity_hint=affinity_hint,
+        )
+
     # The second-time allocation with 2 devices should happen in the largest neighbor component.
     affinity_hint = AffinityHint(
         None,
@@ -194,7 +209,7 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy):
     assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 1
 
 
-def test_affinity_map_secondary_allocation():
+def test_affinity_map_secondary_allocation() -> None:
     devices = [
         DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
         DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
@@ -216,29 +231,23 @@ def test_affinity_map_secondary_allocation():
     m = AffinityMap.build(devices)
 
     print("\n(first allocation) <cpu> cur:{d0,d1,d2,d3}")
-    primary, secondary = m.get_distance_ordered_neighbors(
-        None,
+    primary = m.get_device_clusters_with_lowest_distance(
         DeviceName("cpu"),
     )
     pprint(primary)
-    pprint(secondary)
     assert _devid(primary[0]) == {"d0", "d1", "d2", "d3"}
-    assert _devid(secondary) == set()
 
     print("\n(first allocation) <cuda> cur:{x0}|{x1}")
-    primary, secondary = m.get_distance_ordered_neighbors(
-        None,
+    primary = m.get_device_clusters_with_lowest_distance(
         DeviceName("cuda"),
     )
     pprint(primary)
-    pprint(secondary)
     assert (
         _devid(primary[0]) == {"x0"}
         or _devid(primary[0]) == {"x1"}
         or _devid(primary[0]) == {"x2"}
         or _devid(primary[0]) == {"x3"}
     )
-    assert _devid(secondary) == set()
 
     print("\nprev:{x0} -> cur:{a0,a1,a2},{...other-cpus}")
     primary, secondary = m.get_distance_ordered_neighbors(

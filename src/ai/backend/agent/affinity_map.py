@@ -90,7 +90,7 @@ class AffinityMap(nx.Graph):
 
     def get_distance_ordered_neighbors(
         self,
-        src_devices: Optional[Sequence[AbstractComputeDevice]],
+        src_devices: Sequence[AbstractComputeDevice],
         device_name: DeviceName,
     ) -> tuple[Sequence[Sequence[AbstractComputeDevice]], Sequence[AbstractComputeDevice]]:
         """
@@ -113,26 +113,22 @@ class AffinityMap(nx.Graph):
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
         """
-        if src_devices:
-            assert next(iter(src_devices)).device_name != device_name
-            src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
-            primary_sets = []
-            secondary_set = set()
-            for numa_node in src_numa_nodes:
-                primary_set = set()
-                for u in self.nodes:
-                    if u.device_name == device_name:
-                        if u.numa_node == numa_node:
-                            primary_set.add(u)
-                        else:
-                            secondary_set.add(u)
-                primary_sets.append(primary_set)
-            for primary_set in primary_sets:
-                secondary_set -= primary_set
-            return [*(list(primary_set) for primary_set in primary_sets)], list(secondary_set)
-        else:
-            components = self.get_device_clusters_with_lowest_distance(device_name)
-            return components, []
+        assert next(iter(src_devices)).device_name != device_name
+        src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
+        primary_sets = []
+        secondary_set = set()
+        for numa_node in src_numa_nodes:
+            primary_set = set()
+            for u in self.nodes:
+                if u.device_name == device_name:
+                    if u.numa_node == numa_node:
+                        primary_set.add(u)
+                    else:
+                        secondary_set.add(u)
+            primary_sets.append(primary_set)
+        for primary_set in primary_sets:
+            secondary_set -= primary_set
+        return [*(list(primary_set) for primary_set in primary_sets)], list(secondary_set)
 
     @classmethod
     def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:
