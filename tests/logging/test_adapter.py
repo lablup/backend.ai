@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
 
 
