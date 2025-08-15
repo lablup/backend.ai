@@ -97,8 +97,26 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
         }
         return msg, kwargs
 
-    def trace(self, msg: LiteralString, *args, **kwargs) -> None:
-        self.log(_TRACE_LEVEL, msg, *args, **kwargs)
+    def trace(
+        self,
+        msg: LiteralString,
+        *args,
+        exc_info: _ExcInfoType = None,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
+        **kwargs,
+    ) -> None:
+        self.log(
+            _TRACE_LEVEL,
+            msg,
+            *args,
+            exc_info=exc_info,
+            stack_info=stack_info,
+            stacklevel=stacklevel,
+            extra=extra,
+            **kwargs,
+        )
 
     @classmethod
     def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
