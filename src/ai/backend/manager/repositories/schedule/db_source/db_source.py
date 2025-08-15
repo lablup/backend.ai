@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
     PRIVATE_SESSION_TYPES,
@@ -46,7 +47,6 @@ from ai.backend.manager.models.utils import (
 )
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
-    AllocationBatch,
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
@@ -55,21 +55,26 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from ..types import (
-    AgentMeta,
+from ..types.agent import AgentMeta
+from ..types.allocation import (
+    AllocationBatch,
+    SchedulingFailure,
+    SessionAllocation,
+)
+from ..types.base import SchedulingSpec
+from ..types.scaling_group import ScalingGroupMeta
+from ..types.scheduling import SchedulingData
+from ..types.session import (
     KernelData,
     MarkTerminatingResult,
     PendingSessionData,
     PendingSessions,
-    ResourcePolicies,
-    ScalingGroupMeta,
-    SchedulingData,
-    SchedulingSpec,
-    SnapshotData,
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ..types.snapshot import ResourcePolicies, SnapshotData
+from .types import SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -786,10 +791,199 @@ class ScheduleDBSource:
         """
         Allocate resources for sessions in the batch.
         Updates agent occupied slots and session/kernel statuses.
+
+        This method handles:
+        1. Pre-fetching all necessary agent, session, and kernel data
+        2. Processing successful allocations by updating agent resources and session/kernel statuses
+        3. Processing scheduling failures by updating their status data
         """
-        # This would be implemented similar to the original repository
-        # but would only handle DB operations
-        pass  # TODO: Implement allocation logic
+        async with self._db.begin_session() as db_sess:
+            # Process successful allocations
+            for allocation in allocation_batch.allocations:
+                try:
+                    await self._allocate_single_session(db_sess, allocation)
+                except Exception as e:
+                    log.error(
+                        "Error allocating session {}: {}",
+                        allocation.session_id,
+                        e,
+                    )
+                    # Continue with next session allocation
+
+            # Process scheduling failures in the same transaction
+            if allocation_batch.failures:
+                # Pre-fetch session rows only for failure status updates (needed for retry counts)
+                failure_session_ids = {failure.session_id for failure in allocation_batch.failures}
+                session_cache = await self._prefetch_session_rows(db_sess, failure_session_ids)
+
+                for failure in allocation_batch.failures:
+                    try:
+                        await self._update_session_failure_status(db_sess, session_cache, failure)
+                    except SessionNotFound as e:
+                        log.warning(
+                            "Session {} not found for failure status update: {}",
+                            failure.session_id,
+                            e,
+                        )
+                        # Continue with next failure update
+                    except Exception as e:
+                        log.error(
+                            "Unexpected error updating failure status for session {}: {}",
+                            failure.session_id,
+                            e,
+                        )
+                        # Continue with next failure update
+
+    async def _prefetch_session_rows(
+        self, db_sess: SASession, session_ids: set[SessionId]
+    ) -> SessionRowCache:
+        """Pre-fetch all session rows for the given session IDs."""
+        if not session_ids:
+            return SessionRowCache({})
+
+        query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
+        result = await db_sess.execute(query)
+        sessions = result.scalars().all()
+
+        prefetched = {session.id: session for session in sessions}
+        return SessionRowCache(prefetched)
+
+    async def _allocate_single_session(
+        self,
+        db_sess: SASession,
+        allocation: SessionAllocation,
+    ) -> None:
+        """
+        Allocate resources for a single session.
+        Updates session first, then its kernels.
+        Only updates if session is in PENDING status.
+        """
+        now = datetime.now(tzutc())
+
+        # Update session status and metadata first
+        session_update_query = (
+            sa.update(SessionRow)
+            .where(
+                sa.and_(
+                    SessionRow.id == allocation.session_id,
+                    SessionRow.status == SessionStatus.PENDING,
+                )
+            )
+            .values(
+                status=SessionStatus.SCHEDULED,
+                status_info="scheduled",
+                status_data={},
+                status_changed_at=now,
+                status_history=sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {SessionStatus.SCHEDULED.name: now.isoformat()},
+                ),
+                scaling_group_name=allocation.scaling_group,
+                agent_ids=allocation.unique_agent_ids(),
+            )
+        )
+        result = await db_sess.execute(session_update_query)
+
+        # Check if session was actually updated
+        if result.rowcount == 0:
+            log.warning(
+                "Session {} was not in PENDING status, skipping allocation",
+                allocation.session_id,
+            )
+            return
+
+        # Update kernels only if session was successfully updated
+        for kernel_alloc in allocation.kernel_allocations:
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_alloc.kernel_id,
+                        KernelRow.status == KernelStatus.PENDING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.SCHEDULED,
+                    status_info="scheduled",
+                    status_data={},
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.SCHEDULED.name: now.isoformat()},
+                    ),
+                    agent=kernel_alloc.agent_id,
+                    agent_addr=kernel_alloc.agent_addr,
+                    scaling_group=kernel_alloc.scaling_group,
+                )
+            )
+
+    async def _update_session_failure_status(
+        self, db_sess: SASession, session_cache: SessionRowCache, failure: SchedulingFailure
+    ) -> None:
+        """
+        Update session status for a scheduling failure.
+        Increments retries count from existing status_data.
+        Only updates if session is in PENDING status.
+        """
+        # Get existing session to retrieve current retries count
+        session_row = await session_cache.get_or_fetch(db_sess, failure.session_id)
+
+        # Get current retries count from existing status_data
+        current_status_data = session_row.status_data or {}
+        scheduler_data = current_status_data.get("scheduler", {})
+        current_retries = scheduler_data.get("retries", 0)
+
+        # Prepare status data using the failure's to_status_data method
+        status_data = failure.to_status_data(current_retries)
+
+        # Update session status data first
+        session_query = (
+            sa.update(SessionRow)
+            .where(
+                sa.and_(
+                    SessionRow.id == failure.session_id,
+                    SessionRow.status == SessionStatus.PENDING,
+                )
+            )
+            .values(
+                status_info=failure.msg,
+                status_data=sql_json_merge(
+                    SessionRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
+            )
+        )
+        result = await db_sess.execute(session_query)
+
+        # Check if session was actually updated
+        if result.rowcount == 0:
+            log.warning(
+                "Session {} was not in PENDING status, skipping failure status update",
+                failure.session_id,
+            )
+            return
+
+        # Update kernel status data only if session was updated
+        kernel_query = (
+            sa.update(KernelRow)
+            .where(
+                sa.and_(
+                    KernelRow.session_id == failure.session_id,
+                    KernelRow.status == KernelStatus.PENDING,
+                )
+            )
+            .values(
+                status_data=sql_json_merge(
+                    KernelRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
+            )
+        )
+        await db_sess.execute(kernel_query)
 
     async def batch_update_terminated_status(
         self, session_results: list, agent_slots_to_free: dict[AgentId, ResourceSlot]
