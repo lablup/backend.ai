@@ -38,6 +38,7 @@ class AffinityMap(nx.Graph):
     """
 
     def __init__(self) -> None:
+        self.min_weight = 0
         self.max_weight = 0
         super().__init__()
 
@@ -72,10 +73,15 @@ class AffinityMap(nx.Graph):
         self,
         device_name: DeviceName,
     ) -> Sequence[Sequence[AbstractComputeDevice]]:
+        """
+        Get the device clusters having the minimum distance from each other filtered by device_name.
+
+        This method is intended to be called for the first resource slot of a single allocation run.
+        In most cases, it will be accelerators as defined in the device allocation order
+        (see :attr:`ai.backend.agent.config.unified.ResourceConfig.allocation_order`)
+        """
         device_cluster_list = []
-        # FIXME: this is the intended logic but causes infinite loop.
-        # for weight in range(self.max_weight + 1):
-        for weight in [0]:
+        for weight in [self.min_weight]:
             subgraph = nx.subgraph_view(
                 self,
                 filter_node=lambda u: u.device_name == device_name,
@@ -94,8 +100,12 @@ class AffinityMap(nx.Graph):
         device_name: DeviceName,
     ) -> tuple[Sequence[Sequence[AbstractComputeDevice]], Sequence[AbstractComputeDevice]]:
         """
-        Get the list of neighbor device clusters and their distance from the given source_devices
+        Get the list of neighbor device clusters and their distance from the given src_devices
         with the same name.
+
+        This method is intended to be called for non-first resource slots of a single allocation run.
+        It is used to prioritize the closest devices of the current resource slot
+        from the already allocated devices (src_devices) of the previous resource slot.
 
         Example:
             Given a 4-core dual socket system with two GPUs per socket:
@@ -109,10 +119,11 @@ class AffinityMap(nx.Graph):
             it will return:
               primary: cpu0-3@node0 [interleaved]
               secondary: cpu4-7@node1 [fill-remaining]
-
-        If source_devices is None, it will return the first largest connected component from the
-        device distance matrix sharing the lowest distance values.
         """
+        if not src_devices:
+            raise RuntimeError(
+                "This method must be called when there are previously allocated devices in a single allocation run."
+            )
         if next(iter(src_devices)).device_name == device_name:
             raise RuntimeError(
                 "This is a logic error trying to allocate the same resource slots twice in a single allocation run."
@@ -138,6 +149,7 @@ class AffinityMap(nx.Graph):
         # TODO: allow compute plugins to customize distance calculation
         g = cls()
         max_weight = 0
+        min_weight = 0
         devices_copy = list(devices)
         while devices_copy:
             device1 = devices_copy.pop(0)
@@ -147,6 +159,9 @@ class AffinityMap(nx.Graph):
                 weight = 0 if device1.numa_node == device2.numa_node else 1
                 if max_weight < weight:
                     max_weight = weight
+                if min_weight > weight:
+                    min_weight = weight
                 g.add_edge(device1, device2, weight=weight)
         g.max_weight = max_weight
+        g.min_weight = min_weight
         return g
