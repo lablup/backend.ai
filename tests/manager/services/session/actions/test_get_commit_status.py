@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.get_commit_status import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.types import CommitStatusInfo
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DATA,
     KERNEL_FIXTURE_DICT,
@@ -39,7 +39,7 @@ AGENT_COMMIT_STATUS_RPC_RESP = {
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "List files",
                 GetCommitStatusAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -69,6 +69,6 @@ AGENT_COMMIT_STATUS_RPC_RESP = {
 async def test_get_commit_status(
     mock_agent_get_commit_status_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetCommitStatusAction, GetCommitStatusActionResult],
+    test_scenario: ScenarioBase[GetCommitStatusAction, GetCommitStatusActionResult],
 ):
     await test_scenario.test(processors.get_commit_status.wait_for_complete)

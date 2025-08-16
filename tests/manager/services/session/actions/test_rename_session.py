@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.rename_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     PENDING_SESSION_FIXTURE_DATA,
@@ -24,7 +24,7 @@ from ..fixtures import (
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Rename session",
             RenameSessionAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -33,7 +33,7 @@ from ..fixtures import (
             ),
             RenameSessionActionResult(session_data=replace(SESSION_FIXTURE_DATA, name="new_name")),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Cannot rename not running session",
             RenameSessionAction(
                 session_name=cast(str, PENDING_SESSION_FIXTURE_DATA.name),
@@ -55,6 +55,6 @@ from ..fixtures import (
 )
 async def test_rename_session(
     processors: SessionProcessors,
-    test_scenario: TestScenario[RenameSessionAction, RenameSessionActionResult],
+    test_scenario: ScenarioBase[RenameSessionAction, RenameSessionActionResult],
 ):
     await test_scenario.test(processors.rename_session.wait_for_complete)

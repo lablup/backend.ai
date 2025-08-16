@@ -36,7 +36,7 @@ from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState, TriState
 
-from .utils import TestScenario
+from .utils import ScenarioBase
 
 
 @pytest.fixture
@@ -117,7 +117,7 @@ async def create_group(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "When trigger create group action with valid data, group creation should be successful",
             CreateGroupAction(
                 input=GroupCreator(
@@ -151,8 +151,8 @@ async def create_group(
             ),
         ),
         # TODO: If business logic is implemented to raise exception instead of returning None
-        # we need to update TestScenario.failure
-        TestScenario.success(
+        # we need to update ScenarioBase.failure
+        ScenarioBase.success(
             "With duplicated name, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -169,7 +169,7 @@ async def create_group(
                 success=False,
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "When trigger create group action with invalid resource policy, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -190,7 +190,7 @@ async def create_group(
 )
 async def test_create_group(
     processors: GroupProcessors,
-    test_scenario: TestScenario[CreateGroupAction, CreateGroupActionResult],
+    test_scenario: ScenarioBase[CreateGroupAction, CreateGroupActionResult],
 ) -> None:
     await test_scenario.test(processors.create_group.wait_for_complete)
 

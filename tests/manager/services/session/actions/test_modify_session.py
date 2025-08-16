@@ -10,14 +10,14 @@ from ai.backend.manager.services.session.actions.modify_session import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.types import OptionalState
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Update name, priority",
             ModifySessionAction(
                 session_id=SESSION_FIXTURE_DATA.id,
@@ -43,6 +43,6 @@ from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTUR
 )
 async def test_modify_session(
     processors: SessionProcessors,
-    test_scenario: TestScenario[ModifySessionAction, ModifySessionActionResult],
+    test_scenario: ScenarioBase[ModifySessionAction, ModifySessionActionResult],
 ):
     await test_scenario.test(processors.modify_session.wait_for_complete)

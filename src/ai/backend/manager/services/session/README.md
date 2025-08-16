@@ -243,7 +243,7 @@ for entry in result.status_history["history"]:
 ## Testing Guidelines
 
 ### Unit Testing
-- Use `TestScenario` class for parameterized testing
+- Use `ScenarioBase` class for parameterized testing
 - Test both success and failure scenarios
 - Verify database state changes
 - Mock agent communication and external dependencies

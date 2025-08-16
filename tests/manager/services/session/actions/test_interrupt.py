@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.interrupt_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -39,7 +39,7 @@ INTERRUPT_SESSION_MOCK = None
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Interrupt session",
                 InterruptSessionAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -66,7 +66,7 @@ INTERRUPT_SESSION_MOCK = None
 async def test_interrupt_session(
     mock_interrupt_session_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[InterruptSessionAction, InterruptSessionActionResult],
+    test_scenario: ScenarioBase[InterruptSessionAction, InterruptSessionActionResult],
 ):
     # Expected result will use the session data from the database fixture
     assert test_scenario.expected is not None

@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.start_service import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -78,7 +78,7 @@ START_SERVICE_MOCK = {"started": True, "port": 8080}
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Start service",
             StartServiceAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -123,7 +123,7 @@ START_SERVICE_MOCK = {"started": True, "port": 8080}
 async def test_start_service(
     mock_start_service_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[StartServiceAction, StartServiceActionResult],
+    test_scenario: ScenarioBase[StartServiceAction, StartServiceActionResult],
 ):
     # Execute the action
     result = await processors.start_service.wait_for_complete(test_scenario.input)

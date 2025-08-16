@@ -8,7 +8,7 @@ E = TypeVar("E", bound=BaseException)
 TException = type[E] | tuple[type[E], ...]
 
 
-class TestScenario(Generic[TInput, TResult]):
+class ScenarioBase(Generic[TInput, TResult]):
     description: str
     input: TInput
     expected: Optional[TResult]

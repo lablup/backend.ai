@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.commit_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -42,7 +42,7 @@ COMMIT_SESSION_ACTION = CommitSessionAction(
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Commit session",
                 COMMIT_SESSION_ACTION,
                 CommitSessionActionResult(
@@ -66,6 +66,6 @@ COMMIT_SESSION_ACTION = CommitSessionAction(
 async def test_commit_session(
     mock_commit_session_to_file_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CommitSessionAction, CommitSessionActionResult],
+    test_scenario: ScenarioBase[CommitSessionAction, CommitSessionActionResult],
 ):
     await test_scenario.test(processors.commit_session.wait_for_complete)

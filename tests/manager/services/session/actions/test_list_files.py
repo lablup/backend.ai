@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.list_files import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
 
 
@@ -42,7 +42,7 @@ AGENT_LIST_FILES_RPC_RESP = {
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "List files",
                 ListFilesAction(
                     user_id=SESSION_FIXTURE_DATA.user_uuid,
@@ -71,6 +71,6 @@ AGENT_LIST_FILES_RPC_RESP = {
 async def test_list_files(
     mock_list_files_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[ListFilesAction, ListFilesActionResult],
+    test_scenario: ScenarioBase[ListFilesAction, ListFilesActionResult],
 ):
     await test_scenario.test(processors.list_files.wait_for_complete)
