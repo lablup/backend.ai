@@ -1,15 +1,12 @@
 """Repository pattern implementation for schedule operations."""
 
 import logging
-from collections import defaultdict
-from datetime import timedelta
 from typing import Mapping, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import SessionId, SlotName, SlotTypes
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models import PRIVATE_SESSION_TYPES
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .cache_source.cache_source import ScheduleCacheSource
@@ -68,76 +65,36 @@ class ScheduleRepository:
 
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
         """
-        Allocate sessions by updating DB and cache.
+        Allocate sessions by updating DB.
+        Agent occupied slots are synced directly in the DB.
         """
-        # Track concurrency changes
-        concurrency_to_increment: dict[AccessKey, int] = defaultdict(int)
-        sftp_concurrency_to_increment: dict[AccessKey, int] = defaultdict(int)
-
-        # Process allocations
-        for allocation in allocation_batch.allocations:
-            if allocation.session_type.is_private():
-                sftp_concurrency_to_increment[allocation.access_key] += 1
-            else:
-                concurrency_to_increment[allocation.access_key] += 1
-
-        # Update DB (includes agent resource allocation and status updates)
+        # Update DB
         await self._db_source.allocate_sessions(allocation_batch)
-
-        # Update cache concurrency
-        await self._cache_source.increment_concurrencies(
-            concurrency_to_increment, sftp_concurrency_to_increment
-        )
 
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """
         Get sessions that have exceeded their pending timeout.
+        The timeout is determined by each scaling group's scheduler_opts.
         """
-        # Get default timeout from config
-        default_timeout = timedelta(seconds=0)  # Or fetch from config if needed
-
         # Fetch from DB source
-        return await self._db_source.get_pending_timeout_sessions(default_timeout)
+        return await self._db_source.get_pending_timeout_sessions()
 
     async def batch_update_terminated_status(
         self,
         session_results: list[SessionTerminationResult],
     ) -> None:
         """
-        Update terminated status in DB and cache.
+        Update terminated status in DB.
+        Agent occupied slots are synced directly in the DB.
         """
         if not session_results:
             return
 
-        # Track concurrency changes and agent resources to free
-        concurrency_to_decrement: dict[AccessKey, int] = defaultdict(int)
-        sftp_concurrency_to_decrement: dict[AccessKey, int] = defaultdict(int)
-        agent_slots_to_free: dict[AgentId, ResourceSlot] = defaultdict(ResourceSlot)
-
-        # Process results
-        for session_result in session_results:
-            # Track resources to free
-            for kernel in session_result.kernel_results:
-                if kernel.success and kernel.agent_id:
-                    agent_slots_to_free[kernel.agent_id] += kernel.occupied_slots
-
-            # Track concurrency decrements for successfully terminated sessions
-            if session_result.should_terminate_session:
-                if session_result.session_type in PRIVATE_SESSION_TYPES:
-                    sftp_concurrency_to_decrement[session_result.access_key] += 1
-                else:
-                    concurrency_to_decrement[session_result.access_key] += 1
-
         # Update DB
-        await self._db_source.batch_update_terminated_status(session_results, agent_slots_to_free)
-
-        # Update cache
-        await self._cache_source.decrement_concurrencies(
-            concurrency_to_decrement, sftp_concurrency_to_decrement
-        )
+        await self._db_source.batch_update_terminated_status(session_results)
 
     async def mark_sessions_terminating(
-        self, session_ids: list[str], reason: str = "USER_REQUESTED"
+        self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
     ) -> MarkTerminatingResult:
         """
         Mark sessions for termination.

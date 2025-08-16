@@ -2666,6 +2666,7 @@ class AgentRegistry:
 
         # Get the main container's agent info
 
+        # TODO: Separate VOLATILE network cleanup method
         if session.network_type == NetworkType.VOLATILE:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
