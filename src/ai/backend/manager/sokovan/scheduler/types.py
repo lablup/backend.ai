@@ -81,13 +81,31 @@ class SessionDependencyInfo:
 
 
 @dataclass
+class KeypairOccupancy:
+    """Keypair occupancy information including resources and session counts."""
+
+    occupied_slots: ResourceSlot
+    session_count: int
+    sftp_session_count: int
+
+
+@dataclass
+class AgentOccupancy:
+    """Agent occupancy information including resources and container count."""
+
+    occupied_slots: ResourceSlot
+    container_count: int
+
+
+@dataclass
 class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
-    by_keypair: MutableMapping[AccessKey, ResourceSlot]
+    by_keypair: MutableMapping[AccessKey, KeypairOccupancy]
     by_user: MutableMapping[UUID, ResourceSlot]
     by_group: MutableMapping[UUID, ResourceSlot]
     by_domain: MutableMapping[str, ResourceSlot]
+    by_agent: MutableMapping[AgentId, AgentOccupancy]  # Agent-level occupancy from actual kernels
 
 
 @dataclass(frozen=True)
@@ -345,6 +363,14 @@ class SessionAllocation:
             access_key=session_workload.access_key,
         )
 
+    def unique_agent_ids(self) -> list[AgentId]:
+        """Extract unique agent IDs from kernel allocations."""
+        return list({
+            kernel_alloc.agent_id
+            for kernel_alloc in self.kernel_allocations
+            if kernel_alloc.agent_id is not None
+        })
+
 
 @dataclass
 class SchedulingFailure:
@@ -365,6 +391,16 @@ class SchedulingFailure:
     failed_phases: list[SchedulingPredicate] = field(default_factory=list)
     last_try: Optional[datetime] = field(default_factory=lambda: datetime.now(tzutc()))
     msg: Optional[str] = None
+
+    def to_status_data(self, current_retries: int) -> dict:
+        """Convert failure to status data dictionary for storage."""
+        return {
+            "passed_predicates": [p.serialize() for p in self.passed_phases],
+            "failed_predicates": [p.serialize() for p in self.failed_phases],
+            "retries": current_retries + 1,
+            "last_try": self.last_try.isoformat() if self.last_try else None,
+            "msg": self.msg,
+        }
 
 
 @dataclass

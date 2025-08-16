@@ -49,6 +49,7 @@ class TestGroupResourceLimitValidator:
                 by_user={},
                 by_group={group_id: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -84,6 +85,7 @@ class TestGroupResourceLimitValidator:
                 by_user={},
                 by_group={group_id: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -120,6 +122,7 @@ class TestGroupResourceLimitValidator:
                 by_user={},
                 by_group={group_id: ResourceSlot(cpu=Decimal("50"), mem=Decimal("50"))},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -155,6 +158,7 @@ class TestGroupResourceLimitValidator:
                 by_user={},
                 by_group={},  # No current occupancy for group
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},

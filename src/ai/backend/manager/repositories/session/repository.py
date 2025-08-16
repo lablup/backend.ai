@@ -432,7 +432,7 @@ class SessionRepository:
         session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         recursive: bool = False,
-    ) -> list[str]:
+    ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
@@ -452,8 +452,8 @@ class SessionRepository:
                         allow_stale=True,
                     )
                     # Return dependent sessions first, then root session
-                    session_ids = [str(sid) for sid in dependent_ids]
-                    session_ids.append(str(root_id))
+                    session_ids = [cast(SessionId, sid) for sid in dependent_ids]
+                    session_ids.append(cast(SessionId, root_id))
                 else:
                     # Get only the main session
                     session = await SessionRow.get_session(
@@ -463,7 +463,7 @@ class SessionRepository:
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
-                    session_ids = [str(session.id)]
+                    session_ids = [cast(SessionId, session.id)]
 
                 return session_ids
             except SessionNotFound:

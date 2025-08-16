@@ -19,6 +19,7 @@ from ai.backend.manager.repositories.project_resource_policy.repositories import
 )
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
+from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
@@ -42,6 +43,7 @@ class Repositories:
     project_resource_policy: ProjectResourcePolicyRepositories
     resource_preset: ResourcePresetRepositories
     schedule: ScheduleRepositories
+    scheduler: SchedulerRepositories
     session: SessionRepositories
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
@@ -61,6 +63,7 @@ class Repositories:
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
+        scheduler_repositories = SchedulerRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
@@ -79,6 +82,7 @@ class Repositories:
             project_resource_policy=project_resource_policy_repositories,
             resource_preset=resource_preset_repositories,
             schedule=schedule_repositories,
+            scheduler=scheduler_repositories,
             session=session_repositories,
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,

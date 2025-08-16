@@ -1,12 +1,14 @@
 import logging
-from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
+from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 
 from .handlers import (
     CheckPreconditionHandler,
@@ -16,10 +18,6 @@ from .handlers import (
     SweepSessionsHandler,
     TerminateSessionsHandler,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.schedule.repository import MarkTerminatingResult
-    from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -120,9 +118,9 @@ class ScheduleCoordinator:
 
     async def mark_sessions_for_termination(
         self,
-        session_ids: list[str],
+        session_ids: list[SessionId],
         reason: str = "USER_REQUESTED",
-    ) -> "MarkTerminatingResult":
+    ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
         This provides fast response to users by only updating the status and returning immediately.

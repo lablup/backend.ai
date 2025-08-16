@@ -10,7 +10,8 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.repositories.schedule.repository import MarkTerminatingResult
+from ai.backend.common.types import SessionId
+from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
@@ -76,12 +77,11 @@ class TestScheduleCoordinator:
     ):
         """Test successful marking of sessions for termination."""
         # Setup
-        session_ids = [str(uuid4()) for _ in range(3)]
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
         mock_result = MarkTerminatingResult(
             cancelled_sessions=[session_ids[0]],
             terminating_sessions=[session_ids[1], session_ids[2]],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -111,12 +111,11 @@ class TestScheduleCoordinator:
     ):
         """Test that no scheduling is requested when no sessions are processed."""
         # Setup
-        session_ids = [str(uuid4()) for _ in range(2)]
+        session_ids = [SessionId(uuid4()) for _ in range(2)]
         mock_result = MarkTerminatingResult(
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=session_ids,  # All skipped
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -158,7 +157,7 @@ class TestScheduleCoordinator:
     ):
         """Test marking sessions with different termination reasons."""
         # Setup
-        session_id = str(uuid4())
+        session_id = SessionId(uuid4())
         reasons = [
             "USER_REQUESTED",
             "ADMIN_FORCED",
@@ -172,7 +171,6 @@ class TestScheduleCoordinator:
                 cancelled_sessions=[],
                 terminating_sessions=[session_id],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
             mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -200,7 +198,6 @@ class TestScheduleCoordinator:
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -222,15 +219,14 @@ class TestScheduleCoordinator:
     ):
         """Test marking with mixed results (some found, some not)."""
         # Setup
-        existing_sessions = [str(uuid4()) for _ in range(3)]
-        non_existing = [str(uuid4()) for _ in range(2)]
+        existing_sessions = [SessionId(uuid4()) for _ in range(3)]
+        non_existing = [SessionId(uuid4()) for _ in range(2)]
         all_sessions = existing_sessions + non_existing
 
         mock_result = MarkTerminatingResult(
             cancelled_sessions=[existing_sessions[0]],
             terminating_sessions=[existing_sessions[1], existing_sessions[2]],
-            skipped_sessions=[],
-            not_found_sessions=non_existing,
+            skipped_sessions=non_existing,
         )
         mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
@@ -242,7 +238,8 @@ class TestScheduleCoordinator:
 
         # Verify
         assert result.processed_count() == 3  # Only existing sessions processed
-        assert len(result.not_found_sessions) == 2
+        # Non-existing sessions are now in skipped_sessions
+        assert result.skipped_sessions == non_existing
 
         # Scheduling should be requested for processed sessions
         mock_valkey_schedule.mark_schedule_needed.assert_called_once_with(
@@ -264,7 +261,7 @@ class TestScheduleCoordinator:
         # Execute and verify exception is propagated
         with pytest.raises(Exception) as exc_info:
             await schedule_coordinator.mark_sessions_for_termination(
-                [str(uuid4())],
+                [SessionId(uuid4())],
                 reason="TEST_EXCEPTION",
             )
 
@@ -283,14 +280,13 @@ class TestScheduleCoordinator:
         import asyncio
 
         # Setup
-        session_groups = [[str(uuid4()) for _ in range(2)] for _ in range(3)]
+        session_groups = [[SessionId(uuid4()) for _ in range(2)] for _ in range(3)]
 
         def setup_mock_result(session_ids, reason):
             return MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=session_ids,
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
 
         mock_scheduler.mark_sessions_for_termination.side_effect = setup_mock_result

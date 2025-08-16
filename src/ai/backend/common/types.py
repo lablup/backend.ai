@@ -15,6 +15,7 @@ from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
 from ssl import SSLContext
@@ -421,6 +422,7 @@ class SessionTypes(CIStrEnum):
     SYSTEM = "system"
 
     @classmethod
+    @lru_cache(maxsize=1)
     def private_types(cls) -> tuple[SessionTypes]:
         """
         Returns a set of private session types.

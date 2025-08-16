@@ -5,7 +5,7 @@ This allocator delegates allocation operations to the schedule repository
 to ensure transactional consistency.
 """
 
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
 
 from .allocator import SchedulingAllocator
@@ -19,7 +19,7 @@ class RepositoryAllocator(SchedulingAllocator):
     by delegating to a single repository method.
     """
 
-    _repository: ScheduleRepository
+    _repository: SchedulerRepository
 
     def name(self) -> str:
         """
@@ -33,7 +33,7 @@ class RepositoryAllocator(SchedulingAllocator):
         """
         return "Resources successfully allocated to agents"
 
-    def __init__(self, schedule_repository: ScheduleRepository) -> None:
+    def __init__(self, schedule_repository: SchedulerRepository) -> None:
         """
         Initialize the allocator with schedule repository.
 

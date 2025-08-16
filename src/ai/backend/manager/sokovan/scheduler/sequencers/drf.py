@@ -47,9 +47,9 @@ class DRFSequencer(WorkloadSequencer):
         user_dominant_shares: dict[AccessKey, Decimal] = defaultdict(lambda: Decimal(0))
 
         # Calculate dominant shares from existing allocations
-        for access_key, occupied_slots in system_snapshot.resource_occupancy.by_keypair.items():
+        for access_key, occupancy in system_snapshot.resource_occupancy.by_keypair.items():
             dominant_share = self._calculate_dominant_share(
-                occupied_slots, system_snapshot.total_capacity
+                occupancy.occupied_slots, system_snapshot.total_capacity
             )
             user_dominant_shares[access_key] = dominant_share
 
