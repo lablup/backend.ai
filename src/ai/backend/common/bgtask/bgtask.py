@@ -4,7 +4,6 @@ import asyncio
 import logging
 import time
 import uuid
-import weakref
 from dataclasses import dataclass
 from typing import (
     Awaitable,
@@ -167,7 +166,7 @@ class NopBackgroundTaskObserver:
 
 class BackgroundTaskManager:
     _event_producer: EventProducer
-    _ongoing_tasks: weakref.WeakValueDictionary[TaskID, asyncio.Task]
+    _ongoing_tasks: dict[TaskID, asyncio.Task]
     _metric_observer: BackgroundTaskObserver
     _dict_lock: asyncio.Lock
     _valkey_client: ValkeyBgtaskClient
@@ -179,7 +178,7 @@ class BackgroundTaskManager:
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
         self._event_producer = event_producer
-        self._ongoing_tasks = weakref.WeakValueDictionary()
+        self._ongoing_tasks = {}
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -200,8 +199,7 @@ class BackgroundTaskManager:
                 total_progress=0,
             ),
         )
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self._ongoing_tasks[TaskID(task_id)] = task
+        asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         return task_id
 
     async def shutdown(self) -> None:
@@ -284,7 +282,6 @@ class BackgroundTaskManager:
             msg = repr(e)
             return BgtaskFailedEvent(task_id, msg)
         finally:
-            self._ongoing_tasks.pop(TaskID(task_id), None)
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
                 task_name=task_name,
@@ -304,11 +301,11 @@ class BackgroundTaskManager:
     ) -> None:
         current_task = asyncio.current_task()
         if current_task is not None:
-            self._ongoing_tasks[TaskID(task_id)] = current_task
+            self._ongoing_tasks[TaskID.from_uuid(task_id)] = current_task
         try:
             bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
         finally:
-            self._ongoing_tasks.pop(TaskID(task_id), None)
+            self._ongoing_tasks.pop(TaskID.from_uuid(task_id), None)
         cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
         await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
         log.info(
