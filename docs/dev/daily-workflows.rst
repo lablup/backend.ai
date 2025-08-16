@@ -255,23 +255,21 @@ Install the following extensions:
      *disable* them for the Backend.AI workspace only to prevent interference
      with Ruff's own linting, fixing and formatting.
 
-Set the workspace settings for the Python extension for code navigation and auto-completion:
+Set the workspace settings for the Python extension for automatic linting and formatting:
 
-.. list-table::
-   :header-rows: 1
+.. code-block:: json
 
-   * - Setting ID
-     - Recommended value
-   * - ``python.analysis.autoSearchPaths``
-     - true
-   * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.13.3/lib/python3.12/site-packages"]``
-   * - ``python.analysis.importFormat``
-     - ``"relative"``
-   * - ``editor.formatOnSave``
-     - ``true``
-   * - ``editor.codeActionsOnSave``
-     - ``{"source.fixAll": true}``
+   "[python]": {
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+         "source.fixAll": "explicit",
+         "source.organizeImports": "explicit"
+      },
+      "editor.defaultFormatter": "charliermarsh.ruff"
+   }
+
+Note that the main Python interpreter configuration for code navigation and auto-completion
+is auto-detected from ``pyproject.toml``.
 
 Set the following keys in the workspace settings to configure Python tools:
 
@@ -281,11 +279,13 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["dist/export/python/virtualenvs/mypy/3.13.3/bin/python"]``
+     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.13.3/bin/python"]`` (use the absolute path)
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.path``
-     - ``["dist/export/bin/python"]``
+     - ``["/abs/path/to/dist/export/bin/python"]`` (use the absolute path)
+   * - ``ruff.nativeServer``
+     - ``true``
 
 .. note:: **Changed in July 2023**
 
