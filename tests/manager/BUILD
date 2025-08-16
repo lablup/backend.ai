@@ -1,8 +1,7 @@
 python_test_utils(
     sources=[
-        "conftest.py",
-        "model_factory.py",
-        "scheduler_utils.py",
+        "*.py",
+        "!test_*.py",
     ],
     dependencies=[
         "//:reqs#aiosqlite",  # not auto-inferred
