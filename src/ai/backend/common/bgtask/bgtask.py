@@ -19,7 +19,8 @@ from typing import (
     Union,
 )
 
-from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.bgtask.types import BgtaskStatus, TaskID
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.events.types import EventCacheDomain
 from ai.backend.common.exception import (
     BackendAIError,
@@ -42,6 +43,7 @@ from ..events.event_types.bgtask.broadcast import (
     BgtaskUpdatedEvent,
 )
 from ..types import DispatchResult, Sentinel
+from .defs import HEARTBEAT_INTERVAL
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -165,9 +167,10 @@ class NopBackgroundTaskObserver:
 
 class BackgroundTaskManager:
     _event_producer: EventProducer
-    _ongoing_tasks: weakref.WeakSet[asyncio.Task]
+    _ongoing_tasks: weakref.WeakValueDictionary[TaskID, asyncio.Task]
     _metric_observer: BackgroundTaskObserver
     _dict_lock: asyncio.Lock
+    _valkey_client: ValkeyBgtaskClient
 
     def __init__(
         self,
@@ -176,9 +179,10 @@ class BackgroundTaskManager:
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
         self._event_producer = event_producer
-        self._ongoing_tasks = weakref.WeakSet()
+        self._ongoing_tasks = weakref.WeakValueDictionary()
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
     async def start(
         self,
@@ -197,12 +201,12 @@ class BackgroundTaskManager:
             ),
         )
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self._ongoing_tasks.add(task)
+        self._ongoing_tasks[TaskID(task_id)] = task
         return task_id
 
     async def shutdown(self) -> None:
         log.info("Cancelling remaining background tasks...")
-        for task in self._ongoing_tasks.copy():
+        for task in self._ongoing_tasks.values():
             if task.done():
                 continue
             try:
@@ -280,6 +284,7 @@ class BackgroundTaskManager:
             msg = repr(e)
             return BgtaskFailedEvent(task_id, msg)
         finally:
+            self._ongoing_tasks.pop(TaskID(task_id), None)
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
                 task_name=task_name,
@@ -297,9 +302,30 @@ class BackgroundTaskManager:
         task_name: Optional[str],
         **kwargs,
     ) -> None:
-        bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            self._ongoing_tasks[TaskID(task_id)] = current_task
+        try:
+            bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
+        finally:
+            self._ongoing_tasks.pop(TaskID(task_id), None)
         cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
         await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
         log.info(
             "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
         )
+
+    async def _heartbeat_loop(self) -> None:
+        """Periodically update heartbeat for running background tasks"""
+        while True:
+            try:
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+
+                # Update heartbeat for all ongoing background tasks
+                alive_task_ids: list[TaskID] = []
+                for task_id, bg_task in self._ongoing_tasks.items():
+                    if not bg_task.done():
+                        alive_task_ids.append(task_id)
+                await self._valkey_client.refresh_tasks(alive_task_ids)
+            except Exception as e:
+                log.exception("Error in heartbeat loop: {}", e)
