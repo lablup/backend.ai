@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
@@ -68,24 +67,22 @@ class SchedulerArgs:
     validator: SchedulingValidator
     sequencer: WorkloadSequencer
     agent_selector: AgentSelector
-    allocator: "SchedulingAllocator"
+    allocator: SchedulingAllocator
     repository: SchedulerRepository
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
-    agent_pool: "AgentPool"
-    valkey_stat: "ValkeyStatClient"
+    agent_pool: AgentPool
 
 
 class Scheduler:
     _validator: SchedulingValidator
     _default_sequencer: WorkloadSequencer
     _default_agent_selector: AgentSelector
-    _allocator: "SchedulingAllocator"
+    _allocator: SchedulingAllocator
     _repository: SchedulerRepository
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
-    _agent_pool: "AgentPool"
-    _valkey_stat: "ValkeyStatClient"
+    _agent_pool: AgentPool
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
     _phase_metrics: SchedulerPhaseMetricObserver
@@ -99,7 +96,6 @@ class Scheduler:
         self._config_provider = args.config_provider
         self._lock_factory = args.lock_factory
         self._agent_pool = args.agent_pool
-        self._valkey_stat = args.valkey_stat
         self._sequencer_pool = self._make_sequencer_pool()
         self._agent_selector_pool = self._make_agent_selector_pool(
             args.config_provider.config.manager.agent_selection_resource_priority
