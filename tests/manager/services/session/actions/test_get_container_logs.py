@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DATA,
     KERNEL_FIXTURE_DICT,
@@ -37,7 +37,7 @@ AGENT_GET_CONTAINER_LOGS_RPC_RESP = {"result": {"logs": CONTAINER_LOGS_MOCK}}
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Get container logs",
                 GetContainerLogsAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -65,6 +65,6 @@ AGENT_GET_CONTAINER_LOGS_RPC_RESP = {"result": {"logs": CONTAINER_LOGS_MOCK}}
 async def test_get_container_logs_report(
     mock_agent_get_logs_from_agent_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetContainerLogsAction, GetContainerLogsActionResult],
+    test_scenario: ScenarioBase[GetContainerLogsAction, GetContainerLogsActionResult],
 ):
     await test_scenario.test(processors.get_container_logs.wait_for_complete)

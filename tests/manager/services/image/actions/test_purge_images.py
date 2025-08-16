@@ -17,7 +17,7 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def mock_agent_purge_images_rpc(mocker, mock_agent_responses_result):
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             PurgeImagesAction(
                 keys=[
@@ -90,6 +90,6 @@ def mock_agent_purge_images_rpc(mocker, mock_agent_responses_result):
 async def test_purge_images(
     mock_agent_purge_images_rpc,
     processors: ImageProcessors,
-    test_scenario: TestScenario[PurgeImagesAction, PurgeImagesActionResult],
+    test_scenario: ScenarioBase[PurgeImagesAction, PurgeImagesActionResult],
 ):
     await test_scenario.test(processors.purge_images.wait_for_complete)

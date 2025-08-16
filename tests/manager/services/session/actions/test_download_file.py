@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.download_file import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
 
 
@@ -31,7 +31,7 @@ AGENT_DOWNLOAD_FILE_RPC_RESP = b"file content"
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "List files",
                 DownloadFileAction(
                     user_id=SESSION_FIXTURE_DATA.user_uuid,
@@ -60,6 +60,6 @@ AGENT_DOWNLOAD_FILE_RPC_RESP = b"file content"
 async def test_download_file(
     mock_agent_download_single_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[DownloadFileAction, DownloadFileActionResult],
+    test_scenario: ScenarioBase[DownloadFileAction, DownloadFileActionResult],
 ):
     await test_scenario.test(processors.download_file.wait_for_complete)

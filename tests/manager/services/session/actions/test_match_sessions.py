@@ -9,7 +9,7 @@ from ai.backend.manager.services.session.actions.match_sessions import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -32,7 +32,7 @@ MATCH_SESSIONS_MOCK = [
     ("test_scenario",),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Match sessions",
                 MatchSessionsAction(
                     id_or_name_prefix=cast(str, SESSION_FIXTURE_DATA.name),
@@ -59,7 +59,7 @@ MATCH_SESSIONS_MOCK = [
 )
 async def test_match_sessions(
     processors: SessionProcessors,
-    test_scenario: TestScenario[MatchSessionsAction, MatchSessionsActionResult],
+    test_scenario: ScenarioBase[MatchSessionsAction, MatchSessionsActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.match_sessions.wait_for_complete)

@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.destroy_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -40,7 +40,7 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Destroy session",
                 DestroySessionAction(
                     user_role=UserRole.USER,
@@ -72,7 +72,7 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 async def test_destroy_session(
     mock_agent_destroy_session_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[DestroySessionAction, DestroySessionActionResult],
+    test_scenario: ScenarioBase[DestroySessionAction, DestroySessionActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.destroy_session.wait_for_complete)

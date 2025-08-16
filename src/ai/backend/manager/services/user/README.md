@@ -225,11 +225,11 @@ except Exception as e:
 ### Unit Testing
 ```python
 import pytest
-from tests.manager.services.test_utils import TestScenario
+from tests.manager.services.test_utils import ScenarioBase
 
 @pytest.mark.parametrize("test_scenario", [
-    TestScenario.success("User creation success", action, expected_result),
-    TestScenario.failure("User creation failure", action, expected_exception),
+    ScenarioBase.success("User creation success", action, expected_result),
+    ScenarioBase.failure("User creation failure", action, expected_exception),
 ])
 async def test_user_creation(test_scenario, processors):
     await test_scenario.test(processors.create_user.wait_for_complete)

@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.download_files import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -52,7 +52,7 @@ DOWNLOAD_FILES_ACTION = DownloadFilesAction(
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Download files",
                 DOWNLOAD_FILES_ACTION,
                 DownloadFilesActionResult(
@@ -77,7 +77,7 @@ async def test_download_files(
     mock_increment_session_usage_rpc,
     mock_download_file_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[DownloadFilesAction, DownloadFilesActionResult],
+    test_scenario: ScenarioBase[DownloadFilesAction, DownloadFilesActionResult],
 ):
     # Custom test to handle MultipartWriter comparison
     result = await processors.download_files.wait_for_complete(test_scenario.input)

@@ -15,13 +15,13 @@ from ...fixtures import (
     IMAGE_ALIAS_ROW_FIXTURE,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             DealiasImageAction(
                 alias=IMAGE_ALIAS_ROW_FIXTURE.alias,
@@ -47,7 +47,7 @@ from ...test_utils import TestScenario
 )
 async def test_dealias_image(
     processors: ImageProcessors,
-    test_scenario: TestScenario[DealiasImageAction, DealiasImageActionResult],
+    test_scenario: ScenarioBase[DealiasImageAction, DealiasImageActionResult],
 ):
     await test_scenario.test(processors.dealias_image.wait_for_complete)
 

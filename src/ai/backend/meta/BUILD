@@ -1,3 +1,4 @@
 python_sources(
-    name="lib",
+    name="src",
+    sources=["**/*.py"],
 )

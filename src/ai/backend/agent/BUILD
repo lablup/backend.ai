@@ -1,14 +1,22 @@
 python_sources(
     name="src",
+    sources=["**/*.py", "!watcher/**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/agent/docker:src",  # not auto-inferred
-        "src/ai/backend/agent/dummy:src",  # not auto-inferred
-        "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
-        "src/ai/backend/agent/config:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
+        "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
+        ":resources",
+    ],
+)
+
+python_sources(
+    name="src-watcher",
+    sources=["watcher/**/*.py"],
+    dependencies=[
+        "src/ai/backend/cli:src",  # not auto-inferred
+        "src/ai/backend/runner:src",
+        "src/ai/backend/helpers:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
     ],
@@ -71,7 +79,6 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
-        "!!./watcher:src",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
     ],
@@ -83,7 +90,6 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
-        "!!./watcher:src",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
     ],
@@ -93,7 +99,8 @@ pex_binary(
     name="backendai-agent-watcher",
     **common_scie_config("lazy", entry_point="watcher/__main__.py"),
     dependencies=[
-        "./watcher:src",
+        ":src-watcher",
+        ":buildscript",
         ":resources",
         "!!stubs/trafaret:stubs",
     ],
@@ -103,7 +110,8 @@ pex_binary(
     name="backendai-agent-watcher-fat",
     **common_scie_config("eager", entry_point="watcher/__main__.py"),
     dependencies=[
-        "./watcher:src",
+        ":src-watcher",
+        ":buildscript",
         ":resources",
         "!!stubs/trafaret:stubs",
     ],
@@ -134,5 +142,8 @@ resources(
     ],
     sources=[
         "py.typed",
+        "docker/*.tar.gz",
+        "docker/*.txt",
+        "docker/*.bin",
     ],
 )

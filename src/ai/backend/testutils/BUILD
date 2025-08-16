@@ -1,5 +1,5 @@
 python_test_utils(
-    sources=["*.py"],
+    sources=["**/*.py"],
 )
 
 visibility_private_component(

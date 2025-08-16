@@ -14,7 +14,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import RequesterCtx
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ class TestDeleteModelService:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "successful model deletion (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
@@ -87,7 +87,7 @@ class TestDeleteModelService:
                     success=True,
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "non-existent model (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
@@ -100,7 +100,7 @@ class TestDeleteModelService:
                 ),
                 ModelServiceNotFound,
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "successful model deletion (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
@@ -115,7 +115,7 @@ class TestDeleteModelService:
                     success=True,
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "non-existent model (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
@@ -133,7 +133,7 @@ class TestDeleteModelService:
     @pytest.mark.asyncio
     async def test_delete_model_service(
         self,
-        scenario: TestScenario[DeleteModelServiceAction, DeleteModelServiceActionResult],
+        scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_endpoint_by_id_validated,
         mock_update_endpoint_lifecycle_validated,

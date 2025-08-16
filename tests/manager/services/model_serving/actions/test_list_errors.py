@@ -16,7 +16,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import ErrorInfo, RequesterCtx
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ class TestListErrors:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "recent errors lookup",
                 ListErrorsAction(
                     requester_ctx=RequesterCtx(
@@ -87,7 +87,7 @@ class TestListErrors:
                     retries=0,
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "error type filtered",
                 ListErrorsAction(
                     requester_ctx=RequesterCtx(
@@ -117,7 +117,7 @@ class TestListErrors:
     @pytest.mark.asyncio
     async def test_list_errors(
         self,
-        scenario: TestScenario[ListErrorsAction, ListErrorsActionResult],
+        scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_list_errors,
         mock_get_endpoint_by_id_force_list_errors,

@@ -9,11 +9,6 @@ python_requirements(
     },
 )
 python_requirements(
-    name="reqs-ruff",
-    source="ruff-requirements.txt",
-    resolve="ruff",
-)
-python_requirements(
     name="reqs-black",
     source="black-requirements.txt",
     resolve="black",

@@ -18,13 +18,13 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             ForgetImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -35,7 +35,7 @@ from ...test_utils import TestScenario
                 image=replace(IMAGE_FIXTURE_DATA, status=ImageStatus.DELETED)
             ),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
             ForgetImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -44,7 +44,7 @@ from ...test_utils import TestScenario
             ),
             ForgetImageForbiddenError,
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Image not found",
             ForgetImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -67,7 +67,7 @@ from ...test_utils import TestScenario
 )
 async def test_forget_image_by_id(
     processors: ImageProcessors,
-    test_scenario: TestScenario[ForgetImageByIdAction, ForgetImageByIdActionResult],
+    test_scenario: ScenarioBase[ForgetImageByIdAction, ForgetImageByIdActionResult],
 ):
     await test_scenario.test(processors.forget_image_by_id.wait_for_complete)
 

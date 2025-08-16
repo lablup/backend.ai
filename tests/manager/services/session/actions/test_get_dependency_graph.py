@@ -9,7 +9,7 @@ from ai.backend.manager.services.session.actions.get_dependency_graph import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -47,7 +47,7 @@ GET_DEPENDENCY_GRAPH_WITH_CHILD_MOCK = {
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Get dependency graph",
             GetDependencyGraphAction(
                 root_session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -80,7 +80,7 @@ GET_DEPENDENCY_GRAPH_WITH_CHILD_MOCK = {
 )
 async def test_get_dependency_graph(
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetDependencyGraphAction, GetDependencyGraphActionResult],
+    test_scenario: ScenarioBase[GetDependencyGraphAction, GetDependencyGraphActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.get_dependency_graph.wait_for_complete)

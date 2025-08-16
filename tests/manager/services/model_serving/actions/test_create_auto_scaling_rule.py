@@ -25,7 +25,7 @@ from ai.backend.manager.services.model_serving.types import (
     RequesterCtx,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ class TestCreateEndpointAutoScalingRule:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -99,7 +99,7 @@ class TestCreateEndpointAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("22222222-2222-2222-2222-222222222222")),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "Request count based scaling",
                 CreateEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -125,7 +125,7 @@ class TestCreateEndpointAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("44444444-4444-4444-4444-444444444444")),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "Custom metric",
                 CreateEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -151,7 +151,7 @@ class TestCreateEndpointAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("66666666-6666-6666-6666-666666666666")),
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "Endpoint not found",
                 CreateEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -174,7 +174,7 @@ class TestCreateEndpointAutoScalingRule:
                 ),
                 EndpointNotFound,
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -205,7 +205,7 @@ class TestCreateEndpointAutoScalingRule:
     @pytest.mark.asyncio
     async def test_create_auto_scaling_rule(
         self,
-        scenario: TestScenario[
+        scenario: ScenarioBase[
             CreateEndpointAutoScalingRuleAction, CreateEndpointAutoScalingRuleActionResult
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,

@@ -18,13 +18,13 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             PurgeImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -33,7 +33,7 @@ from ...test_utils import TestScenario
             ),
             PurgeImageByIdActionResult(image=IMAGE_FIXTURE_DATA),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
             PurgeImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -42,7 +42,7 @@ from ...test_utils import TestScenario
             ),
             ForgetImageForbiddenError,
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Image not found",
             PurgeImageByIdAction(
                 user_id=uuid.uuid4(),
@@ -65,7 +65,7 @@ from ...test_utils import TestScenario
 )
 async def test_purge_image_by_id(
     processors: ImageProcessors,
-    test_scenario: TestScenario[PurgeImageByIdAction, PurgeImageByIdActionResult],
+    test_scenario: ScenarioBase[PurgeImageByIdAction, PurgeImageByIdActionResult],
 ):
     await test_scenario.test(processors.purge_image_by_id.wait_for_complete)
 
