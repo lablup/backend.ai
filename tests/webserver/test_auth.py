@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from functools import partial
 from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock
 
@@ -5,7 +8,7 @@ import pytest
 import yarl
 from aiohttp import web
 
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
+from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.web.auth import get_anonymous_session, get_api_session
 
 
@@ -27,13 +30,18 @@ class DummyRequest:
 
 
 @pytest.fixture
-async def test_client_pool() -> ClientPool:
-    config = ClientConfig(ssl=False, limit=10, limit_per_host=5)
-    return ClientPool(config=config, cleanup_interval_seconds=100)
+async def client_pool() -> ClientPool:
+    factory = partial(
+        tcp_client_session_factory,
+        ssl=False,
+        limit=10,
+        limit_per_host=5,
+    )
+    return ClientPool(factory, cleanup_interval_seconds=100)
 
 
 @pytest.mark.asyncio
-async def test_get_api_session(mocker, test_client_pool: ClientPool) -> None:
+async def test_get_api_session(mocker, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -42,7 +50,7 @@ async def test_get_api_session(mocker, test_client_pool: ClientPool) -> None:
                 ssl_verify=False,
             )
         ),
-        "client_pool": test_client_pool,
+        "client_pool": client_pool,
     })
 
     mock_get_session = AsyncMock(
@@ -84,9 +92,7 @@ async def test_get_api_session(mocker, test_client_pool: ClientPool) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_api_session_with_specific_api_endpoint(
-    mocker, test_client_pool: ClientPool
-) -> None:
+async def test_get_api_session_with_specific_api_endpoint(mocker, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -95,7 +101,7 @@ async def test_get_api_session_with_specific_api_endpoint(
                 ssl_verify=False,
             )
         ),
-        "client_pool": test_client_pool,
+        "client_pool": client_pool,
     })
     mock_get_session = AsyncMock(
         return_value={
@@ -112,7 +118,7 @@ async def test_get_api_session_with_specific_api_endpoint(
 
 
 @pytest.mark.asyncio
-async def test_get_anonymous_session(mocker, test_client_pool: ClientPool) -> None:
+async def test_get_anonymous_session(mocker, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -121,7 +127,7 @@ async def test_get_anonymous_session(mocker, test_client_pool: ClientPool) -> No
                 ssl_verify=False,
             )
         ),
-        "client_pool": test_client_pool,
+        "client_pool": client_pool,
     })
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
@@ -137,7 +143,7 @@ async def test_get_anonymous_session(mocker, test_client_pool: ClientPool) -> No
 
 @pytest.mark.asyncio
 async def test_get_anonymous_session_with_specific_api_endpoint(
-    mocker, test_client_pool: ClientPool
+    mocker, client_pool: ClientPool
 ) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
@@ -147,7 +153,7 @@ async def test_get_anonymous_session_with_specific_api_endpoint(
                 ssl_verify=False,
             )
         ),
-        "client_pool": test_client_pool,
+        "client_pool": client_pool,
     })
     specific_api_endpoint = "https://alternative.backend.ai"
     mock_get_session = MagicMock()

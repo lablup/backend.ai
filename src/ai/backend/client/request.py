@@ -330,11 +330,16 @@ class Request:
                 sock_read=self.config.read_timeout,
             )
             full_url = self._build_url()
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             if not self.config.is_anonymous and not force_anonymous:
                 self._sign(full_url.relative())
             return self.session.aiohttp_session.request(
                 self.method,
-                str(full_url),
+                str(request_url),
                 data=self._pack_content(),
                 timeout=timeout_config,
                 headers=self.headers,
@@ -366,8 +371,13 @@ class Request:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             return self.session.aiohttp_session.ws_connect(
-                str(full_url), autoping=True, heartbeat=30.0, headers=self.headers
+                str(request_url), autoping=True, heartbeat=30.0, headers=self.headers
             )
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)
@@ -400,8 +410,13 @@ class Request:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             return self.session.aiohttp_session.request(
-                self.method, str(full_url), timeout=timeout_config, headers=self.headers
+                self.method, str(request_url), timeout=timeout_config, headers=self.headers
             )
 
         return SSEContextManager(self.session, _rqst_ctx_builder, **kwargs)
