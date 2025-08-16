@@ -41,6 +41,7 @@ from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AllocationBatch,
+    KeypairOccupancy,
     SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
@@ -408,8 +409,6 @@ class Scheduler:
 
         # 1. Update resource occupancy - add the session's allocated slots
         # Update keypair occupancy
-        from ai.backend.manager.sokovan.scheduler.types import KeypairOccupancy
-
         current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
         if current_keypair is None:
             current_keypair = KeypairOccupancy(

@@ -893,7 +893,6 @@ class ScheduleDBSource:
                 status=SessionStatus.SCHEDULED,
                 status_info="scheduled",
                 status_data={},
-                status_changed_at=now,
                 status_history=sql_json_merge(
                     SessionRow.status_history,
                     (),
