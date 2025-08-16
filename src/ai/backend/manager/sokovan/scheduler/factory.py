@@ -3,7 +3,7 @@
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
 from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
@@ -40,7 +40,7 @@ from ai.backend.manager.types import DistributedLockFactory
 
 
 def create_default_scheduler(
-    repository: ScheduleRepository,
+    repository: SchedulerRepository,
     config_provider: ManagerConfigProvider,
     lock_factory: DistributedLockFactory,
     agent_pool: AgentPool,
