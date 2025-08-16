@@ -338,8 +338,21 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "python.formatting.ruffPath": "dist/export/bin/ruff",
    }
 
-To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
-after opening any Python source file to install the ``ruff-lsp`` server.
+.. code-block:: json5
+
+   {
+     "coc.preferences.formatOnType": false,
+     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
+     "python.linting.mypyEnabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.ruffEnabled": false,
+     // when using @yaegassy/coc-ruff extension
+     "ruff.enabled": true,
+     "ruff.autoFixOnSave": true,
+     "ruff.path": "/abs/path/to/dist/export/bin/ruff",  // absolute path
+     "ruff.nativeServer": true,
+   }
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

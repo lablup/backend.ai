@@ -12,7 +12,6 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
-    # "towncrier_tool",
 ]
 pants_ignore = [
     ".*/",
