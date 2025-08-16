@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -14,11 +14,11 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.repositories.schedule.repository import (
+from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     MarkTerminatingResult,
-    ScheduleRepository,
-    SchedulingContextData,
+    SchedulerRepository,
+    SchedulingData,
     SessionTerminationResult,
     TerminatingKernelData,
 )
@@ -41,6 +41,7 @@ from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AllocationBatch,
+    SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
     SessionAllocation,
@@ -67,7 +68,7 @@ class SchedulerArgs:
     sequencer: WorkloadSequencer
     agent_selector: AgentSelector
     allocator: "SchedulingAllocator"
-    repository: "ScheduleRepository"
+    repository: SchedulerRepository
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
     agent_pool: "AgentPool"
@@ -79,7 +80,7 @@ class Scheduler:
     _default_sequencer: WorkloadSequencer
     _default_agent_selector: AgentSelector
     _allocator: "SchedulingAllocator"
-    _repository: "ScheduleRepository"
+    _repository: SchedulerRepository
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
     _agent_pool: "AgentPool"
@@ -179,53 +180,94 @@ class Scheduler:
         Returns:
             int: The number of sessions successfully scheduled.
         """
-        # Single optimized call to get all scheduling context data
+        # Single optimized call to get all scheduling data
         # This consolidates: get_scaling_group_info_for_sokovan, get_pending_sessions,
         # get_system_snapshot, and get_scheduling_config into ONE DB session
-        context = await self._repository.get_scheduling_context_data(scaling_group)
+        scheduling_data = await self._repository.get_scheduling_data(scaling_group)
 
-        if context is None:
+        if scheduling_data is None:
             log.trace(
                 "No pending sessions for scaling group {}. Skipping scheduling.",
                 scaling_group,
             )
             return 0
 
-        # Schedule using the context data - no more DB calls needed
-        return await self._schedule_queued_sessions_with_context(scaling_group, context)
+        # Schedule using the scheduling data - no more DB calls needed
+        return await self._schedule_queued_sessions_with_data(scaling_group, scheduling_data)
 
-    async def _schedule_queued_sessions_with_context(
-        self, scaling_group: str, context: "SchedulingContextData"
+    async def _schedule_queued_sessions_with_data(
+        self, scaling_group: str, scheduling_data: SchedulingData
     ) -> int:
         """
-        Schedule all queued sessions using pre-fetched context data.
-        No database calls are made in this method - all data comes from context.
+        Schedule all queued sessions using pre-fetched scheduling data.
+        No database calls are made in this method - all data comes from scheduling_data.
 
         :param scaling_group: The scaling group to schedule for
-        :param context: Pre-fetched context containing all necessary data
+        :param scheduling_data: Pre-fetched data containing all necessary information
         :return: The number of sessions successfully scheduled
         """
-        # Use data from context instead of making DB calls
-        workloads = context.pending_sessions
-        sg_info = context.scaling_group_info
-        system_snapshot = context.system_snapshot
-        config = context.scheduling_config
+        # Use data from scheduling_data instead of making DB calls
+        # Convert PendingSessionData to SessionWorkload
+        workloads = [
+            session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
+        ]
+        sg_info = scheduling_data.scaling_group
+
+        if not scheduling_data.snapshot_data:
+            log.warning("Missing snapshot data for scaling group {}", scaling_group)
+            return 0
+
+        # Convert snapshot data to SystemSnapshot
+        system_snapshot = scheduling_data.snapshot_data.to_system_snapshot(
+            scheduling_data.spec.known_slot_types, scheduling_data.total_capacity
+        )
+
+        # Create scheduling config from spec and scaling group opts
+        config = SchedulingConfig(
+            max_container_count_per_agent=scheduling_data.spec.max_container_count,
+            enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
+        )
 
         selection_config = AgentSelectionConfig(
             max_container_count=config.max_container_count_per_agent,
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
         # Add sequencing predicate to track in passed predicates
-        with self._phase_metrics.measure_phase(
-            scaling_group, f"sequencing_{sg_info.scheduler_name}"
-        ):
-            sequencer = self._sequencer_pool[sg_info.scheduler_name]
+        with self._phase_metrics.measure_phase(scaling_group, f"sequencing_{sg_info.scheduler}"):
+            sequencer = self._sequencer_pool[sg_info.scheduler]
             sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
-        mutable_agents = context.agents
+        # Build mutable agents with occupancy data from snapshot
+        agent_occupancy = (
+            scheduling_data.snapshot_data.resource_occupancy.by_agent
+            if scheduling_data.snapshot_data
+            else {}
+        )
+        mutable_agents = [
+            AgentInfo(
+                agent_id=agent.id,
+                agent_addr=agent.addr,
+                architecture=agent.architecture,
+                scaling_group=agent.scaling_group,
+                available_slots=agent.available_slots,
+                occupied_slots=(
+                    agent_occupancy[agent.id].occupied_slots
+                    if agent.id in agent_occupancy
+                    else ResourceSlot()
+                ),
+                container_count=(
+                    agent_occupancy[agent.id].container_count if agent.id in agent_occupancy else 0
+                ),
+            )
+            for agent in scheduling_data.agents
+        ]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
-        agent_selector = self._agent_selector_pool[sg_info.agent_selection_strategy]
+        # Get agent selection strategy from scheduler opts config
+        agent_selection_strategy = sg_info.scheduler_opts.config.get(
+            "agent_selection_strategy", AgentSelectionStrategy.CONCENTRATED
+        )
+        agent_selector = self._agent_selector_pool[agent_selection_strategy]
         for session_workload in sequenced_workloads:
             # Track predicates for this session
             passed_phases: list[SchedulingPredicate] = []
@@ -587,9 +629,9 @@ class Scheduler:
 
     async def mark_sessions_for_termination(
         self,
-        session_ids: list[str],
+        session_ids: list[SessionId],
         reason: str = "USER_REQUESTED",
-    ) -> "MarkTerminatingResult":
+    ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
         Should only be called by ScheduleCoordinator.
@@ -622,7 +664,7 @@ class Scheduler:
 
         if timed_out_sessions:
             # Extract session IDs
-            session_ids = [str(session.session_id) for session in timed_out_sessions]
+            session_ids = [session.session_id for session in timed_out_sessions]
 
             log.info(
                 "Sweeping {} sessions due to pending timeout",
