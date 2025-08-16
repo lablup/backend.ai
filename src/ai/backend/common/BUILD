@@ -1,5 +1,6 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
         "stubs/trafaret:stubs",
@@ -25,11 +26,6 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "./auth:src",
-        "./configs:src",
-        "./clients:src",
-        "./data:src",
-        "./service_discovery:src",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
