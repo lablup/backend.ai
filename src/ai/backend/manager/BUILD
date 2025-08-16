@@ -115,5 +115,6 @@ resources(
     sources=[
         "**/py.typed",
         "models/alembic/script.py.mako",
+        "models/alembic/revision_history/*.json",
     ],
 )

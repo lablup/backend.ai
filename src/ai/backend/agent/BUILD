@@ -142,5 +142,8 @@ resources(
     ],
     sources=[
         "py.typed",
+        "docker/*.tar.gz",
+        "docker/*.txt",
+        "docker/*.bin",
     ],
 )
