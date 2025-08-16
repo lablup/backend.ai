@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Container, Iterable, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
+from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -131,6 +132,35 @@ class KernelStatus(CIStrEnum):
         Check if the current status is one of the statuses that have containers.
         """
         return self in KernelStatus.having_containers()
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_occupied_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns a set of kernel statuses that are considered as resource-occupying.
+        """
+        return frozenset(
+            e
+            for e in KernelStatus
+            if e
+            not in (
+                cls.PENDING,
+                cls.TERMINATED,
+                cls.CANCELLED,
+            )
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns a set of kernel statuses that are considered terminal.
+        """
+        return frozenset((
+            cls.ERROR,
+            cls.TERMINATED,
+            cls.CANCELLED,
+        ))
 
 
 # statuses to consider when calculating current resource usage

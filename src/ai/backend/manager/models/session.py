@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -185,6 +186,29 @@ class SessionStatus(CIStrEnum):
             cls.TERMINATING,
         }
 
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_occupied_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset(
+            status
+            for status in cls
+            if status
+            not in (
+                cls.PENDING,
+                cls.TERMINATED,
+                cls.CANCELLED,
+            )
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
+            cls.ERROR,
+            cls.TERMINATED,
+            cls.CANCELLED,
+        ))
+
 
 FOLLOWING_SESSION_STATUSES = (
     # Session statuses that need to wait all kernels belonging to the session
@@ -346,6 +370,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
 }
 
 
+# TODO:
 def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> SessionStatus:
     if not kernels:
         raise KernelNotFound

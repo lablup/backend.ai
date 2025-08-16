@@ -62,28 +62,6 @@ class ScheduleCacheSource:
             sftp_sessions_by_keypair=sftp_sessions_by_keypair,
         )
 
-    async def increment_concurrencies(
-        self, regular: dict[AccessKey, int], sftp: dict[AccessKey, int]
-    ) -> None:
-        """
-        Increment concurrency counters for the given access keys.
-
-        :param regular: Dictionary of access keys to increment regular session counts
-        :param sftp: Dictionary of access keys to increment SFTP session counts
-        """
-        await self._valkey_stat.increment_keypair_concurrencies(regular, sftp)
-
-    async def decrement_concurrencies(
-        self, regular: dict[AccessKey, int], sftp: dict[AccessKey, int]
-    ) -> None:
-        """
-        Decrement concurrency counters for the given access keys.
-
-        :param regular: Dictionary of access keys to decrement regular session counts
-        :param sftp: Dictionary of access keys to decrement SFTP session counts
-        """
-        await self._valkey_stat.decrement_keypair_concurrencies(regular, sftp)
-
     async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple keys from cache in a single operation.

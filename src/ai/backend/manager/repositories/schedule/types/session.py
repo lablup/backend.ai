@@ -170,9 +170,11 @@ class SweptSessionInfo:
 class MarkTerminatingResult:
     """Result of marking sessions for termination."""
 
-    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING)
-    terminating_sessions: list[str]  # Sessions marked as TERMINATING
-    skipped_sessions: list[str]  # Sessions not processed (already terminated, not found, etc.)
+    cancelled_sessions: list[SessionId]  # Sessions that were cancelled (PENDING)
+    terminating_sessions: list[SessionId]  # Sessions marked as TERMINATING
+    skipped_sessions: list[
+        SessionId
+    ]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
