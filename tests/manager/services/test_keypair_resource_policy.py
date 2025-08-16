@@ -33,7 +33,7 @@ from ai.backend.manager.services.keypair_resource_policy.service import KeypairR
 from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import TestScenario
 
 
 @pytest.fixture

@@ -15,7 +15,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DICT,
     CONTAINER_REGISTRY_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 CONTAINER_REGISTRY_FIXTURE_2_DATA = copy.deepcopy(CONTAINER_REGISTRY_FIXTURE_DATA)
 CONTAINER_REGISTRY_FIXTURE_2_DATA.id = uuid.uuid4()

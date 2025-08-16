@@ -1,6 +1,7 @@
 python_test_utils(
     sources=[
         "fixtures.py",
+        "utils.py",
     ]
 )
 

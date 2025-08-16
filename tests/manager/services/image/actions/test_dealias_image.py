@@ -15,7 +15,7 @@ from ...fixtures import (
     IMAGE_ALIAS_ROW_FIXTURE,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 
 @pytest.mark.parametrize(

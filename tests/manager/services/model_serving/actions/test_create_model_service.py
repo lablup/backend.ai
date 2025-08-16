@@ -22,7 +22,7 @@ from ai.backend.manager.services.model_serving.types import (
     ServiceInfo,
 )
 
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 
 @pytest.fixture

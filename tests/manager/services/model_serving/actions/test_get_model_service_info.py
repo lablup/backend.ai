@@ -16,7 +16,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
 
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 
 @pytest.fixture

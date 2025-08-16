@@ -51,7 +51,7 @@ from ai.backend.manager.services.domain.types import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import TestScenario
 
 
 @pytest.fixture

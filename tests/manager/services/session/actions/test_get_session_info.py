@@ -13,7 +13,7 @@ from ai.backend.manager.services.session.actions.get_session_info import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.types import LegacySessionInfo
 
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     KERNEL_ROW_FIXTURE,

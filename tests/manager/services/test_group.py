@@ -36,7 +36,7 @@ from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import TestScenario
 
 
 @pytest.fixture

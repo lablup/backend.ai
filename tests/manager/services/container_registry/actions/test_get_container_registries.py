@@ -9,7 +9,7 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 
 @pytest.mark.parametrize(

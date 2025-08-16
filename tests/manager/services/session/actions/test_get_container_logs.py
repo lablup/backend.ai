@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 from ..fixtures import (
     KERNEL_FIXTURE_DATA,
     KERNEL_FIXTURE_DICT,

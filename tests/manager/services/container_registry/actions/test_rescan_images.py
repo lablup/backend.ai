@@ -24,7 +24,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_ROW_FIXTURE,
     DOCKERHUB_RESPONSE_MOCK,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 # Added some default values to IMAGE_FIXTURE_DATA
 EXPECTED_IMAGE_RESCAN_RESULT = [

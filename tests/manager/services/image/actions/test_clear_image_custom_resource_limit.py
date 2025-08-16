@@ -15,7 +15,7 @@ from ...fixtures import (
     IMAGE_FIXTURE_DATA,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 EXPECTED_IMAGE_DATA = copy.deepcopy(IMAGE_FIXTURE_DATA)
 # Intrinsic cpu, and mem resource limits exist.

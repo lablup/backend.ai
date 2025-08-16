@@ -17,7 +17,7 @@ from ...fixtures import (
     IMAGE_ALIAS_DICT,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,

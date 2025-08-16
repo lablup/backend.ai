@@ -17,7 +17,7 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import TestScenario
 
 
 @pytest.fixture
