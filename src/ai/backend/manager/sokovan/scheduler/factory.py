@@ -83,7 +83,6 @@ def create_default_scheduler(
         config_provider=config_provider,
         lock_factory=lock_factory,
         agent_pool=agent_pool,
-        valkey_stat=valkey_stat,
     )
 
     return Scheduler(args)
