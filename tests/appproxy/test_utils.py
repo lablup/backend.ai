@@ -7,11 +7,11 @@ import pytest
 from pydantic import BaseModel
 
 from ai.backend.appproxy.common.utils import (
+    HostPortPair,
     config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
 )
-from ai.backend.common.types import HostPortPair
 
 
 class SampleModel(BaseModel):
@@ -49,7 +49,7 @@ class SampleEnum(enum.Enum):
         ),
         ([UUID("12345678123456781234567812345678")], ["12345678-1234-5678-1234-567812345678"]),
         (UUID("12345678123456781234567812345678"), "12345678-1234-5678-1234-567812345678"),
-        (HostPortPair("localhost", 8080), {"host": "localhost", "port": 8080}),
+        (HostPortPair(host="localhost", port=8080), {"host": "localhost", "port": 8080}),
         (Path("/some/path"), "/some/path"),
         (SampleModel(id=1, name="Test"), {"id": 1, "name": "Test"}),
         (SampleEnum.VALUE_1, "value1"),
