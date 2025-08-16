@@ -29,6 +29,10 @@ class TaskID(uuid.UUID):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @classmethod
+    def from_uuid(cls, value: uuid.UUID) -> "TaskID":
+        return cls(bytes=value.bytes)
+
     def encode(self) -> bytes:
         return self.bytes
 
