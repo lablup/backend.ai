@@ -60,7 +60,7 @@ class BackgroundTaskMetadata(BaseModel):
     task_name: str
     body: Mapping[str, Any]
     server_id: str = Field(description="Server ID where the task is running")
-    server_types: Collection[ServerType] = Field(description="Server types that can run this task")
+    server_types: set[ServerType] = Field(description="Server types that can run this task")
 
     @classmethod
     def create(
