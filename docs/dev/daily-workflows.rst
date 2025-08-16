@@ -208,7 +208,13 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
-For example, ruff's executable path is
+
+As of Pantsbuild 2.24, self-contained tool binaries are auto-exported into ``dist/export/bin/``
+when executing ``pants export`` command with whatever arguments.
+For example, the Ruff executable is exported as ``dist/export/bin/ruff``.
+Other tools that require Python virtualenv (e.g., Mypy) are still exported as virtualenvs.
+
+For Pantsbuild 2.23 or older, the tool binaries are exported as regular Python virtualenvs like
 ``dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
@@ -278,10 +284,8 @@ Set the following keys in the workspace settings to configure Python tools:
      - ``["dist/export/python/virtualenvs/mypy/3.13.3/bin/python"]``
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
-   * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.13.3/bin/python"]``
-   * - ``ruff.importStrategy``
-     - ``"fromEnvironment"``
+   * - ``ruff.path``
+     - ``["dist/export/bin/python"]``
 
 .. note:: **Changed in July 2023**
 
@@ -310,7 +314,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 
    let s:cwd = getcwd()
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -325,14 +329,13 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
    {
      "coc.preferences.formatOnType": false,
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "ruff.enabled": true,
-     "ruff.autoFixOnSave": true,
-     "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff-lsp",
      "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.3/bin/python",
      "python.linting.mypyEnabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy",
+     "python.linting.ruffEnabled": true,
+     "python.linting.ruffPath": "dist/export/bin/ruff",
+     "python.formatting.provider": "ruff",
+     "python.formatting.ruffPath": "dist/export/bin/ruff",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``

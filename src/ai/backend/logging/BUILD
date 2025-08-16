@@ -18,6 +18,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "./handler:src",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
