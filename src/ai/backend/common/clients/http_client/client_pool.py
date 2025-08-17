@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from collections.abc import MutableMapping
@@ -65,7 +66,13 @@ class ClientPool:
     def __init__(self, factory: ClientSessionFactory, cleanup_interval_seconds: int = 600) -> None:
         self._client_session_factory = factory
         self._clients = {}
-        self._cleanup_task = asyncio.create_task(self._cleanup_loop(cleanup_interval_seconds))
+
+        frame = inspect.stack()[1]
+        caller_info = f"{frame.filename}:{frame.lineno} in {frame.function}"
+        self._cleanup_task = asyncio.create_task(
+            self._cleanup_loop(cleanup_interval_seconds),
+            name=f"_cleanup_task from http_client.ClientPool created at {caller_info}",
+        )
 
     async def close(self) -> None:
         if not (self._cleanup_task.cancelled() or self._cleanup_task.done()):
