@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from decimal import Decimal
+from typing import Any, Optional, Union
 from uuid import UUID
 
 import yarl
@@ -170,7 +171,9 @@ class ImageInfo:
     architecture: str
     registry: str
     labels: dict[str, Any]
-    resource_spec: dict[str, Any]
+    # Resource spec maps slot names to {"min": value, "max": value}
+    # Values can be strings (for BinarySize), numbers, or None
+    resource_spec: dict[str, dict[str, Union[str, int, Decimal, None]]]
 
 
 @dataclass

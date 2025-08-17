@@ -906,8 +906,24 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
+    from ai.backend.manager.sokovan.scheduling_controller import (
+        SchedulingController,
+        SchedulingControllerArgs,
+    )
+
     from .agent_cache import AgentRPCCache
     from .registry import AgentRegistry
+
+    # Create scheduling controller first
+    root_ctx.scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=root_ctx.repositories.scheduler.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
+        )
+    )
 
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
@@ -927,9 +943,11 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
+        root_ctx.scheduling_controller,
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
+        use_sokovan=True,
     )
     await root_ctx.registry.init()
     yield
@@ -970,22 +988,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.distributed_lock_factory,
         agent_pool,
         root_ctx.valkey_stat,
-    )
-
-    # Create scheduling controller for external interface
-    from ai.backend.manager.sokovan.scheduling_controller import (
-        SchedulingController,
-        SchedulingControllerArgs,
-    )
-
-    root_ctx.scheduling_controller = SchedulingController(
-        SchedulingControllerArgs(
-            repository=root_ctx.repositories.scheduler.repository,
-            config_provider=root_ctx.config_provider,
-            storage_manager=root_ctx.storage_manager,
-            event_producer=root_ctx.event_producer,
-            valkey_schedule=root_ctx.valkey_schedule,
-        )
     )
 
     # Create sokovan orchestrator with lock factory for timers

@@ -959,12 +959,13 @@ class ScheduleDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             # Collect all unique image references from kernel specs
-            image_refs = []
+            image_refs: list[ImageRef] = []
             for kernel_spec in spec.kernel_specs:
                 image_ref = kernel_spec.get("image_ref")
                 if image_ref and isinstance(image_ref, ImageRef):
-                    if image_ref.canonical not in image_refs:
-                        image_refs.append(image_ref.canonical)
+                    # Keep the full ImageRef object, not just the canonical string
+                    if not any(ref.canonical == image_ref.canonical for ref in image_refs):
+                        image_refs.append(image_ref)
 
             # Fetch all data using private methods that reuse the session
             network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
@@ -1025,12 +1026,13 @@ class ScheduleDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             # Collect all unique image references from kernel specs
-            image_refs = []
+            image_refs: list[ImageRef] = []
             for kernel_spec in spec.kernel_specs:
                 image_ref = kernel_spec.get("image_ref")
                 if image_ref and isinstance(image_ref, ImageRef):
-                    if image_ref.canonical not in image_refs:
-                        image_refs.append(image_ref.canonical)
+                    # Keep the full ImageRef object, not just the canonical string
+                    if not any(ref.canonical == image_ref.canonical for ref in image_refs):
+                        image_refs.append(image_ref)
 
             # Fetch all data using private methods that reuse the session
             network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
@@ -1080,32 +1082,29 @@ class ScheduleDBSource:
         )
 
     async def _resolve_image_info(
-        self, db_sess: SASession, image_refs: list[str]
+        self, db_sess: SASession, image_refs: list[ImageRef]
     ) -> dict[str, "ImageInfo"]:
         """
         Resolve image references to image information.
 
         Args:
             db_sess: Database session
-            image_refs: List of image references to resolve
+            image_refs: List of ImageRef objects to resolve
 
         Returns:
-            Dictionary mapping image reference to ImageInfo
+            Dictionary mapping image canonical reference to ImageInfo
         """
-        from ai.backend.manager.models.image import ImageAlias
-
         image_infos = {}
-        for image_ref_str in image_refs:
-            # Use ImageAlias which accepts just a string
-            image_alias = ImageAlias(image_ref_str)
-            image_row = await ImageRow.resolve(db_sess, [image_alias])
+        for image_ref in image_refs:
+            # Use the ImageRef object directly
+            image_row = await ImageRow.resolve(db_sess, [image_ref])
             if image_row:
-                image_infos[image_ref_str] = ImageInfo(
-                    canonical=image_row.canonical,
+                image_infos[image_ref.canonical] = ImageInfo(
+                    canonical=image_row.name,  # 'name' is the canonical reference in ImageRow
                     architecture=image_row.architecture,
                     registry=image_row.registry,
                     labels=image_row.labels,
-                    resource_spec=image_row.resource_spec,
+                    resource_spec=cast(dict[str, Any], image_row.resources),  # Cast to match type
                 )
         return image_infos
 
@@ -1255,7 +1254,7 @@ class ScheduleDBSource:
         return [
             AllowedScalingGroup(
                 name=sg.name,
-                is_private=sg.is_private,
+                is_private=not sg.is_public,  # Convert is_public to is_private
             )
             for sg in allowed_sgroups
         ]

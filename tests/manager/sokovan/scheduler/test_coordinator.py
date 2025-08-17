@@ -129,7 +129,7 @@ class TestScheduleCoordinator:
         assert result == mock_result
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
             session_ids,
-            "USER_REQUESTED",
+            reason="USER_REQUESTED",
         )
 
     async def test_request_scheduling_direct(

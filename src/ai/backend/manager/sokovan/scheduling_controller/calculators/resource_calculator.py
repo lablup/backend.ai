@@ -1,6 +1,7 @@
 """Stateless calculator for resource requirements."""
 
 import logging
+from decimal import Decimal
 from typing import Mapping, Optional
 
 from ai.backend.common.types import (
@@ -113,13 +114,37 @@ class ResourceCalculator:
         image_min_slots = ResourceSlot()
         image_max_slots = ResourceSlot()
 
-        # Parse min/max from resource spec
+        # Parse min/max from resource spec with proper type conversion
         for slot_name, slot_spec in image_resource_spec.items():
-            if slot_name in known_slot_types:
+            slot_name_typed = SlotName(slot_name)
+            if slot_name_typed in known_slot_types:
+                slot_unit = known_slot_types.get(slot_name_typed)
+
+                # Process min value
                 if "min" in slot_spec:
-                    image_min_slots[slot_name] = slot_spec["min"]
+                    min_value = slot_spec["min"]
+                    if min_value is None:
+                        min_value = Decimal(0)
+                    elif slot_unit == "bytes":
+                        if not isinstance(min_value, Decimal):
+                            min_value = BinarySize.from_str(str(min_value))
+                    else:
+                        if not isinstance(min_value, Decimal):
+                            min_value = Decimal(str(min_value))
+                    image_min_slots[slot_name_typed] = min_value
+
+                # Process max value
                 if "max" in slot_spec:
-                    image_max_slots[slot_name] = slot_spec["max"]
+                    max_value = slot_spec["max"]
+                    if max_value is None:
+                        max_value = Decimal("Infinity")
+                    elif slot_unit == "bytes":
+                        if not isinstance(max_value, Decimal):
+                            max_value = BinarySize.from_str(str(max_value))
+                    else:
+                        if not isinstance(max_value, Decimal):
+                            max_value = Decimal(str(max_value))
+                    image_max_slots[slot_name_typed] = max_value
 
         # Get resource options
         resource_opts = creation_config.get("resource_opts") or {}

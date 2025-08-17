@@ -976,9 +976,17 @@ async def registry_ctx(mocker):
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
+    # Create a mock scheduling controller
+    from ai.backend.common.types import SessionId
+
+    mock_scheduling_controller = AsyncMock()
+    mock_scheduling_controller.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
+    mock_scheduling_controller.dispatch_session_events = AsyncMock()
+
     registry = AgentRegistry(
         config_provider=mock_config_provider,
         db=mock_db,
+        agent_cache=mock_agent_cache,
         valkey_stat=mock_valkey_stat_client,
         valkey_live=mock_redis_live,
         valkey_image=mock_redis_image,
@@ -986,9 +994,10 @@ async def registry_ctx(mocker):
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
-        agent_cache=mock_agent_cache,
+        scheduling_controller=mock_scheduling_controller,  # type: ignore
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+        use_sokovan=False,  # Disable sokovan for tests
     )
     await registry.init()
     try:
