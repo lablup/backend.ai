@@ -69,15 +69,15 @@ class ClientPool:
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
     ) -> None:
-        self._client_session_factory = factory
-        self._clients = {}
-
         frame = inspect.stack()[1]
-        caller_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
+        self._caller_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
-            name=f"_cleanup_task from http_client.ClientPool created at {caller_info}",
+            name=f"_cleanup_task from {self!r}",
         )
+
+        self._client_session_factory = factory
+        self._clients = {}
 
     async def close(self) -> None:
         if not (self._cleanup_task.cancelled() or self._cleanup_task.done()):
@@ -91,10 +91,14 @@ class ClientPool:
             await client.session.close()
         self._clients.clear()
 
+    def __repr__(self) -> str:
+        return f"<http_client.ClientPool created at {self._caller_info}>"
+
     def __del__(self) -> None:
         if self._clients:
             warnings.warn(
-                "Garbage-collected ClientPool still has active client sessions.", ResourceWarning
+                f"{self!r} is garbage-collected but still has active client sessions.",
+                ResourceWarning,
             )
 
     async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:
