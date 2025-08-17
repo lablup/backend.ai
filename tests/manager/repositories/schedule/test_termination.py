@@ -605,8 +605,8 @@ class TestSessionTermination:
             reason="TEST_NONEXISTENT",
         )
 
-        # All should be in not_found category
-        assert len(result.not_found_sessions) == 3
+        # All should be in skipped category (not found)
+        assert len(result.skipped_sessions) == 3
         assert result.processed_count() == 0
         assert result.has_processed() is False
 

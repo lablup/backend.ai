@@ -4,7 +4,7 @@ import logging
 from typing import Mapping, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import SessionId, SlotName, SlotTypes
+from ai.backend.common.types import AccessKey, SessionId, SlotName, SlotTypes, VFolderMount
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -18,6 +18,12 @@ from .types.session import (
     MarkTerminatingResult,
     SessionTerminationResult,
     SweptSessionInfo,
+)
+from .types.session_creation import (
+    AllowedScalingGroup,
+    SessionCreationContext,
+    SessionCreationSpec,
+    SessionEnqueueData,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -125,3 +131,116 @@ class SchedulerRepository:
             "config/agent/max-container-count"
         )
         return int(raw_value) if raw_value else None
+
+    async def enqueue_session(
+        self,
+        session_data: SessionEnqueueData,
+    ) -> SessionId:
+        """
+        Enqueue a new session with its kernels.
+
+        Args:
+            session_data: Prepared session data with kernels and dependencies
+
+        Returns:
+            SessionId: The ID of the created session
+        """
+        return await self._db_source.enqueue_session(session_data)
+
+    async def fetch_session_creation_data(
+        self,
+        spec: SessionCreationSpec,
+        scaling_group_name: str,
+        storage_manager,
+        allowed_vfolder_types: list[str],
+    ) -> SessionCreationContext:
+        """
+        Fetch all data needed for session creation in a single DB session.
+
+        Args:
+            spec: Session creation specification
+            scaling_group_name: Name of the scaling group
+            storage_manager: Storage session manager
+            allowed_vfolder_types: Allowed vfolder types from config
+
+        Returns:
+            SessionCreationContext with all required data
+        """
+        return await self._db_source.fetch_session_creation_data(
+            spec, scaling_group_name, storage_manager, allowed_vfolder_types
+        )
+
+    async def fetch_session_creation_context(
+        self,
+        spec: SessionCreationSpec,
+        scaling_group_name: str,
+    ) -> SessionCreationContext:
+        """
+        Legacy method for backward compatibility.
+        Use fetch_session_creation_data instead.
+
+        Args:
+            spec: Session creation specification
+            scaling_group_name: Name of the scaling group
+
+        Returns:
+            SessionCreationContext with all required data
+        """
+        return await self._db_source.fetch_session_creation_context(spec, scaling_group_name)
+
+    async def query_allowed_scaling_groups(
+        self,
+        domain_name: str,
+        group_id: str,
+        access_key: str,
+    ) -> list[AllowedScalingGroup]:
+        """
+        Query allowed scaling groups for a user.
+
+        Args:
+            domain_name: Domain name
+            group_id: Group ID
+            access_key: Access key
+
+        Returns:
+            List of AllowedScalingGroup objects
+        """
+        return await self._db_source.query_allowed_scaling_groups(domain_name, group_id, access_key)
+
+    async def prepare_vfolder_mounts(
+        self,
+        storage_manager,
+        allowed_vfolder_types: list[str],
+        user_scope,
+        resource_policy: dict,
+        combined_mounts: list,
+        combined_mount_map: dict,
+        requested_mount_options: dict,
+    ) -> list[VFolderMount]:
+        """
+        Prepare vfolder mounts for the session.
+        """
+        return await self._db_source.prepare_vfolder_mounts(
+            storage_manager,
+            allowed_vfolder_types,
+            user_scope,
+            resource_policy,
+            combined_mounts,
+            combined_mount_map,
+            requested_mount_options,
+        )
+
+    async def prepare_dotfiles(
+        self,
+        user_scope,
+        access_key: AccessKey,
+        vfolder_mounts: list[VFolderMount],
+    ) -> dict:
+        """
+        Prepare dotfile data for the session.
+        """
+        return await self._db_source.prepare_dotfiles(
+            user_scope,
+            access_key,
+            vfolder_mounts,
+        )

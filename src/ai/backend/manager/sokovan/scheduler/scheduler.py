@@ -148,7 +148,9 @@ class Scheduler:
                 try:
                     log.trace("Scheduling sessions for scaling group: {}", scaling_group)
                     # Schedule sessions for this scaling group
-                    with self._phase_metrics.measure_phase(scaling_group, "scheduling"):
+                    with self._phase_metrics.measure_phase(
+                        "scheduler", scaling_group, "scheduling"
+                    ):
                         scheduled_count = await self._schedule_scaling_group(scaling_group)
                     total_scheduled_count += scheduled_count
                     if scheduled_count > 0:
@@ -230,7 +232,9 @@ class Scheduler:
             enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
         )
         # Add sequencing predicate to track in passed predicates
-        with self._phase_metrics.measure_phase(scaling_group, f"sequencing_{sg_info.scheduler}"):
+        with self._phase_metrics.measure_phase(
+            "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+        ):
             sequencer = self._sequencer_pool[sg_info.scheduler]
             sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
@@ -318,7 +322,7 @@ class Scheduler:
             allocations=session_allocations,
             failures=scheduling_failures,
         )
-        with self._phase_metrics.measure_phase(scaling_group, "allocation"):
+        with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
             await self._allocator.allocate(batch)
 
         return len(session_allocations)
@@ -335,14 +339,14 @@ class Scheduler:
         failed_phases: list[SchedulingPredicate],
     ) -> SessionAllocation:
         # Phase 1: Validation
-        with self._phase_metrics.measure_phase(scaling_group, "validation"):
+        with self._phase_metrics.measure_phase("scheduler", scaling_group, "validation"):
             # validate_with_predicates will update both lists and raise if validation fails
             self._validator.validate(
                 mutable_snapshot, session_workload, passed_phases, failed_phases
             )
 
         # Phase 2: Agent Selection
-        with self._phase_metrics.measure_phase(scaling_group, "agent_selection"):
+        with self._phase_metrics.measure_phase("scheduler", scaling_group, "agent_selection"):
             try:
                 session_allocation = await self._allocate_workload(
                     session_workload,

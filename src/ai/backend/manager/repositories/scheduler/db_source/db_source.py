@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Any, Mapping, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,6 +11,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -19,8 +20,10 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
+    VFolderMount,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
@@ -29,6 +32,7 @@ from ai.backend.manager.models import (
     DefaultForUnspecified,
     DomainRow,
     GroupRow,
+    ImageRow,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
@@ -38,6 +42,7 @@ from ai.backend.manager.models import (
     SessionRow,
     SessionStatus,
     UserRow,
+    query_allowed_sgroups,
 )
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -69,6 +74,14 @@ from ..types.session import (
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingSessionData,
+)
+from ..types.session_creation import (
+    AllowedScalingGroup,
+    ImageInfo,
+    ScalingGroupNetworkInfo,
+    SessionCreationContext,
+    SessionCreationSpec,
+    SessionEnqueueData,
 )
 from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import SessionRowCache
@@ -793,6 +806,459 @@ class ScheduleDBSource:
                     )
 
         return timed_out_sessions
+
+    async def enqueue_session(
+        self,
+        session_data: "SessionEnqueueData",
+    ) -> SessionId:
+        """
+        Create new session and kernel records in PENDING status.
+
+        Args:
+            session_data: Prepared session data with kernels and dependencies
+
+        Returns:
+            SessionId: The ID of the created session
+        """
+        async with self._db.begin_session() as db_sess:
+            # Validate dependencies if any
+            matched_dependency_ids = []
+            if session_data.dependencies:
+                for dependency_id in session_data.dependencies:
+                    # Check if dependency session exists
+                    query = sa.select(SessionRow.id).where(SessionRow.id == dependency_id)
+                    result = await db_sess.execute(query)
+                    if not result.scalar():
+                        raise InvalidAPIParameters(
+                            "Unknown session ID in the dependency list",
+                            extra_data={"session_ref": str(dependency_id)},
+                        )
+                    matched_dependency_ids.append(dependency_id)
+
+            # Create session row
+            session = SessionRow(
+                id=session_data.id,
+                creation_id=session_data.creation_id,
+                name=session_data.name,
+                access_key=session_data.access_key,
+                user_uuid=session_data.user_uuid,
+                group_id=session_data.group_id,
+                domain_name=session_data.domain_name,
+                scaling_group_name=session_data.scaling_group_name,
+                session_type=session_data.session_type,
+                cluster_mode=session_data.cluster_mode,
+                cluster_size=session_data.cluster_size,
+                priority=session_data.priority,
+                status=SessionStatus[session_data.status],
+                status_history=session_data.status_history,
+                requested_slots=session_data.requested_slots,
+                occupying_slots=session_data.occupying_slots,
+                vfolder_mounts=session_data.vfolder_mounts,
+                environ=session_data.environ,
+                tag=session_data.tag,
+                starts_at=session_data.starts_at,
+                batch_timeout=session_data.batch_timeout,
+                callback_url=session_data.callback_url,
+                images=session_data.images,
+                network_type=session_data.network_type,
+                network_id=session_data.network_id,
+                bootstrap_script=session_data.bootstrap_script,
+                use_host_network=session_data.use_host_network,
+                timeout=session_data.timeout,
+            )
+
+            # Create kernel rows
+            kernels = []
+            for kernel in session_data.kernels:
+                kernel_row = KernelRow(
+                    id=kernel.id,
+                    session_id=kernel.session_id,
+                    session_creation_id=kernel.session_creation_id,
+                    session_name=kernel.session_name,
+                    session_type=kernel.session_type,
+                    cluster_mode=kernel.cluster_mode,
+                    cluster_size=kernel.cluster_size,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    local_rank=kernel.local_rank,
+                    cluster_hostname=kernel.cluster_hostname,
+                    agent=kernel.agent,
+                    scaling_group=kernel.scaling_group,
+                    domain_name=kernel.domain_name,
+                    group_id=kernel.group_id,
+                    user_uuid=kernel.user_uuid,
+                    access_key=kernel.access_key,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    registry=kernel.registry,
+                    tag=kernel.tag,
+                    starts_at=kernel.starts_at,
+                    status=KernelStatus[kernel.status],
+                    status_history=kernel.status_history,
+                    occupied_slots=kernel.occupied_slots,
+                    requested_slots=kernel.requested_slots,
+                    occupied_shares=kernel.occupied_shares,
+                    resource_opts=kernel.resource_opts,
+                    environ=kernel.environ,
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                    internal_data=kernel.internal_data,
+                    callback_url=kernel.callback_url,
+                    mounts=kernel.mounts,
+                    vfolder_mounts=kernel.vfolder_mounts,
+                    preopen_ports=kernel.preopen_ports,
+                    use_host_network=kernel.use_host_network,
+                    repl_in_port=kernel.repl_in_port,
+                    repl_out_port=kernel.repl_out_port,
+                    stdin_port=kernel.stdin_port,
+                    stdout_port=kernel.stdout_port,
+                    uid=kernel.uid,
+                    main_gid=kernel.main_gid,
+                    gids=kernel.gids,
+                )
+                kernels.append(kernel_row)
+
+            # Add session and kernels to database
+            db_sess.add(session)
+            db_sess.add_all(kernels)
+            await db_sess.flush()
+
+            # Add session dependencies if any
+            if matched_dependency_ids:
+                dependency_rows = [
+                    SessionDependencyRow(
+                        session_id=session_data.id,
+                        depends_on=depend_id,
+                    )
+                    for depend_id in matched_dependency_ids
+                ]
+                db_sess.add_all(dependency_rows)
+
+            await db_sess.commit()
+
+        return session_data.id
+
+    async def fetch_session_creation_data(
+        self,
+        spec: "SessionCreationSpec",
+        scaling_group_name: str,
+        storage_manager,
+        allowed_vfolder_types: list[str],
+    ) -> "SessionCreationContext":
+        """
+        Fetch all data needed for session creation in a single DB session.
+
+        Args:
+            spec: Session creation specification
+            scaling_group_name: Name of the scaling group
+            storage_manager: Storage session manager
+            allowed_vfolder_types: Allowed vfolder types from config
+
+        Returns:
+            SessionCreationContext with all required data
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Collect all unique image references from kernel specs
+            image_refs = []
+            for kernel_spec in spec.kernel_specs:
+                image_ref = kernel_spec.get("image_ref")
+                if image_ref and isinstance(image_ref, ImageRef):
+                    if image_ref.canonical not in image_refs:
+                        image_refs.append(image_ref.canonical)
+
+            # Fetch all data using private methods that reuse the session
+            network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
+            allowed_groups = await self._query_allowed_scaling_groups(
+                db_sess,
+                spec.user_scope.domain_name,
+                str(spec.user_scope.group_id),
+                spec.access_key,
+            )
+            image_infos = await self._resolve_image_info(db_sess, image_refs)
+
+            # Prepare mount-related data
+            requested_mounts = spec.creation_spec.get("mounts") or []
+            requested_mount_ids = spec.creation_spec.get("mount_ids") or []
+            requested_mount_map = spec.creation_spec.get("mount_map") or {}
+            requested_mount_id_map = spec.creation_spec.get("mount_id_map") or {}
+            requested_mount_options = spec.creation_spec.get("mount_options") or {}
+
+            combined_mounts = requested_mounts + requested_mount_ids
+            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
+
+            # Fetch vfolder mounts
+            vfolder_mounts = await self._fetch_vfolder_mounts(
+                db_sess,
+                storage_manager,
+                allowed_vfolder_types,
+                spec.user_scope,
+                spec.resource_policy,
+                combined_mounts,
+                combined_mount_map,
+                requested_mount_options,
+            )
+
+            # Fetch dotfile data
+            dotfile_data = await self._fetch_dotfiles(
+                db_sess,
+                spec.user_scope,
+                spec.access_key,
+                vfolder_mounts,
+            )
+
+            return SessionCreationContext(
+                scaling_group_network=network_info,
+                allowed_scaling_groups=allowed_groups,
+                image_infos=image_infos,
+                vfolder_mounts=vfolder_mounts,
+                dotfile_data=dotfile_data,
+            )
+
+    async def fetch_session_creation_context(
+        self,
+        spec: "SessionCreationSpec",
+        scaling_group_name: str,
+    ) -> "SessionCreationContext":
+        """
+        Legacy method for backward compatibility.
+        Use fetch_session_creation_data instead.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Collect all unique image references from kernel specs
+            image_refs = []
+            for kernel_spec in spec.kernel_specs:
+                image_ref = kernel_spec.get("image_ref")
+                if image_ref and isinstance(image_ref, ImageRef):
+                    if image_ref.canonical not in image_refs:
+                        image_refs.append(image_ref.canonical)
+
+            # Fetch all data using private methods that reuse the session
+            network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
+            allowed_groups = await self._query_allowed_scaling_groups(
+                db_sess,
+                spec.user_scope.domain_name,
+                str(spec.user_scope.group_id),
+                spec.access_key,
+            )
+            image_infos = await self._resolve_image_info(db_sess, image_refs)
+
+            return SessionCreationContext(
+                scaling_group_network=network_info,
+                allowed_scaling_groups=allowed_groups,
+                image_infos=image_infos,
+                vfolder_mounts=[],
+                dotfile_data={},
+            )
+
+    async def _get_scaling_group_network_info(
+        self, db_sess: SASession, scaling_group_name: str
+    ) -> "ScalingGroupNetworkInfo":
+        """
+        Get network configuration from scaling group.
+
+        Args:
+            db_sess: Database session
+            scaling_group_name: Name of the scaling group
+
+        Returns:
+            ScalingGroupNetworkInfo with network configuration
+        """
+        query = sa.select(
+            ScalingGroupRow.use_host_network,
+            ScalingGroupRow.wsproxy_addr,
+        ).where(ScalingGroupRow.name == scaling_group_name)
+
+        result = await db_sess.execute(query)
+        row = result.one_or_none()
+
+        if not row:
+            raise ValueError(f"Scaling group {scaling_group_name} not found")
+
+        return ScalingGroupNetworkInfo(
+            use_host_network=row.use_host_network,
+            wsproxy_addr=row.wsproxy_addr,
+        )
+
+    async def _resolve_image_info(
+        self, db_sess: SASession, image_refs: list[str]
+    ) -> dict[str, "ImageInfo"]:
+        """
+        Resolve image references to image information.
+
+        Args:
+            db_sess: Database session
+            image_refs: List of image references to resolve
+
+        Returns:
+            Dictionary mapping image reference to ImageInfo
+        """
+        from ai.backend.manager.models.image import ImageAlias
+
+        image_infos = {}
+        for image_ref_str in image_refs:
+            # Use ImageAlias which accepts just a string
+            image_alias = ImageAlias(image_ref_str)
+            image_row = await ImageRow.resolve(db_sess, [image_alias])
+            if image_row:
+                image_infos[image_ref_str] = ImageInfo(
+                    canonical=image_row.canonical,
+                    architecture=image_row.architecture,
+                    registry=image_row.registry,
+                    labels=image_row.labels,
+                    resource_spec=image_row.resource_spec,
+                )
+        return image_infos
+
+    async def query_allowed_scaling_groups(
+        self,
+        domain_name: str,
+        group_id: str,
+        access_key: str,
+    ) -> list["AllowedScalingGroup"]:
+        """
+        Query allowed scaling groups for a user (public method for external use).
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            return await self._query_allowed_scaling_groups(
+                db_sess, domain_name, group_id, access_key
+            )
+
+    async def _fetch_vfolder_mounts(
+        self,
+        db_sess: SASession,
+        storage_manager,
+        allowed_vfolder_types: list[str],
+        user_scope,
+        resource_policy: dict[str, Any],
+        combined_mounts: list[str],
+        combined_mount_map: dict[str | UUID, str],
+        requested_mount_options: dict[str | UUID, Any],
+    ) -> list[VFolderMount]:
+        """
+        Fetch vfolder mounts for the session using existing DB session.
+        """
+        from ai.backend.manager.models import prepare_vfolder_mounts
+
+        # Convert the async session to sync connection for legacy code
+        conn = db_sess.bind
+
+        vfolder_mounts = await prepare_vfolder_mounts(
+            conn,
+            storage_manager,
+            allowed_vfolder_types,
+            user_scope,
+            resource_policy,
+            combined_mounts,
+            combined_mount_map,
+            requested_mount_options,
+        )
+        return list(vfolder_mounts)
+
+    async def _fetch_dotfiles(
+        self,
+        db_sess: SASession,
+        user_scope,
+        access_key: AccessKey,
+        vfolder_mounts: list,
+    ) -> dict[str, Any]:
+        """
+        Fetch dotfile data for the session using existing DB session.
+        """
+        from ai.backend.manager.models import prepare_dotfiles
+
+        # Convert the async session to sync connection for legacy code
+        conn = db_sess.bind
+
+        dotfile_data = await prepare_dotfiles(
+            conn,
+            user_scope,
+            access_key,
+            vfolder_mounts,
+        )
+        return dict(dotfile_data)
+
+    async def prepare_vfolder_mounts(
+        self,
+        storage_manager,
+        allowed_vfolder_types: list[str],
+        user_scope,
+        resource_policy: dict[str, Any],
+        combined_mounts: list[str],
+        combined_mount_map: dict[str | UUID, str],
+        requested_mount_options: dict[str | UUID, Any],
+    ) -> list[VFolderMount]:
+        """
+        Prepare vfolder mounts for the session.
+        """
+        from ai.backend.manager.models import prepare_vfolder_mounts
+
+        async with self._db.begin_readonly() as conn:
+            vfolder_mounts = await prepare_vfolder_mounts(
+                conn,
+                storage_manager,
+                allowed_vfolder_types,
+                user_scope,
+                resource_policy,
+                combined_mounts,
+                combined_mount_map,
+                requested_mount_options,
+            )
+        return list(vfolder_mounts)
+
+    async def prepare_dotfiles(
+        self,
+        user_scope,
+        access_key: AccessKey,
+        vfolder_mounts: list,
+    ) -> dict[str, Any]:
+        """
+        Prepare dotfile data for the session.
+        """
+
+        from ai.backend.manager.models import prepare_dotfiles
+
+        async with self._db.begin_readonly() as conn:
+            dotfile_data = await prepare_dotfiles(
+                conn,
+                user_scope,
+                access_key,
+                vfolder_mounts,
+            )
+        return dict(dotfile_data)
+
+    async def _query_allowed_scaling_groups(
+        self,
+        db_sess: SASession,
+        domain_name: str,
+        group_id: str,
+        access_key: str,
+    ) -> list["AllowedScalingGroup"]:
+        """
+        Query allowed scaling groups for the given user/group.
+
+        Args:
+            db_sess: Database session
+            domain_name: Domain name
+            group_id: Group ID
+            access_key: Access key
+
+        Returns:
+            List of AllowedScalingGroup objects
+        """
+        allowed_sgroups = await query_allowed_sgroups(
+            db_sess,
+            domain_name,
+            group_id,
+            access_key,
+        )
+
+        return [
+            AllowedScalingGroup(
+                name=sg.name,
+                is_private=sg.is_private,
+            )
+            for sg in allowed_sgroups
+        ]
 
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
         """
