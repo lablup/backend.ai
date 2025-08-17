@@ -113,7 +113,7 @@ async def netstat_ns(ns_path: Path):
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
-    short_cid = container._id[:7]
+    short_cid = container.id[:7]
     try:
         ret = await container.stats(stream=False)  # TODO: cache
     except RuntimeError as e:

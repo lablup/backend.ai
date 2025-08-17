@@ -6,6 +6,7 @@ python_requirements(
         "aiomonitor-ng": ["aiomonitor"],
         "attrs": ["attr", "attrs"],
         "aiohttp-session": ["aiohttp_session"],
+        "boto3": ["botocore", "boto3"],
         "graphql-core": ["graphql"],
         "graphql-relay": ["graphql_relay"],
         "pycryptodome": ["Crypto"],

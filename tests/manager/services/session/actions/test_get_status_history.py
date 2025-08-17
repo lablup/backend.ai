@@ -9,7 +9,7 @@ from ai.backend.manager.services.session.actions.get_status_history import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -53,7 +53,7 @@ def mock_get_status_history_rpc(mocker):
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Get status history",
             GetStatusHistoryAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -81,7 +81,7 @@ def mock_get_status_history_rpc(mocker):
 async def test_get_status_history(
     mock_get_status_history_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetStatusHistoryAction, GetStatusHistoryActionResult],
+    test_scenario: ScenarioBase[GetStatusHistoryAction, GetStatusHistoryActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.get_status_history.wait_for_complete)

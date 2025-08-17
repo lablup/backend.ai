@@ -8,7 +8,7 @@ import graphene
 import sqlalchemy as sa
 from graphql import GraphQLError, Undefined
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..container_registry import (
     ContainerRegistryRow,

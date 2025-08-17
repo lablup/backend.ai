@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.execute_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -72,7 +72,7 @@ EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Execute session",
                 ExecuteSessionAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -93,7 +93,7 @@ EXECUTE_SESSION_ERROR_MOCK = {"result": EXECUTE_SESSION_ERROR_RESULT}
             EXECUTE_SESSION_RAW_RESULT,
         ),
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Execute session with error",
                 ExecuteSessionAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -131,7 +131,7 @@ async def test_execute_session(
     mock_agent_execute_rpc,
     mock_increment_session_usage_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[ExecuteSessionAction, ExecuteSessionActionResult],
+    test_scenario: ScenarioBase[ExecuteSessionAction, ExecuteSessionActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.execute_session.wait_for_complete)

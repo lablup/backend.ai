@@ -19,7 +19,7 @@ from ai.backend.manager.services.model_serving.types import (
     RequesterCtx,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ class TestDeleteAutoScalingRule:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "Normal delete",
                 DeleteEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -82,7 +82,7 @@ class TestDeleteAutoScalingRule:
                     success=True,
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "Rule not found",
                 DeleteEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -95,7 +95,7 @@ class TestDeleteAutoScalingRule:
                 ),
                 EndpointAutoScalingRuleNotFound,
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN delete",
                 DeleteEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -115,7 +115,7 @@ class TestDeleteAutoScalingRule:
     @pytest.mark.asyncio
     async def test_delete_auto_scaling_rule(
         self,
-        scenario: TestScenario[
+        scenario: ScenarioBase[
             DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,

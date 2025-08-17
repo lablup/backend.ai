@@ -52,12 +52,6 @@ class AppMode(enum.StrEnum):
     INFERENCE = "inference"
 
 
-class HealthCheckStatus(enum.StrEnum):
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"
-
-
 @dataclass
 class Slot:
     frontend_mode: FrontendMode

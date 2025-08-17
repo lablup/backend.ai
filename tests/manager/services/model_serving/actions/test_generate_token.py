@@ -18,7 +18,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import RequesterCtx
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ class TestGenerateToken:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
                     requester_ctx=RequesterCtx(
@@ -112,7 +112,7 @@ class TestGenerateToken:
                     ),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
                     requester_ctx=RequesterCtx(
@@ -138,7 +138,7 @@ class TestGenerateToken:
                     ),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
                     requester_ctx=RequesterCtx(
@@ -169,7 +169,7 @@ class TestGenerateToken:
     @pytest.mark.asyncio
     async def test_generate_token(
         self,
-        scenario: TestScenario[GenerateTokenAction, GenerateTokenActionResult],
+        scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_token,
         mock_get_endpoint_by_id_force_token,

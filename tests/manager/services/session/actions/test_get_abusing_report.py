@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.get_abusing_report import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DATA,
     KERNEL_FIXTURE_DICT,
@@ -36,7 +36,7 @@ AGENT_GET_ABUSING_REPORT_RPC_RESP = AbuseReport(kernel=str(KERNEL_FIXTURE_DATA.i
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Get abusing report",
                 GetAbusingReportAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -63,6 +63,6 @@ AGENT_GET_ABUSING_REPORT_RPC_RESP = AbuseReport(kernel=str(KERNEL_FIXTURE_DATA.i
 async def test_get_abusing_report(
     mock_get_abusing_report_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetAbusingReportAction, GetAbusingReportActionResult],
+    test_scenario: ScenarioBase[GetAbusingReportAction, GetAbusingReportActionResult],
 ):
     await test_scenario.test(processors.get_abusing_report.wait_for_complete)
