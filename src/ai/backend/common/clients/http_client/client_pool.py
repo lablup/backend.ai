@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import logging
 import time
+import warnings
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Optional, Protocol
@@ -89,6 +90,12 @@ class ClientPool:
         for client in self._clients.values():
             await client.session.close()
         self._clients.clear()
+
+    def __del__(self) -> None:
+        if self._clients:
+            warnings.warn(
+                "Garbage-collected ClientPool still has active client sessions.", ResourceWarning
+            )
 
     async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:
         while True:
