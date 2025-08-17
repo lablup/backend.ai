@@ -68,7 +68,7 @@ class ClientPool:
         self._clients = {}
 
         frame = inspect.stack()[1]
-        caller_info = f"{frame.filename}:{frame.lineno} in {frame.function}"
+        caller_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
             name=f"_cleanup_task from http_client.ClientPool created at {caller_info}",
