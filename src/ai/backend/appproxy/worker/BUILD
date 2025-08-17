@@ -1,8 +1,7 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/appproxy/worker/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/appproxy/worker/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
         ":resources",
     ],
 )

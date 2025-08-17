@@ -574,17 +574,17 @@ class CurrencyTypes(enum.Enum):
     USD = "USD"
 
 
-UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
+TUUIDSubType = TypeVar("TUUIDSubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[UUID_SubType]):
+class GUID(TypeDecorator, Generic[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
     """
 
     impl = CHAR
-    uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
+    uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
@@ -593,7 +593,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
         else:
             return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: UUID_SubType | uuid.UUID, dialect):
+    def process_bind_param(self, value: TUUIDSubType | uuid.UUID, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -611,15 +611,15 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
             else:
                 return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> Optional[UUID_SubType]:
+    def process_result_value(self, value: Any, dialect) -> Optional[TUUIDSubType]:
         if value is None:
             return value
         else:
             cls = type(self)
             if isinstance(value, bytes):
-                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+                return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
             else:
-                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+                return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
 class SlugType(TypeDecorator):
@@ -658,17 +658,17 @@ class SlugType(TypeDecorator):
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
-    uuid_subtype_func = EndpointId
+    uuid_subtype_func = lambda v: EndpointId(v)
     cache_ok = True
 
 
 class SessionIDColumnType(GUID[SessionId]):
-    uuid_subtype_func = SessionId
+    uuid_subtype_func = lambda v: SessionId(v)
     cache_ok = True
 
 
 class KernelIDColumnType(GUID[KernelId]):
-    uuid_subtype_func = KernelId
+    uuid_subtype_func = lambda v: KernelId(v)
     cache_ok = True
 
 

@@ -24,7 +24,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_ROW_FIXTURE,
     DOCKERHUB_RESPONSE_MOCK,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 # Added some default values to IMAGE_FIXTURE_DATA
 EXPECTED_IMAGE_RESCAN_RESULT = [
@@ -68,7 +68,7 @@ EXPECTED_IMAGE_RESCAN_RESULT = [
     ("test_scenario", "dockerhub_responses_mock"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Success Case",
                 RescanImagesAction(
                     registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
@@ -98,7 +98,7 @@ EXPECTED_IMAGE_RESCAN_RESULT = [
 async def test_rescan_images(
     dockerhub_responses_mock,
     processors: ContainerRegistryProcessors,
-    test_scenario: TestScenario[RescanImagesAction, RescanImagesActionResult],
+    test_scenario: ScenarioBase[RescanImagesAction, RescanImagesActionResult],
 ):
     with aioresponses() as mocked:
         registry_url = CONTAINER_REGISTRY_FIXTURE_DATA.url

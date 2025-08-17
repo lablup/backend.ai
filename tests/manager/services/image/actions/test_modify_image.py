@@ -21,13 +21,13 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Update one column",
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
@@ -38,7 +38,7 @@ from ...test_utils import TestScenario
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, registry="cr.backend.ai2")),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Make a column empty",
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
@@ -49,7 +49,7 @@ from ...test_utils import TestScenario
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, accelerators=None)),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Update multiple columns",
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
@@ -91,7 +91,7 @@ from ...test_utils import TestScenario
                 )
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Update one column by image alias",
             ModifyImageAction(
                 target=IMAGE_ALIAS_ROW_FIXTURE.alias,
@@ -102,7 +102,7 @@ from ...test_utils import TestScenario
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, registry="cr.backend.ai2")),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Image not found",
             ModifyImageAction(
                 target="wrong-image",
@@ -113,7 +113,7 @@ from ...test_utils import TestScenario
             ),
             ImageNotFound,
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Value Error",
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
@@ -143,6 +143,6 @@ from ...test_utils import TestScenario
 )
 async def test_modify_image(
     processors: ImageProcessors,
-    test_scenario: TestScenario[ModifyImageAction, ModifyImageActionResult],
+    test_scenario: ScenarioBase[ModifyImageAction, ModifyImageActionResult],
 ):
     await test_scenario.test(processors.modify_image.wait_for_complete)

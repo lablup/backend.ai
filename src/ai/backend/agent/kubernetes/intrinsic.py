@@ -13,6 +13,7 @@ from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    ContainerId,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -39,7 +40,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
-    short_cid = container._id[:7]
+    short_cid = ContainerId(container.id[:7])
     try:
         ret = await container.stats(stream=False)  # TODO: cache
     except RuntimeError as e:

@@ -18,7 +18,7 @@ from ai.backend.manager.services.model_serving.types import (
     ServiceConfig,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ class TestDryRunModelService:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "Configuration validation success",
                 DryRunModelServiceAction(
                     service_name="test-model-v1.0",
@@ -120,7 +120,7 @@ class TestDryRunModelService:
     @pytest.mark.asyncio
     async def test_dry_run_model_service(
         self,
-        scenario: TestScenario[DryRunModelServiceAction, DryRunModelServiceActionResult],
+        scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_by_id_dry_run,
         mock_get_user_with_keypair,

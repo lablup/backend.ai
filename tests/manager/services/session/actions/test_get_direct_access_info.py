@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
@@ -41,7 +41,7 @@ def mock_increment_session_usage_rpc(mocker):
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Get direct access info",
             GetDirectAccessInfoAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -69,7 +69,7 @@ def mock_increment_session_usage_rpc(mocker):
 async def test_get_direct_access_info(
     mock_increment_session_usage_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetDirectAccessInfoAction, GetDirectAccessInfoActionResult],
+    test_scenario: ScenarioBase[GetDirectAccessInfoAction, GetDirectAccessInfoActionResult],
     session_repository,
 ):
     # Execute the action
