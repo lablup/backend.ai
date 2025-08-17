@@ -51,7 +51,6 @@ from ai.backend.appproxy.common.exceptions import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppCreator,
     AppMode,
@@ -100,7 +99,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
-from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.logging.utils import BraceStyleAdapter as LoggingBraceStyleAdapter
 

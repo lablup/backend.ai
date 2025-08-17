@@ -7,10 +7,10 @@ from typing import Any
 import aiohttp
 from yarl import URL
 
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.common.types import SerializableCircuit as Circuit
 from ai.backend.appproxy.worker.types import RootContext
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

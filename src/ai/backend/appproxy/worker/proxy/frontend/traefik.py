@@ -10,13 +10,13 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
 from ai.backend.common.redis_client import RedisConnection
 from ai.backend.common.types import RedisProfileTarget
+from ai.backend.logging import BraceStyleAdapter
 
 from ...types import (
     LAST_USED_MARKER_SOCKET_NAME,

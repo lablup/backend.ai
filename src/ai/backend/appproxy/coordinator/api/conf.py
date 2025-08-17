@@ -7,11 +7,11 @@ from aiohttp import web
 from pydantic import BaseModel
 
 from ai.backend.appproxy.common.exceptions import AuthorizationFailed
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebMiddleware
 from ai.backend.appproxy.common.utils import pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Token
 
