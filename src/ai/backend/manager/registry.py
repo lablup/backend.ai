@@ -1034,6 +1034,8 @@ class AgentRegistry:
         internal_data.update(dotfile_data)
         if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
             internal_data["model_definition_path"] = _fname
+        if _id := session_enqueue_configs["creation_config"].get("model_service_folder_id"):
+            internal_data["model_service_folder_id"] = _id
         if _variant := session_enqueue_configs["creation_config"].get("runtime_variant"):
             internal_data["runtime_variant"] = _variant
 
@@ -4216,6 +4218,7 @@ async def handle_route_creation(
                 resource_policy,
                 SessionTypes.INFERENCE,
                 {
+                    "model_service_folder_id": str(endpoint.model_row.id),
                     "mounts": [endpoint.model, *[m.vfid.folder_id for m in endpoint.extra_mounts]],
                     "mount_map": {
                         endpoint.model: endpoint.model_mount_destination,

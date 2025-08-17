@@ -41,7 +41,6 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
     VFolderMount,
-    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -894,10 +893,6 @@ class ModelServiceHelper:
             if vfolder.kernel_path == model_mount_destination:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
-                )
-            if vfolder.usage_mode == VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters(
-                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
                 )
 
         return vfolder_mounts
