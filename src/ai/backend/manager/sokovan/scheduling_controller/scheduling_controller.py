@@ -1,8 +1,9 @@
-"""Session controller for managing session creation and lifecycle."""
+"""Scheduling controller for managing session lifecycle and scheduling operations."""
 
 import logging
 from dataclasses import dataclass
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
@@ -15,10 +16,14 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerPhaseMetricObserver
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler import (
+    MarkTerminatingResult,
+    SchedulerRepository,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
 )
+from ai.backend.manager.scheduler.types import ScheduleType
 
 from .calculators.resource_calculator import ResourceCalculator
 from .preparers import (
@@ -42,22 +47,24 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class SessionControllerArgs:
-    """Arguments for initializing SessionController."""
+class SchedulingControllerArgs:
+    """Arguments for initializing SchedulingController."""
 
     repository: SchedulerRepository
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     event_producer: EventProducer
+    valkey_schedule: ValkeyScheduleClient
 
 
-class SessionController:
-    """Controller for session creation and lifecycle management."""
+class SchedulingController:
+    """Controller for session lifecycle and scheduling operations management."""
 
     _repository: SchedulerRepository
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
+    _valkey_schedule: ValkeyScheduleClient
 
     # Services
     _scaling_group_resolver: ScalingGroupResolver
@@ -66,12 +73,13 @@ class SessionController:
     _resource_calculator: ResourceCalculator
     _metric_observer: SchedulerPhaseMetricObserver
 
-    def __init__(self, args: SessionControllerArgs) -> None:
-        """Initialize the session controller with required services."""
+    def __init__(self, args: SchedulingControllerArgs) -> None:
+        """Initialize the scheduling controller with required services."""
         self._repository = args.repository
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
+        self._valkey_schedule = args.valkey_schedule
 
         # Initialize metric observer (singleton)
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
@@ -154,12 +162,14 @@ class SessionController:
             SessionId: The ID of the created session
         """
         # Phase 1: Resolve scaling group
-        with self._metric_observer.measure_phase("session_controller", "", "resolve_scaling_group"):
+        with self._metric_observer.measure_phase(
+            "scheduling_controller", "", "resolve_scaling_group"
+        ):
             validated_scaling_group = await self._resolve_scaling_group(session_spec)
 
         # Phase 2: Fetch all required data
         with self._metric_observer.measure_phase(
-            "session_controller", validated_scaling_group, "fetch_data"
+            "scheduling_controller", validated_scaling_group, "fetch_data"
         ):
             allowed_vfolder_types = list(
                 await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -174,7 +184,7 @@ class SessionController:
 
         # Phase 3: Validate
         with self._metric_observer.measure_phase(
-            "session_controller", validated_scaling_group, "validation"
+            "scheduling_controller", validated_scaling_group, "validation"
         ):
             self._validator.validate(
                 session_spec,
@@ -183,7 +193,7 @@ class SessionController:
 
         # Phase 4: Calculate resources and prepare session data
         with self._metric_observer.measure_phase(
-            "session_controller", validated_scaling_group, "preparation"
+            "scheduling_controller", validated_scaling_group, "preparation"
         ):
             # Pre-calculate resources
             calculated_resources = await self._resource_calculator.calculate(
@@ -201,7 +211,7 @@ class SessionController:
 
         # Phase 5: Enqueue in repository
         with self._metric_observer.measure_phase(
-            "session_controller", validated_scaling_group, "enqueue"
+            "scheduling_controller", validated_scaling_group, "enqueue"
         ):
             session_id = await self._repository.enqueue_session(session_data)
 
@@ -232,3 +242,49 @@ class SessionController:
             SessionEnqueuedAnycastEvent(session_id, creation_id),
             SessionEnqueuedBroadcastEvent(session_id, creation_id),
         )
+
+    async def request_scheduling(self, schedule_type: ScheduleType) -> None:
+        """
+        Request a scheduling operation for the next cycle.
+
+        This is the public interface for requesting scheduling operations.
+        The actual scheduling will be handled internally by the coordinator.
+
+        Args:
+            schedule_type: Type of scheduling to request
+        """
+        await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
+        log.debug("Requested scheduling for type: {}", schedule_type.value)
+
+    async def mark_sessions_for_termination(
+        self,
+        session_ids: list[SessionId],
+        reason: str = "USER_REQUESTED",
+    ) -> MarkTerminatingResult:
+        """
+        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
+
+        This method handles the lifecycle management of sessions by marking them
+        for termination, which will be processed by the scheduler's terminate_sessions method.
+        It also automatically requests TERMINATE scheduling if sessions were processed.
+
+        Args:
+            session_ids: List of session IDs to terminate
+            reason: Reason for termination
+
+        Returns:
+            MarkTerminatingResult with categorized session statuses
+        """
+        result = await self._repository.mark_sessions_terminating(session_ids, reason)
+
+        if result.has_processed():
+            log.info(
+                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
+                result.processed_count(),
+                len(result.cancelled_sessions),
+                len(result.terminating_sessions),
+            )
+            # Request termination scheduling for the next cycle
+            await self.request_scheduling(ScheduleType.TERMINATE)
+
+        return result

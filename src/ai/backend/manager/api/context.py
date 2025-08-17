@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         ServiceDiscoveryLoop,
     )
     from ai.backend.common.types import ValkeyProfileTarget
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
     from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 
     from ..agent_cache import AgentRPCCache
@@ -81,6 +82,7 @@ class RootContext(BaseContext):
     agent_cache: AgentRPCCache
     scheduler_dispatcher: SchedulerDispatcher
     sokovan_orchestrator: SokovanOrchestrator
+    scheduling_controller: SchedulingController
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

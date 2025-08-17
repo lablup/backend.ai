@@ -74,7 +74,7 @@ class SchedulerOperationMetricObserver:
 
 
 class SchedulerPhaseMetricObserver:
-    """Metrics for scheduler and session controller execution phases."""
+    """Metrics for scheduler and scheduling controller execution phases."""
 
     _instance: Optional[Self] = None
 
@@ -84,12 +84,12 @@ class SchedulerPhaseMetricObserver:
     def __init__(self) -> None:
         self._phase_count = Counter(
             name="backendai_scheduler_phase_count",
-            documentation="Total number of scheduler/session controller phase executions",
+            documentation="Total number of scheduler/scheduling controller phase executions",
             labelnames=["component", "scaling_group", "phase", "status"],
         )
         self._phase_duration_sec = Histogram(
             name="backendai_scheduler_phase_duration_sec",
-            documentation="Duration of scheduler/session controller phase executions in seconds",
+            documentation="Duration of scheduler/scheduling controller phase executions in seconds",
             labelnames=["component", "scaling_group", "phase", "status"],
             buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0],
         )
@@ -111,10 +111,10 @@ class SchedulerPhaseMetricObserver:
         duration: float,
     ) -> None:
         """
-        Record a scheduler or session controller phase execution.
+        Record a scheduler or scheduling controller phase execution.
 
         Args:
-            component: The component name ('scheduler' or 'session_controller')
+            component: The component name ('scheduler' or 'scheduling_controller')
             scaling_group: The scaling group name
             phase: The phase name (e.g., 'validation', 'sequencing_fifo', 'allocation', 'fetch_data')
             status: The phase status ('success' or 'failure')
@@ -133,7 +133,7 @@ class SchedulerPhaseMetricObserver:
         Context manager to measure a phase execution.
 
         Args:
-            component: The component name ('scheduler' or 'session_controller')
+            component: The component name ('scheduler' or 'scheduling_controller')
             scaling_group: The scaling group name
             phase: The phase name
         """

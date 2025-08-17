@@ -2,13 +2,12 @@ import logging
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
-from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .handlers import (
     CheckPreconditionHandler,
@@ -30,6 +29,7 @@ class ScheduleCoordinator:
 
     _valkey_schedule: ValkeyScheduleClient
     _scheduler: "Scheduler"
+    _scheduling_controller: SchedulingController
     _event_producer: EventProducer
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _scheduler_dispatcher: SchedulerDispatcher
@@ -39,23 +39,31 @@ class ScheduleCoordinator:
         self,
         valkey_schedule: ValkeyScheduleClient,
         scheduler: "Scheduler",
+        scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         scheduler_dispatcher: SchedulerDispatcher,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
         self._scheduler_dispatcher = scheduler_dispatcher
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
-            ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                scheduler, self, self._scheduler_dispatcher
+            ScheduleType.SCHEDULE: ScheduleSessionsHandler(
+                scheduler, self, self._scheduling_controller
             ),
-            ScheduleType.START: StartSessionsHandler(scheduler, self, self._scheduler_dispatcher),
-            ScheduleType.TERMINATE: TerminateSessionsHandler(scheduler, self),
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
+                scheduler, self, self._scheduler_dispatcher, self._scheduling_controller
+            ),
+            ScheduleType.START: StartSessionsHandler(
+                scheduler, self, self._scheduler_dispatcher, self._scheduling_controller
+            ),
+            ScheduleType.TERMINATE: TerminateSessionsHandler(
+                scheduler, self, self._scheduling_controller
+            ),
             ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
         }
 
@@ -105,40 +113,3 @@ class ScheduleCoordinator:
             return False
 
         return await self.process_schedule(schedule_type)
-
-    async def request_scheduling(self, schedule_type: ScheduleType) -> None:
-        """
-        Request a scheduling operation for the next cycle.
-
-        :param schedule_type: Type of scheduling to request
-        """
-        # Use the actual ValkeyScheduleClient method
-        await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
-        log.debug("Requested scheduling for type: {}", schedule_type.value)
-
-    async def mark_sessions_for_termination(
-        self,
-        session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
-    ) -> MarkTerminatingResult:
-        """
-        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
-        This provides fast response to users by only updating the status and returning immediately.
-        Also requests the TERMINATE scheduling operation for the next cycle.
-
-        :param session_ids: List of session IDs to terminate
-        :param reason: Reason for termination
-        :return: MarkTerminatingResult with categorized session statuses
-        """
-        # Use the internal scheduler method to mark sessions
-        result = await self._scheduler.mark_sessions_for_termination(session_ids, reason)
-
-        # Request termination scheduling for the next cycle if there are sessions to terminate
-        if result.has_processed():
-            await self.request_scheduling(ScheduleType.TERMINATE)
-            log.info(
-                "Marked {} sessions for termination and requested TERMINATE scheduling",
-                result.processed_count(),
-            )
-
-        return result

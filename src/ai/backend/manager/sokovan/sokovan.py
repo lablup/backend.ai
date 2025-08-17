@@ -17,6 +17,7 @@ from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import DistributedLockFactory
@@ -63,6 +64,7 @@ class SokovanOrchestrator:
     _event_producer: EventProducer
     _lock_factory: "DistributedLockFactory"
     _scheduler_dispatcher: SchedulerDispatcher  # TODO: Remove this
+    _scheduling_controller: SchedulingController
 
     # GlobalTimers for scheduling operations
     timers: list[GlobalTimer] = []
@@ -74,15 +76,18 @@ class SokovanOrchestrator:
         valkey_schedule: ValkeyScheduleClient,
         lock_factory: "DistributedLockFactory",
         scheduler_dispatcher: SchedulerDispatcher,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._coordinator = ScheduleCoordinator(
             valkey_schedule=valkey_schedule,
             scheduler=scheduler,
+            scheduling_controller=scheduling_controller,
             event_producer=event_producer,
             scheduler_dispatcher=scheduler_dispatcher,
         )
         self._event_producer = event_producer
         self._lock_factory = lock_factory
+        self._scheduling_controller = scheduling_controller
 
     @property
     def coordinator(self) -> ScheduleCoordinator:

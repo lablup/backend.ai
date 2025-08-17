@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self, override
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -90,7 +90,7 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
-    schedule_coordinator: "ScheduleCoordinator"
+    scheduling_controller: "SchedulingController"
 
 
 @dataclass
@@ -175,7 +175,7 @@ class Services:
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
                 admin_session_repository=repositories.session.admin_repository,
-                schedule_coordinator=args.schedule_coordinator,
+                scheduling_controller=args.scheduling_controller,
             )
         )
         keypair_resource_policy_service = KeypairResourcePolicyService(

@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -15,7 +15,6 @@ from ai.backend.manager.metrics.scheduler import (
 )
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
-    MarkTerminatingResult,
     SchedulerRepository,
     SchedulingData,
     SessionTerminationResult,
@@ -626,35 +625,13 @@ class Scheduler:
                 error=str(e),
             )
 
-    async def mark_sessions_for_termination(
-        self,
-        session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
-    ) -> MarkTerminatingResult:
-        """
-        Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
-        Should only be called by ScheduleCoordinator.
-
-        :param session_ids: List of session IDs to terminate
-        :param reason: Reason for termination
-        :return: MarkTerminatingResult with categorized session statuses
-        """
-        result = await self._repository.mark_sessions_terminating(session_ids, reason)
-
-        if result.has_processed():
-            log.info(
-                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
-                result.processed_count(),
-                len(result.cancelled_sessions),
-                len(result.terminating_sessions),
-            )
-
-        return result
-
     async def sweep_stale_sessions(self) -> ScheduleResult:
         """
         Sweep stale sessions including those with pending timeout.
         This is a maintenance operation, not a scheduling operation.
+
+        Note: The actual marking of sessions for termination should be done
+        through SchedulingController.mark_sessions_for_termination() by the coordinator.
 
         :return: ScheduleResult with the count of swept sessions
         """
@@ -666,12 +643,14 @@ class Scheduler:
             session_ids = [session.session_id for session in timed_out_sessions]
 
             log.info(
-                "Sweeping {} sessions due to pending timeout",
+                "Found {} sessions with pending timeout that need termination",
                 len(session_ids),
             )
 
-            # Mark them for termination using existing method
-            await self.mark_sessions_for_termination(
+            # Note: The coordinator should call SchedulingController.mark_sessions_for_termination()
+            # with these session_ids. This method just identifies the sessions.
+            # For now, we'll directly mark them through repository for backward compatibility
+            await self._repository.mark_sessions_terminating(
                 session_ids,
                 reason="PENDING_TIMEOUT",
             )

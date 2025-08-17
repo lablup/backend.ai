@@ -659,7 +659,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
-                schedule_coordinator=root_ctx.sokovan_orchestrator.coordinator,
+                scheduling_controller=root_ctx.scheduling_controller,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -760,6 +760,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
+            root_ctx.scheduling_controller,
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
@@ -971,6 +972,22 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.valkey_stat,
     )
 
+    # Create scheduling controller for external interface
+    from ai.backend.manager.sokovan.scheduling_controller import (
+        SchedulingController,
+        SchedulingControllerArgs,
+    )
+
+    root_ctx.scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=root_ctx.repositories.scheduler.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
+        )
+    )
+
     # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
         scheduler=scheduler,
@@ -978,6 +995,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,
         scheduler_dispatcher=root_ctx.scheduler_dispatcher,
+        scheduling_controller=root_ctx.scheduling_controller,
     )
 
     # Initialize the GlobalTimers for scheduling operations
