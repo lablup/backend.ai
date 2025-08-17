@@ -1,6 +1,14 @@
 resource(name="version", source="VERSION")
 resource(name="buildscript", source="BUILD")
 
+python_sources(
+    name="src",
+    sources=["**/*.py"],
+    dependencies=[
+        ":resources",
+    ],
+)
+
 resources(
     name="resources",
     dependencies=[
@@ -8,16 +16,7 @@ resources(
     ],
     sources=[
         "**/py.typed",
-    ],
-)
-
-python_sources(
-    name="src",
-    dependencies=[
-        "src/ai/backend/appproxy/coordinator/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/appproxy/coordinator/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
-        "src/ai/backend/appproxy/coordinator/models/alembic:migrations",  # not auto-inferred
-        ":resources",
+        "models/alembic/script.py.mako",
     ],
 )
 

@@ -172,7 +172,7 @@ def container_from_docker_container(src: DockerContainer) -> Container:
             host_port = int(host_ports[0]["HostPort"])
         ports.append(Port(host_ip, private_port, host_port))
     return Container(
-        id=src._id,
+        id=ContainerId(src.id),
         status=src["State"]["Status"],
         image=src["Config"]["Image"],
         labels=src["Config"]["Labels"],
@@ -1143,7 +1143,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=container._id, message="Container creation cancelled"
+                        container_id=ContainerId(container.id),
+                        message="Container creation cancelled",
                     )
                 raise
             except Exception as e:
@@ -1151,7 +1152,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await _rollback_container_creation()
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=container._id, message=f"unknown. {repr(e)}"
+                        container_id=ContainerId(container.id),
+                        message=f"unknown. {repr(e)}",
                     )
                 raise
 

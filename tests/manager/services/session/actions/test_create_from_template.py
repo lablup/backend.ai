@@ -13,7 +13,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -40,7 +40,7 @@ TEST_TEMPLATE_ID = uuid4()
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Create session from template",
                 CreateFromTemplateAction(
                     params=CreateFromTemplateActionParams(
@@ -95,6 +95,6 @@ TEST_TEMPLATE_ID = uuid4()
 async def test_create_from_template(
     mock_create_from_template_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CreateFromTemplateAction, CreateFromTemplateActionResult],
+    test_scenario: ScenarioBase[CreateFromTemplateAction, CreateFromTemplateActionResult],
 ):
     await test_scenario.test(processors.create_from_template.wait_for_complete)

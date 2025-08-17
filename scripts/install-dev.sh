@@ -793,9 +793,7 @@ setup_environment() {
   pants export \
     --resolve=python-default \
     --resolve=python-kernel \
-    --resolve=pants-plugins \
     --resolve=towncrier \
-    --resolve=ruff \
     --resolve=mypy
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.

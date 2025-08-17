@@ -15,7 +15,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import CompactServiceInfo
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestListModelService:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "all model service list",
                 ListModelServiceAction(
                     session_owener_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -65,7 +65,7 @@ class TestListModelService:
                     ]
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "name filtered",
                 ListModelServiceAction(
                     session_owener_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -92,7 +92,7 @@ class TestListModelService:
     @pytest.mark.asyncio
     async def test_list_model_service(
         self,
-        scenario: TestScenario[ListModelServiceAction, ListModelServiceActionResult],
+        scenario: ScenarioBase[ListModelServiceAction, ListModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_list_endpoints_by_owner_validated,
     ):

@@ -28,7 +28,7 @@ from ai.backend.manager.services.model_serving.types import (
     TriState,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ class TestModifyAutoScalingRule:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "Modify threshold",
                 ModifyEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -95,7 +95,7 @@ class TestModifyAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("88888888-8888-8888-8888-888888888888")),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "Modify min/max replicas",
                 ModifyEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -115,7 +115,7 @@ class TestModifyAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "Disable rule",
                 ModifyEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -132,7 +132,7 @@ class TestModifyAutoScalingRule:
                     data=MagicMock(id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "Rule not found",
                 ModifyEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -148,7 +148,7 @@ class TestModifyAutoScalingRule:
                 ),
                 EndpointAutoScalingRuleNotFound,
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN modify all parameters",
                 ModifyEndpointAutoScalingRuleAction(
                     requester_ctx=RequesterCtx(
@@ -176,7 +176,7 @@ class TestModifyAutoScalingRule:
     @pytest.mark.asyncio
     async def test_modify_auto_scaling_rule(
         self,
-        scenario: TestScenario[
+        scenario: ScenarioBase[
             ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
