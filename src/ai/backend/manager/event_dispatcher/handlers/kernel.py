@@ -24,6 +24,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 from ...models.kernel import kernels
 from ...models.utils import (
@@ -40,6 +41,8 @@ class KernelEventHandler:
     _valkey_stream: ValkeyStreamClient
     _registry: AgentRegistry
     _db: ExtendedAsyncSAEngine
+    _schedule_coordinator: ScheduleCoordinator
+    _use_sokovan: bool
 
     def __init__(
         self,
@@ -48,12 +51,16 @@ class KernelEventHandler:
         valkey_stream: ValkeyStreamClient,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
+        schedule_coordinator: ScheduleCoordinator,
+        use_sokovan: bool = False,
     ) -> None:
         self._valkey_container_log = valkey_container_log
         self._valkey_stat = valkey_stat
         self._valkey_stream = valkey_stream
         self._registry = registry
         self._db = db
+        self._schedule_coordinator = schedule_coordinator
+        self._use_sokovan = use_sokovan
 
     async def handle_kernel_log(
         self,
@@ -168,7 +175,13 @@ class KernelEventHandler:
             event.event_name(),
             event.kernel_id,
         )
-        # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
+
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_preparing(event)
+        else:
+            # State transition is done by the DoPrepareEvent handler inside the scheduler-dispatcher object.
+            pass
 
     async def handle_kernel_pulling(
         self,
@@ -181,10 +194,16 @@ class KernelEventHandler:
             event.event_name(),
             event.kernel_id,
         )
-        async with self._db.connect() as db_conn:
-            await self._registry.mark_kernel_pulling(
-                db_conn, event.kernel_id, event.session_id, event.reason
-            )
+
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_pulling(event)
+        else:
+            # Use legacy registry method
+            async with self._db.connect() as db_conn:
+                await self._registry.mark_kernel_pulling(
+                    db_conn, event.kernel_id, event.session_id, event.reason
+                )
 
     async def handle_kernel_creating(
         self,
@@ -197,10 +216,16 @@ class KernelEventHandler:
             event.event_name(),
             event.kernel_id,
         )
-        async with self._db.connect() as db_conn:
-            await self._registry.mark_kernel_creating(
-                db_conn, event.kernel_id, event.session_id, event.reason
-            )
+
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_creating(event)
+        else:
+            # Use legacy registry method
+            async with self._db.connect() as db_conn:
+                await self._registry.mark_kernel_creating(
+                    db_conn, event.kernel_id, event.session_id, event.reason
+                )
 
     async def handle_kernel_started(
         self,
@@ -213,10 +238,16 @@ class KernelEventHandler:
             event.event_name(),
             event.kernel_id,
         )
-        async with self._db.connect() as db_conn:
-            await self._registry.mark_kernel_running(
-                db_conn, event.kernel_id, event.session_id, event.reason, event.creation_info
-            )
+
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_running(event)
+        else:
+            # Use legacy registry method
+            async with self._db.connect() as db_conn:
+                await self._registry.mark_kernel_running(
+                    db_conn, event.kernel_id, event.session_id, event.reason, event.creation_info
+                )
 
     async def handle_kernel_cancelled(
         self,
@@ -230,6 +261,13 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_cancelled(event)
+        else:
+            # Legacy code doesn't handle cancelled state
+            log.warning(f"Kernel cancelled, {event.reason = }")
+
     async def handle_kernel_terminating(
         self,
         context: None,
@@ -237,6 +275,7 @@ class KernelEventHandler:
         event: KernelTerminatingAnycastEvent,
     ) -> None:
         # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
+        # No additional handling needed for terminating state
         pass
 
     async def handle_kernel_terminated(
@@ -245,10 +284,15 @@ class KernelEventHandler:
         source: AgentId,
         event: KernelTerminatedAnycastEvent,
     ) -> None:
-        async with self._db.connect() as db_conn:
-            await self._registry.mark_kernel_terminated(
-                db_conn, event.kernel_id, event.session_id, event.reason, event.exit_code
-            )
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_terminated(event)
+        else:
+            # Use legacy registry method
+            async with self._db.connect() as db_conn:
+                await self._registry.mark_kernel_terminated(
+                    db_conn, event.kernel_id, event.session_id, event.reason, event.exit_code
+                )
 
     async def handle_kernel_heartbeat(
         self,
@@ -256,4 +300,9 @@ class KernelEventHandler:
         source: AgentId,
         event: KernelHeartbeatEvent,
     ) -> None:
-        await self._registry.mark_kernel_heartbeat(event.kernel_id)
+        if self._use_sokovan:
+            # Use Sokovan coordinator's kernel handlers
+            await self._schedule_coordinator.handle_kernel_heartbeat(event)
+        else:
+            # Use legacy registry method
+            await self._registry.mark_kernel_heartbeat(event.kernel_id)

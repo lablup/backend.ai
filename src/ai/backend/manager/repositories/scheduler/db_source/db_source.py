@@ -1632,3 +1632,440 @@ class ScheduleDBSource:
                 agent_slots[row.agent] += row.occupied_slots
 
         return agent_slots
+
+    async def update_kernel_status_pulling(
+        self, kernel_id: UUID, session_id: SessionId, reason: str
+    ) -> bool:
+        """
+        Update kernel status to PULLING when pulling image.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :param reason: The reason for status change
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.SCHEDULED,
+                    )
+                )
+                .values(
+                    status=KernelStatus.PULLING,
+                    status_info=reason,
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.PULLING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_status_creating(
+        self, kernel_id: UUID, session_id: SessionId, reason: str
+    ) -> bool:
+        """
+        Update kernel status to CREATING when creating container.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :param reason: The reason for status change
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.PULLING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.CREATING,
+                    status_info=reason,
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.CREATING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_status_running(
+        self, kernel_id: UUID, session_id: SessionId, reason: str, creation_info: dict[str, Any]
+    ) -> bool:
+        """
+        Update kernel status to RUNNING when container is started.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :param reason: The reason for status change
+        :param creation_info: Container creation information
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        # Extract actual resource allocations
+        actual_allocs = ResourceSlot()
+        if "resource_spec" in creation_info and "allocations" in creation_info["resource_spec"]:
+            actual_allocs = ResourceSlot.from_json(creation_info["resource_spec"]["allocations"])
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.CREATING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.RUNNING,
+                    status_info=reason,
+                    status_changed=now,
+                    occupied_slots=actual_allocs,
+                    container_id=creation_info.get("container_id"),
+                    attached_devices=creation_info.get("attached_devices", {}),
+                    repl_in_port=creation_info.get("repl_in_port"),
+                    repl_out_port=creation_info.get("repl_out_port"),
+                    stdin_port=creation_info.get("stdin_port"),
+                    stdout_port=creation_info.get("stdout_port"),
+                    service_ports=creation_info.get("service_ports", []),
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.RUNNING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_status_preparing(self, kernel_id: UUID, session_id: SessionId) -> bool:
+        """
+        Update kernel status to PREPARING.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.SCHEDULED,
+                    )
+                )
+                .values(
+                    status=KernelStatus.PREPARING,
+                    status_info="preparing",
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.PREPARING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_status_cancelled(
+        self, kernel_id: UUID, session_id: SessionId, reason: str
+    ) -> bool:
+        """
+        Update kernel status to CANCELLED.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :param reason: Cancellation reason
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status.in_([
+                            KernelStatus.PENDING,
+                            KernelStatus.SCHEDULED,
+                            KernelStatus.PREPARING,
+                            KernelStatus.PULLING,
+                            KernelStatus.CREATING,
+                        ]),
+                    )
+                )
+                .values(
+                    status=KernelStatus.CANCELLED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.CANCELLED.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_status_terminated(
+        self, kernel_id: UUID, session_id: SessionId, reason: str, exit_code: Optional[int] = None
+    ) -> bool:
+        """
+        Update kernel status to TERMINATED.
+        Uses UPDATE WHERE to ensure atomic state transition.
+
+        :param kernel_id: Kernel ID to update
+        :param session_id: Session ID
+        :param reason: Termination reason
+        :param exit_code: Process exit code
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.TERMINATING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.TERMINATED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_data=sql_json_merge(
+                        KernelRow.status_data,
+                        ("kernel",),
+                        {"exit_code": exit_code},
+                    ),
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.TERMINATED.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
+        """
+        Update kernel last_heartbeat timestamp.
+        Uses UPDATE WHERE to ensure kernel exists and is running.
+
+        :param kernel_id: Kernel ID to update
+        :return: True if update was successful, False otherwise
+        """
+        now = datetime.now(tzutc())
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == KernelStatus.RUNNING,
+                    )
+                )
+                .values(
+                    last_heartbeat=now,
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount > 0
+
+    async def get_sessions_ready_to_create(self) -> list[SessionId]:
+        """
+        Get sessions in PULLING state where all kernels have progressed past PULLING.
+        Returns session IDs that can transition to CREATING state.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Find sessions in PULLING state where ALL kernels are past PULLING
+            # (i.e., all kernels are in CREATING, PREPARING, or RUNNING)
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == SessionStatus.PULLING)
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_session_ids: list[SessionId] = []
+            for session in sessions:
+                # Check if all kernels are past PULLING state
+                all_past_pulling = all(
+                    kernel.status
+                    in [
+                        KernelStatus.CREATING,
+                        KernelStatus.PREPARING,
+                        KernelStatus.RUNNING,
+                    ]
+                    for kernel in session.kernels
+                )
+                if all_past_pulling and session.kernels:  # Ensure there are kernels
+                    ready_session_ids.append(session.id)
+
+            return ready_session_ids
+
+    async def update_sessions_to_creating(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from PULLING to CREATING state.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.PULLING,
+                    )
+                )
+                .values(
+                    status=SessionStatus.CREATING,
+                    status_changed=datetime.now(tzutc()),
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def get_sessions_ready_to_run(self) -> list[SessionId]:
+        """
+        Get sessions in CREATING/PREPARING state where all kernels are RUNNING.
+        Returns sessions that can transition to RUNNING state.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Find sessions in CREATING or PREPARING state where ALL kernels are RUNNING
+            stmt = (
+                sa.select(SessionRow)
+                .where(
+                    SessionRow.status.in_([
+                        SessionStatus.CREATING,
+                        SessionStatus.PREPARING,
+                    ])
+                )
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_session_ids: list[SessionId] = []
+            for session in sessions:
+                # Check if all kernels are RUNNING
+                all_running = all(
+                    kernel.status == KernelStatus.RUNNING for kernel in session.kernels
+                )
+                if all_running and session.kernels:  # Ensure there are kernels
+                    ready_session_ids.append(session.id)
+
+            return ready_session_ids
+
+    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from CREATING/PREPARING to RUNNING state.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status.in_([
+                            SessionStatus.CREATING,
+                            SessionStatus.PREPARING,
+                        ]),
+                    )
+                )
+                .values(
+                    status=SessionStatus.RUNNING,
+                    status_changed=datetime.now(tzutc()),
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
+        """
+        Get sessions in TERMINATING state where all kernels are TERMINATED.
+        Returns sessions that can transition to TERMINATED state.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Find sessions in TERMINATING state where ALL kernels are TERMINATED
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == SessionStatus.TERMINATING)
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_session_ids: list[SessionId] = []
+            for session in sessions:
+                # Check if all kernels are TERMINATED
+                all_terminated = all(
+                    kernel.status == KernelStatus.TERMINATED for kernel in session.kernels
+                )
+                if all_terminated:  # Include sessions even with no kernels
+                    ready_session_ids.append(session.id)
+
+            return ready_session_ids
+
+    async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from TERMINATING to TERMINATED state.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            # Update session status to TERMINATED
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.TERMINATING,
+                    )
+                )
+                .values(
+                    status=SessionStatus.TERMINATED,
+                    status_changed=datetime.now(tzutc()),
+                    terminated_at=datetime.now(tzutc()),
+                )
+            )
+            await db_sess.execute(stmt)

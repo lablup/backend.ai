@@ -244,3 +244,42 @@ class SchedulerRepository:
             access_key,
             vfolder_mounts,
         )
+
+    async def get_sessions_ready_to_create(self) -> list[SessionId]:
+        """
+        Get sessions in PULLING state where all kernels have progressed past PULLING.
+        These sessions are ready to transition to CREATING state.
+        """
+        return await self._db_source.get_sessions_ready_to_create()
+
+    async def update_sessions_to_creating(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from PULLING to CREATING state.
+        """
+        await self._db_source.update_sessions_to_creating(session_ids)
+
+    async def get_sessions_ready_to_run(self) -> list[SessionId]:
+        """
+        Get sessions in CREATING/PREPARING state where all kernels are RUNNING.
+        These sessions are ready to transition to RUNNING state.
+        """
+        return await self._db_source.get_sessions_ready_to_run()
+
+    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from CREATING/PREPARING to RUNNING state.
+        """
+        await self._db_source.update_sessions_to_running(session_ids)
+
+    async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
+        """
+        Get sessions in TERMINATING state where all kernels are TERMINATED.
+        These sessions are ready to transition to TERMINATED state.
+        """
+        return await self._db_source.get_sessions_ready_to_terminate()
+
+    async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from TERMINATING to TERMINATED state.
+        """
+        await self._db_source.update_sessions_to_terminated(session_ids)

@@ -2,6 +2,15 @@ import logging
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.anycast import (
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
+    KernelHeartbeatEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
@@ -10,13 +19,17 @@ from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .handlers import (
+    CheckCreatingProgressHandler,
     CheckPreconditionHandler,
+    CheckPullingProgressHandler,
+    CheckTerminatingProgressHandler,
     ScheduleHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
     SweepSessionsHandler,
     TerminateSessionsHandler,
 )
+from .kernel import KernelStateEngine
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -34,6 +47,7 @@ class ScheduleCoordinator:
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _scheduler_dispatcher: SchedulerDispatcher
     _operation_metrics: SchedulerOperationMetricObserver
+    _kernel_state_engine: KernelStateEngine
 
     def __init__(
         self,
@@ -50,6 +64,9 @@ class ScheduleCoordinator:
         self._scheduler_dispatcher = scheduler_dispatcher
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
+        # Initialize kernel state engine with the scheduler's repository
+        self._kernel_state_engine = KernelStateEngine(scheduler._repository)
+
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
             ScheduleType.SCHEDULE: ScheduleSessionsHandler(
@@ -65,6 +82,9 @@ class ScheduleCoordinator:
                 scheduler, self, self._scheduling_controller
             ),
             ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
+            ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(scheduler),
+            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(scheduler),
+            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(scheduler),
         }
 
     async def process_schedule(
@@ -113,3 +133,33 @@ class ScheduleCoordinator:
             return False
 
         return await self.process_schedule(schedule_type)
+
+    # Kernel event handling methods using the coordinator's kernel state engine
+
+    async def handle_kernel_pulling(self, event: KernelPullingAnycastEvent) -> bool:
+        """Handle kernel pulling event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_pulling(event)
+
+    async def handle_kernel_creating(self, event: KernelCreatingAnycastEvent) -> bool:
+        """Handle kernel creating event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_creating(event)
+
+    async def handle_kernel_running(self, event: KernelStartedAnycastEvent) -> bool:
+        """Handle kernel running event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_running(event)
+
+    async def handle_kernel_preparing(self, event: KernelPreparingAnycastEvent) -> bool:
+        """Handle kernel preparing event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_preparing(event)
+
+    async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
+        """Handle kernel cancelled event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_cancelled(event)
+
+    async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
+        """Handle kernel terminated event through the kernel state engine."""
+        return await self._kernel_state_engine.mark_kernel_terminated(event)
+
+    async def handle_kernel_heartbeat(self, event: KernelHeartbeatEvent) -> bool:
+        """Handle kernel heartbeat event through the kernel state engine."""
+        return await self._kernel_state_engine.update_kernel_heartbeat(event)

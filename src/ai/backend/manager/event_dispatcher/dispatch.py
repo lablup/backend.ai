@@ -82,6 +82,7 @@ from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEv
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -105,6 +106,7 @@ class DispatcherArgs:
     scheduler_dispatcher: SchedulerDispatcher
     schedule_coordinator: ScheduleCoordinator
     scheduling_controller: SchedulingController
+    scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
@@ -135,12 +137,15 @@ class Dispatchers:
             args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
         )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
+
         self._kernel_event_handler = KernelEventHandler(
             args.valkey_container_log,
             args.valkey_stat,
             args.valkey_stream,
             args.agent_registry,
             args.db,
+            args.schedule_coordinator,
+            args.use_sokovan,
         )
         self._schedule_event_handler = ScheduleEventHandler(
             args.scheduler_dispatcher,

@@ -52,6 +52,13 @@ class ScheduleType(StrEnum):
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions
     TERMINATE = "terminate"  # Terminate sessions
+    CHECK_PULLING_PROGRESS = "check_pulling_progress"  # Check if PULLING sessions can transition
+    CHECK_CREATING_PROGRESS = (
+        "check_creating_progress"  # Check if CREATING sessions can transition to RUNNING
+    )
+    CHECK_TERMINATING_PROGRESS = (
+        "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
+    )
 
 
 def merge_resource(

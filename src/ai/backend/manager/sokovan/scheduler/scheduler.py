@@ -656,3 +656,77 @@ class Scheduler:
             )
 
         return ScheduleResult(succeeded_count=len(timed_out_sessions))
+
+    async def check_pulling_progress(self) -> ScheduleResult:
+        """
+        Check if sessions in PULLING state have all kernels ready to progress.
+        Sessions with all kernels past PULLING state can move to next phase.
+
+        :return: ScheduleResult with the count of sessions that progressed
+        """
+        try:
+            # Check sessions with all kernels past PULLING state
+            sessions_to_update = await self._repository.get_sessions_ready_to_create()
+
+            if sessions_to_update:
+                # Sessions are already SessionIds, no extraction needed
+                # Update sessions to CREATING state
+                await self._repository.update_sessions_to_creating(sessions_to_update)
+
+                log.info("Updated {} sessions from PULLING to CREATING", len(sessions_to_update))
+
+            return ScheduleResult(succeeded_count=len(sessions_to_update))
+        except Exception as e:
+            log.error("Failed to check pulling progress: {}", e, exc_info=True)
+            return ScheduleResult(succeeded_count=0)
+
+    async def check_creating_progress(self) -> ScheduleResult:
+        """
+        Check if sessions in CREATING/PREPARING state have all kernels RUNNING.
+        Sessions with all kernels RUNNING can transition to RUNNING state.
+
+        :return: ScheduleResult with the count of sessions that transitioned to RUNNING
+        """
+        try:
+            # Check sessions with all kernels RUNNING
+            sessions_to_update = await self._repository.get_sessions_ready_to_run()
+
+            if sessions_to_update:
+                # Sessions are already SessionIds, no extraction needed
+                # Update sessions to RUNNING state
+                await self._repository.update_sessions_to_running(sessions_to_update)
+
+                log.info(
+                    "Updated {} sessions from CREATING/PREPARING to RUNNING",
+                    len(sessions_to_update),
+                )
+
+            return ScheduleResult(succeeded_count=len(sessions_to_update))
+        except Exception as e:
+            log.error("Failed to check creating progress: {}", e, exc_info=True)
+            return ScheduleResult(succeeded_count=0)
+
+    async def check_terminating_progress(self) -> ScheduleResult:
+        """
+        Check if sessions in TERMINATING state have all kernels TERMINATED.
+        Sessions with all kernels TERMINATED can transition to TERMINATED state.
+
+        :return: ScheduleResult with the count of sessions that transitioned to TERMINATED
+        """
+        try:
+            # Check sessions with all kernels TERMINATED
+            sessions_to_update = await self._repository.get_sessions_ready_to_terminate()
+
+            if sessions_to_update:
+                # Sessions are already SessionIds, no extraction needed
+                # Update sessions to TERMINATED state
+                await self._repository.update_sessions_to_terminated(sessions_to_update)
+
+                log.info(
+                    "Updated {} sessions from TERMINATING to TERMINATED", len(sessions_to_update)
+                )
+
+            return ScheduleResult(succeeded_count=len(sessions_to_update))
+        except Exception as e:
+            log.error("Failed to check terminating progress: {}", e, exc_info=True)
+            return ScheduleResult(succeeded_count=0)
