@@ -70,7 +70,7 @@ class ClientPool:
         cleanup_interval_seconds: float = 600,
     ) -> None:
         frame = inspect.stack()[1]
-        self._caller_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
+        self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
             name=f"_cleanup_task from {self!r}",
@@ -92,7 +92,9 @@ class ClientPool:
         self._clients.clear()
 
     def __repr__(self) -> str:
-        return f"<http_client.ClientPool created at {self._caller_info}>"
+        return (
+            f"<http_client.ClientPool object at {hex(id(self))} created from {self._creator_info}>"
+        )
 
     def __del__(self) -> None:
         if self._clients:

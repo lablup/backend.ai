@@ -1,3 +1,7 @@
-from .client_pool import ClientPool
+from .client_pool import (
+    ClientKey,
+    ClientPool,
+    tcp_client_session_factory,
+)
 
-__all__ = ["ClientPool"]
+__all__ = ["ClientKey", "ClientPool", "tcp_client_session_factory"]
