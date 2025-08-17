@@ -63,7 +63,11 @@ class ClientPool:
     _clients: MutableMapping[ClientKey, _Client]
     _cleanup_task: asyncio.Task[None]
 
-    def __init__(self, factory: ClientSessionFactory, cleanup_interval_seconds: int = 600) -> None:
+    def __init__(
+        self,
+        factory: ClientSessionFactory,
+        cleanup_interval_seconds: float = 600,
+    ) -> None:
         self._client_session_factory = factory
         self._clients = {}
 
@@ -86,7 +90,7 @@ class ClientPool:
             await client.session.close()
         self._clients.clear()
 
-    async def _cleanup_loop(self, cleanup_interval_seconds: int) -> None:
+    async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:
         while True:
             await asyncio.sleep(cleanup_interval_seconds)
             now = time.perf_counter()
