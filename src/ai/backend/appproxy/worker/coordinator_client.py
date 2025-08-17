@@ -12,7 +12,6 @@ from ai.backend.appproxy.common.exceptions import (
     ServerMisconfiguredError,
     WorkerRegistrationError,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     FrontendMode,
     FrontendServerMode,
@@ -20,6 +19,7 @@ from ai.backend.appproxy.common.types import (
     Slot,
 )
 from ai.backend.appproxy.common.types import SerializableToken as Token
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import (
     LAST_USED_MARKER_SOCKET_NAME,

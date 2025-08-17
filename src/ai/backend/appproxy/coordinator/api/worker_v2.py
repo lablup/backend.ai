@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
@@ -36,6 +35,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
 from ..models.utils import execute_with_txn_retry

@@ -2,11 +2,11 @@ import logging
 from abc import ABCMeta, abstractmethod
 from typing import Generic, TypeVar
 
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
 from ai.backend.appproxy.worker.types import Circuit, RootContext, TCircuitKey
+from ai.backend.logging import BraceStyleAdapter
 
 from ..backend.abc import AbstractBackend
 

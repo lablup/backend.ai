@@ -10,8 +10,8 @@ import aiotools
 from aiohttp import ClientConnectorError, web
 
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractBackend, HttpRequest
 

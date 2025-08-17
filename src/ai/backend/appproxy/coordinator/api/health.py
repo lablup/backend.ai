@@ -10,10 +10,10 @@ import sqlalchemy as sa
 from aiohttp import web
 from pydantic import BaseModel
 
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import AppMode, CORSOptions, PydanticResponse, WebMiddleware
 from ai.backend.appproxy.common.utils import pydantic_api_response_handler
 from ai.backend.common.types import ModelServiceStatus
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..models import Circuit, Endpoint, Worker

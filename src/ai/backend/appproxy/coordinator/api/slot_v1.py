@@ -8,7 +8,6 @@ import aiohttp_cors
 from aiohttp import web
 from pydantic import BaseModel, Field
 
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     CORSOptions,
     PydanticResponse,
@@ -17,6 +16,7 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Circuit
 from ..types import RootContext

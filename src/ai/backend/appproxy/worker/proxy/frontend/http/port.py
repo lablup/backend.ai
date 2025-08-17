@@ -8,8 +8,8 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractHTTPFrontend
 

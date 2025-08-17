@@ -9,7 +9,6 @@ from aiohttp import web
 from ai.backend.appproxy.common.exceptions import (
     ServerMisconfiguredError,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
@@ -17,6 +16,7 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractFrontend
 
