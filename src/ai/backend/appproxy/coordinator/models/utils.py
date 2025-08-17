@@ -39,8 +39,8 @@ from tenacity import (
 )
 
 from ai.backend.appproxy.common.exceptions import DatabaseError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.json import ExtendedJSONEncoder
+from ai.backend.logging import BraceStyleAdapter
 
 from ..config import ServerConfig
 

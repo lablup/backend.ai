@@ -8,7 +8,6 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.exceptions import BackendError, InvalidCredentials
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -19,6 +18,7 @@ from ai.backend.appproxy.worker.types import (
     RootContext,
     TCircuitKey,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..base import BaseFrontend
 

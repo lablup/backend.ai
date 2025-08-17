@@ -18,7 +18,6 @@ from ai.backend.appproxy.common.exceptions import (
     PortNotAvailable,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     EndpointConfig,
@@ -28,6 +27,7 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
 from .circuit import Circuit

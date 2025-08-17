@@ -14,13 +14,13 @@ from aiohttp import ClientConnectorError, web
 from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend, HttpRequest
 
