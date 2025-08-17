@@ -101,7 +101,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.logging.utils import BraceStyleAdapter as LoggingBraceStyleAdapter
 
 from . import __version__
 from .config import ServerConfig
@@ -671,7 +670,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log_level=root_ctx.local_config.otel.log_level,
             endpoint=root_ctx.local_config.otel.endpoint,
         )
-        LoggingBraceStyleAdapter.apply_otel(otel_spec)
+        BraceStyleAdapter.apply_otel(otel_spec)
     yield
     sd_loop.close()
 

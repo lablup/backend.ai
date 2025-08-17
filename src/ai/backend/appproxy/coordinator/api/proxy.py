@@ -24,7 +24,7 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-from ai.backend.logginglogging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Circuit, Token, Worker, add_circuit
 from ..models.utils import execute_with_txn_retry
