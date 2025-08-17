@@ -6,7 +6,7 @@ import random
 import time
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Any, AsyncIterator, Final, override
+from typing import AsyncIterator, Final, override
 
 import aiohttp
 import aiotools
@@ -42,11 +42,12 @@ class HTTPBackend(BaseBackend):
             sock_connect=10.0,
             sock_read=None,
         )
-        client_opts: dict[str, Any] = {
-            "auto_decompress": False,
-        }
         self.client_pool = ClientPool(
-            partial(tcp_client_session_factory, timeout=client_timeout, **client_opts)
+            partial(
+                tcp_client_session_factory,
+                timeout=client_timeout,
+                auto_decompress=False,
+            )
         )
 
     @override
@@ -177,6 +178,8 @@ class HTTPBackend(BaseBackend):
                 await response.drain()
 
                 return response
+        except ConnectionResetError:
+            raise asyncio.CancelledError()
         except aiohttp.ClientOSError as e:
             raise ContainerConnectionRefused from e
         except:

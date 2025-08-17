@@ -25,6 +25,7 @@ def tcp_client_session_factory(
     limit: int = 100,
     limit_per_host: int = 0,
     timeout: Optional[aiohttp.ClientTimeout] = None,
+    **kwargs,
 ) -> aiohttp.ClientSession:
     connector = aiohttp.TCPConnector(
         ssl=ssl,
@@ -35,16 +36,17 @@ def tcp_client_session_factory(
         connector=connector,
         base_url=key.endpoint,
         timeout=timeout,
+        **kwargs,
     )
 
 
-@dataclass
+@dataclass(slots=True)
 class _Client:
     session: aiohttp.ClientSession
     last_used: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientKey:
     endpoint: str
     """The URL or unique identifier of the target server."""
