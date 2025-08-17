@@ -14,7 +14,7 @@ from ai.backend.common.events.user_event.user_bgtask_event import (
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -9,8 +9,8 @@ import aiohttp_cors
 import attrs
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.health import (
     SQLAlchemyConnectionInfo,

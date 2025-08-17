@@ -10,7 +10,7 @@ from ai.backend.manager.services.session.actions.shutdown_service import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -35,7 +35,7 @@ SHUTDOWN_SERVICE_MOCK = None
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Shutdown service",
                 ShutdownServiceAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -63,7 +63,7 @@ SHUTDOWN_SERVICE_MOCK = None
 async def test_shutdown_service(
     mock_shutdown_service_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[ShutdownServiceAction, ShutdownServiceActionResult],
+    test_scenario: ScenarioBase[ShutdownServiceAction, ShutdownServiceActionResult],
 ):
     # Expected result will use the session data from the database fixture
     assert test_scenario.expected is not None

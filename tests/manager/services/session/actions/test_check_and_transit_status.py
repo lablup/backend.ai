@@ -13,7 +13,7 @@ from ai.backend.manager.services.session.actions.check_and_transit_status import
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -59,7 +59,7 @@ CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNN
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Check and transit status",
             CheckAndTransitStatusAction(
                 user_id=SESSION_FIXTURE_DATA.user_uuid,
@@ -86,6 +86,6 @@ async def test_check_and_transit_status(
     mock_session_lifecycle_dependencies,
     mock_trigger_batch_execution_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CheckAndTransitStatusAction, CheckAndTransitStatusActionResult],
+    test_scenario: ScenarioBase[CheckAndTransitStatusAction, CheckAndTransitStatusActionResult],
 ):
     await test_scenario.test(processors.check_and_transit_status.wait_for_complete)

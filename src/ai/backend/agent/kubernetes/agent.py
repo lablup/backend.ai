@@ -28,6 +28,7 @@ from typing import (
 import aiotools
 import cattr
 import pkg_resources
+from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
@@ -733,17 +734,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     raise
 
         arguments: List[Tuple[Optional[functools.partial], Optional[functools.partial]]] = []
-        node_ports = []
 
         try:
-            expose_service_api_response = await core_api.create_namespaced_service(
+            expose_service_api_response: V1Service = await core_api.create_namespaced_service(
                 "backend-ai", body=expose_service.to_dict()
             )
         except Exception as e:
             log.exception("Error while rollup: {}", e)
             raise
 
-        node_ports = expose_service_api_response.spec.ports
+        assert expose_service_api_response.spec is not None
+        node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
             functools.partial(
@@ -772,7 +773,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         await rollup(arguments)
 
-        assigned_ports: MutableMapping[str, int] = {}
+        assigned_ports: MutableMapping[int, int] = {}
         for port in node_ports:
             assigned_ports[port.port] = port.node_port
 

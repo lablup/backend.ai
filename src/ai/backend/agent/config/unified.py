@@ -179,8 +179,9 @@ class CoreDumpConfig(BaseModel):
             )
         return self._core_path
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
 
 class DebugConfig(BaseModel):
@@ -708,9 +709,10 @@ class ContainerConfig(BaseModel):
         serialization_alias="swarm-enabled",
     )
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
 
     @field_validator("port_range", mode="before")
     @classmethod
@@ -758,9 +760,10 @@ class ResourceConfig(BaseModel):
         serialization_alias="affinity-policy",
     )
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
 
     @field_validator("affinity_policy", mode="before")
     @classmethod
@@ -818,8 +821,9 @@ class ContainerLogsConfig(BaseModel):
         serialization_alias="chunk-size",
     )
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
 
 class APIConfig(BaseModel):
@@ -951,5 +955,6 @@ class AgentUnifiedConfig(BaseModel):
     )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )

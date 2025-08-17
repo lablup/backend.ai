@@ -8,6 +8,7 @@ from typing import Any, Optional
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
     FilePath,
     HttpUrl,
@@ -1123,5 +1124,6 @@ class WebServerUnifiedConfig(BaseModel):
     )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )

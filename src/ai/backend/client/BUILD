@@ -1,5 +1,6 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",
         ":resources",

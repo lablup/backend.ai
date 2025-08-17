@@ -16,7 +16,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ class TestGetModelServiceInfo:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "full info lookup",
                 GetModelServiceInfoAction(
                     requester_ctx=RequesterCtx(
@@ -83,7 +83,7 @@ class TestGetModelServiceInfo:
                     ),
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN permission lookup",
                 GetModelServiceInfoAction(
                     requester_ctx=RequesterCtx(
@@ -123,7 +123,7 @@ class TestGetModelServiceInfo:
     @pytest.mark.asyncio
     async def test_get_model_service_info(
         self,
-        scenario: TestScenario[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
+        scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_get_info,
         mock_get_endpoint_by_id_force_get_info,
