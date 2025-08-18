@@ -136,7 +136,12 @@ class Dispatchers:
         self._agent_event_handler = AgentEventHandler(
             args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
         )
-        self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
+        self._image_event_handler = ImageEventHandler(
+            args.agent_registry,
+            args.db,
+            args.use_sokovan,
+            args.schedule_coordinator,
+        )
 
         self._kernel_event_handler = KernelEventHandler(
             args.valkey_container_log,

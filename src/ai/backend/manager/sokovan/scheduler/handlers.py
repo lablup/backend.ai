@@ -4,18 +4,14 @@ Schedule operation handlers that bundle the operation with its post-processing l
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, final
+from typing import final
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .results import ScheduleResult
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-    from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -68,8 +64,6 @@ class ScheduleHandler(ABC):
                 await self.post_process(result)
             except Exception as e:
                 log.error("Error during post-processing: {}", e)
-                # Handle any exceptions that occur during post-processing
-                # This could be logging, retrying, or other error handling logic
         return result
 
 
@@ -78,12 +72,10 @@ class ScheduleSessionsHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
-        coordinator: "ScheduleCoordinator",
-        scheduling_controller: "SchedulingController",
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
-        self._coordinator = coordinator
         self._scheduling_controller = scheduling_controller
 
     @classmethod
@@ -100,7 +92,7 @@ class ScheduleSessionsHandler(ScheduleHandler):
         """Request precondition check if sessions were scheduled."""
         # Request next phase
         await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
-        log.trace("Scheduled {} sessions, requesting precondition check", result.succeeded_count)
+        log.info("Scheduled {} sessions, requesting precondition check", result.succeeded_count)
 
 
 class CheckPreconditionHandler(ScheduleHandler):
@@ -108,14 +100,10 @@ class CheckPreconditionHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
-        coordinator: "ScheduleCoordinator",
-        dispatcher: "SchedulerDispatcher",
-        scheduling_controller: "SchedulingController",
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
-        self._coordinator = coordinator
-        self._dispatcher = dispatcher
         self._scheduling_controller = scheduling_controller
 
     @classmethod
@@ -125,13 +113,11 @@ class CheckPreconditionHandler(ScheduleHandler):
 
     async def execute(self) -> ScheduleResult:
         """Check preconditions for scheduled sessions."""
-        # TODO: Remove dispatcher
-        await self._dispatcher.check_precond("do_check_precond")
-        log.debug("Checking preconditions")
-        return ScheduleResult()
+        return await self._scheduler.check_preconditions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if preconditions are met."""
+        log.info("Checked preconditions for {} sessions", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
 
 
@@ -140,15 +126,9 @@ class StartSessionsHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
-        coordinator: "ScheduleCoordinator",
-        dispatcher: "SchedulerDispatcher",
-        scheduling_controller: "SchedulingController",
+        scheduler: Scheduler,
     ):
         self._scheduler = scheduler
-        self._coordinator = coordinator
-        self._dispatcher = dispatcher
-        self._scheduling_controller = scheduling_controller
 
     @classmethod
     def name(cls) -> str:
@@ -157,14 +137,11 @@ class StartSessionsHandler(ScheduleHandler):
 
     async def execute(self) -> ScheduleResult:
         """Start sessions that passed precondition checks."""
-        # TODO: Remove dispatcher
-        await self._dispatcher.start("do_start_session")
-        log.debug("Starting sessions")
-        return ScheduleResult()
+        return await self._scheduler.start_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of started sessions."""
-        log.trace("Started {} sessions", result.succeeded_count)
+        log.info("Started {} sessions", result.succeeded_count)
 
 
 class TerminateSessionsHandler(ScheduleHandler):
@@ -172,12 +149,10 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
-        coordinator: "ScheduleCoordinator",
-        scheduling_controller: "SchedulingController",
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
-        self._coordinator = coordinator
         self._scheduling_controller = scheduling_controller
 
     @classmethod
@@ -192,7 +167,7 @@ class TerminateSessionsHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
         await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
-        log.trace("Terminated {} sessions", result.succeeded_count)
+        log.info("Terminated {} sessions", result.succeeded_count)
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -200,7 +175,7 @@ class SweepSessionsHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
+        scheduler: Scheduler,
     ):
         self._scheduler = scheduler
 
@@ -219,13 +194,15 @@ class SweepSessionsHandler(ScheduleHandler):
 
 
 class CheckPullingProgressHandler(ScheduleHandler):
-    """Handler for checking if PULLING sessions are ready to transition."""
+    """Handler for checking if PULLING or PREPARING sessions are ready to transition to PREPARED."""
 
     def __init__(
         self,
-        scheduler: "Scheduler",
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     def name(cls) -> str:
@@ -237,9 +214,9 @@ class CheckPullingProgressHandler(ScheduleHandler):
         return await self._scheduler.check_pulling_progress()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of sessions that transitioned from PULLING."""
-        if result.succeeded_count > 0:
-            log.debug("{} sessions progressed from PULLING state", result.succeeded_count)
+        """Request START scheduling if sessions transitioned to PREPARED."""
+        log.info("{} sessions transitioned to PREPARED state", result.succeeded_count)
+        await self._scheduling_controller.request_scheduling(ScheduleType.START)
 
 
 class CheckCreatingProgressHandler(ScheduleHandler):
@@ -247,7 +224,7 @@ class CheckCreatingProgressHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
+        scheduler: Scheduler,
     ):
         self._scheduler = scheduler
 
@@ -262,8 +239,7 @@ class CheckCreatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to RUNNING."""
-        if result.succeeded_count > 0:
-            log.info("{} sessions transitioned to RUNNING state", result.succeeded_count)
+        log.info("{} sessions transitioned to RUNNING state", result.succeeded_count)
 
 
 class CheckTerminatingProgressHandler(ScheduleHandler):
@@ -271,7 +247,7 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
 
     def __init__(
         self,
-        scheduler: "Scheduler",
+        scheduler: Scheduler,
     ):
         self._scheduler = scheduler
 
@@ -286,5 +262,4 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to TERMINATED."""
-        if result.succeeded_count > 0:
-            log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)
+        log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)

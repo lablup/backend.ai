@@ -6,18 +6,12 @@ All database operations go through the repository pattern.
 """
 
 import logging
+from typing import Optional
 
-from ai.backend.common.events.event_types.kernel.anycast import (
-    KernelCancelledAnycastEvent,
-    KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
-    KernelPreparingAnycastEvent,
-    KernelPullingAnycastEvent,
-    KernelStartedAnycastEvent,
-    KernelTerminatedAnycastEvent,
-)
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.types import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -46,182 +40,287 @@ class KernelStateEngine:
 
     async def mark_kernel_pulling(
         self,
-        event: KernelPullingAnycastEvent,
+        kernel_id: KernelId,
+        reason: str,
     ) -> bool:
         """
         Mark a kernel as PULLING when starting to pull its image.
 
-        :param event: The kernel pulling event
+        :param kernel_id: The kernel ID
+        :param reason: The reason for the state change
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as PULLING", event.kernel_id)
+        log.debug("Marking kernel {} as PULLING", kernel_id)
 
-        # Use the repository's db_source to update kernel status
-        success = await self._repository._db_source.update_kernel_status_pulling(
-            event.kernel_id, event.session_id, event.reason
-        )
+        # Use the repository to update kernel status
+        success = await self._repository.update_kernel_status_pulling(kernel_id, reason)
 
         if success:
-            log.info("Kernel {} marked as PULLING", event.kernel_id)
+            log.info("Kernel {} marked as PULLING", kernel_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as PULLING - may not be in SCHEDULED state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def mark_kernel_creating(
         self,
-        event: KernelCreatingAnycastEvent,
+        kernel_id: KernelId,
+        reason: str,
     ) -> bool:
         """
         Mark a kernel as CREATING when starting to create its container.
 
-        :param event: The kernel creating event
+        :param kernel_id: The kernel ID
+        :param reason: The reason for the state change
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as CREATING", event.kernel_id)
+        log.debug("Marking kernel {} as CREATING", kernel_id)
 
-        success = await self._repository._db_source.update_kernel_status_creating(
-            event.kernel_id, event.session_id, event.reason
-        )
+        success = await self._repository.update_kernel_status_creating(kernel_id, reason)
 
         if success:
-            log.info("Kernel {} marked as CREATING", event.kernel_id)
+            log.info("Kernel {} marked as CREATING", kernel_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as CREATING - may not be in PULLING state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def mark_kernel_running(
         self,
-        event: KernelStartedAnycastEvent,
+        kernel_id: KernelId,
+        reason: str,
+        creation_info: KernelCreationInfo,
     ) -> bool:
         """
         Mark a kernel as RUNNING when its container is successfully started.
 
-        :param event: The kernel started event with creation info
+        :param kernel_id: The kernel ID
+        :param reason: The reason for the state change
+        :param creation_info: Creation information as dataclass
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as RUNNING", event.kernel_id)
+        log.debug("Marking kernel {} as RUNNING", kernel_id)
 
-        success = await self._repository._db_source.update_kernel_status_running(
-            event.kernel_id,
-            event.session_id,
-            event.reason,
-            dict(event.creation_info) if event.creation_info else {},
+        success = await self._repository.update_kernel_status_running(
+            kernel_id,
+            reason,
+            creation_info,
         )
 
         if success:
-            log.info("Kernel {} marked as RUNNING", event.kernel_id)
+            log.info("Kernel {} marked as RUNNING", kernel_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as RUNNING - may not be in CREATING state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def mark_kernel_preparing(
         self,
-        event: KernelPreparingAnycastEvent,
+        kernel_id: KernelId,
     ) -> bool:
         """
         Mark a kernel as PREPARING when starting preparation phase.
 
-        :param event: The kernel preparing event
+        :param kernel_id: The kernel ID
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as PREPARING", event.kernel_id)
+        log.debug("Marking kernel {} as PREPARING", kernel_id)
 
-        success = await self._repository._db_source.update_kernel_status_preparing(
-            event.kernel_id, event.session_id
-        )
+        success = await self._repository.update_kernel_status_preparing(kernel_id)
 
         if success:
-            log.info("Kernel {} marked as PREPARING", event.kernel_id)
+            log.info("Kernel {} marked as PREPARING", kernel_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as PREPARING - may not be in SCHEDULED state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def mark_kernel_cancelled(
         self,
-        event: KernelCancelledAnycastEvent,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
     ) -> bool:
         """
         Mark a kernel as CANCELLED when it's cancelled before running.
+        Also checks if the session should be cancelled when all kernels are cancelled.
 
-        :param event: The kernel cancelled event
+        :param kernel_id: The kernel ID
+        :param session_id: The session ID (used for session cancellation check)
+        :param reason: The reason for cancellation
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as CANCELLED: {}", event.kernel_id, event.reason)
+        log.debug("Marking kernel {} as CANCELLED: {}", kernel_id, reason)
 
-        success = await self._repository._db_source.update_kernel_status_cancelled(
-            event.kernel_id, event.session_id, event.reason
-        )
+        success = await self._repository.update_kernel_status_cancelled(kernel_id, reason)
 
         if success:
-            log.info("Kernel {} marked as CANCELLED", event.kernel_id)
+            log.info("Kernel {} marked as CANCELLED", kernel_id)
+            # Check if the session should be cancelled when all kernels are cancelled
+            await self._repository.check_and_cancel_session_if_needed(session_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as CANCELLED - may already be running or terminated",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def mark_kernel_terminated(
         self,
-        event: KernelTerminatedAnycastEvent,
+        kernel_id: KernelId,
+        reason: str,
+        exit_code: Optional[int] = None,
     ) -> bool:
         """
         Mark a kernel as TERMINATED when it's terminated.
 
-        :param event: The kernel terminated event
+        :param kernel_id: The kernel ID
+        :param reason: The reason for termination
+        :param exit_code: Optional exit code
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as TERMINATED: {}", event.kernel_id, event.reason)
+        log.debug("Marking kernel {} as TERMINATED: {}", kernel_id, reason)
 
-        success = await self._repository._db_source.update_kernel_status_terminated(
-            event.kernel_id, event.session_id, event.reason, event.exit_code
+        success = await self._repository.update_kernel_status_terminated(
+            kernel_id, reason, exit_code
         )
 
         if success:
-            log.info("Kernel {} marked as TERMINATED", event.kernel_id)
+            log.info("Kernel {} marked as TERMINATED", kernel_id)
         else:
             log.warning(
                 "Failed to mark kernel {} as TERMINATED - may not be in TERMINATING state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
 
     async def update_kernel_heartbeat(
         self,
-        event: KernelHeartbeatEvent,
+        kernel_id: KernelId,
     ) -> bool:
         """
         Update the heartbeat timestamp for a running kernel.
 
-        :param event: The kernel heartbeat event
+        :param kernel_id: The kernel ID
         :return: True if the update was successful
         """
-        log.trace("Updating heartbeat for kernel {}", event.kernel_id)
+        log.trace("Updating heartbeat for kernel {}", kernel_id)
 
-        success = await self._repository._db_source.update_kernel_heartbeat(event.kernel_id)
+        success = await self._repository.update_kernel_heartbeat(kernel_id)
 
         if not success:
             log.warning(
                 "Failed to update heartbeat for kernel {} - may not be in RUNNING state",
-                event.kernel_id,
+                kernel_id,
             )
 
         return success
+
+    async def update_kernels_to_pulling_for_image(
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: Optional[str] = None,
+    ) -> None:
+        """
+        Update kernel status from PREPARING to PULLING for the specified image on an agent.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference
+        """
+        log.info(
+            "Updating kernels to PULLING for agent:{} image:{}",
+            agent_id,
+            image,
+        )
+
+        updated_count = await self._repository.update_kernels_to_pulling_for_image(
+            agent_id, image, image_ref
+        )
+
+        if updated_count > 0:
+            log.info(
+                "Updated {} kernels to PULLING state for agent:{} image:{}",
+                updated_count,
+                agent_id,
+                image,
+            )
+
+    async def update_kernels_to_prepared_for_image(
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: Optional[str] = None,
+    ) -> None:
+        """
+        Update kernel status to PREPARED for the specified image on an agent.
+        Updates kernels in both PULLING and PREPARING states.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference
+        """
+        log.info(
+            "Updating kernels to PREPARED for agent:{} image:{}",
+            agent_id,
+            image,
+        )
+
+        updated_count = await self._repository.update_kernels_to_prepared_for_image(
+            agent_id, image, image_ref
+        )
+
+        if updated_count > 0:
+            log.info(
+                "Updated {} kernels to PREPARED state for agent:{} image:{}",
+                updated_count,
+                agent_id,
+                image,
+            )
+
+    async def cancel_kernels_for_failed_image(
+        self,
+        agent_id: AgentId,
+        image: str,
+        error_msg: str,
+        image_ref: Optional[str] = None,
+    ) -> None:
+        """
+        Cancel kernels for an image that failed to be available on an agent.
+
+        :param agent_id: The agent ID where the image is unavailable
+        :param image: The image name that failed
+        :param error_msg: The error message to include in status
+        :param image_ref: Optional image reference
+        """
+        log.warning(
+            "Cancelling kernels for failed image on agent:{} image:{}, msg:{}",
+            agent_id,
+            image,
+            error_msg,
+        )
+
+        affected_session_ids = await self._repository.cancel_kernels_for_failed_image(
+            agent_id, image, error_msg, image_ref
+        )
+
+        if affected_session_ids:
+            log.info(
+                "Cancelled kernels due to image failure for sessions: {}",
+                affected_session_ids,
+            )

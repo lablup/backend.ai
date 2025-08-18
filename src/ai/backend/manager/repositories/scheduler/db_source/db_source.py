@@ -26,6 +26,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models import (
     AgentRow,
     AgentStatus,
@@ -51,9 +52,18 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     AllocationBatch,
+    ImageConfigData,
+    ImageIdentifier,
+    KernelBindingData,
+    KernelCreationInfo,
+    KernelStartData,
     KeypairOccupancy,
     KeyPairResourcePolicy,
+    PreparedSessionData,
+    PreparedSessionsWithImages,
     ResourceOccupancySnapshot,
+    ScheduledSessionData,
+    ScheduledSessionsWithImages,
     SchedulingFailure,
     SessionAllocation,
     SessionDependencyInfo,
@@ -809,7 +819,7 @@ class ScheduleDBSource:
 
     async def enqueue_session(
         self,
-        session_data: "SessionEnqueueData",
+        session_data: SessionEnqueueData,
     ) -> SessionId:
         """
         Create new session and kernel records in PENDING status.
@@ -940,7 +950,7 @@ class ScheduleDBSource:
 
     async def fetch_session_creation_data(
         self,
-        spec: "SessionCreationSpec",
+        spec: SessionCreationSpec,
         scaling_group_name: str,
         storage_manager,
         allowed_vfolder_types: list[str],
@@ -1017,7 +1027,7 @@ class ScheduleDBSource:
 
     async def fetch_session_creation_context(
         self,
-        spec: "SessionCreationSpec",
+        spec: SessionCreationSpec,
         scaling_group_name: str,
     ) -> "SessionCreationContext":
         """
@@ -1113,7 +1123,7 @@ class ScheduleDBSource:
         domain_name: str,
         group_id: str,
         access_key: str,
-    ) -> list["AllowedScalingGroup"]:
+    ) -> list[AllowedScalingGroup]:
         """
         Query allowed scaling groups for a user (public method for external use).
         """
@@ -1231,7 +1241,7 @@ class ScheduleDBSource:
         domain_name: str,
         group_id: str,
         access_key: str,
-    ) -> list["AllowedScalingGroup"]:
+    ) -> list[AllowedScalingGroup]:
         """
         Query allowed scaling groups for the given user/group.
 
@@ -1633,15 +1643,12 @@ class ScheduleDBSource:
 
         return agent_slots
 
-    async def update_kernel_status_pulling(
-        self, kernel_id: UUID, session_id: SessionId, reason: str
-    ) -> bool:
+    async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:
         """
         Update kernel status to PULLING when pulling image.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :param reason: The reason for status change
         :return: True if update was successful, False otherwise
         """
@@ -1670,15 +1677,12 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return result.rowcount > 0
 
-    async def update_kernel_status_creating(
-        self, kernel_id: UUID, session_id: SessionId, reason: str
-    ) -> bool:
+    async def update_kernel_status_creating(self, kernel_id: UUID, reason: str) -> bool:
         """
         Update kernel status to CREATING when creating container.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :param reason: The reason for status change
         :return: True if update was successful, False otherwise
         """
@@ -1708,24 +1712,18 @@ class ScheduleDBSource:
             return result.rowcount > 0
 
     async def update_kernel_status_running(
-        self, kernel_id: UUID, session_id: SessionId, reason: str, creation_info: dict[str, Any]
+        self, kernel_id: UUID, reason: str, creation_info: KernelCreationInfo
     ) -> bool:
         """
         Update kernel status to RUNNING when container is started.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :param reason: The reason for status change
-        :param creation_info: Container creation information
+        :param creation_info: Container creation information as dataclass
         :return: True if update was successful, False otherwise
         """
         now = datetime.now(tzutc())
-
-        # Extract actual resource allocations
-        actual_allocs = ResourceSlot()
-        if "resource_spec" in creation_info and "allocations" in creation_info["resource_spec"]:
-            actual_allocs = ResourceSlot.from_json(creation_info["resource_spec"]["allocations"])
 
         async with self._db.begin_session() as db_sess:
             stmt = (
@@ -1740,14 +1738,14 @@ class ScheduleDBSource:
                     status=KernelStatus.RUNNING,
                     status_info=reason,
                     status_changed=now,
-                    occupied_slots=actual_allocs,
-                    container_id=creation_info.get("container_id"),
-                    attached_devices=creation_info.get("attached_devices", {}),
-                    repl_in_port=creation_info.get("repl_in_port"),
-                    repl_out_port=creation_info.get("repl_out_port"),
-                    stdin_port=creation_info.get("stdin_port"),
-                    stdout_port=creation_info.get("stdout_port"),
-                    service_ports=creation_info.get("service_ports", []),
+                    occupied_slots=creation_info.get_resource_allocations(),
+                    container_id=creation_info.container_id,
+                    attached_devices=creation_info.attached_devices,
+                    repl_in_port=creation_info.repl_in_port,
+                    repl_out_port=creation_info.repl_out_port,
+                    stdin_port=creation_info.stdin_port,
+                    stdout_port=creation_info.stdout_port,
+                    service_ports=creation_info.service_ports,
                     status_history=sql_json_merge(
                         KernelRow.status_history,
                         (),
@@ -1758,13 +1756,12 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return result.rowcount > 0
 
-    async def update_kernel_status_preparing(self, kernel_id: UUID, session_id: SessionId) -> bool:
+    async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """
         Update kernel status to PREPARING.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :return: True if update was successful, False otherwise
         """
         now = datetime.now(tzutc())
@@ -1792,15 +1789,12 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return result.rowcount > 0
 
-    async def update_kernel_status_cancelled(
-        self, kernel_id: UUID, session_id: SessionId, reason: str
-    ) -> bool:
+    async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
         """
         Update kernel status to CANCELLED.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :param reason: Cancellation reason
         :return: True if update was successful, False otherwise
         """
@@ -1837,14 +1831,13 @@ class ScheduleDBSource:
             return result.rowcount > 0
 
     async def update_kernel_status_terminated(
-        self, kernel_id: UUID, session_id: SessionId, reason: str, exit_code: Optional[int] = None
+        self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
     ) -> bool:
         """
         Update kernel status to TERMINATED.
         Uses UPDATE WHERE to ensure atomic state transition.
 
         :param kernel_id: Kernel ID to update
-        :param session_id: Session ID
         :param reason: Termination reason
         :param exit_code: Process exit code
         :return: True if update was successful, False otherwise
@@ -1906,17 +1899,194 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return result.rowcount > 0
 
-    async def get_sessions_ready_to_create(self) -> list[SessionId]:
+    async def update_kernels_to_pulling_for_image(
+        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+    ) -> int:
         """
-        Get sessions in PULLING state where all kernels have progressed past PULLING.
-        Returns session IDs that can transition to CREATING state.
+        Update kernel status from PREPARING to PULLING for the specified image on an agent.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference (canonical format)
+        :return: Number of kernels updated
+        """
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+            # Use image_ref if provided (canonical format), otherwise use image
+            image_to_match = image_ref if image_ref else image
+            # Find kernels on this agent with this image in PREPARING state
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.agent == agent_id,
+                        KernelRow.image == image_to_match,
+                        KernelRow.status == KernelStatus.PREPARING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.PULLING,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.PULLING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount
+
+    async def update_kernels_to_prepared_for_image(
+        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+    ) -> int:
+        """
+        Update kernel status to PREPARED for the specified image on an agent.
+        Updates kernels in both PULLING and PREPARING states.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference (canonical format)
+        :return: Number of kernels updated
+        """
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+            # Use image_ref if provided (canonical format), otherwise use image
+            image_to_match = image_ref if image_ref else image
+            # Find kernels on this agent with this image in PULLING or PREPARING state
+            # and update them to PREPARED
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.agent == agent_id,
+                        KernelRow.image == image_to_match,
+                        KernelRow.status.in_([
+                            KernelStatus.PULLING,
+                            KernelStatus.PREPARING,
+                        ]),
+                    )
+                )
+                .values(
+                    status=KernelStatus.PREPARED,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.PREPARED.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount
+
+    async def cancel_kernels_for_failed_image(
+        self, agent_id: AgentId, image: str, error_msg: str, image_ref: Optional[str] = None
+    ) -> set[SessionId]:
+        """
+        Cancel kernels for an image that failed to be available on an agent.
+        Returns session IDs that may need to be checked for full cancellation.
+
+        :param agent_id: The agent ID where the image is unavailable
+        :param image: The image name that failed
+        :param error_msg: The error message to include in status
+        :param image_ref: Optional image reference (canonical format)
+        :return: Set of affected session IDs
+        """
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+            # Use image_ref if provided (canonical format), otherwise use image
+            image_to_match = image_ref if image_ref else image
+            # Find and cancel kernels on this agent with this image in PULLING or PREPARING state
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.agent == agent_id,
+                        KernelRow.image == image_to_match,
+                        KernelRow.status.in_([
+                            KernelStatus.PULLING,
+                            KernelStatus.PREPARING,
+                        ]),
+                    )
+                )
+                .values(
+                    status=KernelStatus.CANCELLED,
+                    status_info=f"Image pull failed: {error_msg}",
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.CANCELLED.name: now.isoformat()},
+                    ),
+                )
+                .returning(KernelRow.session_id)
+            )
+            result = await db_sess.execute(stmt)
+            affected_session_ids = {row.session_id for row in result}
+            return affected_session_ids
+
+    async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
+        """
+        Check if a session should be cancelled when all its kernels are cancelled.
+
+        :param session_id: The session ID to check
+        :return: True if session was cancelled, False otherwise
+        """
+        async with self._db.begin_session() as db_sess:
+            # Check if all kernels for this session are cancelled
+            kernel_check = await db_sess.execute(
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id == session_id,
+                        KernelRow.status != KernelStatus.CANCELLED,
+                    )
+                )
+            )
+            non_cancelled_count = kernel_check.scalar()
+
+            if non_cancelled_count == 0:
+                # All kernels are cancelled, cancel the session
+                now = datetime.now(tzutc())
+                stmt = (
+                    sa.update(SessionRow)
+                    .where(
+                        sa.and_(
+                            SessionRow.id == session_id,
+                            SessionRow.status.not_in([
+                                SessionStatus.CANCELLED,
+                                SessionStatus.TERMINATED,
+                            ]),
+                        )
+                    )
+                    .values(
+                        status=SessionStatus.CANCELLED,
+                        status_info="All kernels cancelled",
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {SessionStatus.CANCELLED.name: now.isoformat()},
+                        ),
+                    )
+                )
+                result = await db_sess.execute(stmt)
+                return result.rowcount > 0
+        return False
+
+    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
+        """
+        Get sessions in PULLING or PREPARING state where all kernels are in PREPARED state.
+        Returns session IDs that can transition to PREPARED state.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in PULLING state where ALL kernels are past PULLING
-            # (i.e., all kernels are in CREATING, PREPARING, or RUNNING)
+            # Find sessions in PULLING or PREPARING state where ALL kernels are PREPARED (or beyond)
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.status == SessionStatus.PULLING)
+                .where(
+                    SessionRow.status.in_([
+                        SessionStatus.PULLING,
+                        SessionStatus.PREPARING,
+                    ])
+                )
                 .options(selectinload(SessionRow.kernels))
             )
             result = await db_sess.execute(stmt)
@@ -1924,59 +2094,61 @@ class ScheduleDBSource:
 
             ready_session_ids: list[SessionId] = []
             for session in sessions:
-                # Check if all kernels are past PULLING state
-                all_past_pulling = all(
-                    kernel.status
-                    in [
-                        KernelStatus.CREATING,
-                        KernelStatus.PREPARING,
-                        KernelStatus.RUNNING,
-                    ]
-                    for kernel in session.kernels
+                # Early exit if no kernels
+                if not session.kernels:
+                    continue
+
+                # Check if all kernels are in PREPARED state
+                all_prepared = all(
+                    kernel.status == KernelStatus.PREPARED for kernel in session.kernels
                 )
-                if all_past_pulling and session.kernels:  # Ensure there are kernels
+                if all_prepared:
                     ready_session_ids.append(session.id)
 
             return ready_session_ids
 
-    async def update_sessions_to_creating(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
-        Update sessions from PULLING to CREATING state.
+        Update sessions from PULLING or PREPARING to PREPARED state.
         """
         if not session_ids:
             return
 
         async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
             stmt = (
                 sa.update(SessionRow)
                 .where(
                     sa.and_(
                         SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.PULLING,
+                        SessionRow.status.in_([
+                            SessionStatus.PULLING,
+                            SessionStatus.PREPARING,
+                        ]),
                     )
                 )
                 .values(
-                    status=SessionStatus.CREATING,
-                    status_changed=datetime.now(tzutc()),
+                    status=SessionStatus.PREPARED,
+                    status_info=None,  # Clear any previous error status
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.PREPARED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(stmt)
 
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """
-        Get sessions in CREATING/PREPARING state where all kernels are RUNNING.
+        Get sessions in CREATING state where all kernels are RUNNING.
         Returns sessions that can transition to RUNNING state.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in CREATING or PREPARING state where ALL kernels are RUNNING
+            # Find sessions in CREATING state where ALL kernels are RUNNING
             stmt = (
                 sa.select(SessionRow)
-                .where(
-                    SessionRow.status.in_([
-                        SessionStatus.CREATING,
-                        SessionStatus.PREPARING,
-                    ])
-                )
+                .where(SessionRow.status == SessionStatus.CREATING)
                 .options(selectinload(SessionRow.kernels))
             )
             result = await db_sess.execute(stmt)
@@ -1995,26 +2167,29 @@ class ScheduleDBSource:
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
-        Update sessions from CREATING/PREPARING to RUNNING state.
+        Update sessions from CREATING to RUNNING state.
         """
         if not session_ids:
             return
 
         async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
             stmt = (
                 sa.update(SessionRow)
                 .where(
                     sa.and_(
                         SessionRow.id.in_(session_ids),
-                        SessionRow.status.in_([
-                            SessionStatus.CREATING,
-                            SessionStatus.PREPARING,
-                        ]),
+                        SessionRow.status == SessionStatus.CREATING,
                     )
                 )
                 .values(
                     status=SessionStatus.RUNNING,
-                    status_changed=datetime.now(tzutc()),
+                    status_info=None,  # Clear any previous error status
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.RUNNING.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(stmt)
@@ -2053,6 +2228,7 @@ class ScheduleDBSource:
             return
 
         async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
             # Update session status to TERMINATED
             stmt = (
                 sa.update(SessionRow)
@@ -2064,8 +2240,492 @@ class ScheduleDBSource:
                 )
                 .values(
                     status=SessionStatus.TERMINATED,
-                    status_changed=datetime.now(tzutc()),
-                    terminated_at=datetime.now(tzutc()),
+                    terminated_at=now,
+                    # Keep status_info if it contains termination reason, otherwise clear
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.TERMINATED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(stmt)
+
+    async def _resolve_image_configs(
+        self, db_sess: SASession, unique_images: set[ImageIdentifier]
+    ) -> dict[str, ImageConfigData]:
+        """
+        Resolve image configurations for the given unique images.
+
+        :param db_sess: Database session to use
+        :param unique_images: Set of ImageIdentifier objects to resolve
+        :return: Dictionary mapping image names to ImageConfigData
+        """
+        from sqlalchemy.orm import selectinload
+
+        from ai.backend.manager.models.image import ImageRow
+
+        if not unique_images:
+            return {}
+
+        image_configs: dict[str, ImageConfigData] = {}
+
+        # Build conditions for all images
+        # Note: KernelRow.image stores the canonical name (ImageRow.name), not ImageRow.image
+        conditions = []
+        for image_id in unique_images:
+            conditions.append(
+                sa.and_(
+                    ImageRow.name == image_id.image, ImageRow.architecture == image_id.architecture
+                )
+            )
+
+        # Query all images at once with registry info
+        stmt = (
+            sa.select(ImageRow)
+            .where(sa.or_(*conditions))
+            .options(selectinload(ImageRow.registry_row))
+        )
+
+        result = await db_sess.execute(stmt)
+        image_rows = result.scalars().all()
+
+        # Convert to ImageConfigData
+        for image_row in image_rows:
+            try:
+                img_ref = image_row.image_ref
+                registry_row = image_row.registry_row
+
+                image_config = ImageConfigData(
+                    canonical=img_ref.canonical,
+                    architecture=image_row.architecture,
+                    project=image_row.project,
+                    is_local=image_row.is_local,
+                    digest=image_row.trimmed_digest,
+                    labels=dict(image_row.labels),
+                    registry_name=img_ref.registry,
+                    registry_url=registry_row.url,
+                    registry_username=registry_row.username,
+                    registry_password=registry_row.password,
+                )
+                # Use the canonical name as key (which is what KernelRow.image contains)
+                image_configs[image_row.name] = image_config
+            except Exception as e:
+                log.error(f"Failed to process image {image_row.name}: {e}")
+                continue
+
+        return image_configs
+
+    async def get_scheduled_sessions_with_images(self) -> ScheduledSessionsWithImages:
+        """
+        Get sessions in SCHEDULED status for precondition checking with image configurations.
+        Returns ScheduledSessionsWithImages dataclass.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get scheduled sessions with their data
+            scheduled_sessions = await self._get_scheduled_sessions(db_sess)
+
+            # Collect unique images to resolve
+            unique_images: set[ImageIdentifier] = set()
+            for session in scheduled_sessions:
+                for kernel in session.kernels:
+                    unique_images.add(
+                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+                    )
+
+            # Resolve all images and build ImageConfigData
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return ScheduledSessionsWithImages(
+                sessions=scheduled_sessions, image_configs=image_configs
+            )
+
+    async def _get_scheduled_sessions(self, db_sess: SASession) -> list[ScheduledSessionData]:
+        """
+        Get sessions in SCHEDULED status for precondition checking.
+        Returns dataclass objects instead of SessionRow.
+        """
+        # Get sessions with SCHEDULED status and their kernels
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == SessionStatus.SCHEDULED)
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.scaling_group,
+                        KernelRow.image,
+                        KernelRow.architecture,
+                    )
+                )
+            )
+        )
+        result = await db_sess.execute(stmt)
+        sessions = result.scalars().all()
+
+        scheduled_sessions: list[ScheduledSessionData] = []
+        for session in sessions:
+            kernel_bindings = [
+                KernelBindingData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                )
+                for kernel in session.kernels
+            ]
+            scheduled_sessions.append(
+                ScheduledSessionData(
+                    session_id=session.id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                    kernels=kernel_bindings,
+                )
+            )
+
+        return scheduled_sessions
+
+    async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from SCHEDULED to PREPARING status.
+        Also updates kernel status to PREPARING.
+        Uses UPDATE WHERE for READ COMMITTED isolation.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+
+            # Update session status
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.SCHEDULED,
+                    )
+                )
+                .values(
+                    status=SessionStatus.PREPARING,
+                    status_info=None,  # Clear any previous error status
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.PREPARING.name: now.isoformat()},
+                    ),
+                )
+            )
+            await db_sess.execute(stmt)
+
+            # Update kernel statuses
+            kernel_stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(session_ids),
+                        KernelRow.status == KernelStatus.SCHEDULED,
+                    )
+                )
+                .values(
+                    status=KernelStatus.PREPARING,
+                    status_changed=now,
+                )
+            )
+            await db_sess.execute(kernel_stmt)
+
+    async def get_prepared_session_with_images(
+        self, session_id: SessionId
+    ) -> PreparedSessionsWithImages:
+        """
+        Get a single prepared session with image configurations for starting.
+        Returns PreparedSessionsWithImages dataclass.
+        """
+        from sqlalchemy.orm import selectinload
+
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get the session
+            stmt = (
+                sa.select(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id == session_id, SessionRow.status == SessionStatus.PREPARED
+                    )
+                )
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            session = result.scalar_one_or_none()
+
+            if not session:
+                return PreparedSessionsWithImages(sessions=[], image_configs={})
+
+            # Convert to PreparedSessionData
+            kernels_data = [
+                KernelStartData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    requested_slots=kernel.requested_slots,
+                    resource_opts=kernel.resource_opts,
+                    preopen_ports=kernel.preopen_ports,
+                    container_id=kernel.container_id,
+                    cluster_hostname=kernel.cluster_hostname,
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                )
+                for kernel in session.kernels
+            ]
+
+            prepared_session = PreparedSessionData(
+                session_id=session.id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+                session_type=session.session_type,
+                name=session.name,
+                cluster_mode=session.cluster_mode,
+                kernels=kernels_data,
+                user_uuid=session.user_uuid,
+                user_email="",  # Need to fetch from user table if needed
+                user_name="",  # Need to fetch from user table if needed
+                network_type=session.network_type,
+                network_id=session.network_id,
+            )
+
+            # Collect unique images to resolve
+            unique_images: set[ImageIdentifier] = set()
+            for kernel in session.kernels:
+                unique_images.add(
+                    ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+                )
+
+            # Resolve all images using shared method
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return PreparedSessionsWithImages(
+                sessions=[prepared_session], image_configs=image_configs
+            )
+
+    async def get_prepared_sessions(self) -> list[PreparedSessionData]:
+        """
+        Get sessions in PREPARED status ready to start.
+        Returns dataclass objects instead of SessionRow.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            return await self._get_prepared_sessions_internal(db_sess)
+
+    async def get_prepared_sessions_with_images(self) -> PreparedSessionsWithImages:
+        """
+        Get all sessions in PREPARED status with their image configurations.
+        This is a batch version that fetches all sessions and their images in one go.
+        Returns PreparedSessionsWithImages dataclass.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get all prepared sessions
+            prepared_sessions = await self._get_prepared_sessions_internal(db_sess)
+
+            if not prepared_sessions:
+                return PreparedSessionsWithImages(sessions=[], image_configs={})
+
+            # Collect unique images from all sessions
+            unique_images: set[ImageIdentifier] = set()
+            for session in prepared_sessions:
+                for kernel in session.kernels:
+                    unique_images.add(
+                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+                    )
+
+            # Resolve all images at once
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return PreparedSessionsWithImages(
+                sessions=prepared_sessions, image_configs=image_configs
+            )
+
+    async def _get_prepared_sessions_internal(
+        self, db_sess: SASession
+    ) -> list[PreparedSessionData]:
+        """
+        Internal method to get sessions in PREPARED status.
+        Used by both get_prepared_sessions and get_prepared_sessions_with_images.
+        """
+        # Get sessions with PREPARED status and their kernels, and user info
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == SessionStatus.PREPARED)
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.scaling_group,
+                        KernelRow.container_id,
+                        KernelRow.image,
+                        KernelRow.architecture,
+                        KernelRow.cluster_role,
+                        KernelRow.cluster_idx,
+                        KernelRow.cluster_hostname,
+                        KernelRow.requested_slots,
+                        KernelRow.resource_opts,
+                        KernelRow.preopen_ports,
+                        KernelRow.bootstrap_script,
+                        KernelRow.startup_command,
+                    )
+                ),
+                selectinload(SessionRow.user).options(
+                    load_only(
+                        UserRow.email,
+                        UserRow.full_name,
+                    )
+                ),
+            )
+        )
+        result = await db_sess.execute(stmt)
+        sessions = result.scalars().all()
+
+        prepared_sessions: list[PreparedSessionData] = []
+        for session in sessions:
+            kernel_data = [
+                KernelStartData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    container_id=kernel.container_id,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    cluster_hostname=kernel.cluster_hostname,
+                    requested_slots=kernel.requested_slots,
+                    resource_opts=kernel.resource_opts or {},
+                    preopen_ports=kernel.preopen_ports or [],
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                )
+                for kernel in session.kernels
+            ]
+            prepared_sessions.append(
+                PreparedSessionData(
+                    session_id=session.id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                    session_type=session.session_type,
+                    name=session.name,
+                    cluster_mode=session.cluster_mode,
+                    kernels=kernel_data,
+                    user_uuid=session.user_uuid,
+                    user_email=session.user.email,  # user is not nullable
+                    user_name=session.user.full_name,  # user is not nullable
+                    network_type=session.network_type,
+                    network_id=session.network_id,
+                )
+            )
+
+        return prepared_sessions
+
+    async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions and kernels from PREPARED to CREATING status.
+        Uses UPDATE WHERE for READ COMMITTED isolation.
+        """
+        if not session_ids:
+            return
+
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+
+            # Update session status
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.PREPARED,
+                    )
+                )
+                .values(
+                    status=SessionStatus.CREATING,
+                    status_info=None,  # Clear any previous error status
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {SessionStatus.CREATING.name: now.isoformat()},
+                    ),
+                )
+            )
+            await db_sess.execute(stmt)
+
+            # Update kernel statuses
+            kernel_stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(session_ids),
+                        KernelRow.status == KernelStatus.PREPARED,
+                    )
+                )
+                .values(
+                    status=KernelStatus.CREATING,
+                    status_changed=now,
+                )
+            )
+            await db_sess.execute(kernel_stmt)
+
+    async def mark_session_cancelled(
+        self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
+    ) -> None:
+        """
+        Mark a session as cancelled with error information.
+        Used when session fails to start.
+        """
+        async with self._db.begin_session() as db_sess:
+            now = datetime.now(tzutc())
+
+            # Update session status
+            stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(
+                    status=SessionStatus.CANCELLED,
+                    status_info=reason,
+                    status_data=error_info,  # Store ErrorStatusInfo as status_data in DB
+                )
+            )
+            await db_sess.execute(stmt)
+
+            # Update kernel statuses
+            kernel_stmt = (
+                sa.update(KernelRow)
+                .where(KernelRow.session_id == session_id)
+                .values(
+                    status=KernelStatus.CANCELLED,
+                    status_changed=now,
+                    status_info=reason,
+                )
+            )
+            await db_sess.execute(kernel_stmt)
+
+    async def get_container_info_for_kernels(
+        self, session_id: SessionId
+    ) -> dict[UUID, Optional[str]]:
+        """
+        Get container IDs for kernels in a session.
+        Used for cleanup when session fails to start.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(KernelRow.id, KernelRow.container_id).where(
+                KernelRow.session_id == session_id
+            )
+            result = await db_sess.execute(stmt)
+            return {row.id: row.container_id for row in result}

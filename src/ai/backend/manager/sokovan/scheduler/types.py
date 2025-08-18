@@ -1,7 +1,7 @@
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from dateutil.tz import tzutc
@@ -11,6 +11,7 @@ from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
     ClusterMode,
+    ClusterSSHPortMapping,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -18,6 +19,8 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 
 if TYPE_CHECKING:
@@ -309,7 +312,7 @@ class SessionAllocation:
     @classmethod
     def from_agent_selections(
         cls,
-        session_workload: "SessionWorkload",
+        session_workload: SessionWorkload,
         selections: list["AgentSelection"],
         scaling_group: str,
     ) -> "SessionAllocation":
@@ -435,3 +438,230 @@ class ScalingGroupInfo:
 
     scheduler_name: str
     agent_selection_strategy: AgentSelectionStrategy
+
+
+@dataclass
+class KernelBindingData:
+    """Kernel-agent binding data for precondition checking."""
+
+    kernel_id: UUID
+    agent_id: Optional[AgentId]
+    agent_addr: Optional[str]
+    scaling_group: str
+    image: str
+    architecture: str
+
+
+@dataclass(frozen=True)
+class ImageIdentifier:
+    """Identifier for an image with architecture."""
+
+    image: str
+    architecture: str
+
+
+@dataclass
+class ImageConfigData:
+    """Image configuration data resolved from database."""
+
+    canonical: str
+    architecture: str
+    project: Optional[str]
+    is_local: bool
+    digest: str
+    labels: dict[str, str]
+    registry_name: str
+    registry_url: str
+    registry_username: Optional[str]
+    registry_password: Optional[str]
+
+
+@dataclass
+class ScheduledSessionData:
+    """Data for a scheduled session ready for precondition check."""
+
+    session_id: SessionId
+    creation_id: str
+    access_key: AccessKey
+    kernels: list[KernelBindingData]
+
+
+@dataclass
+class ScheduledSessionsWithImages:
+    """Scheduled sessions with their image configurations."""
+
+    sessions: list[ScheduledSessionData]
+    image_configs: dict[str, ImageConfigData]
+
+
+@dataclass
+class KernelStartData:
+    """Kernel data for starting a session."""
+
+    kernel_id: UUID
+    agent_id: AgentId
+    agent_addr: str
+    scaling_group: str
+    image: str
+    architecture: str
+    cluster_role: str
+    cluster_idx: int
+    requested_slots: ResourceSlot
+    resource_opts: dict[str, Any]
+    preopen_ports: list[int]
+    container_id: Optional[str] = None
+    cluster_hostname: Optional[str] = None
+    bootstrap_script: Optional[str] = None
+    startup_command: Optional[str] = None
+
+
+@dataclass
+class PreparedSessionData:
+    """Data for a prepared session ready to start."""
+
+    session_id: SessionId
+    creation_id: str
+    access_key: AccessKey
+    session_type: SessionTypes
+    name: str
+    cluster_mode: ClusterMode
+    kernels: list[KernelStartData]
+    user_uuid: UUID
+    user_email: str
+    user_name: str
+    network_type: Optional[NetworkType] = None
+    network_id: Optional[str] = None
+
+
+@dataclass
+class PreparedSessionsWithImages:
+    """Prepared sessions with their image configurations."""
+
+    sessions: list[PreparedSessionData]
+    image_configs: dict[str, ImageConfigData]
+
+
+@dataclass
+class NetworkSetup:
+    """Network configuration for a session."""
+
+    network_name: Optional[str] = None
+    network_config: dict[str, Any] = field(default_factory=dict)
+    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None
+
+
+@dataclass
+class SessionStartResult:
+    """Result of a session start operation."""
+
+    session_id: SessionId
+    success: bool
+    error: Optional[str] = None
+    error_info: Optional[ErrorStatusInfo] = None
+
+
+@dataclass
+class KernelCreationInfo:
+    """Information about kernel creation from agent."""
+
+    container_id: Optional[str] = None
+    resource_spec: Optional[dict[str, Any]] = None
+    attached_devices: dict[str, Any] = field(default_factory=dict)
+    repl_in_port: Optional[int] = None
+    repl_out_port: Optional[int] = None
+    stdin_port: Optional[int] = None
+    stdout_port: Optional[int] = None
+    service_ports: list[int] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "KernelCreationInfo":
+        """Create from dictionary, handling missing or invalid fields."""
+        return cls(
+            container_id=data.get("container_id"),
+            resource_spec=data.get("resource_spec"),
+            attached_devices=data.get("attached_devices", {}),
+            repl_in_port=data.get("repl_in_port"),
+            repl_out_port=data.get("repl_out_port"),
+            stdin_port=data.get("stdin_port"),
+            stdout_port=data.get("stdout_port"),
+            service_ports=data.get("service_ports", []),
+        )
+
+    def get_resource_allocations(self) -> ResourceSlot:
+        """
+        Extract resource allocations from resource_spec.
+        Compatible with AgentRegistry.convert_resource_spec_to_resource_slot() format.
+
+        Handles the agent-side nested format:
+        allocations: {
+            "device_type": {
+                "slot_name": {
+                    "device_id": "value"
+                }
+            }
+        }
+        """
+        if not self.resource_spec or "allocations" not in self.resource_spec:
+            return ResourceSlot()
+
+        allocations = self.resource_spec["allocations"]
+        return self.convert_allocations_to_resource_slot(allocations)
+
+    @staticmethod
+    def convert_allocations_to_resource_slot(allocations: dict[str, Any]) -> ResourceSlot:
+        """
+        Convert per-device resource spec allocations (agent-side format)
+        back into a resource slot (manager-side format).
+
+        This is a static method that mirrors AgentRegistry.convert_resource_spec_to_resource_slot()
+        for compatibility.
+
+        Args:
+            allocations: The allocations dict from resource_spec
+
+        Returns:
+            ResourceSlot with aggregated resource values
+        """
+        from decimal import Decimal
+
+        from ai.backend.common.types import BinarySize
+
+        if not allocations or not isinstance(allocations, dict):
+            return ResourceSlot()
+
+        slots = ResourceSlot()
+
+        # Handle the nested structure from agent
+        for alloc_map in allocations.values():
+            if not isinstance(alloc_map, dict):
+                continue
+
+            for slot_name, allocation_by_device in alloc_map.items():
+                if not isinstance(allocation_by_device, dict):
+                    # If it's not the expected nested structure,
+                    # try to use it directly as a value
+                    if allocation_by_device is not None:
+                        slots[slot_name] = str(allocation_by_device)
+                    continue
+
+                # Sum allocations across devices
+                total_allocs: list[Decimal] = []
+                for allocation in allocation_by_device.values():
+                    if allocation is None:
+                        continue
+
+                    # Handle BinarySize values (e.g., "1073741824b", "1g")
+                    if (
+                        isinstance(allocation, str)
+                        and len(allocation) > 0
+                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
+                    ):
+                        total_allocs.append(Decimal(BinarySize.from_str(allocation)))
+                    else:
+                        # Regular decimal value or special values like "Infinity"
+                        total_allocs.append(Decimal(allocation))
+
+                if total_allocs:
+                    slots[slot_name] = str(sum(total_allocs))
+
+        return slots

@@ -220,7 +220,14 @@ class SchedulingController:
             session_data.name,
             session_id,
         )
-
+        try:
+            await self.request_scheduling(ScheduleType.SCHEDULE)
+        except Exception as e:
+            log.warning(
+                "Failed to request scheduling for session {}: {}",
+                session_id,
+                e,
+            )
         return session_id
 
     async def dispatch_session_events(

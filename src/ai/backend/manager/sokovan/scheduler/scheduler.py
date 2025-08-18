@@ -3,16 +3,36 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Optional
+from itertools import groupby
+from typing import Any, Awaitable, Optional
 
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot
+import aiotools
+import async_timeout
+
+from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    AutoPullBehavior,
+    ClusterInfo,
+    ClusterMode,
+    ClusterSSHKeyPair,
+    ClusterSSHPortMapping,
+    ImageConfig,
+    KernelCreationConfig,
+    KernelId,
+    ResourceSlot,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.defs import LockID
+from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC, LockID
+from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
@@ -39,7 +59,11 @@ from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AllocationBatch,
+    ImageConfigData,
+    KernelStartData,
     KeypairOccupancy,
+    NetworkSetup,
+    PreparedSessionData,
     SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
@@ -58,7 +82,7 @@ class AgentTerminationGroup:
 
     agent_id: Optional[AgentId]
     agent_addr: Optional[str]
-    kernels: list["TerminatingKernelData"] = field(default_factory=list)
+    kernels: list[TerminatingKernelData] = field(default_factory=list)
 
 
 @dataclass
@@ -526,7 +550,7 @@ class Scheduler:
             )
 
             # Create termination tasks for all kernels in this session
-            termination_tasks = []
+            termination_tasks: list[Awaitable[KernelTerminationResult]] = []
             for kernel in session.kernels:
                 if kernel.agent_id and kernel.container_id:
                     # Create task to terminate this kernel
@@ -659,22 +683,16 @@ class Scheduler:
 
     async def check_pulling_progress(self) -> ScheduleResult:
         """
-        Check if sessions in PULLING state have all kernels ready to progress.
-        Sessions with all kernels past PULLING state can move to next phase.
+        Check if sessions in PULLING or PREPARING state have all kernels ready to progress.
+        Sessions with all kernels that have reached PREPARED state can move to PREPARED phase.
 
         :return: ScheduleResult with the count of sessions that progressed
         """
         try:
-            # Check sessions with all kernels past PULLING state
-            sessions_to_update = await self._repository.get_sessions_ready_to_create()
-
+            # Check sessions with all kernels that have reached PREPARED state
+            sessions_to_update = await self._repository.get_sessions_ready_to_prepare()
             if sessions_to_update:
-                # Sessions are already SessionIds, no extraction needed
-                # Update sessions to CREATING state
-                await self._repository.update_sessions_to_creating(sessions_to_update)
-
-                log.info("Updated {} sessions from PULLING to CREATING", len(sessions_to_update))
-
+                await self._repository.update_sessions_to_prepared(sessions_to_update)
             return ScheduleResult(succeeded_count=len(sessions_to_update))
         except Exception as e:
             log.error("Failed to check pulling progress: {}", e, exc_info=True)
@@ -692,15 +710,7 @@ class Scheduler:
             sessions_to_update = await self._repository.get_sessions_ready_to_run()
 
             if sessions_to_update:
-                # Sessions are already SessionIds, no extraction needed
-                # Update sessions to RUNNING state
                 await self._repository.update_sessions_to_running(sessions_to_update)
-
-                log.info(
-                    "Updated {} sessions from CREATING/PREPARING to RUNNING",
-                    len(sessions_to_update),
-                )
-
             return ScheduleResult(succeeded_count=len(sessions_to_update))
         except Exception as e:
             log.error("Failed to check creating progress: {}", e, exc_info=True)
@@ -718,15 +728,463 @@ class Scheduler:
             sessions_to_update = await self._repository.get_sessions_ready_to_terminate()
 
             if sessions_to_update:
-                # Sessions are already SessionIds, no extraction needed
-                # Update sessions to TERMINATED state
                 await self._repository.update_sessions_to_terminated(sessions_to_update)
-
-                log.info(
-                    "Updated {} sessions from TERMINATING to TERMINATED", len(sessions_to_update)
-                )
-
             return ScheduleResult(succeeded_count=len(sessions_to_update))
         except Exception as e:
             log.error("Failed to check terminating progress: {}", e, exc_info=True)
             return ScheduleResult(succeeded_count=0)
+
+    async def check_preconditions(self) -> ScheduleResult:
+        """
+        Check preconditions for scheduled sessions.
+        Transitions sessions from SCHEDULED to PREPARING and triggers image pulling.
+
+        :return: ScheduleResult with the count of sessions transitioned
+        """
+        lock_lifetime = (
+            self._config_provider.config.manager.session_check_precondition_lock_lifetime
+        )
+        try:
+            async with self._lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
+                # Get scheduled sessions with image configurations
+                result = await self._repository.get_scheduled_sessions_with_images()
+                scheduled_sessions = result.sessions
+                image_configs = result.image_configs
+
+                if not scheduled_sessions:
+                    log.debug("No scheduled sessions found for precondition checking")
+                    return ScheduleResult(succeeded_count=0)
+                auto_pull = self._config_provider.config.docker.image.auto_pull.value
+
+                log.debug("Checking preconditions for {} sessions", len(scheduled_sessions))
+
+                # Extract session IDs for status update
+                session_ids = [s.session_id for s in scheduled_sessions]
+
+                # Update sessions to PREPARING status
+                await self._repository.update_sessions_to_preparing(session_ids)
+
+                # Group kernels by agent for image pulling
+                agent_image_configs: defaultdict[AgentId, dict[str, ImageConfig]] = defaultdict(
+                    dict
+                )
+
+                # Build agent_image_configs by directly looking up configs
+                for session in scheduled_sessions:
+                    for kernel in session.kernels:
+                        agent_id = kernel.agent_id
+                        if agent_id:
+                            # Image config must exist since we queried based on kernels
+                            img_cfg = image_configs[kernel.image]
+
+                            # Convert ImageConfigData to ImageConfig format
+                            # Use canonical as key for agent_image_configs to avoid duplicates
+                            canonical = img_cfg.canonical
+                            if canonical not in agent_image_configs[agent_id]:
+                                image_config: ImageConfig = {
+                                    "architecture": img_cfg.architecture,
+                                    "project": img_cfg.project,
+                                    "canonical": canonical,
+                                    "is_local": img_cfg.is_local,
+                                    "digest": img_cfg.digest,
+                                    "labels": img_cfg.labels,
+                                    "repo_digest": None,
+                                    "registry": {
+                                        "name": img_cfg.registry_name,
+                                        "url": img_cfg.registry_url,
+                                        "username": img_cfg.registry_username,
+                                        "password": img_cfg.registry_password,
+                                    },
+                                    "auto_pull": AutoPullBehavior(auto_pull),
+                                }
+                                agent_image_configs[agent_id][canonical] = image_config
+
+                # Trigger image checking and pulling on each agent
+                pull_tasks: list[Awaitable[Any]] = []
+                for agent_id, agent_images in agent_image_configs.items():
+                    agent_client = self._agent_pool.get_agent_client(agent_id)
+                    pull_tasks.append(agent_client.check_and_pull(agent_images))
+
+                if pull_tasks:
+                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+
+                return ScheduleResult(succeeded_count=len(scheduled_sessions))
+        except asyncio.TimeoutError:
+            log.warning("check_preconditions(): timeout while checking preconditions")
+            return ScheduleResult(succeeded_count=0)
+        except Exception as e:
+            log.error("Failed to check preconditions: {}", e, exc_info=True)
+            return ScheduleResult(succeeded_count=0)
+
+    async def start_sessions(self) -> ScheduleResult:
+        """
+        Start sessions that have passed precondition checks.
+        Transitions sessions from PREPARED to CREATING and starts kernels on agents.
+
+        :return: ScheduleResult with the count of sessions started
+        """
+        lock_lifetime = self._config_provider.config.manager.session_start_lock_lifetime
+        try:
+            async with self._lock_factory(LockID.LOCKID_START, lock_lifetime):
+                # Get prepared sessions with images in batch
+                sessions_with_images = await self._repository.get_prepared_sessions_with_images()
+                prepared_sessions = sessions_with_images.sessions
+                image_configs = sessions_with_images.image_configs
+
+                if not prepared_sessions:
+                    log.debug("No prepared sessions found to start")
+                    return ScheduleResult(succeeded_count=0)
+
+                log.debug("Starting {} sessions", len(prepared_sessions))
+
+                # Extract session IDs for status update
+                session_ids = [s.session_id for s in prepared_sessions]
+
+                # Update sessions and kernels to CREATING status
+                await self._repository.update_sessions_and_kernels_to_creating(session_ids)
+
+                # Start each session concurrently with timeout
+                async with (
+                    async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
+                    aiotools.PersistentTaskGroup() as tg,
+                ):
+                    for session in prepared_sessions:
+                        # Start session asynchronously with image configs
+                        tg.create_task(self._start_single_session(session, image_configs))
+
+                return ScheduleResult(succeeded_count=len(prepared_sessions))
+
+        except asyncio.TimeoutError:
+            log.warning("start_sessions(): timeout while starting sessions")
+            return ScheduleResult(succeeded_count=0)
+        except Exception as e:
+            log.error("Failed to start sessions: {}", e, exc_info=True)
+            return ScheduleResult(succeeded_count=0)
+
+    async def _start_single_session(
+        self,
+        session: PreparedSessionData,
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
+        """
+        Start a single session by creating kernels on agents.
+
+        :param session: Session data to start
+        :param image_configs: Image configurations for the session
+        """
+        log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
+        log_args = (
+            session.session_id,
+            session.session_type,
+            session.name,
+            session.access_key,
+            session.cluster_mode,
+        )
+        log.debug(log_fmt + "try-starting", *log_args)
+
+        try:
+            # Ensure we have kernels to start
+            if len(session.kernels) == 0:
+                raise ValueError(f"Session {session.session_id} has no kernels")
+
+            # Get resource policy and idle timeout
+            # In production, this would come from database lookups
+            idle_timeout = 600  # Default timeout in seconds
+            if hasattr(self, "_repository") and hasattr(self._repository, "_db_source"):
+                # Would need proper resource policy lookup
+                pass
+
+            # Setup network configuration
+            network_setup = await self._setup_network_configuration(session)
+            log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
+
+            # Setup environment variables
+            environ: dict[str, str] = {
+                "BACKENDAI_USER_UUID": str(session.user_uuid),
+                "BACKENDAI_USER_EMAIL": session.user_email,
+                "BACKENDAI_USER_NAME": session.user_name,
+                "BACKENDAI_SESSION_ID": str(session.session_id),
+                "BACKENDAI_SESSION_NAME": str(session.name),
+                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
+                "BACKENDAI_ACCESS_KEY": session.access_key,
+            }
+
+            # Group kernels by agent to minimize RPC calls
+            kernels_by_agent: defaultdict[AgentId, list[KernelStartData]] = defaultdict(list)
+            for kernel in session.kernels:
+                kernels_by_agent[kernel.agent_id].append(kernel)
+
+            # Group kernels by cluster role for replica counting
+            keyfunc = lambda k: k.cluster_role
+            replicas = {
+                cluster_role: len(list(group_iterator))
+                for cluster_role, group_iterator in groupby(
+                    sorted(session.kernels, key=keyfunc),
+                    key=keyfunc,
+                )
+            }
+
+            # Create SSH keypair for cluster
+            ssh_keypair = await self._create_cluster_ssh_keypair()
+
+            # Convert ImageConfigData to ImageConfig format for agents
+            image_configs_by_canonical: dict[str, ImageConfig] = {}
+            for image_key, img_cfg in image_configs.items():
+                image_config: ImageConfig = {
+                    "architecture": img_cfg.architecture,
+                    "project": img_cfg.project,
+                    "canonical": img_cfg.canonical,
+                    "is_local": img_cfg.is_local,
+                    "digest": img_cfg.digest,
+                    "labels": img_cfg.labels,
+                    "repo_digest": None,
+                    "registry": {
+                        "name": img_cfg.registry_name,
+                        "url": img_cfg.registry_url,
+                        "username": img_cfg.registry_username,
+                        "password": img_cfg.registry_password,
+                    },
+                    "auto_pull": AutoPullBehavior.DIGEST,
+                }
+                image_configs_by_canonical[image_key] = image_config
+
+            # Create kernels on each agent
+            create_tasks: list[Awaitable[Any]] = []
+            for agent_id, agent_kernels in kernels_by_agent.items():
+                agent_client = self._agent_pool.get_agent_client(
+                    agent_id, order_key=str(session.session_id)
+                )
+
+                # Prepare kernel creation configs
+                kernel_ids = [str(k.kernel_id) for k in agent_kernels]
+                kernel_configs: list[KernelCreationConfig] = []
+                kernel_image_refs: dict[KernelId, ImageRef] = {}
+
+                for k in agent_kernels:
+                    kernel_id_str = str(k.kernel_id)
+                    image_str = k.image
+
+                    # Use resolved image config or fallback
+                    if image_str not in image_configs_by_canonical:
+                        # This should not happen - all images should be resolved by precondition check
+                        log.error(
+                            "Image {} not found in resolved configs - this indicates precondition check failed",
+                            image_str,
+                        )
+                        raise ValueError(
+                            f"Image {image_str} not found in database - session start failed"
+                        )
+
+                    kernel_image_config = image_configs_by_canonical[image_str]
+
+                    # Build proper KernelCreationConfig
+                    kernel_config: KernelCreationConfig = {
+                        "image": kernel_image_config,
+                        "network_id": str(session.session_id),
+                        "auto_pull": AutoPullBehavior.DIGEST,
+                        "session_type": session.session_type,
+                        "cluster_mode": session.cluster_mode,
+                        "cluster_role": k.cluster_role,
+                        "cluster_idx": k.cluster_idx,
+                        "cluster_hostname": k.cluster_hostname or f"node-{k.kernel_id}",
+                        "uid": None,  # Would need actual UID
+                        "main_gid": None,  # Would need actual GID
+                        "supplementary_gids": [],
+                        "resource_slots": k.requested_slots.to_json(),
+                        "resource_opts": k.resource_opts,
+                        "environ": {
+                            **environ,
+                            "BACKENDAI_KERNEL_ID": kernel_id_str,
+                            "BACKENDAI_KERNEL_IMAGE": image_str,
+                            "BACKENDAI_CLUSTER_ROLE": k.cluster_role,
+                            "BACKENDAI_CLUSTER_IDX": str(k.cluster_idx),
+                            "BACKENDAI_CLUSTER_HOST": k.cluster_hostname or f"node-{k.kernel_id}",
+                        },
+                        "mounts": [],  # Would need actual vfolder mounts
+                        "package_directory": [],
+                        "idle_timeout": idle_timeout,
+                        "bootstrap_script": k.bootstrap_script,
+                        "startup_command": k.startup_command,
+                        "internal_data": None,
+                        "preopen_ports": k.preopen_ports,
+                        "allocated_host_ports": [],  # Will be populated by agent
+                        "scaling_group": k.scaling_group,
+                        "agent_addr": k.agent_addr,
+                        "endpoint_id": None,  # For inference endpoints
+                    }
+                    kernel_configs.append(kernel_config)
+
+                    # Create image ref for this kernel
+                    kernel_image_refs[KernelId(k.kernel_id)] = ImageRef.from_image_str(
+                        image_str,
+                        project=None,
+                        registry="",  # Would need proper registry in production
+                        architecture=k.architecture,
+                        is_local=False,
+                    )
+
+                # Create cluster info with network and SSH configuration
+                cluster_info: ClusterInfo = {
+                    "mode": session.cluster_mode,
+                    "size": len(session.kernels),
+                    "replicas": replicas,
+                    "network_config": network_setup.network_config,
+                    "ssh_keypair": ssh_keypair,
+                    "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
+                }
+
+                # Create the kernels
+                create_tasks.append(
+                    agent_client.create_kernels(
+                        str(session.session_id),
+                        kernel_ids,
+                        kernel_configs,
+                        cluster_info,
+                        kernel_image_refs,
+                    )
+                )
+
+            if create_tasks:
+                await asyncio.gather(*create_tasks, return_exceptions=True)
+
+            log.info(log_fmt + "started", *log_args)
+
+        except Exception as e:
+            # Convert exception to error status info
+            error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
+            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
+
+            # Mark session as cancelled
+            await self._repository.mark_session_cancelled(
+                session.session_id,
+                error_info,
+                reason=KernelLifecycleEventReason.FAILED_TO_START,
+            )
+
+            # Cleanup: destroy any partially created kernels
+            log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
+            try:
+                # Get container info for cleanup
+                container_info = await self._repository.get_container_info_for_kernels(
+                    session.session_id
+                )
+
+                # Destroy kernels through agent pool
+                destroyed_kernels = [
+                    {
+                        "agent": kernel.agent_id,
+                        "agent_addr": kernel.agent_addr,
+                        "id": kernel.kernel_id,
+                        "container_id": container_info.get(kernel.kernel_id),
+                    }
+                    for kernel in session.kernels
+                ]
+
+                # Destroy kernels through agent pool
+                destroy_tasks: list[Awaitable[Any]] = []
+                for kernel_info in destroyed_kernels:
+                    if kernel_info["agent"] and kernel_info["container_id"]:
+                        agent_client = self._agent_pool.get_agent_client(
+                            AgentId(str(kernel_info["agent"])), order_key=str(session.session_id)
+                        )
+                        destroy_tasks.append(
+                            agent_client.destroy_kernel(
+                                str(kernel_info["id"]),
+                                str(session.session_id),
+                                reason=KernelLifecycleEventReason.FAILED_TO_START,
+                                suppress_events=True,
+                            )
+                        )
+
+                if destroy_tasks:
+                    await asyncio.gather(*destroy_tasks, return_exceptions=True)
+
+            except Exception as destroy_err:
+                log.error(log_fmt + "cleanup-start-failure: error", *log_args, exc_info=destroy_err)
+            finally:
+                log.debug(log_fmt + "cleanup-start-failure: done", *log_args)
+
+    async def _setup_network_configuration(
+        self,
+        session: PreparedSessionData,
+    ) -> NetworkSetup:
+        """
+        Setup network configuration based on session network type.
+
+        :param session: Session data containing network type and configuration
+        :return: NetworkSetup with network config and SSH port mapping
+        """
+        network_name: Optional[str] = None
+        network_config: dict[str, Any] = {}
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None
+
+        network_type = session.network_type or NetworkType.VOLATILE
+
+        if network_type == NetworkType.PERSISTENT:
+            # For persistent networks, use pre-created network
+            if session.network_id:
+                # In production, would look up network details from database
+                network_name = f"persistent-{session.network_id}"
+                network_config = {"mode": "bridge", "network_name": network_name}
+        elif network_type == NetworkType.VOLATILE:
+            if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
+                # Create single-node network for multi-kernel sessions
+                network_name = f"bai-singlenode-{session.session_id}"
+                first_kernel = session.kernels[0]
+                agent_client = self._agent_pool.get_agent_client(
+                    first_kernel.agent_id, order_key=str(session.session_id)
+                )
+                try:
+                    await agent_client.create_local_network(network_name)
+                except Exception:
+                    log.exception(f"Failed to create agent-local network {network_name}")
+                    raise
+                network_config = {
+                    "mode": "bridge",
+                    "network_name": network_name,
+                }
+            elif session.cluster_mode == ClusterMode.MULTI_NODE:
+                # For multi-node, would need network plugin support
+                # Simplified for now
+                network_name = f"overlay-{session.session_id}"
+                network_config = {
+                    "mode": "overlay",
+                    "network_name": network_name,
+                }
+        elif network_type == NetworkType.HOST:
+            network_config = {"mode": "host"}
+            network_name = "host"
+
+            # Setup SSH port mapping for multi-kernel sessions in host mode
+            if len(session.kernels) > 1:
+                port_mapping: dict[str, tuple[str, int]] = {}
+                for kernel in session.kernels:
+                    agent_client = self._agent_pool.get_agent_client(
+                        kernel.agent_id, order_key=str(session.session_id)
+                    )
+                    port = await agent_client.assign_port()
+                    # Extract host from agent_addr
+                    agent_host = kernel.agent_addr.replace("tcp://", "").split(":", maxsplit=1)[0]
+                    cluster_hostname = kernel.cluster_hostname or f"node-{kernel.kernel_id}"
+                    port_mapping[cluster_hostname] = (agent_host, port)
+                cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
+
+        return NetworkSetup(
+            network_name=network_name,
+            network_config=network_config,
+            cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+        )
+
+    async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
+        """
+        Create SSH keypair for cluster communication.
+        In production, this would generate actual SSH keys.
+
+        :return: ClusterSSHKeyPair with 'public_key' and 'private_key'
+        """
+        # Simplified for now - in production would use cryptography library
+        # to generate actual SSH keys
+        return ClusterSSHKeyPair(
+            public_key="ssh-rsa AAAAB3NzaC1yc2E... cluster-key",
+            private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+        )

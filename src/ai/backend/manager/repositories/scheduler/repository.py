@@ -2,13 +2,28 @@
 
 import logging
 from typing import Mapping, Optional
+from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import AccessKey, SessionId, SlotName, SlotTypes, VFolderMount
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    SessionId,
+    SlotName,
+    SlotTypes,
+    VFolderMount,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
+from ai.backend.manager.sokovan.scheduler.types import (
+    AllocationBatch,
+    KernelCreationInfo,
+    PreparedSessionData,
+    PreparedSessionsWithImages,
+    ScheduledSessionsWithImages,
+)
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
@@ -245,29 +260,29 @@ class SchedulerRepository:
             vfolder_mounts,
         )
 
-    async def get_sessions_ready_to_create(self) -> list[SessionId]:
+    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
         """
-        Get sessions in PULLING state where all kernels have progressed past PULLING.
-        These sessions are ready to transition to CREATING state.
+        Get sessions in PULLING or PREPARING state where all kernels have reached PREPARED state.
+        These sessions are ready to transition to PREPARED state.
         """
-        return await self._db_source.get_sessions_ready_to_create()
+        return await self._db_source.get_sessions_ready_to_prepare()
 
-    async def update_sessions_to_creating(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
-        Update sessions from PULLING to CREATING state.
+        Update sessions from PULLING or PREPARING to PREPARED state.
         """
-        await self._db_source.update_sessions_to_creating(session_ids)
+        await self._db_source.update_sessions_to_prepared(session_ids)
 
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """
-        Get sessions in CREATING/PREPARING state where all kernels are RUNNING.
+        Get sessions in CREATING state where all kernels are RUNNING.
         These sessions are ready to transition to RUNNING state.
         """
         return await self._db_source.get_sessions_ready_to_run()
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
-        Update sessions from CREATING/PREPARING to RUNNING state.
+        Update sessions from CREATING to RUNNING state.
         """
         await self._db_source.update_sessions_to_running(session_ids)
 
@@ -283,3 +298,155 @@ class SchedulerRepository:
         Update sessions from TERMINATING to TERMINATED state.
         """
         await self._db_source.update_sessions_to_terminated(session_ids)
+
+    async def update_kernels_to_pulling_for_image(
+        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+    ) -> int:
+        """
+        Update kernel status from PREPARING to PULLING for the specified image on an agent.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference
+        :return: Number of kernels updated
+        """
+        return await self._db_source.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
+
+    async def update_kernels_to_prepared_for_image(
+        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+    ) -> int:
+        """
+        Update kernel status to PREPARED for the specified image on an agent.
+        Updates kernels in both PULLING and PREPARING states.
+
+        :param agent_id: The agent ID where kernels should be updated
+        :param image: The image name to match kernels
+        :param image_ref: Optional image reference
+        :return: Number of kernels updated
+        """
+        return await self._db_source.update_kernels_to_prepared_for_image(
+            agent_id, image, image_ref
+        )
+
+    async def cancel_kernels_for_failed_image(
+        self, agent_id: AgentId, image: str, error_msg: str, image_ref: Optional[str] = None
+    ) -> set[SessionId]:
+        """
+        Cancel kernels for an image that failed to be available on an agent.
+        Also checks and cancels sessions if all their kernels are cancelled.
+
+        :param agent_id: The agent ID where the image is unavailable
+        :param image: The image name that failed
+        :param error_msg: The error message to include in status
+        :param image_ref: Optional image reference
+        :return: Set of affected session IDs
+        """
+        affected_session_ids = await self._db_source.cancel_kernels_for_failed_image(
+            agent_id, image, error_msg, image_ref
+        )
+
+        # Check if any sessions need to be cancelled
+        for session_id in affected_session_ids:
+            await self._db_source.check_and_cancel_session_if_needed(session_id)
+
+        return affected_session_ids
+
+    async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
+        """
+        Check if a session should be cancelled when all its kernels are cancelled.
+
+        :param session_id: The session ID to check
+        :return: True if session was cancelled, False otherwise
+        """
+        return await self._db_source.check_and_cancel_session_if_needed(session_id)
+
+    async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:
+        """Update kernel status to PULLING."""
+        return await self._db_source.update_kernel_status_pulling(kernel_id, reason)
+
+    async def update_kernel_status_creating(self, kernel_id: UUID, reason: str) -> bool:
+        """Update kernel status to CREATING."""
+        return await self._db_source.update_kernel_status_creating(kernel_id, reason)
+
+    async def update_kernel_status_running(
+        self, kernel_id: UUID, reason: str, creation_info: KernelCreationInfo
+    ) -> bool:
+        """Update kernel status to RUNNING."""
+        return await self._db_source.update_kernel_status_running(kernel_id, reason, creation_info)
+
+    async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
+        """Update kernel status to PREPARING."""
+        return await self._db_source.update_kernel_status_preparing(kernel_id)
+
+    async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
+        """Update kernel status to CANCELLED."""
+        return await self._db_source.update_kernel_status_cancelled(kernel_id, reason)
+
+    async def update_kernel_status_terminated(
+        self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
+    ) -> bool:
+        """Update kernel status to TERMINATED."""
+        return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
+
+    async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
+        """Update kernel heartbeat timestamp."""
+        return await self._db_source.update_kernel_heartbeat(kernel_id)
+
+    async def get_scheduled_sessions_with_images(self) -> ScheduledSessionsWithImages:
+        """
+        Get sessions in SCHEDULED status with image configurations for precondition checking.
+        Returns ScheduledSessionsWithImages dataclass.
+        """
+        return await self._db_source.get_scheduled_sessions_with_images()
+
+    async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions from SCHEDULED to PREPARING status.
+        """
+        await self._db_source.update_sessions_to_preparing(session_ids)
+
+    async def get_prepared_session_with_images(
+        self, session_id: SessionId
+    ) -> PreparedSessionsWithImages:
+        """
+        Get a single prepared session with image configurations for starting.
+        Returns PreparedSessionsWithImages dataclass.
+        """
+        return await self._db_source.get_prepared_session_with_images(session_id)
+
+    async def get_prepared_sessions(self) -> list[PreparedSessionData]:
+        """
+        Get sessions in PREPARED status ready to start.
+        Returns dataclass objects instead of SessionRow.
+        """
+        return await self._db_source.get_prepared_sessions()
+
+    async def get_prepared_sessions_with_images(self) -> PreparedSessionsWithImages:
+        """
+        Get all sessions in PREPARED status with their image configurations.
+        This is a batch version that fetches all sessions and their images in one go.
+        Returns PreparedSessionsWithImages dataclass.
+        """
+        return await self._db_source.get_prepared_sessions_with_images()
+
+    async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
+        """
+        Update sessions and kernels from PREPARED to CREATING status.
+        """
+        await self._db_source.update_sessions_and_kernels_to_creating(session_ids)
+
+    async def mark_session_cancelled(
+        self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
+    ) -> None:
+        """
+        Mark a session as cancelled with error information.
+        """
+        await self._db_source.mark_session_cancelled(session_id, error_info, reason)
+
+    async def get_container_info_for_kernels(
+        self, session_id: SessionId
+    ) -> dict[UUID, Optional[str]]:
+        """
+        Get container IDs for kernels in a session.
+        """
+        return await self._db_source.get_container_info_for_kernels(session_id)
