@@ -73,6 +73,7 @@ def hf_service(
         registry_configs=mock_registry_configs,
         background_task_manager=mock_background_task_manager,
         storage_service=mock_storage_service,
+        event_producer=MagicMock(),  # Mock event producer
     )
     return HuggingFaceService(args)
 
