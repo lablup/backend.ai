@@ -29,7 +29,7 @@ class ArtifactOrderField(StrEnum):
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
-    status: Optional[list[ArtifactStatus]] = None
+    status: Optional[ArtifactStatus] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
@@ -116,9 +116,7 @@ class ArtifactRevision(Node):
             id=ID(str(data.id)),
             name=data.name,
             type=ArtifactType(data.type),
-            # TODO: Fetch status from the actual data source
-            # status=ArtifactStatus(data.status),
-            status=ArtifactStatus(ArtifactStatus.AVAILABLE),
+            status=data.status,
             description=data.description,
             # TODO: Fill these with actual data
             registry=SourceInfo(name=None, url=None),
