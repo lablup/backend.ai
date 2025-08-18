@@ -510,6 +510,19 @@ class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/artifact-not-authorized"
+    error_title = "Artifact Not Authorized"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-association-not-found"
     error_title = "Artifact Association Not Found"

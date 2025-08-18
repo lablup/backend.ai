@@ -58,9 +58,10 @@ def _make_download_progress_logger(
     """
     Return a lightweight progress logging callback.
 
-    - The returned function: (offset_bytes: int, final: bool = False) -> None
-    - Skips logging unless either `bytes_interval` or `secs_interval` has elapsed.
-    - Uses preformatted strings (str.format) instead of '%' style placeholders.
+    Args:
+        total_getter: A callable that returns the total number of bytes to download.
+        bytes_interval: The number of bytes to download before logging progress.
+        secs_interval: The number of seconds to wait before logging progress.
     """
 
     last_t = time.monotonic()
