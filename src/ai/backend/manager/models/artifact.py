@@ -46,6 +46,7 @@ class ArtifactRow(Base):
     registry_type = sa.Column("registry_type", sa.String, nullable=False, index=True)
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=True, index=True)
     description = sa.Column("description", sa.String, nullable=True)
+    readme = sa.Column("readme", sa.TEXT, nullable=True)
     version = sa.Column("version", sa.String, nullable=False)
     created_at = sa.Column(
         "created_at",
@@ -125,8 +126,7 @@ class ArtifactRow(Base):
         return cls(
             type=ArtifactType.MODEL,
             name=model_data.id,
-            # TODO: How to handle this?
-            size=0,
+            size=None,
             source_registry_id=source_registry_id,
             registry_id=registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,

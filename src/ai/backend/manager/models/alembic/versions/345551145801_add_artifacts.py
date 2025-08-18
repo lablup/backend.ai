@@ -47,13 +47,24 @@ def upgrade() -> None:
         sa.Column("size", sa.BigInteger(), nullable=True, default=None),
         sa.Column("status", sa.String(), nullable=True),
         sa.Column("source", sa.String(), nullable=True),
-        sa.Column("registry", sa.String(), nullable=True),
+        sa.Column("registry_id", GUID(), nullable=False),
+        sa.Column("source_registry_id", GUID(), nullable=False),
+        sa.Column("registry_type", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
+        sa.Column("readme", sa.TEXT(), nullable=True),
+        sa.Column("version", sa.String(), nullable=False),
         sa.Column("authorized", sa.Boolean(), nullable=False, default=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifacts")),
     )
     op.create_index(op.f("ix_artifacts_created_at"), "artifacts", ["created_at"], unique=False)
     op.create_index(op.f("ix_artifacts_name"), "artifacts", ["name"], unique=False)
+    op.create_index(op.f("ix_artifacts_registry_id"), "artifacts", ["registry_id"], unique=False)
+    op.create_index(
+        op.f("ix_artifacts_source_registry_id"), "artifacts", ["source_registry_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_artifacts_registry_type"), "artifacts", ["registry_type"], unique=False
+    )
     op.create_index(op.f("ix_artifacts_type"), "artifacts", ["type"], unique=False)
     op.create_index(op.f("ix_artifacts_updated_at"), "artifacts", ["updated_at"], unique=False)
     op.create_table(
@@ -78,6 +89,9 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_artifacts_updated_at"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_type"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_name"), table_name="artifacts")
+    op.drop_index(op.f("ix_artifacts_registry_id"), table_name="artifacts")
+    op.drop_index(op.f("ix_artifacts_source_registry_id"), table_name="artifacts")
+    op.drop_index(op.f("ix_artifacts_registry_type"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_created_at"), table_name="artifacts")
     op.drop_table("artifacts")
     op.execute("DROP TYPE IF EXISTS artifacttype")
