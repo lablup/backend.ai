@@ -12,30 +12,29 @@ from typing import Annotated, Self
 import click
 from pydantic import AnyUrl, Field, FilePath, ValidationError, model_validator
 
-from ai.backend.appproxy.common.exceptions import ConfigValidationError
-from ai.backend.common import config
-from ai.backend.common.types import ServiceDiscoveryType
-from ai.backend.logging import LogLevel
-
-from ..common.config import (
+from ai.backend.appproxy.common.config import (
     BaseSchema,
     DebugConfig,
     GroupID,
     HostPortPair,
-    LoggingConfig,
     PermitHashConfig,
     ProfilingConfig,
     RedisConfig,
     SecretConfig,
     UserID,
 )
-from ..common.types import (
+from ai.backend.appproxy.common.exceptions import ConfigValidationError
+from ai.backend.appproxy.common.types import (
     AppMode,
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
     ProxyProtocol,
 )
+from ai.backend.common import config
+from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.logging import LogLevel
+from ai.backend.logging.config_pydantic import LoggingConfig
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 

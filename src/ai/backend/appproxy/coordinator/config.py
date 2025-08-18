@@ -14,7 +14,6 @@ from ai.backend.appproxy.common.config import (
     DebugConfig,
     GroupID,
     HostPortPair,
-    LoggingConfig,
     PermitHashConfig,
     ProfilingConfig,
     RedisConfig,
@@ -26,6 +25,7 @@ from ai.backend.appproxy.common.types import EventLoopType
 from ai.backend.common import config
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
+from ai.backend.logging.config_pydantic import LoggingConfig
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 
