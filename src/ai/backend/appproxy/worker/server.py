@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import grp
@@ -513,6 +515,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Determine announce addresses
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
+    assert announce_addr is not None  # auto-populated if None
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,

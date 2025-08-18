@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import ipaddress
 import os
 import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated
+from typing import Annotated, Self
 
 import click
-from pydantic import AnyUrl, Field, FilePath, ValidationError
+from pydantic import AnyUrl, Field, FilePath, ValidationError, model_validator
 
 from ai.backend.appproxy.common.exceptions import ConfigValidationError
 from ai.backend.common import config
@@ -37,62 +39,52 @@ class AppFilterConfig(BaseSchema):
 
 
 class WildcardDomainConfig(BaseSchema):
-    bind_addr: Annotated[HostPortPair, Field(examples=[HostPortPair(host="127.0.0.1", port=10205)])]
-    domain: Annotated[
-        str,
-        Field(
-            description="Base domain for wildcard proxy.", examples=[".example.proxy.backend.ai"]
-        ),
-    ]
-    advertised_port: Annotated[
-        int | None,
-        Field(
-            default=None,
-            description="Must be set if appproxy worker is between NAT.",
-            examples=[10205],
-        ),
-    ]
+    bind_addr: HostPortPair = Field(examples=[HostPortPair(host="127.0.0.1", port=10205)])
+    domain: str = Field(
+        description="Base domain for wildcard proxy.",
+        examples=[".example.proxy.backend.ai"],
+    )
+    advertised_port: int | None = Field(
+        description="Must be set if appproxy worker is between NAT.",
+        default=None,
+        examples=[10205],
+    )
 
 
 class PortProxyConfig(BaseSchema):
-    bind_host: Annotated[str, Field(examples=["127.0.0.1"])]
-    advertised_host: Annotated[str | None, Field(default=None, examples=["127.0.0.1"])]
-    bind_port_range: Annotated[tuple[int, int], Field(examples=[(10205, 10300)])]
-    advertised_port_range: Annotated[
-        tuple[int, int] | None,
-        Field(
-            default=None,
-            description="Must be set if appproxy worker is between NAT.",
-            examples=[(10205, 10300)],
-        ),
-    ]
+    bind_host: str = Field(examples=["127.0.0.1"])
+    advertised_host: str | None = Field(default=None, examples=["127.0.0.1"])
+    bind_port_range: tuple[int, int] = Field(examples=[(10205, 10300)])
+    advertised_port_range: tuple[int, int] | None = Field(
+        description="Must be set if appproxy worker is between NAT.",
+        default=None,
+        examples=[(10205, 10300)],
+    )
 
 
 class H2Config(BaseSchema):
-    nghttpx_path: Annotated[
-        FilePath,
-        Field(description="Path to nghttpx binary.", examples=[Path("/usr/local/bin/nghttpx")]),
-    ]
-    api_port_pool: Annotated[
-        tuple[int, int],
-        Field(description="Port pool for nghttpx API server.", default=(50000, 60000)),
-    ]
+    nghttpx_path: FilePath = Field(
+        description="Path to nghttpx binary.",
+        examples=[Path("/usr/local/bin/nghttpx")],
+    )
+    api_port_pool: tuple[int, int] = Field(
+        description="Port pool for nghttpx API server.",
+        default=(50000, 60000),
+    )
 
 
 class TraefikPortProxyConfig(BaseSchema):
-    advertised_host: Annotated[str, Field(default=None, examples=["127.0.0.1"])]
-    port_range: Annotated[tuple[int, int], Field(examples=[(10205, 10300)])]
+    advertised_host: str = Field(examples=["127.0.0.1"])
+    port_range: tuple[int, int] = Field(examples=[(10205, 10300)])
 
 
 class TraefikWildcardDomainConfig(BaseSchema):
-    domain: Annotated[
-        str,
-        Field(
-            description="Base domain for wildcard proxy.", examples=[".example.proxy.backend.ai"]
-        ),
-    ]
+    domain: str = Field(
+        description="Base domain for wildcard proxy.",
+        examples=[".example.proxy.backend.ai"],
+    )
     advertised_port: int
-    tls_advertised: Annotated[bool, Field(default=False)]
+    tls_advertised: bool = Field(default=False)
 
 
 class TraefikConfig(BaseSchema):
@@ -339,46 +331,53 @@ class ProxyWorkerConfig(BaseSchema):
     ]
 
     metric_access_allowed_hosts: str = Field(
-        default="127.0.0.1/32",
         description="Limits access to `/metrics` HTTP resources from described hosts only.",
+        default="127.0.0.1/32",
     )
 
-    inference_metric_collection_interval: Annotated[
-        float, Field(default=5.0, description="Sets the interval of inference metric collector")
-    ]
+    inference_metric_collection_interval: float = Field(
+        description="The interval of inference metric collection (secs)",
+        default=5.0,
+    )
 
-    announce_addr: Annotated[
-        HostPortPair,
-        Field(
-            default_factory=lambda: HostPortPair(host="http://127.0.0.1", port=10201),
-            description=(
-                "Manually set the announced address for service discovery. "
-                "If not set, it will use api_bind_addr for announcement."
-            ),
+    client_pool_cleanup_interval: float = Field(
+        description="The interval to sweep unused aiohttp.ClientSession instances to make backend requests to kernel apps (secs)",
+        default=60.0,
+    )
+
+    announce_addr: HostPortPair | None = Field(
+        description=(
+            "The announced address for service discovery. "
+            "If not set, it will use api_bind_addr for announcement."
         ),
-    ]
+        default=None,
+    )
+
+    @model_validator(mode="after")
+    def populate_announce_addr(self) -> Self:
+        if self.announce_addr is None:
+            self.announce_addr = self.api_bind_addr
+        return self
 
 
 class ServerConfig(BaseSchema):
     redis: RedisConfig
     proxy_worker: ProxyWorkerConfig
-    profiling: Annotated[ProfilingConfig, Field(default_factory=lambda: ProfilingConfig())]
+    profiling: ProfilingConfig = Field(default_factory=lambda: ProfilingConfig())
     secrets: SecretConfig
     permit_hash: PermitHashConfig
     logging: LoggingConfig
     debug: DebugConfig
-    otel: Annotated[
-        OTELConfig,
-        Field(
-            default_factory=lambda: OTELConfig(
-                enabled=False, log_level="INFO", endpoint="http://localhost:4317"
-            )
-        ),
-    ]
-    service_discovery: Annotated[
-        ServiceDiscoveryConfig,
-        Field(default_factory=lambda: ServiceDiscoveryConfig(type=ServiceDiscoveryType.REDIS)),
-    ]
+    otel: OTELConfig = Field(
+        default_factory=lambda: OTELConfig(
+            enabled=False,
+            log_level="INFO",
+            endpoint="http://localhost:4317",
+        )
+    )
+    service_discovery: ServiceDiscoveryConfig = Field(
+        default_factory=lambda: ServiceDiscoveryConfig(type=ServiceDiscoveryType.REDIS)
+    )
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
