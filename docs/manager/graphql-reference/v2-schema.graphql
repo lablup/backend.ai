@@ -253,6 +253,7 @@ extend type EndpointToken @key(fields: "token") {
 }
 
 input GetPresignedDownloadURLInput {
+  artifactId: ID!
   storageId: ID!
   bucketName: String!
   key: String!

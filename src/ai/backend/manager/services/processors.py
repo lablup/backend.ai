@@ -225,6 +225,7 @@ class Services:
             auth_repository=repositories.auth.repository,
         )
         object_storage_service = ObjectStorageService(
+            artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
             storage_manager=args.storage_manager,
         )
