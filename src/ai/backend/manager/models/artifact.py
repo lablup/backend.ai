@@ -100,18 +100,22 @@ class ArtifactRow(Base):
         model_data: ModelData,
         registry_id: uuid.UUID,
         source_registry_id: Optional[uuid.UUID] = None,
+        source_registry_type: Optional[ArtifactRegistryType] = None,
     ) -> Self:
         return cls(
             type=ArtifactType.MODEL,
             name=model_data.id,
-            size=None,
-            source_registry_id=source_registry_id,
+            size=None,  # Size is populated later when handling ModelImportDone event
             registry_id=registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,
+            source_registry_id=source_registry_id,
+            source_registry_type=source_registry_type,
             # TODO: How to handle this?
             description="",
+            readme="",
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
+            authorized=False,
             version=model_data.revision,
             status=ArtifactStatus.SCANNED.value,
         )
