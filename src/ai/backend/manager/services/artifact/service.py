@@ -3,7 +3,9 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
 )
+from ai.backend.common.exception import ArtifactNotVerified
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -83,6 +85,10 @@ class ArtifactService:
 
     async def import_(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
+        await self._artifact_repository.update_artifact_status(
+            action.artifact_id, ArtifactStatus.PULLING
+        )
+
         storage = await self._object_storage_repository.get_by_id(action.storage_id)
         registry_data = (
             await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
@@ -101,6 +107,17 @@ class ArtifactService:
         )
 
         await self.associate_with_storage(AssociateWithStorageAction(artifact.id, storage.id))
+        await self._artifact_repository.update_artifact_status(
+            action.artifact_id, ArtifactStatus.PULLED
+        )
+
+        # TODO: Add verify step
+        await self._artifact_repository.update_artifact_status(
+            action.artifact_id, ArtifactStatus.VERIFYING
+        )
+        await self._artifact_repository.update_artifact_status(
+            action.artifact_id, ArtifactStatus.VERIFIED
+        )
         return ImportArtifactActionResult(result=artifact, task_id=result.task_id)
 
     async def import_batch(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
@@ -123,12 +140,17 @@ class ArtifactService:
         return DisassociateWithStorageActionResult(result=result)
 
     async def authorize(self, action: AuthorizeArtifactAction) -> AuthorizeArtifactActionResult:
+        artifact_data = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
+        if artifact_data.status != ArtifactStatus.VERIFIED:
+            raise ArtifactNotVerified()
+
         result = await self._artifact_repository.authorize_artifact(action.artifact_id)
         return AuthorizeArtifactActionResult(result=result)
 
     async def unauthorize(
         self, action: UnauthorizeArtifactAction
     ) -> UnauthorizeArtifactActionResult:
+        # TODO: Should we reset the artifact row's status to SCANNED?
         result = await self._artifact_repository.unauthorize_artifact(action.artifact_id)
         return UnauthorizeArtifactActionResult(result=result)
 

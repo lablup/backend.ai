@@ -195,3 +195,12 @@ class ArtifactRepository:
             )
             await db_sess.execute(stmt)
             return artifact_id
+
+    @repository_decorator()
+    async def update_artifact_status(
+        self, artifact_id: uuid.UUID, status: ArtifactStatus
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(status=status)
+            await db_sess.execute(stmt)
+            return artifact_id

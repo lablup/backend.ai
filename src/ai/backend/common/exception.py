@@ -518,7 +518,20 @@ class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.READ,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-not-verified"
+    error_title = "Artifact Not Verified"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
