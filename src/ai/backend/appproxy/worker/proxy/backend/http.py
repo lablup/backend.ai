@@ -118,7 +118,7 @@ class HTTPBackend(BaseBackend):
             domain=str(route.route_id),
         )
         client_session = self.client_pool.load_client_session(client_key)
-        log.debug("connecting to {}", URL(client_key.endpoint) / request.rel_url.path)
+        log.debug("connecting to {}", URL(client_key.endpoint).with_path(request.path))
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             log.debug("connected")
             yield ws
@@ -177,8 +177,6 @@ class HTTPBackend(BaseBackend):
                 await response.prepare(request)
                 async for data in backend_response.content.iter_chunked(CHUNK_SIZE):
                     await response.write(data)
-                await response.drain()
-
                 return response
         except ConnectionResetError:
             raise asyncio.CancelledError()
