@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -90,7 +90,7 @@ UPLOAD_FILES_MOCK = {"uploaded": True, "files": ["test_file1.txt", "test_file2.t
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Upload files",
             UploadFilesAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -117,7 +117,7 @@ async def test_upload_files(
     mock_upload_file_rpc,
     mock_simple_file_reader,
     processors: SessionProcessors,
-    test_scenario: TestScenario[UploadFilesAction, UploadFilesActionResult],
+    test_scenario: ScenarioBase[UploadFilesAction, UploadFilesActionResult],
 ):
     # Set the reader in the test scenario
     test_scenario.input.reader = mock_simple_file_reader

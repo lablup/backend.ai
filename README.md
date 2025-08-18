@@ -302,7 +302,7 @@ To build:
 
 ```bash
 # Build wheels or SCIE packages
-./scripts/build-wheel.sh
+./scripts/build-wheels.sh
 ./scripts/build-scies.sh
 ```
 

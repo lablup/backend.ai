@@ -1,50 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/manager/actions:src",
-        "src/ai/backend/manager/actions/monitors:src",
-        "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
-        "src/ai/backend/manager/config:src",
-        "src/ai/backend/manager/config/loader:src",
-        "src/ai/backend/manager/network:src",
-        "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
-        "src/ai/backend/manager/scheduler:src",
-        "src/ai/backend/manager/services:src",
-        "src/ai/backend/manager/services/agent:src",
-        "src/ai/backend/manager/services/agent/actions:src",
-        "src/ai/backend/manager/services/container_registry:src",
-        "src/ai/backend/manager/services/container_registry/actions:src",
-        "src/ai/backend/manager/services/domain:src",
-        "src/ai/backend/manager/services/domain/actions:src",
-        "src/ai/backend/manager/services/group:src",
-        "src/ai/backend/manager/services/group/actions:src",
-        "src/ai/backend/manager/services/image:src",
-        "src/ai/backend/manager/services/image/actions:src",
-        "src/ai/backend/manager/services/keypair_resource_policy:src",
-        "src/ai/backend/manager/services/keypair_resource_policy/actions:src",
-        "src/ai/backend/manager/services/metric:src",
-        "src/ai/backend/manager/services/metric/actions:src",
-        "src/ai/backend/manager/services/metric/processors:src",
-        "src/ai/backend/manager/services/model_serving:src",
-        "src/ai/backend/manager/services/model_serving/actions:src",
-        "src/ai/backend/manager/services/model_serving/processors:src",
-        "src/ai/backend/manager/services/model_serving/services:src",
-        "src/ai/backend/manager/services/resource_preset:src",
-        "src/ai/backend/manager/services/resource_preset/actions:src",
-        "src/ai/backend/manager/services/session:src",
-        "src/ai/backend/manager/services/session/actions:src",
-        "src/ai/backend/manager/services/user:src",
-        "src/ai/backend/manager/services/user/actions:src",
-        "src/ai/backend/manager/services/user_resource_policy:src",
-        "src/ai/backend/manager/services/user_resource_policy/actions:src",
-        "src/ai/backend/manager/services/vfolder:src",
-        "src/ai/backend/manager/services/vfolder/actions:src",
-        "src/ai/backend/manager/services/vfolder/processors:src",
-        "src/ai/backend/manager/services/vfolder/services:src",
-        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         ":resources",
     ],
 )
@@ -156,5 +114,7 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "models/alembic/script.py.mako",
+        "models/alembic/revision_history/*.json",
     ],
 )

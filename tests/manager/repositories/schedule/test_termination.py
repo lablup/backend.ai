@@ -507,11 +507,15 @@ class TestSessionTermination:
         # Create termination results with all kernels successful
         termination_results = [
             SessionTerminationResult(
-                session_id=str(running_session.id),
+                session_id=running_session.id,
+                access_key=running_session.access_key,
+                session_type=running_session.session_type,
                 reason="TEST_TERMINATION",
                 kernel_results=[
                     KernelTerminationResult(
                         kernel_id=str(sample_sessions_for_termination["kernels"][2].id),
+                        agent_id=sample_sessions_for_termination["kernels"][2].agent,
+                        occupied_slots=sample_sessions_for_termination["kernels"][2].occupied_slots,
                         success=True,
                     )
                 ],
@@ -556,11 +560,15 @@ class TestSessionTermination:
         # Create termination results with kernel failure
         termination_results = [
             SessionTerminationResult(
-                session_id=str(running_session.id),
+                session_id=running_session.id,
+                access_key=running_session.access_key,
+                session_type=running_session.session_type,
                 reason="TEST_PARTIAL",
                 kernel_results=[
                     KernelTerminationResult(
                         kernel_id=str(running_kernel.id),
+                        agent_id=running_kernel.agent,
+                        occupied_slots=running_kernel.occupied_slots,
                         success=False,
                         error="Agent communication failed",
                     )

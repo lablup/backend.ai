@@ -19,7 +19,7 @@ from ai.backend.manager.services.model_serving.types import (
     RequesterCtx,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ class TestScaleServiceReplicas:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "scale up",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -95,7 +95,7 @@ class TestScaleServiceReplicas:
                     target_count=5,
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "scale down",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -113,7 +113,7 @@ class TestScaleServiceReplicas:
                     target_count=1,
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "zero scale",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -131,7 +131,7 @@ class TestScaleServiceReplicas:
                     target_count=0,
                 ),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN scale up",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -149,7 +149,7 @@ class TestScaleServiceReplicas:
                     target_count=10,
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "non-existent service",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -164,7 +164,7 @@ class TestScaleServiceReplicas:
                 ),
                 ModelServiceNotFound,
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "update operation failed",
                 ScaleServiceReplicasAction(
                     requester_ctx=RequesterCtx(
@@ -184,7 +184,7 @@ class TestScaleServiceReplicas:
     @pytest.mark.asyncio
     async def test_scale_service_replicas(
         self,
-        scenario: TestScenario[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],
+        scenario: ScenarioBase[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_scale,
         mock_get_endpoint_by_id_force_scale,

@@ -22,7 +22,7 @@ def mock_scheduler():
     """Mock Scheduler for testing."""
     mock = MagicMock(spec=Scheduler)
     # Create AsyncMock with support for side_effect
-    mock._mark_sessions_for_termination = AsyncMock()
+    mock.mark_sessions_for_termination = AsyncMock()
     mock.terminate_sessions = AsyncMock()
     return mock
 
@@ -83,7 +83,7 @@ class TestScheduleCoordinator:
             skipped_sessions=[],
             not_found_sessions=[],
         )
-        mock_scheduler._mark_sessions_for_termination.return_value = mock_result
+        mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
         # Execute
         result = await schedule_coordinator.mark_sessions_for_termination(
@@ -93,7 +93,7 @@ class TestScheduleCoordinator:
 
         # Verify
         assert result == mock_result
-        mock_scheduler._mark_sessions_for_termination.assert_called_once_with(
+        mock_scheduler.mark_sessions_for_termination.assert_called_once_with(
             session_ids,
             "USER_REQUESTED",
         )
@@ -118,7 +118,7 @@ class TestScheduleCoordinator:
             skipped_sessions=session_ids,  # All skipped
             not_found_sessions=[],
         )
-        mock_scheduler._mark_sessions_for_termination.return_value = mock_result
+        mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
         # Execute
         result = await schedule_coordinator.mark_sessions_for_termination(
@@ -174,7 +174,7 @@ class TestScheduleCoordinator:
                 skipped_sessions=[],
                 not_found_sessions=[],
             )
-            mock_scheduler._mark_sessions_for_termination.return_value = mock_result
+            mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
             # Execute
             await schedule_coordinator.mark_sessions_for_termination(
@@ -183,7 +183,7 @@ class TestScheduleCoordinator:
             )
 
             # Verify reason was passed correctly
-            mock_scheduler._mark_sessions_for_termination.assert_called_with(
+            mock_scheduler.mark_sessions_for_termination.assert_called_with(
                 [session_id],
                 reason,
             )
@@ -202,7 +202,7 @@ class TestScheduleCoordinator:
             skipped_sessions=[],
             not_found_sessions=[],
         )
-        mock_scheduler._mark_sessions_for_termination.return_value = mock_result
+        mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
         # Execute
         result = await schedule_coordinator.mark_sessions_for_termination(
@@ -232,7 +232,7 @@ class TestScheduleCoordinator:
             skipped_sessions=[],
             not_found_sessions=non_existing,
         )
-        mock_scheduler._mark_sessions_for_termination.return_value = mock_result
+        mock_scheduler.mark_sessions_for_termination.return_value = mock_result
 
         # Execute
         result = await schedule_coordinator.mark_sessions_for_termination(
@@ -257,7 +257,7 @@ class TestScheduleCoordinator:
     ):
         """Test that coordinator handles exceptions from scheduler."""
         # Setup - scheduler raises exception
-        mock_scheduler._mark_sessions_for_termination.side_effect = Exception(
+        mock_scheduler.mark_sessions_for_termination.side_effect = Exception(
             "Database connection failed"
         )
 
@@ -293,7 +293,7 @@ class TestScheduleCoordinator:
                 not_found_sessions=[],
             )
 
-        mock_scheduler._mark_sessions_for_termination.side_effect = setup_mock_result
+        mock_scheduler.mark_sessions_for_termination.side_effect = setup_mock_result
 
         # Execute concurrent marking
         tasks = [

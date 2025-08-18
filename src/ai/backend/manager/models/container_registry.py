@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 
 from ..defs import PASSWORD_PLACEHOLDER

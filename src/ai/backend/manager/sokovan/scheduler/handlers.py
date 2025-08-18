@@ -51,7 +51,12 @@ class ScheduleHandler(ABC):
         """Execute the operation and run post-processing."""
         result = await self.execute()
         if result.needs_post_processing():
-            await self.post_process(result)
+            try:
+                await self.post_process(result)
+            except Exception as e:
+                log.error("Error during post-processing: {}", e)
+                # Handle any exceptions that occur during post-processing
+                # This could be logging, retrying, or other error handling logic
         return result
 
 
@@ -165,6 +170,7 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
+        await self._coordinator.request_scheduling(ScheduleType.SCHEDULE)
         log.trace("Terminated {} sessions", result.succeeded_count)
 
 

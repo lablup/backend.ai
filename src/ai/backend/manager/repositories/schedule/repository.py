@@ -226,6 +226,7 @@ class TerminatingSessionData:
     creation_id: str
     status: SessionStatus
     status_info: str
+    session_type: SessionTypes
     kernels: list["TerminatingKernelData"]
 
 
@@ -238,6 +239,7 @@ class TerminatingKernelData:
     container_id: Optional[str]
     agent_id: Optional[AgentId]
     agent_addr: Optional[str]
+    occupied_slots: ResourceSlot
 
 
 @dataclass
@@ -287,6 +289,8 @@ class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
     kernel_id: str
+    agent_id: Optional[AgentId]
+    occupied_slots: ResourceSlot
     success: bool
     error: Optional[str] = None
 
@@ -295,7 +299,9 @@ class KernelTerminationResult:
 class SessionTerminationResult:
     """Result of termination for a session and its kernels."""
 
-    session_id: str
+    session_id: SessionId
+    access_key: AccessKey
+    session_type: SessionTypes
     reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
     kernel_results: list[KernelTerminationResult] = field(default_factory=list)
 
@@ -700,6 +706,7 @@ class ScheduleRepository:
                             KernelRow.container_id,
                             KernelRow.agent,
                             KernelRow.agent_addr,
+                            KernelRow.occupied_slots,
                         )
                     )
                 )
@@ -717,6 +724,7 @@ class ScheduleRepository:
                         container_id=kernel.container_id,
                         agent_id=kernel.agent,
                         agent_addr=kernel.agent_addr,
+                        occupied_slots=kernel.occupied_slots,
                     )
                     for kernel in session_row.kernels
                 ]
@@ -728,6 +736,7 @@ class ScheduleRepository:
                         creation_id=session_row.creation_id,
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
+                        session_type=session_row.session_type,
                         kernels=kernels,
                     )
                 )
@@ -2627,7 +2636,8 @@ class ScheduleRepository:
         session_results: list[SessionTerminationResult],
     ) -> None:
         """
-        Batch update kernel and session statuses to TERMINATED for successful terminations.
+        Batch update kernel and session statuses to TERMINATED for successful terminations
+        and decrement keypair concurrency counters.
 
         :param session_results: List of session termination results with nested kernel results
         """
@@ -2635,14 +2645,23 @@ class ScheduleRepository:
             return
 
         now = datetime.now(tzutc())
+        # Build maps for concurrency tracking
+        concurrency_to_decrement: dict[str, int] = defaultdict(int)
+        sftp_concurrency_to_decrement: dict[str, int] = defaultdict(int)
+        # Track occupied_slots to be freed per agent
+        agent_slots_to_free: dict[AgentId, ResourceSlot] = defaultdict(ResourceSlot)
 
         async with self._db.begin_session() as db_sess:
             # Process each session's results
             for session_result in session_results:
-                # Collect successful kernel IDs for this session
-                successful_kernel_ids = [
-                    kernel.kernel_id for kernel in session_result.kernel_results if kernel.success
-                ]
+                # Collect successful kernel IDs and track agent resource changes
+                successful_kernel_ids = []
+                for kernel in session_result.kernel_results:
+                    if kernel.success:
+                        successful_kernel_ids.append(kernel.kernel_id)
+                        # Accumulate slots to be freed for each agent
+                        if kernel.agent_id:
+                            agent_slots_to_free[kernel.agent_id] += kernel.occupied_slots
 
                 # Update successful kernels to TERMINATED
                 if successful_kernel_ids:
@@ -2660,6 +2679,12 @@ class ScheduleRepository:
 
                 # Update session if all kernels succeeded
                 if session_result.should_terminate_session:
+                    # Track concurrency decrements for successfully terminated sessions
+                    if session_result.session_type.is_private():
+                        sftp_concurrency_to_decrement[session_result.access_key] += 1
+                    else:
+                        concurrency_to_decrement[session_result.access_key] += 1
+
                     session_stmt = (
                         sa.update(SessionRow)
                         .where(SessionRow.id == session_result.session_id)
@@ -2675,3 +2700,48 @@ class ScheduleRepository:
                         )
                     )
                     await db_sess.execute(session_stmt)
+
+            # Decrement agent resource occupancy by subtracting freed slots
+            await self._decrement_agent_occupied_slots(db_sess, agent_slots_to_free)
+
+        # Decrement concurrency counters after database updates
+        await self._valkey_stat.decrement_keypair_concurrencies(
+            concurrency_to_decrement, sftp_concurrency_to_decrement
+        )
+
+    async def _decrement_agent_occupied_slots(
+        self,
+        db_sess: SASession,
+        agent_slots_to_free: dict[AgentId, ResourceSlot],
+    ) -> None:
+        """
+        Decrement agent occupied_slots by subtracting the freed slots from terminated kernels.
+
+        :param db_sess: Database session
+        :param agent_slots_to_free: Mapping of agent_id to ResourceSlot to be freed
+        """
+        if not agent_slots_to_free:
+            return
+
+        # Batch fetch all affected agents' current occupied_slots
+        agent_ids = list(agent_slots_to_free.keys())
+        agents_query = sa.select(AgentRow.id, AgentRow.occupied_slots).where(
+            AgentRow.id.in_(agent_ids)
+        )
+        result = await db_sess.execute(agents_query)
+
+        # Process each agent and calculate new occupied_slots
+        for agent_id, current_occupied in result:
+            slots_to_free = agent_slots_to_free[agent_id]
+            # If current_occupied is None (shouldn't happen), treat as empty ResourceSlot
+            if current_occupied is None:
+                current_occupied = ResourceSlot()
+            # Subtract the freed slots from current occupied slots
+            new_occupied = current_occupied - slots_to_free
+            # Update the agent's occupied_slots
+            update_stmt = (
+                sa.update(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .values(occupied_slots=new_occupied)
+            )
+            await db_sess.execute(update_stmt)
