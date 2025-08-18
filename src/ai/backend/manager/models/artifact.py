@@ -104,8 +104,7 @@ class ArtifactRow(Base):
         return cls(
             type=ArtifactType.MODEL,
             name=model_data.id,
-            # TODO: How to handle this?
-            size=0,
+            size=None,
             source_registry_id=source_registry_id,
             registry_id=registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,
