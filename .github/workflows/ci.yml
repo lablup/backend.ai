@@ -64,13 +64,6 @@ jobs:
         id: labeler
         if: github.event_name == 'pull_request'
         uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
-      - name: Skip CI
-        id: check_skip
-        if: |
-          contains(toJSON(github.event.head_commit.message), 'skip:ci')
-          || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-          || steps.check_stacked_pr.outputs.NON_TOP_BOTTOM == 'true'
-        run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
       - name: Graphite labels
         id: graphite_labels
         if: contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.pull_request.labels.*.name)
