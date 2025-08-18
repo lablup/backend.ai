@@ -21,6 +21,28 @@ from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsActio
 from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
 
 
+# TODO: Add more fields
+@strawberry.enum
+class ArtifactGroupOrderField(StrEnum):
+    NAME = "NAME"
+
+
+@strawberry.input
+class ArtifactGroupOrderBy:
+    field: ArtifactGroupOrderField
+    direction: OrderDirection = OrderDirection.ASC
+
+
+@strawberry.input
+class ArtifactGroupFilter:
+    name: Optional[StringFilter] = None
+
+    AND: Optional["ArtifactGroupFilter"] = None
+    OR: Optional["ArtifactGroupFilter"] = None
+    NOT: Optional["ArtifactGroupFilter"] = None
+    DISTINCT: Optional[bool] = None
+
+
 @strawberry.enum
 class ArtifactOrderField(StrEnum):
     ID = "ID"
@@ -35,7 +57,7 @@ class ArtifactOrderField(StrEnum):
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
-    status: Optional[list[ArtifactStatus]] = None
+    status: Optional[ArtifactStatus] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
@@ -117,9 +139,7 @@ class Artifact(Node):
             id=ID(str(data.id)),
             name=data.name,
             type=ArtifactType(data.type),
-            # TODO: Fetch status from the actual data source
-            # status=ArtifactStatus(data.status),
-            status=ArtifactStatus(ArtifactStatus.AVAILABLE),
+            status=data.status,
             description=data.description,
             # TODO: Fill these with actual data
             registry=SourceInfo(name=None, url=None),
@@ -154,8 +174,8 @@ class ArtifactGroup(Node):
     @strawberry.field
     def artifacts(
         self,
-        filter: Optional[ArtifactFilter] = None,
-        order_by: Optional[list[ArtifactOrderBy]] = None,
+        filter: Optional[ArtifactGroupFilter] = None,
+        order_by: Optional[list[ArtifactGroupOrderBy]] = None,
         before: Optional[str] = None,
         after: Optional[str] = None,
         first: Optional[int] = None,
