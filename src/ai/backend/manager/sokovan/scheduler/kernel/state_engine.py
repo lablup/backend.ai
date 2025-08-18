@@ -53,17 +53,7 @@ class KernelStateEngine:
         log.debug("Marking kernel {} as PULLING", kernel_id)
 
         # Use the repository to update kernel status
-        success = await self._repository.update_kernel_status_pulling(kernel_id, reason)
-
-        if success:
-            log.info("Kernel {} marked as PULLING", kernel_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as PULLING - may not be in SCHEDULED state",
-                kernel_id,
-            )
-
-        return success
+        return await self._repository.update_kernel_status_pulling(kernel_id, reason)
 
     async def mark_kernel_creating(
         self,
@@ -79,17 +69,7 @@ class KernelStateEngine:
         """
         log.debug("Marking kernel {} as CREATING", kernel_id)
 
-        success = await self._repository.update_kernel_status_creating(kernel_id, reason)
-
-        if success:
-            log.info("Kernel {} marked as CREATING", kernel_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as CREATING - may not be in PULLING state",
-                kernel_id,
-            )
-
-        return success
+        return await self._repository.update_kernel_status_creating(kernel_id, reason)
 
     async def mark_kernel_running(
         self,
@@ -107,21 +87,11 @@ class KernelStateEngine:
         """
         log.debug("Marking kernel {} as RUNNING", kernel_id)
 
-        success = await self._repository.update_kernel_status_running(
+        return await self._repository.update_kernel_status_running(
             kernel_id,
             reason,
             creation_info,
         )
-
-        if success:
-            log.info("Kernel {} marked as RUNNING", kernel_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as RUNNING - may not be in CREATING state",
-                kernel_id,
-            )
-
-        return success
 
     async def mark_kernel_preparing(
         self,
@@ -135,17 +105,7 @@ class KernelStateEngine:
         """
         log.debug("Marking kernel {} as PREPARING", kernel_id)
 
-        success = await self._repository.update_kernel_status_preparing(kernel_id)
-
-        if success:
-            log.info("Kernel {} marked as PREPARING", kernel_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as PREPARING - may not be in SCHEDULED state",
-                kernel_id,
-            )
-
-        return success
+        return await self._repository.update_kernel_status_preparing(kernel_id)
 
     async def mark_kernel_cancelled(
         self,
@@ -167,14 +127,8 @@ class KernelStateEngine:
         success = await self._repository.update_kernel_status_cancelled(kernel_id, reason)
 
         if success:
-            log.info("Kernel {} marked as CANCELLED", kernel_id)
             # Check if the session should be cancelled when all kernels are cancelled
             await self._repository.check_and_cancel_session_if_needed(session_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as CANCELLED - may already be running or terminated",
-                kernel_id,
-            )
 
         return success
 
@@ -194,19 +148,7 @@ class KernelStateEngine:
         """
         log.debug("Marking kernel {} as TERMINATED: {}", kernel_id, reason)
 
-        success = await self._repository.update_kernel_status_terminated(
-            kernel_id, reason, exit_code
-        )
-
-        if success:
-            log.info("Kernel {} marked as TERMINATED", kernel_id)
-        else:
-            log.warning(
-                "Failed to mark kernel {} as TERMINATED - may not be in TERMINATING state",
-                kernel_id,
-            )
-
-        return success
+        return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     async def update_kernel_heartbeat(
         self,
@@ -220,15 +162,7 @@ class KernelStateEngine:
         """
         log.trace("Updating heartbeat for kernel {}", kernel_id)
 
-        success = await self._repository.update_kernel_heartbeat(kernel_id)
-
-        if not success:
-            log.warning(
-                "Failed to update heartbeat for kernel {} - may not be in RUNNING state",
-                kernel_id,
-            )
-
-        return success
+        return await self._repository.update_kernel_heartbeat(kernel_id)
 
     async def update_kernels_to_pulling_for_image(
         self,
@@ -243,30 +177,20 @@ class KernelStateEngine:
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
         """
-        log.info(
+        log.debug(
             "Updating kernels to PULLING for agent:{} image:{}",
             agent_id,
             image,
         )
 
-        updated_count = await self._repository.update_kernels_to_pulling_for_image(
-            agent_id, image, image_ref
-        )
-
-        if updated_count > 0:
-            log.info(
-                "Updated {} kernels to PULLING state for agent:{} image:{}",
-                updated_count,
-                agent_id,
-                image,
-            )
+        await self._repository.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
 
     async def update_kernels_to_prepared_for_image(
         self,
         agent_id: AgentId,
         image: str,
         image_ref: Optional[str] = None,
-    ) -> None:
+    ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
         Updates kernels in both PULLING and PREPARING states.
@@ -274,24 +198,11 @@ class KernelStateEngine:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
+        :return: The number of kernels updated to PREPARED state
         """
-        log.info(
-            "Updating kernels to PREPARED for agent:{} image:{}",
-            agent_id,
-            image,
-        )
-
-        updated_count = await self._repository.update_kernels_to_prepared_for_image(
+        return await self._repository.update_kernels_to_prepared_for_image(
             agent_id, image, image_ref
         )
-
-        if updated_count > 0:
-            log.info(
-                "Updated {} kernels to PREPARED state for agent:{} image:{}",
-                updated_count,
-                agent_id,
-                image,
-            )
 
     async def cancel_kernels_for_failed_image(
         self,
@@ -315,12 +226,6 @@ class KernelStateEngine:
             error_msg,
         )
 
-        affected_session_ids = await self._repository.cancel_kernels_for_failed_image(
+        await self._repository.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref
         )
-
-        if affected_session_ids:
-            log.info(
-                "Cancelled kernels due to image failure for sessions: {}",
-                affected_session_ids,
-            )

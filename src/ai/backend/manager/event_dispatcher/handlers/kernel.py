@@ -179,9 +179,6 @@ class KernelEventHandler:
         if self._use_sokovan:
             # Use Sokovan coordinator's kernel handlers
             await self._schedule_coordinator.handle_kernel_preparing(event)
-        else:
-            # State transition is done by the DoPrepareEvent handler inside the scheduler-dispatcher object.
-            pass
 
     async def handle_kernel_pulling(
         self,

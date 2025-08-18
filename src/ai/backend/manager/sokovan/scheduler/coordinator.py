@@ -76,8 +76,12 @@ class ScheduleCoordinator:
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
                 scheduler, self._scheduling_controller
             ),
-            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(scheduler),
-            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(scheduler),
+            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(
+                scheduler, self._scheduling_controller
+            ),
+            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
+                scheduler, self._scheduling_controller
+            ),
         }
 
     async def process_schedule(
@@ -141,19 +145,12 @@ class ScheduleCoordinator:
 
     async def handle_kernel_creating(self, event: KernelCreatingAnycastEvent) -> bool:
         """Handle kernel creating event through the kernel state engine."""
-        result = await self._kernel_state_engine.mark_kernel_creating(event.kernel_id, event.reason)
-        if result:
-            # Request CHECK_CREATING_PROGRESS to monitor container creation progress
-            await self._scheduling_controller.request_scheduling(
-                ScheduleType.CHECK_CREATING_PROGRESS
-            )
-        return result
+        return await self._kernel_state_engine.mark_kernel_creating(event.kernel_id, event.reason)
 
     async def handle_kernel_running(self, event: KernelStartedAnycastEvent) -> bool:
         """Handle kernel running event through the kernel state engine."""
         # Convert event data to dataclass (always present, may be empty)
         creation_info = KernelCreationInfo.from_dict(dict(event.creation_info))
-
         result = await self._kernel_state_engine.mark_kernel_running(
             event.kernel_id,
             event.reason,
@@ -176,11 +173,9 @@ class ScheduleCoordinator:
 
     async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
         """Handle kernel cancelled event through the kernel state engine."""
-        result = await self._kernel_state_engine.mark_kernel_cancelled(
+        return await self._kernel_state_engine.mark_kernel_cancelled(
             event.kernel_id, event.session_id, event.reason
         )
-        # No need to request scheduling for cancelled kernels
-        return result
 
     async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
         """Handle kernel terminated event through the kernel state engine."""
@@ -210,8 +205,6 @@ class ScheduleCoordinator:
         await self._kernel_state_engine.update_kernels_to_pulling_for_image(
             agent_id, image, image_ref
         )
-        # Request CHECK_PULLING_PROGRESS to monitor image pull progress
-        await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PULLING_PROGRESS)
 
     async def update_kernels_to_prepared_for_image(
         self,
@@ -220,13 +213,20 @@ class ScheduleCoordinator:
         image_ref: Optional[str] = None,
     ) -> None:
         """Update kernel status to PREPARED for the specified image on an agent."""
-        await self._kernel_state_engine.update_kernels_to_prepared_for_image(
+        result = await self._kernel_state_engine.update_kernels_to_prepared_for_image(
             agent_id, image, image_ref
         )
-        # Request CHECK_PULLING_PROGRESS to check if session should transition to PREPARED
-        await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PULLING_PROGRESS)
-        # Also request START to immediately start prepared sessions
-        await self._scheduling_controller.request_scheduling(ScheduleType.START)
+        if result > 0:
+            log.info(
+                "Updated {} kernels to PREPARED state for agent:{} image:{}",
+                result,
+                agent_id,
+                image,
+            )
+            # Request scheduling to check if sessions can transition to RUNNING
+            await self._scheduling_controller.request_scheduling(
+                ScheduleType.CHECK_CREATING_PROGRESS
+            )
 
     async def cancel_kernels_for_failed_image(
         self,

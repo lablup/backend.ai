@@ -166,7 +166,6 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
-        await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         log.info("Terminated {} sessions", result.succeeded_count)
 
 
@@ -216,7 +215,6 @@ class CheckPullingProgressHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Request START scheduling if sessions transitioned to PREPARED."""
         log.info("{} sessions transitioned to PREPARED state", result.succeeded_count)
-        await self._scheduling_controller.request_scheduling(ScheduleType.START)
 
 
 class CheckCreatingProgressHandler(ScheduleHandler):
@@ -225,8 +223,10 @@ class CheckCreatingProgressHandler(ScheduleHandler):
     def __init__(
         self,
         scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     def name(cls) -> str:
@@ -240,6 +240,7 @@ class CheckCreatingProgressHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to RUNNING."""
         log.info("{} sessions transitioned to RUNNING state", result.succeeded_count)
+        await self._scheduling_controller.request_scheduling(ScheduleType.START)
 
 
 class CheckTerminatingProgressHandler(ScheduleHandler):
@@ -248,8 +249,10 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
     def __init__(
         self,
         scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
     ):
         self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     def name(cls) -> str:
@@ -263,3 +266,4 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to TERMINATED."""
         log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)
+        await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
