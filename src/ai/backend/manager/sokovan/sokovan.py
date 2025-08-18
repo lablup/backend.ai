@@ -29,7 +29,8 @@ class SchedulerTimerSpec:
     """Specification and behavior for a scheduler's periodic operation."""
 
     schedule_type: ScheduleType
-    lock_id: LockID
+    short_lock_id: Optional[LockID]  # None means no short-cycle timer
+    long_lock_id: LockID
     short_interval: Optional[float] = 2.0  # None means no short-cycle timer
     long_interval: float = 60.0
     initial_delay: float = 30.0
@@ -96,28 +97,32 @@ class SokovanOrchestrator:
             # Regular scheduling operations with both short and long cycle timers
             SchedulerTimerSpec(
                 ScheduleType.SCHEDULE,
-                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER,
+                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTimerSpec(
                 ScheduleType.CHECK_PRECONDITION,
-                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER,
+                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTimerSpec(
                 ScheduleType.START,
-                LockID.LOCKID_SOKOVAN_START_TIMER,
+                LockID.LOCKID_SOKOVAN_START_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_START_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTimerSpec(
                 ScheduleType.TERMINATE,
-                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER,
+                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
@@ -125,6 +130,7 @@ class SokovanOrchestrator:
             # Sweep is a maintenance task - only needs long cycle timer
             SchedulerTimerSpec(
                 ScheduleType.SWEEP,
+                None,  # No short-cycle timer for maintenance tasks
                 LockID.LOCKID_SOKOVAN_SWEEP_TIMER,
                 short_interval=None,  # No short-cycle timer for maintenance tasks
                 long_interval=60.0,
@@ -133,21 +139,24 @@ class SokovanOrchestrator:
             # Progress check operations with both short and long cycle timers
             SchedulerTimerSpec(
                 ScheduleType.CHECK_PULLING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_PULLING_PROGRESS_TIMER,
+                LockID.LOCKID_SOKOVAN_CHECK_PULLING_PROGRESS_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_CHECK_PULLING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTimerSpec(
                 ScheduleType.CHECK_CREATING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_CREATING_PROGRESS_TIMER,
+                LockID.LOCKID_SOKOVAN_CHECK_CREATING_PROGRESS_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_CHECK_CREATING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTimerSpec(
                 ScheduleType.CHECK_TERMINATING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_TERMINATING_PROGRESS_TIMER,
+                LockID.LOCKID_SOKOVAN_CHECK_TERMINATING_PROGRESS_TIMER_SHORT,
+                LockID.LOCKID_SOKOVAN_CHECK_TERMINATING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
@@ -160,17 +169,21 @@ class SokovanOrchestrator:
 
         # Create timers based on specifications
         for spec in timer_specs:
-            if spec.short_interval is not None:
+            if spec.short_interval is not None and spec.short_lock_id is not None:
+                # Lock timeout should be slightly longer than interval to prevent overlap
+                short_lock_timeout = spec.short_interval * 1.5
                 process_if_needed_timer = GlobalTimer(
-                    self._lock_factory(spec.lock_id, 10.0),
+                    self._lock_factory(spec.short_lock_id, short_lock_timeout),
                     self._event_producer,
                     spec.create_if_needed_event,
                     interval=spec.short_interval,
                     task_name=spec.short_timer_name,
                 )
                 self.timers.append(process_if_needed_timer)
+            # Lock timeout should be slightly longer than interval to prevent overlap
+            long_lock_timeout = spec.long_interval * 1.5
             process_schedule_timer = GlobalTimer(
-                self._lock_factory(spec.lock_id, 10.0),
+                self._lock_factory(spec.long_lock_id, long_lock_timeout),
                 self._event_producer,
                 spec.create_process_event,
                 interval=spec.long_interval,
