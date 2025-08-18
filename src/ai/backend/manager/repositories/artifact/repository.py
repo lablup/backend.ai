@@ -3,7 +3,7 @@ from typing import Optional
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.storage.registries.types import ModelData
+from ai.backend.common.data.storage.registries.types import ModelData, ModelTarget
 from ai.backend.common.exception import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -34,6 +34,22 @@ class ArtifactRepository:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError()
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_artifact_by_model_target(self, model_target: ModelTarget) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(
+                    sa.and_(
+                        ArtifactRow.name == model_target.model_id,
+                        ArtifactRow.version == model_target.revision,
+                    )
+                )
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
@@ -202,5 +218,12 @@ class ArtifactRepository:
     ) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
             stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(status=status)
+            await db_sess.execute(stmt)
+            return artifact_id
+
+    @repository_decorator()
+    async def update_artifact_bytesize(self, artifact_id: uuid.UUID, size: int) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(size=size)
             await db_sess.execute(stmt)
             return artifact_id

@@ -17,6 +17,8 @@ from ai.backend.common.data.storage.registries.types import (
     ModelSortKey,
     ModelTarget,
 )
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -95,14 +97,13 @@ def _make_download_progress_logger(
             eta_sec = (remain / (inst_mibs * _MiB)) if inst_mibs > 0 else None
             eta_str = _fmt_eta(eta_sec)
 
-            # TODO: Change this logging level to Trace?
-            log.debug(
+            log.trace(
                 "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
                 )
             )
         else:
-            log.debug(
+            log.trace(
                 "Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
                     offset / _MiB, inst_mibs
                 )
@@ -119,6 +120,7 @@ class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
     storage_service: StorageService
+    event_producer: EventProducer
 
 
 class HuggingFaceService:
@@ -127,11 +129,13 @@ class HuggingFaceService:
     _storages_service: StorageService
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
+    _event_producer: EventProducer
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storages_service = args.storage_service
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs
+        self._event_producer = args.event_producer
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -254,6 +258,7 @@ class HuggingFaceService:
         chunk_size = registry_config.download_chunk_size
 
         async def _import_model(reporter: ProgressReporter) -> None:
+            artifact_total_size = 0
             model_id = model.model_id
             revision = model.revision
             try:
@@ -268,6 +273,7 @@ class HuggingFaceService:
                     f"Found files to import: model_id={model_id}@{revision}, file_count={file_count}, "
                     f"total_size={file_total_size / (1024 * 1024)} MB"
                 )
+                artifact_total_size += file_total_size
 
                 successful_uploads = 0
                 failed_uploads = 0
@@ -304,6 +310,13 @@ class HuggingFaceService:
                     log.warning(
                         f"Some files failed to import: model_id={model_id}@{revision}, failed_count={failed_uploads}"
                     )
+
+                await self._event_producer.anycast_event(
+                    ModelImportDoneEvent(
+                        model_id=model_id, revision=revision, total_size=artifact_total_size
+                    )
+                )
+
             except HuggingFaceModelNotFoundError:
                 log.error(f"Model not found: model_id={model_id}@{revision}")
                 raise
@@ -434,7 +447,6 @@ class HuggingFaceService:
         etag: Optional[str] = None
         accept_ranges = False
 
-        # Progress logger (decoupled from the core download logic)
         progress_logger = _make_download_progress_logger(
             total_getter=lambda: total,
             bytes_interval=64 * _MiB,

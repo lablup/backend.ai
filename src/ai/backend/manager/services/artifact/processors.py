@@ -40,8 +40,9 @@ from .service import ArtifactService
 
 
 class ArtifactProcessors(AbstractProcessorPackage):
-    import_: ActionProcessor[ImportArtifactAction, ImportArtifactActionResult]
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
+    import_: ActionProcessor[ImportArtifactAction, ImportArtifactActionResult]
+    cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
     associate_with_storage: ActionProcessor[
         AssociateWithStorageAction, AssociateWithStorageActionResult
     ]
@@ -51,11 +52,11 @@ class ArtifactProcessors(AbstractProcessorPackage):
     authorize: ActionProcessor[AuthorizeArtifactAction, AuthorizeArtifactActionResult]
     unauthorize: ActionProcessor[UnauthorizeArtifactAction, UnauthorizeArtifactActionResult]
     delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
-    cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
-        self.import_ = ActionProcessor(service.import_, action_monitors)
         self.scan = ActionProcessor(service.scan, action_monitors)
+        self.import_ = ActionProcessor(service.import_, action_monitors)
+        self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
         self.associate_with_storage = ActionProcessor(
             service.associate_with_storage, action_monitors
         )
@@ -65,13 +66,13 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.authorize = ActionProcessor(service.authorize, action_monitors)
         self.unauthorize = ActionProcessor(service.unauthorize, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
-        self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            ImportArtifactAction.spec(),
             ScanArtifactsAction.spec(),
+            ImportArtifactAction.spec(),
+            CancelImportAction.spec(),
             AssociateWithStorageAction.spec(),
             DisassociateWithStorageAction.spec(),
             AuthorizeArtifactAction.spec(),
