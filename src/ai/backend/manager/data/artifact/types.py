@@ -14,6 +14,16 @@ class ArtifactRegistryType(enum.StrEnum):
     HUGGINGFACE = "huggingface"
 
 
+class ArtifactStatus(enum.StrEnum):
+    SCANNED = "SCANNED"
+    PULLED = "PULLED"
+    PULLING = "PULLING"
+    VERIFYING = "VERIFYING"
+    VERIFIED = "VERIFIED"
+    AVAILABLE = "AVAILABLE"
+    FAILED = "FAILED"
+
+
 @dataclass
 class ArtifactData:
     id: uuid.UUID
@@ -28,6 +38,7 @@ class ArtifactData:
     updated_at: datetime
     version: str
     authorized: bool
+    status: ArtifactStatus
 
 
 @dataclass

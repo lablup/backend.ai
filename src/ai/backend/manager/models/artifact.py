@@ -9,7 +9,12 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRegistryType, ArtifactType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactData,
+    ArtifactRegistryType,
+    ArtifactStatus,
+    ArtifactType,
+)
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 
@@ -36,7 +41,7 @@ class ArtifactRow(Base):
     id = IDColumn("id")
     type = sa.Column("type", sa.Enum(ArtifactType), index=True, nullable=False)
     name = sa.Column("name", sa.String, index=True, nullable=False)
-    size = sa.Column("size", sa.BigInteger, nullable=False, default=0)
+    size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
     registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     registry_type = sa.Column("registry_type", sa.String, nullable=False, index=True)
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=True, index=True)
@@ -58,6 +63,7 @@ class ArtifactRow(Base):
         index=True,
     )
     authorized = sa.Column(sa.Boolean, nullable=False, default=False)
+    status = sa.Column(sa.String, nullable=False, default=ArtifactStatus.SCANNED.value)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -85,6 +91,7 @@ class ArtifactRow(Base):
             f"created_at={self.created_at.isoformat()}, "
             f"updated_at={self.updated_at.isoformat()}, "
             f"authorized={self.authorized}, "
+            f"status={self.status}, "
             f"version={self.version})"
         )
 
@@ -105,6 +112,7 @@ class ArtifactRow(Base):
             updated_at=self.updated_at,
             authorized=self.authorized,
             version=self.version,
+            status=ArtifactStatus(self.status),
         )
 
     @classmethod
@@ -127,4 +135,5 @@ class ArtifactRow(Base):
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
             version=model_data.revision,
+            status=ArtifactStatus.SCANNED.value,
         )

@@ -12,20 +12,12 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactStatus, ArtifactType
 from ai.backend.manager.services.artifact.actions.authorize import AuthorizeArtifactAction
 from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
-
-
-@strawberry.enum
-class ArtifactStatus(StrEnum):
-    AVAILABLE = "AVAILABLE"
-    PULLING = "PULLING"
-    VERIFYING = "VERIFYING"
-    FAILED = "FAILED"
 
 
 @strawberry.enum
@@ -126,7 +118,7 @@ class Artifact(Node):
             type=ArtifactType(data.type),
             # TODO: Fetch status from the actual data source
             # status=ArtifactStatus(data.status),
-            status=ArtifactStatus.AVAILABLE,
+            status=ArtifactStatus(ArtifactStatus.AVAILABLE),
             description=data.description,
             # TODO: Fill these with actual data
             registry=SourceInfo(name=None, url=None),

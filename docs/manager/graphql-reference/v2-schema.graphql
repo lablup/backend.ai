@@ -100,9 +100,12 @@ enum ArtifactOrderField {
 }
 
 enum ArtifactStatus {
-  AVAILABLE
+  SCANNED
+  PULLED
   PULLING
   VERIFYING
+  VERIFIED
+  AVAILABLE
   FAILED
 }
 
