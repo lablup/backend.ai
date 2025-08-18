@@ -40,7 +40,7 @@ type ArtifactEdge {
 
 input ArtifactFilter {
   type: [ArtifactType!] = null
-  status: [ArtifactStatus!] = null
+  status: ArtifactStatus = null
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
@@ -57,7 +57,7 @@ type ArtifactGroup implements Node {
   type: ArtifactType!
   status: ArtifactStatus!
   description: String
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactGroupFilter = null, orderBy: [ArtifactGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
 }
 
 """A connection to a list of items."""
@@ -76,6 +76,23 @@ type ArtifactGroupEdge {
 
   """The item at the end of the edge"""
   node: ArtifactGroup!
+}
+
+input ArtifactGroupFilter {
+  name: StringFilter = null
+  AND: ArtifactGroupFilter = null
+  OR: ArtifactGroupFilter = null
+  NOT: ArtifactGroupFilter = null
+  DISTINCT: Boolean = null
+}
+
+input ArtifactGroupOrderBy {
+  field: ArtifactGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactGroupOrderField {
+  NAME
 }
 
 type ArtifactImportProgressUpdatedPayload {
