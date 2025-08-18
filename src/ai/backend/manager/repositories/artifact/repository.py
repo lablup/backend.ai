@@ -10,7 +10,11 @@ from ai.backend.common.exception import (
     ArtifactNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactStatus
+from ai.backend.manager.data.artifact.types import (
+    ArtifactData,
+    ArtifactRegistryType,
+    ArtifactStatus,
+)
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -61,12 +65,16 @@ class ArtifactRepository:
         self,
         model_list: list[ModelData],
         registry_id: uuid.UUID,
-        source_registry_id: Optional[uuid.UUID],
+        source_registry_id: Optional[uuid.UUID] = None,
+        source_registry_type: Optional[ArtifactRegistryType] = None,
     ) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             models = [
                 ArtifactRow.from_huggingface_model_data(
-                    model, registry_id=registry_id, source_registry_id=source_registry_id
+                    model,
+                    registry_id=registry_id,
+                    source_registry_id=source_registry_id,
+                    source_registry_type=source_registry_type,
                 )
                 for model in model_list
             ]

@@ -78,7 +78,7 @@ class ArtifactService:
         )
 
         scanned_models = await self._artifact_repository.insert_huggingface_model_artifacts(
-            scan_result.models, registry_id=registry_data.id, source_registry_id=registry_data.id
+            scan_result.models, registry_id=registry_data.id
         )
 
         return ScanArtifactsActionResult(result=scanned_models)
