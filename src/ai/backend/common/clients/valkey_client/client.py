@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Iterable, Optional, Self
 
+import glide
 from glide import (
     GlideClient,
     GlideClientConfiguration,
@@ -106,6 +107,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
     _db_id: int
     _pubsub_channels: Optional[set[str]]
     _human_readable_name: str
+    _monitor_task: Optional[asyncio.Task[None]]
 
     def __init__(
         self,
@@ -119,6 +121,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._pubsub_channels = pubsub_channels
+        self._monitor_task = None
 
     @property
     def client(self) -> GlideClient:
@@ -130,9 +133,27 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         if self._valkey_client is not None:
             return
 
-        addresses = [
-            NodeAddress(host=str(self._target.address.host), port=self._target.address.port)
-        ]
+        await self._create_valkey_client()
+        self._monitor_task = asyncio.create_task(self._monitor_connection())
+
+    async def disconnect(self) -> None:
+        if self._monitor_task:
+            self._monitor_task.cancel()
+            try:
+                await self._monitor_task
+            except asyncio.CancelledError:
+                pass
+            self._monitor_task = None
+
+        if self._valkey_client:
+            await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
+            self._valkey_client = None
+
+    async def _create_valkey_client(self) -> None:
+        target_host = self._target.address.host
+        target_port = self._target.address.port
+        addresses = [NodeAddress(host=target_host, port=target_port)]
+
         credentials = (
             ServerCredentials(password=self._target.password) if self._target.password else None
         )
@@ -141,7 +162,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
-            request_timeout=self._target.request_timeout or 1_000,
+            request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
                     GlideClientConfiguration.PubSubChannelModes.Exact: self._pubsub_channels,
@@ -158,15 +179,69 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
         log.info(
             "Created ValkeyClient for standalone at {}:{} for database {}",
-            self._target.address.host,
-            self._target.address.port,
+            target_host,
+            target_port,
             self._human_readable_name,
         )
 
-    async def disconnect(self) -> None:
+    async def _ping(self) -> bool:
+        """
+        Ping the server to check if the connection is alive.
+        """
+        if self._valkey_client is None:
+            return False
+        try:
+            await self._valkey_client.ping()
+            return True
+        except glide.ClosingError as e:
+            log.warning(
+                "Valkey client is closed for standalone at {}:{}, human readable name '{}': {}",
+                self._target.address.host,
+                self._target.address.port,
+                self._human_readable_name,
+                e,
+            )
+            return False
+        except Exception as e:
+            log.debug(
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.address,
+                self._human_readable_name,
+                e,
+            )
+            return True
+
+    async def _check_connection(self) -> bool:
+        """
+        Check if the current connection is alive.
+        If not, return False to trigger reconnection.
+        """
+        if not await self._ping():
+            return False
+        return True
+
+    async def _monitor_connection(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(10.0)
+                if await self._check_connection():
+                    continue
+                await self._reconnect()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                log.exception("Error in connection monitoring: {}", e)
+
+    async def _reconnect(self) -> None:
         if self._valkey_client:
-            await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
+            try:
+                await self._valkey_client.close()
+            except Exception as e:
+                log.warning("Error closing old client: {}", e)
             self._valkey_client = None
+
+        await self._create_valkey_client()
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -186,8 +261,12 @@ class ValkeySentinelClient(AbstractValkeyClient):
         human_readable_name: str,
         pubsub_channels: Optional[set[str]] = None,
     ) -> None:
+        sentinel_addrs = []
+        for addr in target.sentinel_addresses:
+            sentinel_addrs.append((addr.host, addr.port))
+
         self._sentinel = Sentinel(
-            [(str(host), port) for host, port in target.sentinel_addresses],
+            sentinel_addrs,
             sentinel_kwargs={
                 "password": target.password,
             },
@@ -211,7 +290,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             return
 
         await self._create_valkey_client()
-        self._monitor_task = asyncio.create_task(self._monitor_master())
+        self._monitor_task = asyncio.create_task(self._monitor_connection())
 
     async def disconnect(self) -> None:
         if self._monitor_task:
@@ -276,23 +355,65 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return None
 
-    async def _monitor_master(self) -> None:
+    async def _ping(self) -> bool:
+        """
+        Ping the current master to check if the connection is alive.
+        """
+        if self._valkey_client is None:
+            return False
+        try:
+            await self._valkey_client.ping()
+            return True
+        except glide.ClosingError as e:
+            log.warning(
+                "Valkey client is closed for service '{}', human readable name '{}': {}",
+                self._target.service_name,
+                self._human_readable_name,
+                e,
+            )
+            return False
+        except Exception as e:
+            log.debug(
+                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
+                self._target.service_name,
+                self._human_readable_name,
+                e,
+            )
+            return True
+
+    async def _check_connection(self) -> bool:
+        """
+        Check if the current master connection is alive.
+        If not, attempt to reconnect.
+        """
+        if not await self._ping():
+            log.warning(
+                "Connection to master {}:{} is down, attempting to reconnect",
+                self._master_address[0] if self._master_address else "unregistered",
+                self._master_address[1] if self._master_address else "unregistered",
+            )
+            return False
+        current_master = await self._get_master_address()
+        if current_master is None or current_master == self._master_address:
+            return True
+        log.warning(
+            "Master change detected for service '{}': {}:{} -> {}:{} in {}",
+            self._target.service_name,
+            self._master_address[0] if self._master_address else "unregistered",
+            self._master_address[1] if self._master_address else "unregistered",
+            current_master[0],
+            current_master[1],
+            self._human_readable_name,
+        )
+        return False
+
+    async def _monitor_connection(self) -> None:
         while True:
             try:
-                await asyncio.sleep(5.0)
-                current_master = await self._get_master_address()
-                if current_master is None or current_master == self._master_address:
+                await asyncio.sleep(10.0)
+                if await self._check_connection():
                     continue
-
-                log.info(
-                    "Master change detected for service '{}': {}:{} -> {}:{} in {}",
-                    self._target.service_name,
-                    self._master_address[0] if self._master_address else "unregistered",
-                    self._master_address[1] if self._master_address else "unregistered",
-                    current_master[0],
-                    current_master[1],
-                    self._human_readable_name,
-                )
+                log.info("Reconnecting to new master for service '{}'", self._target.service_name)
                 await self._reconnect_to_new_master()
 
             except asyncio.CancelledError:
