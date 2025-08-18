@@ -1,9 +1,12 @@
 """HuggingFace model scanner implementation for Backend.AI storage."""
 
+import asyncio
 import logging
+import ssl
+import time
 import uuid
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
+from typing import Callable, Optional, Protocol
 
 import aiohttp
 
@@ -31,8 +34,83 @@ from ai.backend.storage.services.storages import StorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# TODO: Move to config
-_DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in seconds
+_MiB = 1024 * 1024
+
+_DOWNLOAD_RETRIABLE_ERROR = (
+    aiohttp.ClientPayloadError,
+    aiohttp.ServerDisconnectedError,
+    aiohttp.ClientOSError,
+    asyncio.TimeoutError,
+    ssl.SSLError,
+)
+
+
+class ProgressLogger(Protocol):
+    def __call__(self, offset: int, final: bool = False) -> None: ...
+
+
+def make_download_progress_logger(
+    *,
+    total_getter: Callable[[], Optional[int]] = lambda: None,
+    bytes_interval: int = 64 * _MiB,
+    secs_interval: float = 15.0,
+) -> ProgressLogger:
+    """
+    Return a lightweight progress logging callback.
+
+    - The returned function: (offset_bytes: int, final: bool = False) -> None
+    - Skips logging unless either `bytes_interval` or `secs_interval` has elapsed.
+    - Uses preformatted strings (str.format) instead of '%' style placeholders.
+    """
+
+    last_t = time.monotonic()
+    last_bytes = 0
+
+    def _fmt_eta(eta_sec: Optional[float]) -> str:
+        """Format ETA seconds as H:MM:SS or '?' if unknown."""
+        if eta_sec is None or eta_sec >= 1e9:
+            return "?"
+        m, s = divmod(int(eta_sec), 60)
+        h, m = divmod(m, 60)
+        return f"{h:d}:{m:02d}:{s:02d}"
+
+    def log_progress(offset: int, final: bool = False) -> None:
+        nonlocal last_t, last_bytes
+
+        now = time.monotonic()
+        bytes_since = offset - last_bytes
+        secs_since = now - last_t
+
+        # Skip if neither interval threshold is met (and not final)
+        if not final and bytes_since < bytes_interval and secs_since < secs_interval:
+            return
+
+        inst_mibs = (bytes_since / _MiB) / secs_since if secs_since > 0 else 0.0
+        total = total_getter()
+
+        if total:
+            pct = (offset * 100.0) / total if total > 0 else 0.0
+            remain = max(total - offset, 0)
+            eta_sec = (remain / (inst_mibs * _MiB)) if inst_mibs > 0 else None
+            eta_str = _fmt_eta(eta_sec)
+
+            # TODO: Change this logging level to Trace
+            log.debug(
+                "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                    pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
+                )
+            )
+        else:
+            log.debug(
+                "Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                    offset / _MiB, inst_mibs
+                )
+            )
+
+        last_t = now
+        last_bytes = offset
+
+    return log_progress
 
 
 @dataclass
@@ -336,37 +414,140 @@ class HuggingFaceService:
         return bgtask_id
 
     async def _make_download_file_stream(
-        self, url: str, download_chunk_size: int, timeout: int = _DEFAULT_FILE_DOWNLOAD_TIMEOUT
-    ) -> AsyncIterator[bytes]:
-        """Download file from URL as async byte stream.
-
-        Args:
-            url: URL to download from
-            download_chunk_size: Chunk size for file download
-            timeout: Request timeout in seconds
-
-        Yields:
-            Chunks of file data as bytes
-
-        Raises:
-            HuggingFaceAPIError: If download fails
+        self,
+        url: str,
+        chunk_size: int,
+        *,
+        max_retries: int = 8,
+    ):
         """
-        try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=timeout)
-            ) as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        raise HuggingFaceAPIError(
-                            f"Download failed with status {response.status}: {url}"
-                        )
+        Stream bytes from `url` with resume support.
+        """
+        session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
+            auto_decompress=False,
+        )
 
-                    async for chunk in response.content.iter_chunked(download_chunk_size):
-                        yield chunk
-        except aiohttp.ClientError as e:
-            raise HuggingFaceAPIError(f"HTTP client error downloading {url}: {str(e)}") from e
-        except Exception as e:
-            raise HuggingFaceAPIError(f"Unexpected error downloading {url}: {str(e)}") from e
+        headers_base = {"Accept-Encoding": "identity"}
+        total: Optional[int] = None
+        etag: Optional[str] = None
+        accept_ranges = False
+
+        # Progress logger (decoupled from the core download logic)
+        progress = make_download_progress_logger(
+            total_getter=lambda: total,
+            bytes_interval=64 * _MiB,
+            secs_interval=15.0,
+        )
+
+        async def _probe_head() -> None:
+            """
+            Probe metadata via HEAD.
+            - May set total size, etag, and Accept-Ranges support.
+            - Any failure is swallowed (best effort).
+            """
+            nonlocal total, etag, accept_ranges
+            try:
+                async with session.head(url, headers=headers_base, allow_redirects=True) as resp:
+                    content_length = resp.headers.get("Content-Length")
+                    if content_length and content_length.isdigit():
+                        total = int(content_length)
+
+                    new_etag = resp.headers.get("ETag")
+                    if etag and new_etag and new_etag != etag:
+                        raise aiohttp.ClientPayloadError("ETag changed on HEAD")
+                    etag = etag or new_etag
+
+                    accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
+            except Exception:
+                # HEAD is best-effort; ignore failures.
+                pass
+
+        offset = 0
+        backoff = 1.0
+        retries = 0
+
+        try:
+            await _probe_head()
+
+            while True:
+                headers = dict(headers_base)
+                if offset and accept_ranges:
+                    headers["Range"] = f"bytes={offset}-"
+
+                try:
+                    async with session.get(url, headers=headers, allow_redirects=True) as resp:
+                        # Validate partial content when resuming
+                        if offset and accept_ranges and resp.status != 206:
+                            raise aiohttp.ClientPayloadError(f"Expected 206, got {resp.status}")
+
+                        # Validate ETag across resumes
+                        resp_etag = resp.headers.get("ETag")
+                        if etag and resp_etag and resp_etag != etag:
+                            raise aiohttp.ClientPayloadError("ETag changed during resume")
+
+                        # Fill total size from response headers if still unknown
+                        if total is None:
+                            if resp.status == 200:
+                                content_length = resp.headers.get("Content-Length")
+                                if content_length and content_length.isdigit():
+                                    total = int(content_length)
+                            elif resp.status == 206:
+                                content_range = resp.headers.get(
+                                    "Content-Range"
+                                )  # e.g. "bytes 123-456/789"
+                                if content_range and "/" in content_range:
+                                    try:
+                                        total = int(content_range.split("/")[-1])
+                                    except ValueError:
+                                        pass
+                            # TODO: Handle else case
+
+                        async for chunk in resp.content.iter_chunked(chunk_size):
+                            if not chunk:
+                                continue
+                            offset += len(chunk)
+                            progress(offset)
+                            yield chunk
+
+                    # total unknown
+                    if total is None:
+                        progress(offset, final=True)
+                        log.warning("Skipped download of %s since total size is unknown", url)
+                        break
+
+                    # Completed
+                    if offset >= total:
+                        progress(offset, final=True)
+                        break
+
+                    # Unexpected early EOF → retry
+                    raise aiohttp.ClientPayloadError("Early EOF before Content-Length")
+
+                except _DOWNLOAD_RETRIABLE_ERROR as e:
+                    retries += 1
+                    if retries > max_retries:
+                        progress(offset, final=True)
+                        raise aiohttp.ClientPayloadError(
+                            f"Exceeded retries while downloading {url} at offset={offset}"
+                        ) from e
+
+                    log.warning(
+                        "Download retry {}/{} at offset {} MiB (backoff={:.1fs}, err={})",
+                        retries,
+                        max_retries,
+                        offset / _MiB,
+                        backoff,
+                        e.__class__.__name__,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 30.0)
+
+                    # Refresh metadata before retry
+                    await _probe_head()
+                    continue
+        finally:
+            await session.close()
 
     async def _pipe_single_file_to_storage(
         self,
@@ -422,9 +603,6 @@ class HuggingFaceService:
             )
 
         except Exception as e:
-            log.error(
-                f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
-            )
             raise HuggingFaceAPIError(
                 f"Unexpected error uploading {file_info.path}: {str(e)}"
             ) from e
