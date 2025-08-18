@@ -5,12 +5,6 @@ from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.session.anycast import (
-    SessionEnqueuedAnycastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionEnqueuedBroadcastEvent,
-)
 from ai.backend.common.types import SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -229,26 +223,6 @@ class SchedulingController:
                 e,
             )
         return session_id
-
-    async def dispatch_session_events(
-        self,
-        session_id: SessionId,
-        creation_id: str,
-    ) -> None:
-        """
-        Dispatch session enqueued events.
-
-        This should be called after successfully enqueuing a session,
-        typically from a handler or higher-level coordinator.
-
-        Args:
-            session_id: The ID of the enqueued session
-            creation_id: The creation ID of the session
-        """
-        await self._event_producer.anycast_and_broadcast_event(
-            SessionEnqueuedAnycastEvent(session_id, creation_id),
-            SessionEnqueuedBroadcastEvent(session_id, creation_id),
-        )
 
     async def request_scheduling(self, schedule_type: ScheduleType) -> None:
         """
