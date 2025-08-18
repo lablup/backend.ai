@@ -114,4 +114,5 @@ class ArtifactRow(Base):
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
             version=model_data.revision,
+            status=ArtifactStatus.SCANNED.value,
         )

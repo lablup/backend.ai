@@ -118,7 +118,7 @@ class ArtifactRevision(Node):
             type=ArtifactType(data.type),
             # TODO: Fetch status from the actual data source
             # status=ArtifactStatus(data.status),
-            status=ArtifactStatus.AVAILABLE,
+            status=ArtifactStatus(ArtifactStatus.AVAILABLE),
             description=data.description,
             # TODO: Fill these with actual data
             registry=SourceInfo(name=None, url=None),
