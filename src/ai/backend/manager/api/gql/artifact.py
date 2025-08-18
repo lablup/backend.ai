@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilt
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactStatus, ArtifactType
 from ai.backend.manager.services.artifact.actions.authorize import AuthorizeArtifactAction
+from ai.backend.manager.services.artifact.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact.actions.import_ import ImportArtifactAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
@@ -227,7 +228,7 @@ class UnauthorizeArtifactPayload:
 
 @strawberry.type
 class CancelImportArtifactPayload:
-    artifact: Artifact
+    artifact_id: ID
 
 
 @strawberry.type
@@ -346,8 +347,17 @@ async def delete_artifact(
 
 
 @strawberry.mutation
-def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
-    raise NotImplementedError("Cancel import artifact functionality is not implemented yet.")
+async def cancel_import_artifact(
+    artifact_id: ID, info: Info[StrawberryGQLContext]
+) -> CancelImportArtifactPayload:
+    # TODO: Cancel actual import bgtask
+    action_result = await info.context.processors.artifact.cancel_import.wait_for_complete(
+        CancelImportAction(
+            artifact_id=uuid.UUID(artifact_id),
+        )
+    )
+
+    return CancelImportArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
 
 
 @strawberry.mutation

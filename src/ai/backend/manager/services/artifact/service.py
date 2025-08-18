@@ -15,6 +15,10 @@ from ai.backend.manager.services.artifact.actions.authorize import (
     AuthorizeArtifactAction,
     AuthorizeArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.cancel_import import (
+    CancelImportAction,
+    CancelImportActionResult,
+)
 from ai.backend.manager.services.artifact.actions.delete import (
     DeleteArtifactAction,
     DeleteArtifactActionResult,
@@ -131,3 +135,7 @@ class ArtifactService:
     async def delete(self, action: DeleteArtifactAction) -> DeleteArtifactActionResult:
         result = await self._artifact_repository.delete_artifact(action.artifact_id)
         return DeleteArtifactActionResult(artifact_id=result)
+
+    async def cancel_import(self, action: CancelImportAction) -> CancelImportActionResult:
+        artifact_id = await self._artifact_repository.cancel_import_artifact(action.artifact_id)
+        return CancelImportActionResult(artifact_id=artifact_id)

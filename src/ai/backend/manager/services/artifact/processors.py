@@ -11,6 +11,10 @@ from ai.backend.manager.services.artifact.actions.authorize import (
     AuthorizeArtifactAction,
     AuthorizeArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.cancel_import import (
+    CancelImportAction,
+    CancelImportActionResult,
+)
 from ai.backend.manager.services.artifact.actions.delete import (
     DeleteArtifactAction,
     DeleteArtifactActionResult,
@@ -47,6 +51,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     authorize: ActionProcessor[AuthorizeArtifactAction, AuthorizeArtifactActionResult]
     unauthorize: ActionProcessor[UnauthorizeArtifactAction, UnauthorizeArtifactActionResult]
     delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
+    cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.import_ = ActionProcessor(service.import_, action_monitors)
@@ -60,6 +65,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.authorize = ActionProcessor(service.authorize, action_monitors)
         self.unauthorize = ActionProcessor(service.unauthorize, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
+        self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

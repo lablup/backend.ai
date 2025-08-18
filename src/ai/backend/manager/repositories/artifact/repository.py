@@ -10,7 +10,7 @@ from ai.backend.common.exception import (
     ArtifactNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactData
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactStatus
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -183,4 +183,15 @@ class ArtifactRepository:
             await db_sess.delete(row)
             await db_sess.flush()
 
+            return artifact_id
+
+    @repository_decorator()
+    async def cancel_import_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRow)
+                .where(ArtifactRow.id == artifact_id)
+                .values(status=ArtifactStatus.SCANNED)
+            )
+            await db_sess.execute(stmt)
             return artifact_id
