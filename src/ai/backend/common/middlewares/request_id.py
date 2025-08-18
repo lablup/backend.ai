@@ -3,6 +3,7 @@ from typing import Awaitable, Callable, Optional, TypeAlias
 from aiohttp import web
 
 from ai.backend.common.contexts.request_id import with_request_id
+from ai.backend.logging.utils import with_log_context_fields
 
 Handler: TypeAlias = Callable[
     [web.Request],

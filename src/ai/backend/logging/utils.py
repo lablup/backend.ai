@@ -5,9 +5,7 @@ from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import TracebackType
-from typing import Any, LiteralString, TypeAlias, TypedDict, cast, override
-
-from ai.backend.logging.otel import OpenTelemetrySpec
+from typing import Any, TypeAlias, TypedDict, cast, override
 
 _log_context_fields: ContextVar[Mapping[str, Any]] = ContextVar("log_context_fields", default={})
 
@@ -87,33 +85,6 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
             **(cast(dict[str, Any], kwargs["extra"] or {})),
         }
         return msg, kwargs
-
-    def trace(
-        self,
-        msg: LiteralString,
-        *args,
-        exc_info: _ExcInfoType = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, object] | None = None,
-        **kwargs,
-    ) -> None:
-        self.log(
-            _TRACE_LEVEL,
-            msg,
-            *args,
-            exc_info=exc_info,
-            stack_info=stack_info,
-            stacklevel=stacklevel,
-            extra=extra,
-            **kwargs,
-        )
-
-    @classmethod
-    def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
-        from .otel import apply_otel_loggers
-
-        apply_otel_loggers(cls._loggers, spec)
 
 
 def enforce_debug_logging(loggers: Iterable[str]) -> None:
