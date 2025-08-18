@@ -99,7 +99,7 @@ type AuthorizeArtifactPayload {
 scalar ByteSize
 
 type CancelImportArtifactPayload {
-  artifact: Artifact!
+  artifactId: ID!
 }
 
 type ClusterConfig {

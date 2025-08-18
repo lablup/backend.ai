@@ -182,7 +182,7 @@ class UnauthorizeArtifactPayload:
 
 @strawberry.type
 class CancelImportArtifactPayload:
-    artifact: Artifact
+    artifact_id: ID
 
 
 @strawberry.type
@@ -273,8 +273,17 @@ async def delete_artifact(
 
 
 @strawberry.mutation
-def cancel_import_artifact(artifact_id: ID) -> CancelImportArtifactPayload:
-    raise NotImplementedError("Cancel import artifact functionality is not implemented yet.")
+async def cancel_import_artifact(
+    artifact_id: ID, info: Info[StrawberryGQLContext]
+) -> CancelImportArtifactPayload:
+    # TODO: Cancel actual import bgtask
+    action_result = await info.context.processors.artifact.cancel_import.wait_for_complete(
+        CancelImportAction(
+            artifact_id=uuid.UUID(artifact_id),
+        )
+    )
+
+    return CancelImportArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
 
 
 @strawberry.mutation
