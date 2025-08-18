@@ -247,7 +247,11 @@ class ProxyWorkerConfig(BaseSchema):
         lt=65536,
     )
 
-    heartbeat_period: float = Field(gt=0, description="Heartbeat period in seconds.", default=10.0)
+    heartbeat_period: float = Field(
+        description="Heartbeat period in seconds.",
+        default=10.0,
+        gt=0,
+    )
 
     frontend_mode: FrontendServerMode = Field(
         description="Type of frontend mode the worker will operate.",
