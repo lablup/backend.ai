@@ -35,7 +35,7 @@ type ArtifactEdge {
 
 input ArtifactFilter {
   type: [ArtifactType!] = null
-  status: [ArtifactStatus!] = null
+  status: ArtifactStatus = null
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
