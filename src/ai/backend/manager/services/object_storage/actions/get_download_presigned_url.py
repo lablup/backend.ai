@@ -9,6 +9,7 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 @dataclass
 class GetDownloadPresignedURLAction(ObjectStorageAction):
     artifact_id: uuid.UUID
+    artifact_revision: str
     storage_id: uuid.UUID
     bucket_name: str
     key: str

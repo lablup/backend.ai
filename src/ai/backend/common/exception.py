@@ -524,9 +524,9 @@ class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
+class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-not-approved"
-    error_title = "Artifact Not Approved"
+    error_title = "Artifact Not Authorized"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
