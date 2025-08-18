@@ -5,7 +5,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.exception import (
-    ArtifactAssociationCreationError,
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
@@ -66,21 +65,34 @@ class ArtifactRepository:
 
     @repository_decorator()
     async def associate_artifact_with_storage(
-        self, artifact_id: uuid.UUID, storage_id: uuid.UUID
+        self,
+        artifact_id: uuid.UUID,
+        storage_id: uuid.UUID,
     ) -> AssociationArtifactsStoragesData:
         async with self._db.begin_session() as db_sess:
-            stmt = (
+            select_stmt = sa.select(AssociationArtifactsStorageRow.id).where(
+                sa.and_(
+                    AssociationArtifactsStorageRow.artifact_id == artifact_id,
+                    AssociationArtifactsStorageRow.storage_id == storage_id,
+                )
+            )
+            existing = (await db_sess.execute(select_stmt)).scalar_one_or_none()
+            if existing is not None:
+                return AssociationArtifactsStoragesData(
+                    id=existing, artifact_id=artifact_id, storage_id=storage_id
+                )
+
+            insert_stmt = (
                 sa.insert(AssociationArtifactsStorageRow)
                 .values(artifact_id=artifact_id, storage_id=storage_id)
                 .returning(AssociationArtifactsStorageRow.id)
             )
-            result = await db_sess.execute(stmt)
-            inserted_id = result.scalar_one_or_none()
-            if inserted_id is None:
-                raise ArtifactAssociationCreationError("Failed to create association")
+
+            result = await db_sess.execute(insert_stmt)
+            existing = result.scalar_one_or_none()
 
             return AssociationArtifactsStoragesData(
-                id=inserted_id,
+                id=existing,
                 artifact_id=artifact_id,
                 storage_id=storage_id,
             )
