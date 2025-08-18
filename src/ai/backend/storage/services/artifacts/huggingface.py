@@ -45,16 +45,16 @@ _DOWNLOAD_RETRIABLE_ERROR = (
 )
 
 
-class ProgressLogger(Protocol):
+class _DownloadProgressLogger(Protocol):
     def __call__(self, offset: int, final: bool = False) -> None: ...
 
 
-def make_download_progress_logger(
+def _make_download_progress_logger(
     *,
     total_getter: Callable[[], Optional[int]] = lambda: None,
     bytes_interval: int = 64 * _MiB,
     secs_interval: float = 15.0,
-) -> ProgressLogger:
+) -> _DownloadProgressLogger:
     """
     Return a lightweight progress logging callback.
 
@@ -94,7 +94,7 @@ def make_download_progress_logger(
             eta_sec = (remain / (inst_mibs * _MiB)) if inst_mibs > 0 else None
             eta_str = _fmt_eta(eta_sec)
 
-            # TODO: Change this logging level to Trace
+            # TODO: Change this logging level to Trace?
             log.debug(
                 "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
@@ -434,7 +434,7 @@ class HuggingFaceService:
         accept_ranges = False
 
         # Progress logger (decoupled from the core download logic)
-        progress = make_download_progress_logger(
+        progress_logger = _make_download_progress_logger(
             total_getter=lambda: total,
             bytes_interval=64 * _MiB,
             secs_interval=15.0,
@@ -507,18 +507,18 @@ class HuggingFaceService:
                             if not chunk:
                                 continue
                             offset += len(chunk)
-                            progress(offset)
+                            progress_logger(offset)
                             yield chunk
 
                     # total unknown
                     if total is None:
-                        progress(offset, final=True)
+                        progress_logger(offset, final=True)
                         log.warning("Skipped download of %s since total size is unknown", url)
                         break
 
                     # Completed
                     if offset >= total:
-                        progress(offset, final=True)
+                        progress_logger(offset, final=True)
                         break
 
                     # Unexpected early EOF → retry
@@ -527,13 +527,13 @@ class HuggingFaceService:
                 except _DOWNLOAD_RETRIABLE_ERROR as e:
                     retries += 1
                     if retries > max_retries:
-                        progress(offset, final=True)
+                        progress_logger(offset, final=True)
                         raise aiohttp.ClientPayloadError(
                             f"Exceeded retries while downloading {url} at offset={offset}"
                         ) from e
 
                     log.warning(
-                        "Download retry {}/{} at offset {} MiB (backoff={:.1fs}, err={})",
+                        "Download retry {}/{} at offset {:.1f} MiB (backoff={:.1f}s, err={})",
                         retries,
                         max_retries,
                         offset / _MiB,
