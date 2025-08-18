@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.11.3 (2025-08-18)
+No significant changes.
+
+
 ## 25.11.2 (2025-07-16)
 No significant changes.
 
