@@ -119,14 +119,10 @@ class TraefikConfig(BaseSchema):
         match self.frontend_mode:
             case FrontendMode.PORT:
                 if self.port_proxy is None:
-                    raise ValueError(
-                        "traefik.port_proxy must be set when traefik.frontend_mode = 'port'"
-                    )
+                    raise ValueError("port_proxy must be set when frontend_mode = 'port'")
             case FrontendMode.WILDCARD_DOMAIN:
                 if self.wildcard_domain is None:
-                    raise ValueError(
-                        "traefik.wildcard_domain must be set when traefik.frontend_mode = 'wildcard'"
-                    )
+                    raise ValueError("wildcard_domain must be set when frontend_mode = 'wildcard'")
         return self
 
 
@@ -322,7 +318,7 @@ class ProxyWorkerConfig(BaseSchema):
             ipaddress.IPv4Network(self.metric_access_allowed_hosts)
         except ValueError:
             raise ValueError(
-                "proxy_worker.metric_access_allowed_hosts should be either a valid IPv4 Address or Network"
+                "metric_access_allowed_hosts should be either a valid IPv4 Address or Network"
             ) from None
         return self
 
@@ -331,19 +327,13 @@ class ProxyWorkerConfig(BaseSchema):
         match self.frontend_mode:
             case FrontendServerMode.PORT:
                 if self.port_proxy is None:
-                    raise ValueError(
-                        "proxy_worker.port_proxy must be set when proxy_worker.frontend_mode = 'port'"
-                    )
+                    raise ValueError("port_proxy must be set when frontend_mode = 'port'")
             case FrontendServerMode.WILDCARD_DOMAIN:
                 if self.wildcard_domain is None:
-                    raise ValueError(
-                        "proxy_worker.wildcard_domain must be set when proxy_worker.frontend_mode = 'wildcard'"
-                    )
+                    raise ValueError("wildcard_domain must be set when frontend_mode = 'wildcard'")
             case FrontendServerMode.TRAEFIK:
                 if self.traefik is None:
-                    raise ValueError(
-                        "proxy_worker.traefik must be set when proxy_worker.frontend_mode = 'traefik'"
-                    )
+                    raise ValueError("traefik must be set when frontend_mode = 'traefik'")
         return self
 
     @model_validator(mode="after")
@@ -351,13 +341,11 @@ class ProxyWorkerConfig(BaseSchema):
         match self.protocol:
             case ProxyProtocol.GRPC:
                 raise ValueError(
-                    "Directly setting proxy_worker.protocol = 'grpc' is not supported; use 'h2' instead"
+                    "Directly setting protocol = 'grpc' is not supported; use 'h2' instead"
                 )
             case ProxyProtocol.HTTP2:
                 if not self.http2:
-                    raise ValueError(
-                        "proxy_worker.http2 must be set when proxy_worker.protocol = 'h2'"
-                    )
+                    raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
 
 
