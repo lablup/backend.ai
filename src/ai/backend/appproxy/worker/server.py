@@ -841,9 +841,7 @@ async def server_main(
     finally:
         if aiomon_started:
             m.close()
-        log.info("Leftover tasks:")
-        for task in asyncio.all_tasks():
-            log.info("{}", task)
+        log.debug("The number of leftover asyncio tasks: {}", len(asyncio.all_tasks()))
 
 
 @actxmgr
