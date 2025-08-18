@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -26,7 +28,7 @@ from ...types import (
     SubdomainFrontendInfo,
     TCircuitKey,
 )
-from .abc import AbstractFrontend
+from .base import BaseFrontend
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -36,7 +38,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 
 
-class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBackend, TCircuitKey]):
+class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):
     runner: web.AppRunner
     last_used_time_marker_writer_task: asyncio.Task
     active_circuit_writer_task: asyncio.Task

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import dataclasses
 import enum
@@ -30,7 +32,6 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     SerializableCircuit,
 )
-from ai.backend.appproxy.worker.config import ServerConfig
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -46,7 +47,8 @@ from ai.backend.common.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.appproxy.worker.proxy.frontend.abc import AbstractFrontend
+    from .config import ServerConfig
+    from .proxy.frontend.base import BaseFrontend
 
 
 class ProxyMetricObserver:
@@ -301,7 +303,7 @@ class PrometheusMetrics:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: "AbstractFrontend"
+    proxy_frontend: BaseFrontend
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     redis_live: RedisConnectionInfo
@@ -571,7 +573,7 @@ class Metric:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "__type": self.type.name,
+            "__type": self.type.name,  # type: ignore
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
                 str(remove_exponent(self.capacity.quantize(q)))

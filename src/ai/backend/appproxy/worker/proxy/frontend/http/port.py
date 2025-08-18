@@ -8,15 +8,15 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
-from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
 from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractHTTPFrontend
+from ....types import Circuit, PortFrontendInfo
+from .base import BaseHTTPFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class PortFrontend(AbstractHTTPFrontend[int]):
+class PortFrontend(BaseHTTPFrontend[int]):
     sites: list[web.TCPSite]
 
     def __init__(self, *args, **kwargs) -> None:

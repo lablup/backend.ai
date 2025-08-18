@@ -10,7 +10,7 @@ from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging import BraceStyleAdapter
 
-from .abc import H2Frontend
+from .base import H2Frontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

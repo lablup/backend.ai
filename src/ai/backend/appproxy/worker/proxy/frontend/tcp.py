@@ -18,12 +18,12 @@ from ai.backend.appproxy.worker.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractFrontend
+from .base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class TCPFrontend(AbstractFrontend[TCPBackend, int]):
+class TCPFrontend(BaseFrontend[TCPBackend, int]):
     servers: list[asyncio.Server]
     server_tasks: list[asyncio.Task]
 

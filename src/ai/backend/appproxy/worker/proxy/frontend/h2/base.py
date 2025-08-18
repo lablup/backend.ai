@@ -8,12 +8,12 @@ from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.types import Circuit, TCircuitKey
 from ai.backend.logging import BraceStyleAdapter
 
-from ..abc import AbstractFrontend
+from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class H2Frontend(Generic[TCircuitKey], AbstractFrontend[H2Backend, TCircuitKey]):
+class H2Frontend(Generic[TCircuitKey], BaseFrontend[H2Backend, TCircuitKey]):
     api_port_pool: set[int]
 
     def __init__(self, *args, **kwargs) -> None:

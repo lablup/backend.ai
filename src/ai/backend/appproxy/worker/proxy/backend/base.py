@@ -1,8 +1,7 @@
 import logging
 import time
-from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, final
 
 import aiohttp
 from yarl import URL
@@ -12,7 +11,7 @@ from ai.backend.appproxy.common.types import SerializableCircuit as Circuit
 from ai.backend.appproxy.worker.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -23,7 +22,7 @@ class HttpRequest:
     body: aiohttp.StreamReader
 
 
-class AbstractBackend(metaclass=ABCMeta):
+class BaseBackend:
     root_context: RootContext
     circuit: Circuit
     last_used: float
@@ -33,6 +32,13 @@ class AbstractBackend(metaclass=ABCMeta):
         self.circuit = circuit
         self.last_used = time.time()
 
+    async def close(self) -> None:
+        pass
+
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        self.routes = routes
+
+    @final
     async def mark_last_used_time(self, route: RouteInfo) -> None:
         await self.root_context.last_used_time_marker_redis_queue.put((
             [
@@ -42,6 +48,7 @@ class AbstractBackend(metaclass=ABCMeta):
             time.time(),
         ))
 
+    @final
     async def increase_request_counter(self) -> None:
         await self.root_context.request_counter_redis_queue.put(
             f"circuit.{self.circuit.id}.requests"
