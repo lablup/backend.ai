@@ -132,15 +132,11 @@ ArtifactEdge = Edge[Artifact]
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
-    total_count: int = 0
+    count: int = 0
 
-    def __init__(self, *args, total_count: int = 0, **kwargs):
+    def __init__(self, *args, count: int = 0, **kwargs):
         super().__init__(*args, **kwargs)
-        self._total_count = total_count
-
-    @strawberry.field
-    def count(self) -> int:
-        return self._total_count
+        self.count = count
 
 
 @strawberry.type
