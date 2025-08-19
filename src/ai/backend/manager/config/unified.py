@@ -372,7 +372,7 @@ class EtcdConfig(BaseModel):
             {"host": "127.0.0.1", "port": 2379},  # single endpoint
             [
                 {"host": "127.0.0.4", "port": 2379},
-                {"host": "127.0.05", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
             ],  # multiple endpoints
         ],
     )
