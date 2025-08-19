@@ -15,6 +15,7 @@ from .base import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 __all__ = ("ObjectStorageRow",)
 
 
