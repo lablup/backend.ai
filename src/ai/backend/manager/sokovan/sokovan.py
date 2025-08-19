@@ -161,6 +161,23 @@ class SokovanOrchestrator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
+            # Retry operations - only long cycle timers (30 seconds)
+            SchedulerTimerSpec(
+                ScheduleType.RETRY_PREPARING,
+                None,  # No short-cycle timer for retry tasks
+                LockID.LOCKID_SOKOVAN_RETRY_PREPARING_TIMER,
+                short_interval=None,  # No short-cycle timer
+                long_interval=30.0,  # 30 seconds for retry operations
+                initial_delay=10.0,  # Wait a bit before first retry
+            ),
+            SchedulerTimerSpec(
+                ScheduleType.RETRY_CREATING,
+                None,  # No short-cycle timer for retry tasks
+                LockID.LOCKID_SOKOVAN_RETRY_CREATING_TIMER,
+                short_interval=None,  # No short-cycle timer
+                long_interval=30.0,  # 30 seconds for retry operations
+                initial_delay=10.0,  # Wait a bit before first retry
+            ),
         ]
 
     async def init_timers(self) -> None:

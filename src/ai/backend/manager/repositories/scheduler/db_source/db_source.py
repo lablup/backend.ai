@@ -2517,7 +2517,20 @@ class ScheduleDBSource:
                         KernelRow.scaling_group,
                         KernelRow.image,
                         KernelRow.architecture,
+                        KernelRow.cluster_role,
                         KernelRow.cluster_idx,
+                        KernelRow.local_rank,
+                        KernelRow.cluster_hostname,
+                        KernelRow.uid,
+                        KernelRow.main_gid,
+                        KernelRow.gids,
+                        KernelRow.requested_slots,
+                        KernelRow.resource_opts,
+                        KernelRow.bootstrap_script,
+                        KernelRow.startup_command,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                        KernelRow.vfolder_mounts,
                         KernelRow.status,
                         KernelRow.status_changed,
                     )
@@ -2547,6 +2560,20 @@ class ScheduleDBSource:
                     status_changed=kernel.status_changed.timestamp()
                     if kernel.status_changed
                     else None,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    local_rank=kernel.local_rank,
+                    cluster_hostname=kernel.cluster_hostname,
+                    uid=kernel.uid,
+                    main_gid=kernel.main_gid,
+                    gids=kernel.gids or [],
+                    requested_slots=kernel.requested_slots or ResourceSlot(),
+                    resource_opts=kernel.resource_opts or {},
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                    preopen_ports=kernel.preopen_ports or [],
+                    internal_data=kernel.internal_data,
+                    vfolder_mounts=kernel.vfolder_mounts or [],
                 )
                 for kernel in session.kernels
             ]
@@ -2582,7 +2609,20 @@ class ScheduleDBSource:
                         KernelRow.scaling_group,
                         KernelRow.image,
                         KernelRow.architecture,
+                        KernelRow.cluster_role,
                         KernelRow.cluster_idx,
+                        KernelRow.local_rank,
+                        KernelRow.cluster_hostname,
+                        KernelRow.uid,
+                        KernelRow.main_gid,
+                        KernelRow.gids,
+                        KernelRow.requested_slots,
+                        KernelRow.resource_opts,
+                        KernelRow.bootstrap_script,
+                        KernelRow.startup_command,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                        KernelRow.vfolder_mounts,
                         KernelRow.status,
                         KernelRow.status_changed,
                     )
@@ -2626,6 +2666,20 @@ class ScheduleDBSource:
                     status_changed=kernel.status_changed.timestamp()
                     if kernel.status_changed
                     else None,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    local_rank=kernel.local_rank,
+                    cluster_hostname=kernel.cluster_hostname,
+                    uid=kernel.uid,
+                    main_gid=kernel.main_gid,
+                    gids=kernel.gids or [],
+                    requested_slots=kernel.requested_slots or ResourceSlot(),
+                    resource_opts=kernel.resource_opts or {},
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                    preopen_ports=kernel.preopen_ports or [],
+                    internal_data=kernel.internal_data,
+                    vfolder_mounts=kernel.vfolder_mounts or [],
                 )
                 for kernel in session.kernels
             ]

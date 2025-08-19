@@ -301,8 +301,7 @@ class RetryPreparingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were retried."""
-        if result.succeeded_count > 0:
-            log.info("Retried {} stuck PREPARING/PULLING sessions", result.succeeded_count)
+        log.info("Retried {} stuck PREPARING/PULLING sessions", result.succeeded_count)
 
 
 class RetryCreatingHandler(ScheduleHandler):
@@ -330,5 +329,4 @@ class RetryCreatingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if sessions were retried."""
-        if result.succeeded_count > 0:
-            log.info("Retried {} stuck CREATING sessions", result.succeeded_count)
+        log.info("Retried {} stuck CREATING sessions", result.succeeded_count)

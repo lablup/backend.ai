@@ -881,23 +881,7 @@ class Scheduler:
             network_setup = await self._setup_network_configuration(session)
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
-            # Setup environment variables
-            environ: dict[str, str] = {
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
-                "BACKENDAI_USER_EMAIL": session.user_email,
-                "BACKENDAI_USER_NAME": session.user_name,
-                "BACKENDAI_SESSION_ID": str(session.session_id),
-                "BACKENDAI_SESSION_NAME": str(session.name),
-                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
-            }
-
-            # Group kernels by agent to minimize RPC calls
-            kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
-            for kernel in session.kernels:
-                if kernel.agent_id:
-                    kernels_by_agent[kernel.agent_id].append(kernel)
-
+            # Setup environment variables - similar to registry.py
             # Group kernels by cluster role for replica counting
             keyfunc = lambda k: k.cluster_role
             replicas = {
@@ -907,6 +891,33 @@ class Scheduler:
                     key=keyfunc,
                 )
             }
+
+            environ: dict[str, str] = {
+                "BACKENDAI_USER_UUID": str(session.user_uuid),
+                "BACKENDAI_USER_EMAIL": session.user_email,
+                "BACKENDAI_USER_NAME": session.user_name,
+                "BACKENDAI_SESSION_ID": str(session.session_id),
+                "BACKENDAI_SESSION_NAME": str(session.name),
+                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
+                "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
+                "BACKENDAI_CLUSTER_HOSTS": ",".join(
+                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
+                    for k in session.kernels
+                ),
+                "BACKENDAI_ACCESS_KEY": session.access_key,
+                # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
+                "BACKENDAI_PREOPEN_PORTS": (
+                    ",".join(str(port) for port in session.kernels[0].preopen_ports)
+                    if session.kernels and session.kernels[0].preopen_ports
+                    else ""
+                ),
+            }
+
+            # Group kernels by agent to minimize RPC calls
+            kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
+            for kernel in session.kernels:
+                if kernel.agent_id:
+                    kernels_by_agent[kernel.agent_id].append(kernel)
 
             # Create SSH keypair for cluster
             ssh_keypair = await self._create_cluster_ssh_keypair()
@@ -946,44 +957,58 @@ class Scheduler:
 
                     kernel_image_config = image_configs_by_canonical[image_str]
 
-                    # Determine cluster role - first kernel is main, rest are workers
-                    cluster_role = "main" if idx == 0 and len(session.kernels) > 0 else "worker"
-                    cluster_idx = idx
-                    cluster_hostname = f"node-{k.kernel_id}"
+                    # Use cluster configuration from kernel data
+                    cluster_role = k.cluster_role
+                    cluster_idx = k.cluster_idx
+                    local_rank = k.local_rank
+                    cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
 
-                    # Build proper KernelCreationConfig
+                    # Build proper KernelCreationConfig matching registry.py format
                     kernel_config: KernelCreationConfig = {
                         "image": kernel_image_config,
+                        "kernel_id": kernel_id_str,
+                        "session_id": str(session.session_id),
+                        "owner_user_id": str(session.user_uuid),
+                        "owner_project_id": None,  # TODO: Implement project-owned sessions
                         "network_id": str(session.session_id),
-                        "auto_pull": AutoPullBehavior.DIGEST,
                         "session_type": session.session_type,
                         "cluster_mode": session.cluster_mode,
                         "cluster_role": cluster_role,
                         "cluster_idx": cluster_idx,
                         "cluster_hostname": cluster_hostname,
-                        "uid": None,  # Would need actual UID
-                        "main_gid": None,  # Would need actual GID
-                        "supplementary_gids": [],
-                        "resource_slots": ResourceSlot().to_json(),  # Would need actual slots
-                        "resource_opts": {},
+                        "local_rank": local_rank,
+                        "uid": k.uid,
+                        "main_gid": k.main_gid,
+                        "supplementary_gids": k.gids or [],
+                        "resource_slots": k.requested_slots.to_json(),
+                        "resource_opts": k.resource_opts or {},
                         "environ": {
                             **environ,
                             "BACKENDAI_KERNEL_ID": kernel_id_str,
                             "BACKENDAI_KERNEL_IMAGE": image_str,
                             "BACKENDAI_CLUSTER_ROLE": cluster_role,
                             "BACKENDAI_CLUSTER_IDX": str(cluster_idx),
+                            "BACKENDAI_CLUSTER_LOCAL_RANK": str(local_rank),
                             "BACKENDAI_CLUSTER_HOST": cluster_hostname,
+                            "BACKENDAI_SERVICE_PORTS": str(
+                                kernel_image_config.get("labels", {}).get(
+                                    "ai.backend.service-ports", ""
+                                )
+                            ),
                         },
-                        "mounts": [],  # Would need actual vfolder mounts
-                        "package_directory": [],
-                        "idle_timeout": idle_timeout,
-                        "bootstrap_script": None,
-                        "startup_command": None,
-                        "internal_data": None,
-                        "preopen_ports": [],
+                        "mounts": [
+                            m.to_json() if hasattr(m, "to_json") else m for m in k.vfolder_mounts
+                        ],
+                        "package_directory": tuple(),  # Use tuple like registry.py
+                        "idle_timeout": int(idle_timeout),
+                        "bootstrap_script": k.bootstrap_script,
+                        "startup_command": k.startup_command,
+                        "internal_data": k.internal_data,
+                        "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
+                        "preopen_ports": k.preopen_ports or [],
                         "allocated_host_ports": [],  # Will be populated by agent
-                        "scaling_group": k.scaling_group,
                         "agent_addr": k.agent_addr or "",
+                        "scaling_group": k.scaling_group,
                         "endpoint_id": None,  # For inference endpoints
                     }
                     kernel_configs.append(kernel_config)
@@ -1226,7 +1251,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        PREPARING_CHECK_THRESHOLD = 900.0  # 15 minutes
+        PREPARING_CHECK_THRESHOLD = 3.0  # 5 minutes
 
         # Get sessions with PREPARING and PULLING statuses
         sessions_with_images = await self._repository.get_sessions_for_pull([
@@ -1291,7 +1316,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        CREATING_CHECK_THRESHOLD = 600.0  # 10 minutes
+        CREATING_CHECK_THRESHOLD = 6.0  # 10 minutes
 
         # Get CREATING sessions from repository
         sessions_with_images = await self._repository.get_sessions_for_start([

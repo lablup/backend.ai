@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
@@ -445,7 +446,7 @@ class ScalingGroupInfo:
 
 @dataclass
 class KernelBindingData:
-    """Kernel-agent binding data for precondition checking."""
+    """Kernel-agent binding data for precondition checking and session starting."""
 
     kernel_id: UUID
     agent_id: Optional[AgentId]
@@ -454,7 +455,23 @@ class KernelBindingData:
     image: str
     architecture: str
     status: Optional[KernelStatus] = None
-    status_changed: Optional[float] = None  # Timestamp
+    status_changed: Optional[float] = None
+    cluster_role: str = DEFAULT_ROLE
+    cluster_idx: int = 0
+    local_rank: int = 0
+    cluster_hostname: Optional[str] = None
+    uid: Optional[int] = None
+    main_gid: Optional[int] = None
+    gids: list[int] = field(default_factory=list)
+    requested_slots: ResourceSlot = field(default_factory=ResourceSlot)
+    resource_opts: dict[str, Any] = field(default_factory=dict)
+    bootstrap_script: Optional[str] = None
+    startup_command: Optional[str] = None
+    preopen_ports: list[int] = field(default_factory=list)
+    internal_data: Optional[dict[str, Any]] = None
+    vfolder_mounts: list[Any] = field(
+        default_factory=list
+    )  # Would be list[VFolderMount] in full impl
 
 
 @dataclass(frozen=True)
