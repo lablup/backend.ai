@@ -228,12 +228,12 @@ async def resolve_artifacts(
     # Choose pagination mode
     if offset is not None or limit is not None:
         # Standard pagination
-        pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+        offset_based_pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
         forward = None
         backward = None
     else:
         # GraphQL connection pagination
-        pagination = None
+        offset_based_pagination = None
         # Create forward or backward pagination options based on parameters
         forward = None
         backward = None
@@ -245,9 +245,11 @@ async def resolve_artifacts(
     # Use service layer to get artifacts
     action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
         ListArtifactsAction(
-            pagination=pagination,
-            forward=forward,
-            backward=backward,
+            pagination=PaginationOptions(
+                offset=offset_based_pagination,
+                forward=forward,
+                backward=backward,
+            ),
             ordering=ordering,
             filters=filters,
         )

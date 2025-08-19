@@ -15,7 +15,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class ListArtifactsAction(ArtifactAction):
-    pagination: Optional[PaginationOptions] = None
+    pagination: PaginationOptions
     ordering: Optional[ArtifactOrderingOptions] = None
     filters: Optional[ArtifactFilterOptions] = None
 

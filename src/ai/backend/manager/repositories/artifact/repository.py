@@ -27,6 +27,8 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
+from ai.backend.manager.models.base import validate_connection_args
+from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -38,6 +40,8 @@ from ai.backend.manager.repositories.types import (
 
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
+
+DEFAULT_PAGE_SIZE = 10
 
 
 class ArtifactRepository:
@@ -365,7 +369,7 @@ class ArtifactRepository:
     async def list_artifacts_paginated(
         self,
         *,
-        pagination: Optional[PaginationOptions] = None,
+        pagination: PaginationOptions,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
     ) -> tuple[list[ArtifactData], int]:
@@ -379,4 +383,187 @@ class ArtifactRepository:
         Returns:
             Tuple of (artifacts list, total count)
         """
-        raise NotImplementedError()
+        offset_based_pagination = pagination.offset
+        forward = pagination.forward
+        backward = pagination.backward
+
+        if ordering is None:
+            ordering = ArtifactOrderingOptions()
+        if filters is None:
+            filters = ArtifactFilterOptions()
+        async with self._db.begin_session() as db_sess:
+            # Build base query
+            stmt = sa.select(ArtifactRow)
+            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+
+            # Apply filters
+            conditions = []
+
+            if filters.artifact_type is not None:
+                conditions.append(ArtifactRow.type == filters.artifact_type)
+            if filters.status is not None:
+                # Support multiple status values using IN clause
+                status_values = [status.value for status in filters.status]
+                conditions.append(ArtifactRow.status.in_(status_values))
+            if filters.authorized is not None:
+                conditions.append(ArtifactRow.authorized == filters.authorized)
+            if filters.name_filter is not None:
+                conditions.append(ArtifactRow.name.ilike(f"%{filters.name_filter}%"))
+            if filters.registry_id is not None:
+                conditions.append(ArtifactRow.registry_id == filters.registry_id)
+            if filters.registry_type is not None:
+                conditions.append(ArtifactRow.registry_type == filters.registry_type)
+            if filters.source_registry_id is not None:
+                conditions.append(ArtifactRow.source_registry_id == filters.source_registry_id)
+            if filters.source_registry_type is not None:
+                conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
+
+            # Apply conditions to both queries
+            if conditions:
+                where_clause = sa.and_(*conditions)
+                stmt = stmt.where(where_clause)
+                count_stmt = count_stmt.where(where_clause)
+
+            # Determine pagination mode
+            if offset_based_pagination and offset_based_pagination.offset is not None:
+                # Standard offset/limit pagination
+                page_size = (
+                    offset_based_pagination.limit
+                    if offset_based_pagination.limit is not None
+                    else DEFAULT_PAGE_SIZE
+                )
+
+                # Apply multiple ordering fields
+                order_clauses = []
+                for field, desc in ordering.order_by:
+                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
+                    if desc:
+                        order_clauses.append(order_column.desc())
+                    else:
+                        order_clauses.append(order_column.asc())
+                stmt = stmt.order_by(*order_clauses)
+
+                # Default order by id for consistent pagination
+                stmt = stmt.order_by(ArtifactRow.id.asc())
+
+                # Apply pagination
+                stmt = stmt.offset(pagination.offset).limit(page_size)
+
+            else:
+                # GraphQL connection pagination
+                # Extract pagination parameters from forward/backward options
+                after = forward.after if forward else None
+                first = forward.first if forward else None
+                before = backward.before if backward else None
+                last = backward.last if backward else None
+
+                connection_args = validate_connection_args(
+                    after=after,
+                    first=first,
+                    before=before,
+                    last=last,
+                )
+
+                cursor_id = connection_args.cursor
+                pagination_order = connection_args.pagination_order
+                page_size = connection_args.requested_page_size
+
+                # Apply multiple ordering fields for connection pagination
+                order_clauses = []
+                for field, desc in ordering.order_by:
+                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
+                    order_clauses.append((order_column, desc))
+
+                # For cursor pagination, use the first ordering field as primary
+                primary_order_column, primary_desc = order_clauses[0]
+
+                # Handle cursor-based pagination
+                if cursor_id is not None:
+                    try:
+                        cursor_uuid = uuid.UUID(cursor_id)
+
+                        # Get the cursor row to compare against
+                        cursor_stmt = sa.select(ArtifactRow).where(ArtifactRow.id == cursor_uuid)
+                        cursor_result = await db_sess.execute(cursor_stmt)
+                        cursor_row = cursor_result.scalar_one_or_none()
+
+                        if cursor_row is not None:
+                            cursor_order_value = getattr(cursor_row, primary_order_column.name)
+
+                            # Build cursor condition based on pagination direction using primary order field
+                            if pagination_order == ConnectionPaginationOrder.FORWARD:
+                                if primary_desc:
+                                    cursor_condition = (
+                                        primary_order_column < cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
+                                        & (ArtifactRow.id > cursor_uuid)
+                                    )
+                                else:
+                                    cursor_condition = (
+                                        primary_order_column > cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
+                                        & (ArtifactRow.id > cursor_uuid)
+                                    )
+                            else:  # BACKWARD
+                                if primary_desc:
+                                    cursor_condition = (
+                                        primary_order_column > cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
+                                        & (ArtifactRow.id < cursor_uuid)
+                                    )
+                                else:
+                                    cursor_condition = (
+                                        primary_order_column < cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
+                                        & (ArtifactRow.id < cursor_uuid)
+                                    )
+
+                            stmt = stmt.where(cursor_condition)
+
+                    except ValueError:
+                        # Invalid UUID cursor, ignore
+                        pass
+
+                # Apply ordering based on pagination direction
+                final_order_clauses = []
+                if pagination_order == ConnectionPaginationOrder.BACKWARD:
+                    # Reverse ordering for backward pagination
+                    for order_column, desc in order_clauses:
+                        if desc:
+                            final_order_clauses.append(order_column.asc())
+                        else:
+                            final_order_clauses.append(order_column.desc())
+                    final_order_clauses.append(ArtifactRow.id.desc())
+                else:  # FORWARD or None
+                    for order_column, desc in order_clauses:
+                        if desc:
+                            final_order_clauses.append(order_column.desc())
+                        else:
+                            final_order_clauses.append(order_column.asc())
+                    final_order_clauses.append(ArtifactRow.id.asc())
+
+                stmt = stmt.order_by(*final_order_clauses)
+
+                # Apply limit
+                stmt = stmt.limit(page_size)
+
+            # Execute queries
+            result = await db_sess.execute(stmt)
+            rows = result.scalars().all()
+
+            # Reverse results for backward pagination
+            if (
+                pagination.offset is None
+                and connection_args.pagination_order == ConnectionPaginationOrder.BACKWARD
+            ):
+                rows = list(reversed(rows))
+
+            count_result = await db_sess.execute(count_stmt)
+            total_count = count_result.scalar()
+
+            artifacts = [row.to_dataclass() for row in rows]
+            return artifacts, total_count
