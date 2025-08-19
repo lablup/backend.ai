@@ -37,3 +37,10 @@ class BackwardPaginationOptions:
 
     before: Optional[str] = None
     last: Optional[int] = None
+
+
+@dataclass
+class PaginationOptions:
+    forward: Optional[ForwardPaginationOptions] = None
+    backward: Optional[BackwardPaginationOptions] = None
+    offset: Optional[OffsetBasedPaginationOptions] = None

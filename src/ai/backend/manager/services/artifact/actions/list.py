@@ -8,18 +8,14 @@ from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.repositories.artifact.repository import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
-    BackwardPaginationOptions,
-    ForwardPaginationOptions,
-    OffsetBasedPaginationOptions,
+    PaginationOptions,
 )
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
 class ListArtifactsAction(ArtifactAction):
-    pagination: Optional[OffsetBasedPaginationOptions] = None
-    forward: Optional[ForwardPaginationOptions] = None
-    backward: Optional[BackwardPaginationOptions] = None
+    pagination: Optional[PaginationOptions] = None
     ordering: Optional[ArtifactOrderingOptions] = None
     filters: Optional[ArtifactFilterOptions] = None
 

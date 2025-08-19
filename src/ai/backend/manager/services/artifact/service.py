@@ -182,8 +182,6 @@ class ArtifactService:
     async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
         artifacts_data, total_count = await self._artifact_repository.list_artifacts_paginated(
             pagination=action.pagination,
-            forward=action.forward,
-            backward=action.backward,
             ordering=action.ordering,
             filters=action.filters,
         )

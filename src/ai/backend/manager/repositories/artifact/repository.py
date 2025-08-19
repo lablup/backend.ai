@@ -27,9 +27,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
 )
 from ai.backend.manager.repositories.types import (
-    BackwardPaginationOptions,
-    ForwardPaginationOptions,
-    OffsetBasedPaginationOptions,
+    PaginationOptions,
 )
 
 # Layer-specific decorator for artifact repository
@@ -280,18 +278,14 @@ class ArtifactRepository:
     async def list_artifacts_paginated(
         self,
         *,
-        pagination: Optional[OffsetBasedPaginationOptions] = None,
-        forward: Optional[ForwardPaginationOptions] = None,
-        backward: Optional[BackwardPaginationOptions] = None,
+        pagination: Optional[PaginationOptions] = None,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
     ) -> tuple[list[ArtifactData], int]:
         """List artifacts with pagination and filtering.
 
         Args:
-            pagination: Standard offset/limit pagination options
-            forward: Forward pagination options (after, first)
-            backward: Backward pagination options (before, last)
+            pagination: Pagination options for the query
             ordering: Ordering options for the query
             filters: Filtering options for artifacts
 
