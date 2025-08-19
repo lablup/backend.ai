@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from enum import StrEnum
-from typing import AsyncGenerator, Optional, Self
+from typing import TYPE_CHECKING, AsyncGenerator, Optional, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -11,11 +10,15 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactStatus, ArtifactType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactData,
+    ArtifactGroupOrderField,
+    ArtifactOrderField,
+    ArtifactStatus,
+    ArtifactType,
+)
 from ai.backend.manager.repositories.artifact.repository import (
     ArtifactFilterOptions,
-    ArtifactOrderingField,
     ArtifactOrderingOptions,
     BackwardPaginationOptions,
     ForwardPaginationOptions,
@@ -30,11 +33,8 @@ from ai.backend.manager.services.artifact.actions.list import ListArtifactsActio
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.unauthorize import UnauthorizeArtifactAction
 
-
-# TODO: Add more fields
-@strawberry.enum
-class ArtifactGroupOrderField(StrEnum):
-    NAME = "NAME"
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.input
@@ -53,21 +53,15 @@ class ArtifactGroupFilter:
     DISTINCT: Optional[bool] = None
 
 
-@strawberry.enum
-class ArtifactOrderField(StrEnum):
-    ID = "ID"
-    NAME = "NAME"
-    TYPE = "TYPE"
-    SIZE = "SIZE"
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    LATEST_VERSION = "LATEST_VERSION"
+@strawberry.input
+class ArtifactStatusFilter:
+    IN: Optional[list[ArtifactStatus]] = None
 
 
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
-    status: Optional[ArtifactStatus] = None
+    status: Optional[ArtifactStatusFilter] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
@@ -184,7 +178,7 @@ class ArtifactGroup(Node):
     description: Optional[str]
 
     @strawberry.field
-    def artifacts(
+    async def artifacts(
         self,
         filter: Optional[ArtifactFilter] = None,
         order_by: Optional[list[ArtifactOrderBy]] = None,
@@ -290,24 +284,21 @@ async def artifacts(
     if filter:
         if filter.type:
             filters.artifact_type = filter.type[0] if filter.type else None
-        if filter.status:
-            filters.status = filter.status
+        if filter.status and filter.status.IN:
+            # TODO: Support other operators if needed
+            filters.status = filter.status.IN
         if filter.name and filter.name.i_contains:
             filters.name_filter = filter.name.i_contains
 
     # Build ordering options
     ordering = ArtifactOrderingOptions()
-    if order_by and order_by[0]:
-        order_field_map = {
-            ArtifactOrderField.ID: ArtifactOrderingField.CREATED_AT,
-            ArtifactOrderField.NAME: ArtifactOrderingField.NAME,
-            ArtifactOrderField.TYPE: ArtifactOrderingField.TYPE,
-            ArtifactOrderField.SIZE: ArtifactOrderingField.SIZE,
-            ArtifactOrderField.CREATED_AT: ArtifactOrderingField.CREATED_AT,
-            ArtifactOrderField.UPDATED_AT: ArtifactOrderingField.UPDATED_AT,
-        }
-        ordering.order_by = order_field_map.get(order_by[0].field, ArtifactOrderingField.CREATED_AT)
-        ordering.order_desc = order_by[0].direction == OrderDirection.DESC
+    if order_by:
+        order_tuples: list[tuple[ArtifactOrderField, bool]] = []
+        for order_item in order_by:
+            desc = order_item.direction == OrderDirection.DESC
+            order_tuples.append((order_item.field, desc))
+
+        ordering.order_by = order_tuples
 
     # Choose pagination mode
     if offset is not None or limit is not None:

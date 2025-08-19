@@ -48,3 +48,18 @@ class ArtifactGroupData:
     name: str
     type: ArtifactType
     description: str
+
+
+class ArtifactGroupOrderField(enum.StrEnum):
+    NAME = "NAME"
+    TYPE = "TYPE"
+    STATUS = "STATUS"
+    DESCRIPTION = "DESCRIPTION"
+
+
+class ArtifactOrderField(enum.StrEnum):
+    NAME = "NAME"
+    TYPE = "TYPE"
+    SIZE = "SIZE"
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"

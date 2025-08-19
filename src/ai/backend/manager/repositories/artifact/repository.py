@@ -1,6 +1,4 @@
 import uuid
-from dataclasses import dataclass
-from enum import Enum
 from typing import Optional
 
 import sqlalchemy as sa
@@ -16,7 +14,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactRegistryType,
     ArtifactStatus,
-    ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
@@ -27,70 +24,18 @@ from ai.backend.manager.models.association_artifacts_storages import Association
 from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
 from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.types import (
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
+)
+from ai.backend.manager.repositories.types import (
+    BackwardPaginationOptions,
+    ForwardPaginationOptions,
+    OffsetBasedPaginationOptions,
+)
 
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
-
-
-class ArtifactOrderingField(Enum):
-    """Available fields for ordering artifacts."""
-
-    CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
-    NAME = "name"
-    SIZE = "size"
-    TYPE = "type"
-    STATUS = "status"
-    AUTHORIZED = "authorized"
-    REGISTRY_TYPE = "registry_type"
-    SOURCE_REGISTRY_TYPE = "source_registry_type"
-    VERSION = "version"
-
-
-@dataclass
-class OffsetBasedPaginationOptions:
-    """Standard offset/limit pagination options."""
-
-    offset: Optional[int] = None
-    limit: Optional[int] = None
-
-
-@dataclass
-class ForwardPaginationOptions:
-    """Forward pagination: fetch items after a given cursor."""
-
-    after: Optional[str] = None
-    first: Optional[int] = None
-
-
-@dataclass
-class BackwardPaginationOptions:
-    """Backward pagination: fetch items before a given cursor."""
-
-    before: Optional[str] = None
-    last: Optional[int] = None
-
-
-@dataclass
-class ArtifactOrderingOptions:
-    """Ordering options for artifact queries."""
-
-    order_by: ArtifactOrderingField = ArtifactOrderingField.CREATED_AT
-    order_desc: bool = True
-
-
-@dataclass
-class ArtifactFilterOptions:
-    """Filtering options for artifacts."""
-
-    artifact_type: Optional[ArtifactType] = None
-    status: Optional[ArtifactStatus] = None
-    authorized: Optional[bool] = None
-    name_filter: Optional[str] = None
-    registry_id: Optional[uuid.UUID] = None
-    registry_type: Optional[ArtifactRegistryType] = None
-    source_registry_id: Optional[uuid.UUID] = None
-    source_registry_type: Optional[ArtifactRegistryType] = None
 
 
 class ArtifactRepository:
@@ -149,20 +94,19 @@ class ArtifactRepository:
                 existing_artifact = existing_result.scalar_one_or_none()
 
                 if existing_artifact is not None:
-                    # Update existing artifact
+                    # Update existing artifacts
                     existing_artifact.source_registry_id = source_registry_id
                     existing_artifact.source_registry_type = source_registry_type
                     if model.modified_at:
                         existing_artifact.updated_at = model.modified_at
                     existing_artifact.authorized = False
                     existing_artifact.version = model.revision
-                    # existing_artifact.status = ArtifactStatus.SCANNED.value
 
                     await db_sess.flush()
                     await db_sess.refresh(existing_artifact, attribute_names=["updated_at"])
                     result.append(existing_artifact.to_dataclass())
                 else:
-                    # Insert new artifact
+                    # Insert new artifacts
                     new_artifact = ArtifactRow.from_huggingface_model_data(
                         model,
                         registry_id=registry_id,
@@ -374,7 +318,9 @@ class ArtifactRepository:
             if filters.artifact_type is not None:
                 conditions.append(ArtifactRow.type == filters.artifact_type)
             if filters.status is not None:
-                conditions.append(ArtifactRow.status == filters.status.value)
+                # Support multiple status values using IN clause
+                status_values = [status.value for status in filters.status]
+                conditions.append(ArtifactRow.status.in_(status_values))
             if filters.authorized is not None:
                 conditions.append(ArtifactRow.authorized == filters.authorized)
             if filters.name_filter is not None:
@@ -399,12 +345,15 @@ class ArtifactRepository:
                 # Standard offset/limit pagination
                 page_size = pagination.limit if pagination.limit is not None else DEFAULT_PAGE_SIZE
 
-                # Apply ordering
-                order_column = getattr(ArtifactRow, ordering.order_by.value, ArtifactRow.created_at)
-                if ordering.order_desc:
-                    stmt = stmt.order_by(order_column.desc())
-                else:
-                    stmt = stmt.order_by(order_column.asc())
+                # Apply multiple ordering fields
+                order_clauses = []
+                for field, desc in ordering.order_by:
+                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
+                    if desc:
+                        order_clauses.append(order_column.desc())
+                    else:
+                        order_clauses.append(order_column.asc())
+                stmt = stmt.order_by(*order_clauses)
 
                 # Default order by id for consistent pagination
                 stmt = stmt.order_by(ArtifactRow.id.asc())
@@ -431,8 +380,14 @@ class ArtifactRepository:
                 pagination_order = connection_args.pagination_order
                 page_size = connection_args.requested_page_size
 
-                # Apply primary ordering
-                order_column = getattr(ArtifactRow, ordering.order_by.value, ArtifactRow.created_at)
+                # Apply multiple ordering fields for connection pagination
+                order_clauses = []
+                for field, desc in ordering.order_by:
+                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
+                    order_clauses.append((order_column, desc))
+
+                # For cursor pagination, use the first ordering field as primary
+                primary_order_column, primary_desc = order_clauses[0]
 
                 # Handle cursor-based pagination
                 if cursor_id is not None:
@@ -445,29 +400,37 @@ class ArtifactRepository:
                         cursor_row = cursor_result.scalar_one_or_none()
 
                         if cursor_row is not None:
-                            cursor_order_value = getattr(cursor_row, ordering.order_by.value)
+                            cursor_order_value = getattr(cursor_row, primary_order_column.name)
 
-                            # Build cursor condition based on pagination direction
+                            # Build cursor condition based on pagination direction using primary order field
                             if pagination_order == ConnectionPaginationOrder.FORWARD:
-                                if ordering.order_desc:
-                                    cursor_condition = (order_column < cursor_order_value) | (
-                                        (order_column == cursor_order_value)
+                                if primary_desc:
+                                    cursor_condition = (
+                                        primary_order_column < cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
                                         & (ArtifactRow.id > cursor_uuid)
                                     )
                                 else:
-                                    cursor_condition = (order_column > cursor_order_value) | (
-                                        (order_column == cursor_order_value)
+                                    cursor_condition = (
+                                        primary_order_column > cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
                                         & (ArtifactRow.id > cursor_uuid)
                                     )
                             else:  # BACKWARD
-                                if ordering.order_desc:
-                                    cursor_condition = (order_column > cursor_order_value) | (
-                                        (order_column == cursor_order_value)
+                                if primary_desc:
+                                    cursor_condition = (
+                                        primary_order_column > cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
                                         & (ArtifactRow.id < cursor_uuid)
                                     )
                                 else:
-                                    cursor_condition = (order_column < cursor_order_value) | (
-                                        (order_column == cursor_order_value)
+                                    cursor_condition = (
+                                        primary_order_column < cursor_order_value
+                                    ) | (
+                                        (primary_order_column == cursor_order_value)
                                         & (ArtifactRow.id < cursor_uuid)
                                     )
 
@@ -478,17 +441,24 @@ class ArtifactRepository:
                         pass
 
                 # Apply ordering based on pagination direction
+                final_order_clauses = []
                 if pagination_order == ConnectionPaginationOrder.BACKWARD:
                     # Reverse ordering for backward pagination
-                    if ordering.order_desc:
-                        stmt = stmt.order_by(order_column.asc(), ArtifactRow.id.desc())
-                    else:
-                        stmt = stmt.order_by(order_column.desc(), ArtifactRow.id.desc())
+                    for order_column, desc in order_clauses:
+                        if desc:
+                            final_order_clauses.append(order_column.asc())
+                        else:
+                            final_order_clauses.append(order_column.desc())
+                    final_order_clauses.append(ArtifactRow.id.desc())
                 else:  # FORWARD or None
-                    if ordering.order_desc:
-                        stmt = stmt.order_by(order_column.desc(), ArtifactRow.id.asc())
-                    else:
-                        stmt = stmt.order_by(order_column.asc(), ArtifactRow.id.asc())
+                    for order_column, desc in order_clauses:
+                        if desc:
+                            final_order_clauses.append(order_column.desc())
+                        else:
+                            final_order_clauses.append(order_column.asc())
+                    final_order_clauses.append(ArtifactRow.id.asc())
+
+                stmt = stmt.order_by(*final_order_clauses)
 
                 # Apply limit
                 stmt = stmt.limit(page_size)
