@@ -29,6 +29,10 @@ from ai.backend.manager.services.artifact.actions.disassociate_with_storage impo
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
 )
+from ai.backend.manager.services.artifact.actions.get import (
+    GetArtifactAction,
+    GetArtifactActionResult,
+)
 from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
     ImportArtifactActionResult,
@@ -165,3 +169,7 @@ class ArtifactService:
     async def cancel_import(self, action: CancelImportAction) -> CancelImportActionResult:
         artifact_id = await self._artifact_repository.cancel_import_artifact(action.artifact_id)
         return CancelImportActionResult(artifact_id=artifact_id)
+
+    async def get(self, action: GetArtifactAction) -> GetArtifactActionResult:
+        artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
+        return GetArtifactActionResult(result=artifact)

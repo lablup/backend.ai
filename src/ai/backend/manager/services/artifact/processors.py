@@ -23,6 +23,10 @@ from ai.backend.manager.services.artifact.actions.disassociate_with_storage impo
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
 )
+from ai.backend.manager.services.artifact.actions.get import (
+    GetArtifactAction,
+    GetArtifactActionResult,
+)
 from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
     ImportArtifactActionResult,
@@ -52,6 +56,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     authorize: ActionProcessor[AuthorizeArtifactAction, AuthorizeArtifactActionResult]
     unauthorize: ActionProcessor[UnauthorizeArtifactAction, UnauthorizeArtifactActionResult]
     delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
+    get: ActionProcessor[GetArtifactAction, GetArtifactActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.scan = ActionProcessor(service.scan, action_monitors)
@@ -66,6 +71,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.authorize = ActionProcessor(service.authorize, action_monitors)
         self.unauthorize = ActionProcessor(service.unauthorize, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
+        self.get = ActionProcessor(service.get, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -78,4 +84,5 @@ class ArtifactProcessors(AbstractProcessorPackage):
             AuthorizeArtifactAction.spec(),
             UnauthorizeArtifactAction.spec(),
             DeleteArtifactAction.spec(),
+            GetArtifactAction.spec(),
         ]
