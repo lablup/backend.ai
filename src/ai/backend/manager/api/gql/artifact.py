@@ -276,7 +276,7 @@ async def resolve_artifacts(
         has_previous_page = current_offset > 0
 
     artifact_connection = ArtifactConnection(
-        total_count=action_result.total_count,
+        count=action_result.total_count,
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=has_next_page,
@@ -360,7 +360,7 @@ async def import_artifacts(
     ]
 
     artifacts_connection = ArtifactConnection(
-        total_count=len(imported_artifacts),
+        count=len(imported_artifacts),
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
