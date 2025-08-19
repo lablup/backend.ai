@@ -7,12 +7,14 @@ from typing import Any, AsyncIterator, Optional
 import aiohttp
 
 from ai.backend.common.dto.storage.request import (
+    DownloadObjectReq,
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
 )
 from ai.backend.common.dto.storage.response import (
+    DownloadObjectResponse,
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
@@ -672,6 +674,23 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return HuggingFaceImportModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def download_s3_file(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: DownloadObjectReq,
+    ) -> DownloadObjectResponse:
+        """
+        Download a file from S3 storage.
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/download",
+            body=req.model_dump(by_alias=True),
+        )
+        return DownloadObjectResponse.model_validate(resp)
 
     @client_decorator()
     async def get_s3_presigned_download_url(

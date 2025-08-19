@@ -52,6 +52,10 @@ class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
 
 
+class DownloadObjectResponse(BaseResponseModel):
+    pass
+
+
 class DeleteObjectResponse(BaseResponseModel):
     pass
 

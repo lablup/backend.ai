@@ -166,7 +166,7 @@ class HuggingFaceService:
             registry_name: Name of the HuggingFace registry
             limit: Maximum number of models to retrieve
             search: Search query to filter models
-            sort: Sort criteria ("downloads", "likes", "created", "modified")
+            sort: Sort criteria ("downloads", "likes", "created_at", "last_modified")
 
         Returns:
             UUID of the background task that will perform the scan
@@ -190,7 +190,7 @@ class HuggingFaceService:
             model: ModelTarget containing model_id and revision
 
         Returns:
-            ModelInfo object with complete metadata
+            ModelData object with complete metadata
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
@@ -460,7 +460,7 @@ class HuggingFaceService:
         max_retries: int = 8,
     ):
         """
-        Stream bytes from `url` with resume support.
+        Stream bytes from `url`.
         """
         session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
@@ -613,8 +613,7 @@ class HuggingFaceService:
             # Create storage key path: {model_id}/{revision}/{file_path}
             storage_key = f"{model_id}/{revision}/{file_info.path}"
 
-            # Create token data for the upload
-            log.debug(
+            log.info(
                 f"Starting file upload to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )

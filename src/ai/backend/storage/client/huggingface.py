@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+import aiohttp
 from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, model_info
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
@@ -187,46 +188,81 @@ class HuggingFaceScanner:
         sort: ModelSortKey,
         search: Optional[str] = None,
     ) -> list[ModelData]:
-        """Scan HuggingFace models and retrieve metadata.
-
-        Args:
-            limit: Maximum number of models to retrieve
-            sort: Sort criteria
-            search: Search query to filter models
-
-        Returns:
-            List of ModelInfo objects containing model metadata
-        """
+        """Scan HuggingFace models concurrently and retrieve metadata."""
         try:
             log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
             models = await self._client.scan_models(search=search, sort=sort, limit=limit)
+            if not models:
+                log.info("No models returned from scan_models()")
+                return []
 
-            model_infos: list[ModelData] = []
-            for model in models:
+            sem = asyncio.Semaphore(8)
+
+            async def build_model_data(model: HfModelInfo) -> Optional[ModelData]:
+                """Download README and build a ModelData object for a single model."""
                 try:
-                    filename = model.id.split("/")[-1]
-                    model_infos.append(
-                        ModelData(
-                            id=model.id,
-                            name=filename,
-                            author=model.author,
-                            tags=model.tags or [],
-                            created_at=model.created_at,
-                            modified_at=model.last_modified,
+                    async with sem:
+                        readme_content = await self._download_readme(
+                            ModelTarget(model_id=model.id, revision="main")
                         )
+
+                    filename = model.id.split("/")[-1]
+                    return ModelData(
+                        id=model.id,
+                        name=filename,
+                        author=model.author,
+                        tags=model.tags or [],
+                        created_at=model.created_at,
+                        modified_at=model.last_modified,
+                        readme=readme_content,
                     )
                 except Exception as e:
+                    # Log and skip this model, do not fail the whole scan.
                     log.warning(
                         f"Failed to get details for model: model_id={model.id}, error={str(e)}"
                     )
-                    continue
+                    return None
 
+            # Fire tasks concurrently and collect results
+            tasks = [asyncio.create_task(build_model_data(m)) for m in models]
+            results = await asyncio.gather(*tasks, return_exceptions=False)
+
+            model_infos: list[ModelData] = [r for r in results if r is not None]
             log.info(f"Successfully scanned HuggingFace models: count={len(model_infos)}")
             return model_infos
 
         except Exception as e:
             log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
+
+    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
+        """Download README content for a model.
+
+        Args:
+            model: HuggingFace model to download README for
+
+        Returns:
+            README content as string, or None if download fails
+        """
+        try:
+            readme_url = self._client.get_download_url(model, "README.md")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(readme_url) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        return content
+                    else:
+                        log.warning(
+                            f"Failed to download README for {model.model_id}@{model.revision}: HTTP {response.status}"
+                        )
+                        return None
+
+        except Exception as e:
+            log.warning(
+                f"Failed to download README for {model.model_id}@{model.revision}: {str(e)}"
+            )
+            return None
 
     async def scan_model(self, model: ModelTarget) -> ModelData:
         """Scan a specific model by ID.
@@ -235,7 +271,7 @@ class HuggingFaceScanner:
             model: HuggingFace model to scan
 
         Returns:
-            ModelInfo object with model metadata and files
+            ModelData object with model metadata and files
         """
         model_id = model.model_id
         revision = model.revision
@@ -243,6 +279,8 @@ class HuggingFaceScanner:
         try:
             log.info(f"Scanning specific HuggingFace model: model_id={model_id}@{revision}")
             model_info = await self._client.scan_model(model)
+
+            readme_content = await self._download_readme(model)
 
             result = ModelData(
                 id=model_id,
@@ -252,6 +290,7 @@ class HuggingFaceScanner:
                 tags=model_info.tags or [],
                 created_at=model_info.created_at,
                 modified_at=model_info.last_modified,
+                readme=readme_content,
             )
 
             log.info(
