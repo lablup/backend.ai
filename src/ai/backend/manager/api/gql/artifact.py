@@ -209,7 +209,7 @@ async def resolve_artifacts(
             # TODO: Support other operators if needed
             filters.status = filter.status.IN
         if filter.name and filter.name.i_contains:
-            filters.name_filter = filter.name.i_contains
+            filters.name = filter.name.i_contains
 
     # Build ordering options
     ordering = ArtifactOrderingOptions()

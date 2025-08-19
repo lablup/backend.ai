@@ -407,8 +407,8 @@ class ArtifactRepository:
                 conditions.append(ArtifactRow.status.in_(status_values))
             if filters.authorized is not None:
                 conditions.append(ArtifactRow.authorized == filters.authorized)
-            if filters.name_filter is not None:
-                conditions.append(ArtifactRow.name.ilike(f"%{filters.name_filter}%"))
+            if filters.name is not None:
+                conditions.append(ArtifactRow.name.ilike(f"%{filters.name}%"))
             if filters.registry_id is not None:
                 conditions.append(ArtifactRow.registry_id == filters.registry_id)
             if filters.registry_type is not None:
