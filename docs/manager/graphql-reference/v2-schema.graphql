@@ -591,6 +591,8 @@ type Queries {
   replica(id: ID!): ModelReplica
   objectStorage(id: ID!): ObjectStorage
   objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
+  huggingfaceRegistry(id: ID!): HuggingFaceRegistry
+  huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null): HuggingFaceRegistryConnection!
 }
 
 type RawServiceConfig {
