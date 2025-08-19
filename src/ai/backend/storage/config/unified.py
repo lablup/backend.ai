@@ -22,6 +22,7 @@ from ai.backend.common.typed_validators import (
     UserID,
 )
 from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.logging.config_pydantic import LoggingConfig
 from ai.backend.storage.types import VolumeInfo
 
 _max_cpu_count = os.cpu_count()
@@ -95,7 +96,7 @@ class EtcdConfig(BaseModel):
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.
-        For production, should point to an etcd cluster endpoint.
+        In production, should point to one or more etcd instance endpoint(s).
         """,
         examples=[
             {"host": "127.0.0.1", "port": 2379},  # single endpoint
@@ -679,8 +680,8 @@ class StorageProxyUnifiedConfig(BaseModel):
         Controls integration with the Pyroscope performance profiling tool.
         """,
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.

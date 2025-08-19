@@ -36,6 +36,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.config_pydantic import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes
@@ -901,8 +902,8 @@ class AgentUnifiedConfig(BaseModel):
         default_factory=PyroscopeConfig,
         description="Pyroscope configuration",
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="Logging configuration",
     )
     resource: ResourceConfig = Field(

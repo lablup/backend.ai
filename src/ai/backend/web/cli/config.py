@@ -74,7 +74,6 @@ Generated automatically from the WebServerUnifiedConfig schema.
         )
         click.echo(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        click.echo(f"Error generating sample configuration: {e}", err=True)
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 
 
