@@ -232,7 +232,6 @@ async def artifacts(
     if offset is not None or limit is not None:
         # Standard pagination
         pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
-        connection = None
         forward = None
         backward = None
     else:
@@ -258,10 +257,10 @@ async def artifacts(
     )
 
     # Convert to GraphQL artifacts
-    artifacts_gql = [Artifact.from_dataclass(artifact) for artifact in action_result.data]
+    artifacts = [Artifact.from_dataclass(artifact) for artifact in action_result.data]
 
     # Create edges
-    edges = [ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in artifacts_gql]
+    edges = [ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in artifacts]
 
     # Determine pagination info
     has_next_page = False
@@ -269,7 +268,7 @@ async def artifacts(
     start_cursor = edges[0].cursor if edges else None
     end_cursor = edges[-1].cursor if edges else None
 
-    if connection:
+    if forward or backward:
         # For connection pagination (simplified logic)
         if first and len(edges) == first:
             has_next_page = True  # Could be more accurate with additional service call
@@ -281,7 +280,6 @@ async def artifacts(
         has_next_page = (current_offset + len(edges)) < action_result.total_count
         has_previous_page = current_offset > 0
 
-    # Create connection
     artifact_connection = ArtifactConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
@@ -294,7 +292,6 @@ async def artifacts(
 
     # Set the total count
     artifact_connection.set_total_count(action_result.total_count)
-
     return artifact_connection
 
 
