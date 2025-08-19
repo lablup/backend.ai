@@ -1,6 +1,4 @@
 import uuid
-from dataclasses import dataclass
-from enum import Enum
 from typing import Optional
 
 import sqlalchemy as sa
@@ -21,7 +19,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionData,
     ArtifactStatus,
-    ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
@@ -43,67 +40,6 @@ from ai.backend.manager.repositories.types import (
 
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
-
-
-class ArtifactOrderingField(Enum):
-    """Available fields for ordering artifacts."""
-
-    CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
-    NAME = "name"
-    SIZE = "size"
-    TYPE = "type"
-    STATUS = "status"
-    AUTHORIZED = "authorized"
-    REGISTRY_TYPE = "registry_type"
-    SOURCE_REGISTRY_TYPE = "source_registry_type"
-    VERSION = "version"
-
-
-@dataclass
-class OffsetBasedPaginationOptions:
-    """Standard offset/limit pagination options."""
-
-    offset: Optional[int] = None
-    limit: Optional[int] = None
-
-
-@dataclass
-class ForwardPaginationOptions:
-    """Forward pagination: fetch items after a given cursor."""
-
-    after: Optional[str] = None
-    first: Optional[int] = None
-
-
-@dataclass
-class BackwardPaginationOptions:
-    """Backward pagination: fetch items before a given cursor."""
-
-    before: Optional[str] = None
-    last: Optional[int] = None
-
-
-@dataclass
-class ArtifactOrderingOptions:
-    """Ordering options for artifact queries."""
-
-    order_by: ArtifactOrderingField = ArtifactOrderingField.CREATED_AT
-    order_desc: bool = True
-
-
-@dataclass
-class ArtifactFilterOptions:
-    """Filtering options for artifacts."""
-
-    artifact_type: Optional[ArtifactType] = None
-    status: Optional[ArtifactStatus] = None
-    authorized: Optional[bool] = None
-    name_filter: Optional[str] = None
-    registry_id: Optional[uuid.UUID] = None
-    registry_type: Optional[ArtifactRegistryType] = None
-    source_registry_id: Optional[uuid.UUID] = None
-    source_registry_type: Optional[ArtifactRegistryType] = None
 
 
 class ArtifactRepository:

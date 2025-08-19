@@ -36,7 +36,7 @@ type ArtifactEdge {
 
 input ArtifactFilter {
   type: [ArtifactType!] = null
-  status: ArtifactStatus = null
+  status: ArtifactStatusFilter = null
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
@@ -58,13 +58,11 @@ input ArtifactOrderBy {
 }
 
 enum ArtifactOrderField {
-  ID
   NAME
   TYPE
   SIZE
   CREATED_AT
   UPDATED_AT
-  LATEST_VERSION
 }
 
 enum ArtifactStatus {
@@ -81,6 +79,10 @@ type ArtifactStatusChangedPayload {
   artifactId: ID!
   status: ArtifactStatus!
   updatedAt: DateTime!
+}
+
+input ArtifactStatusFilter {
+  IN: [ArtifactStatus!] = null
 }
 
 enum ArtifactType {
