@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, Self
+from typing import Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
@@ -44,8 +44,8 @@ class ArtifactRow(Base):
     size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
     registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     registry_type = sa.Column("registry_type", sa.String, nullable=False, index=True)
-    source_registry_id = sa.Column("source_registry_id", GUID, nullable=True, index=True)
-    source_registry_type = sa.Column("source_registry_type", sa.String, nullable=True, index=True)
+    source_registry_id = sa.Column("source_registry_id", GUID, nullable=False, index=True)
+    source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readme = sa.Column("readme", sa.TEXT, nullable=True)
     version = sa.Column("version", sa.String, nullable=False)
@@ -126,8 +126,8 @@ class ArtifactRow(Base):
         cls,
         model_data: ModelData,
         registry_id: uuid.UUID,
-        source_registry_id: Optional[uuid.UUID] = None,
-        source_registry_type: Optional[ArtifactRegistryType] = None,
+        source_registry_id: uuid.UUID,
+        source_registry_type: ArtifactRegistryType,
     ) -> Self:
         return cls(
             type=ArtifactType.MODEL,

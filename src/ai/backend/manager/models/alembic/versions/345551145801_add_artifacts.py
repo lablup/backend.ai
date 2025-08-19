@@ -45,12 +45,11 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("size", sa.BigInteger(), nullable=True, default=None),
-        sa.Column("status", sa.String(), nullable=True),
-        sa.Column("source", sa.String(), nullable=True),
+        sa.Column("status", sa.String(), nullable=False, default="SCANNED"),
         sa.Column("registry_id", GUID(), nullable=False),
         sa.Column("source_registry_id", GUID(), nullable=False),
         sa.Column("registry_type", sa.String(), nullable=False),
-        sa.Column("source_registry_type", sa.String(), nullable=True),
+        sa.Column("source_registry_type", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
         sa.Column("readme", sa.TEXT(), nullable=True),
         sa.Column("version", sa.String(), nullable=False),
@@ -66,6 +65,7 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_artifacts_registry_type"), "artifacts", ["registry_type"], unique=False
     )
+    op.create_index(op.f("ix_artifacts_status"), "artifacts", ["status"], unique=False)
     op.create_index(
         op.f("ix_artifacts_source_registry_type"),
         "artifacts",
@@ -96,6 +96,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_artifacts_updated_at"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_type"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_name"), table_name="artifacts")
+    op.drop_index(op.f("ix_artifacts_status"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_registry_id"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_source_registry_id"), table_name="artifacts")
     op.drop_index(op.f("ix_artifacts_registry_type"), table_name="artifacts")
