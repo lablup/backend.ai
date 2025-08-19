@@ -66,6 +66,8 @@ async def object_storages(
     after: Optional[str] = None,
     first: Optional[int] = None,
     last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> ObjectStorageConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?

@@ -170,7 +170,6 @@ input CreateObjectStorageInput {
   secretKey: String!
   endpoint: String!
   region: String!
-  buckets: [String!]!
 }
 
 type CreateObjectStoragePayload {
@@ -544,7 +543,7 @@ type Queries {
   revision(id: ID!): ModelRevision
   replica(id: ID!): ModelReplica
   objectStorage(id: ID!): ObjectStorage
-  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null): ObjectStorageConnection!
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
 }
 
 type RawServiceConfig {
@@ -660,7 +659,6 @@ input UpdateObjectStorageInput {
   secretKey: String
   endpoint: String
   region: String
-  buckets: [String!]
 }
 
 type UpdateObjectStoragePayload {
