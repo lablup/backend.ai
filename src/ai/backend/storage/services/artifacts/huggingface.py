@@ -37,6 +37,8 @@ from ai.backend.storage.services.storages import StorageService
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MiB = 1024 * 1024
+_DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS = 15
+_DEFAULT_BYTESIZE_INTERVAL = 64 * _MiB
 
 _DOWNLOAD_RETRIABLE_ERROR = (
     aiohttp.ClientPayloadError,
@@ -53,9 +55,9 @@ class _DownloadProgressLogger(Protocol):
 
 def _make_download_progress_logger(
     *,
-    total_getter: Callable[[], Optional[int]] = lambda: None,
-    bytes_interval: int = 64 * _MiB,
-    secs_interval: float = 15.0,
+    total_getter: Callable[[], Optional[int]],
+    bytes_interval: int = _DEFAULT_BYTESIZE_INTERVAL,
+    secs_interval: float = _DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS,
 ) -> _DownloadProgressLogger:
     """
     Return a lightweight progress logging callback.
@@ -472,8 +474,6 @@ class HuggingFaceService:
 
         progress_logger = _make_download_progress_logger(
             total_getter=lambda: total,
-            bytes_interval=64 * _MiB,
-            secs_interval=15.0,
         )
 
         async def _probe_head() -> None:
