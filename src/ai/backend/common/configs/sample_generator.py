@@ -60,6 +60,7 @@ def _dump_toml_scalar(
     match value:
         case {"$ref": complex_type}:
             type_name = complex_type.removeprefix("#/$defs/")
+            # TODO: connect with object_props
             return _dump_toml_scalar("{ " + type_name + " }", default, extra_formatter)
         case {"type": "array", "items": item_type}:
             return "[ " + _dump_toml_scalar(item_type, default, extra_formatter) + " ]"
@@ -81,10 +82,6 @@ def _dump_toml_scalar(
             if default is not None:
                 return _dump_toml_scalar(default, None, extra_formatter)
             return _dump_toml_scalar("PATH", default)
-        case {"type": "BinarySize"}:
-            if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
-            return _dump_toml_scalar("BinarySize", default)
         case {"type": toml_type}:
             if default is not None:
                 return _dump_toml_scalar(default, None, extra_formatter)
@@ -97,13 +94,9 @@ def _dump_toml_scalar(
             if default is not None:
                 return _dump_toml_scalar(default, None, extra_formatter)
             return str(value)
-        case PosixPath() | PurePath():
+        case PosixPath() | PurePath() | URL() | timedelta():
             if default is not None:
                 return _dump_toml_scalar(default, None, extra_formatter)
-            return str(value)
-        case URL():
-            return str(value)
-        case timedelta():
             return str(value)
     if default is not None:
         return _dump_toml_scalar(default, None, extra_formatter)
@@ -315,6 +308,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 simple_props[prop_name] = prop_schema
 
         if path == [] and simple_props:
+            # ref: https://github.com/toml-lang/toml/issues/984
             raise ValueError(
                 "The configuration schema CANNOT have simple fields in the root "
                 "without any section header according to the TOML specification. "
