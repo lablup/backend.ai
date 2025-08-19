@@ -308,6 +308,13 @@ class ArtifactRepository:
     @repository_decorator()
     async def delete_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
+            # Delete all associations
+            await db_sess.execute(
+                sa.delete(AssociationArtifactsStoragesData).where(
+                    AssociationArtifactsStoragesData.artifact_id == artifact_id
+                )
+            )
+
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
