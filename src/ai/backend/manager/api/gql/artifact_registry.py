@@ -234,30 +234,12 @@ def artifact_groups(
 
 @strawberry.field
 def artifact(id: ID) -> Optional[Artifact]:
-    # Mock implementation - return artifact by ID
-    id_to_artifact = {
-        "1": mock_model_artifact_1,
-        "2": mock_model_artifact_2,
-        "3": mock_model_artifact_3,
-        "4": mock_image_artifact_1,
-        "5": mock_image_artifact_2,
-        "6": mock_image_artifact_3,
-        "7": mock_package_artifact_1,
-        "8": mock_package_artifact_2,
-        "9": mock_package_artifact_3,
-    }
-    return id_to_artifact.get(str(id))
+    raise NotImplementedError("Artifact retrieval not implemented yet.")
 
 
 @strawberry.field
 def artifact_group(id: ID) -> Optional[ArtifactGroup]:
-    # Mock implementation - return artifact group by ID
-    id_to_artifact_group = {
-        "4": mock_artifact_group1,
-        "5": mock_artifact_group2,
-        "6": mock_artifact_group3,
-    }
-    return id_to_artifact_group.get(str(id))
+    raise NotImplementedError("Artifact group retrieval not implemented yet.")
 
 
 # Mutations

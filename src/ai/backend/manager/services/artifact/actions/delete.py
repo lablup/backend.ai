@@ -3,31 +3,27 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
-# TODO: Make this a batch action.
 @dataclass
-class ImportArtifactBatchAction(ArtifactAction):
-    artifact_ids: list[uuid.UUID]
-    storage_id: uuid.UUID
-    bucket_name: str
+class DeleteArtifactAction(ArtifactAction):
+    artifact_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.artifact_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "import_batch"
+        return "delete"
 
 
 @dataclass
-class ImportArtifactBatchActionResult(BaseActionResult):
-    result: list[ArtifactData]
+class DeleteArtifactActionResult(BaseActionResult):
+    artifact_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.artifact_id)
