@@ -97,17 +97,6 @@ class UpdateObjectStorageReq(BaseRequestModel):
     region: Optional[str] = Field(default=None, description="Updated region")
 
 
-# Association Artifact-Storage API Request Models
-class AssociateArtifactWithStorageReq(BaseRequestModel):
-    artifact_id: uuid.UUID = Field(description="The unique identifier of the artifact")
-    storage_id: uuid.UUID = Field(description="The unique identifier of the storage")
-
-
-class DisassociateArtifactWithStorageReq(BaseRequestModel):
-    artifact_id: uuid.UUID = Field(description="The unique identifier of the artifact")
-    storage_id: uuid.UUID = Field(description="The unique identifier of the storage")
-
-
 class CreateHuggingFaceRegistryReq(BaseRequestModel):
     name: str = Field(description="Name of the Hugging Face model registry")
     endpoint: str = Field(
