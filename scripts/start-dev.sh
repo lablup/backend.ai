@@ -15,5 +15,7 @@ tmux new-session -d -s backendai-appproxy-dev
 tmux new-window -t backendai-appproxy-dev -n "coordinator"
 tmux send-keys "./backend.ai app-proxy-coordinator start-server --debug" C-m
 
+sleep 10
+
 tmux new-window -t backendai-appproxy-dev -n "worker"
 tmux send-keys "./backend.ai app-proxy-worker start-server --debug" C-m
