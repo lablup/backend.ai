@@ -237,8 +237,8 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
     docker_sudo=''
     sudo=''
   else
-    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
-    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
@@ -247,7 +247,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     sudo=''
   else
     docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
-    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
   echo "Unsupported OSTYPE: $OSTYPE"

@@ -58,28 +58,29 @@ show_note() {
   echo "${BLUE}[NOTE]${NC} $1"
 }
 
-has_python() {
-  "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 0 ]; then
-    echo 0  # ok
-  else
-    echo 1  # missing
-  fi
-}
-
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 docker compose version >/dev/null 2>&1
