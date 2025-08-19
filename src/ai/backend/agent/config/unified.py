@@ -781,9 +781,15 @@ class EtcdConfig(BaseModel):
         description="Etcd namespace",
         examples=["local", "backend"],
     )
-    addr: HostPortPair = Field(
+    addr: HostPortPair | list[HostPortPair] = Field(
         description="Etcd address and port",
-        examples=[{"host": "127.0.0.1", "port": 2379}],
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.05", "port": 2379},
+            ],  # multiple endpoints
+        ],
     )
     user: Optional[str] = Field(
         default=None,
@@ -799,7 +805,7 @@ class EtcdConfig(BaseModel):
     def to_dataclass(self) -> EtcdConfigData:
         return EtcdConfigData(
             namespace=self.namespace,
-            addr=self.addr,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
             user=self.user,
             password=self.password,
         )
