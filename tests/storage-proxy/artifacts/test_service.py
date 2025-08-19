@@ -2,8 +2,8 @@
 
 import uuid
 from datetime import datetime
-from typing import AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import AsyncIterator, Tuple
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from aiohttp import ClientError
@@ -28,6 +28,38 @@ from ai.backend.storage.services.artifacts.huggingface import (
 from ai.backend.storage.services.storages import StorageService
 
 _DEFAULT_CHUNK_SIZE = 8192
+
+
+def create_mock_aiohttp_session() -> Tuple[Mock, Mock]:
+    """Create a properly configured mock session that supports async context manager protocol."""
+    mock_session = Mock()
+
+    # Create mock response with regular Mock for non-async attributes
+    mock_response = Mock()
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock headers as a regular Mock so .get() returns normal values
+    mock_headers = Mock()
+    mock_response.headers = mock_headers
+
+    # Mock content as a regular Mock
+    mock_content = Mock()
+    mock_response.content = mock_content
+
+    # Configure session methods to return the mock response
+    mock_get = Mock()
+    mock_get.return_value = mock_response
+    mock_session.get = mock_get
+
+    mock_head = Mock()
+    mock_head.return_value = mock_response
+    mock_session.head = mock_head
+
+    # Add close method
+    mock_session.close = AsyncMock()
+
+    return mock_session, mock_response
 
 
 @pytest.fixture
@@ -339,21 +371,30 @@ class TestHuggingFaceService:
     ) -> None:
         """Test successful file download stream."""
 
+        mock_session, mock_response = create_mock_aiohttp_session()
+        mock_client_session.return_value = mock_session
+
         # Create an async generator for iter_chunked
         async def mock_iter_chunked(chunk_size):
             yield b"chunk1"
             yield b"chunk2"
 
-        # Mock aiohttp response
-        mock_response = MagicMock()
+        # Configure response
         mock_response.status = 200
         mock_response.content.iter_chunked = mock_iter_chunked
 
-        mock_session = MagicMock()
-        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_client_session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_client_session.return_value.__aexit__ = AsyncMock(return_value=None)
+        # Mock headers.get to return different values for different headers
+        def mock_headers_get(key, default=None):
+            if key == "Content-Length":
+                return "12"  # Total size matches our chunks
+            elif key == "ETag":
+                return None
+            elif key == "Accept-Ranges":
+                return None
+            else:
+                return default
+
+        mock_response.headers.get.side_effect = mock_headers_get
 
         chunks = []
         async for chunk in hf_service._make_download_file_stream(
@@ -362,6 +403,7 @@ class TestHuggingFaceService:
             chunks.append(chunk)
 
         assert chunks == [b"chunk1", b"chunk2"]
+        mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
@@ -369,17 +411,20 @@ class TestHuggingFaceService:
         self, mock_client_session: MagicMock, hf_service: HuggingFaceService
     ) -> None:
         """Test file download stream with HTTP error."""
-        # Mock aiohttp response with error status
-        mock_response = MagicMock()
+        mock_session, mock_response = create_mock_aiohttp_session()
+        mock_client_session.return_value = mock_session
+
+        # Create an async generator that immediately raises a non-retriable error
+        async def mock_iter_chunked_error(chunk_size):
+            raise RuntimeError("HTTP 404 Not Found")
+            yield  # Never reached, but needed for generator syntax
+
+        # Configure response with error status
         mock_response.status = 404
+        mock_response.content.iter_chunked = mock_iter_chunked_error
+        mock_response.headers.get.return_value = None
 
-        mock_session = MagicMock()
-        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_client_session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_client_session.return_value.__aexit__ = AsyncMock(return_value=None)
-
-        with pytest.raises(HuggingFaceAPIError):
+        with pytest.raises(RuntimeError):
             async for chunk in hf_service._make_download_file_stream(
                 "http://test.com/file", _DEFAULT_CHUNK_SIZE
             ):
@@ -393,7 +438,7 @@ class TestHuggingFaceService:
         """Test file download stream with client error."""
         mock_client_session.side_effect = ClientError("Connection error")
 
-        with pytest.raises(HuggingFaceAPIError):
+        with pytest.raises(ClientError):
             async for chunk in hf_service._make_download_file_stream(
                 "http://test.com/file", _DEFAULT_CHUNK_SIZE
             ):

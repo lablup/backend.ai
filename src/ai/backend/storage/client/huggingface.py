@@ -235,35 +235,6 @@ class HuggingFaceScanner:
             log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
 
-    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
-        """Download README content for a model.
-
-        Args:
-            model: HuggingFace model to download README for
-
-        Returns:
-            README content as string, or None if download fails
-        """
-        try:
-            readme_url = self._client.get_download_url(model, "README.md")
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(readme_url) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        return content
-                    else:
-                        log.warning(
-                            f"Failed to download README for {model.model_id}@{model.revision}: HTTP {response.status}"
-                        )
-                        return None
-
-        except Exception as e:
-            log.warning(
-                f"Failed to download README for {model.model_id}@{model.revision}: {str(e)}"
-            )
-            return None
-
     async def scan_model(self, model: ModelTarget) -> ModelData:
         """Scan a specific model by ID.
 
@@ -369,3 +340,32 @@ class HuggingFaceScanner:
             raise HuggingFaceAPIError(
                 f"Failed to list files for model {model_id}@{revision}: {str(e)}"
             ) from e
+
+    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
+        """Download README content for a model.
+
+        Args:
+            model: HuggingFace model to download README for
+
+        Returns:
+            README content as string, or None if download fails
+        """
+        try:
+            readme_url = self._client.get_download_url(model, "README.md")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(readme_url) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        return content
+                    else:
+                        log.warning(
+                            f"Failed to download README for {model.model_id}@{model.revision}: HTTP {response.status}"
+                        )
+                        return None
+
+        except Exception as e:
+            log.warning(
+                f"Failed to download README for {model.model_id}@{model.revision}: {str(e)}"
+            )
+            return None
