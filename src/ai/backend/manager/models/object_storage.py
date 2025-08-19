@@ -53,6 +53,8 @@ class ObjectStorageRow(Base):
         return (
             f"ObjectStorageRow("
             f"id={self.id}, "
+            f"name={self.name}, "
+            f"host={self.host}, "
             f"access_key={self.access_key}, "
             f"secret_key={self.secret_key}, "
             f"endpoint={self.endpoint}, "
