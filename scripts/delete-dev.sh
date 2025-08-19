@@ -19,7 +19,7 @@ LG="\033[0;37m"
 NC="\033[0m"
 
 readlinkf() {
-  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  scripts/python.sh -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 usage() {
@@ -89,16 +89,6 @@ else
   DOCKER_COMPOSE="docker-compose"
 fi
 
-show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.13.3"
-STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
-if [ $(has_python "$bpython") -ne 0 ]; then
-  show_error "Python for bootstrapping is not available!"
-  echo "Check if you have installed using the 'install-dev.sh' script."
-  exit 1
-fi
-
 INSTALL_PATH="./backend.ai-dev"
 REMOVE_VENVS=1
 REMOVE_CONTAINERS=1
@@ -149,7 +139,7 @@ show_note "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
 echo "  $ rm -rf .pants.d ~/.cache/pants"
 if [ -f .pants.rc ]; then
-  echo "  \$ rm -rf $($bpython scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
+  echo "  \$ rm -rf $(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
 fi
 
 echo ""
