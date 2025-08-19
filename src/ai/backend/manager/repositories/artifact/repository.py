@@ -48,7 +48,7 @@ class ArtifactOrderingField(Enum):
 
 
 @dataclass
-class ArtifactPaginationOptions:
+class OffsetBasedPaginationOptions:
     """Standard offset/limit pagination options."""
 
     offset: Optional[int] = None
@@ -56,11 +56,17 @@ class ArtifactPaginationOptions:
 
 
 @dataclass
-class ArtifactConnectionOptions:
-    """GraphQL connection pagination options."""
+class ForwardPaginationOptions:
+    """Forward pagination: fetch items after a given cursor."""
 
     after: Optional[str] = None
     first: Optional[int] = None
+
+
+@dataclass
+class BackwardPaginationOptions:
+    """Backward pagination: fetch items before a given cursor."""
+
     before: Optional[str] = None
     last: Optional[int] = None
 
@@ -121,7 +127,7 @@ class ArtifactRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def insert_huggingface_model_artifacts(
+    async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],
         registry_id: uuid.UUID,
@@ -129,22 +135,47 @@ class ArtifactRepository:
         source_registry_type: ArtifactRegistryType,
     ) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
-            models = [
-                ArtifactRow.from_huggingface_model_data(
-                    model,
-                    registry_id=registry_id,
-                    source_registry_id=source_registry_id,
-                    source_registry_type=source_registry_type,
+            result = []
+
+            for model in model_list:
+                # Check if artifact with same model_id and registry_id already exists
+                existing_stmt = sa.select(ArtifactRow).where(
+                    sa.and_(
+                        ArtifactRow.name == model.id,
+                        ArtifactRow.registry_id == registry_id,
+                    )
                 )
-                for model in model_list
-            ]
-            db_sess.add_all(models)
-            await db_sess.flush()
+                existing_result = await db_sess.execute(existing_stmt)
+                existing_artifact = existing_result.scalar_one_or_none()
 
-            for m in models:
-                await db_sess.refresh(m, attribute_names=["id", "created_at", "updated_at"])
+                if existing_artifact is not None:
+                    # Update existing artifact
+                    existing_artifact.source_registry_id = source_registry_id
+                    existing_artifact.source_registry_type = source_registry_type
+                    if model.modified_at:
+                        existing_artifact.updated_at = model.modified_at
+                    existing_artifact.authorized = False
+                    existing_artifact.version = model.revision
+                    # existing_artifact.status = ArtifactStatus.SCANNED.value
 
-            result = [model.to_dataclass() for model in models]
+                    await db_sess.flush()
+                    await db_sess.refresh(existing_artifact, attribute_names=["updated_at"])
+                    result.append(existing_artifact.to_dataclass())
+                else:
+                    # Insert new artifact
+                    new_artifact = ArtifactRow.from_huggingface_model_data(
+                        model,
+                        registry_id=registry_id,
+                        source_registry_id=source_registry_id,
+                        source_registry_type=source_registry_type,
+                    )
+                    db_sess.add(new_artifact)
+                    await db_sess.flush()
+                    await db_sess.refresh(
+                        new_artifact, attribute_names=["id", "created_at", "updated_at"]
+                    )
+                    result.append(new_artifact.to_dataclass())
+
         return result
 
     @repository_decorator()
@@ -307,8 +338,9 @@ class ArtifactRepository:
     async def list_artifacts_paginated(
         self,
         *,
-        pagination: Optional[ArtifactPaginationOptions] = None,
-        connection: Optional[ArtifactConnectionOptions] = None,
+        pagination: Optional[OffsetBasedPaginationOptions] = None,
+        forward: Optional[ForwardPaginationOptions] = None,
+        backward: Optional[BackwardPaginationOptions] = None,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
     ) -> tuple[list[ArtifactData], int]:
@@ -316,7 +348,8 @@ class ArtifactRepository:
 
         Args:
             pagination: Standard offset/limit pagination options
-            connection: GraphQL connection pagination options
+            forward: Forward pagination options (after, first)
+            backward: Backward pagination options (before, last)
             ordering: Ordering options for the query
             filters: Filtering options for artifacts
 
@@ -325,9 +358,7 @@ class ArtifactRepository:
         """
         # Set defaults
         if pagination is None:
-            pagination = ArtifactPaginationOptions()
-        if connection is None:
-            connection = ArtifactConnectionOptions()
+            pagination = OffsetBasedPaginationOptions()
         if ordering is None:
             ordering = ArtifactOrderingOptions()
         if filters is None:
@@ -383,11 +414,17 @@ class ArtifactRepository:
 
             else:
                 # GraphQL connection pagination
+                # Extract pagination parameters from forward/backward options
+                after = forward.after if forward else None
+                first = forward.first if forward else None
+                before = backward.before if backward else None
+                last = backward.last if backward else None
+
                 connection_args = validate_connection_args(
-                    after=connection.after,
-                    first=connection.first,
-                    before=connection.before,
-                    last=connection.last,
+                    after=after,
+                    first=first,
+                    before=before,
+                    last=last,
                 )
 
                 cursor_id = connection_args.cursor

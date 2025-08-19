@@ -31,6 +31,10 @@ from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
     ImportArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.list import (
+    ListArtifactsAction,
+    ListArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
@@ -57,6 +61,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     unauthorize: ActionProcessor[UnauthorizeArtifactAction, UnauthorizeArtifactActionResult]
     delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
     get: ActionProcessor[GetArtifactAction, GetArtifactActionResult]
+    list_artifacts: ActionProcessor[ListArtifactsAction, ListArtifactsActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.scan = ActionProcessor(service.scan, action_monitors)
@@ -72,6 +77,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.unauthorize = ActionProcessor(service.unauthorize, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
+        self.list_artifacts = ActionProcessor(service.list, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -85,4 +91,5 @@ class ArtifactProcessors(AbstractProcessorPackage):
             UnauthorizeArtifactAction.spec(),
             DeleteArtifactAction.spec(),
             GetArtifactAction.spec(),
+            ListArtifactsAction.spec(),
         ]

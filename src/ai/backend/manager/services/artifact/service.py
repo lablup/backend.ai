@@ -37,6 +37,10 @@ from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
     ImportArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.list import (
+    ListArtifactsAction,
+    ListArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
@@ -82,7 +86,7 @@ class ArtifactService:
             )
         )
 
-        scanned_models = await self._artifact_repository.insert_huggingface_model_artifacts(
+        scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
             scan_result.models,
             registry_id=registry_data.id,
             source_registry_id=registry_data.id,
@@ -173,3 +177,13 @@ class ArtifactService:
     async def get(self, action: GetArtifactAction) -> GetArtifactActionResult:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
         return GetArtifactActionResult(result=artifact)
+
+    async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
+        artifacts_data, total_count = await self._artifact_repository.list_artifacts_paginated(
+            pagination=action.pagination,
+            forward=action.forward,
+            backward=action.backward,
+            ordering=action.ordering,
+            filters=action.filters,
+        )
+        return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)

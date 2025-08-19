@@ -12,7 +12,7 @@ from .artifact import (
     authorize_artifact,
     cancel_import_artifact,
     delete_artifact,
-    import_artifact,
+    import_artifacts,
     scan_artifacts,
     unauthorize_artifact,
     update_artifact,
@@ -70,7 +70,7 @@ class Queries:
 @strawberry.type
 class Mutation:
     scan_artifacts = scan_artifacts
-    import_artifact = import_artifact
+    import_artifacts = import_artifacts
     update_artifact = update_artifact
     delete_artifact = delete_artifact
     cancel_import_artifact = cancel_import_artifact

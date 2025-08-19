@@ -26,6 +26,7 @@ type ArtifactConnection {
 
   """Contains the nodes in this connection"""
   edges: [ArtifactEdge!]!
+  TotalCount: Int!
   count: Int!
 }
 
@@ -57,7 +58,7 @@ type ArtifactGroup implements Node {
   type: ArtifactType!
   status: ArtifactStatus!
   description: String
-  artifacts(filter: ArtifactGroupFilter = null, orderBy: [ArtifactGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
 }
 
 """A connection to a list of items."""
@@ -363,14 +364,14 @@ extend type ImageNode @key(fields: "id") {
   id: ID! @external
 }
 
-input ImportArtifactInput {
-  artifactId: ID!
+input ImportArtifactsInput {
+  artifactIds: [ID!]!
   storageId: ID!
   bucketName: String!
 }
 
-type ImportArtifactPayload {
-  artifact: Artifact!
+type ImportArtifactsPayload {
+  artifacts: ArtifactConnection!
 }
 
 """A custom scalar for JSON strings using orjson"""
@@ -534,7 +535,7 @@ input ModelRuntimeConfigInput {
 
 type Mutation {
   scanArtifacts(input: ScanArtifactInput!): ScanArtifactsPayload!
-  importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
+  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
   cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
@@ -613,9 +614,9 @@ type Queries {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
   artifact(id: ID!): Artifact
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
   artifactGroup(id: ID!): ArtifactGroup
-  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
+  artifactGroups(filter: ArtifactGroupFilter = null, orderBy: [ArtifactGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactGroupConnection!
   deployments(
     filter: DeploymentFilter = null
     orderBy: DeploymentOrderBy = null
@@ -716,7 +717,6 @@ input ScanArtifactInput {
   registryId: ID!
   storageId: ID!
   limit: Int!
-  order: String!
   search: String = null
 }
 

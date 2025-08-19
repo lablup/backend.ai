@@ -313,7 +313,9 @@ class HuggingFaceService:
 
                 await self._event_producer.anycast_event(
                     ModelImportDoneEvent(
-                        model_id=model_id, revision=revision, total_size=artifact_total_size
+                        model_id=model_id,
+                        revision=revision,
+                        total_size=artifact_total_size,
                     )
                 )
 
@@ -328,6 +330,27 @@ class HuggingFaceService:
 
         bgtask_id = await self._background_task_manager.start(_import_model)
         return bgtask_id
+
+    async def _download_readme_content(self, download_url: str) -> Optional[str]:
+        """Download README content from the given URL.
+
+        Args:
+            download_url: The URL to download README content from
+
+        Returns:
+            README content as string if successful, None otherwise
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(download_url) as resp:
+                    if resp.status == 200:
+                        return await resp.text()
+                    else:
+                        log.warning(f"Failed to download README.md: HTTP {resp.status}")
+                        return None
+        except Exception as e:
+            log.error(f"Error downloading README.md: {str(e)}")
+            return None
 
     async def import_models_batch(
         self,
