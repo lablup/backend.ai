@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#   "tomlkit~=0.13.3",
+# ]
+# ///
+
 """
 A simple script to get/set a specific key in a TOML file or a TOML data streamed via stdin.
 """
@@ -9,7 +15,7 @@ from pathlib import Path
 
 import tomlkit
 from tomlkit.exceptions import NonExistentKey
-from tomlkit.items import AbstractTable, Array
+from tomlkit.items import AbstractTable
 
 
 rx_index = re.compile(r"^(?P<key>\w+)(\[(?P<index>\d+)\])?$")
@@ -107,6 +113,7 @@ def do_set(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file", default="-")
+    parser.set_defaults(func=None)
     subparsers = parser.add_subparsers()
 
     parser_set = subparsers.add_parser("set", help="set a toml key")
@@ -119,7 +126,10 @@ def main():
     parser_get.set_defaults(func=do_get)
 
     args = parser.parse_args()
-    args.func(args)
+    if args.func is None:
+        parser.print_help()
+    else:
+        args.func(args)
 
 
 if __name__ == "__main__":
