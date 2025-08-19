@@ -767,7 +767,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.db,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
-            use_sokovan=True,  # TODO: Get from config when available
+            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -949,7 +949,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
-        use_sokovan=True,
+        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     yield
