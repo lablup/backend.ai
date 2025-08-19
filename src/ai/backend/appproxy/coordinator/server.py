@@ -51,7 +51,6 @@ from ai.backend.appproxy.common.exceptions import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppCreator,
     AppMode,
@@ -100,9 +99,8 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
-from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.logging.utils import BraceStyleAdapter as LoggingBraceStyleAdapter
 
 from . import __version__
 from .config import ServerConfig
@@ -326,7 +324,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config.debug.log_events,
         event_observer=root_ctx.metrics.event,
     )
+    await root_ctx.event_dispatcher.start()
+    await root_ctx.core_event_dispatcher.start()
+
     yield
+
     await root_ctx.event_producer.close()
     await root_ctx.core_event_producer.close()
     await asyncio.sleep(0.2)
@@ -616,15 +618,6 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 
 
 @actxmgr
-async def event_dispatcher_lifecycle_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    await root_ctx.event_dispatcher.start()
-    await root_ctx.core_event_dispatcher.start()
-    yield
-    await root_ctx.event_dispatcher.close()
-    await root_ctx.core_event_dispatcher.close()
-
-
-@actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_type = root_ctx.local_config.service_discovery.type
     service_discovery: ServiceDiscovery
@@ -672,7 +665,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log_level=root_ctx.local_config.otel.log_level,
             endpoint=root_ctx.local_config.otel.endpoint,
         )
-        LoggingBraceStyleAdapter.apply_otel(otel_spec)
+        BraceStyleAdapter.apply_otel(otel_spec)
     yield
     sd_loop.close()
 
@@ -845,7 +838,6 @@ def build_root_app(
             health_check_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
-            event_dispatcher_lifecycle_ctx,
             service_discovery_ctx,
         ]
 

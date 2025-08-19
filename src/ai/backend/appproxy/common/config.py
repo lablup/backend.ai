@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from pydantic import (
-    AliasChoices,
     BaseModel,
     ByteSize,
     ConfigDict,
@@ -394,29 +393,6 @@ class GraylogConfig(BaseSchema):
             default=None,
         ),
     ]
-
-
-class LoggingConfig(BaseSchema):
-    level: Annotated[LogLevel, Field(default=LogLevel.INFO, description="Log level.")]
-    pkg_ns: Annotated[
-        dict[str, LogLevel],
-        Field(
-            description="Override default log level for specific scope of package",
-            default=default_pkg_ns,
-            validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
-            serialization_alias="pkg-ns",
-        ),
-    ]
-    drivers: Annotated[
-        list[LogDriver],
-        Field(default=[LogDriver.CONSOLE], description="Array of log drivers to print."),
-    ]
-    console: Annotated[
-        ConsoleLogConfig, Field(default=ConsoleLogConfig(colored=None, format=LogFormat.VERBOSE))
-    ]
-    file: Annotated[FileLogConfig | None, Field(default=None)]
-    logstash: Annotated[LogstashConfig | None, Field(default=None)]
-    graylog: Annotated[GraylogConfig | None, Field(default=None)]
 
 
 class PyroscopeConfig(BaseSchema):

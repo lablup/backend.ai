@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -10,13 +12,13 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
 from ai.backend.common.redis_client import RedisConnection
 from ai.backend.common.types import RedisProfileTarget
+from ai.backend.logging import BraceStyleAdapter
 
 from ...types import (
     LAST_USED_MARKER_SOCKET_NAME,
@@ -26,7 +28,7 @@ from ...types import (
     SubdomainFrontendInfo,
     TCircuitKey,
 )
-from .abc import AbstractFrontend
+from .base import BaseFrontend
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -36,7 +38,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 
 
-class AbstractTraefikFrontend(Generic[TCircuitKey], AbstractFrontend[TraefikBackend, TCircuitKey]):
+class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):
     runner: web.AppRunner
     last_used_time_marker_writer_task: asyncio.Task
     active_circuit_writer_task: asyncio.Task

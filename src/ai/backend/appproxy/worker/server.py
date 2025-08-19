@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import grp
@@ -51,7 +53,6 @@ from ai.backend.appproxy.common.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppCreator,
     FrontendMode,
@@ -93,9 +94,8 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import AgentId, RedisProfileTarget, ServiceDiscoveryType
 from ai.backend.common.utils import env_info
-from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.logging.utils import BraceStyleAdapter as LoggingBraceStyleAdapter
 
 from . import __version__
 from .config import ServerConfig
@@ -367,7 +367,10 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config.debug.log_events,
         event_observer=root_ctx.metrics.event,
     )
+    await root_ctx.event_dispatcher.start()
+
     yield
+
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()
@@ -388,13 +391,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
     for handler in handlers:
         root_ctx.event_dispatcher.unsubscribe(handler)
-
-
-@actxmgr
-async def event_dispatcher_lifecycle_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    await root_ctx.event_dispatcher.start()
-    yield
-    await root_ctx.event_dispatcher.close()
 
 
 @actxmgr
@@ -515,6 +511,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Determine announce addresses
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
+    assert announce_addr is not None  # auto-populated if None
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -541,7 +538,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log_level=root_ctx.local_config.otel.log_level,
             endpoint=root_ctx.local_config.otel.endpoint,
         )
-        LoggingBraceStyleAdapter.apply_otel(otel_spec)
+        BraceStyleAdapter.apply_otel(otel_spec)
     yield
     sd_loop.close()
 
@@ -722,7 +719,6 @@ def build_root_app(
                 proxy_frontend_ctx,
                 redis_ctx,
                 event_dispatcher_ctx,
-                event_dispatcher_lifecycle_ctx,
                 event_handler_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
@@ -845,9 +841,7 @@ async def server_main(
     finally:
         if aiomon_started:
             m.close()
-        log.info("Leftover tasks:")
-        for task in asyncio.all_tasks():
-            log.info("{}", task)
+        log.debug("The number of leftover asyncio tasks: {}", len(asyncio.all_tasks()))
 
 
 @actxmgr

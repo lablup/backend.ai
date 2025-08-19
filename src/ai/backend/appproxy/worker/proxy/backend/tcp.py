@@ -7,17 +7,17 @@ from typing import Final
 import aiotools
 
 from ai.backend.appproxy.common.exceptions import WorkerNotAvailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractBackend
+from .base import BaseBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
 
-class TCPBackend(AbstractBackend):
+class TCPBackend(BaseBackend):
     routes: list[RouteInfo]
 
     def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:

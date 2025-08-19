@@ -8,15 +8,16 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
-from ai.backend.appproxy.worker.config import WildcardDomainConfig
-from ai.backend.appproxy.worker.proxy.frontend.http.abc import AbstractHTTPFrontend
-from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
+from ai.backend.logging import BraceStyleAdapter
+
+from ....config import WildcardDomainConfig
+from ....types import Circuit, SubdomainFrontendInfo
+from .base import BaseHTTPFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class SubdomainFrontend(AbstractHTTPFrontend[str]):
+class SubdomainFrontend(BaseHTTPFrontend[str]):
     site: web.TCPSite | None
     wildcard_config: WildcardDomainConfig
 

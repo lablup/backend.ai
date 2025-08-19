@@ -95,7 +95,7 @@ ignore = ["E203","E731","E501"]
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
 known-local-folder = ["src"]
-known-third-party = ["alembic", "redis"]
+known-third-party = ["alembic", "redis", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]

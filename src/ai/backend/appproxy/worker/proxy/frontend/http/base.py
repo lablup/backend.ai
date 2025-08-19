@@ -8,7 +8,6 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.exceptions import BackendError, InvalidCredentials
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -19,13 +18,14 @@ from ai.backend.appproxy.worker.types import (
     RootContext,
     TCircuitKey,
 )
+from ai.backend.logging import BraceStyleAdapter
 
-from ..abc import AbstractFrontend
+from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, TCircuitKey]):
+class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitKey]):
     root_context: RootContext
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -71,11 +71,11 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
         return HTTPBackend(routes, self.root_context, circuit)
 
     async def update_backend(self, backend: HTTPBackend, routes: list[RouteInfo]) -> HTTPBackend:
-        backend.routes = routes
+        await backend.update_routes(routes)
         return backend
 
     async def terminate_backend(self, backend: HTTPBackend) -> None:
-        return
+        await backend.close()
 
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
