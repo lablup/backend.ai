@@ -13,7 +13,6 @@ import ssl
 import sys
 import time
 from collections import OrderedDict, defaultdict
-from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -66,11 +65,6 @@ from ai.backend.common.dto.agent.response import (
 )
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.event_types.image.anycast import (
-    ImagePullFailedEvent,
-    ImagePullFinishedEvent,
-    ImagePullStartedEvent,
-)
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
 )
@@ -101,7 +95,6 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceMetadata,
 )
 from ai.backend.common.types import (
-    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     ContainerId,
@@ -134,7 +127,13 @@ from .config.unified import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, KernelOwnershipData, LifecycleEvent, VolumeInfo
+from .types import (
+    AgentBackend,
+    KernelLifecycleStatus,
+    KernelOwnershipData,
+    LifecycleEvent,
+    VolumeInfo,
+)
 from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
@@ -634,6 +633,37 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def check_pulling(self, image_name: str) -> bool:
+        """Check if an image is being pulled."""
+        log.debug("rpc::check_pulling(image:{})", image_name)
+        return image_name in self.agent._active_pulls
+
+    @rpc_function
+    @collect_error
+    async def check_creating(self, kernel_id: str) -> bool:
+        """Check if a kernel is being created."""
+        log.debug("rpc::check_creating(k:{})", kernel_id)
+        kid = KernelId(UUID(kernel_id))
+        return kid in self.agent._active_creates
+
+    @rpc_function
+    @collect_error
+    async def check_running(self, kernel_id: str) -> bool:
+        """Check if a kernel is running."""
+        log.debug("rpc::check_running(k:{})", kernel_id)
+        kid = KernelId(UUID(kernel_id))
+
+        # Safely get kernel from registry
+        kernel_obj = self.agent.kernel_registry.get(kid)
+
+        # Check if kernel exists and is running
+        if kernel_obj is None:
+            return False
+
+        return kernel_obj.state == KernelLifecycleStatus.RUNNING
+
+    @rpc_function
+    @collect_error
     async def sync_kernel_registry(
         self,
         raw_kernel_session_ids: Iterable[tuple[str, str]],
@@ -677,92 +707,11 @@ class AgentRPCServer(aobject):
         image_configs: Mapping[str, ImageConfig],
     ) -> dict[str, str]:
         """
-        Check whether the agent has an image.
-        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        Check whether the agent has images and pull if needed.
+        Delegates to agent's check_and_pull method which handles tracking.
         """
-        log.info(
-            "rpc::check_and_pull(images:{0})",
-            [
-                {
-                    "name": conf["canonical"],
-                    "project": conf["project"],
-                    "registry": conf["registry"]["name"],
-                }
-                for conf in image_configs.values()
-            ],
-        )
-
-        bgtask_mgr = self.agent.background_task_manager
-
-        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
-            img_ref = ImageRef.from_image_config(img_conf)
-            need_to_pull = await self.agent.check_image(
-                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
-            )
-            if need_to_pull:
-                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
-                await self.agent.anycast_event(
-                    ImagePullStartedEvent(
-                        image=str(img_ref),
-                        image_ref=img_ref,
-                        agent_id=self.agent.id,
-                        timestamp=datetime.now(timezone.utc).timestamp(),
-                    )
-                )
-                image_pull_timeout = cast(Optional[float], self.local_config.api.pull_timeout)
-                try:
-                    await self.agent.pull_image(
-                        img_ref, img_conf["registry"], timeout=image_pull_timeout
-                    )
-                except asyncio.TimeoutError:
-                    log.exception(
-                        f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
-                    )
-                    await self.agent.anycast_event(
-                        ImagePullFailedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            msg=f"timeout (s:{image_pull_timeout})",
-                        )
-                    )
-                except Exception as e:
-                    log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
-                    await self.agent.anycast_event(
-                        ImagePullFailedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            msg=repr(e),
-                        )
-                    )
-                else:
-                    log.info(f"Image pull succeeded {img_ref}")
-                    await self.agent.anycast_event(
-                        ImagePullFinishedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
-                        )
-                    )
-            else:
-                log.debug(f"No need to pull image {img_ref}")
-                await self.agent.anycast_event(
-                    ImagePullFinishedEvent(
-                        image=str(img_ref),
-                        image_ref=img_ref,
-                        agent_id=self.agent.id,
-                        timestamp=datetime.now(timezone.utc).timestamp(),
-                        msg="Image already exists",
-                    )
-                )
-
-        ret: dict[str, str] = {}
-        for img, img_conf in image_configs.items():
-            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
-            ret[img] = task_id.hex
-        return ret
+        log.debug("rpc::check_and_pull(images:{})", list(image_configs.keys()))
+        return await self.agent.check_and_pull(image_configs)
 
     @rpc_function
     @collect_error
