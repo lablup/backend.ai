@@ -61,7 +61,7 @@ class ArtifactOrderingField(Enum):
 
 
 @dataclass
-class ArtifactPaginationOptions:
+class OffsetBasedPaginationOptions:
     """Standard offset/limit pagination options."""
 
     offset: Optional[int] = None
@@ -69,11 +69,17 @@ class ArtifactPaginationOptions:
 
 
 @dataclass
-class ArtifactConnectionOptions:
-    """GraphQL connection pagination options."""
+class ForwardPaginationOptions:
+    """Forward pagination: fetch items after a given cursor."""
 
     after: Optional[str] = None
     first: Optional[int] = None
+
+
+@dataclass
+class BackwardPaginationOptions:
+    """Backward pagination: fetch items before a given cursor."""
+
     before: Optional[str] = None
     last: Optional[int] = None
 

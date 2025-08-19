@@ -51,14 +51,12 @@ class ScanArtifactInput:
     registry_id: ID
     storage_id: ID
     limit: int
-    # TODO: Make it enum
-    order: str
     search: Optional[str] = None
 
 
 @strawberry.input
-class ImportArtifactInput:
-    artifact_id: ID
+class ImportArtifactsInput:
+    artifact_ids: list[ID]
     storage_id: ID
     bucket_name: str
 
@@ -124,7 +122,6 @@ class ArtifactRevision(Node):
             size=ByteSize(data.size),
             created_at=data.created_at,
             updated_at=data.updated_at,
-            version=data.version,
             authorized=data.authorized,
         )
 
@@ -134,10 +131,14 @@ ArtifactEdge = Edge[Artifact]
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
+    _total_count: int = 0
+
     @strawberry.field
     def count(self) -> int:
-        # Mock implementation - in real implementation, count from database
-        return 0
+        return self._total_count
+
+    def set_total_count(self, count: int) -> None:
+        self._total_count = count
 
 
 @strawberry.type
@@ -154,8 +155,8 @@ class ScanArtifactsPayload:
 
 # Mutation Payloads
 @strawberry.type
-class ImportArtifactPayload:
-    artifact: Artifact
+class ImportArtifactsPayload:
+    artifacts: ArtifactConnection
 
 
 @strawberry.type
@@ -192,24 +193,109 @@ class ArtifactStatusChangedPayload:
 
 # Query Fields
 @strawberry.field
-def artifacts(
+async def artifacts(
+    info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
     last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    # Mock implementation - return sample artifacts
-    return ArtifactConnection(
-        edges=[],
+    # Build filter options
+    filters = ArtifactFilterOptions()
+    if filter:
+        if filter.type:
+            filters.artifact_type = filter.type[0] if filter.type else None
+        if filter.status:
+            filters.status = filter.status
+        if filter.name and filter.name.i_contains:
+            filters.name_filter = filter.name.i_contains
+
+    # Build ordering options
+    ordering = ArtifactOrderingOptions()
+    if order_by and order_by[0]:
+        order_field_map = {
+            ArtifactOrderField.ID: ArtifactOrderingField.CREATED_AT,
+            ArtifactOrderField.NAME: ArtifactOrderingField.NAME,
+            ArtifactOrderField.TYPE: ArtifactOrderingField.TYPE,
+            ArtifactOrderField.SIZE: ArtifactOrderingField.SIZE,
+            ArtifactOrderField.CREATED_AT: ArtifactOrderingField.CREATED_AT,
+            ArtifactOrderField.UPDATED_AT: ArtifactOrderingField.UPDATED_AT,
+        }
+        ordering.order_by = order_field_map.get(order_by[0].field, ArtifactOrderingField.CREATED_AT)
+        ordering.order_desc = order_by[0].direction == OrderDirection.DESC
+
+    # Choose pagination mode
+    if offset is not None or limit is not None:
+        # Standard pagination
+        pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+        connection = None
+        forward = None
+        backward = None
+    else:
+        # GraphQL connection pagination
+        pagination = None
+        # Create forward or backward pagination options based on parameters
+        forward = None
+        backward = None
+        if after is not None or first is not None:
+            forward = ForwardPaginationOptions(after=after, first=first)
+        if before is not None or last is not None:
+            backward = BackwardPaginationOptions(before=before, last=last)
+
+    # Use service layer to get artifacts
+    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
+        ListArtifactsAction(
+            pagination=pagination,
+            forward=forward,
+            backward=backward,
+            ordering=ordering,
+            filters=filters,
+        )
+    )
+
+    # Convert to GraphQL artifacts
+    artifacts_gql = [Artifact.from_dataclass(artifact) for artifact in action_result.data]
+
+    # Create edges
+    edges = [ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in artifacts_gql]
+
+    # Determine pagination info
+    has_next_page = False
+    has_previous_page = False
+    start_cursor = edges[0].cursor if edges else None
+    end_cursor = edges[-1].cursor if edges else None
+
+    if connection:
+        # For connection pagination (simplified logic)
+        if first and len(edges) == first:
+            has_next_page = True  # Could be more accurate with additional service call
+        if last and len(edges) == last:
+            has_previous_page = True  # Could be more accurate with additional service call
+    else:
+        # For offset/limit pagination
+        current_offset = offset or 0
+        has_next_page = (current_offset + len(edges)) < action_result.total_count
+        has_previous_page = current_offset > 0
+
+    # Create connection
+    artifact_connection = ArtifactConnection(
+        edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=None,
-            end_cursor=None,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+            start_cursor=start_cursor,
+            end_cursor=end_cursor,
         ),
     )
+
+    # Set the total count
+    artifact_connection.set_total_count(action_result.total_count)
+
+    return artifact_connection
 
 
 @strawberry.field
@@ -221,13 +307,13 @@ def artifact(id: ID) -> Optional[Artifact]:
 async def scan_artifacts(
     input: ScanArtifactInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
-    # TODO: 여기서 타입 별로 호출해야...
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             registry_id=uuid.UUID(input.registry_id),
             storage_id=uuid.UUID(input.storage_id),
             limit=input.limit,
-            order=ModelSortKey(input.order),
+            # TODO: Move this huggingface_registries config if needed
+            order=ModelSortKey.DOWNLOADS,
             search=input.search,
         )
     )
@@ -238,18 +324,35 @@ async def scan_artifacts(
 
 # Mutations
 @strawberry.mutation
-async def import_artifact(
-    input: ImportArtifactInput, info: Info[StrawberryGQLContext]
-) -> ImportArtifactPayload:
-    action_result = await info.context.processors.artifact.import_.wait_for_complete(
-        ImportArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-            storage_id=uuid.UUID(input.storage_id),
-            bucket_name=input.bucket_name,
+async def import_artifacts(
+    input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
+) -> ImportArtifactsPayload:
+    imported_artifacts = []
+    for artifact_id in input.artifact_ids:
+        action_result = await info.context.processors.artifact.import_.wait_for_complete(
+            ImportArtifactAction(
+                artifact_id=uuid.UUID(artifact_id),
+                storage_id=uuid.UUID(input.storage_id),
+                bucket_name=input.bucket_name,
+            )
         )
+        imported_artifacts.append(Artifact.from_dataclass(action_result.result))
+
+    edges = [
+        ArtifactEdge(node=artifact, cursor=str(i)) for i, artifact in enumerate(imported_artifacts)
+    ]
+
+    artifacts_connection = ArtifactConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
-    return ImportArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+    return ImportArtifactsPayload(artifacts=artifacts_connection)
 
 
 @strawberry.mutation
