@@ -27,8 +27,6 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
-from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,

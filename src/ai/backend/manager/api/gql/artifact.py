@@ -122,6 +122,8 @@ class ArtifactRevision(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             authorized=data.authorized,
+            # TODO: Fill this
+            versions=[],
         )
 
 
@@ -130,14 +132,15 @@ ArtifactEdge = Edge[Artifact]
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
-    _total_count: int = 0
+    total_count: int = 0
+
+    def __init__(self, *args, total_count: int = 0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._total_count = total_count
 
     @strawberry.field
     def count(self) -> int:
         return self._total_count
-
-    def set_total_count(self, count: int) -> None:
-        self._total_count = count
 
 
 @strawberry.type
@@ -190,9 +193,7 @@ class ArtifactStatusChangedPayload:
     updated_at: datetime
 
 
-# Query Fields
-@strawberry.field
-async def artifacts(
+async def resolve_artifacts(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
@@ -277,6 +278,7 @@ async def artifacts(
         has_previous_page = current_offset > 0
 
     artifact_connection = ArtifactConnection(
+        total_count=action_result.total_count,
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=has_next_page,
@@ -286,9 +288,33 @@ async def artifacts(
         ),
     )
 
-    # Set the total count
-    artifact_connection.set_total_count(action_result.total_count)
     return artifact_connection
+
+
+# Query Fields
+@strawberry.field
+async def artifacts(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ArtifactFilter] = None,
+    order_by: Optional[list[ArtifactOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ArtifactConnection:
+    return await resolve_artifacts(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @strawberry.field
@@ -336,6 +362,7 @@ async def import_artifacts(
     ]
 
     artifacts_connection = ArtifactConnection(
+        total_count=len(imported_artifacts),
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
