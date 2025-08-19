@@ -159,14 +159,15 @@ ArtifactEdge = Edge[Artifact]
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
-    _total_count: int = 0
+    total_count: int = 0
+
+    def __init__(self, *args, total_count: int = 0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._total_count = total_count
 
     @strawberry.field
     def count(self) -> int:
         return self._total_count
-
-    def set_total_count(self, count: int) -> None:
-        self._total_count = count
 
 
 @strawberry.type
@@ -180,6 +181,7 @@ class ArtifactGroup(Node):
     @strawberry.field
     async def artifacts(
         self,
+        info: Info[StrawberryGQLContext],
         filter: Optional[ArtifactFilter] = None,
         order_by: Optional[list[ArtifactOrderBy]] = None,
         before: Optional[str] = None,
@@ -189,28 +191,111 @@ class ArtifactGroup(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactConnection:
-        all_mock_artifacts: list = []
+        # Parse the group ID to extract name and registry_id
+        try:
+            name, registry_id_str = str(self.id).split(":", 1)
+        except ValueError:
+            # Return empty connection if ID format is invalid
+            return ArtifactConnection(
+                total_count=0,
+                edges=[],
+                page_info=strawberry.relay.PageInfo(
+                    has_next_page=False,
+                    has_previous_page=False,
+                    start_cursor=None,
+                    end_cursor=None,
+                ),
+            )
 
-        # Filter artifacts to match the group's type
-        filtered_artifacts = [
-            (artifact, cursor)
-            for artifact, cursor in all_mock_artifacts
-            if artifact.type == self.type
+        # Build filter options
+        filters = ArtifactFilterOptions()
+        filters.name_filter = name
+
+        # Apply additional filters from the request
+        if filter:
+            if filter.type:
+                filters.artifact_type = filter.type[0] if filter.type else None
+            if filter.status and filter.status.IN:
+                filters.status = filter.status.IN
+
+        # Build ordering options
+        ordering = ArtifactOrderingOptions()
+        if order_by:
+            order_tuples: list[tuple[ArtifactOrderField, bool]] = []
+            for order_item in order_by:
+                desc = order_item.direction == OrderDirection.DESC
+                order_tuples.append((order_item.field, desc))
+            ordering.order_by = order_tuples
+
+        # Choose pagination mode
+        if offset is not None or limit is not None:
+            # Standard pagination
+            pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+            forward = None
+            backward = None
+        else:
+            # GraphQL connection pagination
+            pagination = None
+            forward = None
+            backward = None
+            if after is not None or first is not None:
+                forward = ForwardPaginationOptions(after=after, first=first)
+            if before is not None or last is not None:
+                backward = BackwardPaginationOptions(before=before, last=last)
+
+        # Use service layer to get artifacts
+        action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
+            ListArtifactsAction(
+                pagination=pagination,
+                forward=forward,
+                backward=backward,
+                ordering=ordering,
+                filters=filters,
+            )
+        )
+
+        # Filter artifacts that match the specific registry_id for this group
+        matching_artifacts = [
+            artifact
+            for artifact in action_result.data
+            if str(artifact.registry_id) == registry_id_str
         ]
 
-        edges = [
-            ArtifactEdge(node=artifact, cursor=cursor) for artifact, cursor in filtered_artifacts
-        ]
+        # Convert to GraphQL artifacts
+        artifacts = [Artifact.from_dataclass(artifact) for artifact in matching_artifacts]
 
-        return ArtifactConnection(
+        # Create edges
+        edges = [ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in artifacts]
+
+        # Determine pagination info
+        has_next_page = False
+        has_previous_page = False
+        start_cursor = edges[0].cursor if edges else None
+        end_cursor = edges[-1].cursor if edges else None
+
+        # Note: This is a simplified pagination logic since we're filtering after fetching
+        if forward or backward:
+            if first and len(edges) == first:
+                has_next_page = True  # Could be more accurate with additional service call
+            if last and len(edges) == last:
+                has_previous_page = True  # Could be more accurate with additional service call
+        else:
+            current_offset = offset or 0
+            has_next_page = (current_offset + len(edges)) < len(matching_artifacts)
+            has_previous_page = current_offset > 0
+
+        artifact_connection = ArtifactConnection(
+            total_count=len(matching_artifacts),
             edges=edges,
             page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
+                has_next_page=has_next_page,
+                has_previous_page=has_previous_page,
+                start_cursor=start_cursor,
+                end_cursor=end_cursor,
             ),
         )
+
+        return artifact_connection
 
 
 ArtifactGroupEdge = Edge[ArtifactGroup]
@@ -266,9 +351,7 @@ class ArtifactStatusChangedPayload:
     updated_at: datetime
 
 
-# Query Fields
-@strawberry.field
-async def artifacts(
+async def resolve_artifacts(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
@@ -353,6 +436,7 @@ async def artifacts(
         has_previous_page = current_offset > 0
 
     artifact_connection = ArtifactConnection(
+        total_count=action_result.total_count,
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=has_next_page,
@@ -362,13 +446,38 @@ async def artifacts(
         ),
     )
 
-    # Set the total count
-    artifact_connection.set_total_count(action_result.total_count)
     return artifact_connection
 
 
+# Query Fields
 @strawberry.field
-def artifact_groups(
+async def artifacts(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ArtifactFilter] = None,
+    order_by: Optional[list[ArtifactOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ArtifactConnection:
+    return await resolve_artifacts(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@strawberry.field
+async def artifact_groups(
+    info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactGroupFilter] = None,
     order_by: Optional[list[ArtifactGroupOrderBy]] = None,
     before: Optional[str] = None,
@@ -378,16 +487,7 @@ def artifact_groups(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> Connection[ArtifactGroup]:
-    # Mock implementation - return empty connection
-    return Connection(
-        edges=[],
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=None,
-            end_cursor=None,
-        ),
-    )
+    raise NotImplementedError("Artifact groups are not implemented yet.")
 
 
 @strawberry.field
@@ -402,9 +502,8 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
 
 
 @strawberry.field
-def artifact_group(id: ID) -> Optional[ArtifactGroup]:
-    # Mock implementation
-    return None
+async def artifact_group(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactGroup]:
+    raise NotImplementedError("Artifact groups are not implemented yet.")
 
 
 @strawberry.mutation
@@ -447,6 +546,7 @@ async def import_artifacts(
     ]
 
     artifacts_connection = ArtifactConnection(
+        total_count=len(imported_artifacts),
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,

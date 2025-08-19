@@ -86,6 +86,7 @@ class ArtifactService:
             )
         )
 
+        # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
         scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
             scan_result.models,
             registry_id=registry_data.id,
