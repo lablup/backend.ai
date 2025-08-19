@@ -118,7 +118,7 @@ configure_storage_proxy_minio() {
     fi
 
     # Replace placeholder values in the [[storages]] section with actual MinIO configuration
-    sed_inplace 's/bucket = "enter_bucket_name"/bucket = "backendai-storage"/' "$storage_proxy_config"
+    sed_inplace "s/buckets = \[\"enter_bucket_name\"\]/buckets = [\"backendai-storage\"]/" "$storage_proxy_config"
     sed_inplace 's#endpoint = "http://minio.example.com:9000"#endpoint = "http://127.0.0.1:9000"#' "$storage_proxy_config"
     sed_inplace "s/access-key = \"<minio-access-key>\"/access-key = \"${MINIO_ACCESS_KEY}\"/" "$storage_proxy_config"
     sed_inplace "s/secret-key = \"<minio-secret-key>\"/secret-key = \"${MINIO_SECRET_KEY}\"/" "$storage_proxy_config"
