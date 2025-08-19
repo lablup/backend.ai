@@ -270,7 +270,7 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-source scripts/bootstrap-static-python.sh
+bpython="scripts/static-python.sh"
 $bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
