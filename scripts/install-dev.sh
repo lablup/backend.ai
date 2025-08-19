@@ -229,19 +229,29 @@ show_guide() {
   fi
 }
 
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo -E'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo -E'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 # Detect distribution
