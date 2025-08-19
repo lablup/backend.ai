@@ -1,13 +1,17 @@
 import asyncio
 import logging
+import time
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import Any, Awaitable, Optional
+from typing import Any, Awaitable, Coroutine, Optional
 
 import aiotools
 import async_timeout
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -33,6 +37,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
@@ -60,14 +65,15 @@ from .sequencers.sequencer import WorkloadSequencer
 from .types import (
     AllocationBatch,
     ImageConfigData,
-    KernelStartData,
+    KernelBindingData,
     KeypairOccupancy,
     NetworkSetup,
-    PreparedSessionData,
     SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
     SessionAllocation,
+    SessionDataForPull,
+    SessionDataForStart,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -407,7 +413,6 @@ class Scheduler:
         # Store predicates in the allocation
         session_allocation.passed_phases = passed_phases
         session_allocation.failed_phases = failed_phases
-
         return session_allocation
 
     def _update_system_snapshot(
@@ -538,7 +543,6 @@ class Scheduler:
 
         # Build session termination results
         session_results: list[SessionTerminationResult] = []
-
         for session in terminating_sessions:
             # Create session result with reason from session's status_info
             session_result = SessionTerminationResult(
@@ -626,7 +630,6 @@ class Scheduler:
 
             # Call agent's destroy_kernel RPC method with correct parameters
             await agent_client.destroy_kernel(kernel_id, session_id, reason)
-
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,
@@ -688,15 +691,11 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that progressed
         """
-        try:
-            # Check sessions with all kernels that have reached PREPARED state
-            sessions_to_update = await self._repository.get_sessions_ready_to_prepare()
-            if sessions_to_update:
-                await self._repository.update_sessions_to_prepared(sessions_to_update)
-            return ScheduleResult(succeeded_count=len(sessions_to_update))
-        except Exception as e:
-            log.error("Failed to check pulling progress: {}", e, exc_info=True)
-            return ScheduleResult(succeeded_count=0)
+        # Check sessions with all kernels that have reached PREPARED state
+        sessions_to_update = await self._repository.get_sessions_ready_to_prepare()
+        if sessions_to_update:
+            await self._repository.update_sessions_to_prepared(sessions_to_update)
+        return ScheduleResult(succeeded_count=len(sessions_to_update))
 
     async def check_creating_progress(self) -> ScheduleResult:
         """
@@ -705,16 +704,12 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that transitioned to RUNNING
         """
-        try:
-            # Check sessions with all kernels RUNNING
-            sessions_to_update = await self._repository.get_sessions_ready_to_run()
+        # Check sessions with all kernels RUNNING
+        sessions_to_update = await self._repository.get_sessions_ready_to_run()
 
-            if sessions_to_update:
-                await self._repository.update_sessions_to_running(sessions_to_update)
-            return ScheduleResult(succeeded_count=len(sessions_to_update))
-        except Exception as e:
-            log.error("Failed to check creating progress: {}", e, exc_info=True)
-            return ScheduleResult(succeeded_count=0)
+        if sessions_to_update:
+            await self._repository.update_sessions_to_running(sessions_to_update)
+        return ScheduleResult(succeeded_count=len(sessions_to_update))
 
     async def check_terminating_progress(self) -> ScheduleResult:
         """
@@ -723,16 +718,12 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that transitioned to TERMINATED
         """
-        try:
-            # Check sessions with all kernels TERMINATED
-            sessions_to_update = await self._repository.get_sessions_ready_to_terminate()
+        # Check sessions with all kernels TERMINATED
+        sessions_to_update = await self._repository.get_sessions_ready_to_terminate()
 
-            if sessions_to_update:
-                await self._repository.update_sessions_to_terminated(sessions_to_update)
-            return ScheduleResult(succeeded_count=len(sessions_to_update))
-        except Exception as e:
-            log.error("Failed to check terminating progress: {}", e, exc_info=True)
-            return ScheduleResult(succeeded_count=0)
+        if sessions_to_update:
+            await self._repository.update_sessions_to_terminated(sessions_to_update)
+        return ScheduleResult(succeeded_count=len(sessions_to_update))
 
     async def check_preconditions(self) -> ScheduleResult:
         """
@@ -744,77 +735,65 @@ class Scheduler:
         lock_lifetime = (
             self._config_provider.config.manager.session_check_precondition_lock_lifetime
         )
-        try:
-            async with self._lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
-                # Get scheduled sessions with image configurations
-                result = await self._repository.get_scheduled_sessions_with_images()
-                scheduled_sessions = result.sessions
-                image_configs = result.image_configs
+        async with self._lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
+            # Get scheduled sessions for image pulling
+            result = await self._repository.get_sessions_for_pull([SessionStatus.SCHEDULED])
+            scheduled_sessions = result.sessions
+            image_configs = result.image_configs
 
-                if not scheduled_sessions:
-                    log.debug("No scheduled sessions found for precondition checking")
-                    return ScheduleResult(succeeded_count=0)
-                auto_pull = self._config_provider.config.docker.image.auto_pull.value
+            if not scheduled_sessions:
+                return ScheduleResult(succeeded_count=0)
 
-                log.debug("Checking preconditions for {} sessions", len(scheduled_sessions))
+            # Extract session IDs for status update
+            session_ids = [s.session_id for s in scheduled_sessions]
 
-                # Extract session IDs for status update
-                session_ids = [s.session_id for s in scheduled_sessions]
+            # Update sessions to PREPARING status
+            await self._repository.update_sessions_to_preparing(session_ids)
 
-                # Update sessions to PREPARING status
-                await self._repository.update_sessions_to_preparing(session_ids)
+            # Trigger image checking and pulling on agents
+            await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
 
-                # Group kernels by agent for image pulling
-                agent_image_configs: defaultdict[AgentId, dict[str, ImageConfig]] = defaultdict(
-                    dict
-                )
+            return ScheduleResult(succeeded_count=len(scheduled_sessions))
 
-                # Build agent_image_configs by directly looking up configs
-                for session in scheduled_sessions:
-                    for kernel in session.kernels:
-                        agent_id = kernel.agent_id
-                        if agent_id:
-                            # Image config must exist since we queried based on kernels
-                            img_cfg = image_configs[kernel.image]
+    async def _trigger_image_pulling_for_sessions(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
+        """
+        Trigger image checking and pulling on agents for the given sessions.
 
-                            # Convert ImageConfigData to ImageConfig format
-                            # Use canonical as key for agent_image_configs to avoid duplicates
-                            canonical = img_cfg.canonical
-                            if canonical not in agent_image_configs[agent_id]:
-                                image_config: ImageConfig = {
-                                    "architecture": img_cfg.architecture,
-                                    "project": img_cfg.project,
-                                    "canonical": canonical,
-                                    "is_local": img_cfg.is_local,
-                                    "digest": img_cfg.digest,
-                                    "labels": img_cfg.labels,
-                                    "repo_digest": None,
-                                    "registry": {
-                                        "name": img_cfg.registry_name,
-                                        "url": img_cfg.registry_url,
-                                        "username": img_cfg.registry_username,
-                                        "password": img_cfg.registry_password,
-                                    },
-                                    "auto_pull": AutoPullBehavior(auto_pull),
-                                }
-                                agent_image_configs[agent_id][canonical] = image_config
+        :param sessions: List of sessions with kernels
+        :param image_configs: Image configurations indexed by image name
+        """
+        auto_pull = self._config_provider.config.docker.image.auto_pull.value
 
-                # Trigger image checking and pulling on each agent
-                pull_tasks: list[Awaitable[Any]] = []
-                for agent_id, agent_images in agent_image_configs.items():
-                    agent_client = self._agent_pool.get_agent_client(agent_id)
-                    pull_tasks.append(agent_client.check_and_pull(agent_images))
+        # Group kernels by agent for image pulling
+        agent_image_configs: defaultdict[AgentId, dict[str, ImageConfig]] = defaultdict(dict)
 
-                if pull_tasks:
-                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+        # Build agent_image_configs by directly looking up configs
+        for session in sessions:
+            for kernel in session.kernels:
+                agent_id = kernel.agent_id
+                if agent_id:
+                    # Image config must exist since we queried based on kernels
+                    img_cfg = image_configs[kernel.image]
 
-                return ScheduleResult(succeeded_count=len(scheduled_sessions))
-        except asyncio.TimeoutError:
-            log.warning("check_preconditions(): timeout while checking preconditions")
-            return ScheduleResult(succeeded_count=0)
-        except Exception as e:
-            log.error("Failed to check preconditions: {}", e, exc_info=True)
-            return ScheduleResult(succeeded_count=0)
+                    # Convert ImageConfigData to ImageConfig format
+                    # Use canonical as key for agent_image_configs to avoid duplicates
+                    canonical = img_cfg.canonical
+                    if canonical not in agent_image_configs[agent_id]:
+                        image_config = img_cfg.to_image_config(AutoPullBehavior(auto_pull))
+                        agent_image_configs[agent_id][canonical] = image_config
+
+        # Trigger image checking and pulling on each agent
+        pull_tasks: list[Coroutine[Any, Any, Mapping[str, str]]] = []
+        for agent_id, agent_images in agent_image_configs.items():
+            agent_client = self._agent_pool.get_agent_client(agent_id)
+            pull_tasks.append(agent_client.check_and_pull(agent_images))
+
+        if pull_tasks:
+            await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions(self) -> ScheduleResult:
         """
@@ -824,46 +803,50 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions started
         """
         lock_lifetime = self._config_provider.config.manager.session_start_lock_lifetime
-        try:
-            async with self._lock_factory(LockID.LOCKID_START, lock_lifetime):
-                # Get prepared sessions with images in batch
-                sessions_with_images = await self._repository.get_prepared_sessions_with_images()
-                prepared_sessions = sessions_with_images.sessions
-                image_configs = sessions_with_images.image_configs
+        async with self._lock_factory(LockID.LOCKID_START, lock_lifetime):
+            # Get prepared sessions for starting
+            sessions_with_images = await self._repository.get_sessions_for_start([
+                SessionStatus.PREPARED
+            ])
+            prepared_sessions = sessions_with_images.sessions
+            image_configs = sessions_with_images.image_configs
 
-                if not prepared_sessions:
-                    log.debug("No prepared sessions found to start")
-                    return ScheduleResult(succeeded_count=0)
+            if not prepared_sessions:
+                return ScheduleResult(succeeded_count=0)
+            # Extract session IDs for status update
+            session_ids = [s.session_id for s in prepared_sessions]
 
-                log.debug("Starting {} sessions", len(prepared_sessions))
+            # Update sessions and kernels to CREATING status
+            await self._repository.update_sessions_and_kernels_to_creating(session_ids)
 
-                # Extract session IDs for status update
-                session_ids = [s.session_id for s in prepared_sessions]
+            # Start sessions concurrently
+            await self._start_sessions_concurrently(prepared_sessions, image_configs)
 
-                # Update sessions and kernels to CREATING status
-                await self._repository.update_sessions_and_kernels_to_creating(session_ids)
+            return ScheduleResult(succeeded_count=len(prepared_sessions))
 
-                # Start each session concurrently with timeout
-                async with (
-                    async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
-                    aiotools.PersistentTaskGroup() as tg,
-                ):
-                    for session in prepared_sessions:
-                        # Start session asynchronously with image configs
-                        tg.create_task(self._start_single_session(session, image_configs))
+    async def _start_sessions_concurrently(
+        self,
+        sessions: list[SessionDataForStart],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
+        """
+        Start multiple sessions concurrently with timeout.
 
-                return ScheduleResult(succeeded_count=len(prepared_sessions))
-
-        except asyncio.TimeoutError:
-            log.warning("start_sessions(): timeout while starting sessions")
-            return ScheduleResult(succeeded_count=0)
-        except Exception as e:
-            log.error("Failed to start sessions: {}", e, exc_info=True)
-            return ScheduleResult(succeeded_count=0)
+        :param sessions: List of sessions to start
+        :param image_configs: Image configurations for the sessions
+        """
+        # Start each session concurrently with timeout
+        async with (
+            async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
+            aiotools.PersistentTaskGroup() as tg,
+        ):
+            for session in sessions:
+                # Start session asynchronously with image configs
+                tg.create_task(self._start_single_session(session, image_configs))
 
     async def _start_single_session(
         self,
-        session: PreparedSessionData,
+        session: SessionDataForStart,
         image_configs: dict[str, ImageConfigData],
     ) -> None:
         """
@@ -910,9 +893,10 @@ class Scheduler:
             }
 
             # Group kernels by agent to minimize RPC calls
-            kernels_by_agent: defaultdict[AgentId, list[KernelStartData]] = defaultdict(list)
+            kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
             for kernel in session.kernels:
-                kernels_by_agent[kernel.agent_id].append(kernel)
+                if kernel.agent_id:
+                    kernels_by_agent[kernel.agent_id].append(kernel)
 
             # Group kernels by cluster role for replica counting
             keyfunc = lambda k: k.cluster_role
@@ -930,22 +914,7 @@ class Scheduler:
             # Convert ImageConfigData to ImageConfig format for agents
             image_configs_by_canonical: dict[str, ImageConfig] = {}
             for image_key, img_cfg in image_configs.items():
-                image_config: ImageConfig = {
-                    "architecture": img_cfg.architecture,
-                    "project": img_cfg.project,
-                    "canonical": img_cfg.canonical,
-                    "is_local": img_cfg.is_local,
-                    "digest": img_cfg.digest,
-                    "labels": img_cfg.labels,
-                    "repo_digest": None,
-                    "registry": {
-                        "name": img_cfg.registry_name,
-                        "url": img_cfg.registry_url,
-                        "username": img_cfg.registry_username,
-                        "password": img_cfg.registry_password,
-                    },
-                    "auto_pull": AutoPullBehavior.DIGEST,
-                }
+                image_config = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
                 image_configs_by_canonical[image_key] = image_config
 
             # Create kernels on each agent
@@ -960,7 +929,7 @@ class Scheduler:
                 kernel_configs: list[KernelCreationConfig] = []
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
-                for k in agent_kernels:
+                for idx, k in enumerate(agent_kernels):
                     kernel_id_str = str(k.kernel_id)
                     image_str = k.image
 
@@ -977,6 +946,11 @@ class Scheduler:
 
                     kernel_image_config = image_configs_by_canonical[image_str]
 
+                    # Determine cluster role - first kernel is main, rest are workers
+                    cluster_role = "main" if idx == 0 and len(session.kernels) > 0 else "worker"
+                    cluster_idx = idx
+                    cluster_hostname = f"node-{k.kernel_id}"
+
                     # Build proper KernelCreationConfig
                     kernel_config: KernelCreationConfig = {
                         "image": kernel_image_config,
@@ -984,32 +958,32 @@ class Scheduler:
                         "auto_pull": AutoPullBehavior.DIGEST,
                         "session_type": session.session_type,
                         "cluster_mode": session.cluster_mode,
-                        "cluster_role": k.cluster_role,
-                        "cluster_idx": k.cluster_idx,
-                        "cluster_hostname": k.cluster_hostname or f"node-{k.kernel_id}",
+                        "cluster_role": cluster_role,
+                        "cluster_idx": cluster_idx,
+                        "cluster_hostname": cluster_hostname,
                         "uid": None,  # Would need actual UID
                         "main_gid": None,  # Would need actual GID
                         "supplementary_gids": [],
-                        "resource_slots": k.requested_slots.to_json(),
-                        "resource_opts": k.resource_opts,
+                        "resource_slots": ResourceSlot().to_json(),  # Would need actual slots
+                        "resource_opts": {},
                         "environ": {
                             **environ,
                             "BACKENDAI_KERNEL_ID": kernel_id_str,
                             "BACKENDAI_KERNEL_IMAGE": image_str,
-                            "BACKENDAI_CLUSTER_ROLE": k.cluster_role,
-                            "BACKENDAI_CLUSTER_IDX": str(k.cluster_idx),
-                            "BACKENDAI_CLUSTER_HOST": k.cluster_hostname or f"node-{k.kernel_id}",
+                            "BACKENDAI_CLUSTER_ROLE": cluster_role,
+                            "BACKENDAI_CLUSTER_IDX": str(cluster_idx),
+                            "BACKENDAI_CLUSTER_HOST": cluster_hostname,
                         },
                         "mounts": [],  # Would need actual vfolder mounts
                         "package_directory": [],
                         "idle_timeout": idle_timeout,
-                        "bootstrap_script": k.bootstrap_script,
-                        "startup_command": k.startup_command,
+                        "bootstrap_script": None,
+                        "startup_command": None,
                         "internal_data": None,
-                        "preopen_ports": k.preopen_ports,
+                        "preopen_ports": [],
                         "allocated_host_ports": [],  # Will be populated by agent
                         "scaling_group": k.scaling_group,
-                        "agent_addr": k.agent_addr,
+                        "agent_addr": k.agent_addr or "",
                         "endpoint_id": None,  # For inference endpoints
                     }
                     kernel_configs.append(kernel_config)
@@ -1073,7 +1047,7 @@ class Scheduler:
                 destroyed_kernels = [
                     {
                         "agent": kernel.agent_id,
-                        "agent_addr": kernel.agent_addr,
+                        "agent_addr": kernel.agent_addr or "",
                         "id": kernel.kernel_id,
                         "container_id": container_info.get(kernel.kernel_id),
                     }
@@ -1106,7 +1080,7 @@ class Scheduler:
 
     async def _setup_network_configuration(
         self,
-        session: PreparedSessionData,
+        session: SessionDataForStart,
     ) -> NetworkSetup:
         """
         Setup network configuration based on session network type.
@@ -1131,6 +1105,8 @@ class Scheduler:
                 # Create single-node network for multi-kernel sessions
                 network_name = f"bai-singlenode-{session.session_id}"
                 first_kernel = session.kernels[0]
+                if not first_kernel.agent_id:
+                    raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
                 agent_client = self._agent_pool.get_agent_client(
                     first_kernel.agent_id, order_key=str(session.session_id)
                 )
@@ -1159,13 +1135,23 @@ class Scheduler:
             if len(session.kernels) > 1:
                 port_mapping: dict[str, tuple[str, int]] = {}
                 for kernel in session.kernels:
+                    if not kernel.agent_id:
+                        log.warning(
+                            f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
+                        )
+                        continue
                     agent_client = self._agent_pool.get_agent_client(
                         kernel.agent_id, order_key=str(session.session_id)
                     )
                     port = await agent_client.assign_port()
                     # Extract host from agent_addr
-                    agent_host = kernel.agent_addr.replace("tcp://", "").split(":", maxsplit=1)[0]
-                    cluster_hostname = kernel.cluster_hostname or f"node-{kernel.kernel_id}"
+                    agent_addr = kernel.agent_addr or ""
+                    agent_host = (
+                        agent_addr.replace("tcp://", "").split(":", maxsplit=1)[0]
+                        if agent_addr
+                        else "localhost"
+                    )
+                    cluster_hostname = f"node-{kernel.kernel_id}"
                     port_mapping[cluster_hostname] = (agent_host, port)
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
@@ -1178,13 +1164,154 @@ class Scheduler:
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         """
         Create SSH keypair for cluster communication.
-        In production, this would generate actual SSH keys.
+        Generates actual RSA SSH keys using cryptography library.
 
         :return: ClusterSSHKeyPair with 'public_key' and 'private_key'
         """
-        # Simplified for now - in production would use cryptography library
-        # to generate actual SSH keys
-        return ClusterSSHKeyPair(
-            public_key="ssh-rsa AAAAB3NzaC1yc2E... cluster-key",
-            private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+        key = rsa.generate_private_key(
+            backend=default_backend(),
+            public_exponent=65537,
+            key_size=2048,
         )
+        public_key = key.public_key().public_bytes(
+            serialization.Encoding.OpenSSH,
+            serialization.PublicFormat.OpenSSH,
+        )
+        public_key += b" work@cluster.backend.ai.local"
+        pem = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        return ClusterSSHKeyPair(
+            private_key=pem.decode("utf-8"),
+            public_key=public_key.decode("utf-8"),
+        )
+
+    def _filter_stuck_sessions_for_pull(
+        self,
+        sessions: list[SessionDataForPull],
+        threshold: float,
+    ) -> list[SessionDataForPull]:
+        """
+        Filter sessions that appear stuck based on kernel status change time.
+
+        :param sessions: List of sessions to filter
+        :param threshold: Time threshold in seconds
+        :return: List of stuck sessions
+        """
+        current_time = time.time()
+        stuck_sessions: list[SessionDataForPull] = []
+
+        for session in sessions:
+            # Check the oldest kernel's status_changed time
+            oldest_status_change = min(
+                (kernel.status_changed for kernel in session.kernels if kernel.status_changed),
+                default=None,
+            )
+
+            if oldest_status_change is None:
+                # No status change info, consider it stuck
+                stuck_sessions.append(session)
+            elif (current_time - oldest_status_change) >= threshold:
+                # Status hasn't changed for too long
+                stuck_sessions.append(session)
+
+        return stuck_sessions
+
+    async def retry_preparing_sessions(self) -> ScheduleResult:
+        """
+        Retry PREPARING/PULLING sessions that appear stuck.
+        Re-triggers check_and_pull operations for their images.
+
+        :return: ScheduleResult with number of sessions retried
+        """
+        PREPARING_CHECK_THRESHOLD = 900.0  # 15 minutes
+
+        # Get sessions with PREPARING and PULLING statuses
+        sessions_with_images = await self._repository.get_sessions_for_pull([
+            SessionStatus.PREPARING,
+            SessionStatus.PULLING,
+        ])
+        sessions = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
+
+        if not sessions:
+            log.trace("No sessions found with PREPARING/PULLING status")
+            return ScheduleResult(succeeded_count=0)
+
+        # Filter sessions that haven't changed status for threshold time
+        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
+
+        if not stuck_sessions:
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Retrying {} stuck PREPARING/PULLING sessions", len(stuck_sessions))
+
+        # Use the existing _trigger_image_pulling_for_sessions method
+        await self._trigger_image_pulling_for_sessions(stuck_sessions, image_configs)
+
+        return ScheduleResult(succeeded_count=len(stuck_sessions))
+
+    def _filter_stuck_sessions_for_start(
+        self,
+        sessions: list[SessionDataForStart],
+        threshold: float,
+    ) -> list[SessionDataForStart]:
+        """
+        Filter sessions that appear stuck based on kernel status change time.
+
+        :param sessions: List of sessions to filter
+        :param threshold: Time threshold in seconds
+        :return: List of stuck sessions
+        """
+        current_time = time.time()
+        stuck_sessions: list[SessionDataForStart] = []
+
+        for session in sessions:
+            # Check the oldest kernel's status_changed time
+            oldest_status_change = min(
+                (kernel.status_changed for kernel in session.kernels if kernel.status_changed),
+                default=None,
+            )
+
+            if oldest_status_change is None:
+                # No status change info, consider it stuck
+                stuck_sessions.append(session)
+            elif (current_time - oldest_status_change) >= threshold:
+                # Status hasn't changed for too long
+                stuck_sessions.append(session)
+
+        return stuck_sessions
+
+    async def retry_creating_sessions(self) -> ScheduleResult:
+        """
+        Retry CREATING sessions that appear stuck.
+        Re-triggers kernel creation operations directly.
+
+        :return: ScheduleResult with number of sessions retried
+        """
+        CREATING_CHECK_THRESHOLD = 600.0  # 10 minutes
+
+        # Get CREATING sessions from repository
+        sessions_with_images = await self._repository.get_sessions_for_start([
+            SessionStatus.CREATING
+        ])
+        sessions = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
+
+        if not sessions:
+            return ScheduleResult(succeeded_count=0)
+
+        # Filter sessions that haven't changed status for threshold time
+        stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
+
+        if not stuck_sessions:
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Retrying {} stuck CREATING sessions", len(stuck_sessions))
+
+        # Use the existing _start_sessions_concurrently method to retry
+        # This will re-trigger kernel creation for stuck sessions
+        await self._start_sessions_concurrently(stuck_sessions, image_configs)
+        return ScheduleResult(succeeded_count=len(stuck_sessions))

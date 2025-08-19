@@ -23,6 +23,8 @@ from .handlers import (
     CheckPreconditionHandler,
     CheckPullingProgressHandler,
     CheckTerminatingProgressHandler,
+    RetryCreatingHandler,
+    RetryPreparingHandler,
     ScheduleHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
@@ -80,6 +82,12 @@ class ScheduleCoordinator:
                 scheduler, self._scheduling_controller
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
+                scheduler, self._scheduling_controller
+            ),
+            ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
+                scheduler, self._scheduling_controller
+            ),
+            ScheduleType.RETRY_CREATING: RetryCreatingHandler(
                 scheduler, self._scheduling_controller
             ),
         }

@@ -10,8 +10,10 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     AgentSelectionStrategy,
+    AutoPullBehavior,
     ClusterMode,
     ClusterSSHPortMapping,
+    ImageConfig,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -20,6 +22,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 
@@ -450,6 +453,8 @@ class KernelBindingData:
     scaling_group: str
     image: str
     architecture: str
+    status: Optional[KernelStatus] = None
+    status_changed: Optional[float] = None  # Timestamp
 
 
 @dataclass(frozen=True)
@@ -475,6 +480,57 @@ class ImageConfigData:
     registry_username: Optional[str]
     registry_password: Optional[str]
 
+    def to_image_config(self, auto_pull: AutoPullBehavior) -> ImageConfig:
+        """
+        Convert ImageConfigData to ImageConfig format for agents.
+
+        :param auto_pull: Auto pull behavior setting
+        :return: ImageConfig dictionary for agent RPC calls
+        """
+        return ImageConfig(
+            architecture=self.architecture,
+            project=self.project,
+            canonical=self.canonical,
+            is_local=self.is_local,
+            digest=self.digest,
+            labels=self.labels,
+            repo_digest=None,
+            registry={
+                "name": self.registry_name,
+                "url": self.registry_url,
+                "username": self.registry_username,
+                "password": self.registry_password,
+            },
+            auto_pull=auto_pull,
+        )
+
+
+@dataclass
+class SessionDataForPull:
+    """Data for a session that needs image pulling."""
+
+    session_id: SessionId
+    access_key: AccessKey
+    kernels: list[KernelBindingData]
+
+
+@dataclass
+class SessionDataForStart:
+    """Data for a session ready to start with full details."""
+
+    session_id: SessionId
+    creation_id: str
+    access_key: AccessKey
+    session_type: SessionTypes
+    name: str
+    cluster_mode: ClusterMode
+    kernels: list[KernelBindingData]
+    user_uuid: UUID
+    user_email: str
+    user_name: str
+    network_type: Optional[NetworkType] = None
+    network_id: Optional[str] = None
+
 
 @dataclass
 class ScheduledSessionData:
@@ -483,7 +539,32 @@ class ScheduledSessionData:
     session_id: SessionId
     creation_id: str
     access_key: AccessKey
+    session_type: SessionTypes
+    name: str
     kernels: list[KernelBindingData]
+    # Additional fields for PREPARED sessions
+    cluster_mode: Optional[ClusterMode] = None
+    user_uuid: Optional[UUID] = None
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    network_type: Optional[NetworkType] = None
+    network_id: Optional[str] = None
+
+
+@dataclass
+class SessionsForPullWithImages:
+    """Sessions for image pulling with their image configurations."""
+
+    sessions: list[SessionDataForPull]
+    image_configs: dict[str, ImageConfigData]
+
+
+@dataclass
+class SessionsForStartWithImages:
+    """Sessions for starting with their image configurations."""
+
+    sessions: list[SessionDataForStart]
+    image_configs: dict[str, ImageConfigData]
 
 
 @dataclass
