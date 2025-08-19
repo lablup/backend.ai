@@ -73,6 +73,8 @@ async def huggingface_registries(
     after: Optional[str] = None,
     first: Optional[int] = None,
     last: Optional[int] = None,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None,
 ) -> HuggingFaceRegistryConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
@@ -110,6 +112,7 @@ class CreateHuggingFaceRegistryInput:
 
 @strawberry.input
 class UpdateHuggingFaceRegistryInput:
+    id: ID
     url: Optional[str] = UNSET
     name: Optional[str] = UNSET
     token: Optional[str] = UNSET
@@ -161,13 +164,13 @@ async def create_huggingface_registry(
 
 @strawberry.mutation
 async def update_huggingface_registry(
-    id: ID, input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
+    input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
     processors = info.context.processors
 
     action_result = (
         await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
-            UpdateHuggingFaceRegistryAction(id=uuid.UUID(id), modifier=input.to_modifier())
+            UpdateHuggingFaceRegistryAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
         )
     )
 
