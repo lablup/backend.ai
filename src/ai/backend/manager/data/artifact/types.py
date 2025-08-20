@@ -38,23 +38,8 @@ class ArtifactData:
     size: int
     created_at: datetime
     updated_at: datetime
-    version: str
     authorized: bool
     status: ArtifactStatus
-
-
-@dataclass
-class ArtifactGroupData:
-    name: str
-    type: ArtifactType
-    description: str
-
-
-class ArtifactGroupOrderField(enum.StrEnum):
-    NAME = "NAME"
-    TYPE = "TYPE"
-    STATUS = "STATUS"
-    DESCRIPTION = "DESCRIPTION"
 
 
 class ArtifactOrderField(enum.StrEnum):

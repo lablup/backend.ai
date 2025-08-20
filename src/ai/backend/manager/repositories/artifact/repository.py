@@ -19,7 +19,7 @@ from ai.backend.manager.data.association.types import AssociationArtifactsStorag
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact import ArtifactRow, ArtifactVersionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
@@ -82,8 +82,8 @@ class ArtifactRepository:
                 # Check if artifact with same model_id and registry_id already exists
                 existing_stmt = sa.select(ArtifactRow).where(
                     sa.and_(
-                        ArtifactRow.name == model.id,
                         ArtifactRow.registry_id == registry_id,
+                        ArtifactRow.name == model.id,
                     )
                 )
                 existing_result = await db_sess.execute(existing_stmt)
@@ -102,7 +102,7 @@ class ArtifactRepository:
                     await db_sess.refresh(existing_artifact, attribute_names=["updated_at"])
                     result.append(existing_artifact.to_dataclass())
                 else:
-                    # Insert new artifacts
+                    # Insert new artifact
                     new_artifact = ArtifactRow.from_huggingface_model_data(
                         model,
                         registry_id=registry_id,
@@ -114,6 +114,13 @@ class ArtifactRepository:
                     await db_sess.refresh(
                         new_artifact, attribute_names=["id", "created_at", "updated_at"]
                     )
+
+                    artifact_version_row = ArtifactVersionRow(
+                        artifact_id=new_artifact.id, version=model.revision
+                    )
+                    db_sess.add(artifact_version_row)
+                    await db_sess.flush()
+
                     result.append(new_artifact.to_dataclass())
 
         return result

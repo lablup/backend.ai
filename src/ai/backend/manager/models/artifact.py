@@ -26,7 +26,30 @@ from .base import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__ = ("ArtifactRow",)
+__all__ = ("ArtifactRow", "ArtifactVersionRow")
+
+
+class ArtifactVersionRow(Base):
+    __tablename__ = "artifact_versions"
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
+    )
+
+    id = IDColumn("id")
+    artifact_id = sa.Column(
+        GUID,
+        sa.ForeignKey("artifacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version = sa.Column("version", sa.String, nullable=False)
+
+    artifact = relationship(
+        "ArtifactRow",
+        back_populates="versions",
+        primaryjoin=lambda: foreign(ArtifactVersionRow.artifact_id) == ArtifactRow.id,
+    )
 
 
 class ArtifactRow(Base):
@@ -48,7 +71,6 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readme = sa.Column("readme", sa.TEXT, nullable=True)
-    version = sa.Column("version", sa.String, nullable=False)
     created_at = sa.Column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -65,7 +87,7 @@ class ArtifactRow(Base):
         index=True,
     )
     authorized = sa.Column(sa.Boolean, nullable=False, default=False)
-    status = sa.Column(sa.String, nullable=False, default=ArtifactStatus.SCANNED.value)
+    status = sa.Column(sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -77,6 +99,12 @@ class ArtifactRow(Base):
         "HuggingFaceRegistryRow",
         back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
+    )
+
+    versions = relationship(
+        "ArtifactVersionRow",
+        back_populates="artifact",
+        primaryjoin=lambda: ArtifactRow.id == foreign(ArtifactVersionRow.artifact_id),
     )
 
     def __str__(self) -> str:
@@ -95,8 +123,7 @@ class ArtifactRow(Base):
             f"created_at={self.created_at.isoformat()}, "
             f"updated_at={self.updated_at.isoformat()}, "
             f"authorized={self.authorized}, "
-            f"status={self.status}, "
-            f"version={self.version})"
+            f"status={self.status})"
         )
 
     def __repr__(self) -> str:
@@ -117,7 +144,6 @@ class ArtifactRow(Base):
             created_at=self.created_at,
             updated_at=self.updated_at,
             authorized=self.authorized,
-            version=self.version,
             status=ArtifactStatus(self.status),
         )
 
@@ -143,6 +169,5 @@ class ArtifactRow(Base):
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
             authorized=False,
-            version=model_data.revision,
             status=ArtifactStatus.SCANNED.value,
         )

@@ -16,8 +16,8 @@ type Artifact implements Node {
   size: ByteSize!
   createdAt: DateTime!
   updatedAt: DateTime!
-  version: String!
   authorized: Boolean!
+  versions: [String!]!
 }
 
 type ArtifactConnection {
@@ -48,34 +48,6 @@ input ArtifactFilter {
   OR: ArtifactFilter = null
   NOT: ArtifactFilter = null
   DISTINCT: Boolean = null
-}
-
-type ArtifactGroup implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  name: String!
-  type: ArtifactType!
-  status: ArtifactStatus!
-  description: String
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
-}
-
-"""A connection to a list of items."""
-type ArtifactGroupConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ArtifactGroupEdge!]!
-}
-
-"""An edge in a connection."""
-type ArtifactGroupEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ArtifactGroup!
 }
 
 type ArtifactImportProgressUpdatedPayload {
@@ -553,8 +525,6 @@ type Queries {
   _service: _Service!
   artifact(id: ID!): Artifact
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
-  artifactGroup(id: ID!): ArtifactGroup
-  artifactGroups(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactGroupConnection!
   deployments(
     filter: DeploymentFilter = null
     orderBy: DeploymentOrderBy = null

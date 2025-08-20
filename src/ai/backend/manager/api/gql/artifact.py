@@ -93,8 +93,8 @@ class Artifact(Node):
     size: ByteSize
     created_at: datetime
     updated_at: datetime
-    version: str
     authorized: bool
+    versions: list[str]
 
 
 ArtifactEdge = Edge[Artifact]
@@ -106,52 +106,6 @@ class ArtifactConnection(Connection[Artifact]):
     def count(self) -> int:
         # Mock implementation - in real implementation, count from database
         return 0
-
-
-@strawberry.type
-class ArtifactGroup(Node):
-    id: NodeID[str]
-    name: str
-    type: ArtifactType
-    status: ArtifactStatus
-    description: Optional[str]
-
-    @strawberry.field
-    def artifacts(
-        self,
-        filter: Optional[ArtifactFilter] = None,
-        order_by: Optional[list[ArtifactOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-    ) -> ArtifactConnection:
-        # Mock implementation - filter artifacts by group type
-        all_mock_artifacts: list = []
-
-        # Filter artifacts to match the group's type
-        filtered_artifacts = [
-            (artifact, cursor)
-            for artifact, cursor in all_mock_artifacts
-            if artifact.type == self.type
-        ]
-
-        edges = [
-            ArtifactEdge(node=artifact, cursor=cursor) for artifact, cursor in filtered_artifacts
-        ]
-
-        return ArtifactConnection(
-            edges=edges,
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        )
-
-
-ArtifactGroupEdge = Edge[ArtifactGroup]
 
 
 @strawberry.type
@@ -212,34 +166,8 @@ def artifacts(
 
 
 @strawberry.field
-def artifact_groups(
-    filter: Optional[ArtifactFilter] = None,
-    order_by: Optional[list[ArtifactOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-) -> Connection[ArtifactGroup]:
-    # Mock implementation - return empty connection
-    return Connection(
-        edges=[],
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=None,
-            end_cursor=None,
-        ),
-    )
-
-
-@strawberry.field
 def artifact(id: ID) -> Optional[Artifact]:
     raise NotImplementedError("Artifact retrieval not implemented yet.")
-
-
-@strawberry.field
-def artifact_group(id: ID) -> Optional[ArtifactGroup]:
-    raise NotImplementedError("Artifact group retrieval not implemented yet.")
 
 
 # Mutations
