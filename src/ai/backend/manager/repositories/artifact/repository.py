@@ -28,7 +28,7 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-from ai.backend.manager.models.base import validate_connection_args
+from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
 from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
@@ -41,8 +41,6 @@ from ai.backend.manager.repositories.types import (
 
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
-
-_DEFAULT_PAGE_SIZE = 10
 
 
 class ArtifactRepository:
@@ -431,7 +429,7 @@ class ArtifactRepository:
                 page_size = (
                     offset_based_pagination.limit
                     if offset_based_pagination.limit is not None
-                    else _DEFAULT_PAGE_SIZE
+                    else DEFAULT_PAGE_SIZE
                 )
 
                 # Apply multiple ordering fields
@@ -473,9 +471,6 @@ class ArtifactRepository:
                     order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
                     order_clauses.append((order_column, desc))
 
-                # For cursor pagination, use the first ordering field as primary
-                primary_order_column, primary_desc = order_clauses[0]
-
                 # Handle cursor-based pagination
                 if cursor_id is not None:
                     type_, cursor_id = resolve_global_id(cursor_id)
@@ -484,39 +479,95 @@ class ArtifactRepository:
 
                     cursor_uuid = uuid.UUID(cursor_id)
 
-                    # Get the cursor row to compare against
-                    cursor_stmt = sa.select(ArtifactRow).where(ArtifactRow.id == cursor_uuid)
-                    cursor_result = await db_sess.execute(cursor_stmt)
-                    cursor_row = cursor_result.scalar_one_or_none()
+                    # Build lexicographic cursor conditions for proper multi-field ordering
+                    # This implements the same logic as generate_sql_info_for_gql_connection
 
-                    if cursor_row is not None:
-                        cursor_order_value = getattr(cursor_row, primary_order_column.name)
+                    def build_lexicographic_cursor_conditions(
+                        order_clauses,
+                        cursor_uuid,
+                        pagination_order,
+                    ):
+                        """
+                        Build lexicographic cursor conditions for multiple ordering fields.
 
-                        # Build cursor condition based on pagination direction using primary order field
-                        if pagination_order == ConnectionPaginationOrder.FORWARD:
-                            if primary_desc:
-                                cursor_condition = (primary_order_column < cursor_order_value) | (
-                                    (primary_order_column == cursor_order_value)
-                                    & (ArtifactRow.id > cursor_uuid)
+                        For proper multi-field ordering, we need to build conditions that represent
+                        lexicographic ordering. For fields [A, B, C], the condition should be:
+                        (A > cursor_A) OR
+                        (A = cursor_A AND B > cursor_B) OR
+                        (A = cursor_A AND B = cursor_B AND C > cursor_C) OR
+                        (A = cursor_A AND B = cursor_B AND C = cursor_C AND id > cursor_id)
+
+                        The direction operators (>, <) depend on the sort direction and pagination direction.
+                        """
+                        if not order_clauses:
+                            return []
+
+                        conditions = []
+
+                        # Build conditions for each level of the lexicographic ordering
+                        for i in range(len(order_clauses) + 1):  # +1 for the ID field
+                            condition_parts = []
+
+                            # Add equality conditions for all previous fields
+                            for j in range(i):
+                                order_column, desc = order_clauses[j]
+                                cursor_value_subq = (
+                                    sa.select(order_column)
+                                    .where(ArtifactRow.id == cursor_uuid)
+                                    .scalar_subquery()
                                 )
+                                condition_parts.append(order_column == cursor_value_subq)
+
+                            # Add the inequality condition for the current field
+                            if i < len(order_clauses):
+                                # Current field is one of the ordering fields
+                                order_column, desc = order_clauses[i]
+                                cursor_value_subq = (
+                                    sa.select(order_column)
+                                    .where(ArtifactRow.id == cursor_uuid)
+                                    .scalar_subquery()
+                                )
+
+                                # Determine the operator based on sort direction and pagination direction
+                                if pagination_order == ConnectionPaginationOrder.FORWARD:
+                                    if desc:
+                                        inequality_cond = order_column < cursor_value_subq
+                                    else:
+                                        inequality_cond = order_column > cursor_value_subq
+                                else:  # BACKWARD
+                                    if desc:
+                                        inequality_cond = order_column > cursor_value_subq
+                                    else:
+                                        inequality_cond = order_column < cursor_value_subq
+
+                                condition_parts.append(inequality_cond)
                             else:
-                                cursor_condition = (primary_order_column > cursor_order_value) | (
-                                    (primary_order_column == cursor_order_value)
-                                    & (ArtifactRow.id > cursor_uuid)
-                                )
-                        else:  # BACKWARD
-                            if primary_desc:
-                                cursor_condition = (primary_order_column > cursor_order_value) | (
-                                    (primary_order_column == cursor_order_value)
-                                    & (ArtifactRow.id < cursor_uuid)
-                                )
-                            else:
-                                cursor_condition = (primary_order_column < cursor_order_value) | (
-                                    (primary_order_column == cursor_order_value)
-                                    & (ArtifactRow.id < cursor_uuid)
-                                )
+                                # Final condition: all fields equal, compare by ID
+                                if pagination_order == ConnectionPaginationOrder.FORWARD:
+                                    id_inequality_cond = ArtifactRow.id > cursor_uuid
+                                else:  # BACKWARD
+                                    id_inequality_cond = ArtifactRow.id < cursor_uuid
 
-                        stmt = stmt.where(cursor_condition)
+                                condition_parts.append(id_inequality_cond)
+
+                            # Combine all parts with AND
+                            if condition_parts:
+                                if len(condition_parts) == 1:
+                                    conditions.append(condition_parts[0])
+                                else:
+                                    conditions.append(sa.and_(*condition_parts))
+
+                        return conditions
+
+                    # Build the lexicographic cursor conditions
+                    cursor_conditions = build_lexicographic_cursor_conditions(
+                        order_clauses, cursor_uuid, pagination_order
+                    )
+
+                    # Apply cursor conditions with OR logic
+                    if cursor_conditions:
+                        combined_cursor_condition = sa.or_(*cursor_conditions)
+                        stmt = stmt.where(combined_cursor_condition)
 
                 # Apply ordering based on pagination direction
                 final_order_clauses = []
