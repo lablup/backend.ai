@@ -118,7 +118,7 @@ class ArtifactRevision(Node):
             id=ID(str(data.id)),
             name=data.name,
             type=ArtifactType(data.type),
-            status=data.status,
+            status=ArtifactStatus(data.status),
             description=data.description,
             # TODO: Fill these with actual data
             registry=SourceInfo(name=None, url=None),
@@ -127,8 +127,7 @@ class ArtifactRevision(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             authorized=data.authorized,
-            # TODO: Fill this
-            versions=[],
+            versions=data.versions,
         )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
@@ -8,6 +9,9 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
+    ArtifactDataWithRevisions,
+    ArtifactRevisionData,
+    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
@@ -34,7 +38,7 @@ class ArtifactRow(Base):
     """
     Represents an artifact in the system.
     Artifacts can be models, packages, or images.
-    This model is used to track the metadata of artifacts
+    This model is used to track the metadata of artifacts.
     """
 
     __tablename__ = "artifacts"
@@ -92,4 +96,32 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=self.source_registry_type,
             description=self.description,
+        )
+
+    def to_dataclass_with_revisions(self) -> ArtifactDataWithRevisions:
+        return ArtifactDataWithRevisions(
+            artifact=ArtifactData(
+                id=self.id,
+                type=self.type,
+                name=self.name,
+                registry_id=self.registry_id,
+                registry_type=self.registry_type,
+                source_registry_id=self.source_registry_id,
+                source_registry_type=self.source_registry_type,
+                description=self.description,
+                authorized=self.authorized,
+            ),
+            revisions=[
+                ArtifactRevisionData(
+                    id=revision.id,
+                    artifact_id=revision.artifact_id,
+                    version=revision.version,
+                    readme=revision.readme,
+                    size=revision.size,
+                    status=ArtifactStatus(revision.status),
+                    created_at=revision.created_at,
+                    updated_at=revision.updated_at,
+                )
+                for revision in self.revision_rows
+            ],
         )
