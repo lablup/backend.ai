@@ -74,10 +74,12 @@ enum ArtifactStatus {
   FAILED
 }
 
+input ArtifactStatusChangedInput {
+  artifactIds: [ID!]!
+}
+
 type ArtifactStatusChangedPayload {
-  artifactId: ID!
-  status: ArtifactStatus!
-  updatedAt: DateTime!
+  artifact: Artifact!
 }
 
 input ArtifactStatusFilter {
@@ -695,7 +697,7 @@ input StringFilter {
 }
 
 type Subscription {
-  artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
+  artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
   artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!

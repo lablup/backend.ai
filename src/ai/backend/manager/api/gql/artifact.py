@@ -80,6 +80,11 @@ class UnauthorizeArtifactInput:
     artifact_id: ID
 
 
+@strawberry.input
+class ArtifactStatusChangedInput:
+    artifact_ids: list[ID]
+
+
 # Object Types
 @strawberry.type
 class SourceInfo:
@@ -184,9 +189,7 @@ class CancelImportArtifactPayload:
 
 @strawberry.type
 class ArtifactStatusChangedPayload:
-    artifact_id: ID
-    status: ArtifactStatus
-    updated_at: datetime
+    artifact: Artifact
 
 
 async def resolve_artifacts(
@@ -434,7 +437,7 @@ async def unauthorize_artifact(
 # Subscriptions
 @strawberry.subscription
 async def artifact_status_changed(
-    artifact_id: Optional[ID] = None,
+    input: ArtifactStatusChangedInput,
 ) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
     # Mock implementation
     # In real implementation, this would yield artifacts when status changes
