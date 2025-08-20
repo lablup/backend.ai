@@ -1183,7 +1183,7 @@ async def server_main_logwrapper(
     local_cfg: AgentUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        local_cfg.logging,
+        local_cfg.logging.model_dump(),
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1285,8 +1285,9 @@ async def server_main(
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.scaling_group}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.id}",
     }
+    etcd_config_data = local_config.etcd.to_dataclass()
     etcd = AsyncEtcd(
-        HostPortPair(local_config.etcd.addr.host, local_config.etcd.addr.port),
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
@@ -1563,10 +1564,9 @@ def main(
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        unified_conf.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                unified_conf.logging,
+                unified_conf.logging.model_dump(),
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

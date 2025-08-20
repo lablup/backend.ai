@@ -54,7 +54,7 @@ class BaseConfigModel(BaseModel):
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
-        t.Key("addr", ("127.0.0.1", 2379)): tx.HostPortPair,
+        t.Key("addr", ("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
     }).allow_extra("*"),

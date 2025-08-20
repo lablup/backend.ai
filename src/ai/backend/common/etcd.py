@@ -255,7 +255,7 @@ class AsyncEtcd(AbstractKVStore):
 
     def __init__(
         self,
-        addrs: Sequence[HostPortPair],
+        addrs: HostPortPair | Sequence[HostPortPair],
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
@@ -277,6 +277,9 @@ class AsyncEtcd(AbstractKVStore):
             self._connect_options = None
 
         self.ns = namespace
+        if isinstance(addrs, HostPortPair):
+            # Make it plural.
+            addrs = [addrs]
         log.info(
             'using etcd cluster at [{}] with namespace "{}"',
             ", ".join(str(addr) for addr in addrs),
@@ -284,7 +287,6 @@ class AsyncEtcd(AbstractKVStore):
         )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
-
         self.etcd = EtcdClient(
             [f"http://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,

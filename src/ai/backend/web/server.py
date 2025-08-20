@@ -638,10 +638,10 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
-    config = cast(WebServerUnifiedConfig, _args[0])
+    config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        config.logging,
+        config.logging.model_dump(),
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -908,10 +908,9 @@ def main(
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                cfg.logging,
+                cfg.logging.model_dump(),
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

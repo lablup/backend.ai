@@ -80,7 +80,7 @@ async def server_main_logwrapper(
     local_config = cast(StorageProxyUnifiedConfig, _args[0])
     log_endpoint = _args[1]
     logger = Logger(
-        local_config.logging,
+        local_config.logging.model_dump(),
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -423,10 +423,9 @@ def main(
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        local_config.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                local_config.logging,
+                local_config.logging.model_dump(),
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
