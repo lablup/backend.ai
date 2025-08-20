@@ -29,6 +29,14 @@ def tcp_client_session_factory(
     timeout: Optional[aiohttp.ClientTimeout] = None,
     **kwargs,
 ) -> aiohttp.ClientSession:
+    """
+    The default TCP-based ClientSession factory.
+    It creates ClientSession instances with base_url set from the endpoint of
+    client keys, so all HTTP requests must use relative URL paths.
+
+    All custom keyword arguments are passed to the ClientSession constructor,
+    while ssl, limit, limit_per_host are passed to the TCPConnector consctructor.
+    """
     connector = aiohttp.TCPConnector(
         ssl=ssl,
         limit=limit,
