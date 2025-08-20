@@ -156,7 +156,7 @@
   # This fields is filled by the agent at runtime based on the
   # `krunner_volumes` configuration in the agent's environment.
   # It is not intended to be set in the configuration file.
-  ## krunner-volumes = {}
+  ## krunner-volumes = {  }
   # Whether to enable Docker Swarm mode.
   # This allows the agent to manage containers in a Docker Swarm cluster.
   # When enabled, the agent will use Docker Swarm APIs to manage containers,

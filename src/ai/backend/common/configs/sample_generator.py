@@ -129,15 +129,12 @@ def _dump_toml_scalar(
             case "EnumByName":
                 assert ctx.annotation is not None
                 value = ctx.annotation(value).name
-    match value:
-        case {"host": _, "port": _}:
-            return (
-                toml.dumps({"x": _InlineTable(value)}, encoder=TomlPreserveInlineDictEncoder())
-                .strip()
-                .split(" = ", 1)[1]
-            )
-        case dict():
-            return "{}"
+    if isinstance(value, dict):
+        return (
+            toml.dumps({"x": _InlineTable(value)}, encoder=TomlPreserveInlineDictEncoder())
+            .strip()
+            .split(" = ", 1)[1]
+        )
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
 

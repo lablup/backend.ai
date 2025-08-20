@@ -214,7 +214,7 @@
     # Allows different Redis settings for different services within Backend.AI.
     # Each key represents a context name, and the value is a complete Redis
     # configuration.
-    ## override_configs = {}
+    ## override_configs = {  }
 
     [session.redis.redis_helper_config]
       # Timeout in seconds for Redis socket operations.
