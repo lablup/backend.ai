@@ -84,6 +84,7 @@ type ArtifactStatusChangedPayload {
 
 input ArtifactStatusFilter {
   IN: [ArtifactStatus!] = null
+  EQ: [ArtifactStatus!] = null
 }
 
 enum ArtifactType {
