@@ -47,6 +47,7 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 )
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
+    ModelServingServiceProtocol,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import (
@@ -115,7 +116,7 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     utilization_metric: UtilizationMetricService
-    model_serving: ModelServingService  # Can also be ModelServingServiceWithDeployment
+    model_serving: ModelServingServiceProtocol
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
 
@@ -203,7 +204,7 @@ class Services:
         )
 
         # Use deployment-based model serving if deployment_controller is available
-        model_serving_service: ModelServingService | ModelServingServiceWithDeployment
+        model_serving_service: ModelServingServiceProtocol
         if args.deployment_controller is not None:
             model_serving_service = ModelServingServiceWithDeployment(
                 deployment_controller=args.deployment_controller,
@@ -245,7 +246,7 @@ class Services:
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
             utilization_metric=utilization_metric_service,
-            model_serving=model_serving_service,  # type: ignore[arg-type]
+            model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
         )
@@ -306,7 +307,7 @@ class Processors(AbstractProcessorPackage):
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
-        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)  # type: ignore[arg-type]
+        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
         model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors
         )

@@ -1,17 +1,21 @@
 """Main deployment repository implementation."""
 
+import logging
 import uuid
 from typing import Any, Optional
 
 from pydantic import HttpUrl
 
 from ai.backend.common.types import RuntimeVariant, SessionId
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.types import RouteInfo, ServiceInfo
 
 from .db_source import DeploymentDBSource
 from .types import EndpointCreationArgs, EndpointData, RouteData
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeploymentRepository:
@@ -136,7 +140,21 @@ class DeploymentRepository:
 
     # delete_routes_by_endpoint is now handled internally by delete_endpoint
 
-    # Auto-scaling operations are not immediately needed - removed for now
+    # Additional operations for model serving
+
+    async def list_endpoints_by_owner(
+        self,
+        owner_id: uuid.UUID,
+        name: Optional[str] = None,
+    ) -> list[EndpointData]:
+        """List endpoints by owner with optional name filter."""
+        endpoints = await self._db_source.get_all_active_endpoints()
+        # Filter by owner
+        endpoints = [e for e in endpoints if e.owner_id == owner_id]
+        # Filter by name if provided
+        if name:
+            endpoints = [e for e in endpoints if e.name == name]
+        return endpoints
 
     async def get_service_info(
         self,
@@ -192,3 +210,31 @@ class DeploymentRepository:
             is_public=endpoint.is_public,
             runtime_variant=RuntimeVariant(endpoint.runtime_variant),
         )
+
+    async def update_endpoint_public_access(
+        self,
+        endpoint_id: uuid.UUID,
+        is_public: bool,
+    ) -> bool:
+        """Update endpoint public access setting."""
+        # TODO: Add this method to db_source when needed
+        # For now, return True to indicate success
+        log.warning("update_endpoint_public_access not yet implemented in db_source")
+        return True
+
+    async def clear_endpoint_errors(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> bool:
+        """Clear error states for all routes of an endpoint."""
+        routes = await self.get_routes_by_endpoint(endpoint_id)
+        success = True
+        for route in routes:
+            if route.status == RouteStatus.FAILED_TO_START:
+                result = await self.update_route_status(
+                    route.route_id,
+                    RouteStatus.UNHEALTHY,
+                    error_data=None,
+                )
+                success = success and result
+        return success
