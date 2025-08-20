@@ -345,7 +345,9 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
             prop_type = prop_schema.get("type", "")
 
-            if prop_type == "object" or "properties" in prop_schema:
+            if (prop_type == "object" or "properties" in prop_schema) and prop_schema[
+                "title"
+            ] != "HostPortPair":
                 object_props[prop_name] = prop_schema
             else:
                 simple_props[prop_name] = prop_schema

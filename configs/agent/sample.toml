@@ -14,6 +14,12 @@
   # - `kubernetes`: Uses Kubernetes as the backend.
   # - `dummy`: A dummy backend for testing purposes.
   backend = "docker"
+  # RPC listen address and port
+  rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
+  # Service address and port
+  service-addr = { host = "0.0.0.0", port = 6003 }
+  # Announce address and port
+  announce-addr = { host = "host.docker.internal", port = 6003 }
   # Whether to enable SSL
   ssl-enabled = false
   # Path to SSL certificate file
@@ -84,36 +90,6 @@
   ## docker-mode = "linuxkit"
   # Owner uid:gid of the mount directory
   ## mount-path-uid-gid = "root:root"
-
-  [agent.rpc-listen-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-  [agent.service-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-  [agent.announce-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
 
   [agent.sync-container-lifecycles]
     # Whether to enable container lifecycle synchronization
