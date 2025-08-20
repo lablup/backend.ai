@@ -47,6 +47,10 @@ __all__ = (
 
 _keepalive_options: MutableMapping[int, int] = {}
 
+
+SSL_CERT_NONE = "none"
+SSL_CERT_REQUIRED = "required"
+
 # macOS does not support several TCP_ options
 # so check if socket package includes TCP options before adding it
 if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
@@ -185,6 +189,27 @@ async def execute(
             await asyncio.sleep(0)
 
 
+def _get_redis_url_schema(redis_target: RedisTarget) -> str:
+    """
+    Returns the Redis URL schema based on the Redis target configuration.
+    """
+    if redis_target.use_tls:
+        return "rediss"
+    return "redis"
+
+
+def _parse_redis_url(redis_target: RedisTarget, db: int) -> yarl.URL:
+    redis_url = redis_target.addr
+    if redis_url is None:
+        raise ValueError("Redis URL is not provided in the configuration.")
+
+    schema = _get_redis_url_schema(redis_target)
+    url = yarl.URL(f"{schema}://host").with_host(str(redis_url[0])).with_port(
+        redis_url[1]
+    ).with_password(redis_target.get("password")) / str(db)
+    return url
+
+
 def get_redis_object(
     redis_target: RedisTarget,
     *,
@@ -228,6 +253,11 @@ def get_redis_object(
             "config/redis/service_name is required when using Redis Sentinel"
         )
 
+        kwargs = {
+            "password": password,
+            "ssl": redis_target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
+        }
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],
             password=password,
@@ -253,10 +283,7 @@ def get_redis_object(
         if redis_url is None:
             raise ValueError("Redis URL is not provided in the configuration.")
 
-        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
-            redis_url[1]
-        ).with_password(redis_target.get("password")) / str(db)
-
+        url = _parse_redis_url(redis_target, db)
         return RedisConnectionInfo(
             # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
             client=Redis(
@@ -267,6 +294,8 @@ def get_redis_object(
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,
+                ssl=redis_target.use_tls,
+                ssl_cert_reqs=SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
             ),
             sentinel=None,
             name=name,

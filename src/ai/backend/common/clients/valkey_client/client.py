@@ -38,6 +38,10 @@ _DEFAULT_REQUEST_TIMEOUT = 1_000  # Default request timeout in milliseconds
 Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
 
+SSL_CERT_NONE = "none"
+SSL_CERT_REQUIRED = "required"
+
+
 @dataclass
 class ValkeyStandaloneTarget:
     address: str
@@ -167,7 +171,6 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
-            use_tls=self._target.use_tls,
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
@@ -178,6 +181,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            use_tls=self._target.use_tls,
             advanced_config=AdvancedGlideClientConfiguration(
                 tls_config=TlsAdvancedConfiguration(
                     use_insecure_tls=self._target.tls_skip_verify,
@@ -292,9 +296,9 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         sentinel_kwargs: dict[str, Any] = {
             "password": target.password,
+            "ssl": target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
-        if target.use_tls:
-            sentinel_kwargs["ssl"] = True
         self._sentinel = Sentinel(
             sentinel_addrs,
             sentinel_kwargs=sentinel_kwargs,
@@ -351,7 +355,6 @@ class ValkeySentinelClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
-            use_tls=self._target.use_tls,
             client_name=self._target.service_name,
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
@@ -363,6 +366,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            use_tls=self._target.use_tls,
             advanced_config=AdvancedGlideClientConfiguration(
                 tls_config=TlsAdvancedConfiguration(
                     use_insecure_tls=self._target.tls_skip_verify,

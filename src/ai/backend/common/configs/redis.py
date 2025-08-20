@@ -114,6 +114,20 @@ class SingleRedisConfig(BaseModel):
         validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
         serialization_alias="redis-helper-config",
     )
+    use_tls: bool = Field(
+        default=False,
+        description="""
+        Whether to use TLS for Redis connections.""",
+        validation_alias=AliasChoices("use_tls", "use-tls"),
+    )
+    tls_skip_verify: bool = Field(
+        default=False,
+        description="""
+        Whether to skip TLS certificate verification.
+        Set to True for self-signed certificates or development environments.
+        """,
+        validation_alias=AliasChoices("tls_skip_verify", "tls-skip-verify"),
+    )
 
     @field_validator("sentinel", mode="before")
     @classmethod
