@@ -19,6 +19,8 @@ from typing import Any, Optional, Type
 import toml
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
+from toml.decoder import InlineTableDict
+from toml.encoder import TomlPreserveInlineDictEncoder
 from yarl import URL
 
 from ai.backend.common.typed_validators import HostPortPair
@@ -41,6 +43,10 @@ _base_values_by_type = {
 class FormatterContext:
     hint: str = ""
     annotation: type | None = None
+
+
+class _InlineTable(dict, InlineTableDict):
+    pass
 
 
 def _wrap_comment(text: str, prefix: str = "", width: int = 80) -> str:
@@ -69,7 +75,6 @@ def _dump_toml_scalar(
     match value:
         case {"$ref": complex_type}:
             type_name = complex_type.removeprefix("#/$defs/").split("__")[-1]
-            # TODO: connect with object_props
             if default is not None:
                 return _dump_toml_scalar(default, None, ctx)
             return _dump_toml_scalar("{ " + type_name + " }", default, ctx)
@@ -102,10 +107,6 @@ def _dump_toml_scalar(
             if default is not None:
                 return _dump_toml_scalar(default, None, ctx)
             return _dump_toml_scalar(_base_values_by_type[toml_type], default)
-        case {}:
-            if default is not None:
-                return _dump_toml_scalar(default, None, ctx)
-            return "{}"
         case IPv4Network() | IPv4Address() | IPv6Network() | IPv6Address():
             if default is not None:
                 return _dump_toml_scalar(default, None, ctx)
@@ -128,6 +129,15 @@ def _dump_toml_scalar(
             case "EnumByName":
                 assert ctx.annotation is not None
                 value = ctx.annotation(value).name
+    match value:
+        case {"host": _, "port": _}:
+            return (
+                toml.dumps({"x": _InlineTable(value)}, encoder=TomlPreserveInlineDictEncoder())
+                .strip()
+                .split(" = ", 1)[1]
+            )
+        case dict():
+            return "{}"
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
 
@@ -202,7 +212,6 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
     def _process_property(
         prop_name: str,
         prop_schema: dict[str, Any],
-        optional: bool = False,
         indent: int = 0,
         model_cls: Optional[Type[BaseModel]] = None,
     ) -> list[str]:
@@ -243,7 +252,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 if issubclass(annotation, HostPortPair):
                     fmt_ctx.hint = "HostPortPair"
                 if issubclass(annotation, enum.Enum):
-                    if annotation.__name__ in ("AffinityHint",):
+                    if annotation.__name__ in ("AffinityPolicy",):
                         fmt_ctx.hint = "EnumByName"
                     else:
                         fmt_ctx.hint = "EnumByValue"
@@ -282,7 +291,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Format the property line
         line = indent_str
         print(
-            f"{indent_str}{prop_name} ({optional=}, {union=}, {default=}, {example=})",
+            f"{indent_str}{prop_name} ({optional=}, {union=}, {default=}, {example=}, {annotation=})",
         )
         match value:
             case None:
@@ -347,9 +356,8 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Add simple properties first
         processed_simple_props = []
         for prop_name, prop_schema in simple_props.items():
-            is_required = prop_name in required or prop_name in parent_required
             prop_lines = _process_property(
-                prop_name, prop_schema, optional=is_required, indent=len(path), model_cls=model_cls
+                prop_name, prop_schema, indent=len(path), model_cls=model_cls
             )
             if prop_lines:
                 lines.extend(prop_lines)

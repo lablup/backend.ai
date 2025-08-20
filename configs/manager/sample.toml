@@ -61,7 +61,7 @@
   # Network address of the etcd server.
   # Default is the standard etcd port on localhost.
   # In production, should point to one or more etcd instance endpoint(s).
-  ## addr = {}  # | [ {} ]
+  ## addr = { host = "127.0.0.1", port = 2379 }  # | [ { host = "127.0.0.1", port = 2379 } ]
   # Username for authenticating with etcd.
   # Optional if etcd doesn't require authentication.
   # Should be set along with password for secure deployments.

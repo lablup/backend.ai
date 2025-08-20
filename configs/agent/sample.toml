@@ -21,7 +21,7 @@
   # Path to SSL private key file
   ## ssl-key = "/path/to/key.pem"
   # Advertised RPC address and port
-  ## advertised-rpc-addr = {}
+  ## advertised-rpc-addr = { host = "192.168.1.100", port = 6001 }
   # Path to RPC auth manager public key
   ## rpc-auth-manager-public-key = "/path/to/public.key"
   # Path to RPC auth agent keypair
@@ -63,7 +63,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "cuda", "rocm",]
+  ## allow-compute-plugins = [ "rocm", "cuda",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "cpu",]
   # Allowed network plugins
@@ -202,7 +202,7 @@
   # Resource allocation order
   allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy
-  affinity-policy = 1
+  affinity-policy = "INTERLEAVED"
 
 [otel]
   # Whether to enable OpenTelemetry
@@ -256,7 +256,7 @@
   # Etcd namespace
   namespace = "local"
   # Etcd address and port
-  ## addr = {}  # | [ {} ]
+  ## addr = { host = "127.0.0.1", port = 2379 }  # | [ { host = "127.0.0.1", port = 2379 } ]
   # Etcd username
   ## user = "backend"
   # Etcd password
