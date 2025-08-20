@@ -1,5 +1,5 @@
 """
-Tests for GenericPaginator functionality.
+Tests for GenericQueryBuilder functionality.
 Tests the generic pagination logic with focused unit tests.
 """
 
@@ -10,11 +10,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
-from ai.backend.manager.repositories.artifact.repository import (
+from ai.backend.manager.repositories.types import (
     FilterApplier,
-    GenericPaginator,
+    GenericQueryBuilder,
     ModelConverter,
+    OffsetBasedPaginationOptions,
     OrderingApplier,
+    PaginationOptions,
+    PaginationQueryResult,
 )
 
 
@@ -51,8 +54,8 @@ class MockModelConverter(ModelConverter):
         }
 
 
-class TestGenericPaginator:
-    """Test cases for GenericPaginator"""
+class TestGenericQueryBuilder:
+    """Test cases for GenericQueryBuilder"""
 
     @pytest.fixture
     def mock_model_class(self):
@@ -65,8 +68,8 @@ class TestGenericPaginator:
 
     @pytest.fixture
     def generic_paginator(self, mock_model_class):
-        """Create GenericPaginator instance with mock components"""
-        return GenericPaginator(
+        """Create GenericQueryBuilder instance with mock components"""
+        return GenericQueryBuilder(
             model_class=mock_model_class,
             filter_applier=MockFilterApplier(),
             ordering_applier=MockOrderingApplier(),
@@ -75,7 +78,7 @@ class TestGenericPaginator:
         )
 
     def test_paginator_initialization(self, generic_paginator, mock_model_class):
-        """Test GenericPaginator initialization"""
+        """Test GenericQueryBuilder initialization"""
         assert generic_paginator.model_class == mock_model_class
         assert isinstance(generic_paginator.filter_applier, MockFilterApplier)
         assert isinstance(generic_paginator.ordering_applier, MockOrderingApplier)
@@ -153,7 +156,7 @@ class TestGenericPaginator:
         assert result["name"] == "test-model"
         assert result["converted"]
 
-    @patch("ai.backend.manager.repositories.artifact.repository.getattr")
+    @patch("ai.backend.manager.repositories.types.getattr")
     def test_build_lexicographic_cursor_conditions_structure(self, mock_getattr, generic_paginator):
         """Test that cursor condition building has correct structure without SQLAlchemy operations"""
         # Mock getattr to return mock columns that don't perform actual SQL operations
@@ -188,7 +191,7 @@ class TestGenericPaginator:
         assert len(conditions) == 1
         mock_id_column.__lt__.assert_called_once_with(cursor_uuid)
 
-    @patch("ai.backend.manager.repositories.artifact.repository.getattr")
+    @patch("ai.backend.manager.repositories.types.getattr")
     @patch("sqlalchemy.select")
     @patch("sqlalchemy.and_")
     @patch("sqlalchemy.or_")
@@ -310,9 +313,100 @@ class TestGenericPaginator:
         assert hasattr(generic_paginator.ordering_applier, "apply_ordering")
         assert hasattr(generic_paginator.model_converter, "convert_to_data")
 
+    @patch("sqlalchemy.select")
+    def test_build_pagination_queries_offset_based(self, mock_select, generic_paginator):
+        """Test query building for offset-based pagination"""
+        # Mock SQLAlchemy select
+        mock_stmt = MagicMock()
+        mock_select.return_value = mock_stmt
 
-class TestGenericPaginatorStructure:
-    """Test the structure and composition of GenericPaginator"""
+        # Create offset-based pagination
+        pagination = PaginationOptions(offset=OffsetBasedPaginationOptions(offset=10, limit=20))
+
+        # Call query building method
+        query_result = generic_paginator.build_pagination_queries(pagination=pagination)
+
+        # Verify result structure
+        assert isinstance(query_result, PaginationQueryResult)
+        assert query_result.data_query is not None
+        assert query_result.pagination_order is None  # offset-based doesn't use pagination_order
+
+        # Verify SQLAlchemy methods were called
+        mock_select.assert_called()
+
+    def test_convert_rows_to_data_forward(self, generic_paginator):
+        """Test row conversion for forward pagination"""
+        # Create mock rows
+        mock_rows = [MagicMock(), MagicMock(), MagicMock()]
+        for i, row in enumerate(mock_rows):
+            row.id = f"id-{i}"
+            row.name = f"name-{i}"
+
+        # Convert rows
+        result = generic_paginator.convert_rows_to_data(
+            rows=mock_rows, pagination_order=ConnectionPaginationOrder.FORWARD
+        )
+
+        # Verify conversion
+        assert len(result) == 3
+        assert result[0]["id"] == "id-0"
+        assert result[1]["id"] == "id-1"
+        assert result[2]["id"] == "id-2"
+
+    def test_convert_rows_to_data_backward(self, generic_paginator):
+        """Test row conversion for backward pagination"""
+        # Create mock rows
+        mock_rows = [MagicMock(), MagicMock(), MagicMock()]
+        for i, row in enumerate(mock_rows):
+            row.id = f"id-{i}"
+            row.name = f"name-{i}"
+
+        # Convert rows with backward pagination
+        result = generic_paginator.convert_rows_to_data(
+            rows=mock_rows, pagination_order=ConnectionPaginationOrder.BACKWARD
+        )
+
+        # Verify order is reversed
+        assert len(result) == 3
+        assert result[0]["id"] == "id-2"  # Reversed
+        assert result[1]["id"] == "id-1"
+        assert result[2]["id"] == "id-0"
+
+    def test_pagination_separation_of_concerns(self, generic_paginator):
+        """Test that paginator only handles query building, not DB execution"""
+        # Verify the paginator doesn't have database-related methods
+        assert not hasattr(generic_paginator, "execute")
+        assert not hasattr(generic_paginator, "session")
+        assert not hasattr(generic_paginator, "db")
+
+        # Verify it has query building methods
+        assert hasattr(generic_paginator, "build_pagination_queries")
+        assert hasattr(generic_paginator, "convert_rows_to_data")
+        assert hasattr(generic_paginator, "build_lexicographic_cursor_conditions")
+
+    @patch("sqlalchemy.select")
+    def test_build_pagination_queries_with_filters(self, mock_select, generic_paginator):
+        """Test query building with filters applied"""
+        mock_stmt = MagicMock()
+        mock_select.return_value = mock_stmt
+
+        # Create pagination with filters
+        pagination = PaginationOptions(offset=OffsetBasedPaginationOptions(offset=0, limit=10))
+        mock_filters = MagicMock()
+
+        # Build queries
+        query_result = generic_paginator.build_pagination_queries(
+            pagination=pagination, filters=mock_filters
+        )
+
+        # Verify result structure
+        assert isinstance(query_result, PaginationQueryResult)
+        assert query_result.data_query is not None
+        assert query_result.pagination_order is None  # offset-based doesn't use pagination_order
+
+
+class TestGenericQueryBuilderStructure:
+    """Test the structure and composition of GenericQueryBuilder"""
 
     def test_paginator_composition_pattern(self):
         """Test that the paginator follows composition pattern correctly"""
@@ -321,7 +415,7 @@ class TestGenericPaginatorStructure:
         ordering_applier = MockOrderingApplier()
         model_converter = MockModelConverter()
 
-        paginator = GenericPaginator(
+        paginator = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=filter_applier,
             ordering_applier=ordering_applier,
@@ -370,7 +464,7 @@ class TestGenericPaginatorStructure:
 
         # Create paginator with specialized components
         mock_model = MagicMock()
-        paginator = GenericPaginator(
+        paginator = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=SpecialFilterApplier(),
             ordering_applier=SpecialOrderingApplier(),

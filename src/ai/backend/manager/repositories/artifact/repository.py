@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
@@ -36,279 +36,12 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
 )
 from ai.backend.manager.repositories.types import (
+    GenericQueryBuilder,
     PaginationOptions,
 )
 
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
-
-# Generic types for pagination
-TModel = TypeVar("TModel")
-TData = TypeVar("TData")
-TFilters = TypeVar("TFilters")
-TOrdering = TypeVar("TOrdering")
-
-
-class PaginatableModel(Protocol):
-    """Protocol for models that can be paginated"""
-
-    id: Any
-
-
-class FilterApplier(Protocol):
-    """Protocol for applying filters to a query"""
-
-    def apply_filters(self, stmt: Select, filters: Any) -> Select:
-        """Apply filters to the query statement"""
-        ...
-
-
-class OrderingApplier(Protocol):
-    """Protocol for applying ordering to a query"""
-
-    def apply_ordering(
-        self, stmt: Select, ordering: Any
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
-        """Apply ordering to the query statement and return order clauses for cursor pagination"""
-        ...
-
-
-class ModelConverter(Protocol):
-    """Protocol for converting model to data objects"""
-
-    def convert_to_data(self, model: Any) -> Any:
-        """Convert model instance to data object"""
-        ...
-
-
-class GenericPaginator(Generic[TModel, TData, TFilters, TOrdering]):
-    """Generic pagination logic that can be reused across different models"""
-
-    def __init__(
-        self,
-        model_class: type[TModel],
-        filter_applier: FilterApplier,
-        ordering_applier: OrderingApplier,
-        model_converter: ModelConverter,
-        cursor_type_name: str = "Generic",
-    ):
-        self.model_class = model_class
-        self.filter_applier = filter_applier
-        self.ordering_applier = ordering_applier
-        self.model_converter = model_converter
-        self.cursor_type_name = cursor_type_name
-
-    def build_lexicographic_cursor_conditions(
-        self,
-        order_clauses: list[tuple[sa.Column, bool]],
-        cursor_uuid: uuid.UUID,
-        pagination_order: Optional[ConnectionPaginationOrder],
-    ) -> list[sa.sql.elements.BooleanClauseList]:
-        """
-        Build lexicographic cursor conditions for multiple ordering fields.
-        Generic implementation that works with any model.
-        """
-        if not order_clauses:
-            # Handle empty order_clauses case - compare by ID only
-            id_column = getattr(self.model_class, "id")
-            if pagination_order == ConnectionPaginationOrder.FORWARD:
-                return [id_column > cursor_uuid]
-            else:
-                return [id_column < cursor_uuid]
-
-        conditions = []
-
-        # Cache subqueries to avoid duplication
-        subquery_cache = {}
-
-        def get_cursor_value_subquery(column):
-            """Get or create cached subquery for cursor value"""
-            if column not in subquery_cache:
-                id_column = getattr(self.model_class, "id")
-                subquery_cache[column] = (
-                    sa.select(column).where(id_column == cursor_uuid).scalar_subquery()
-                )
-            return subquery_cache[column]
-
-        # Build conditions for each level of the lexicographic ordering
-        for i in range(len(order_clauses) + 1):  # +1 for the ID field
-            condition_parts = []
-
-            # Add equality conditions for all previous fields
-            for j in range(i):
-                order_column, desc = order_clauses[j]
-                cursor_value_subq = get_cursor_value_subquery(order_column)
-                condition_parts.append(order_column == cursor_value_subq)
-
-            # Add the inequality condition for the current field
-            if i < len(order_clauses):
-                # Current field is one of the ordering fields
-                order_column, desc = order_clauses[i]
-                cursor_value_subq = get_cursor_value_subquery(order_column)
-
-                # Determine the operator based on sort direction and pagination direction
-                if pagination_order == ConnectionPaginationOrder.FORWARD:
-                    if desc:
-                        inequality_cond = order_column < cursor_value_subq
-                    else:
-                        inequality_cond = order_column > cursor_value_subq
-                else:  # BACKWARD
-                    if desc:
-                        inequality_cond = order_column > cursor_value_subq
-                    else:
-                        inequality_cond = order_column < cursor_value_subq
-
-                condition_parts.append(inequality_cond)
-            else:
-                # Final condition: all fields equal, compare by ID
-                id_column = getattr(self.model_class, "id")
-                if pagination_order == ConnectionPaginationOrder.FORWARD:
-                    id_inequality_cond = id_column > cursor_uuid
-                else:  # BACKWARD
-                    id_inequality_cond = id_column < cursor_uuid
-
-                condition_parts.append(id_inequality_cond)
-
-            # Combine all parts with AND
-            if condition_parts:
-                if len(condition_parts) == 1:
-                    conditions.append(condition_parts[0])
-                else:
-                    conditions.append(sa.and_(*condition_parts))
-
-        return conditions
-
-    async def paginate(
-        self,
-        db_session: sa.ext.asyncio.AsyncSession,
-        pagination: PaginationOptions,
-        ordering: Optional[TOrdering] = None,
-        filters: Optional[TFilters] = None,
-        select_options: Optional[list] = None,
-    ) -> tuple[list[TData], int]:
-        """
-        Generic pagination method that works with any model.
-        """
-        # Build base query
-        stmt = sa.select(self.model_class)
-        if select_options:
-            stmt = stmt.options(*select_options)
-        count_stmt = sa.select(sa.func.count()).select_from(self.model_class)
-
-        # Apply filters
-        if filters is not None:
-            stmt = self.filter_applier.apply_filters(stmt, filters)
-            count_stmt = self.filter_applier.apply_filters(count_stmt, filters)
-
-        offset_based_pagination = pagination.offset
-        forward = pagination.forward
-        backward = pagination.backward
-
-        # Determine pagination mode
-        if offset_based_pagination:
-            offset = pagination.offset.offset if pagination.offset is not None else 0
-            page_size = (
-                offset_based_pagination.limit
-                if offset_based_pagination.limit is not None
-                else DEFAULT_PAGE_SIZE
-            )
-
-            # Apply ordering for offset-based pagination
-            if ordering is not None:
-                stmt, _ = self.ordering_applier.apply_ordering(stmt, ordering)
-
-            # Default order by id for consistent pagination
-            id_column = getattr(self.model_class, "id")
-            stmt = stmt.order_by(id_column.asc())
-
-            # Apply pagination
-            stmt = stmt.offset(offset).limit(page_size)
-
-            # Execute queries
-            result = await db_session.execute(stmt)
-            rows = result.scalars().all()
-        else:
-            # Cursor-based pagination
-            after = forward.after if forward else None
-            first = forward.first if forward else None
-            before = backward.before if backward else None
-            last = backward.last if backward else None
-
-            connection_args = validate_connection_args(
-                after=after,
-                first=first,
-                before=before,
-                last=last,
-            )
-
-            cursor_id = connection_args.cursor
-            pagination_order = connection_args.pagination_order
-            page_size = connection_args.requested_page_size
-
-            # Apply ordering for cursor-based pagination
-            order_clauses: list[tuple[sa.Column, bool]] = []
-            if ordering is not None:
-                stmt, order_clauses = self.ordering_applier.apply_ordering(stmt, ordering)
-
-            # Handle cursor-based pagination
-            if cursor_id is not None:
-                type_, cursor_id = resolve_global_id(cursor_id)
-                if type_ != self.cursor_type_name:
-                    raise InvalidCursorTypeError(f"Invalid cursor type: {type_}")
-
-                cursor_uuid = uuid.UUID(cursor_id)
-
-                # Build the lexicographic cursor conditions
-                cursor_conditions = self.build_lexicographic_cursor_conditions(
-                    order_clauses, cursor_uuid, pagination_order
-                )
-
-                # Apply cursor conditions with OR logic
-                if cursor_conditions:
-                    combined_cursor_condition = sa.or_(*cursor_conditions)
-                    stmt = stmt.where(combined_cursor_condition)
-
-            # Apply ordering based on pagination direction
-            final_order_clauses = []
-            id_column = getattr(self.model_class, "id")
-
-            if pagination_order == ConnectionPaginationOrder.BACKWARD:
-                # Reverse ordering for backward pagination
-                for order_column, desc in order_clauses:
-                    if desc:
-                        final_order_clauses.append(order_column.asc())
-                    else:
-                        final_order_clauses.append(order_column.desc())
-                final_order_clauses.append(id_column.desc())
-            else:  # FORWARD or None
-                for order_column, desc in order_clauses:
-                    if desc:
-                        final_order_clauses.append(order_column.desc())
-                    else:
-                        final_order_clauses.append(order_column.asc())
-                final_order_clauses.append(id_column.asc())
-
-            stmt = stmt.order_by(*final_order_clauses)
-
-            # Apply limit
-            stmt = stmt.limit(page_size)
-
-            # Execute queries
-            result = await db_session.execute(stmt)
-            rows = result.scalars().all()
-
-            # Reverse results for backward pagination
-            if pagination_order == ConnectionPaginationOrder.BACKWARD:
-                rows = list(reversed(rows))
-
-        # Get total count
-        count_result = await db_session.execute(count_stmt)
-        total_count = count_result.scalar()
-
-        # Convert models to data objects
-        data_objects = [self.model_converter.convert_to_data(row) for row in rows]
-
-        return data_objects, total_count
 
 
 class ArtifactFilterApplier:
@@ -385,7 +118,7 @@ class ArtifactRepository:
         self._db = db
 
         # Initialize the generic paginator with artifact-specific components
-        self._paginator = GenericPaginator[
+        self._paginator = GenericQueryBuilder[
             ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
         ](
             model_class=ArtifactRow,
@@ -769,12 +502,25 @@ class ArtifactRepository:
         if filters is None:
             filters = ArtifactFilterOptions()
 
-        # Use the generic paginator with artifact-specific select options
+        # Build query using the generic paginator
+        querybuild_result = self._paginator.build_pagination_queries(
+            pagination=pagination,
+            ordering=ordering,
+            filters=filters,
+            select_options=[selectinload(ArtifactRow.version_rows)],
+        )
+
         async with self._db.begin_session() as db_sess:
-            return await self._paginator.paginate(
-                db_session=db_sess,
-                pagination=pagination,
-                ordering=ordering,
-                filters=filters,
-                select_options=[selectinload(ArtifactRow.version_rows)],
+            # Execute data query
+            result = await db_sess.execute(querybuild_result.data_query)
+            rows = result.scalars().all()
+
+            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            count_result = await db_sess.execute(count_stmt)
+            total_count = count_result.scalar()
+
+            # Convert to data objects using paginator
+            data_objects = self._paginator.convert_rows_to_data(
+                rows, querybuild_result.pagination_order
             )
+            return data_objects, total_count
