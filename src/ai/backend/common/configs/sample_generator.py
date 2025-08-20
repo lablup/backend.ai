@@ -192,6 +192,9 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Add description as comment if available
         description = field_info.get("description") or prop_schema.get("description")
         if description:
+            if "This field is injected at runtime" in description:
+                # Skip runtimme-generated fields.
+                return []
             comment_lines = _wrap_comment(description)
             for line in comment_lines.split("\n"):
                 lines.append(f"{indent_str}{line}")
@@ -308,16 +311,8 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
             else:
                 simple_props[prop_name] = prop_schema
 
-        if path == [] and simple_props:
-            # ref: https://github.com/toml-lang/toml/issues/984
-            warnings.append(
-                "The configuration schema CANNOT have simple fields in the root "
-                "without any section header according to the TOML specification. "
-                "Also, optional sections should be defined non-optional with explicit default factory. "
-                f"Please move or fix these fields/sections: {', '.join(simple_props.keys())}. "
-            )
-
         # Add simple properties first
+        processed_simple_props = []
         for prop_name, prop_schema in simple_props.items():
             is_required = prop_name in required or prop_name in parent_required
             prop_lines = _process_property(
@@ -325,6 +320,16 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
             )
             if prop_lines:
                 lines.extend(prop_lines)
+                processed_simple_props.append(prop_name)
+
+        if path == [] and processed_simple_props:
+            # ref: https://github.com/toml-lang/toml/issues/984
+            warnings.append(
+                "The configuration schema CANNOT have simple fields in the root "
+                "without any section header according to the TOML specification. "
+                "Also, optional sections should be defined non-optional with explicit default factory. "
+                f"Please move or fix these fields/sections: {', '.join(simple_props.keys())}. "
+            )
 
         # Add object properties as sections
         for prop_name, prop_schema in object_props.items():
