@@ -63,6 +63,11 @@ def _dump_toml_scalar(
             # TODO: connect with object_props
             return _dump_toml_scalar("{ " + type_name + " }", default, extra_formatter)
         case {"type": "array", "items": item_type}:
+            if default is not None:
+                if isinstance(default, list):
+                    return _dump_toml_scalar(default, None, extra_formatter)
+                else:
+                    return "[ " + _dump_toml_scalar(default, None, extra_formatter) + " ]"
             return "[ " + _dump_toml_scalar(item_type, default, extra_formatter) + " ]"
         case {"type": "integer"} | {"type": "number"}:
             if default is None:

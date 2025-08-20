@@ -63,13 +63,13 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ [ "cuda", "rocm",] ]
+  ## allow-compute-plugins = [ "rocm", "cuda",]
   # Blocked compute plugins
-  ## block-compute-plugins = [ [ "cpu",] ]
+  ## block-compute-plugins = [ "cpu",]
   # Allowed network plugins
-  ## allow-network-plugins = [ [ "overlay",] ]
+  ## allow-network-plugins = [ "overlay",]
   # Blocked network plugins
-  ## block-network-plugins = [ [ "host",] ]
+  ## block-network-plugins = [ "host",]
   # Path for image commit
   image-commit-path = "tmp/backend.ai/commit"
   # Path for abuse reports
