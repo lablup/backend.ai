@@ -6,9 +6,11 @@ from Pydantic models by extracting field information, defaults, descriptions,
 and examples using JSON Schema.
 """
 
+import enum
 import logging
 import textwrap
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from pathlib import PosixPath, PurePath
@@ -19,6 +21,7 @@ from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 from yarl import URL
 
+from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
 
@@ -32,6 +35,12 @@ _base_values_by_type = {
     "array": [],
     "object": {},
 }
+
+
+@dataclass(slots=True)
+class FormatterContext:
+    hint: str = ""
+    annotation: type | None = None
 
 
 def _wrap_comment(text: str, prefix: str = "", width: int = 80) -> str:
@@ -55,25 +64,27 @@ def _wrap_comment(text: str, prefix: str = "", width: int = 80) -> str:
 def _dump_toml_scalar(
     value: Any,
     default: Any,
-    extra_formatter: str | None = None,
+    ctx: FormatterContext | None = None,
 ) -> str:
     match value:
         case {"$ref": complex_type}:
-            type_name = complex_type.removeprefix("#/$defs/")
+            type_name = complex_type.removeprefix("#/$defs/").split("__")[-1]
             # TODO: connect with object_props
-            return _dump_toml_scalar("{ " + type_name + " }", default, extra_formatter)
+            if default is not None:
+                return _dump_toml_scalar(default, None, ctx)
+            return _dump_toml_scalar("{ " + type_name + " }", default, ctx)
         case {"type": "array", "items": item_type}:
             if default is not None:
                 if isinstance(default, list):
-                    return _dump_toml_scalar(default, None, extra_formatter)
+                    return _dump_toml_scalar(default, None, ctx)
                 else:
-                    return "[ " + _dump_toml_scalar(default, None, extra_formatter) + " ]"
-            return "[ " + _dump_toml_scalar(item_type, default, extra_formatter) + " ]"
+                    return "[ " + _dump_toml_scalar(default, None, ctx) + " ]"
+            return "[ " + _dump_toml_scalar(item_type, default, ctx) + " ]"
         case {"type": "integer"} | {"type": "number"}:
             if default is None:
                 out = "  "
             else:
-                out = _dump_toml_scalar(default, None, extra_formatter)
+                out = _dump_toml_scalar(default, None, ctx)
             has_min = False
             if (min_ := value.get("minimum", None)) is not None:
                 out += f"  # min={min_}"
@@ -85,29 +96,38 @@ def _dump_toml_scalar(
             return out
         case {"type": "string", "format": "file-path"} | {"type": "string", "format": "path"}:
             if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
+                return _dump_toml_scalar(default, None, ctx)
             return _dump_toml_scalar("PATH", default)
         case {"type": toml_type}:
             if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
+                return _dump_toml_scalar(default, None, ctx)
             return _dump_toml_scalar(_base_values_by_type[toml_type], default)
         case {}:
             if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
+                return _dump_toml_scalar(default, None, ctx)
             return "{}"
         case IPv4Network() | IPv4Address() | IPv6Network() | IPv6Address():
             if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
+                return _dump_toml_scalar(default, None, ctx)
             return str(value)
         case PosixPath() | PurePath() | URL() | timedelta():
             if default is not None:
-                return _dump_toml_scalar(default, None, extra_formatter)
+                return _dump_toml_scalar(default, None, ctx)
             return str(value)
     if default is not None:
-        return _dump_toml_scalar(default, None, extra_formatter)
-    match extra_formatter:
-        case "BinarySize":
-            value = f"{BinarySize(value):s}".upper()
+        return _dump_toml_scalar(default, None, ctx)
+    if ctx is not None:
+        match ctx.hint:
+            case "BinarySize":
+                value = f"{BinarySize(value):s}".upper()
+            case "HostPortPair":
+                value = {"host": value.host, "port": value.port}
+            case "EnumByValue":
+                assert ctx.annotation is not None
+                value = ctx.annotation(value).value
+            case "EnumByName":
+                assert ctx.annotation is not None
+                value = ctx.annotation(value).name
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
 
@@ -165,9 +185,10 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                     # Handle default_factory case - create instance to get defaults
                     try:
                         factory_instance = field.default_factory()  # type: ignore
-                        if hasattr(factory_instance, "model_dump"):
-                            # It's a Pydantic model, get its default values
-                            field_info["factory_defaults"] = factory_instance.model_dump()
+                        if isinstance(factory_instance, BaseModel):
+                            field_info["default"] = factory_instance.model_dump()
+                        else:
+                            field_info["default"] = factory_instance
                     except Exception:
                         # If factory fails, just set to None
                         pass
@@ -212,11 +233,20 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         union = False
         default = None
         example = None
-        extra_formatter = None
+        fmt_ctx = FormatterContext()
 
         if annotation := field_info.get("annotation", None):
-            if isinstance(annotation, type) and issubclass(annotation, BinarySize):
-                extra_formatter = "BinarySize"
+            if isinstance(annotation, type):
+                fmt_ctx.annotation = annotation
+                if issubclass(annotation, BinarySize):
+                    fmt_ctx.hint = "BinarySize"
+                if issubclass(annotation, HostPortPair):
+                    fmt_ctx.hint = "HostPortPair"
+                if issubclass(annotation, enum.Enum):
+                    if annotation.__name__ in ("AffinityHint",):
+                        fmt_ctx.hint = "EnumByName"
+                    else:
+                        fmt_ctx.hint = "EnumByValue"
 
         match prop_schema:
             case {"anyOf": [v1, v2]}:
@@ -232,7 +262,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                     # union types
                     value = [v1, v2]
                     union = True
-            case {"default": v} if v != PydanticUndefined:
+            case {"default": v} if v != PydanticUndefined and v != ...:
                 value = v
                 default = v
             case _:
@@ -263,18 +293,16 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 if not optional:
                     line += "## "
                 line += f"{prop_name} = "
-                line += _dump_toml_scalar(value[0], example, extra_formatter)
+                line += _dump_toml_scalar(value[0], example, fmt_ctx)
                 # Append additional unions as comments
                 line += "  # | "
-                line += " | ".join(
-                    _dump_toml_scalar(v, example, extra_formatter) for v in value[1:]
-                )
+                line += " | ".join(_dump_toml_scalar(v, example, fmt_ctx) for v in value[1:])
             case _:
                 if optional:
                     line += "## "
                 # The default is likely to be None if optional.
                 # Take the example value as the placeholder.
-                line += f"{prop_name} = {_dump_toml_scalar(value, example if default is None else default, extra_formatter)}"
+                line += f"{prop_name} = {_dump_toml_scalar(value, example if default is None else default, fmt_ctx)}"
 
         lines.append(line)
         return lines
