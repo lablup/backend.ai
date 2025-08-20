@@ -65,11 +65,12 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
+            _log_level = LogLevel.INFO if self.log_level == LogLevel.NOTSET else self.log_level
             logging_config = {
-                "level": self.log_level,
+                "level": _log_level,
                 "pkg-ns": {
                     "": LogLevel.WARNING,
-                    "ai.backend": self.log_level,
+                    "ai.backend": _log_level,
                 },
             }
             try:
@@ -92,25 +93,25 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    etcd_config = cli_ctx.get_bootstrap_config().etcd
+    etcd_config_data = cli_ctx.get_bootstrap_config().etcd.to_dataclass()
     creds = None
-    if etcd_config.user:
-        if not etcd_config.password:
+    if etcd_config_data.user:
+        if not etcd_config_data.password:
             raise ConfigurationError({
                 "etcd": "password is required when user is set",
             })
 
         creds = {
-            "user": etcd_config.user,
-            "password": etcd_config.password,
+            "user": etcd_config_data.user,
+            "password": etcd_config_data.password,
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         # TODO: provide a way to specify other scope prefixes
     }
     etcd = AsyncEtcd(
-        etcd_config.addr.to_legacy(),
-        etcd_config.namespace,
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
+        etcd_config_data.namespace,
         scope_prefix_map,
         credentials=creds,
     )

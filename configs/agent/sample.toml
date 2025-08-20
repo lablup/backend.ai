@@ -6,8 +6,6 @@
 #
 # Generated automatically from the AgentUnifiedConfig schema.
 
-# Logging configuration
-logging = "..."
 # Plugins configuration.
 # This field is injected at runtime based on etcd configuration.
 # It is not intended to be set in the configuration file.
@@ -184,6 +182,24 @@ plugins = "..."
   ## server-addr = "http://localhost:4040"
   # Sampling rate for Pyroscope profiling
   ## sample-rate = 10
+
+[logging]
+  # Log level.
+  level = "INFO"
+  # Array of log drivers to print.
+  drivers = [ "console",]
+  ## file = "{ FileConfig }"
+  ## logstash = "{ LogstashConfig }"
+  ## graylog = "{ GraylogConfig }"
+
+  [logging.console]
+    # Opt to print colorized log.
+    ## colored = true
+    # Determine verbosity of log.
+    format = "verbose"
+
+  # Override default log level for specific scope of package
+  [logging.pkg_ns]
 
 [resource]
   # Reserved CPU cores

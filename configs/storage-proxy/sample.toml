@@ -6,9 +6,6 @@
 #
 # Generated automatically from the StorageProxyUnifiedConfig schema.
 
-# Logging system configuration.
-# Controls how logs are formatted, filtered, and stored.
-logging = "..."
 # Configuration for external registries.
 # Defines how to connect and interact with external model registries.
 registries = []
@@ -84,6 +81,24 @@ registries = []
   # Higher values collect more data but increase overhead.
   # Balance based on your performance monitoring needs.
   ## sample-rate = 10
+
+[logging]
+  # Log level.
+  level = "INFO"
+  # Array of log drivers to print.
+  drivers = [ "console",]
+  ## file = "{ FileConfig }"
+  ## logstash = "{ LogstashConfig }"
+  ## graylog = "{ GraylogConfig }"
+
+  [logging.console]
+    # Opt to print colorized log.
+    ## colored = true
+    # Determine verbosity of log.
+    format = "verbose"
+
+  # Override default log level for specific scope of package
+  [logging.pkg_ns]
 
 [api]
   [api.client]

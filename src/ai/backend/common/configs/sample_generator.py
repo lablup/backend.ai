@@ -116,6 +116,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
     Returns:
         A string containing the TOML configuration with comments
     """
+    warnings: list[str] = []
     schema = model_class.model_json_schema()
 
     def _get_field_info(model_cls: Type[BaseModel], field_name: str, indent: int) -> dict[str, Any]:
@@ -309,7 +310,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
         if path == [] and simple_props:
             # ref: https://github.com/toml-lang/toml/issues/984
-            log.warning(
+            warnings.append(
                 "The configuration schema CANNOT have simple fields in the root "
                 "without any section header according to the TOML specification. "
                 "Also, optional sections should be defined non-optional with explicit default factory. "
@@ -380,7 +381,8 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
     # Process the root schema
     lines = _process_schema(schema, model_cls=model_class)
-
+    for msg in warnings:
+        log.warning(msg)
     return "\n".join(lines)
 
 
@@ -396,7 +398,6 @@ def generate_sample_config_file(
         header_comment: Optional header comment to add at the top of the file
     """
     config_content = _generate_sample_config(model_class)
-
     with open(output_path, "w") as f:
         if header_comment:
             f.write(_wrap_comment(header_comment))
