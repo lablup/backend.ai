@@ -4,16 +4,18 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
 
 import glide
 from glide import (
+    AdvancedGlideClientConfiguration,
     GlideClient,
     GlideClientConfiguration,
     Logger,
     LogLevel,
     NodeAddress,
     ServerCredentials,
+    TlsAdvancedConfiguration,
 )
 from redis.asyncio.sentinel import Sentinel
 
@@ -41,6 +43,8 @@ class ValkeyStandaloneTarget:
     address: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
@@ -53,6 +57,8 @@ class ValkeyStandaloneTarget:
             address=valkey_target.addr,
             password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
+            use_tls=valkey_target.use_tls,
+            tls_skip_verify=valkey_target.tls_skip_verify,
         )
 
 
@@ -62,6 +68,8 @@ class ValkeySentinelTarget:
     service_name: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
@@ -79,6 +87,8 @@ class ValkeySentinelTarget:
             service_name=valkey_target.service_name,
             password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
+            use_tls=valkey_target.use_tls,
+            tls_skip_verify=valkey_target.tls_skip_verify,
         )
 
 
@@ -157,6 +167,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
+            use_tls=self._target.use_tls,
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
@@ -167,6 +178,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            advanced_config=AdvancedGlideClientConfiguration(
+                tls_config=TlsAdvancedConfiguration(
+                    use_insecure_tls=self._target.tls_skip_verify,
+                ),
+            ),
         )
 
         glide_client = await GlideClient.create(config)
@@ -274,11 +290,14 @@ class ValkeySentinelClient(AbstractValkeyClient):
             host, port = addr_to_hostport_pair(addr)
             sentinel_addrs.append((host, port))
 
+        sentinel_kwargs: dict[str, Any] = {
+            "password": target.password,
+        }
+        if target.use_tls:
+            sentinel_kwargs["ssl"] = True
         self._sentinel = Sentinel(
             sentinel_addrs,
-            sentinel_kwargs={
-                "password": target.password,
-            },
+            sentinel_kwargs=sentinel_kwargs,
         )
         self._db_id = db_id
         self._human_readable_name = human_readable_name
@@ -332,6 +351,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
+            use_tls=self._target.use_tls,
             client_name=self._target.service_name,
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
@@ -343,6 +363,11 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            advanced_config=AdvancedGlideClientConfiguration(
+                tls_config=TlsAdvancedConfiguration(
+                    use_insecure_tls=self._target.tls_skip_verify,
+                ),
+            ),
         )
 
         glide_client = await GlideClient.create(config)

@@ -78,6 +78,8 @@ redis_default_config = {
     "service_name": None,
     "password": None,
     "redis_helper_config": redis_helper_default_config,
+    "use_tls": False,
+    "tls_skip_verify": False,
 }
 
 redis_config_iv = t.Dict({
@@ -87,6 +89,8 @@ redis_config_iv = t.Dict({
     ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
     t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
     t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+    t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+    t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
     t.Key(
         "redis_helper_config",
         default=redis_helper_default_config,
@@ -101,6 +105,8 @@ redis_config_iv = t.Dict({
             ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
             t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
             t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+            t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+            t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
             t.Key(
                 "redis_helper_config",
                 default=redis_helper_default_config,

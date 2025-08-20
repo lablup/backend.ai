@@ -20,7 +20,14 @@ from typing import (
 
 import redis.exceptions
 import yarl
-from glide import GlideClient, GlideClientConfiguration, NodeAddress, ServerCredentials
+from glide import (
+    AdvancedGlideClientConfiguration,
+    GlideClient,
+    GlideClientConfiguration,
+    NodeAddress,
+    ServerCredentials,
+    TlsAdvancedConfiguration,
+)
 from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
@@ -303,6 +310,12 @@ async def create_valkey_client(
         raise ValueError("At least one Redis address is required to create a GlideClient.")
     config = GlideClientConfiguration(
         addresses,
+        use_tls=valkey_target.use_tls,
+        advanced_config=AdvancedGlideClientConfiguration(
+            tls_config=TlsAdvancedConfiguration(
+                use_insecure_tls=valkey_target.tls_skip_verify,
+            ),
+        ),
         credentials=credentials,
         database_id=db,
         client_name=name,
