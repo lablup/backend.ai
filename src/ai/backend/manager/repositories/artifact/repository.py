@@ -2,6 +2,7 @@ import uuid
 from typing import Optional
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.exception import (
@@ -53,12 +54,15 @@ class ArtifactRepository:
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+                sa.select(ArtifactRow)
+                .where(ArtifactRow.id == artifact_id)
+                .options(selectinload(ArtifactRow.version_rows))
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError()
-            return row.to_dataclass()
+            versions = [version.version for version in row.version_rows]
+            return row.to_dataclass(versions)
 
     @repository_decorator()
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
@@ -67,11 +71,13 @@ class ArtifactRepository:
                 sa.select(ArtifactRow).where(
                     sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
                 )
+                .options(selectinload(ArtifactRow.version_rows))
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError()
-            return row.to_dataclass()
+            versions = [version.version for version in row.version_rows]
+            return row.to_dataclass(versions)
 
     @repository_decorator()
     async def get_artifact_revision(
@@ -118,6 +124,7 @@ class ArtifactRepository:
                             ArtifactRow.name == model.id, ArtifactRow.registry_id == registry_id
                         )
                     )
+                    .options(selectinload(ArtifactRow.version_rows))
                 )
                 artifact_row: ArtifactRow = artifact_query_result.scalar_one_or_none()
 
@@ -156,6 +163,23 @@ class ArtifactRepository:
                     if model.modified_at:
                         existing_revision.updated_at = model.modified_at
 
+                    # Check if version row already exists for this artifact
+                    existing_version_stmt = sa.select(ArtifactVersionRow).where(
+                        sa.and_(
+                            ArtifactVersionRow.artifact_id == existing_artifact.id,
+                            ArtifactVersionRow.version == model.revision,
+                        )
+                    )
+                    existing_version_result = await db_sess.execute(existing_version_stmt)
+                    existing_version = existing_version_result.scalar_one_or_none()
+
+                    # Create version row if it doesn't exist
+                    if existing_version is None:
+                        artifact_version_row = ArtifactVersionRow(
+                            artifact_id=existing_artifact.id, version=model.revision
+                        )
+                        db_sess.add(artifact_version_row)
+
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision, attribute_names=["updated_at"])
                     artifacts_map[artifact_row.id][1].append(existing_revision)
@@ -182,7 +206,7 @@ class ArtifactRepository:
                     ArtifactDataWithRevisions(artifact=artifact_data, revisions=revision_data_list)
                 )
 
-        return result
+        return list(result.values())
 
     @repository_decorator()
     async def associate_artifact_with_storage(
