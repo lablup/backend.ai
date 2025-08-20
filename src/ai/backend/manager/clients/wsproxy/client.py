@@ -26,7 +26,7 @@ class WSProxyClient:
         body: Mapping[str, Any],
     ) -> dict[str, Any]:
         async with self._client_session.post(
-            f"{self._address}/v2/endpoints/{endpoint_id}",
+            f"/v2/endpoints/{endpoint_id}",
             json=body,
             headers={
                 "X-BackendAI-Token": self._token,
@@ -41,7 +41,7 @@ class WSProxyClient:
         endpoint_id: UUID,
     ) -> None:
         async with self._client_session.delete(
-            f"{self._address}/v2/endpoints/{endpoint_id}",
+            f"/v2/endpoints/{endpoint_id}",
             headers={
                 "X-BackendAI-Token": self._token,
             },
