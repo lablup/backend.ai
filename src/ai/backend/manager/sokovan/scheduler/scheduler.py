@@ -1323,7 +1323,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        PREPARING_CHECK_THRESHOLD = 30.0  # 30 seconds
+        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
         # Get sessions with PREPARING and PULLING statuses
         sessions_with_images = await self._repository.get_sessions_for_pull([
@@ -1436,7 +1436,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        CREATING_CHECK_THRESHOLD = 30.0  # 30 seconds
+        CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
         # Get CREATING sessions from repository
         sessions_with_images = await self._repository.get_sessions_for_start([
