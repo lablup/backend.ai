@@ -35,7 +35,7 @@ def tcp_client_session_factory(
     client keys, so all HTTP requests must use relative URL paths.
 
     All custom keyword arguments are passed to the ClientSession constructor,
-    while ssl, limit, limit_per_host are passed to the TCPConnector consctructor.
+    while ssl, limit, limit_per_host are passed to the TCPConnector constructor.
     """
     connector = aiohttp.TCPConnector(
         ssl=ssl,
