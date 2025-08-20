@@ -6,6 +6,7 @@ from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
+from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
@@ -34,6 +35,7 @@ class Repositories:
     agent: AgentRepositories
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
+    deployment: DeploymentRepositories
     domain: DomainRepositories
     group: GroupRepositories
     image: ImageRepositories
@@ -54,6 +56,7 @@ class Repositories:
         agent_repositories = AgentRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
+        deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
@@ -73,6 +76,7 @@ class Repositories:
             agent=agent_repositories,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
+            deployment=deployment_repositories,
             domain=domain_repositories,
             group=group_repositories,
             image=image_repositories,

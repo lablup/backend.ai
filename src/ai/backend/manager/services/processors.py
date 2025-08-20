@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Self, override
+from typing import TYPE_CHECKING, Optional, Self, override
 
 if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.deployment import DeploymentController
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -51,6 +52,9 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
+from ai.backend.manager.services.model_serving.services.model_serving_with_deployment import (
+    ModelServingServiceWithDeployment,
+)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -91,6 +95,7 @@ class ServiceArgs:
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: "SchedulingController"
+    deployment_controller: Optional["DeploymentController"]
 
 
 @dataclass
@@ -110,7 +115,7 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     utilization_metric: UtilizationMetricService
-    model_serving: ModelServingService
+    model_serving: ModelServingService  # Can also be ModelServingServiceWithDeployment
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
 
@@ -196,16 +201,25 @@ class Services:
         utilization_metric_service = UtilizationMetricService(
             args.config_provider, repositories.metric.repository
         )
-        model_serving_service = ModelServingService(
-            agent_registry=args.agent_registry,
-            background_task_manager=args.background_task_manager,
-            event_dispatcher=args.event_dispatcher,
-            storage_manager=args.storage_manager,
-            config_provider=args.config_provider,
-            valkey_live=args.valkey_live,
-            repository=repositories.model_serving.repository,
-            admin_repository=repositories.model_serving.admin_repository,
-        )
+
+        # Use deployment-based model serving if deployment_controller is available
+        model_serving_service: ModelServingService | ModelServingServiceWithDeployment
+        if args.deployment_controller is not None:
+            model_serving_service = ModelServingServiceWithDeployment(
+                deployment_controller=args.deployment_controller,
+            )
+        else:
+            model_serving_service = ModelServingService(
+                agent_registry=args.agent_registry,
+                background_task_manager=args.background_task_manager,
+                event_dispatcher=args.event_dispatcher,
+                storage_manager=args.storage_manager,
+                config_provider=args.config_provider,
+                valkey_live=args.valkey_live,
+                repository=repositories.model_serving.repository,
+                admin_repository=repositories.model_serving.admin_repository,
+            )
+
         model_serving_auto_scaling = AutoScalingService(
             repository=repositories.model_serving.repository,
             admin_repository=repositories.model_serving.admin_repository,
@@ -231,7 +245,7 @@ class Services:
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
             utilization_metric=utilization_metric_service,
-            model_serving=model_serving_service,
+            model_serving=model_serving_service,  # type: ignore[arg-type]
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
         )
@@ -292,7 +306,7 @@ class Processors(AbstractProcessorPackage):
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
-        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
+        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)  # type: ignore[arg-type]
         model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors
         )
