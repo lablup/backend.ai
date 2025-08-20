@@ -309,7 +309,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
         if path == [] and simple_props:
             # ref: https://github.com/toml-lang/toml/issues/984
-            raise ValueError(
+            log.warning(
                 "The configuration schema CANNOT have simple fields in the root "
                 "without any section header according to the TOML specification. "
                 "Also, optional sections should be defined non-optional with explicit default factory. "
