@@ -1244,6 +1244,78 @@ class Scheduler:
 
         return stuck_sessions
 
+    async def _check_truly_stuck_pulling_sessions(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> list[SessionDataForPull]:
+        """
+        Check if sessions are truly stuck by verifying if pulling is still in progress.
+
+        :param sessions: List of potentially stuck sessions
+        :param image_configs: Image configurations
+        :return: List of sessions that are truly stuck
+        """
+        truly_stuck_sessions: list[SessionDataForPull] = []
+
+        # Group images by agent to check pulling status
+        agent_images: defaultdict[AgentId, set[str]] = defaultdict(set)
+        session_images: dict[SessionDataForPull, set[str]] = {}
+
+        for session in sessions:
+            session_image_set = set()
+            for kernel in session.kernels:
+                if kernel.agent_id and kernel.image in image_configs:
+                    img_cfg = image_configs[kernel.image]
+                    canonical = img_cfg.canonical
+                    agent_images[kernel.agent_id].add(canonical)
+                    session_image_set.add(canonical)
+            session_images[session] = session_image_set
+
+        # Check pulling status for each agent
+        agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
+        for agent_id, images in agent_images.items():
+            agent_client = self._agent_pool.get_agent_client(agent_id)
+            pulling_status = {}
+            for image in images:
+                try:
+                    is_pulling = await agent_client.check_pulling(image)
+                    pulling_status[image] = is_pulling
+                except Exception as e:
+                    log.warning(
+                        "Failed to check pulling status for image {} on agent {}: {}",
+                        image,
+                        agent_id,
+                        e,
+                    )
+                    # If we can't check, assume it's stuck
+                    pulling_status[image] = False
+            agent_pulling_status[agent_id] = pulling_status
+
+        # Determine truly stuck sessions
+        for session in sessions:
+            images_to_check = session_images[session]
+            if not images_to_check:
+                # No images to check, consider it stuck
+                truly_stuck_sessions.append(session)
+                continue
+
+            # Check if any image for this session is actively being pulled
+            any_pulling = False
+            for kernel in session.kernels:
+                if kernel.agent_id and kernel.image in image_configs:
+                    img_cfg = image_configs[kernel.image]
+                    canonical = img_cfg.canonical
+                    if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
+                        any_pulling = True
+                        break
+
+            if not any_pulling:
+                # No images are being pulled, session is truly stuck
+                truly_stuck_sessions.append(session)
+
+        return truly_stuck_sessions
+
     async def retry_preparing_sessions(self) -> ScheduleResult:
         """
         Retry PREPARING/PULLING sessions that appear stuck.
@@ -1251,7 +1323,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        PREPARING_CHECK_THRESHOLD = 3.0  # 5 minutes
+        PREPARING_CHECK_THRESHOLD = 30.0  # 30 seconds
 
         # Get sessions with PREPARING and PULLING statuses
         sessions_with_images = await self._repository.get_sessions_for_pull([
@@ -1271,12 +1343,21 @@ class Scheduler:
         if not stuck_sessions:
             return ScheduleResult(succeeded_count=0)
 
-        log.info("Retrying {} stuck PREPARING/PULLING sessions", len(stuck_sessions))
+        # Check which sessions are actually stuck (not actively pulling)
+        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
+            stuck_sessions, image_configs
+        )
+
+        if not truly_stuck_sessions:
+            log.debug("All sessions are actively pulling, no retry needed")
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
 
         # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(stuck_sessions, image_configs)
+        await self._trigger_image_pulling_for_sessions(truly_stuck_sessions, image_configs)
 
-        return ScheduleResult(succeeded_count=len(stuck_sessions))
+        return ScheduleResult(succeeded_count=len(truly_stuck_sessions))
 
     def _filter_stuck_sessions_for_start(
         self,
@@ -1309,6 +1390,45 @@ class Scheduler:
 
         return stuck_sessions
 
+    async def _check_truly_stuck_creating_sessions(
+        self,
+        sessions: list[SessionDataForStart],
+    ) -> list[SessionDataForStart]:
+        """
+        Check if sessions are truly stuck by verifying if kernels are being created or already exist.
+
+        :param sessions: List of potentially stuck sessions
+        :return: List of sessions that are truly stuck
+        """
+        truly_stuck_sessions: list[SessionDataForStart] = []
+
+        for session in sessions:
+            # Check each kernel in the session
+            any_active = False
+            for kernel in session.kernels:
+                if kernel.agent_id:
+                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
+                    try:
+                        # Check if kernel is being created or already exists
+                        is_active = await agent_client.check_creating(str(kernel.kernel_id))
+                        if is_active:
+                            any_active = True
+                            break
+                    except Exception as e:
+                        log.warning(
+                            "Failed to check creating status for kernel {} on agent {}: {}",
+                            kernel.kernel_id,
+                            kernel.agent_id,
+                            e,
+                        )
+                        # If we can't check, assume it's stuck
+
+            if not any_active:
+                # No kernels are being created or existing, session is truly stuck
+                truly_stuck_sessions.append(session)
+
+        return truly_stuck_sessions
+
     async def retry_creating_sessions(self) -> ScheduleResult:
         """
         Retry CREATING sessions that appear stuck.
@@ -1316,7 +1436,7 @@ class Scheduler:
 
         :return: ScheduleResult with number of sessions retried
         """
-        CREATING_CHECK_THRESHOLD = 6.0  # 10 minutes
+        CREATING_CHECK_THRESHOLD = 30.0  # 30 seconds
 
         # Get CREATING sessions from repository
         sessions_with_images = await self._repository.get_sessions_for_start([
@@ -1334,9 +1454,16 @@ class Scheduler:
         if not stuck_sessions:
             return ScheduleResult(succeeded_count=0)
 
-        log.info("Retrying {} stuck CREATING sessions", len(stuck_sessions))
+        # Check which sessions are truly stuck (not actively creating)
+        truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
+
+        if not truly_stuck_sessions:
+            log.debug("All sessions are actively creating kernels, no retry needed")
+            return ScheduleResult(succeeded_count=0)
+
+        log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
         # Use the existing _start_sessions_concurrently method to retry
         # This will re-trigger kernel creation for stuck sessions
-        await self._start_sessions_concurrently(stuck_sessions, image_configs)
-        return ScheduleResult(succeeded_count=len(stuck_sessions))
+        await self._start_sessions_concurrently(truly_stuck_sessions, image_configs)
+        return ScheduleResult(succeeded_count=len(truly_stuck_sessions))
