@@ -54,8 +54,8 @@ class KeyPairResourcePolicy:
 
     name: str
     total_resource_slots: ResourceSlot
-    max_concurrent_sessions: int
-    max_concurrent_sftp_sessions: int
+    max_concurrent_sessions: Optional[int]
+    max_concurrent_sftp_sessions: Optional[int]
     max_pending_session_count: Optional[int]
     max_pending_session_resource_slots: Optional[ResourceSlot]
 

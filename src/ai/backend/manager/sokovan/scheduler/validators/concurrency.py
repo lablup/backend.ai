@@ -43,6 +43,10 @@ class ConcurrencyValidator(ValidatorRule):
             current_count = current_sessions
             session_type = "concurrent"
 
+        # Skip validation if no limit is set (None or 0 means unlimited)
+        if max_sessions is None or max_sessions == 0:
+            return
+
         if current_count >= max_sessions:
             raise ConcurrencyLimitExceeded(
                 f"You cannot run more than {max_sessions} {session_type} sessions"
