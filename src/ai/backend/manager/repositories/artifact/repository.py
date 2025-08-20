@@ -11,8 +11,10 @@ from ai.backend.common.exception import (
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
+    InvalidCursorTypeError,
 )
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
