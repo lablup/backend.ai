@@ -600,3 +600,16 @@ class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-cursor-type"
+    error_title = "Invalid Cursor Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

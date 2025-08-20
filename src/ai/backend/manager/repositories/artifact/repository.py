@@ -13,6 +13,7 @@ from ai.backend.common.exception import (
     ArtifactUpdateError,
 )
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -41,7 +42,7 @@ from ai.backend.manager.repositories.types import (
 # Layer-specific decorator for artifact repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
 
-DEFAULT_PAGE_SIZE = 10
+_DEFAULT_PAGE_SIZE = 10
 
 
 class ArtifactRepository:
@@ -425,12 +426,12 @@ class ArtifactRepository:
                 count_stmt = count_stmt.where(where_clause)
 
             # Determine pagination mode
-            if offset_based_pagination and offset_based_pagination.offset is not None:
-                # Standard offset/limit pagination
+            if offset_based_pagination:
+                offset = pagination.offset.offset if pagination.offset is not None else 0
                 page_size = (
                     offset_based_pagination.limit
                     if offset_based_pagination.limit is not None
-                    else DEFAULT_PAGE_SIZE
+                    else _DEFAULT_PAGE_SIZE
                 )
 
                 # Apply multiple ordering fields
@@ -447,10 +448,8 @@ class ArtifactRepository:
                 stmt = stmt.order_by(ArtifactRow.id.asc())
 
                 # Apply pagination
-                stmt = stmt.offset(pagination.offset).limit(page_size)
-
+                stmt = stmt.offset(offset).limit(page_size)
             else:
-                # GraphQL connection pagination
                 # Extract pagination parameters from forward/backward options
                 after = forward.after if forward else None
                 first = forward.first if forward else None
@@ -479,54 +478,45 @@ class ArtifactRepository:
 
                 # Handle cursor-based pagination
                 if cursor_id is not None:
-                    try:
-                        cursor_uuid = uuid.UUID(cursor_id)
+                    type_, cursor_id = resolve_global_id(cursor_id)
+                    if type_ != "Artifact":
+                        raise InvalidCursorTypeError(f"Invalid cursor type: {type_}")
 
-                        # Get the cursor row to compare against
-                        cursor_stmt = sa.select(ArtifactRow).where(ArtifactRow.id == cursor_uuid)
-                        cursor_result = await db_sess.execute(cursor_stmt)
-                        cursor_row = cursor_result.scalar_one_or_none()
+                    cursor_uuid = uuid.UUID(cursor_id)
 
-                        if cursor_row is not None:
-                            cursor_order_value = getattr(cursor_row, primary_order_column.name)
+                    # Get the cursor row to compare against
+                    cursor_stmt = sa.select(ArtifactRow).where(ArtifactRow.id == cursor_uuid)
+                    cursor_result = await db_sess.execute(cursor_stmt)
+                    cursor_row = cursor_result.scalar_one_or_none()
 
-                            # Build cursor condition based on pagination direction using primary order field
-                            if pagination_order == ConnectionPaginationOrder.FORWARD:
-                                if primary_desc:
-                                    cursor_condition = (
-                                        primary_order_column < cursor_order_value
-                                    ) | (
-                                        (primary_order_column == cursor_order_value)
-                                        & (ArtifactRow.id > cursor_uuid)
-                                    )
-                                else:
-                                    cursor_condition = (
-                                        primary_order_column > cursor_order_value
-                                    ) | (
-                                        (primary_order_column == cursor_order_value)
-                                        & (ArtifactRow.id > cursor_uuid)
-                                    )
-                            else:  # BACKWARD
-                                if primary_desc:
-                                    cursor_condition = (
-                                        primary_order_column > cursor_order_value
-                                    ) | (
-                                        (primary_order_column == cursor_order_value)
-                                        & (ArtifactRow.id < cursor_uuid)
-                                    )
-                                else:
-                                    cursor_condition = (
-                                        primary_order_column < cursor_order_value
-                                    ) | (
-                                        (primary_order_column == cursor_order_value)
-                                        & (ArtifactRow.id < cursor_uuid)
-                                    )
+                    if cursor_row is not None:
+                        cursor_order_value = getattr(cursor_row, primary_order_column.name)
 
-                            stmt = stmt.where(cursor_condition)
+                        # Build cursor condition based on pagination direction using primary order field
+                        if pagination_order == ConnectionPaginationOrder.FORWARD:
+                            if primary_desc:
+                                cursor_condition = (primary_order_column < cursor_order_value) | (
+                                    (primary_order_column == cursor_order_value)
+                                    & (ArtifactRow.id > cursor_uuid)
+                                )
+                            else:
+                                cursor_condition = (primary_order_column > cursor_order_value) | (
+                                    (primary_order_column == cursor_order_value)
+                                    & (ArtifactRow.id > cursor_uuid)
+                                )
+                        else:  # BACKWARD
+                            if primary_desc:
+                                cursor_condition = (primary_order_column > cursor_order_value) | (
+                                    (primary_order_column == cursor_order_value)
+                                    & (ArtifactRow.id < cursor_uuid)
+                                )
+                            else:
+                                cursor_condition = (primary_order_column < cursor_order_value) | (
+                                    (primary_order_column == cursor_order_value)
+                                    & (ArtifactRow.id < cursor_uuid)
+                                )
 
-                    except ValueError:
-                        # Invalid UUID cursor, ignore
-                        pass
+                        stmt = stmt.where(cursor_condition)
 
                 # Apply ordering based on pagination direction
                 final_order_clauses = []

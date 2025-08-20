@@ -6,6 +6,7 @@ from typing import Any, Optional
 import orjson
 import strawberry
 from graphql import StringValueNode
+from graphql_relay.utils import unbase64
 
 
 @strawberry.scalar
@@ -86,3 +87,9 @@ def parse_json(value: str | bytes) -> Any:
 )
 class JSONString:
     pass
+
+
+def resolve_global_id(global_id: str) -> tuple[str, str]:
+    unbased_global_id = unbase64(global_id)
+    type_, _, id_ = unbased_global_id.partition(":")
+    return type_, id_
