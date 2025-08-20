@@ -350,6 +350,16 @@ service_name = ""
 # Should be kept secret in production environments.
 # Examples: None, REDIS_PASSWORD
 password = ""
+# Enable TLS/SSL encryption for Redis connections.
+# Set to true when connecting to Redis servers configured with TLS.
+# Both standalone and sentinel connections will use TLS when enabled.
+# Examples: true, false
+use_tls = false
+# Skip TLS certificate verification (insecure mode).
+# Only use this for development/testing with self-signed certificates.
+# WARNING: This disables certificate validation and should not be used in production.
+# Examples: true, false
+tls_skip_verify = false
 
 
 [idle]

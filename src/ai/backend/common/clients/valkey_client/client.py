@@ -34,6 +34,8 @@ class ValkeyStandaloneTarget:
     address: HostPortPair
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_redis_target(cls, redis_target: RedisTarget) -> Self:
@@ -46,6 +48,8 @@ class ValkeyStandaloneTarget:
             address=redis_target.addr,
             password=redis_target.password,
             request_timeout=1_000,  # Default request timeout
+            use_tls=redis_target.use_tls,
+            tls_skip_verify=redis_target.tls_skip_verify,
         )
 
 
@@ -65,6 +69,8 @@ class ValkeySentinelTarget:
     service_name: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_redis_target(cls, redis_target: RedisTarget) -> Self:
@@ -83,6 +89,8 @@ class ValkeySentinelTarget:
             service_name=redis_target.service_name,
             password=redis_target.password,
             request_timeout=1_000,  # Default request timeout
+            use_tls=redis_target.use_tls,
+            tls_skip_verify=redis_target.tls_skip_verify,
         )
 
 
@@ -162,6 +170,8 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
+            use_tls=self._target.use_tls,
+            use_insecure_tls=self._target.tls_skip_verify,  # Skip certificate verification if needed
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
@@ -265,11 +275,15 @@ class ValkeySentinelClient(AbstractValkeyClient):
         for addr in target.sentinel_addresses:
             sentinel_addrs.append((addr.host, addr.port))
 
+        sentinel_kwargs = {
+            "password": target.password,
+        }
+        if target.use_tls:
+            sentinel_kwargs["ssl"] = True
+
         self._sentinel = Sentinel(
             sentinel_addrs,
-            sentinel_kwargs={
-                "password": target.password,
-            },
+            sentinel_kwargs=sentinel_kwargs,
         )
         self._db_id = db_id
         self._human_readable_name = human_readable_name
@@ -323,6 +337,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
             addresses,
             credentials=credentials,
             database_id=self._db_id,
+            use_tls=self._target.use_tls,
+            use_insecure_tls=self._target.tls_skip_verify,  # Skip certificate verification if needed
             client_name=self._target.service_name,
             request_timeout=self._target.request_timeout or _DEFAULT_REQUEST_TIMEOUT,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
