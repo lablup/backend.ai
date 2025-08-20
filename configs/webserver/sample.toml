@@ -193,11 +193,11 @@
     # Network address and port of the Redis server.
     # Redis is used for distributed caching and messaging between managers.
     # Set to None when using Sentinel for high availability.
-    ## addr = "{ ai__backend__common__typed_validators__HostPortPair }"
+    ## addr = "{ HostPortPair }"
     # List of Redis Sentinel addresses for high availability.
     # If provided, the manager will use Redis Sentinel for automatic failover.
     # When using Sentinel, the addr field is ignored and service_name is required.
-    ## sentinel = [ "{ ai__backend__common__typed_validators__HostPortPair }" ]
+    ## sentinel = [ "{ HostPortPair }" ]
     # Service name for Redis Sentinel.
     # Required when using Redis Sentinel for high availability.
     # Identifies which service to monitor for failover.
