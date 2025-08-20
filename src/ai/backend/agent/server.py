@@ -1223,7 +1223,7 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
-    local_config = cast(AgentUnifiedConfig, _args[0])
+    local_config: AgentUnifiedConfig = _args[0]
 
     # Start aiomonitor.
     # Port is set by config (default=50200).
