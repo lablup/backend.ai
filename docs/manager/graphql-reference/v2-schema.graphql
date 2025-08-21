@@ -91,6 +91,28 @@ type ArtifactRevisionEdge {
   node: ArtifactRevision!
 }
 
+input ArtifactRevisionFilter {
+  status: [ArtifactStatus!] = null
+  version: StringFilter = null
+  artifactId: ID = null
+  AND: ArtifactRevisionFilter = null
+  OR: ArtifactRevisionFilter = null
+  NOT: ArtifactRevisionFilter = null
+  DISTINCT: Boolean = null
+}
+
+input ArtifactRevisionOrderBy {
+  field: ArtifactRevisionOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactRevisionOrderField {
+  VERSION
+  SIZE
+  CREATED_AT
+  UPDATED_AT
+}
+
 enum ArtifactStatus {
   SCANNED
   PULLED
@@ -606,6 +628,8 @@ type Queries {
   _service: _Service!
   artifact(id: ID!): Artifact
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifactRevision(id: ID!): ArtifactRevision
+  artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
   deployments(
     filter: DeploymentFilter = null
     orderBy: DeploymentOrderBy = null

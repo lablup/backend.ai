@@ -5,6 +5,8 @@ from strawberry.schema.config import StrawberryConfig
 from .artifact import (
     artifact,
     artifact_import_progress_updated,
+    artifact_revision,
+    artifact_revisions,
     artifact_status_changed,
     artifacts,
     authorize_artifact,
@@ -52,6 +54,8 @@ from .object_storage import (
 class Queries:
     artifact = artifact
     artifacts = artifacts
+    artifact_revision = artifact_revision
+    artifact_revisions = artifact_revisions
     deployments = deployments
     deployment = deployment
     revisions = revisions

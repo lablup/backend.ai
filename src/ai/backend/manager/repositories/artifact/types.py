@@ -21,7 +21,7 @@ class ArtifactOrderingOptions:
 
 
 @dataclass
-class ArtifactRevisioniOrderingOptions:
+class ArtifactRevisionOrderingOptions:
     """Ordering options for artifact revision queries."""
 
     order_by: list[tuple[ArtifactRevisionOrderField, bool]] = field(
@@ -47,5 +47,5 @@ class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
 
     artifact_id: Optional[uuid.UUID] = None
-    status: Optional[ArtifactStatus] = None
+    status: Optional[list[ArtifactStatus]] = None
     version: Optional[str] = None

@@ -84,6 +84,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.get = ActionProcessor(service.get, action_monitors)
         self.list_artifacts = ActionProcessor(service.list, action_monitors)
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
+        self.list_revisions = ActionProcessor(service.list_revisions, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

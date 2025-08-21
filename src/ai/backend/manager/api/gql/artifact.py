@@ -75,6 +75,53 @@ class ArtifactOrderBy:
 
 
 @strawberry.input
+class ArtifactRevisionFilter:
+    status: Optional[list[ArtifactStatus]] = None
+    version: Optional[StringFilter] = None
+    artifact_id: Optional[ID] = None
+
+    AND: Optional["ArtifactRevisionFilter"] = None
+    OR: Optional["ArtifactRevisionFilter"] = None
+    NOT: Optional["ArtifactRevisionFilter"] = None
+    DISTINCT: Optional[bool] = None
+
+    def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
+        repo_filter = ArtifactRevisionFilterOptions()
+
+        # Handle artifact_id filter
+        if self.artifact_id:
+            repo_filter.artifact_id = uuid.UUID(self.artifact_id)
+
+        # Handle status filter
+        if self.status:
+            repo_filter.status = self.status
+
+        # Handle version filter
+        if self.version:
+            # Use the most specific filter available
+            if self.version.equals:
+                repo_filter.version = self.version.equals
+            elif self.version.i_equals:
+                repo_filter.version = self.version.i_equals
+            elif self.version.contains:
+                repo_filter.version = self.version.contains
+            elif self.version.i_contains:
+                repo_filter.version = self.version.i_contains
+            elif self.version.starts_with:
+                repo_filter.version = self.version.starts_with
+            elif self.version.i_starts_with:
+                repo_filter.version = self.version.i_starts_with
+
+        return repo_filter
+
+
+@strawberry.input
+class ArtifactRevisionOrderBy:
+    field: ArtifactRevisionOrderField
+    direction: OrderDirection = OrderDirection.ASC
+
+
+@strawberry.input
 class ScanArtifactInput:
     registry_id: ID
     storage_id: ID
@@ -377,6 +424,21 @@ def _convert_gql_ordering_to_repo_ordering(
     return ArtifactOrderingOptions(order_by=repo_order_by)
 
 
+def _convert_gql_ordering_to_repo_ordering_revision(
+    order_by: Optional[list[ArtifactRevisionOrderBy]],
+) -> ArtifactRevisionOrderingOptions:
+    """Convert GraphQL ordering to repository ordering options for revisions"""
+    if not order_by:
+        return ArtifactRevisionOrderingOptions()  # Uses default ordering
+
+    repo_order_by = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_order_by.append((order.field, desc))
+
+    return ArtifactRevisionOrderingOptions(order_by=repo_order_by)
+
+
 def _build_artifact_connection(
     artifacts: list[ArtifactData],
     total_count: int,
@@ -441,6 +503,70 @@ def _build_artifact_connection(
     )
 
 
+def _build_artifact_revision_connection(
+    artifact_revisions: list[ArtifactRevisionData],
+    total_count: int,
+    pagination_options: PaginationOptions,
+) -> ArtifactRevisionConnection:
+    """Build GraphQL connection from artifact revision data"""
+    edges = []
+    for i, revision_data in enumerate(artifact_revisions):
+        revision = ArtifactRevision.from_dataclass(revision_data)
+        cursor = str(revision_data.id)  # Use revision ID as cursor
+        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+    # Calculate pagination info
+    has_next_page = False
+    has_previous_page = False
+
+    if pagination_options.offset:
+        # Offset-based pagination
+        offset = pagination_options.offset.offset or 0
+
+        has_previous_page = offset > 0
+        has_next_page = (offset + len(artifact_revisions)) < total_count
+
+    elif pagination_options.forward:
+        # Forward pagination (after/first)
+        first = pagination_options.forward.first
+        if first is not None:
+            # If we got exactly the requested number and there might be more
+            has_next_page = len(artifact_revisions) == first
+        else:
+            # If no first specified, check if we have all items
+            has_next_page = len(artifact_revisions) < total_count
+        has_previous_page = pagination_options.forward.after is not None
+
+    elif pagination_options.backward:
+        # Backward pagination (before/last)
+        last = pagination_options.backward.last
+        if last is not None:
+            # If we got exactly the requested number, there might be more before
+            has_previous_page = len(artifact_revisions) == last
+        else:
+            # If no last specified, assume there could be previous items
+            has_previous_page = True
+        has_next_page = pagination_options.backward.before is not None
+
+    else:
+        # Default case - assume we have all items if no pagination specified
+        has_next_page = len(artifact_revisions) < total_count
+        has_previous_page = False
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=has_next_page,
+        has_previous_page=has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactRevisionConnection(
+        count=total_count,
+        edges=edges,
+        page_info=page_info,
+    )
+
+
 async def resolve_artifact_revisions(
     artifact: Artifact, info: Info[StrawberryGQLContext]
 ) -> list[ArtifactRevision]:
@@ -474,13 +600,67 @@ async def artifacts(
 
 
 @strawberry.field
-def artifact(id: ID) -> Optional[Artifact]:
-    raise NotImplementedError("Artifact retrieval not implemented yet.")
+async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
+    action_result = await info.context.processors.artifact.get.wait_for_complete(
+        GetArtifactAction(
+            artifact_id=uuid.UUID(id),
+        )
+    )
+
+    return Artifact.from_dataclass(action_result.result)
 
 
 @strawberry.field
-def artifact_revision(id: ID) -> Optional[ArtifactRevision]:
-    raise NotImplementedError("Artifact revision retrieval not implemented yet.")
+async def artifact_revisions(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ArtifactRevisionFilter] = None,
+    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ArtifactRevisionConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    # Convert GraphQL ordering to repository ordering
+    repo_ordering = _convert_gql_ordering_to_repo_ordering_revision(order_by)
+
+    # Set up pagination options
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    # Get artifact revisions using list action
+    action_result = await info.context.processors.artifact.list_revisions.wait_for_complete(
+        ListArtifactRevisionsAction(
+            pagination=pagination_options,
+            ordering=repo_ordering,
+            filters=repo_filter,
+        )
+    )
+
+    # Build GraphQL connection response
+    return _build_artifact_revision_connection(
+        artifact_revisions=action_result.data,
+        total_count=action_result.total_count,
+        pagination_options=pagination_options,
+    )
+
+
+@strawberry.field
+async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
+    action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
+        GetArtifactRevisionsAction(
+            artifact_id=uuid.UUID(id),
+        )
+    )
+
+    # Return the most recent revision
+    return ArtifactRevision.from_dataclass(max(action_result.revisions, key=lambda r: r.updated_at))
 
 
 @strawberry.mutation
