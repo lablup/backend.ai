@@ -19,7 +19,7 @@ python_requirements(
     resolve="mypy",
     module_mapping={
         "strawberry": ["strawberry_graphql"],
-    }
+    },
 )
 python_requirements(
     name="reqs-coveragepy",
