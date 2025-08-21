@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
@@ -58,7 +58,7 @@ class ArtifactFilterApplier:
 
     def _build_filter_condition(
         self, stmt: Select, filters: ArtifactFilterOptions
-    ) -> tuple[Optional[sa.ColumnElement], Select]:
+    ) -> tuple[Optional[Any], Select]:
         """Build a filter condition from ArtifactFilterOptions, handling logical operations"""
         conditions = []
 
@@ -205,7 +205,7 @@ class ArtifactRevisionFilterApplier:
 
     def _build_filter_condition(
         self, stmt: Select, filters: ArtifactRevisionFilterOptions
-    ) -> tuple[Optional[sa.ColumnElement], Select]:
+    ) -> tuple[Optional[Any], Select]:
         """Build a filter condition from ArtifactRevisionFilterOptions, handling logical operations"""
         conditions = []
 
