@@ -9,12 +9,12 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 @dataclass
 class DisassociateWithStorageAction(ArtifactRevisionAction):
-    artifact_id: uuid.UUID
+    artifact_revision_id: uuid.UUID
     storage_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.artifact_id)
+        return str(self.artifact_revision_id)
 
     @override
     @classmethod

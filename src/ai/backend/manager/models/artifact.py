@@ -8,6 +8,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
+    ArtifactRegistryType,
     ArtifactType,
 )
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
@@ -81,8 +82,8 @@ class ArtifactRow(Base):
             type=self.type,
             name=self.name,
             registry_id=self.registry_id,
-            registry_type=self.registry_type,
+            registry_type=ArtifactRegistryType(self.registry_type),
             source_registry_id=self.source_registry_id,
-            source_registry_type=self.source_registry_type,
+            source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
         )

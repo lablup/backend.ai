@@ -101,7 +101,7 @@ class ArtifactRevisionService:
         self, action: DisassociateWithStorageAction
     ) -> DisassociateWithStorageActionResult:
         result = await self._artifact_repository.disassociate_artifact_with_storage(
-            action.artifact_id, action.storage_id
+            action.artifact_revision_id, action.storage_id
         )
         return DisassociateWithStorageActionResult(result=result)
 
@@ -185,5 +185,12 @@ class ArtifactRevisionService:
             )
         except Exception as e:
             raise ArtifactDeletionError("Failed to delete artifact from storage") from e
+
+        await self.disassociate_with_storage(
+            DisassociateWithStorageAction(
+                artifact_revision_id=revision_data.id,
+                storage_id=storage_data.id,
+            )
+        )
 
         return DeleteArtifactActionResult(artifact_revision_id=result)
