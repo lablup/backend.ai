@@ -2193,7 +2193,6 @@ class ScheduleDBSource:
                     session_name=session.name,
                     session_type=session.session_type,
                     access_key=session.access_key,
-                    scaling_group=session.scaling_group,
                     cluster_mode=session.cluster_mode,
                     kernels=kernel_data,
                     batch_timeout=session.batch_timeout,

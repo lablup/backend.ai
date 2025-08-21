@@ -788,7 +788,6 @@ class SessionTransitionData:
     session_name: str
     session_type: SessionTypes
     access_key: AccessKey
-    scaling_group: str
     cluster_mode: Optional[ClusterMode]
     kernels: list[KernelTransitionData]
     batch_timeout: Optional[int]  # For batch sessions
