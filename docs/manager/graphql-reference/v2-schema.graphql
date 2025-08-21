@@ -35,7 +35,7 @@ type ArtifactEdge {
 
 input ArtifactFilter {
   type: [ArtifactType!] = null
-  status: ArtifactStatusFilter = null
+  status: [ArtifactStatus!] = null
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
@@ -57,6 +57,7 @@ input ArtifactOrderBy {
 }
 
 enum ArtifactOrderField {
+  ID
   NAME
   TYPE
   SIZE
@@ -101,17 +102,10 @@ enum ArtifactStatus {
   FAILED
 }
 
-input ArtifactStatusChangedInput {
-  artifactIds: [ID!]!
-}
-
 type ArtifactStatusChangedPayload {
-  artifact: Artifact!
-}
-
-input ArtifactStatusFilter {
-  IN: [ArtifactStatus!] = null
-  EQ: [ArtifactStatus!] = null
+  artifactId: ID!
+  status: ArtifactStatus!
+  updatedAt: DateTime!
 }
 
 input ArtifactTarget {
@@ -136,7 +130,7 @@ type AuthorizeArtifactPayload {
 scalar ByteSize
 
 type CancelImportArtifactPayload {
-  artifactId: ID!
+  artifact: Artifact!
 }
 
 type ClusterConfig {
@@ -356,8 +350,8 @@ input ImportArtifactsInput {
   bucketName: String!
 }
 
-type ImportArtifactsPayload {
-  artifacts: ArtifactConnection!
+type ImportArtifactPayload {
+  artifact: Artifact!
 }
 
 """A custom scalar for JSON strings using orjson"""
@@ -521,7 +515,7 @@ input ModelRuntimeConfigInput {
 
 type Mutation {
   scanArtifacts(input: ScanArtifactInput!): ScanArtifactsPayload!
-  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+  importArtifact(input: ImportArtifactInput!): ImportArtifactPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
   cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
@@ -600,7 +594,7 @@ type Queries {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
   artifact(id: ID!): Artifact
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ArtifactConnection!
   deployments(
     filter: DeploymentFilter = null
     orderBy: DeploymentOrderBy = null
@@ -701,6 +695,7 @@ input ScanArtifactInput {
   registryId: ID!
   storageId: ID!
   limit: Int!
+  order: String!
   search: String = null
 }
 
@@ -730,7 +725,7 @@ input StringFilter {
 }
 
 type Subscription {
-  artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
+  artifactStatusChanged(artifactId: ID = null): ArtifactStatusChangedPayload!
   artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
