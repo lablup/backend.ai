@@ -120,10 +120,6 @@ class ArtifactRevisionService:
         await self._artifact_repository.update_artifact_revision_status(
             artifact.id, ArtifactStatus.PULLING
         )
-        revision_row = await self._artifact_repository.get_artifact_revision(
-            artifact.id, revision_data.version
-        )
-
         storage = await self._object_storage_repository.get_by_id(action.storage_id)
         registry_data = (
             await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
@@ -142,17 +138,7 @@ class ArtifactRevisionService:
         )
 
         await self.associate_with_storage(AssociateWithStorageAction(revision_data.id, storage.id))
-        await self._artifact_repository.update_artifact_revision_status(
-            revision_row.id, ArtifactStatus.PULLED
-        )
-
-        # TODO: Add verify step
-        await self._artifact_repository.update_artifact_revision_status(
-            revision_row.id, ArtifactStatus.VERIFYING
-        )
-        await self._artifact_repository.update_artifact_revision_status(
-            revision_row.id, ArtifactStatus.NEEDS_APPROVAL
-        )
+        # TODO: Improve event-based state structure with heartbeat-based structure
         return ImportArtifactActionResult(result=revision_data, task_id=result.task_id)
 
     async def delete(self, action: DeleteArtifactAction) -> DeleteArtifactActionResult:

@@ -424,6 +424,7 @@ input ImportArtifactsInput {
 """Added in 25.14.0"""
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
+  taskIds: [UUID!]!
 }
 
 """A custom scalar for JSON strings using orjson"""

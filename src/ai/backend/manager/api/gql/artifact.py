@@ -322,6 +322,7 @@ class ScanArtifactsPayload:
 @strawberry.type(description="Added in 25.14.0")
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
+    task_ids: list[uuid.UUID]
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -698,6 +699,7 @@ async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
+    task_ids = []
     for revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
             ImportArtifactAction(
@@ -707,6 +709,7 @@ async def import_artifacts(
             )
         )
         imported_artifacts.append(ArtifactRevision.from_dataclass(action_result.result))
+        task_ids.append(action_result.task_id)
 
     edges = [
         ArtifactRevisionEdge(node=artifact, cursor=str(i))
@@ -724,7 +727,7 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifact_revisions=artifacts_connection)
+    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, task_ids=task_ids)
 
 
 @strawberry.mutation(description="Added in 25.14.0")
