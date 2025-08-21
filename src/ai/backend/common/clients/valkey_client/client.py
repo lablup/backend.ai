@@ -4,16 +4,18 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
 
 import glide
 from glide import (
+    AdvancedGlideClientConfiguration,
     GlideClient,
     GlideClientConfiguration,
     Logger,
     LogLevel,
     NodeAddress,
     ServerCredentials,
+    TlsAdvancedConfiguration,
 )
 from redis.asyncio.sentinel import Sentinel
 
@@ -36,11 +38,17 @@ _DEFAULT_REQUEST_TIMEOUT = 1_000  # Default request timeout in milliseconds
 Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
 
+SSL_CERT_NONE = "none"
+SSL_CERT_REQUIRED = "required"
+
+
 @dataclass
 class ValkeyStandaloneTarget:
     address: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
@@ -53,6 +61,8 @@ class ValkeyStandaloneTarget:
             address=valkey_target.addr,
             password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
+            use_tls=valkey_target.use_tls,
+            tls_skip_verify=valkey_target.tls_skip_verify,
         )
 
 
@@ -62,6 +72,8 @@ class ValkeySentinelTarget:
     service_name: str
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     @classmethod
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
@@ -79,6 +91,8 @@ class ValkeySentinelTarget:
             service_name=valkey_target.service_name,
             password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
+            use_tls=valkey_target.use_tls,
+            tls_skip_verify=valkey_target.tls_skip_verify,
         )
 
 
@@ -167,6 +181,12 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            use_tls=self._target.use_tls,
+            advanced_config=AdvancedGlideClientConfiguration(
+                tls_config=TlsAdvancedConfiguration(
+                    use_insecure_tls=self._target.tls_skip_verify,
+                ),
+            ),
         )
 
         glide_client = await GlideClient.create(config)
@@ -274,11 +294,14 @@ class ValkeySentinelClient(AbstractValkeyClient):
             host, port = addr_to_hostport_pair(addr)
             sentinel_addrs.append((host, port))
 
+        sentinel_kwargs: dict[str, Any] = {
+            "password": target.password,
+            "ssl": target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
+        }
         self._sentinel = Sentinel(
             sentinel_addrs,
-            sentinel_kwargs={
-                "password": target.password,
-            },
+            sentinel_kwargs=sentinel_kwargs,
         )
         self._db_id = db_id
         self._human_readable_name = human_readable_name
@@ -343,6 +366,12 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             if self._pubsub_channels
             else None,
+            use_tls=self._target.use_tls,
+            advanced_config=AdvancedGlideClientConfiguration(
+                tls_config=TlsAdvancedConfiguration(
+                    use_insecure_tls=self._target.tls_skip_verify,
+                ),
+            ),
         )
 
         glide_client = await GlideClient.create(config)

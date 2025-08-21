@@ -1476,6 +1476,8 @@ class ValkeyTarget:
     service_name: Optional[str] = None
     password: Optional[str] = None
     request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1497,6 +1499,8 @@ class RedisTarget:
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1517,6 +1521,8 @@ class RedisTarget:
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
         )
 
     def to_valkey_target(self) -> ValkeyTarget:
@@ -1538,6 +1544,8 @@ class RedisTarget:
             service_name=self.service_name,
             password=self.password,
             request_timeout=None,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
         )
 
 
@@ -1586,6 +1594,8 @@ class RedisProfileTarget:
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
         override_targets: Optional[Mapping[str, RedisTarget]] = None,
+        use_tls: bool = False,
+        tls_skip_verify: bool = False,
     ) -> None:
         self._base_target = RedisTarget(
             addr=addr,
@@ -1593,6 +1603,8 @@ class RedisProfileTarget:
             service_name=service_name,
             password=password,
             redis_helper_config=redis_helper_config,
+            use_tls=use_tls,
+            tls_skip_verify=tls_skip_verify,
         )
         self._override_targets = override_targets
 
