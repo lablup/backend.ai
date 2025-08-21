@@ -139,6 +139,14 @@ class Artifact(Node):
             edges=edges,
         )
 
+    @strawberry.field
+    async def updated_at(self, info: Info[StrawberryGQLContext]) -> datetime:
+        action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
+            GetArtifactRevisionsAction(uuid.UUID(self.id))
+        )
+
+        return max(action_result.revisions, key=lambda r: r.updated_at).updated_at
+
 
 @strawberry.type
 class ArtifactRevision(Node):
