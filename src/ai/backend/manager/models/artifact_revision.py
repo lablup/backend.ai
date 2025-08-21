@@ -45,7 +45,7 @@ class ArtifactRevisionRow(Base):
         index=True,
     )
     version = sa.Column("version", sa.String, nullable=False)
-    readme = sa.Column("readme", sa.TEXT, nullable=True)
+    readme = sa.Column("readme", sa.TEXT, nullable=True, default=None)
     size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
 
     # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.

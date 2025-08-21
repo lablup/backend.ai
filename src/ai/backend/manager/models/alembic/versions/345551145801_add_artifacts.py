@@ -25,9 +25,9 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("artifact_id", GUID(), nullable=False),
         sa.Column("version", sa.String(), nullable=False),
-        sa.Column("size", sa.BigInteger(), nullable=False),
+        sa.Column("size", sa.BigInteger(), nullable=True, default=None),
         sa.Column("status", sa.String(), nullable=False),
-        sa.Column("readme", sa.TEXT(), nullable=False),
+        sa.Column("readme", sa.TEXT(), nullable=True, default=None),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
