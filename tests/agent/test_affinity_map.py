@@ -480,6 +480,7 @@ def test_affinity_map_secondary_allocation_integrated(
 
     print(alloc_map.allocations[SlotName("cuda")])
     assert sorted(per_node_cuda_alloc.values()) == [0, 0, 1, 1]
+    used_numa_nodes = {node for node, count in per_node_cuda_alloc.items() if count > 0}
 
     # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
     alloc_map.allocate(
@@ -499,4 +500,9 @@ def test_affinity_map_secondary_allocation_integrated(
             per_node_cpu_alloc[3] += int(alloc)
 
     print(alloc_map.allocations[SlotName("cpu")])
+    for node_idx, count in per_node_cpu_alloc.items():
+        if node_idx in used_numa_nodes:
+            assert count == 2
+        else:
+            assert count == 0
     assert sorted(per_node_cpu_alloc.values()) == [0, 0, 2, 2]
