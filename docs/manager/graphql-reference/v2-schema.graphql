@@ -161,6 +161,11 @@ type AuthorizeArtifactPayload {
 
 scalar ByteSize
 
+input CancelArtifactInput {
+  artifactId: ID!
+  artifactVersion: String!
+}
+
 type CancelImportArtifactPayload {
   artifactId: ID!
 }
@@ -233,6 +238,9 @@ scalar DateTime
 
 input DeleteArtifactInput {
   artifactId: ID!
+  artifactVersion: String!
+  storageId: ID!
+  bucketName: String!
 }
 
 type DeleteArtifactPayload {
@@ -550,7 +558,7 @@ type Mutation {
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
-  cancelImportArtifact(artifactId: ID!): CancelImportArtifactPayload!
+  cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
