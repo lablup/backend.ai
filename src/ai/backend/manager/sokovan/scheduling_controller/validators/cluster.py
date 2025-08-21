@@ -22,16 +22,18 @@ class ClusterValidationRule(SessionValidatorRule):
         context: SessionCreationContext,
         allowed_groups: list[AllowedScalingGroup],
     ) -> None:
-        """Validate cluster configuration for multi-container sessions."""
-        # Only validate multi-container sessions
+        """Validate cluster configuration and kernel specifications."""
+        # Check if kernel_specs exists
+        if not spec.kernel_specs:
+            raise InvalidAPIParameters("At least one kernel specification is required")
+
+        # Only validate multi-container sessions further
         if spec.cluster_size <= 1:
             return
 
         kernel_specs_count = len(spec.kernel_specs)
 
-        if kernel_specs_count == 0:
-            raise InvalidAPIParameters("Missing kernel configurations")
-        elif kernel_specs_count == 1:
+        if kernel_specs_count == 1:
             # Single kernel spec will be replicated - this is valid
             # The main kernel config will be replicated to sub-containers
             pass

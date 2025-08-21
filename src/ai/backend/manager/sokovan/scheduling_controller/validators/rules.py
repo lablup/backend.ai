@@ -66,22 +66,6 @@ class ScalingGroupAccessRule(SessionValidatorRule):
         raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
 
 
-class KernelSpecsRule(SessionValidatorRule):
-    """Validates kernel specifications."""
-
-    def name(self) -> str:
-        return "kernel_specs"
-
-    def validate(
-        self,
-        spec: SessionCreationSpec,
-        context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
-    ) -> None:
-        if not spec.kernel_specs:
-            raise InvalidAPIParameters("At least one kernel specification is required")
-
-
 class ServicePortRule(SessionValidatorRule):
     """Validates preopen ports against service ports."""
 

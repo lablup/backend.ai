@@ -63,17 +63,17 @@ class ClusterConfigurationRule(SessionPreparerRule):
             for idx, kernel_spec in enumerate(spec.kernel_specs):
                 kernel_config = kernel_spec.copy()
 
+                # Common fields for all kernels
+                kernel_config["cluster_idx"] = idx + 1
+                kernel_config["local_rank"] = idx
+
                 if idx == 0:
                     # First kernel is main
                     kernel_config["cluster_role"] = "main"
-                    kernel_config["cluster_idx"] = 1
-                    kernel_config["local_rank"] = 0
                     kernel_config["cluster_hostname"] = "main1"
                 else:
                     # Rest are sub kernels
                     kernel_config["cluster_role"] = "sub"
-                    kernel_config["cluster_idx"] = idx + 1
-                    kernel_config["local_rank"] = idx
                     kernel_config["cluster_hostname"] = f"sub{idx}"
 
                 kernel_configs.append(kernel_config)
