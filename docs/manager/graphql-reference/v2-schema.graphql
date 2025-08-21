@@ -5,6 +5,16 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
 }
 
 """Added in 25.14.0"""
+input ApproveArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""Added in 25.14.0"""
+type ApproveArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.14.0"""
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -129,8 +139,8 @@ input ArtifactRevisionStatusFilter {
 
 enum ArtifactStatus {
   SCANNED
-  PULLED
   PULLING
+  PULLED
   VERIFYING
   NEEDS_APPROVAL
   AVAILABLE
@@ -164,27 +174,16 @@ enum ArtifactType {
   IMAGE
 }
 
-"""Added in 25.14.0"""
-input AuthorizeArtifactInput {
-  artifactId: ID!
-}
-
-"""Added in 25.14.0"""
-type AuthorizeArtifactPayload {
-  artifact: Artifact!
-}
-
 scalar ByteSize
 
 """Added in 25.14.0"""
 input CancelArtifactInput {
-  artifactId: ID!
-  artifactVersion: String!
+  artifactRevisionId: ID!
 }
 
 """Added in 25.14.0"""
 type CancelImportArtifactPayload {
-  artifactId: ID!
+  artifactRevisionId: ID!
 }
 
 type ClusterConfig {
@@ -259,15 +258,14 @@ scalar DateTime
 
 """Added in 25.14.0"""
 input DeleteArtifactInput {
-  artifactId: ID!
-  artifactVersion: String!
+  artifactRevisionId: ID!
   storageId: ID!
   bucketName: String!
 }
 
 """Added in 25.14.0"""
 type DeleteArtifactPayload {
-  artifactId: ID!
+  artifactRevisionId: ID!
 }
 
 """Added in 25.14.0"""
@@ -342,6 +340,16 @@ enum DeploymentStrategyType {
   CANARY
 }
 
+"""Added in 25.14.0"""
+input DisapproveArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""Added in 25.14.0"""
+type DisapproveArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
 extend type EndpointAutoScalingRuleNode @key(fields: "id") {
   id: ID! @external
 }
@@ -353,6 +361,7 @@ extend type EndpointToken @key(fields: "token") {
 """Added in 25.14.0"""
 input GetPresignedDownloadURLInput {
   artifactId: ID!
+  artifactRevision: String!
   storageId: ID!
   bucketName: String!
   key: String!
@@ -419,14 +428,14 @@ extend type ImageNode @key(fields: "id") {
 
 """Added in 25.14.0"""
 input ImportArtifactsInput {
-  artifacts: [ArtifactTarget!]!
+  artifactRevisionIds: [ID!]!
   storageId: ID!
   bucketName: String!
 }
 
 """Added in 25.14.0"""
 type ImportArtifactsPayload {
-  artifacts: ArtifactConnection!
+  artifactRevisions: ArtifactRevisionConnection!
 }
 
 """A custom scalar for JSON strings using orjson"""
@@ -633,10 +642,10 @@ type Mutation {
   getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
 
   """Added in 25.14.0"""
-  authorizeArtifact(input: AuthorizeArtifactInput!): AuthorizeArtifactPayload!
+  approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
 
   """Added in 25.14.0"""
-  unauthorizeArtifact(input: UnauthorizeArtifactInput!): UnauthorizeArtifactPayload!
+  disapproveArtifactRevision(input: DisapproveArtifactInput!): DisapproveArtifactPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -861,16 +870,6 @@ type Subscription {
 }
 
 scalar UUID
-
-"""Added in 25.14.0"""
-input UnauthorizeArtifactInput {
-  artifactId: ID!
-}
-
-"""Added in 25.14.0"""
-type UnauthorizeArtifactPayload {
-  artifact: Artifact!
-}
 
 """Added in 25.14.0"""
 input UpdateArtifactInput {

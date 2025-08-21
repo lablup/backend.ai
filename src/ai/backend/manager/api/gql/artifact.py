@@ -126,14 +126,8 @@ class ScanArtifactInput:
 
 
 @strawberry.input(description="Added in 25.14.0")
-class ArtifactTarget:
-    artifact_id: ID
-    revision: str
-
-
-@strawberry.input(description="Added in 25.14.0")
 class ImportArtifactsInput:
-    artifacts: list[ArtifactTarget]
+    artifact_revision_ids: list[ID]
     storage_id: ID
     bucket_name: str
 
@@ -145,26 +139,24 @@ class UpdateArtifactInput:
 
 @strawberry.input(description="Added in 25.14.0")
 class CancelArtifactInput:
-    artifact_id: ID
-    artifact_version: str
+    artifact_revision_id: ID
 
 
 @strawberry.input(description="Added in 25.14.0")
 class DeleteArtifactInput:
-    artifact_id: ID
-    artifact_version: str
+    artifact_revision_id: ID
     storage_id: ID
     bucket_name: str
 
 
 @strawberry.input(description="Added in 25.14.0")
-class AuthorizeArtifactInput:
-    artifact_id: ID
+class ApproveArtifactInput:
+    artifact_revision_id: ID
 
 
 @strawberry.input(description="Added in 25.14.0")
-class UnauthorizeArtifactInput:
-    artifact_id: ID
+class DisapproveArtifactInput:
+    artifact_revision_id: ID
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -339,7 +331,7 @@ class ScanArtifactsPayload:
 # Mutation Payloads
 @strawberry.type(description="Added in 25.14.0")
 class ImportArtifactsPayload:
-    artifacts: ArtifactConnection
+    artifact_revisions: ArtifactRevisionConnection
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -349,17 +341,17 @@ class UpdateArtifactPayload:
 
 @strawberry.type(description="Added in 25.14.0")
 class DeleteArtifactPayload:
-    artifact_id: ID
+    artifact_revision_id: ID
 
 
 @strawberry.type(description="Added in 25.14.0")
-class AuthorizeArtifactPayload:
-    artifact: Artifact
+class ApproveArtifactPayload:
+    artifact_revision: ArtifactRevision
 
 
 @strawberry.type(description="Added in 25.14.0")
-class UnauthorizeArtifactPayload:
-    artifact: Artifact
+class DisapproveArtifactPayload:
+    artifact_revision: ArtifactRevision
 
 
 @strawberry.type
@@ -374,7 +366,7 @@ class UnauthorizeArtifactPayload:
 
 @strawberry.type
 class CancelImportArtifactPayload:
-    artifact_id: ID
+    artifact_revision_id: ID
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -716,22 +708,22 @@ async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
-    for artifact in input.artifacts:
-        action_result = await info.context.processors.artifact.import_.wait_for_complete(
+    for revision_id in input.artifact_revision_ids:
+        action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
             ImportArtifactAction(
-                artifact_id=uuid.UUID(artifact.artifact_id),
-                artifact_version=artifact.revision,
+                artifact_revision_id=uuid.UUID(revision_id),
                 storage_id=uuid.UUID(input.storage_id),
                 bucket_name=input.bucket_name,
             )
         )
-        imported_artifacts.append(Artifact.from_dataclass(action_result.result))
+        imported_artifacts.append(ArtifactRevision.from_dataclass(action_result.result))
 
     edges = [
-        ArtifactEdge(node=artifact, cursor=str(i)) for i, artifact in enumerate(imported_artifacts)
+        ArtifactRevisionEdge(node=artifact, cursor=str(i))
+        for i, artifact in enumerate(imported_artifacts)
     ]
 
-    artifacts_connection = ArtifactConnection(
+    artifacts_connection = ArtifactRevisionConnection(
         count=len(imported_artifacts),
         edges=edges,
         page_info=strawberry.relay.PageInfo(
@@ -742,7 +734,7 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifacts=artifacts_connection)
+    return ImportArtifactsPayload(artifact_revisions=artifacts_connection)
 
 
 @strawberry.mutation(description="Added in 25.14.0")
@@ -754,16 +746,15 @@ def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
 async def delete_artifact(
     input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactPayload:
-    action_result = await info.context.processors.artifact.delete.wait_for_complete(
+    action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
         DeleteArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-            artifact_version=input.artifact_version,
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             storage_id=uuid.UUID(input.storage_id),
             bucket_name=input.bucket_name,
         )
     )
 
-    return DeleteArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
+    return DeleteArtifactPayload(artifact_revision_id=ID(str(action_result.artifact_revision_id)))
 
 
 @strawberry.mutation(description="Added in 25.14.0")
@@ -771,39 +762,44 @@ async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
     # TODO: Cancel actual import bgtask
-    action_result = await info.context.processors.artifact.cancel_import.wait_for_complete(
+    action_result = await info.context.processors.artifact_revision.cancel_import.wait_for_complete(
         CancelImportAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-            artifact_version=input.artifact_version,
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
         )
     )
-    return CancelImportArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
+    return CancelImportArtifactPayload(
+        artifact_revision_id=ID(str(action_result.artifact_revision_id))
+    )
 
 
 @strawberry.mutation(description="Added in 25.14.0")
-async def authorize_artifact(
-    input: AuthorizeArtifactInput, info: Info[StrawberryGQLContext]
-) -> AuthorizeArtifactPayload:
-    action_result = await info.context.processors.artifact.authorize.wait_for_complete(
-        AuthorizeArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
+async def approve_artifact_revision(
+    input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
+) -> ApproveArtifactPayload:
+    action_result = await info.context.processors.artifact_revision.approve.wait_for_complete(
+        ApproveArtifactRevisionAction(
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
         )
     )
 
-    return AuthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+    return ApproveArtifactPayload(
+        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
+    )
 
 
 @strawberry.mutation(description="Added in 25.14.0")
-async def unauthorize_artifact(
-    input: UnauthorizeArtifactInput, info: Info[StrawberryGQLContext]
-) -> UnauthorizeArtifactPayload:
-    action_result = await info.context.processors.artifact.unauthorize.wait_for_complete(
-        UnauthorizeArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
+async def disapprove_artifact_revision(
+    input: DisapproveArtifactInput, info: Info[StrawberryGQLContext]
+) -> DisapproveArtifactPayload:
+    action_result = await info.context.processors.artifact_revision.disapprove.wait_for_complete(
+        DisapproveArtifactRevisionAction(
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
         )
     )
 
-    return UnauthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
+    return DisapproveArtifactPayload(
+        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
+    )
 
 
 @strawberry.mutation

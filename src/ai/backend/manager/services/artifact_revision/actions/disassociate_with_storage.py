@@ -3,16 +3,14 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.services.artifact.actions.base import ArtifactAction
+from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
+from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
 @dataclass
-class ImportArtifactAction(ArtifactAction):
+class DisassociateWithStorageAction(ArtifactRevisionAction):
     artifact_id: uuid.UUID
-    artifact_version: str
     storage_id: uuid.UUID
-    bucket_name: str
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -21,13 +19,12 @@ class ImportArtifactAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "import"
+        return "disassociate_with_storage"
 
 
 @dataclass
-class ImportArtifactActionResult(BaseActionResult):
-    result: ArtifactData
-    task_id: uuid.UUID
+class DisassociateWithStorageActionResult(BaseActionResult):
+    result: AssociationArtifactsStoragesData
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -35,7 +35,6 @@ class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
     artifact_type: Optional[ArtifactType] = None
-    authorized: Optional[bool] = None
     name_filter: Optional["StringFilter"] = None
     registry_filter: Optional["StringFilter"] = None
     source_filter: Optional["StringFilter"] = None

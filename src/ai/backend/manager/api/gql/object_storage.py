@@ -148,6 +148,7 @@ class DeleteObjectStorageInput:
 @strawberry.input(description="Added in 25.14.0")
 class GetPresignedDownloadURLInput:
     artifact_id: ID
+    artifact_revision: str
     storage_id: ID
     bucket_name: str
     key: str
@@ -249,6 +250,7 @@ async def get_presigned_download_url(
     action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
         GetDownloadPresignedURLAction(
             artifact_id=uuid.UUID(input.artifact_id),
+            artifact_revision=input.artifact_revision,
             storage_id=uuid.UUID(input.storage_id),
             bucket_name=input.bucket_name,
             key=input.key,

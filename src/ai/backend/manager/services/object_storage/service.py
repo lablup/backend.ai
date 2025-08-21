@@ -4,7 +4,7 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
 )
-from ai.backend.common.exception import ArtifactNotAuthorized
+from ai.backend.common.exception import ArtifactNotApproved
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.artifact.types import ArtifactStatus
@@ -115,7 +115,7 @@ class ObjectStorageService:
         )
 
         if not revision_data.status != ArtifactStatus.AVAILABLE:
-            raise ArtifactNotAuthorized("Only available artifacts can be downloaded.")
+            raise ArtifactNotApproved("Only available artifacts can be downloaded.")
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 

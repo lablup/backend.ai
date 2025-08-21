@@ -12,6 +12,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
     ArtifactStatus,
 )
+from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
     GUID,
@@ -70,6 +71,13 @@ class ArtifactRevisionRow(Base):
         "ArtifactRow",
         back_populates="revision_rows",
         primaryjoin=_get_artifact_join_cond,
+    )
+
+    association_artifacts_storages_rows = relationship(
+        "AssociationArtifactsStorageRow",
+        back_populates="artifact_revision_row",
+        primaryjoin=lambda: ArtifactRevisionRow.id
+        == foreign(AssociationArtifactsStorageRow.artifact_revision_id),
     )
 
     def __str__(self) -> str:

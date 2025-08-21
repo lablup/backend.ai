@@ -20,8 +20,8 @@ class ArtifactStatus(enum.StrEnum):
     """
 
     SCANNED = "SCANNED"
-    PULLED = "PULLED"
     PULLING = "PULLING"
+    PULLED = "PULLED"
     VERIFYING = "VERIFYING"
     NEEDS_APPROVAL = "NEEDS_APPROVAL"
     AVAILABLE = "AVAILABLE"

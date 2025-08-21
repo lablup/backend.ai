@@ -524,7 +524,7 @@ class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
+class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-not-approved"
     error_title = "Artifact Not Authorized"
 
@@ -540,6 +540,19 @@ class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
 class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ArtifactNotAvailable(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-not-available"
+    error_title = "Artifact Not Available"
 
     @classmethod
     def error_code(cls) -> ErrorCode:

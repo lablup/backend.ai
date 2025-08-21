@@ -1,35 +1,10 @@
-from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.storage.request import (
-    DeleteObjectReq,
-    HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
 )
-from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
-from ai.backend.manager.services.artifact.actions.associate_with_storage import (
-    AssociateWithStorageAction,
-    AssociateWithStorageActionResult,
-)
-from ai.backend.manager.services.artifact.actions.authorize import (
-    AuthorizeArtifactAction,
-    AuthorizeArtifactActionResult,
-)
-from ai.backend.manager.services.artifact.actions.cancel_import import (
-    CancelImportAction,
-    CancelImportActionResult,
-)
-from ai.backend.manager.services.artifact.actions.delete import (
-    DeleteArtifactAction,
-    DeleteArtifactActionResult,
-)
-from ai.backend.manager.services.artifact.actions.disassociate_with_storage import (
-    DisassociateWithStorageAction,
-    DisassociateWithStorageActionResult,
-)
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
@@ -38,10 +13,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.import_ import (
-    ImportArtifactAction,
-    ImportArtifactActionResult,
-)
 from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
     ListArtifactsActionResult,
@@ -49,10 +20,6 @@ from ai.backend.manager.services.artifact.actions.list import (
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
-)
-from ai.backend.manager.services.artifact.actions.unauthorize import (
-    UnauthorizeArtifactAction,
-    UnauthorizeArtifactActionResult,
 )
 
 

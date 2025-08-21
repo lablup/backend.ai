@@ -101,10 +101,12 @@ def upgrade() -> None:
             server_default=sa.text("uuid_generate_v4()"),
             nullable=False,
         ),
-        sa.Column("artifact_id", GUID(), nullable=False),
+        sa.Column("artifact_revision_id", GUID(), nullable=False),
         sa.Column("storage_id", GUID(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_association_artifacts_storages")),
-        sa.UniqueConstraint("artifact_id", "storage_id", name="uq_artifact_id_storage_id"),
+        sa.UniqueConstraint(
+            "artifact_revision_id", "storage_id", name="uq_artifact_revision_id_storage_id"
+        ),
     )
     # ### end Alembic commands ###
 
