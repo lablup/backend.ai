@@ -48,6 +48,39 @@ class StringFilter:
     i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
     i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
 
+    def apply_to_column(self, column):
+        """Apply this string filter to a SQLAlchemy column and return the condition.
+
+        Args:
+            column: SQLAlchemy column to apply the filter to
+
+        Returns:
+            SQLAlchemy condition expression or None if no filter is set
+        """
+
+        if self.equals:
+            return column == self.equals
+        elif self.i_equals:
+            return column.ilike(self.i_equals)
+        elif self.not_equals:
+            return column != self.not_equals
+        elif self.i_not_equals:
+            return ~column.ilike(self.i_not_equals)
+        elif self.starts_with:
+            return column.like(f"{self.starts_with}%")
+        elif self.i_starts_with:
+            return column.ilike(f"{self.i_starts_with}%")
+        elif self.ends_with:
+            return column.like(f"%{self.ends_with}")
+        elif self.i_ends_with:
+            return column.ilike(f"%{self.i_ends_with}")
+        elif self.contains:
+            return column.like(f"%{self.contains}%")
+        elif self.i_contains:
+            return column.ilike(f"%{self.i_contains}%")
+
+        return None
+
 
 @strawberry.enum
 class OrderDirection(StrEnum):

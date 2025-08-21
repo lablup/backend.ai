@@ -51,14 +51,59 @@ class ArtifactFilterApplier:
 
     def apply_filters(self, stmt: Select, filters: ArtifactFilterOptions) -> Select:
         """Apply artifact filters to the query statement"""
+        condition, stmt = self._build_filter_condition(stmt, filters)
+        if condition is not None:
+            stmt = stmt.where(condition)
+        return stmt
+
+    def _build_filter_condition(
+        self, stmt: Select, filters: ArtifactFilterOptions
+    ) -> tuple[Optional[sa.ColumnElement], Select]:
+        """Build a filter condition from ArtifactFilterOptions, handling logical operations"""
         conditions = []
 
+        # Handle basic filters
         if filters.artifact_type is not None:
             conditions.append(ArtifactRow.type == filters.artifact_type)
         if filters.authorized is not None:
             conditions.append(ArtifactRow.authorized == filters.authorized)
-        if filters.name is not None:
-            conditions.append(ArtifactRow.name.ilike(f"%{filters.name}%"))
+
+        # Handle new StringFilter-based filters
+        if filters.name_filter is not None:
+            name_condition = filters.name_filter.apply_to_column(ArtifactRow.name)
+            if name_condition is not None:
+                conditions.append(name_condition)
+
+        # Handle registry_filter by joining with registry tables
+
+        # TODO: Handle to join with proper table?
+        if filters.registry_filter is not None:
+            from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+
+            registry_condition = filters.registry_filter.apply_to_column(
+                HuggingFaceRegistryRow.name
+            )
+            if registry_condition is not None:
+                # Join with registry table and add condition
+                stmt = stmt.join(
+                    HuggingFaceRegistryRow,
+                    HuggingFaceRegistryRow.id == ArtifactRow.registry_id,
+                )
+                conditions.append(registry_condition)
+
+        # Handle source_filter by joining with source registry tables
+        if filters.source_filter is not None:
+            from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+
+            source_registry = sa.orm.aliased(HuggingFaceRegistryRow)
+            source_condition = filters.source_filter.apply_to_column(source_registry.name)
+            if source_condition is not None:
+                # Join with source registry table (using alias to avoid conflicts)
+                stmt = stmt.join(
+                    source_registry,
+                    source_registry.id == ArtifactRow.source_registry_id,
+                )
+                conditions.append(source_condition)
         if filters.registry_id is not None:
             conditions.append(ArtifactRow.registry_id == filters.registry_id)
         if filters.registry_type is not None:
@@ -68,12 +113,51 @@ class ArtifactFilterApplier:
         if filters.source_registry_type is not None:
             conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
 
-        # Apply conditions to the query
+        # Combine basic conditions with AND
+        base_condition = None
         if conditions:
-            where_clause = sa.and_(*conditions)
-            stmt = stmt.where(where_clause)
+            base_condition = sa.and_(*conditions)
 
-        return stmt
+        # Handle logical operations
+        logical_conditions = []
+
+        # Handle AND operation
+        if filters.AND is not None:
+            and_condition, stmt = self._build_filter_condition(stmt, filters.AND)
+            if and_condition is not None:
+                logical_conditions.append(and_condition)
+
+        # Handle OR operation
+        if filters.OR is not None:
+            or_condition, stmt = self._build_filter_condition(stmt, filters.OR)
+            if or_condition is not None:
+                if base_condition is not None:
+                    # Combine base condition OR logical condition
+                    base_condition = sa.or_(base_condition, or_condition)
+                else:
+                    base_condition = or_condition
+
+        # Handle NOT operation
+        if filters.NOT is not None:
+            not_condition, stmt = self._build_filter_condition(stmt, filters.NOT)
+            if not_condition is not None:
+                logical_conditions.append(~not_condition)  # SQLAlchemy NOT operator
+
+        # Combine all conditions
+        all_conditions = []
+        if base_condition is not None:
+            all_conditions.append(base_condition)
+        if logical_conditions:
+            all_conditions.extend(logical_conditions)
+
+        final_condition = None
+        if all_conditions:
+            if len(all_conditions) == 1:
+                final_condition = all_conditions[0]
+            else:
+                final_condition = sa.and_(*all_conditions)
+
+        return final_condition, stmt
 
 
 class ArtifactOrderingApplier:
@@ -114,23 +198,75 @@ class ArtifactRevisionFilterApplier:
 
     def apply_filters(self, stmt: Select, filters: ArtifactRevisionFilterOptions) -> Select:
         """Apply artifact revision filters to the query statement"""
+        condition, stmt = self._build_filter_condition(stmt, filters)
+        if condition is not None:
+            stmt = stmt.where(condition)
+        return stmt
+
+    def _build_filter_condition(
+        self, stmt: Select, filters: ArtifactRevisionFilterOptions
+    ) -> tuple[Optional[sa.ColumnElement], Select]:
+        """Build a filter condition from ArtifactRevisionFilterOptions, handling logical operations"""
         conditions = []
 
+        # Handle basic filters
         if filters.artifact_id is not None:
             conditions.append(ArtifactRevisionRow.artifact_id == filters.artifact_id)
         if filters.status is not None:
             # Support multiple status values using IN clause
             status_values = [status.value for status in filters.status]
             conditions.append(ArtifactRevisionRow.status.in_(status_values))
-        if filters.version is not None:
-            conditions.append(ArtifactRevisionRow.version.ilike(f"%{filters.version}%"))
+        # Handle StringFilter-based version filter
+        if filters.version_filter is not None:
+            version_condition = filters.version_filter.apply_to_column(ArtifactRevisionRow.version)
+            if version_condition is not None:
+                conditions.append(version_condition)
 
-        # Apply conditions to the query
+        # Combine basic conditions with AND
+        base_condition = None
         if conditions:
-            where_clause = sa.and_(*conditions)
-            stmt = stmt.where(where_clause)
+            base_condition = sa.and_(*conditions)
 
-        return stmt
+        # Handle logical operations
+        logical_conditions = []
+
+        # Handle AND operation
+        if filters.AND is not None:
+            and_condition, stmt = self._build_filter_condition(stmt, filters.AND)
+            if and_condition is not None:
+                logical_conditions.append(and_condition)
+
+        # Handle OR operation
+        if filters.OR is not None:
+            or_condition, stmt = self._build_filter_condition(stmt, filters.OR)
+            if or_condition is not None:
+                if base_condition is not None:
+                    # Combine base condition OR logical condition
+                    base_condition = sa.or_(base_condition, or_condition)
+                else:
+                    base_condition = or_condition
+
+        # Handle NOT operation
+        if filters.NOT is not None:
+            not_condition, stmt = self._build_filter_condition(stmt, filters.NOT)
+            if not_condition is not None:
+                logical_conditions.append(~not_condition)  # SQLAlchemy NOT operator
+
+        # Combine all conditions
+        all_conditions = []
+        if base_condition is not None:
+            all_conditions.append(base_condition)
+        if logical_conditions:
+            all_conditions.extend(logical_conditions)
+
+        final_condition = None
+        if all_conditions:
+            if len(all_conditions) == 1:
+                final_condition = all_conditions[0]
+            else:
+                final_condition = sa.and_(*all_conditions)
+
+        return final_condition, stmt
 
 
 class ArtifactRevisionOrderingApplier:
@@ -652,10 +788,12 @@ class ArtifactRepository:
             if filters.status is not None:
                 status_values = [status.value for status in filters.status]
                 count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
-            if filters.version is not None:
-                count_stmt = count_stmt.where(
-                    ArtifactRevisionRow.version.ilike(f"%{filters.version}%")
+            if filters.version_filter is not None:
+                version_condition = filters.version_filter.apply_to_column(
+                    ArtifactRevisionRow.version
                 )
+                if version_condition is not None:
+                    count_stmt = count_stmt.where(version_condition)
 
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()

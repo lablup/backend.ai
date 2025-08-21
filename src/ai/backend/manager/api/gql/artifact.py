@@ -28,7 +28,6 @@ class ArtifactOrderField(StrEnum):
 @strawberry.input
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
-    status: Optional[ArtifactStatusFilter] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
@@ -41,29 +40,21 @@ class ArtifactFilter:
     def to_repo_filter(self) -> ArtifactFilterOptions:
         repo_filter = ArtifactFilterOptions()
 
-        # Handle artifact type filter
+        # Handle basic filters
         if self.type:
-            # Convert first type from list (assuming single type for now)
             repo_filter.artifact_type = self.type[0] if self.type else None
 
-        # Handle name filter
-        if self.name:
-            # Use the most specific filter available (starts with preference order)
-            if self.name.equals:
-                repo_filter.name = self.name.equals
-            elif self.name.i_equals:
-                repo_filter.name = self.name.i_equals
-            elif self.name.contains:
-                repo_filter.name = self.name.contains
-            elif self.name.i_contains:
-                repo_filter.name = self.name.i_contains
-            elif self.name.starts_with:
-                repo_filter.name = self.name.starts_with
-            elif self.name.i_starts_with:
-                repo_filter.name = self.name.i_starts_with
+        repo_filter.name_filter = self.name
+        repo_filter.registry_filter = self.registry
+        repo_filter.source_filter = self.source
 
-        # Note: For now we ignore registry and source filters as they require additional complexity
-        # TODO: Add support for registry/source filters when needed
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = self.AND.to_repo_filter()
+        if self.OR:
+            repo_filter.OR = self.OR.to_repo_filter()
+        if self.NOT:
+            repo_filter.NOT = self.NOT.to_repo_filter()
 
         return repo_filter
 
@@ -75,8 +66,15 @@ class ArtifactOrderBy:
 
 
 @strawberry.input
+class ArtifactRevisionStatusFilter:
+    IN: Optional[list[ArtifactStatus]] = None
+    # TODO: Support this
+    EQ: Optional[list[ArtifactStatus]] = None
+
+
+@strawberry.input
 class ArtifactRevisionFilter:
-    status: Optional[list[ArtifactStatus]] = None
+    status: Optional[ArtifactRevisionStatusFilter] = None
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
 
@@ -88,29 +86,27 @@ class ArtifactRevisionFilter:
     def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
         repo_filter = ArtifactRevisionFilterOptions()
 
-        # Handle artifact_id filter
+        # Handle basic filters
         if self.artifact_id:
             repo_filter.artifact_id = uuid.UUID(self.artifact_id)
 
-        # Handle status filter
+        # Handle status filter using ArtifactRevisionStatusFilter
         if self.status:
-            repo_filter.status = self.status
+            if self.status.IN:
+                repo_filter.status = self.status.IN
+            elif self.status.EQ:
+                repo_filter.status = self.status.EQ
 
-        # Handle version filter
-        if self.version:
-            # Use the most specific filter available
-            if self.version.equals:
-                repo_filter.version = self.version.equals
-            elif self.version.i_equals:
-                repo_filter.version = self.version.i_equals
-            elif self.version.contains:
-                repo_filter.version = self.version.contains
-            elif self.version.i_contains:
-                repo_filter.version = self.version.i_contains
-            elif self.version.starts_with:
-                repo_filter.version = self.version.starts_with
-            elif self.version.i_starts_with:
-                repo_filter.version = self.version.i_starts_with
+        # Pass StringFilter directly for processing in repository
+        repo_filter.version_filter = self.version
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = self.AND.to_repo_filter()
+        if self.OR:
+            repo_filter.OR = self.OR.to_repo_filter()
+        if self.NOT:
+            repo_filter.NOT = self.NOT.to_repo_filter()
 
         return repo_filter
 

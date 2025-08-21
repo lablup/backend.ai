@@ -33,19 +33,41 @@ class ArtifactRevisionOrderingOptions:
 class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from ai.backend.manager.api.gql.base import StringFilter
+
     artifact_type: Optional[ArtifactType] = None
     authorized: Optional[bool] = None
-    name: Optional[str] = None
+    name_filter: Optional["StringFilter"] = None
+    registry_filter: Optional["StringFilter"] = None
+    source_filter: Optional["StringFilter"] = None
     registry_id: Optional[uuid.UUID] = None
     registry_type: Optional[ArtifactRegistryType] = None
     source_registry_id: Optional[uuid.UUID] = None
     source_registry_type: Optional[ArtifactRegistryType] = None
+
+    # Logical operations
+    AND: Optional["ArtifactFilterOptions"] = None
+    OR: Optional["ArtifactFilterOptions"] = None
+    NOT: Optional["ArtifactFilterOptions"] = None
 
 
 @dataclass
 class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
 
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from ai.backend.manager.api.gql.base import StringFilter
+
     artifact_id: Optional[uuid.UUID] = None
     status: Optional[list[ArtifactStatus]] = None
-    version: Optional[str] = None
+    version_filter: Optional["StringFilter"] = None
+
+    # Logical operations
+    AND: Optional["ArtifactRevisionFilterOptions"] = None
+    OR: Optional["ArtifactRevisionFilterOptions"] = None
+    NOT: Optional["ArtifactRevisionFilterOptions"] = None
