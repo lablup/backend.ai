@@ -660,6 +660,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
                 scheduling_controller=root_ctx.scheduling_controller,
+                deployment_controller=root_ctx.deployment_controller,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -767,7 +768,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.db,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
-            use_sokovan=True,  # TODO: Get from config when available
+            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -927,6 +928,25 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
     )
 
+    # Create deployment controller if Sokovan is enabled
+    if root_ctx.config_provider.config.manager.use_sokovan:
+        from ai.backend.manager.sokovan.deployment import DeploymentController
+        from ai.backend.manager.sokovan.deployment.deployment_controller import (
+            DeploymentControllerArgs,
+        )
+
+        root_ctx.deployment_controller = DeploymentController(
+            DeploymentControllerArgs(
+                scheduling_controller=root_ctx.scheduling_controller,
+                deployment_repository=root_ctx.repositories.deployment.repository,
+                config_provider=root_ctx.config_provider,
+                storage_manager=root_ctx.storage_manager,
+                event_producer=root_ctx.event_producer,
+            )
+        )
+    else:
+        root_ctx.deployment_controller = None
+
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
     )
@@ -949,7 +969,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
-        use_sokovan=True,
+        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     yield

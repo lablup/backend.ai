@@ -56,18 +56,20 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ImageIdentifier,
     KernelBindingData,
     KernelCreationInfo,
-    KernelStartData,
+    KernelTransitionData,
     KeypairOccupancy,
     KeyPairResourcePolicy,
-    PreparedSessionData,
-    PreparedSessionsWithImages,
     ResourceOccupancySnapshot,
     ScheduledSessionData,
-    ScheduledSessionsWithImages,
     SchedulingFailure,
     SessionAllocation,
+    SessionDataForPull,
+    SessionDataForStart,
     SessionDependencyInfo,
     SessionDependencySnapshot,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionTransitionData,
     UserResourcePolicy,
 )
 
@@ -450,8 +452,12 @@ class ScheduleDBSource:
                 keypair_policies[row.access_key] = KeyPairResourcePolicy(
                     name=row.name,
                     total_resource_slots=total_resource_slots,
-                    max_concurrent_sessions=row.max_concurrent_sessions or 0,
-                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions or 0,
+                    max_concurrent_sessions=row.max_concurrent_sessions
+                    if row.max_concurrent_sessions and row.max_concurrent_sessions > 0
+                    else None,
+                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions
+                    if row.max_concurrent_sftp_sessions and row.max_concurrent_sftp_sessions > 0
+                    else None,
                     max_pending_session_count=row.max_pending_session_count,
                     max_pending_session_resource_slots=row.max_pending_session_resource_slots,
                 )
@@ -2139,6 +2145,63 @@ class ScheduleDBSource:
             )
             await db_sess.execute(stmt)
 
+    async def get_sessions_for_transition(
+        self,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition based on current session and kernel status.
+
+        :param session_status: Current session status to filter by
+        :param kernel_status: Required kernel status for transition
+        :return: List of sessions ready for transition with detailed information
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Find sessions in specified state
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == session_status)
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_sessions: list[SessionTransitionData] = []
+            for session in sessions:
+                # Check if all kernels have the required status
+                all_ready = all(kernel.status == kernel_status for kernel in session.kernels)
+                if not all_ready or not session.kernels:
+                    continue
+
+                # Build kernel transition data
+                kernel_data = [
+                    KernelTransitionData(
+                        kernel_id=str(kernel.id),
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                        cluster_role=kernel.cluster_role,
+                        container_id=kernel.container_id,
+                        startup_command=kernel.startup_command,
+                    )
+                    for kernel in session.kernels
+                ]
+
+                # Build session transition data
+                session_data = SessionTransitionData(
+                    session_id=session.id,
+                    session_name=session.name,
+                    session_type=session.session_type,
+                    access_key=session.access_key,
+                    cluster_mode=session.cluster_mode,
+                    kernels=kernel_data,
+                    batch_timeout=session.batch_timeout,
+                )
+
+                ready_sessions.append(session_data)
+
+            return ready_sessions
+
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """
         Get sessions in CREATING state where all kernels are RUNNING.
@@ -2316,29 +2379,67 @@ class ScheduleDBSource:
 
         return image_configs
 
-    async def get_scheduled_sessions_with_images(self) -> ScheduledSessionsWithImages:
+    async def _get_sessions_by_statuses(
+        self,
+        db_sess: SASession,
+        statuses: list[SessionStatus],
+    ) -> list[ScheduledSessionData]:
         """
-        Get sessions in SCHEDULED status for precondition checking with image configurations.
-        Returns ScheduledSessionsWithImages dataclass.
+        Get sessions with specified statuses.
+        Returns dataclass objects instead of SessionRow.
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            # Get scheduled sessions with their data
-            scheduled_sessions = await self._get_scheduled_sessions(db_sess)
-
-            # Collect unique images to resolve
-            unique_images: set[ImageIdentifier] = set()
-            for session in scheduled_sessions:
-                for kernel in session.kernels:
-                    unique_images.add(
-                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+        # Get sessions with specified statuses and their kernels
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status.in_(statuses))
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.scaling_group,
+                        KernelRow.image,
+                        KernelRow.architecture,
+                        KernelRow.status,
+                        KernelRow.status_changed,
                     )
-
-            # Resolve all images and build ImageConfigData
-            image_configs = await self._resolve_image_configs(db_sess, unique_images)
-
-            return ScheduledSessionsWithImages(
-                sessions=scheduled_sessions, image_configs=image_configs
+                )
             )
+        )
+        result = await db_sess.execute(stmt)
+        sessions = result.scalars().all()
+
+        scheduled_sessions: list[ScheduledSessionData] = []
+        for session in sessions:
+            # Create kernel data list with status_changed timestamp
+            kernels_data = []
+            for kernel in session.kernels:
+                kernel_data = KernelBindingData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    status=kernel.status,
+                    status_changed=kernel.status_changed.timestamp()
+                    if kernel.status_changed
+                    else None,
+                )
+                kernels_data.append(kernel_data)
+
+            scheduled_session = ScheduledSessionData(
+                session_id=session.id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+                session_type=session.session_type,
+                name=session.name,
+                kernels=kernels_data,
+            )
+            scheduled_sessions.append(scheduled_session)
+
+        return scheduled_sessions
 
     async def _get_scheduled_sessions(self, db_sess: SASession) -> list[ScheduledSessionData]:
         """
@@ -2359,7 +2460,14 @@ class ScheduleDBSource:
                         KernelRow.image,
                         KernelRow.architecture,
                     )
-                )
+                ),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.access_key,
+                    SessionRow.session_type,
+                    SessionRow.name,
+                ),
             )
         )
         result = await db_sess.execute(stmt)
@@ -2383,11 +2491,284 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    session_type=session.session_type,
+                    name=session.name,
                     kernels=kernel_bindings,
                 )
             )
 
         return scheduled_sessions
+
+    async def get_sessions_for_pull(
+        self,
+        statuses: list[SessionStatus],
+    ) -> SessionsForPullWithImages:
+        """
+        Get sessions for image pulling with specified statuses.
+        Returns SessionsForPullWithImages dataclass.
+
+        :param statuses: Session statuses to filter by (typically SCHEDULED, PREPARING, PULLING)
+        :return: SessionsForPullWithImages object
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get sessions with minimal fields needed for pulling
+            sessions_for_pull = await self._get_sessions_for_pull(db_sess, statuses)
+
+            # Collect unique images to resolve
+            unique_images: set[ImageIdentifier] = set()
+            for session in sessions_for_pull:
+                for kernel in session.kernels:
+                    unique_images.add(
+                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+                    )
+
+            # Resolve all images and build ImageConfigData
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return SessionsForPullWithImages(
+                sessions=sessions_for_pull, image_configs=image_configs
+            )
+
+    async def get_sessions_for_start(
+        self,
+        statuses: list[SessionStatus],
+    ) -> SessionsForStartWithImages:
+        """
+        Get sessions for starting with specified statuses.
+        Returns SessionsForStartWithImages dataclass.
+
+        :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
+        :return: SessionsForStartWithImages object
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Get sessions with all fields needed for starting
+            sessions_for_start = await self._get_sessions_for_start(db_sess, statuses)
+
+            # Collect unique images to resolve
+            unique_images: set[ImageIdentifier] = set()
+            for session in sessions_for_start:
+                for kernel in session.kernels:
+                    unique_images.add(
+                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
+                    )
+
+            # Resolve all images and build ImageConfigData
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return SessionsForStartWithImages(
+                sessions=sessions_for_start, image_configs=image_configs
+            )
+
+    async def _get_sessions_for_pull(
+        self,
+        db_sess: SASession,
+        statuses: list[SessionStatus],
+    ) -> list[SessionDataForPull]:
+        """
+        Get sessions with minimal fields needed for image pulling.
+        """
+        # Get sessions with specified statuses and their kernels
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status.in_(statuses))
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.scaling_group,
+                        KernelRow.image,
+                        KernelRow.architecture,
+                        KernelRow.cluster_role,
+                        KernelRow.cluster_idx,
+                        KernelRow.local_rank,
+                        KernelRow.cluster_hostname,
+                        KernelRow.uid,
+                        KernelRow.main_gid,
+                        KernelRow.gids,
+                        KernelRow.requested_slots,
+                        KernelRow.resource_opts,
+                        KernelRow.bootstrap_script,
+                        KernelRow.startup_command,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                        KernelRow.vfolder_mounts,
+                        KernelRow.status,
+                        KernelRow.status_changed,
+                    )
+                ),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.access_key,
+                ),
+            )
+            .order_by(SessionRow.created_at)
+        )
+        result = await db_sess.execute(stmt)
+        sessions = result.scalars().all()
+
+        # Convert to dataclass
+        sessions_for_pull: list[SessionDataForPull] = []
+        for session in sessions:
+            kernel_bindings = [
+                KernelBindingData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    status=kernel.status,
+                    status_changed=kernel.status_changed.timestamp()
+                    if kernel.status_changed
+                    else None,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    local_rank=kernel.local_rank,
+                    cluster_hostname=kernel.cluster_hostname,
+                    uid=kernel.uid,
+                    main_gid=kernel.main_gid,
+                    gids=kernel.gids or [],
+                    requested_slots=kernel.requested_slots or ResourceSlot(),
+                    resource_opts=kernel.resource_opts or {},
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                    preopen_ports=kernel.preopen_ports or [],
+                    internal_data=kernel.internal_data,
+                    vfolder_mounts=kernel.vfolder_mounts or [],
+                )
+                for kernel in session.kernels
+            ]
+
+            sessions_for_pull.append(
+                SessionDataForPull(
+                    session_id=session.id,
+                    access_key=session.access_key,
+                    kernels=kernel_bindings,
+                )
+            )
+
+        return sessions_for_pull
+
+    async def _get_sessions_for_start(
+        self,
+        db_sess: SASession,
+        statuses: list[SessionStatus],
+    ) -> list[SessionDataForStart]:
+        """
+        Get sessions with all fields needed for starting.
+        """
+        # Get sessions with specified statuses and their kernels
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status.in_(statuses))
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.scaling_group,
+                        KernelRow.image,
+                        KernelRow.architecture,
+                        KernelRow.cluster_role,
+                        KernelRow.cluster_idx,
+                        KernelRow.local_rank,
+                        KernelRow.cluster_hostname,
+                        KernelRow.uid,
+                        KernelRow.main_gid,
+                        KernelRow.gids,
+                        KernelRow.requested_slots,
+                        KernelRow.resource_opts,
+                        KernelRow.bootstrap_script,
+                        KernelRow.startup_command,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                        KernelRow.vfolder_mounts,
+                        KernelRow.status,
+                        KernelRow.status_changed,
+                    )
+                ),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.access_key,
+                    SessionRow.session_type,
+                    SessionRow.name,
+                    SessionRow.cluster_mode,
+                    SessionRow.user_uuid,
+                ),
+            )
+            .order_by(SessionRow.created_at)
+        )
+        result = await db_sess.execute(stmt)
+        sessions = result.scalars().all()
+
+        # Load user info for sessions
+        user_query = sa.select(
+            UserRow.uuid,
+            UserRow.email,
+            UserRow.username,
+        ).where(UserRow.uuid.in_([s.user_uuid for s in sessions if s.user_uuid]))
+        user_result = await db_sess.execute(user_query)
+        user_map = {row.uuid: row for row in user_result.fetchall()}
+
+        # Convert to dataclass
+        sessions_for_start: list[SessionDataForStart] = []
+        for session in sessions:
+            kernel_bindings = [
+                KernelBindingData(
+                    kernel_id=kernel.id,
+                    agent_id=kernel.agent,
+                    agent_addr=kernel.agent_addr,
+                    scaling_group=kernel.scaling_group,
+                    image=kernel.image,
+                    architecture=kernel.architecture,
+                    status=kernel.status,
+                    status_changed=kernel.status_changed.timestamp()
+                    if kernel.status_changed
+                    else None,
+                    cluster_role=kernel.cluster_role,
+                    cluster_idx=kernel.cluster_idx,
+                    local_rank=kernel.local_rank,
+                    cluster_hostname=kernel.cluster_hostname,
+                    uid=kernel.uid,
+                    main_gid=kernel.main_gid,
+                    gids=kernel.gids or [],
+                    requested_slots=kernel.requested_slots or ResourceSlot(),
+                    resource_opts=kernel.resource_opts or {},
+                    bootstrap_script=kernel.bootstrap_script,
+                    startup_command=kernel.startup_command,
+                    preopen_ports=kernel.preopen_ports or [],
+                    internal_data=kernel.internal_data,
+                    vfolder_mounts=kernel.vfolder_mounts or [],
+                )
+                for kernel in session.kernels
+            ]
+
+            # Get user info
+            user_info = user_map.get(session.user_uuid)
+            if not user_info:
+                log.warning(f"User info not found for session {session.id}")
+                continue
+
+            sessions_for_start.append(
+                SessionDataForStart(
+                    session_id=session.id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                    session_type=session.session_type,
+                    name=session.name,
+                    cluster_mode=session.cluster_mode,
+                    kernels=kernel_bindings,
+                    user_uuid=session.user_uuid,
+                    user_email=user_info.email,
+                    user_name=user_info.username,
+                )
+            )
+
+        return sessions_for_start
 
     async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
         """
@@ -2437,202 +2818,6 @@ class ScheduleDBSource:
                 )
             )
             await db_sess.execute(kernel_stmt)
-
-    async def get_prepared_session_with_images(
-        self, session_id: SessionId
-    ) -> PreparedSessionsWithImages:
-        """
-        Get a single prepared session with image configurations for starting.
-        Returns PreparedSessionsWithImages dataclass.
-        """
-        from sqlalchemy.orm import selectinload
-
-        async with self._db.begin_readonly_session() as db_sess:
-            # Get the session
-            stmt = (
-                sa.select(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id == session_id, SessionRow.status == SessionStatus.PREPARED
-                    )
-                )
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            session = result.scalar_one_or_none()
-
-            if not session:
-                return PreparedSessionsWithImages(sessions=[], image_configs={})
-
-            # Convert to PreparedSessionData
-            kernels_data = [
-                KernelStartData(
-                    kernel_id=kernel.id,
-                    agent_id=kernel.agent,
-                    agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
-                    cluster_role=kernel.cluster_role,
-                    cluster_idx=kernel.cluster_idx,
-                    requested_slots=kernel.requested_slots,
-                    resource_opts=kernel.resource_opts,
-                    preopen_ports=kernel.preopen_ports,
-                    container_id=kernel.container_id,
-                    cluster_hostname=kernel.cluster_hostname,
-                    bootstrap_script=kernel.bootstrap_script,
-                    startup_command=kernel.startup_command,
-                )
-                for kernel in session.kernels
-            ]
-
-            prepared_session = PreparedSessionData(
-                session_id=session.id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                session_type=session.session_type,
-                name=session.name,
-                cluster_mode=session.cluster_mode,
-                kernels=kernels_data,
-                user_uuid=session.user_uuid,
-                user_email="",  # Need to fetch from user table if needed
-                user_name="",  # Need to fetch from user table if needed
-                network_type=session.network_type,
-                network_id=session.network_id,
-            )
-
-            # Collect unique images to resolve
-            unique_images: set[ImageIdentifier] = set()
-            for kernel in session.kernels:
-                unique_images.add(
-                    ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
-                )
-
-            # Resolve all images using shared method
-            image_configs = await self._resolve_image_configs(db_sess, unique_images)
-
-            return PreparedSessionsWithImages(
-                sessions=[prepared_session], image_configs=image_configs
-            )
-
-    async def get_prepared_sessions(self) -> list[PreparedSessionData]:
-        """
-        Get sessions in PREPARED status ready to start.
-        Returns dataclass objects instead of SessionRow.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            return await self._get_prepared_sessions_internal(db_sess)
-
-    async def get_prepared_sessions_with_images(self) -> PreparedSessionsWithImages:
-        """
-        Get all sessions in PREPARED status with their image configurations.
-        This is a batch version that fetches all sessions and their images in one go.
-        Returns PreparedSessionsWithImages dataclass.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            # Get all prepared sessions
-            prepared_sessions = await self._get_prepared_sessions_internal(db_sess)
-
-            if not prepared_sessions:
-                return PreparedSessionsWithImages(sessions=[], image_configs={})
-
-            # Collect unique images from all sessions
-            unique_images: set[ImageIdentifier] = set()
-            for session in prepared_sessions:
-                for kernel in session.kernels:
-                    unique_images.add(
-                        ImageIdentifier(image=kernel.image, architecture=kernel.architecture)
-                    )
-
-            # Resolve all images at once
-            image_configs = await self._resolve_image_configs(db_sess, unique_images)
-
-            return PreparedSessionsWithImages(
-                sessions=prepared_sessions, image_configs=image_configs
-            )
-
-    async def _get_prepared_sessions_internal(
-        self, db_sess: SASession
-    ) -> list[PreparedSessionData]:
-        """
-        Internal method to get sessions in PREPARED status.
-        Used by both get_prepared_sessions and get_prepared_sessions_with_images.
-        """
-        # Get sessions with PREPARED status and their kernels, and user info
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == SessionStatus.PREPARED)
-            .options(
-                selectinload(SessionRow.kernels).options(
-                    load_only(
-                        KernelRow.id,
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                        KernelRow.scaling_group,
-                        KernelRow.container_id,
-                        KernelRow.image,
-                        KernelRow.architecture,
-                        KernelRow.cluster_role,
-                        KernelRow.cluster_idx,
-                        KernelRow.cluster_hostname,
-                        KernelRow.requested_slots,
-                        KernelRow.resource_opts,
-                        KernelRow.preopen_ports,
-                        KernelRow.bootstrap_script,
-                        KernelRow.startup_command,
-                    )
-                ),
-                selectinload(SessionRow.user).options(
-                    load_only(
-                        UserRow.email,
-                        UserRow.full_name,
-                    )
-                ),
-            )
-        )
-        result = await db_sess.execute(stmt)
-        sessions = result.scalars().all()
-
-        prepared_sessions: list[PreparedSessionData] = []
-        for session in sessions:
-            kernel_data = [
-                KernelStartData(
-                    kernel_id=kernel.id,
-                    agent_id=kernel.agent,
-                    agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group,
-                    container_id=kernel.container_id,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
-                    cluster_role=kernel.cluster_role,
-                    cluster_idx=kernel.cluster_idx,
-                    cluster_hostname=kernel.cluster_hostname,
-                    requested_slots=kernel.requested_slots,
-                    resource_opts=kernel.resource_opts or {},
-                    preopen_ports=kernel.preopen_ports or [],
-                    bootstrap_script=kernel.bootstrap_script,
-                    startup_command=kernel.startup_command,
-                )
-                for kernel in session.kernels
-            ]
-            prepared_sessions.append(
-                PreparedSessionData(
-                    session_id=session.id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
-                    session_type=session.session_type,
-                    name=session.name,
-                    cluster_mode=session.cluster_mode,
-                    kernels=kernel_data,
-                    user_uuid=session.user_uuid,
-                    user_email=session.user.email,  # user is not nullable
-                    user_name=session.user.full_name,  # user is not nullable
-                    network_type=session.network_type,
-                    network_id=session.network_id,
-                )
-            )
-
-        return prepared_sessions
 
     async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
         """

@@ -25,6 +25,8 @@ __all__ = [
     "CheckPullingProgressHandler",
     "CheckCreatingProgressHandler",
     "CheckTerminatingProgressHandler",
+    "RetryPreparingHandler",
+    "RetryCreatingHandler",
 ]
 
 
@@ -267,3 +269,64 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         """Log the number of sessions that transitioned to TERMINATED."""
         log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
+
+
+# Time thresholds for health checks
+PREPARING_CHECK_THRESHOLD = 900.0  # 15 minutes
+CREATING_CHECK_THRESHOLD = 600.0  # 10 minutes
+
+
+class RetryPreparingHandler(ScheduleHandler):
+    """Handler for retrying PREPARING/PULLING sessions that appear stuck."""
+
+    def __init__(
+        self,
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
+    ):
+        self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
+
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "retry-preparing"
+
+    async def execute(self) -> ScheduleResult:
+        """Check and retry stuck PREPARING/PULLING sessions."""
+        log.debug("Checking for stuck PREPARING/PULLING sessions to retry")
+
+        # Call scheduler method to handle retry logic
+        return await self._scheduler.retry_preparing_sessions()
+
+    async def post_process(self, result: ScheduleResult) -> None:
+        """Request precondition check if sessions were retried."""
+        log.info("Retried {} stuck PREPARING/PULLING sessions", result.succeeded_count)
+
+
+class RetryCreatingHandler(ScheduleHandler):
+    """Handler for retrying CREATING sessions that appear stuck."""
+
+    def __init__(
+        self,
+        scheduler: Scheduler,
+        scheduling_controller: SchedulingController,
+    ):
+        self._scheduler = scheduler
+        self._scheduling_controller = scheduling_controller
+
+    @classmethod
+    def name(cls) -> str:
+        """Get the name of the handler."""
+        return "retry-creating"
+
+    async def execute(self) -> ScheduleResult:
+        """Check and retry stuck CREATING sessions."""
+        log.debug("Checking for stuck CREATING sessions to retry")
+
+        # Call scheduler method to handle retry logic
+        return await self._scheduler.retry_creating_sessions()
+
+    async def post_process(self, result: ScheduleResult) -> None:
+        """Request session start if sessions were retried."""
+        log.info("Retried {} stuck CREATING sessions", result.succeeded_count)

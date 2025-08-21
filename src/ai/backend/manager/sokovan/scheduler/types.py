@@ -10,8 +10,10 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     AgentSelectionStrategy,
+    AutoPullBehavior,
     ClusterMode,
     ClusterSSHPortMapping,
+    ImageConfig,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -19,7 +21,9 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 
@@ -50,8 +54,8 @@ class KeyPairResourcePolicy:
 
     name: str
     total_resource_slots: ResourceSlot
-    max_concurrent_sessions: int
-    max_concurrent_sftp_sessions: int
+    max_concurrent_sessions: Optional[int]
+    max_concurrent_sftp_sessions: Optional[int]
     max_pending_session_count: Optional[int]
     max_pending_session_resource_slots: Optional[ResourceSlot]
 
@@ -442,7 +446,7 @@ class ScalingGroupInfo:
 
 @dataclass
 class KernelBindingData:
-    """Kernel-agent binding data for precondition checking."""
+    """Kernel-agent binding data for precondition checking and session starting."""
 
     kernel_id: UUID
     agent_id: Optional[AgentId]
@@ -450,6 +454,24 @@ class KernelBindingData:
     scaling_group: str
     image: str
     architecture: str
+    status: Optional[KernelStatus] = None
+    status_changed: Optional[float] = None
+    cluster_role: str = DEFAULT_ROLE
+    cluster_idx: int = 0
+    local_rank: int = 0
+    cluster_hostname: Optional[str] = None
+    uid: Optional[int] = None
+    main_gid: Optional[int] = None
+    gids: list[int] = field(default_factory=list)
+    requested_slots: ResourceSlot = field(default_factory=ResourceSlot)
+    resource_opts: dict[str, Any] = field(default_factory=dict)
+    bootstrap_script: Optional[str] = None
+    startup_command: Optional[str] = None
+    preopen_ports: list[int] = field(default_factory=list)
+    internal_data: Optional[dict[str, Any]] = None
+    vfolder_mounts: list[Any] = field(
+        default_factory=list
+    )  # Would be list[VFolderMount] in full impl
 
 
 @dataclass(frozen=True)
@@ -475,6 +497,57 @@ class ImageConfigData:
     registry_username: Optional[str]
     registry_password: Optional[str]
 
+    def to_image_config(self, auto_pull: AutoPullBehavior) -> ImageConfig:
+        """
+        Convert ImageConfigData to ImageConfig format for agents.
+
+        :param auto_pull: Auto pull behavior setting
+        :return: ImageConfig dictionary for agent RPC calls
+        """
+        return ImageConfig(
+            architecture=self.architecture,
+            project=self.project,
+            canonical=self.canonical,
+            is_local=self.is_local,
+            digest=self.digest,
+            labels=self.labels,
+            repo_digest=None,
+            registry={
+                "name": self.registry_name,
+                "url": self.registry_url,
+                "username": self.registry_username,
+                "password": self.registry_password,
+            },
+            auto_pull=auto_pull,
+        )
+
+
+@dataclass
+class SessionDataForPull:
+    """Data for a session that needs image pulling."""
+
+    session_id: SessionId
+    access_key: AccessKey
+    kernels: list[KernelBindingData]
+
+
+@dataclass
+class SessionDataForStart:
+    """Data for a session ready to start with full details."""
+
+    session_id: SessionId
+    creation_id: str
+    access_key: AccessKey
+    session_type: SessionTypes
+    name: str
+    cluster_mode: ClusterMode
+    kernels: list[KernelBindingData]
+    user_uuid: UUID
+    user_email: str
+    user_name: str
+    network_type: Optional[NetworkType] = None
+    network_id: Optional[str] = None
+
 
 @dataclass
 class ScheduledSessionData:
@@ -483,7 +556,32 @@ class ScheduledSessionData:
     session_id: SessionId
     creation_id: str
     access_key: AccessKey
+    session_type: SessionTypes
+    name: str
     kernels: list[KernelBindingData]
+    # Additional fields for PREPARED sessions
+    cluster_mode: Optional[ClusterMode] = None
+    user_uuid: Optional[UUID] = None
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    network_type: Optional[NetworkType] = None
+    network_id: Optional[str] = None
+
+
+@dataclass
+class SessionsForPullWithImages:
+    """Sessions for image pulling with their image configurations."""
+
+    sessions: list[SessionDataForPull]
+    image_configs: dict[str, ImageConfigData]
+
+
+@dataclass
+class SessionsForStartWithImages:
+    """Sessions for starting with their image configurations."""
+
+    sessions: list[SessionDataForStart]
+    image_configs: dict[str, ImageConfigData]
 
 
 @dataclass
@@ -665,3 +763,41 @@ class KernelCreationInfo:
                     slots[slot_name] = str(sum(total_allocs))
 
         return slots
+
+
+@dataclass(frozen=True)
+class KernelTransitionData:
+    """Kernel information for state transitions."""
+
+    kernel_id: str
+    agent_id: AgentId
+    agent_addr: str
+    cluster_role: str  # DEFAULT_ROLE for main kernel
+    container_id: Optional[str]
+    startup_command: Optional[str]
+
+
+@dataclass(frozen=True)
+class SessionTransitionData:
+    """
+    Session data for state transitions.
+    Contains all necessary information for hooks without exposing database rows.
+    """
+
+    session_id: SessionId
+    session_name: str
+    session_type: SessionTypes
+    access_key: AccessKey
+    cluster_mode: Optional[ClusterMode]
+    kernels: list[KernelTransitionData]
+    batch_timeout: Optional[int]  # For batch sessions
+
+    @property
+    def main_kernel(self) -> KernelTransitionData:
+        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
+        main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise ValueError(f"Session {self.session_id} has more than 1 main kernel")
+        if len(main_kernels) == 0:
+            raise ValueError(f"Session {self.session_id} has no main kernel")
+        return main_kernels[0]

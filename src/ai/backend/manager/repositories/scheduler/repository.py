@@ -16,13 +16,15 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel import KernelStatus
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
-    PreparedSessionData,
-    PreparedSessionsWithImages,
-    ScheduledSessionsWithImages,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionTransitionData,
 )
 
 from .cache_source.cache_source import ScheduleCacheSource
@@ -280,6 +282,20 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_ready_to_run()
 
+    async def get_sessions_for_transition(
+        self,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition based on current session and kernel status.
+
+        :param session_status: Current session status to filter by
+        :param kernel_status: Required kernel status for transition
+        :return: List of sessions ready for transition with detailed information
+        """
+        return await self._db_source.get_sessions_for_transition(session_status, kernel_status)
+
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from CREATING to RUNNING state.
@@ -392,42 +408,37 @@ class SchedulerRepository:
         """Update kernel heartbeat timestamp."""
         return await self._db_source.update_kernel_heartbeat(kernel_id)
 
-    async def get_scheduled_sessions_with_images(self) -> ScheduledSessionsWithImages:
+    async def get_sessions_for_pull(
+        self,
+        statuses: list[SessionStatus],
+    ) -> SessionsForPullWithImages:
         """
-        Get sessions in SCHEDULED status with image configurations for precondition checking.
-        Returns ScheduledSessionsWithImages dataclass.
+        Get sessions for image pulling with specified statuses.
+        Returns SessionsForPullWithImages dataclass.
+
+        :param statuses: Session statuses to filter by (typically SCHEDULED, PREPARING, PULLING)
+        :return: SessionsForPullWithImages object
         """
-        return await self._db_source.get_scheduled_sessions_with_images()
+        return await self._db_source.get_sessions_for_pull(statuses)
+
+    async def get_sessions_for_start(
+        self,
+        statuses: list[SessionStatus],
+    ) -> SessionsForStartWithImages:
+        """
+        Get sessions for starting with specified statuses.
+        Returns SessionsForStartWithImages dataclass.
+
+        :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
+        :return: SessionsForStartWithImages object
+        """
+        return await self._db_source.get_sessions_for_start(statuses)
 
     async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from SCHEDULED to PREPARING status.
         """
         await self._db_source.update_sessions_to_preparing(session_ids)
-
-    async def get_prepared_session_with_images(
-        self, session_id: SessionId
-    ) -> PreparedSessionsWithImages:
-        """
-        Get a single prepared session with image configurations for starting.
-        Returns PreparedSessionsWithImages dataclass.
-        """
-        return await self._db_source.get_prepared_session_with_images(session_id)
-
-    async def get_prepared_sessions(self) -> list[PreparedSessionData]:
-        """
-        Get sessions in PREPARED status ready to start.
-        Returns dataclass objects instead of SessionRow.
-        """
-        return await self._db_source.get_prepared_sessions()
-
-    async def get_prepared_sessions_with_images(self) -> PreparedSessionsWithImages:
-        """
-        Get all sessions in PREPARED status with their image configurations.
-        This is a batch version that fetches all sessions and their images in one go.
-        Returns PreparedSessionsWithImages dataclass.
-        """
-        return await self._db_source.get_prepared_sessions_with_images()
 
     async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
         """
