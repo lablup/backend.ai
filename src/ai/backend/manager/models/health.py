@@ -26,7 +26,7 @@ __all__: tuple[str, ...] = (
     "RedisObjectConnectionInfo",
     "get_sqlalchemy_connection_info",
     "get_redis_object_info_list",
-    "_get_connnection_info",
+    "_get_connection_info",
     "report_manager_status",
 )
 
@@ -99,7 +99,7 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
     return []
 
 
-async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
+async def _get_connection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
     node_id = root_ctx.config_provider.config.manager.id or socket.gethostname()
     pid = os.getpid()
 
@@ -112,7 +112,7 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
 
 async def report_manager_status(root_ctx: RootContext) -> None:
     lifetime = root_ctx.config_provider.config.manager.status_lifetime
-    cxn_info = await _get_connnection_info(root_ctx)
+    cxn_info = await _get_connection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
     if lifetime is not None:
@@ -136,12 +136,12 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
         )
     except (asyncio.TimeoutError, redis.exceptions.ConnectionError):
         # Cannot get data from redis. Return process's own info.
-        cxn_infos = [(await _get_connnection_info(root_ctx))]
+        cxn_infos = [(await _get_connection_info(root_ctx))]
     else:
         if _raw_value is not None:
             cxn_infos = [
                 ConnectionInfoOfProcess.model_validate(msgpack.unpackb(val)) for val in _raw_value
             ]
         else:
-            cxn_infos = [(await _get_connnection_info(root_ctx))]
+            cxn_infos = [(await _get_connection_info(root_ctx))]
     return cxn_infos

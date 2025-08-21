@@ -213,12 +213,13 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # but in this case:
                 #  - The lock ID is only given from trusted codes.
                 #  - asyncpg does not support parameter interpolation with raw SQL statements.
+                # The timeout only applies to acquiring the lock, not holding it
                 async with asyncio.timeout(self.lock_conn_timeout):
                     await lock_conn.exec_driver_sql(
                         f"SELECT pg_advisory_lock({lock_id:d});",
                     )
-                    lock_acquired = True
-                    yield
+                lock_acquired = True
+                yield  # Lock is held during this yield, no timeout here
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
@@ -234,7 +235,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                            f"DB Connection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
                         )
 
 
