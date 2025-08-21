@@ -2,27 +2,50 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, AsyncGenerator, Optional, Self, Sequence
+from typing import AsyncGenerator, Optional, Self, Sequence
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
-from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
-from ai.backend.manager.data.artifact.types import ArtifactStatus, ArtifactType
-
-
-# Enums
-@strawberry.enum
-class ArtifactOrderField(StrEnum):
-    ID = "ID"
-    NAME = "NAME"
-    TYPE = "TYPE"
-    SIZE = "SIZE"
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    LATEST_VERSION = "LATEST_VERSION"
+from ai.backend.manager.api.gql.base import (
+    ByteSize,
+    OrderDirection,
+    StringFilter,
+    build_pagination_options,
+)
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.artifact.types import (
+    ArtifactData,
+    ArtifactOrderField,
+    ArtifactRevisionData,
+    ArtifactRevisionOrderField,
+    ArtifactStatus,
+    ArtifactType,
+)
+from ai.backend.manager.repositories.artifact.types import (
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
+    ArtifactRevisionFilterOptions,
+    ArtifactRevisionOrderingOptions,
+)
+from ai.backend.manager.repositories.types import PaginationOptions
+from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
+from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
+from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
+from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact_revision.actions.approve import (
+    ApproveArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
+from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.disapprove import (
+    DisapproveArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
+from ai.backend.manager.services.artifact_revision.actions.import_ import ImportArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.list import ListArtifactRevisionsAction
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -179,7 +202,6 @@ class Artifact(Node):
     description: Optional[str]
     registry: SourceInfo
     source: SourceInfo
-    size: ByteSize
 
     @classmethod
     def from_dataclass(cls, data: ArtifactData) -> Self:
