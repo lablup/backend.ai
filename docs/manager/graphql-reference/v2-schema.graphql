@@ -35,7 +35,6 @@ type ArtifactEdge {
 
 input ArtifactFilter {
   type: [ArtifactType!] = null
-  status: ArtifactStatusFilter = null
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
@@ -92,7 +91,7 @@ type ArtifactRevisionEdge {
 }
 
 input ArtifactRevisionFilter {
-  status: [ArtifactStatus!] = null
+  status: ArtifactRevisionStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
   AND: ArtifactRevisionFilter = null
@@ -113,6 +112,11 @@ enum ArtifactRevisionOrderField {
   UPDATED_AT
 }
 
+input ArtifactRevisionStatusFilter {
+  IN: [ArtifactStatus!] = null
+  EQ: [ArtifactStatus!] = null
+}
+
 enum ArtifactStatus {
   SCANNED
   PULLED
@@ -129,11 +133,6 @@ input ArtifactStatusChangedInput {
 
 type ArtifactStatusChangedPayload {
   artifact: Artifact!
-}
-
-input ArtifactStatusFilter {
-  IN: [ArtifactStatus!] = null
-  EQ: [ArtifactStatus!] = null
 }
 
 input ArtifactTarget {
