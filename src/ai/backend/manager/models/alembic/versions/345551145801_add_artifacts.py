@@ -77,7 +77,6 @@ def upgrade() -> None:
         sa.Column("description", sa.String(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifacts")),
     )
-    op.create_index(op.f("ix_artifacts_created_at"), "artifacts", ["created_at"], unique=False)
     op.create_index(op.f("ix_artifacts_name"), "artifacts", ["name"], unique=False)
     op.create_index(op.f("ix_artifacts_registry_id"), "artifacts", ["registry_id"], unique=False)
     op.create_index(
@@ -86,7 +85,6 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_artifacts_registry_type"), "artifacts", ["registry_type"], unique=False
     )
-    op.create_index(op.f("ix_artifacts_status"), "artifacts", ["status"], unique=False)
     op.create_index(
         op.f("ix_artifacts_source_registry_type"),
         "artifacts",
@@ -94,7 +92,6 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_artifacts_type"), "artifacts", ["type"], unique=False)
-    op.create_index(op.f("ix_artifacts_updated_at"), "artifacts", ["updated_at"], unique=False)
 
     op.create_table(
         "association_artifacts_storages",
