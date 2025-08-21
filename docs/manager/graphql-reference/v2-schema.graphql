@@ -150,7 +150,7 @@ enum ArtifactStatus {
 
 """Added in 25.14.0"""
 input ArtifactStatusChangedInput {
-  artifactIds: [ID!]!
+  artifactRevisionIds: [ID!]!
 }
 
 """Added in 25.14.0"""
@@ -853,7 +853,7 @@ type Subscription {
   artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
 
   """Added in 25.14.0"""
-  artifactImportProgressUpdated(artifactId: ID!): ArtifactImportProgressUpdatedPayload!
+  artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
 }

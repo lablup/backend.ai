@@ -91,7 +91,6 @@ class ArtifactOrderBy:
 @strawberry.input(description="Added in 25.14.0")
 class ArtifactRevisionStatusFilter:
     IN: Optional[list[ArtifactStatus]] = None
-    # TODO: Support this
     EQ: Optional[list[ArtifactStatus]] = None
 
 
@@ -155,6 +154,7 @@ class ImportArtifactsInput:
     bucket_name: str
 
 
+# TODO: Remove this?
 @strawberry.input(description="Added in 25.14.0")
 class UpdateArtifactInput:
     artifact_id: ID
@@ -184,7 +184,7 @@ class DisapproveArtifactInput:
 
 @strawberry.input(description="Added in 25.14.0")
 class ArtifactStatusChangedInput:
-    artifact_ids: list[ID]
+    artifact_revision_ids: list[ID]
 
 
 # Object Types
@@ -346,23 +346,13 @@ class DisapproveArtifactPayload:
 
 
 @strawberry.type
-class AuthorizeArtifactPayload:
-    artifact: Artifact
-
-
-@strawberry.type
-class UnauthorizeArtifactPayload:
-    artifact: Artifact
-
-
-@strawberry.type
 class CancelImportArtifactPayload:
     artifact_revision_id: ID
 
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactStatusChangedPayload:
-    artifact: Artifact
+    artifact_revision: ArtifactRevision
 
 
 async def resolve_artifacts(
@@ -381,7 +371,7 @@ async def resolve_artifacts(
         repo_filter = filter.to_repo_filter()
 
     # Convert GraphQL ordering to repository ordering
-    repo_ordering = _convert_gql_ordering_to_repo_ordering(order_by)
+    repo_ordering = _convert_gql_artifact_ordering_to_repo_ordering(order_by)
 
     # Set up pagination options
     pagination_options = build_pagination_options(
@@ -403,7 +393,7 @@ async def resolve_artifacts(
     )
 
 
-def _convert_gql_ordering_to_repo_ordering(
+def _convert_gql_artifact_ordering_to_repo_ordering(
     order_by: Optional[list[ArtifactOrderBy]],
 ) -> ArtifactOrderingOptions:
     """Convert GraphQL ordering to repository ordering options"""
@@ -418,7 +408,7 @@ def _convert_gql_ordering_to_repo_ordering(
     return ArtifactOrderingOptions(order_by=repo_order_by)
 
 
-def _convert_gql_ordering_to_repo_ordering_revision(
+def _convert_gql_artifact_revision_ordering_to_repo_ordering(
     order_by: Optional[list[ArtifactRevisionOrderBy]],
 ) -> ArtifactRevisionOrderingOptions:
     """Convert GraphQL ordering to repository ordering options for revisions"""
@@ -577,7 +567,7 @@ async def resolve_artifact_revisions(
         repo_filter = filter.to_repo_filter()
 
     # Convert GraphQL ordering to repository ordering
-    repo_ordering = _convert_gql_ordering_to_repo_ordering_revision(order_by)
+    repo_ordering = _convert_gql_artifact_revision_ordering_to_repo_ordering(order_by)
 
     # Set up pagination options
     pagination_options = build_pagination_options(
@@ -809,7 +799,7 @@ async def artifact_status_changed(
 
 @strawberry.subscription(description="Added in 25.14.0")
 async def artifact_import_progress_updated(
-    artifact_id: ID,
+    artifact_revision_id: ID,
 ) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
     # Mock implementation
     # In real implementation, this would yield progress updates
