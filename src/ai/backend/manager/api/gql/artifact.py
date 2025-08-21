@@ -190,7 +190,6 @@ class Artifact(Node):
             description=data.description,
             registry=SourceInfo(name=None, url=None),
             source=SourceInfo(name=None, url=None),
-            authorized=data.authorized,
         )
 
     @strawberry.field
@@ -247,38 +246,6 @@ class ArtifactRevision(Node):
             readme=data.readme,
             version=data.version,
             size=ByteSize(data.size),
-        )
-
-    @classmethod
-    async def batch_load_by_artifact_id(
-        cls, ctx: StrawberryGQLContext, artifact_ids: Sequence[uuid.UUID]
-    ) -> list[ArtifactRevision]:
-        revisions = []
-        for artifact_id in artifact_ids:
-            action_result = await ctx.processors.artifact.get_revisions.wait_for_complete(
-                GetArtifactRevisionsAction(artifact_id=artifact_id)
-            )
-            revisions.extend(action_result.revisions)
-        return [ArtifactRevision.from_dataclass(r) for r in revisions]
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            type=ArtifactType(data.type),
-            # TODO: Fetch status from the actual data source
-            # status=ArtifactStatus(data.status),
-            status=ArtifactStatus(ArtifactStatus.AVAILABLE),
-            description=data.description,
-            # TODO: Fill these with actual data
-            registry=SourceInfo(name=None, url=None),
-            source=SourceInfo(name=None, url=None),
-            size=ByteSize(data.size),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            version=data.version,
-            authorized=data.authorized,
         )
 
     @classmethod
@@ -800,32 +767,6 @@ async def disapprove_artifact_revision(
     return DisapproveArtifactPayload(
         artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
     )
-
-
-@strawberry.mutation
-async def authorize_artifact(
-    input: AuthorizeArtifactInput, info: Info[StrawberryGQLContext]
-) -> AuthorizeArtifactPayload:
-    action_result = await info.context.processors.artifact.authorize.wait_for_complete(
-        AuthorizeArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-        )
-    )
-
-    return AuthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
-
-
-@strawberry.mutation
-async def unauthorize_artifact(
-    input: UnauthorizeArtifactInput, info: Info[StrawberryGQLContext]
-) -> UnauthorizeArtifactPayload:
-    action_result = await info.context.processors.artifact.unauthorize.wait_for_complete(
-        UnauthorizeArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-        )
-    )
-
-    return UnauthorizeArtifactPayload(artifact=Artifact.from_dataclass(action_result.result))
 
 
 # Subscriptions

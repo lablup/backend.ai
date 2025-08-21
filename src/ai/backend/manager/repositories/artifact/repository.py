@@ -438,22 +438,12 @@ class ArtifactRepository:
                     if model.modified_at:
                         existing_revision.updated_at = model.modified_at
 
-                    # Check if version row already exists for this artifact
-                    existing_version_stmt = sa.select(ArtifactVersionRow).where(
-                        sa.and_(
-                            ArtifactVersionRow.artifact_id == existing_artifact.id,
-                            ArtifactVersionRow.version == model.revision,
+                    # Create revision row if it doesn't exist
+                    if existing_revision is None:
+                        artifact_revision_row = ArtifactRevisionRow(
+                            artifact_id=artifact_row.id, version=model.revision
                         )
-                    )
-                    existing_version_result = await db_sess.execute(existing_version_stmt)
-                    existing_version = existing_version_result.scalar_one_or_none()
-
-                    # Create version row if it doesn't exist
-                    if existing_version is None:
-                        artifact_version_row = ArtifactVersionRow(
-                            artifact_id=existing_artifact.id, version=model.revision
-                        )
-                        db_sess.add(artifact_version_row)
+                        db_sess.add(artifact_revision_row)
 
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision, attribute_names=["updated_at"])
