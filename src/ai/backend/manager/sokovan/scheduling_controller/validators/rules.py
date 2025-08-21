@@ -81,16 +81,6 @@ class KernelSpecsRule(SessionValidatorRule):
         if not spec.kernel_specs:
             raise InvalidAPIParameters("At least one kernel specification is required")
 
-        # Validate cluster configuration
-        if spec.cluster_size > 1:
-            if len(spec.kernel_specs) == 1:
-                # Single kernel spec will be replicated - this is fine
-                pass
-            elif len(spec.kernel_specs) != spec.cluster_size:
-                raise InvalidAPIParameters(
-                    "The number of kernel configs differs from the cluster size"
-                )
-
 
 class ServicePortRule(SessionValidatorRule):
     """Validates preopen ports against service ports."""
