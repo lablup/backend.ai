@@ -37,6 +37,7 @@ from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.repositories.scheduler import (
@@ -708,10 +709,6 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that transitioned to RUNNING
         """
-        from ai.backend.manager.models.kernel import KernelStatus
-        from ai.backend.manager.models.session import SessionStatus
-
-        # Get sessions ready to transition with detailed information
         sessions_data = await self._repository.get_sessions_for_transition(
             SessionStatus.CREATING,
             KernelStatus.RUNNING,
@@ -720,29 +717,27 @@ class Scheduler:
         if not sessions_data:
             return ScheduleResult(succeeded_count=0)
 
-        # Process hooks for each session in parallel
         sessions_to_update: list[SessionId] = []
-        hook_tasks: list[asyncio.Task] = []
 
-        async with asyncio.TaskGroup() as tg:
-            for session_data in sessions_data:
-                hook = self._hook_registry.get_hook(session_data.session_type)
-                task = tg.create_task(hook.on_transition_to_running(session_data))
-                hook_tasks.append(task)
+        hook_coroutines = [
+            self._hook_registry.get_hook(session_data.session_type).on_transition_to_running(
+                session_data
+            )
+            for session_data in sessions_data
+        ]
 
-        # Check results
-        for session_data, task in zip(sessions_data, hook_tasks):
-            result = task.result()
-            if result.success:
-                sessions_to_update.append(session_data.session_id)
-            else:
-                log.warning(
-                    "Hook failed for session {}: {}",
+        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+
+        for session_data, result in zip(sessions_data, hook_results):
+            if isinstance(result, BaseException):
+                log.error(
+                    "Hook failed with exception for session {}: {}",
                     session_data.session_id,
-                    result.message,
+                    result,
                 )
+                continue
+            sessions_to_update.append(session_data.session_id)
 
-        # Update sessions that passed hook validation
         if sessions_to_update:
             await self._repository.update_sessions_to_running(sessions_to_update)
 
@@ -755,10 +750,6 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that transitioned to TERMINATED
         """
-        from ai.backend.manager.models.kernel import KernelStatus
-        from ai.backend.manager.models.session import SessionStatus
-
-        # Get sessions ready to transition with detailed information
         sessions_data = await self._repository.get_sessions_for_transition(
             SessionStatus.TERMINATING,
             KernelStatus.TERMINATED,
@@ -767,30 +758,26 @@ class Scheduler:
         if not sessions_data:
             return ScheduleResult(succeeded_count=0)
 
-        # Process hooks for each session in parallel (best-effort for termination)
         sessions_to_update: list[SessionId] = []
-        hook_tasks: list[asyncio.Task] = []
 
-        async with asyncio.TaskGroup() as tg:
-            for session_data in sessions_data:
-                hook = self._hook_registry.get_hook(session_data.session_type)
-                task = tg.create_task(hook.on_transition_to_terminated(session_data))
-                hook_tasks.append(task)
+        hook_coroutines = [
+            self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(
+                session_data
+            )
+            for session_data in sessions_data
+        ]
 
-        # Check results (allow transition even if hook fails for termination)
-        for session_data, task in zip(sessions_data, hook_tasks):
-            result = task.result()
-            # For termination, we allow transition even if hook fails (best-effort cleanup)
+        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+
+        for session_data, result in zip(sessions_data, hook_results):
+            if isinstance(result, BaseException):
+                log.error(
+                    "Termination hook failed with exception for session {} (will still terminate): {}",
+                    session_data.session_id,
+                    result,
+                )
             sessions_to_update.append(session_data.session_id)
 
-            if not result.success:
-                log.warning(
-                    "Termination hook failed for session {} (will still terminate): {}",
-                    session_data.session_id,
-                    result.message,
-                )
-
-        # Update all sessions to terminated (even if hooks failed)
         if sessions_to_update:
             await self._repository.update_sessions_to_terminated(sessions_to_update)
 
