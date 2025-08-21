@@ -736,7 +736,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> List[MountInfo]:
         src_path = self.config_dir / str(computer.key)
-        src_path.mkdir()
+        src_path.mkdir(exist_ok=True)
         return await computer.generate_mounts(src_path, device_alloc)
 
     async def prepare_container(
@@ -1982,18 +1982,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            await docker.networks.create({
-                "Name": network_name,
-                "Driver": "bridge",
-                "Labels": {
-                    "ai.backend.cluster-network": "1",
-                },
-            })
+            try:
+                await docker.networks.get(network_name)
+            except DockerError as e:
+                if e.status == HTTPStatus.NOT_FOUND:
+                    await docker.networks.create({
+                        "Name": network_name,
+                        "Driver": "bridge",
+                        "Labels": {
+                            "ai.backend.cluster-network": "1",
+                        },
+                    })
+                else:
+                    raise
 
     async def destroy_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            network = await docker.networks.get(network_name)
-            await network.delete()
+            try:
+                network = await docker.networks.get(network_name)
+                await network.delete()
+            except DockerError as e:
+                if e.status == HTTPStatus.NOT_FOUND:
+                    # skip silently if already removed/missing
+                    pass
+                else:
+                    raise
 
     @preserve_termination_log
     async def monitor_docker_events(self):
