@@ -105,13 +105,13 @@ class ObjectStorageService:
         Get a presigned download URL for an existing object storage.
         """
         log.info(
-            "Getting presigned download URL for object storage, storage: {}, artifact: {}",
+            "Getting presigned download URL for object storage, storage: {}, artifact_revision: {}",
             action.storage_id,
-            action.artifact_id,
+            action.artifact_revision_id,
         )
         storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
-        revision_data = await self._artifact_repository.get_artifact_revision(
-            action.artifact_id, action.artifact_revision
+        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
         )
 
         if not revision_data.status != ArtifactStatus.AVAILABLE:

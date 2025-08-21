@@ -762,6 +762,7 @@ async def cancel_import_artifact(
     )
 
 
+# TODO: Make this available when only having super-admin privileges
 @strawberry.mutation(description="Added in 25.14.0")
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
