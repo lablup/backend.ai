@@ -6,6 +6,7 @@ to ensure transactional consistency.
 """
 
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
 
 from .allocator import SchedulingAllocator
@@ -42,13 +43,16 @@ class RepositoryAllocator(SchedulingAllocator):
         """
         self._repository = schedule_repository
 
-    async def allocate(self, batch: AllocationBatch) -> None:
+    async def allocate(self, batch: AllocationBatch) -> list[ScheduledSessionData]:
         """
         Allocate resources by delegating to repository and update session status.
         Both allocations and failures are processed in a single transaction.
 
         Args:
             batch: AllocationBatch containing allocations and failures to process
+
+        Returns:
+            List of ScheduledSessionData for allocated sessions
         """
         # Delegate to repository for atomic processing of both allocations and failures
-        await self._repository.allocate_sessions(batch)
+        return await self._repository.allocate_sessions(batch)

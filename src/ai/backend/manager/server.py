@@ -1009,7 +1009,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
-        root_ctx.valkey_stat,
     )
 
     # Create sokovan orchestrator with lock factory for timers

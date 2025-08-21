@@ -3,7 +3,11 @@ from dataclasses import dataclass
 from typing import Optional, Self, override
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
+from ai.backend.common.events.types import (
+    AbstractBroadcastEvent,
+    BatchBroadcastEvent,
+    EventDomain,
+)
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import SessionId
 
@@ -204,3 +208,119 @@ class SessionFailureBroadcastEvent(SessionResultEvent):
     @override
     def event_name(cls) -> str:
         return "session_failure"
+
+
+@dataclass
+class SessionSchedulingEventData:
+    """Data for each session in batch scheduling event."""
+
+    session_id: SessionId
+    creation_id: str
+
+
+@dataclass
+class SchedulingBroadcastEvent(AbstractBroadcastEvent):
+    """Individual scheduling event for a session status transition."""
+
+    session_id: SessionId
+    creation_id: str
+    status_transition: str  # "SCHEDULED", "PREPARING", "CREATING", etc.
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.session_id)
+
+    @override
+    def serialize(self) -> tuple:
+        return (
+            str(self.session_id),
+            self.creation_id,
+            self.status_transition,
+        )
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            session_id=SessionId(uuid.UUID(value[0])),
+            creation_id=value[1],
+            status_transition=value[2],
+        )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "scheduling"
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class BatchSchedulingBroadcastEvent(BatchBroadcastEvent):
+    """Batch event for multiple sessions going through scheduling stages."""
+
+    # List of session event data
+    session_events: list[SessionSchedulingEventData]
+    # Session status after transition (e.g., "SCHEDULED", "PREPARING", "CREATING")
+    status_transition: str
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        # For batch events, we don't have a single domain_id
+        return None
+
+    @override
+    def generate_events(self) -> list[AbstractBroadcastEvent]:
+        """Generate individual scheduling events for each session in the batch."""
+        events: list[AbstractBroadcastEvent] = []
+
+        # Generate a SchedulingBroadcastEvent for each session
+        for session_data in self.session_events:
+            events.append(
+                SchedulingBroadcastEvent(
+                    session_id=session_data.session_id,
+                    creation_id=session_data.creation_id,
+                    status_transition=self.status_transition,
+                )
+            )
+
+        return events
+
+    @override
+    def serialize(self) -> tuple:
+        return (
+            [(str(event.session_id), event.creation_id) for event in self.session_events],
+            str(self.status_transition),
+        )
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            session_events=[
+                SessionSchedulingEventData(session_id=SessionId(uuid.UUID(sid)), creation_id=cid)
+                for sid, cid in value[0]
+            ],
+            status_transition=value[1],
+        )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "batch_scheduling"
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None

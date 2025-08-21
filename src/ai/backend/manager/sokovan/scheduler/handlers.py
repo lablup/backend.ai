@@ -6,7 +6,13 @@ import logging
 from abc import ABC, abstractmethod
 from typing import final
 
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.session.broadcast import (
+    BatchSchedulingBroadcastEvent,
+    SessionSchedulingEventData,
+)
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -76,9 +82,11 @@ class ScheduleSessionsHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -92,9 +100,24 @@ class ScheduleSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were scheduled."""
-        # Request next phase
+        # Request next phase first
         await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
-        log.info("Scheduled {} sessions, requesting precondition check", result.succeeded_count)
+        log.info(
+            "Scheduled {} sessions, requesting precondition check", len(result.scheduled_sessions)
+        )
+
+        # Broadcast batch event for scheduled sessions
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.SCHEDULED),
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class CheckPreconditionHandler(ScheduleHandler):
@@ -104,9 +127,11 @@ class CheckPreconditionHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -119,8 +144,22 @@ class CheckPreconditionHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if preconditions are met."""
-        log.info("Checked preconditions for {} sessions", result.succeeded_count)
+        # Request next phase first
+        log.info("Checked preconditions for {} sessions", len(result.scheduled_sessions))
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
+
+        # Broadcast batch event for sessions that passed precondition check
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.PREPARING),  # Sessions transition to PREPARING
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class StartSessionsHandler(ScheduleHandler):
@@ -129,8 +168,10 @@ class StartSessionsHandler(ScheduleHandler):
     def __init__(
         self,
         scheduler: Scheduler,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -142,8 +183,21 @@ class StartSessionsHandler(ScheduleHandler):
         return await self._scheduler.start_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of started sessions."""
-        log.info("Started {} sessions", result.succeeded_count)
+        """Log the number of started sessions and broadcast event."""
+        log.info("Started {} sessions", len(result.scheduled_sessions))
+
+        # Broadcast batch event for started sessions
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.CREATING),
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class TerminateSessionsHandler(ScheduleHandler):
@@ -153,9 +207,11 @@ class TerminateSessionsHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -168,7 +224,7 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
-        log.info("Terminated {} sessions", result.succeeded_count)
+        log.info("Terminated {} sessions", len(result.scheduled_sessions))
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -191,7 +247,7 @@ class SweepSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of swept sessions."""
-        log.info("Swept {} stale sessions", result.succeeded_count)
+        log.info("Swept {} stale sessions", len(result.scheduled_sessions))
 
 
 class CheckPullingProgressHandler(ScheduleHandler):
@@ -201,9 +257,11 @@ class CheckPullingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -216,7 +274,21 @@ class CheckPullingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request START scheduling if sessions transitioned to PREPARED."""
-        log.info("{} sessions transitioned to PREPARED state", result.succeeded_count)
+        log.info("{} sessions transitioned to PREPARED state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to PREPARED
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.PREPARED),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 class CheckCreatingProgressHandler(ScheduleHandler):
@@ -226,9 +298,11 @@ class CheckCreatingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -241,8 +315,22 @@ class CheckCreatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to RUNNING."""
-        log.info("{} sessions transitioned to RUNNING state", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
+        log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to RUNNING
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.RUNNING),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 class CheckTerminatingProgressHandler(ScheduleHandler):
@@ -252,9 +340,11 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -267,8 +357,22 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to TERMINATED."""
-        log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
+        log.info("{} sessions transitioned to TERMINATED state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to TERMINATED
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.TERMINATED),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 # Time thresholds for health checks
@@ -283,9 +387,11 @@ class RetryPreparingHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -301,7 +407,7 @@ class RetryPreparingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were retried."""
-        log.info("Retried {} stuck PREPARING/PULLING sessions", result.succeeded_count)
+        log.info("Retried {} stuck PREPARING/PULLING sessions", len(result.scheduled_sessions))
 
 
 class RetryCreatingHandler(ScheduleHandler):
@@ -311,9 +417,11 @@ class RetryCreatingHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
@@ -329,4 +437,4 @@ class RetryCreatingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if sessions were retried."""
-        log.info("Retried {} stuck CREATING sessions", result.succeeded_count)
+        log.info("Retried {} stuck CREATING sessions", len(result.scheduled_sessions))
