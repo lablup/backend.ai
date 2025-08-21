@@ -136,8 +136,10 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        # TODO: These tests should be updated when terminate_sessions returns actual session data
-        assert len(result.scheduled_sessions) == 0
+        # Single session should be successfully terminated
+        assert len(result.scheduled_sessions) == 1
+        assert result.scheduled_sessions[0].session_id == session_id
+        assert result.scheduled_sessions[0].creation_id == "test-creation"
 
         # Verify agent destroy_kernel was called with correct parameters
         mock_agent.destroy_kernel.assert_called_once_with(
@@ -193,8 +195,10 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        # TODO: These tests should be updated when terminate_sessions returns actual session data
-        assert len(result.scheduled_sessions) == 0
+        # Session with multiple kernels should be successfully terminated
+        assert len(result.scheduled_sessions) == 1
+        assert result.scheduled_sessions[0].session_id == session_id
+        assert result.scheduled_sessions[0].creation_id == "test-creation"
 
         # Verify all kernels were terminated
         for i in range(3):
@@ -328,8 +332,10 @@ class TestTerminateSessions:
         elapsed = time.time() - start_time
 
         # Verify
-        # TODO: These tests should be updated when terminate_sessions returns actual session data
-        assert len(result.scheduled_sessions) == 0
+        # All sessions should be successfully terminated
+        assert len(result.scheduled_sessions) == 3
+        for i, scheduled in enumerate(result.scheduled_sessions):
+            assert scheduled.creation_id == f"creation-{i}"
 
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)
         # With concurrent execution, it should be much faster

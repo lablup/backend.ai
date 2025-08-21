@@ -560,6 +560,7 @@ class Scheduler:
             session_result = SessionTerminationResult(
                 session_id=session.session_id,
                 access_key=session.access_key,
+                creation_id=session.creation_id,
                 session_type=session.session_type,
                 reason=session.status_info,
                 kernel_results=[],
@@ -618,13 +619,14 @@ class Scheduler:
             len(session_results) - terminated_session_count,
         )
 
-        # Convert terminated sessions to ScheduledSessionData format
+        # Convert only successfully terminated sessions to ScheduledSessionData format
         scheduled_data = [
             ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
+                session_id=result.session_id,
+                creation_id=result.creation_id,
             )
-            for session in terminating_sessions
+            for result in session_results
+            if result.should_terminate_session
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
 
