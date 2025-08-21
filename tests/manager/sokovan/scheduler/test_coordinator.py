@@ -75,6 +75,7 @@ def schedule_coordinator(
         valkey_schedule=mock_valkey_schedule,
         scheduler=mock_scheduler,
         scheduling_controller=mock_scheduling_controller,
+        event_producer=mock_event_producer,
     )
 
 

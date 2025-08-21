@@ -19,6 +19,7 @@ from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
@@ -84,12 +85,17 @@ class SchedulerRepository:
 
         return scheduling_data
 
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
+    async def allocate_sessions(
+        self, allocation_batch: AllocationBatch
+    ) -> list[ScheduledSessionData]:
         """
         Allocate sessions by updating DB.
         Agent occupied slots are synced directly in the DB.
+
+        Returns:
+            List of ScheduledSessionData for allocated sessions
         """
-        await self._db_source.allocate_sessions(allocation_batch)
+        return await self._db_source.allocate_sessions(allocation_batch)
 
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """

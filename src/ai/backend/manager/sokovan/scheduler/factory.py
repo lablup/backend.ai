@@ -1,6 +1,5 @@
 """Factory functions for creating scheduler components."""
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
@@ -44,7 +43,6 @@ def create_default_scheduler(
     config_provider: ManagerConfigProvider,
     lock_factory: DistributedLockFactory,
     agent_pool: AgentPool,
-    valkey_stat: ValkeyStatClient,
 ) -> Scheduler:
     """
     Create a scheduler with default components.
@@ -54,7 +52,6 @@ def create_default_scheduler(
         config_provider: The manager configuration provider
         lock_factory: Factory for creating distributed locks
         agent_pool: Pool for managing agent clients
-        valkey_stat: Valkey client for statistics
 
     Returns:
         A configured Scheduler instance

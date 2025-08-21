@@ -13,6 +13,7 @@ __all__ = (
     "AbstractEvent",
     "AbstractAnycastEvent",
     "AbstractBroadcastEvent",
+    "BatchBroadcastEvent",
 )
 
 
@@ -136,6 +137,31 @@ class AbstractBroadcastEvent(AbstractEvent):
     @override
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
+
+    def generate_events(self) -> list["AbstractBroadcastEvent"]:
+        """
+        Generate events to be propagated through EventHub.
+        Default implementation returns just this event itself.
+        Subclasses can override to generate multiple events.
+        """
+        return [self]
+
+
+class BatchBroadcastEvent(AbstractBroadcastEvent):
+    """
+    An event that generates multiple individual events for propagation.
+    Subclasses should override generate_events() to create individual events.
+    """
+
+    @override
+    @abstractmethod
+    def generate_events(self) -> list[AbstractBroadcastEvent]:
+        """
+        Generate individual events to be propagated through EventHub.
+        Each generated event will be broadcast separately.
+        Must be overridden by subclasses to generate multiple events.
+        """
+        raise NotImplementedError
 
 
 class EventCacheDomain(enum.StrEnum):

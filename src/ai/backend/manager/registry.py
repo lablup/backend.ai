@@ -108,11 +108,15 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
+    SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
+from ai.backend.common.events.types import EventDomain
 from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -248,6 +252,7 @@ class AgentRegistry:
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
     _scheduling_controller: SchedulingController
     _use_sokovan: bool
+    _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
@@ -264,6 +269,7 @@ class AgentRegistry:
         valkey_live: ValkeyLiveClient,
         valkey_image: ValkeyImageClient,
         event_producer: EventProducer,
+        event_hub: EventHub,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
@@ -282,6 +288,7 @@ class AgentRegistry:
         self.valkey_live = valkey_live
         self.valkey_image = valkey_image
         self.event_producer = event_producer
+        self._event_hub = event_hub
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
         self.network_plugin_ctx = network_plugin_ctx
@@ -553,8 +560,6 @@ class AgentRegistry:
             dependencies = []
 
         session_creation_id = secrets.token_urlsafe(16)
-        start_event = asyncio.Event()
-        self.session_creation_tracker[session_creation_id] = start_event
 
         async with self.db.begin_readonly_session() as db_session:
             conn = await db_session.connection()
@@ -631,14 +636,28 @@ class AgentRegistry:
             resp["created"] = True
 
             if not enqueue_only:
+                # Create and register propagator for event hub
+                propagator = AsyncBypassPropagator()
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
+
+                # Register propagator and ensure cleanup
+                self._event_hub.register_event_propagator(
+                    propagator, [(EventDomain.SESSION, str(session_id))]
+                )
                 try:
+                    # Wait for SchedulingBroadcastEvent with RUNNING status
                     if max_wait > 0:
                         with _timeout(max_wait):
-                            await start_event.wait()
+                            async for event in propagator.receive():
+                                if isinstance(event, SchedulingBroadcastEvent):
+                                    if event.status_transition == str(SessionStatus.RUNNING):
+                                        break
                     else:
-                        await start_event.wait()
+                        async for event in propagator.receive():
+                            if isinstance(event, SchedulingBroadcastEvent):
+                                if event.status_transition == str(SessionStatus.RUNNING):
+                                    break
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -667,12 +686,16 @@ class AgentRegistry:
                             resp["servicePorts"].append(response_dict)
                     else:
                         resp["status"] = row.status.name
+                finally:
+                    # Always unregister propagator
+                    self._event_hub.unregister_event_propagator(propagator.id())
             return resp
         except asyncio.CancelledError:
             raise
         finally:
             self.pending_waits.discard(current_task)
-            if not enqueue_only and session_creation_id in self.session_creation_tracker:
+            # Clean up old tracker if exists (for backward compatibility)
+            if session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
 
     async def create_cluster(
@@ -813,9 +836,7 @@ class AgentRegistry:
                 )
 
         session_creation_id = secrets.token_urlsafe(16)
-        start_event = asyncio.Event()
         kernel_id: Optional[KernelId] = None
-        self.session_creation_tracker[session_creation_id] = start_event
         current_task = asyncio.current_task()
         assert current_task is not None
 
@@ -855,14 +876,28 @@ class AgentRegistry:
             resp["created"] = True
 
             if not enqueue_only:
+                # Create and register propagator for event hub
+                propagator = AsyncBypassPropagator()
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
+
+                # Register propagator and ensure cleanup
+                self._event_hub.register_event_propagator(
+                    propagator, [(EventDomain.SESSION, str(session_id))]
+                )
                 try:
+                    # Wait for SchedulingBroadcastEvent with RUNNING status
                     if max_wait > 0:
                         with _timeout(max_wait):
-                            await start_event.wait()
+                            async for event in propagator.receive():
+                                if isinstance(event, SchedulingBroadcastEvent):
+                                    if event.status_transition == str(SessionStatus.RUNNING):
+                                        break
                     else:
-                        await start_event.wait()
+                        async for event in propagator.receive():
+                            if isinstance(event, SchedulingBroadcastEvent):
+                                if event.status_transition == str(SessionStatus.RUNNING):
+                                    break
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -895,11 +930,15 @@ class AgentRegistry:
                             resp["servicePorts"].append(response_dict)
                     else:
                         resp["status"] = row["status"].name
+                finally:
+                    # Always unregister propagator
+                    self._event_hub.unregister_event_propagator(propagator.id())
             return resp
         except asyncio.CancelledError:
             raise
         finally:
             self.pending_waits.discard(current_task)
+            # Clean up old tracker if exists (for backward compatibility)
             if session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
 

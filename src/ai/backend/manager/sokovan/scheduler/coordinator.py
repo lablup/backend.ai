@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
@@ -55,10 +56,12 @@ class ScheduleCoordinator:
         valkey_schedule: ValkeyScheduleClient,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize kernel state engine with the scheduler's repository
@@ -66,29 +69,31 @@ class ScheduleCoordinator:
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
-            ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self._scheduling_controller),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                scheduler, self._scheduling_controller
+            ScheduleType.SCHEDULE: ScheduleSessionsHandler(
+                scheduler, self._scheduling_controller, event_producer
             ),
-            ScheduleType.START: StartSessionsHandler(scheduler),
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
+                scheduler, self._scheduling_controller, event_producer
+            ),
+            ScheduleType.START: StartSessionsHandler(scheduler, event_producer),
             ScheduleType.TERMINATE: TerminateSessionsHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.RETRY_CREATING: RetryCreatingHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
         }
 

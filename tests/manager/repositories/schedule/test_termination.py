@@ -509,6 +509,7 @@ class TestSessionTermination:
             SessionTerminationResult(
                 session_id=running_session.id,
                 access_key=running_session.access_key,
+                creation_id=running_session.creation_id,
                 session_type=running_session.session_type,
                 reason="TEST_TERMINATION",
                 kernel_results=[
@@ -563,6 +564,7 @@ class TestSessionTermination:
                 session_id=running_session.id,
                 access_key=running_session.access_key,
                 session_type=running_session.session_type,
+                creation_id=running_session.creation_id,
                 reason="TEST_PARTIAL",
                 kernel_results=[
                     KernelTerminationResult(

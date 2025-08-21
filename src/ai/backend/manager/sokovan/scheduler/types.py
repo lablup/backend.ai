@@ -527,6 +527,7 @@ class SessionDataForPull:
     """Data for a session that needs image pulling."""
 
     session_id: SessionId
+    creation_id: str
     access_key: AccessKey
     kernels: list[KernelBindingData]
 

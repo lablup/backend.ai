@@ -49,6 +49,7 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     AllocationBatch,
@@ -60,7 +61,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
-    ScheduledSessionData,
     SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
@@ -1275,7 +1275,9 @@ class ScheduleDBSource:
             for sg in allowed_sgroups
         ]
 
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
+    async def allocate_sessions(
+        self, allocation_batch: AllocationBatch
+    ) -> list[ScheduledSessionData]:
         """
         Allocate resources for sessions in the batch.
         Updates session/kernel statuses and syncs agent occupied slots.
@@ -1285,9 +1287,13 @@ class ScheduleDBSource:
         2. Processing successful allocations by updating session/kernel statuses
         3. Processing scheduling failures by updating their status data
         4. Syncing agent occupied slots to AgentRow
+
+        Returns:
+            List of ScheduledSessionData for allocated sessions
         """
         # Collect all affected agents
         affected_agent_ids: set[AgentId] = set()
+        scheduled_sessions: list[ScheduledSessionData] = []
 
         for allocation in allocation_batch.allocations:
             for kernel_alloc in allocation.kernel_allocations:
@@ -1295,6 +1301,25 @@ class ScheduleDBSource:
                     affected_agent_ids.add(kernel_alloc.agent_id)
 
         async with self._db.begin_session() as db_sess:
+            # First, fetch session data to get creation_id
+            session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
+            if session_ids:
+                query = sa.select(SessionRow.id, SessionRow.creation_id).where(
+                    SessionRow.id.in_(session_ids)
+                )
+                result = await db_sess.execute(query)
+                session_creation_map = {row.id: row.creation_id for row in result}
+
+                # Create SessionEventData for each allocated session
+                for allocation in allocation_batch.allocations:
+                    if creation_id := session_creation_map.get(allocation.session_id):
+                        scheduled_sessions.append(
+                            ScheduledSessionData(
+                                session_id=allocation.session_id,
+                                creation_id=creation_id,
+                            )
+                        )
+
             # Process successful allocations
             for allocation in allocation_batch.allocations:
                 try:
@@ -1334,6 +1359,8 @@ class ScheduleDBSource:
             # Sync agent occupied slots to AgentRow
             # This must be done within the same transaction to ensure consistency
             await self._sync_agent_occupied_slots(db_sess, affected_agent_ids)
+
+        return scheduled_sessions
 
     async def _prefetch_session_rows(
         self, db_sess: SASession, session_ids: set[SessionId]
@@ -2432,10 +2459,6 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id,
-                access_key=session.access_key,
-                session_type=session.session_type,
-                name=session.name,
-                kernels=kernels_data,
             )
             scheduled_sessions.append(scheduled_session)
 
@@ -2475,25 +2498,10 @@ class ScheduleDBSource:
 
         scheduled_sessions: list[ScheduledSessionData] = []
         for session in sessions:
-            kernel_bindings = [
-                KernelBindingData(
-                    kernel_id=kernel.id,
-                    agent_id=kernel.agent,
-                    agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
-                )
-                for kernel in session.kernels
-            ]
             scheduled_sessions.append(
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id,
-                    access_key=session.access_key,
-                    session_type=session.session_type,
-                    name=session.name,
-                    kernels=kernel_bindings,
                 )
             )
 
@@ -2600,6 +2608,7 @@ class ScheduleDBSource:
                 ),
                 load_only(
                     SessionRow.id,
+                    SessionRow.creation_id,
                     SessionRow.access_key,
                 ),
             )
@@ -2644,6 +2653,7 @@ class ScheduleDBSource:
             sessions_for_pull.append(
                 SessionDataForPull(
                     session_id=session.id,
+                    creation_id=session.creation_id,
                     access_key=session.access_key,
                     kernels=kernel_bindings,
                 )
