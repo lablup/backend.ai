@@ -26,6 +26,8 @@ def mock_scheduler():
     # Create AsyncMock with support for side_effect
     mock.mark_sessions_for_termination = AsyncMock()
     mock.terminate_sessions = AsyncMock()
+    # Add _repository attribute for KernelStateEngine initialization
+    mock._repository = MagicMock()
     return mock
 
 
@@ -73,8 +75,6 @@ def schedule_coordinator(
         valkey_schedule=mock_valkey_schedule,
         scheduler=mock_scheduler,
         scheduling_controller=mock_scheduling_controller,
-        event_producer=mock_event_producer,
-        scheduler_dispatcher=mock_scheduler_dispatcher,
     )
 
 

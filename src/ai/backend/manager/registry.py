@@ -962,15 +962,7 @@ class AgentRegistry:
         )
 
         # Delegate to scheduling controller
-        session_id = await self._scheduling_controller.enqueue_session(spec)
-
-        # Dispatch events
-        await self._scheduling_controller.dispatch_session_events(
-            session_id,
-            session_creation_id,
-        )
-
-        return session_id
+        return await self._scheduling_controller.enqueue_session(spec)
 
     async def enqueue_session(
         self,
