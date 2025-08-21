@@ -66,6 +66,7 @@ def mock_scheduling_controller():
 def mock_lock_factory():
     """Mock DistributedLockFactory."""
     from ai.backend.manager.types import DistributedLockFactory
+
     mock = MagicMock(spec=DistributedLockFactory)
     # Make it return an async context manager
     lock_mock = AsyncMock()
@@ -79,6 +80,7 @@ def mock_lock_factory():
 def mock_config_provider():
     """Mock ManagerConfigProvider."""
     from ai.backend.manager.config.provider import ManagerConfigProvider
+
     mock = MagicMock(spec=ManagerConfigProvider)
     # Set up config.manager.session_schedule_lock_lifetime
     mock.config.manager.session_schedule_lock_lifetime = 60.0
