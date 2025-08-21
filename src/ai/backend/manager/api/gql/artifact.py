@@ -355,7 +355,11 @@ async def resolve_artifacts(
     )
 
     # Build GraphQL connection response
-    return _build_artifact_connection(action_result.data, action_result.total_count)
+    return _build_artifact_connection(
+        artifacts=action_result.data,
+        total_count=action_result.total_count,
+        pagination_options=pagination_options,
+    )
 
 
 def _convert_gql_ordering_to_repo_ordering(
@@ -374,7 +378,9 @@ def _convert_gql_ordering_to_repo_ordering(
 
 
 def _build_artifact_connection(
-    artifacts: list[ArtifactData], total_count: int
+    artifacts: list[ArtifactData],
+    total_count: int,
+    pagination_options: PaginationOptions,
 ) -> ArtifactConnection:
     """Build GraphQL connection from artifacts data"""
     edges = []
@@ -383,9 +389,43 @@ def _build_artifact_connection(
         cursor = str(artifact_data.id)  # Use artifact ID as cursor
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
-    # Build page info
-    has_next_page = False  # TODO: Implement proper has_next_page logic
-    has_previous_page = False  # TODO: Implement proper has_previous_page logic
+    # Calculate pagination info
+    has_next_page = False
+    has_previous_page = False
+
+    if pagination_options.offset:
+        # Offset-based pagination
+        offset = pagination_options.offset.offset or 0
+
+        has_previous_page = offset > 0
+        has_next_page = (offset + len(artifacts)) < total_count
+
+    elif pagination_options.forward:
+        # Forward pagination (after/first)
+        first = pagination_options.forward.first
+        if first is not None:
+            # If we got exactly the requested number and there might be more
+            has_next_page = len(artifacts) == first
+        else:
+            # If no first specified, check if we have all items
+            has_next_page = len(artifacts) < total_count
+        has_previous_page = pagination_options.forward.after is not None
+
+    elif pagination_options.backward:
+        # Backward pagination (before/last)
+        last = pagination_options.backward.last
+        if last is not None:
+            # If we got exactly the requested number, there might be more before
+            has_previous_page = len(artifacts) == last
+        else:
+            # If no last specified, assume there could be previous items
+            has_previous_page = True
+        has_next_page = pagination_options.backward.before is not None
+
+    else:
+        # Default case - assume we have all items if no pagination specified
+        has_next_page = len(artifacts) < total_count
+        has_previous_page = False
 
     page_info = strawberry.relay.PageInfo(
         has_next_page=has_next_page,
