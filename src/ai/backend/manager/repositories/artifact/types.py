@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Optional
 
+from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactOrderField,
     ArtifactRegistryType,
@@ -33,11 +34,6 @@ class ArtifactRevisionOrderingOptions:
 class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
-    from typing import TYPE_CHECKING
-
-    if TYPE_CHECKING:
-        from ai.backend.manager.api.gql.base import StringFilter
-
     artifact_type: Optional[ArtifactType] = None
     authorized: Optional[bool] = None
     name_filter: Optional["StringFilter"] = None
@@ -57,11 +53,6 @@ class ArtifactFilterOptions:
 @dataclass
 class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
-
-    from typing import TYPE_CHECKING
-
-    if TYPE_CHECKING:
-        from ai.backend.manager.api.gql.base import StringFilter
 
     artifact_id: Optional[uuid.UUID] = None
     status: Optional[list[ArtifactStatus]] = None
