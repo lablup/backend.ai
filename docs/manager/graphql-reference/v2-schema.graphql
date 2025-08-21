@@ -13,7 +13,6 @@ type Artifact implements Node {
   registry: SourceInfo!
   source: SourceInfo!
   size: ByteSize!
-  authorized: Boolean!
 }
 
 type ArtifactConnection {
@@ -68,9 +67,12 @@ enum ArtifactOrderField {
 }
 
 enum ArtifactStatus {
-  AVAILABLE
+  SCANNED
+  PULLED
   PULLING
   VERIFYING
+  NEEDS_APPROVAL
+  AVAILABLE
   FAILED
 }
 

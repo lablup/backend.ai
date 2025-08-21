@@ -47,7 +47,6 @@ class ArtifactRow(Base):
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=False, index=True)
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
-    authorized = sa.Column(sa.Boolean, nullable=False, default=False)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -77,8 +76,7 @@ class ArtifactRow(Base):
             f"registry_type={self.registry_type}, "
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
-            f"description={self.description}, "
-            f"authorized={self.authorized})"
+            f"description={self.description})"
         )
 
     def __repr__(self) -> str:
@@ -94,5 +92,4 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=self.source_registry_type,
             description=self.description,
-            authorized=self.authorized,
         )

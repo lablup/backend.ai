@@ -75,7 +75,6 @@ def upgrade() -> None:
         sa.Column("registry_type", sa.String(), nullable=False),
         sa.Column("source_registry_type", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
-        sa.Column("authorized", sa.Boolean(), nullable=False, default=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifacts")),
     )
     op.create_index(op.f("ix_artifacts_created_at"), "artifacts", ["created_at"], unique=False)

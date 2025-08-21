@@ -23,7 +23,7 @@ class ArtifactStatus(enum.StrEnum):
     PULLED = "PULLED"
     PULLING = "PULLING"
     VERIFYING = "VERIFYING"
-    VERIFIED = "VERIFIED"
+    NEEDS_APPROVAL = "NEEDS_APPROVAL"
     AVAILABLE = "AVAILABLE"
     FAILED = "FAILED"
 
@@ -38,7 +38,6 @@ class ArtifactData:
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
-    authorized: bool
 
 
 @dataclass

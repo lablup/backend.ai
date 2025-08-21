@@ -8,7 +8,9 @@ from ai.backend.common.exception import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
+    ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
+    ArtifactUpdateError,
 )
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.types import (
@@ -249,34 +251,60 @@ class ArtifactRepository:
             return association_data
 
     @repository_decorator()
-    async def authorize_artifact(self, artifact_id: uuid.UUID) -> ArtifactData:
+    async def approve_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError()
+                raise ArtifactRevisionNotFoundError()
 
-            row.authorized = True
-            await db_sess.flush()
-            await db_sess.refresh(row, attribute_names=["updated_at"])
-            return row.to_dataclass()
+            if row.status != ArtifactStatus.NEEDS_APPROVAL:
+                raise ArtifactNotVerified("Only verified artifacts could be approved")
+
+            update_stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == revision_id)
+                .values(status=ArtifactStatus.AVAILABLE.value)
+                .returning(ArtifactRevisionRow)
+            )
+
+            result = await db_sess.execute(update_stmt)
+            updated_row: ArtifactRevisionRow | None = result.scalar_one_or_none()
+
+            if updated_row is None:
+                raise ArtifactUpdateError()
+
+            return updated_row.to_dataclass()
 
     @repository_decorator()
-    async def unauthorize_artifact(self, artifact_id: uuid.UUID) -> ArtifactData:
+    async def disapprove_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError()
+                raise ArtifactRevisionNotFoundError()
 
-            row.authorized = False
-            await db_sess.flush()
-            await db_sess.refresh(row, attribute_names=["updated_at"])
-            return row.to_dataclass()
+            if row.status != ArtifactStatus.AVAILABLE:
+                raise ArtifactNotVerified("Only approved artifacts could be disapproved")
+
+            update_stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == revision_id)
+                .values(status=ArtifactStatus.NEEDS_APPROVAL.value)
+                .returning(ArtifactRevisionRow)
+            )
+
+            result = await db_sess.execute(update_stmt)
+            updated_row: ArtifactRevisionRow | None = result.scalar_one_or_none()
+
+            if updated_row is None:
+                raise ArtifactUpdateError()
+
+            return updated_row.to_dataclass()
 
     @repository_decorator()
     async def delete_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:

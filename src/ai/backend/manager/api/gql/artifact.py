@@ -9,24 +9,10 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import ByteSize, OrderDirection, StringFilter
+from ai.backend.manager.data.artifact.types import ArtifactStatus, ArtifactType
 
 
 # Enums
-@strawberry.enum
-class ArtifactType(StrEnum):
-    MODEL = "MODEL"
-    PACKAGE = "PACKAGE"
-    IMAGE = "IMAGE"
-
-
-@strawberry.enum
-class ArtifactStatus(StrEnum):
-    AVAILABLE = "AVAILABLE"
-    PULLING = "PULLING"
-    VERIFYING = "VERIFYING"
-    FAILED = "FAILED"
-
-
 @strawberry.enum
 class ArtifactOrderField(StrEnum):
     ID = "ID"
@@ -90,7 +76,6 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     size: ByteSize
-    authorized: bool
 
 
 @strawberry.type

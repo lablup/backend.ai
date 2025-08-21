@@ -524,9 +524,9 @@ class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotAuthorized(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/artifact-not-authorized"
-    error_title = "Artifact Not Authorized"
+class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/artifact-not-approved"
+    error_title = "Artifact Not Approved"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -563,7 +563,20 @@ class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactAssociationCreationError(BackendAIError, web.HTTPNotFound):
+class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/artifact-update-failed"
+    error_title = "Artifact Update Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactAssociationCreationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-association-creation-failed"
     error_title = "Artifact Association Creation Failed"
 

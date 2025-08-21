@@ -155,14 +155,14 @@ class ArtifactService:
         if artifact_data.status != ArtifactStatus.VERIFIED:
             raise ArtifactNotVerified()
 
-        result = await self._artifact_repository.authorize_artifact(action.artifact_id)
+        result = await self._artifact_repository.approve_artifact(action.artifact_id)
         return AuthorizeArtifactActionResult(result=result)
 
     async def unauthorize(
         self, action: UnauthorizeArtifactAction
     ) -> UnauthorizeArtifactActionResult:
         # TODO: Should we reset the artifact row's status to SCANNED?
-        result = await self._artifact_repository.unauthorize_artifact(action.artifact_id)
+        result = await self._artifact_repository.disapprove_artifact(action.artifact_id)
         return UnauthorizeArtifactActionResult(result=result)
 
     async def delete(self, action: DeleteArtifactAction) -> DeleteArtifactActionResult:
