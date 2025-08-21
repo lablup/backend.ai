@@ -429,8 +429,12 @@ class ScheduleDBSource:
                 keypair_policies[row.access_key] = KeyPairResourcePolicy(
                     name=row.name,
                     total_resource_slots=total_resource_slots,
-                    max_concurrent_sessions=row.max_concurrent_sessions or 0,
-                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions or 0,
+                    max_concurrent_sessions=row.max_concurrent_sessions
+                    if row.max_concurrent_sessions and row.max_concurrent_sessions > 0
+                    else None,
+                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions
+                    if row.max_concurrent_sftp_sessions and row.max_concurrent_sftp_sessions > 0
+                    else None,
                     max_pending_session_count=row.max_pending_session_count,
                     max_pending_session_resource_slots=row.max_pending_session_resource_slots,
                 )

@@ -659,7 +659,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
-                schedule_coordinator=root_ctx.sokovan_orchestrator.coordinator,
+                scheduling_controller=root_ctx.scheduling_controller,
+                deployment_controller=root_ctx.deployment_controller,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -760,11 +761,14 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
+            root_ctx.scheduling_controller,
+            root_ctx.sokovan_orchestrator.coordinator._scheduler._repository,  # Add scheduler_repository
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
+            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -905,8 +909,43 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
+    from ai.backend.manager.sokovan.scheduling_controller import (
+        SchedulingController,
+        SchedulingControllerArgs,
+    )
+
     from .agent_cache import AgentRPCCache
     from .registry import AgentRegistry
+
+    # Create scheduling controller first
+    root_ctx.scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=root_ctx.repositories.scheduler.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
+        )
+    )
+
+    # Create deployment controller if Sokovan is enabled
+    if root_ctx.config_provider.config.manager.use_sokovan:
+        from ai.backend.manager.sokovan.deployment import DeploymentController
+        from ai.backend.manager.sokovan.deployment.deployment_controller import (
+            DeploymentControllerArgs,
+        )
+
+        root_ctx.deployment_controller = DeploymentController(
+            DeploymentControllerArgs(
+                scheduling_controller=root_ctx.scheduling_controller,
+                deployment_repository=root_ctx.repositories.deployment.repository,
+                config_provider=root_ctx.config_provider,
+                storage_manager=root_ctx.storage_manager,
+                event_producer=root_ctx.event_producer,
+            )
+        )
+    else:
+        root_ctx.deployment_controller = None
 
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
@@ -926,9 +965,11 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
+        root_ctx.scheduling_controller,
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
+        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     yield
@@ -977,7 +1018,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,
-        scheduler_dispatcher=root_ctx.scheduler_dispatcher,
+        scheduling_controller=root_ctx.scheduling_controller,
     )
 
     # Initialize the GlobalTimers for scheduling operations

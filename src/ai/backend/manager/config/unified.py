@@ -829,6 +829,17 @@ class ManagerConfig(BaseModel):
         validation_alias=AliasChoices("public-metrics-port", "public_metrics_port"),
         serialization_alias="public-metrics-port",
     )
+    use_sokovan: bool = Field(
+        default=True,
+        description="""
+        Whether to use the Sokovan orchestrator for session scheduling.
+        When enabled, uses the new Sokovan orchestrator for improved scheduling performance.
+        When disabled, falls back to the legacy scheduling system.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("use-sokovan", "use_sokovan"),
+        serialization_alias="use-sokovan",
+    )
 
     @property
     def aiomonitor_terminal_ui_port(self) -> int:

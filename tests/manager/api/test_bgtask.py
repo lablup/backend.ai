@@ -34,6 +34,7 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
+    repositories_ctx,
     storage_manager_ctx,
 )
 
@@ -64,6 +65,7 @@ async def bgtask_fixture(
             message_queue_ctx,
             event_producer_ctx,
             storage_manager_ctx,
+            repositories_ctx,
             monitoring_ctx,
             network_plugin_ctx,
             hook_plugin_ctx,

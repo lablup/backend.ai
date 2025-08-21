@@ -74,7 +74,7 @@ class SchedulerOperationMetricObserver:
 
 
 class SchedulerPhaseMetricObserver:
-    """Metrics for scheduler execution phases (validation, sequencing, allocation)."""
+    """Metrics for scheduler and scheduling controller execution phases."""
 
     _instance: Optional[Self] = None
 
@@ -84,13 +84,13 @@ class SchedulerPhaseMetricObserver:
     def __init__(self) -> None:
         self._phase_count = Counter(
             name="backendai_scheduler_phase_count",
-            documentation="Total number of scheduler phase executions",
-            labelnames=["scaling_group", "phase", "status"],
+            documentation="Total number of scheduler/scheduling controller phase executions",
+            labelnames=["component", "scaling_group", "phase", "status"],
         )
         self._phase_duration_sec = Histogram(
             name="backendai_scheduler_phase_duration_sec",
-            documentation="Duration of scheduler phase executions in seconds",
-            labelnames=["scaling_group", "phase", "status"],
+            documentation="Duration of scheduler/scheduling controller phase executions in seconds",
+            labelnames=["component", "scaling_group", "phase", "status"],
             buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0],
         )
 
@@ -101,36 +101,41 @@ class SchedulerPhaseMetricObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_phase(
+    def _observe_phase(
         self,
         *,
+        component: str,
         scaling_group: str,
         phase: str,
         status: str,
         duration: float,
     ) -> None:
         """
-        Record a scheduler phase execution.
+        Record a scheduler or scheduling controller phase execution.
 
         Args:
+            component: The component name ('scheduler' or 'scheduling_controller')
             scaling_group: The scaling group name
-            phase: The scheduler phase (e.g., 'validation', 'sequencing_fifo', 'allocation')
+            phase: The phase name (e.g., 'validation', 'sequencing_fifo', 'allocation', 'fetch_data')
             status: The phase status ('success' or 'failure')
             duration: The phase duration in seconds
         """
-        self._phase_count.labels(scaling_group=scaling_group, phase=phase, status=status).inc()
+        self._phase_count.labels(
+            component=component, scaling_group=scaling_group, phase=phase, status=status
+        ).inc()
         self._phase_duration_sec.labels(
-            scaling_group=scaling_group, phase=phase, status=status
+            component=component, scaling_group=scaling_group, phase=phase, status=status
         ).observe(duration)
 
     @contextmanager
-    def measure_phase(self, scaling_group: str, phase: str) -> Iterator[None]:
+    def measure_phase(self, component: str, scaling_group: str, phase: str) -> Iterator[None]:
         """
-        Context manager to measure a scheduler phase.
+        Context manager to measure a phase execution.
 
         Args:
+            component: The component name ('scheduler' or 'scheduling_controller')
             scaling_group: The scaling group name
-            phase: The scheduler phase
+            phase: The phase name
         """
         start = time.perf_counter()
         status = "success"
@@ -141,6 +146,10 @@ class SchedulerPhaseMetricObserver:
             raise
         finally:
             duration = time.perf_counter() - start
-            self.observe_phase(
-                scaling_group=scaling_group, phase=phase, status=status, duration=duration
+            self._observe_phase(
+                component=component,
+                scaling_group=scaling_group,
+                phase=phase,
+                status=status,
+                duration=duration,
             )

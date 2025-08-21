@@ -27,6 +27,7 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
+    repositories_ctx,
     services_ctx,
     storage_manager_ctx,
 )
@@ -132,6 +133,7 @@ async def test_scan_gpu_alloc_maps(
             message_queue_ctx,
             event_producer_ctx,
             storage_manager_ctx,
+            repositories_ctx,
             monitoring_ctx,
             network_plugin_ctx,
             hook_plugin_ctx,
