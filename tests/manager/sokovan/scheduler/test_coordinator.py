@@ -63,12 +63,39 @@ def mock_scheduling_controller():
 
 
 @pytest.fixture
+def mock_lock_factory():
+    """Mock DistributedLockFactory."""
+    from ai.backend.manager.types import DistributedLockFactory
+
+    mock = MagicMock(spec=DistributedLockFactory)
+    # Make it return an async context manager
+    lock_mock = AsyncMock()
+    lock_mock.__aenter__ = AsyncMock(return_value=None)
+    lock_mock.__aexit__ = AsyncMock(return_value=None)
+    mock.return_value = lock_mock
+    return mock
+
+
+@pytest.fixture
+def mock_config_provider():
+    """Mock ManagerConfigProvider."""
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+
+    mock = MagicMock(spec=ManagerConfigProvider)
+    # Set up config.manager.session_schedule_lock_lifetime
+    mock.config.manager.session_schedule_lock_lifetime = 60.0
+    return mock
+
+
+@pytest.fixture
 def schedule_coordinator(
     mock_scheduler,
     mock_valkey_schedule,
     mock_event_producer,
     mock_scheduler_dispatcher,
     mock_scheduling_controller,
+    mock_lock_factory,
+    mock_config_provider,
 ):
     """Create ScheduleCoordinator with mocked dependencies."""
     return ScheduleCoordinator(
@@ -76,6 +103,8 @@ def schedule_coordinator(
         scheduler=mock_scheduler,
         scheduling_controller=mock_scheduling_controller,
         event_producer=mock_event_producer,
+        lock_factory=mock_lock_factory,
+        config_provider=mock_config_provider,
     )
 
 

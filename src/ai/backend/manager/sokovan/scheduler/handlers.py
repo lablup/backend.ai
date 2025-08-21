@@ -4,7 +4,7 @@ Schedule operation handlers that bundle the operation with its post-processing l
 
 import logging
 from abc import ABC, abstractmethod
-from typing import final
+from typing import Optional, final
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import (
@@ -12,6 +12,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionSchedulingEventData,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
@@ -44,6 +45,16 @@ class ScheduleHandler(ABC):
     def name(cls) -> str:
         """Get the name of the handler."""
         raise NotImplementedError("Subclasses must implement name()")
+
+    @property
+    @abstractmethod
+    def lock_id(self) -> Optional[LockID]:
+        """Get the lock ID for this handler.
+
+        Returns:
+            LockID to acquire before execution, or None if no lock needed
+        """
+        raise NotImplementedError("Subclasses must implement lock_id")
 
     @abstractmethod
     async def execute(self) -> ScheduleResult:
@@ -93,6 +104,11 @@ class ScheduleSessionsHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "schedule-sessions"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PENDING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PENDING
+
     async def execute(self) -> ScheduleResult:
         """Schedule all pending sessions across scaling groups."""
         log.trace("Scheduling sessions across all scaling groups")
@@ -138,6 +154,11 @@ class CheckPreconditionHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "check-precondition"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
+
     async def execute(self) -> ScheduleResult:
         """Check preconditions for scheduled sessions."""
         return await self._scheduler.check_preconditions()
@@ -177,6 +198,11 @@ class StartSessionsHandler(ScheduleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "start-sessions"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 
     async def execute(self) -> ScheduleResult:
         """Start sessions that passed precondition checks."""
@@ -218,6 +244,11 @@ class TerminateSessionsHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "terminate-sessions"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting TERMINATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
+
     async def execute(self) -> ScheduleResult:
         """Terminate sessions marked for termination."""
         return await self._scheduler.terminate_sessions()
@@ -240,6 +271,11 @@ class SweepSessionsHandler(ScheduleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "sweep-sessions"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """No lock needed for sweeping stale sessions."""
+        return None
 
     async def execute(self) -> ScheduleResult:
         """Sweep stale sessions including those with pending timeout."""
@@ -267,6 +303,11 @@ class CheckPullingProgressHandler(ScheduleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-pulling-progress"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING/PULLING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
     async def execute(self) -> ScheduleResult:
         """Check if sessions in PULLING state have all kernels ready."""
@@ -309,6 +350,11 @@ class CheckCreatingProgressHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "check-creating-progress"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
+
     async def execute(self) -> ScheduleResult:
         """Check if sessions in CREATING state have all kernels running."""
         return await self._scheduler.check_creating_progress()
@@ -350,6 +396,11 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-terminating-progress"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting TERMINATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
     async def execute(self) -> ScheduleResult:
         """Check if sessions in TERMINATING state have all kernels terminated."""
@@ -398,6 +449,11 @@ class RetryPreparingHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "retry-preparing"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING sessions (retry)."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
+
     async def execute(self) -> ScheduleResult:
         """Check and retry stuck PREPARING/PULLING sessions."""
         log.debug("Checking for stuck PREPARING/PULLING sessions to retry")
@@ -427,6 +483,11 @@ class RetryCreatingHandler(ScheduleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "retry-creating"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions (retry)."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 
     async def execute(self) -> ScheduleResult:
         """Check and retry stuck CREATING sessions."""

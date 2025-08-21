@@ -14,10 +14,12 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 )
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.types import DistributedLockFactory
 
 from .handlers import (
     CheckCreatingProgressHandler,
@@ -50,6 +52,8 @@ class ScheduleCoordinator:
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
+    _lock_factory: DistributedLockFactory
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
@@ -57,11 +61,15 @@ class ScheduleCoordinator:
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
+        lock_factory: DistributedLockFactory,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
+        self._lock_factory = lock_factory
+        self._config_provider = config_provider
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize kernel state engine with the scheduler's repository
@@ -118,9 +126,19 @@ class ScheduleCoordinator:
                 log.warning("No handler for schedule type: {}", schedule_type.value)
                 return False
 
-            # Execute the handler (includes operation and post-processing)
+            # Execute the handler with optional locking
             with self._operation_metrics.measure_operation(handler.name()):
-                await handler.handle()
+                if handler.lock_id is not None:
+                    # Use unified lock lifetime for all operations
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    # Acquire lock for the entire operation
+                    async with self._lock_factory(handler.lock_id, lock_lifetime):
+                        await handler.handle()
+                else:
+                    # No lock needed
+                    await handler.handle()
             return True
         except Exception as e:
             log.exception(
