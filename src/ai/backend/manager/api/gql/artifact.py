@@ -38,6 +38,35 @@ class ArtifactFilter:
     NOT: Optional["ArtifactFilter"] = None
     DISTINCT: Optional[bool] = None
 
+    def to_repo_filter(self) -> ArtifactFilterOptions:
+        repo_filter = ArtifactFilterOptions()
+
+        # Handle artifact type filter
+        if self.type:
+            # Convert first type from list (assuming single type for now)
+            repo_filter.artifact_type = self.type[0] if self.type else None
+
+        # Handle name filter
+        if self.name:
+            # Use the most specific filter available (starts with preference order)
+            if self.name.equals:
+                repo_filter.name = self.name.equals
+            elif self.name.i_equals:
+                repo_filter.name = self.name.i_equals
+            elif self.name.contains:
+                repo_filter.name = self.name.contains
+            elif self.name.i_contains:
+                repo_filter.name = self.name.i_contains
+            elif self.name.starts_with:
+                repo_filter.name = self.name.starts_with
+            elif self.name.i_starts_with:
+                repo_filter.name = self.name.i_starts_with
+
+        # Note: For now we ignore registry and source filters as they require additional complexity
+        # TODO: Add support for registry/source filters when needed
+
+        return repo_filter
+
 
 @strawberry.input
 class ArtifactOrderBy:
@@ -306,7 +335,70 @@ async def resolve_artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    raise NotImplementedError("Artifact retrieval not implemented yet.")
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    # Convert GraphQL ordering to repository ordering
+    repo_ordering = _convert_gql_ordering_to_repo_ordering(order_by)
+
+    # Set up pagination options
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    # Get artifacts using list action
+    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
+        ListArtifactsAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
+    )
+
+    # Build GraphQL connection response
+    return _build_artifact_connection(action_result.data, action_result.total_count)
+
+
+def _convert_gql_ordering_to_repo_ordering(
+    order_by: Optional[list[ArtifactOrderBy]],
+) -> ArtifactOrderingOptions:
+    """Convert GraphQL ordering to repository ordering options"""
+    if not order_by:
+        return ArtifactOrderingOptions()  # Uses default ordering
+
+    repo_order_by = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_order_by.append((order.field, desc))
+
+    return ArtifactOrderingOptions(order_by=repo_order_by)
+
+
+def _build_artifact_connection(
+    artifacts: list[ArtifactData], total_count: int
+) -> ArtifactConnection:
+    """Build GraphQL connection from artifacts data"""
+    edges = []
+    for i, artifact_data in enumerate(artifacts):
+        artifact = Artifact.from_dataclass(artifact_data)
+        cursor = str(artifact_data.id)  # Use artifact ID as cursor
+        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
+
+    # Build page info
+    has_next_page = False  # TODO: Implement proper has_next_page logic
+    has_previous_page = False  # TODO: Implement proper has_previous_page logic
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=has_next_page,
+        has_previous_page=has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactConnection(
+        count=total_count,
+        edges=edges,
+        page_info=page_info,
+    )
 
 
 async def resolve_artifact_revisions(

@@ -53,10 +53,6 @@ class ArtifactFilterApplier:
 
         if filters.artifact_type is not None:
             conditions.append(ArtifactRow.type == filters.artifact_type)
-        if filters.status is not None:
-            # Support multiple status values using IN clause
-            status_values = [status.value for status in filters.status]
-            conditions.append(ArtifactRow.status.in_(status_values))
         if filters.authorized is not None:
             conditions.append(ArtifactRow.authorized == filters.authorized)
         if filters.name is not None:
@@ -89,7 +85,7 @@ class ArtifactOrderingApplier:
         sql_order_clauses = []
 
         for field, desc in ordering.order_by:
-            order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
+            order_column = getattr(ArtifactRow, field.value, ArtifactRow.name)
             order_clauses.append((order_column, desc))
 
             if desc:
@@ -507,7 +503,7 @@ class ArtifactRepository:
             pagination=pagination,
             ordering=ordering,
             filters=filters,
-            select_options=[selectinload(ArtifactRow.version_rows)],
+            select_options=[selectinload(ArtifactRow.revision_rows)],
         )
 
         async with self._db.begin_session() as db_sess:

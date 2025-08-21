@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import orjson
 import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import unbase64
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import (
+        PaginationOptions,
+    )
 
 
 @strawberry.scalar
@@ -93,3 +98,35 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
     return type_, id_
+
+
+def build_pagination_options(
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> PaginationOptions:
+    from ai.backend.manager.repositories.types import (
+        BackwardPaginationOptions,
+        ForwardPaginationOptions,
+        OffsetBasedPaginationOptions,
+        PaginationOptions,
+    )
+
+    """Build pagination options from GraphQL arguments"""
+    pagination = PaginationOptions()
+
+    # Handle offset-based pagination
+    if offset is not None or limit is not None:
+        pagination.offset = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+        return pagination
+
+    # Handle cursor-based pagination
+    if after is not None or first is not None:
+        pagination.forward = ForwardPaginationOptions(after=after, first=first)
+    elif before is not None or last is not None:
+        pagination.backward = BackwardPaginationOptions(before=before, last=last)
+
+    return pagination

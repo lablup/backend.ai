@@ -64,7 +64,7 @@ TOrdering = TypeVar("TOrdering")
 
 @dataclass
 class PaginationQueryResult:
-    """GenericPaginator의 쿼리 빌딩 결과를 담는 데이터클래스"""
+    """Result of a pagination query."""
 
     data_query: Select
     pagination_order: Optional[ConnectionPaginationOrder] = None
