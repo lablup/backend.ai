@@ -30,7 +30,6 @@ from .resolvers.scaling_group_resolver import ScalingGroupResolver
 from .validators import (
     ClusterValidationRule,
     ContainerLimitRule,
-    KernelSpecsRule,
     MountNameValidationRule,
     ScalingGroupAccessRule,
     ServicePortRule,
@@ -85,7 +84,6 @@ class SchedulingController:
         validator_rules = [
             ContainerLimitRule(),
             ScalingGroupAccessRule(),
-            KernelSpecsRule(),
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),

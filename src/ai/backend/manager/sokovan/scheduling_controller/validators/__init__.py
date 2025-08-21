@@ -5,7 +5,6 @@ from .cluster import ClusterValidationRule
 from .mount import MountNameValidationRule
 from .rules import (
     ContainerLimitRule,
-    KernelSpecsRule,
     ResourceLimitRule,
     ScalingGroupAccessRule,
     ServicePortRule,
@@ -17,7 +16,6 @@ __all__ = [
     "SessionValidatorRule",
     "ContainerLimitRule",
     "ScalingGroupAccessRule",
-    "KernelSpecsRule",
     "ServicePortRule",
     "ResourceLimitRule",
     "ClusterValidationRule",
