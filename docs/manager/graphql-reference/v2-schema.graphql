@@ -9,15 +9,11 @@ type Artifact implements Node {
   id: ID!
   name: String!
   type: ArtifactType!
-  status: ArtifactStatus!
   description: String
   registry: SourceInfo!
   source: SourceInfo!
   size: ByteSize!
-  createdAt: DateTime!
-  updatedAt: DateTime!
   authorized: Boolean!
-  versions: [String!]!
 }
 
 type ArtifactConnection {
