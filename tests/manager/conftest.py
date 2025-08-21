@@ -972,6 +972,13 @@ async def registry_ctx(mocker):
     mock_event_producer.anycast_event = AsyncMock()
     mock_event_producer.broadcast_event = AsyncMock()
     mock_event_producer.anycast_and_broadcast_event = AsyncMock()
+
+    # Create a mock EventHub
+    mock_event_hub = MagicMock()
+    mock_event_hub.publish = AsyncMock()
+    mock_event_hub.subscribe = AsyncMock()
+    mock_event_hub.unsubscribe = AsyncMock()
+
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
@@ -991,6 +998,7 @@ async def registry_ctx(mocker):
         valkey_live=mock_redis_live,
         valkey_image=mock_redis_image,
         event_producer=mock_event_producer,
+        event_hub=mock_event_hub,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
