@@ -3,23 +3,28 @@ from typing import Optional
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.storage.registries.types import ModelData, ModelTarget
+from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.exception import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
+    ArtifactRevisionNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
+    ArtifactDataWithRevisions,
     ArtifactRegistryType,
+    ArtifactRevisionData,
     ArtifactStatus,
+    ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.models.artifact import ArtifactRow, ArtifactVersionRow
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
@@ -52,14 +57,11 @@ class ArtifactRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def get_artifact_by_model_target(self, model_target: ModelTarget) -> ArtifactData:
+    async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(
-                    sa.and_(
-                        ArtifactRow.name == model_target.model_id,
-                        ArtifactRow.version == model_target.revision,
-                    )
+                    sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
                 )
             )
             row: ArtifactRow = result.scalar_one_or_none()
@@ -68,60 +70,104 @@ class ArtifactRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def get_artifact_revision(
+        self, artifact_id: uuid.UUID, revision: str
+    ) -> ArtifactRevisionData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(
+                    sa.and_(
+                        ArtifactRevisionRow.artifact_id == artifact_id,
+                        ArtifactRevisionRow.version == revision,
+                    )
+                )
+            )
+            row: ArtifactRevisionRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRevisionNotFoundError()
+            return row.to_dataclass()
+
+    @repository_decorator()
     async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],
         registry_id: uuid.UUID,
-        source_registry_id: uuid.UUID,
-        source_registry_type: ArtifactRegistryType,
-    ) -> list[ArtifactData]:
+    ) -> list[ArtifactDataWithRevisions]:
         async with self._db.begin_session() as db_sess:
-            result = []
+            # key: artifact_id
+            artifacts_map: dict[uuid.UUID, tuple[ArtifactRow, list[ArtifactRevisionRow]]] = {}
 
             for model in model_list:
-                # Check if artifact with same model_id and registry_id already exists
-                existing_stmt = sa.select(ArtifactRow).where(
-                    sa.and_(
-                        ArtifactRow.registry_id == registry_id,
-                        ArtifactRow.name == model.id,
+                # Check if artifact exists within the current session
+                artifact_query_result = await db_sess.execute(
+                    sa.select(ArtifactRow).where(
+                        sa.and_(
+                            ArtifactRow.name == model.id, ArtifactRow.registry_id == registry_id
+                        )
                     )
                 )
-                existing_result = await db_sess.execute(existing_stmt)
-                existing_artifact = existing_result.scalar_one_or_none()
+                artifact_row: ArtifactRow = artifact_query_result.scalar_one_or_none()
 
-                if existing_artifact is not None:
-                    # Update existing artifacts
-                    existing_artifact.source_registry_id = source_registry_id
-                    existing_artifact.source_registry_type = source_registry_type
-                    if model.modified_at:
-                        existing_artifact.updated_at = model.modified_at
-                    existing_artifact.authorized = False
-                    existing_artifact.version = model.revision
+                if artifact_row is None:
+                    # Create new artifact
+                    artifact_row = ArtifactRow(
+                        type=ArtifactType.MODEL,
+                        name=model.id,
+                        registry_id=registry_id,
+                        registry_type=ArtifactRegistryType.HUGGINGFACE,
+                        source_registry_id=registry_id,
+                        source_registry_type=ArtifactRegistryType.HUGGINGFACE,
+                    )
+                    db_sess.add(artifact_row)
+                    await db_sess.flush()
+                    await db_sess.refresh(artifact_row, attribute_names=["updated_at"])
+
+                # Initialize artifact in map if not exists
+                if artifact_row.id not in artifacts_map:
+                    artifacts_map[artifact_row.id] = (artifact_row, [])
+
+                # Check if artifact revision exists
+                revision_query_result = await db_sess.execute(
+                    sa.select(ArtifactRevisionRow).where(
+                        sa.and_(
+                            ArtifactRevisionRow.artifact_id == artifact_row.id,
+                            ArtifactRevisionRow.version == model.revision,
+                        )
+                    )
+                )
+
+                existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
+                if existing_revision is not None:
+                    # Update existing revision
+                    # TODO: Reset to SCANNED?
+                    existing_revision.created_at = model.created_at
+                    existing_revision.updated_at = model.modified_at
 
                     await db_sess.flush()
-                    await db_sess.refresh(existing_artifact, attribute_names=["updated_at"])
-                    result.append(existing_artifact.to_dataclass())
+                    await db_sess.refresh(existing_revision, attribute_names=["updated_at"])
+                    artifacts_map[artifact_row.id][1].append(existing_revision)
                 else:
-                    # Insert new artifact
-                    new_artifact = ArtifactRow.from_huggingface_model_data(
-                        model,
-                        registry_id=registry_id,
-                        source_registry_id=source_registry_id,
-                        source_registry_type=source_registry_type,
+                    # Insert new artifact revision
+                    new_revision = ArtifactRevisionRow.from_huggingface_model_data(
+                        artifact_id=artifact_row.id,
+                        model_data=model,
                     )
-                    db_sess.add(new_artifact)
+
+                    db_sess.add(new_revision)
                     await db_sess.flush()
                     await db_sess.refresh(
-                        new_artifact, attribute_names=["id", "created_at", "updated_at"]
+                        new_revision, attribute_names=["id", "created_at", "updated_at"]
                     )
+                    artifacts_map[artifact_row.id][1].append(new_revision)
 
-                    artifact_version_row = ArtifactVersionRow(
-                        artifact_id=new_artifact.id, version=model.revision
-                    )
-                    db_sess.add(artifact_version_row)
-                    await db_sess.flush()
-
-                    result.append(new_artifact.to_dataclass())
+            # Convert to ArtifactDataWithRevisions format
+            result: list[ArtifactDataWithRevisions] = []
+            for artifact_row, revision_rows in artifacts_map.values():
+                artifact_data = artifact_row.to_dataclass()
+                revision_data_list = [revision.to_dataclass() for revision in revision_rows]
+                result.append(
+                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revision_data_list)
+                )
 
         return result
 

@@ -10,6 +10,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 @dataclass
 class ImportArtifactAction(ArtifactAction):
     artifact_id: uuid.UUID
+    artifact_version: str
     storage_id: uuid.UUID
     bucket_name: str
 

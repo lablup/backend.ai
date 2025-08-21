@@ -5,7 +5,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.common.exception import ArtifactNotVerified
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType, ArtifactStatus
+from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -90,8 +90,6 @@ class ArtifactService:
         scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
             scan_result.models,
             registry_id=registry_data.id,
-            source_registry_id=registry_data.id,
-            source_registry_type=ArtifactRegistryType.HUGGINGFACE,
         )
 
         return ScanArtifactsActionResult(result=scanned_models)
@@ -112,7 +110,7 @@ class ArtifactService:
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
         result = await storage_proxy_client.import_huggingface_models(
             HuggingFaceImportModelsReq(
-                models=[ModelTarget(model_id=artifact.name, revision=artifact.version)],
+                models=[ModelTarget(model_id=artifact.name, revision=action.artifact_version)],
                 registry_name=registry_data.name,
                 storage_name=storage.name,
                 bucket_name=action.bucket_name,

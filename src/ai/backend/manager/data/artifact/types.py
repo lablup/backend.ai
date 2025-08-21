@@ -15,6 +15,10 @@ class ArtifactRegistryType(enum.StrEnum):
 
 
 class ArtifactStatus(enum.StrEnum):
+    """
+    ArtifactRevision's status.
+    """
+
     SCANNED = "SCANNED"
     PULLED = "PULLED"
     PULLING = "PULLING"
@@ -30,21 +34,39 @@ class ArtifactData:
     name: str
     type: ArtifactType
     description: str
-    readme: str
     registry_id: uuid.UUID
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    authorized: bool
+
+
+@dataclass
+class ArtifactRevisionData:
+    id: uuid.UUID
+    artifact_id: uuid.UUID
+    version: str
+    readme: str
     size: int
+    status: ArtifactStatus
     created_at: datetime
     updated_at: datetime
-    authorized: bool
-    status: ArtifactStatus
+
+
+@dataclass
+class ArtifactDataWithRevisions:
+    artifact: ArtifactData
+    revisions: list[ArtifactRevisionData]
 
 
 class ArtifactOrderField(enum.StrEnum):
     NAME = "NAME"
     TYPE = "TYPE"
+    SIZE = "SIZE"
+
+
+class ArtifactRevisionOrderField(enum.StrEnum):
+    VERSION = "VERSION"
     SIZE = "SIZE"
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"

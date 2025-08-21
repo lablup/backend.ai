@@ -86,15 +86,21 @@ class Artifact(Node):
     id: NodeID[str]
     name: str
     type: ArtifactType
-    status: ArtifactStatus
     description: Optional[str]
     registry: SourceInfo
     source: SourceInfo
     size: ByteSize
+    authorized: bool
+
+
+@strawberry.type
+class ArtifactRevision(Node):
+    id: NodeID[str]
+    status: ArtifactStatus
     created_at: datetime
     updated_at: datetime
-    authorized: bool
-    versions: list[str]
+    readme: str
+    version: str
 
 
 ArtifactEdge = Edge[Artifact]

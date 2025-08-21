@@ -5,6 +5,7 @@ from typing import Optional
 from ai.backend.manager.data.artifact.types import (
     ArtifactOrderField,
     ArtifactRegistryType,
+    ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,
 )
@@ -15,7 +16,16 @@ class ArtifactOrderingOptions:
     """Ordering options for artifact queries."""
 
     order_by: list[tuple[ArtifactOrderField, bool]] = field(
-        default_factory=lambda: [(ArtifactOrderField.CREATED_AT, True)]
+        default_factory=lambda: [(ArtifactOrderField.NAME, True)]
+    )  # (field, desc)
+
+
+@dataclass
+class ArtifactRevisioniOrderingOptions:
+    """Ordering options for artifact revision queries."""
+
+    order_by: list[tuple[ArtifactRevisionOrderField, bool]] = field(
+        default_factory=lambda: [(ArtifactRevisionOrderField.CREATED_AT, True)]
     )  # (field, desc)
 
 
@@ -24,10 +34,18 @@ class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
     artifact_type: Optional[ArtifactType] = None
-    status: Optional[list[ArtifactStatus]] = None  # Changed to support multiple statuses
     authorized: Optional[bool] = None
-    name_filter: Optional[str] = None
+    name: Optional[str] = None
     registry_id: Optional[uuid.UUID] = None
     registry_type: Optional[ArtifactRegistryType] = None
     source_registry_id: Optional[uuid.UUID] = None
     source_registry_type: Optional[ArtifactRegistryType] = None
+
+
+@dataclass
+class ArtifactRevisionFilterOptions:
+    """Filtering options for artifact revisions."""
+
+    artifact_id: Optional[uuid.UUID] = None
+    status: Optional[ArtifactStatus] = None
+    version: Optional[str] = None

@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
-from typing import Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
-from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
-    ArtifactRegistryType,
-    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
@@ -26,30 +21,13 @@ from .base import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__ = ("ArtifactRow", "ArtifactVersionRow")
+__all__ = ("ArtifactRow",)
 
 
-class ArtifactVersionRow(Base):
-    __tablename__ = "artifact_versions"
-    __table_args__ = (
-        # constraint
-        sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
-    )
+def _get_artifact_revision_join_cond():
+    from .artifact_revision import ArtifactRevisionRow
 
-    id = IDColumn("id")
-    artifact_id = sa.Column(
-        GUID,
-        sa.ForeignKey("artifacts.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    version = sa.Column("version", sa.String, nullable=False)
-
-    artifact = relationship(
-        "ArtifactRow",
-        back_populates="versions",
-        primaryjoin=lambda: foreign(ArtifactVersionRow.artifact_id) == ArtifactRow.id,
-    )
+    return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
 class ArtifactRow(Base):
@@ -64,30 +42,12 @@ class ArtifactRow(Base):
     id = IDColumn("id")
     type = sa.Column("type", sa.Enum(ArtifactType), index=True, nullable=False)
     name = sa.Column("name", sa.String, index=True, nullable=False)
-    size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
     registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     registry_type = sa.Column("registry_type", sa.String, nullable=False, index=True)
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=False, index=True)
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
-    readme = sa.Column("readme", sa.TEXT, nullable=True)
-    created_at = sa.Column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-        index=True,
-    )
-    updated_at = sa.Column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
-        index=True,
-    )
     authorized = sa.Column(sa.Boolean, nullable=False, default=False)
-    status = sa.Column(sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value)
 
     association_artifacts_storages_rows = relationship(
         "AssociationArtifactsStorageRow",
@@ -101,10 +61,10 @@ class ArtifactRow(Base):
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
     )
 
-    versions = relationship(
-        "ArtifactVersionRow",
+    revision_rows = relationship(
+        "ArtifactRevisionRow",
         back_populates="artifact",
-        primaryjoin=lambda: ArtifactRow.id == foreign(ArtifactVersionRow.artifact_id),
+        primaryjoin=_get_artifact_revision_join_cond,
     )
 
     def __str__(self) -> str:
@@ -113,17 +73,12 @@ class ArtifactRow(Base):
             f"id={self.id}, "
             f"type={self.type}, "
             f"name={self.name}, "
-            f"size={self.size}, "
             f"registry_id={self.registry_id}, "
             f"registry_type={self.registry_type}, "
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
             f"description={self.description}, "
-            f"readme={self.readme[:30]}, "  # truncate for display
-            f"created_at={self.created_at.isoformat()}, "
-            f"updated_at={self.updated_at.isoformat()}, "
-            f"authorized={self.authorized}, "
-            f"status={self.status})"
+            f"authorized={self.authorized})"
         )
 
     def __repr__(self) -> str:
@@ -134,40 +89,10 @@ class ArtifactRow(Base):
             id=self.id,
             type=self.type,
             name=self.name,
-            size=self.size,
             registry_id=self.registry_id,
             registry_type=self.registry_type,
             source_registry_id=self.source_registry_id,
             source_registry_type=self.source_registry_type,
             description=self.description,
-            readme=self.readme,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
             authorized=self.authorized,
-            status=ArtifactStatus(self.status),
-        )
-
-    @classmethod
-    def from_huggingface_model_data(
-        cls,
-        model_data: ModelData,
-        registry_id: uuid.UUID,
-        source_registry_id: uuid.UUID,
-        source_registry_type: ArtifactRegistryType,
-    ) -> Self:
-        return cls(
-            type=ArtifactType.MODEL,
-            name=model_data.id,
-            size=None,  # Size is populated later when handling ModelImportDone event
-            registry_id=registry_id,
-            registry_type=ArtifactRegistryType.HUGGINGFACE,
-            source_registry_id=source_registry_id,
-            source_registry_type=source_registry_type,
-            # TODO: How to handle this?
-            description="",
-            readme="",
-            created_at=model_data.created_at,
-            updated_at=model_data.modified_at,
-            authorized=False,
-            status=ArtifactStatus.SCANNED.value,
         )
