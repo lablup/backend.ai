@@ -60,8 +60,35 @@ enum ArtifactOrderField {
   NAME
   TYPE
   SIZE
-  CREATED_AT
-  UPDATED_AT
+}
+
+type ArtifactRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  status: ArtifactStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  readme: String!
+  version: String!
+  size: ByteSize!
+}
+
+type ArtifactRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRevision!
 }
 
 enum ArtifactStatus {
@@ -85,6 +112,11 @@ type ArtifactStatusChangedPayload {
 input ArtifactStatusFilter {
   IN: [ArtifactStatus!] = null
   EQ: [ArtifactStatus!] = null
+}
+
+input ArtifactTarget {
+  artifactId: ID!
+  revision: String!
 }
 
 enum ArtifactType {
@@ -319,7 +351,7 @@ extend type ImageNode @key(fields: "id") {
 }
 
 input ImportArtifactsInput {
-  artifactIds: [ID!]!
+  artifacts: [ArtifactTarget!]!
   storageId: ID!
   bucketName: String!
 }

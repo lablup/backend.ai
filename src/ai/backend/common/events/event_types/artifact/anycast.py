@@ -19,6 +19,8 @@ class BaseArtifactEvent(AbstractAnycastEvent):
 class ModelImportDoneEvent(BaseArtifactEvent):
     model_id: str
     revision: str
+    registry_name: str
+    registry_type: str
     total_size: int
 
     @classmethod
@@ -27,14 +29,22 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         return "model_import_done"
 
     def serialize(self) -> tuple:
-        return (self.model_id, self.revision, self.total_size)
+        return (
+            self.model_id,
+            self.revision,
+            self.registry_name,
+            self.registry_type,
+            self.total_size,
+        )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
             model_id=value[0],
             revision=value[1],
-            total_size=value[2],
+            registry_name=value[2],
+            registry_type=value[3],
+            total_size=value[4],
         )
 
     @override

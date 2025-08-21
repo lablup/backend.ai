@@ -2,7 +2,6 @@ import uuid
 from typing import Optional
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.exception import (
@@ -14,13 +13,13 @@ from ai.backend.common.exception import (
     ArtifactUpdateError,
 )
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactRegistryType,
     ArtifactRevisionData,
     ArtifactStatus,
+    ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.decorators.repository_decorator import (
@@ -29,8 +28,6 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
-from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -54,15 +51,12 @@ class ArtifactRepository:
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ArtifactRow)
-                .where(ArtifactRow.id == artifact_id)
-                .options(selectinload(ArtifactRow.version_rows))
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError()
-            versions = [version.version for version in row.version_rows]
-            return row.to_dataclass(versions)
+            return row.to_dataclass()
 
     @repository_decorator()
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
@@ -71,13 +65,11 @@ class ArtifactRepository:
                 sa.select(ArtifactRow).where(
                     sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
                 )
-                .options(selectinload(ArtifactRow.version_rows))
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError()
-            versions = [version.version for version in row.version_rows]
-            return row.to_dataclass(versions)
+            return row.to_dataclass()
 
     @repository_decorator()
     async def get_artifact_revision(
@@ -98,6 +90,15 @@ class ArtifactRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
+            )
+            rows: list[ArtifactRevisionRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
     async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],
@@ -115,7 +116,6 @@ class ArtifactRepository:
                             ArtifactRow.name == model.id, ArtifactRow.registry_id == registry_id
                         )
                     )
-                    .options(selectinload(ArtifactRow.version_rows))
                 )
                 artifact_row: ArtifactRow = artifact_query_result.scalar_one_or_none()
 
@@ -131,7 +131,7 @@ class ArtifactRepository:
                     )
                     db_sess.add(artifact_row)
                     await db_sess.flush()
-                    await db_sess.refresh(artifact_row, attribute_names=["updated_at"])
+                    await db_sess.refresh(artifact_row)
 
                 # Initialize artifact in map if not exists
                 if artifact_row.id not in artifacts_map:
@@ -151,25 +151,8 @@ class ArtifactRepository:
                 if existing_revision is not None:
                     # Update existing revision
                     # TODO: Reset to SCANNED?
-                    existing_revision.created_at = model.created_at
-                    existing_revision.updated_at = model.modified_at
-
-                    # Check if version row already exists for this artifact
-                    existing_version_stmt = sa.select(ArtifactVersionRow).where(
-                        sa.and_(
-                            ArtifactVersionRow.artifact_id == existing_artifact.id,
-                            ArtifactVersionRow.version == model.revision,
-                        )
-                    )
-                    existing_version_result = await db_sess.execute(existing_version_stmt)
-                    existing_version = existing_version_result.scalar_one_or_none()
-
-                    # Create version row if it doesn't exist
-                    if existing_version is None:
-                        artifact_version_row = ArtifactVersionRow(
-                            artifact_id=existing_artifact.id, version=model.revision
-                        )
-                        db_sess.add(artifact_version_row)
+                    if model.modified_at:
+                        existing_revision.updated_at = model.modified_at
 
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision, attribute_names=["updated_at"])
@@ -197,7 +180,7 @@ class ArtifactRepository:
                     ArtifactDataWithRevisions(artifact=artifact_data, revisions=revision_data_list)
                 )
 
-        return list(result.values())
+        return result
 
     @repository_decorator()
     async def associate_artifact_with_storage(
@@ -335,13 +318,6 @@ class ArtifactRepository:
     @repository_decorator()
     async def delete_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
-            # Delete all associations
-            await db_sess.execute(
-                sa.delete(AssociationArtifactsStoragesData).where(
-                    AssociationArtifactsStoragesData.artifact_id == artifact_id
-                )
-            )
-
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
@@ -366,33 +342,49 @@ class ArtifactRepository:
             return artifact_id
 
     @repository_decorator()
-    async def update_artifact_status(
-        self, artifact_id: uuid.UUID, status: ArtifactStatus
+    async def update_artifact_revision_status(
+        self, artifact_revision_id: uuid.UUID, status: ArtifactStatus
     ) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
-            stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(status=status)
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(status=status)
+            )
             await db_sess.execute(stmt)
-            return artifact_id
+            return artifact_revision_id
 
     @repository_decorator()
-    async def update_artifact_bytesize(self, artifact_id: uuid.UUID, size: int) -> uuid.UUID:
+    async def update_artifact_revision_bytesize(
+        self, artifact_revision_id: uuid.UUID, size: int
+    ) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
-            stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(size=size)
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(size=size)
+            )
             await db_sess.execute(stmt)
-            return artifact_id
+            return artifact_revision_id
 
     @repository_decorator()
-    async def update_artifact_readme(self, artifact_id: uuid.UUID, readme: str) -> uuid.UUID:
+    async def update_artifact_revision_readme(
+        self, artifact_revision_id: uuid.UUID, readme: str
+    ) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
-            stmt = sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(readme=readme)
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(readme=readme)
+            )
             await db_sess.execute(stmt)
-            return artifact_id
+            return artifact_revision_id
 
     @repository_decorator()
     async def list_artifacts_paginated(
         self,
         *,
-        pagination: PaginationOptions,
+        pagination: Optional[PaginationOptions] = None,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
     ) -> tuple[list[ArtifactData], int]:
@@ -406,229 +398,4 @@ class ArtifactRepository:
         Returns:
             Tuple of (artifacts list, total count)
         """
-        offset_based_pagination = pagination.offset
-        forward = pagination.forward
-        backward = pagination.backward
-
-        if ordering is None:
-            ordering = ArtifactOrderingOptions()
-        if filters is None:
-            filters = ArtifactFilterOptions()
-        async with self._db.begin_session() as db_sess:
-            # Build base query
-            stmt = sa.select(ArtifactRow).options(selectinload(ArtifactRow.version_rows))
-            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
-
-            # Apply filters
-            conditions = []
-
-            if filters.artifact_type is not None:
-                conditions.append(ArtifactRow.type == filters.artifact_type)
-            if filters.status is not None:
-                # Support multiple status values using IN clause
-                status_values = [status.value for status in filters.status]
-                conditions.append(ArtifactRow.status.in_(status_values))
-            if filters.authorized is not None:
-                conditions.append(ArtifactRow.authorized == filters.authorized)
-            if filters.name is not None:
-                conditions.append(ArtifactRow.name.ilike(f"%{filters.name}%"))
-            if filters.registry_id is not None:
-                conditions.append(ArtifactRow.registry_id == filters.registry_id)
-            if filters.registry_type is not None:
-                conditions.append(ArtifactRow.registry_type == filters.registry_type)
-            if filters.source_registry_id is not None:
-                conditions.append(ArtifactRow.source_registry_id == filters.source_registry_id)
-            if filters.source_registry_type is not None:
-                conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
-
-            # Apply conditions to both queries
-            if conditions:
-                where_clause = sa.and_(*conditions)
-                stmt = stmt.where(where_clause)
-                count_stmt = count_stmt.where(where_clause)
-
-            # Determine pagination mode
-            if offset_based_pagination:
-                offset = pagination.offset.offset if pagination.offset is not None else 0
-                page_size = (
-                    offset_based_pagination.limit
-                    if offset_based_pagination.limit is not None
-                    else DEFAULT_PAGE_SIZE
-                )
-
-                # Apply multiple ordering fields
-                order_clauses = []
-                for field, desc in ordering.order_by:
-                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
-                    if desc:
-                        order_clauses.append(order_column.desc())
-                    else:
-                        order_clauses.append(order_column.asc())
-                stmt = stmt.order_by(*order_clauses)
-
-                # Default order by id for consistent pagination
-                stmt = stmt.order_by(ArtifactRow.id.asc())
-
-                # Apply pagination
-                stmt = stmt.offset(offset).limit(page_size)
-            else:
-                # Extract pagination parameters from forward/backward options
-                after = forward.after if forward else None
-                first = forward.first if forward else None
-                before = backward.before if backward else None
-                last = backward.last if backward else None
-
-                connection_args = validate_connection_args(
-                    after=after,
-                    first=first,
-                    before=before,
-                    last=last,
-                )
-
-                cursor_id = connection_args.cursor
-                pagination_order = connection_args.pagination_order
-                page_size = connection_args.requested_page_size
-
-                # Apply multiple ordering fields for connection pagination
-                order_clauses = []
-                for field, desc in ordering.order_by:
-                    order_column = getattr(ArtifactRow, field.value, ArtifactRow.created_at)
-                    order_clauses.append((order_column, desc))
-
-                # Handle cursor-based pagination
-                if cursor_id is not None:
-                    type_, cursor_id = resolve_global_id(cursor_id)
-                    if type_ != "Artifact":
-                        raise InvalidCursorTypeError(f"Invalid cursor type: {type_}")
-
-                    cursor_uuid = uuid.UUID(cursor_id)
-
-                    # Build lexicographic cursor conditions for proper multi-field ordering
-                    # This implements the same logic as generate_sql_info_for_gql_connection
-
-                    def build_lexicographic_cursor_conditions(
-                        order_clauses,
-                        cursor_uuid,
-                        pagination_order,
-                    ):
-                        """
-                        Build lexicographic cursor conditions for multiple ordering fields.
-
-                        For proper multi-field ordering, we need to build conditions that represent
-                        lexicographic ordering. For fields [A, B, C], the condition should be:
-                        (A > cursor_A) OR
-                        (A = cursor_A AND B > cursor_B) OR
-                        (A = cursor_A AND B = cursor_B AND C > cursor_C) OR
-                        (A = cursor_A AND B = cursor_B AND C = cursor_C AND id > cursor_id)
-
-                        The direction operators (>, <) depend on the sort direction and pagination direction.
-                        """
-                        if not order_clauses:
-                            return []
-
-                        conditions = []
-
-                        # Build conditions for each level of the lexicographic ordering
-                        for i in range(len(order_clauses) + 1):  # +1 for the ID field
-                            condition_parts = []
-
-                            # Add equality conditions for all previous fields
-                            for j in range(i):
-                                order_column, desc = order_clauses[j]
-                                cursor_value_subq = (
-                                    sa.select(order_column)
-                                    .where(ArtifactRow.id == cursor_uuid)
-                                    .scalar_subquery()
-                                )
-                                condition_parts.append(order_column == cursor_value_subq)
-
-                            # Add the inequality condition for the current field
-                            if i < len(order_clauses):
-                                # Current field is one of the ordering fields
-                                order_column, desc = order_clauses[i]
-                                cursor_value_subq = (
-                                    sa.select(order_column)
-                                    .where(ArtifactRow.id == cursor_uuid)
-                                    .scalar_subquery()
-                                )
-
-                                # Determine the operator based on sort direction and pagination direction
-                                if pagination_order == ConnectionPaginationOrder.FORWARD:
-                                    if desc:
-                                        inequality_cond = order_column < cursor_value_subq
-                                    else:
-                                        inequality_cond = order_column > cursor_value_subq
-                                else:  # BACKWARD
-                                    if desc:
-                                        inequality_cond = order_column > cursor_value_subq
-                                    else:
-                                        inequality_cond = order_column < cursor_value_subq
-
-                                condition_parts.append(inequality_cond)
-                            else:
-                                # Final condition: all fields equal, compare by ID
-                                if pagination_order == ConnectionPaginationOrder.FORWARD:
-                                    id_inequality_cond = ArtifactRow.id > cursor_uuid
-                                else:  # BACKWARD
-                                    id_inequality_cond = ArtifactRow.id < cursor_uuid
-
-                                condition_parts.append(id_inequality_cond)
-
-                            # Combine all parts with AND
-                            if condition_parts:
-                                if len(condition_parts) == 1:
-                                    conditions.append(condition_parts[0])
-                                else:
-                                    conditions.append(sa.and_(*condition_parts))
-
-                        return conditions
-
-                    # Build the lexicographic cursor conditions
-                    cursor_conditions = build_lexicographic_cursor_conditions(
-                        order_clauses, cursor_uuid, pagination_order
-                    )
-
-                    # Apply cursor conditions with OR logic
-                    if cursor_conditions:
-                        combined_cursor_condition = sa.or_(*cursor_conditions)
-                        stmt = stmt.where(combined_cursor_condition)
-
-                # Apply ordering based on pagination direction
-                final_order_clauses = []
-                if pagination_order == ConnectionPaginationOrder.BACKWARD:
-                    # Reverse ordering for backward pagination
-                    for order_column, desc in order_clauses:
-                        if desc:
-                            final_order_clauses.append(order_column.asc())
-                        else:
-                            final_order_clauses.append(order_column.desc())
-                    final_order_clauses.append(ArtifactRow.id.desc())
-                else:  # FORWARD or None
-                    for order_column, desc in order_clauses:
-                        if desc:
-                            final_order_clauses.append(order_column.desc())
-                        else:
-                            final_order_clauses.append(order_column.asc())
-                    final_order_clauses.append(ArtifactRow.id.asc())
-
-                stmt = stmt.order_by(*final_order_clauses)
-
-                # Apply limit
-                stmt = stmt.limit(page_size)
-
-            # Execute queries
-            result = await db_sess.execute(stmt)
-            rows = result.scalars().all()
-
-            # Reverse results for backward pagination
-            if (
-                pagination.offset is None
-                and connection_args.pagination_order == ConnectionPaginationOrder.BACKWARD
-            ):
-                rows = list(reversed(rows))
-
-            count_result = await db_sess.execute(count_stmt)
-            total_count = count_result.scalar()
-
-            artifacts = [row.to_dataclass() for row in rows]
-            return artifacts, total_count
+        raise NotImplementedError()

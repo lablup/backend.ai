@@ -71,7 +71,9 @@ class ArtifactRegistryService:
         Get an existing huggingface registry by ID.
         """
         log.info("Getting huggingface registry with id: {}", action.registry_id)
-        registry_data = await self._huggingface_registry_repository.get_by_id(action.registry_id)
+        registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
+            action.registry_id
+        )
         return GetHuggingFaceRegistryActionResult(result=registry_data)
 
     async def list_huggingface_registry(

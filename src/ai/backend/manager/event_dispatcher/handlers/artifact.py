@@ -1,6 +1,5 @@
 import logging
 
-from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
 )
@@ -9,15 +8,20 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactEventHandler:
     _artifact_repository: ArtifactRepository
+    _huggingface_repository: HuggingFaceRepository
 
-    def __init__(self, artifact_repository: ArtifactRepository) -> None:
+    def __init__(
+        self, artifact_repository: ArtifactRepository, huggingface_repository: HuggingFaceRepository
+    ) -> None:
         self._artifact_repository = artifact_repository
+        self._huggingface_repository = huggingface_repository
 
     async def handle_artifact_import_done(
         self,
@@ -26,11 +30,20 @@ class ArtifactEventHandler:
         event: ModelImportDoneEvent,
     ) -> None:
         model_id = event.model_id
-        revision = event.revision
         artifact_total_size = event.total_size
 
-        artifact = await self._artifact_repository.get_artifact_by_model_target(
-            ModelTarget(model_id=model_id, revision=revision)
+        registry_data = await self._huggingface_repository.get_registry_data_by_name(
+            event.registry_name
         )
 
-        await self._artifact_repository.update_artifact_bytesize(artifact.id, artifact_total_size)
+        artifact = await self._artifact_repository.get_model_artifact(
+            model_id, registry_id=registry_data.id
+        )
+
+        revision = await self._artifact_repository.get_artifact_revision(
+            artifact.id, revision=event.revision
+        )
+
+        await self._artifact_repository.update_artifact_revision_bytesize(
+            revision.id, artifact_total_size
+        )

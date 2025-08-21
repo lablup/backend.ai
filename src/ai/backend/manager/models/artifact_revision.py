@@ -68,7 +68,7 @@ class ArtifactRevisionRow(Base):
 
     artifact = relationship(
         "ArtifactRow",
-        back_populates="versions",
+        back_populates="revision_rows",
         primaryjoin=_get_artifact_join_cond,
     )
 

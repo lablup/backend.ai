@@ -3,7 +3,6 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
 )
-from ai.backend.common.exception import ArtifactNotVerified
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -32,6 +31,10 @@ from ai.backend.manager.services.artifact.actions.disassociate_with_storage impo
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
+)
+from ai.backend.manager.services.artifact.actions.get_revisions import (
+    GetArtifactRevisionsAction,
+    GetArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.import_ import (
     ImportArtifactAction,
@@ -96,8 +99,11 @@ class ArtifactService:
 
     async def import_(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
-        await self._artifact_repository.update_artifact_status(
+        await self._artifact_repository.update_artifact_revision_status(
             action.artifact_id, ArtifactStatus.PULLING
+        )
+        revision_row = await self._artifact_repository.get_artifact_revision(
+            action.artifact_id, action.artifact_version
         )
 
         storage = await self._object_storage_repository.get_by_id(action.storage_id)
@@ -118,16 +124,16 @@ class ArtifactService:
         )
 
         await self.associate_with_storage(AssociateWithStorageAction(artifact.id, storage.id))
-        await self._artifact_repository.update_artifact_status(
-            action.artifact_id, ArtifactStatus.PULLED
+        await self._artifact_repository.update_artifact_revision_status(
+            revision_row.id, ArtifactStatus.PULLED
         )
 
         # TODO: Add verify step
-        await self._artifact_repository.update_artifact_status(
-            action.artifact_id, ArtifactStatus.VERIFYING
+        await self._artifact_repository.update_artifact_revision_status(
+            revision_row.id, ArtifactStatus.VERIFYING
         )
-        await self._artifact_repository.update_artifact_status(
-            action.artifact_id, ArtifactStatus.VERIFIED
+        await self._artifact_repository.update_artifact_revision_status(
+            revision_row.id, ArtifactStatus.VERIFIED
         )
         return ImportArtifactActionResult(result=artifact, task_id=result.task_id)
 
@@ -184,3 +190,9 @@ class ArtifactService:
             filters=action.filters,
         )
         return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
+
+    async def get_revisions(
+        self, action: GetArtifactRevisionsAction
+    ) -> GetArtifactRevisionsActionResult:
+        revisions = await self._artifact_repository.list_artifact_revisions(action.artifact_id)
+        return GetArtifactRevisionsActionResult(revisions=revisions)

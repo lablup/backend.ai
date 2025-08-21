@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship

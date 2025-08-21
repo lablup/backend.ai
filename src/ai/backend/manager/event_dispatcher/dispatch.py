@@ -159,7 +159,10 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
-        self._artifact_event_handler = ArtifactEventHandler(args.repositories.artifact.repository)
+        self._artifact_event_handler = ArtifactEventHandler(
+            args.repositories.artifact.repository,
+            args.repositories.huggingface_registry.repository,
+        )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """

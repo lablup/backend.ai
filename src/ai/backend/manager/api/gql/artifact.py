@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, AsyncGenerator, Optional, Self
+from typing import TYPE_CHECKING, AsyncGenerator, Optional, Self, Sequence
 
 import strawberry
 from strawberry import ID, Info
@@ -54,8 +54,14 @@ class ScanArtifactInput:
 
 
 @strawberry.input
+class ArtifactTarget:
+    artifact_id: ID
+    revision: str
+
+
+@strawberry.input
 class ImportArtifactsInput:
-    artifact_ids: list[ID]
+    artifacts: list[ArtifactTarget]
     storage_id: ID
     bucket_name: str
 
@@ -102,6 +108,37 @@ class Artifact(Node):
     source: SourceInfo
     size: ByteSize
 
+    @classmethod
+    def from_dataclass(cls, data: ArtifactData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            name=data.name,
+            type=ArtifactType(data.type),
+            description=data.description,
+            registry=SourceInfo(name=None, url=None),
+            source=SourceInfo(name=None, url=None),
+            authorized=data.authorized,
+        )
+
+    @strawberry.field
+    async def revisions(self, info: Info[StrawberryGQLContext]) -> ArtifactRevisionConnection:
+        loader = info.context.dataloader_manager.get_loader_by_func(
+            info.context, ArtifactRevision.batch_load_by_artifact_id
+        )
+
+        revision = await loader.load(self.id)
+        edges = [ArtifactRevisionEdge(node=revision, cursor=str(revision.id))]
+
+        return ArtifactRevisionConnection(
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            edges=edges,
+        )
+
 
 @strawberry.type
 class ArtifactRevision(Node):
@@ -111,31 +148,48 @@ class ArtifactRevision(Node):
     updated_at: datetime
     readme: str
     version: str
+    size: ByteSize
 
     @classmethod
-    def from_dataclass(cls, data: ArtifactData) -> Self:
+    def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            name=data.name,
-            type=ArtifactType(data.type),
             status=ArtifactStatus(data.status),
-            description=data.description,
-            # TODO: Fill these with actual data
-            registry=SourceInfo(name=None, url=None),
-            source=SourceInfo(name=None, url=None),
-            size=ByteSize(data.size),
             created_at=data.created_at,
             updated_at=data.updated_at,
-            authorized=data.authorized,
-            versions=data.versions,
+            readme=data.readme,
+            version=data.version,
+            size=ByteSize(data.size),
         )
+
+    @classmethod
+    async def batch_load_by_artifact_id(
+        cls, ctx: StrawberryGQLContext, artifact_ids: Sequence[uuid.UUID]
+    ) -> list[ArtifactRevision]:
+        revisions = []
+        for artifact_id in artifact_ids:
+            action_result = await ctx.processors.artifact.get_revisions.wait_for_complete(
+                GetArtifactRevisionsAction(artifact_id=artifact_id)
+            )
+            revisions.extend(action_result.revisions)
+        return [ArtifactRevision.from_dataclass(r) for r in revisions]
 
 
 ArtifactEdge = Edge[Artifact]
+ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 
 @strawberry.type
 class ArtifactConnection(Connection[Artifact]):
+    count: int = 0
+
+    def __init__(self, *args, count: int = 0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+@strawberry.type
+class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int = 0
 
     def __init__(self, *args, count: int = 0, **kwargs):
@@ -202,93 +256,13 @@ async def resolve_artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    # Build filter options
-    filters = ArtifactFilterOptions()
-    if filter:
-        if filter.type:
-            filters.artifact_type = filter.type[0] if filter.type else None
-        if filter.status and filter.status.IN:
-            # TODO: Support other operators if needed
-            filters.status = filter.status.IN
-        if filter.name and filter.name.i_contains:
-            filters.name = filter.name.i_contains
+    raise NotImplementedError("Artifact retrieval not implemented yet.")
 
-    # Build ordering options
-    ordering = ArtifactOrderingOptions()
-    if order_by:
-        order_tuples: list[tuple[ArtifactOrderField, bool]] = []
-        for order_item in order_by:
-            desc = order_item.direction == OrderDirection.DESC
-            order_tuples.append((order_item.field, desc))
 
-        ordering.order_by = order_tuples
-
-    # Choose pagination mode
-    if offset is not None or limit is not None:
-        # Standard pagination
-        offset_based_pagination = OffsetBasedPaginationOptions(offset=offset, limit=limit)
-        forward = None
-        backward = None
-    else:
-        # GraphQL connection pagination
-        offset_based_pagination = None
-        # Create forward or backward pagination options based on parameters
-        forward = None
-        backward = None
-        if after is not None or first is not None:
-            forward = ForwardPaginationOptions(after=after, first=first)
-        if before is not None or last is not None:
-            backward = BackwardPaginationOptions(before=before, last=last)
-
-    # Use service layer to get artifacts
-    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
-        ListArtifactsAction(
-            pagination=PaginationOptions(
-                offset=offset_based_pagination,
-                forward=forward,
-                backward=backward,
-            ),
-            ordering=ordering,
-            filters=filters,
-        )
-    )
-
-    # Convert to GraphQL artifacts
-    artifacts = [Artifact.from_dataclass(artifact) for artifact in action_result.data]
-
-    # Create edges
-    edges = [ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in artifacts]
-
-    # Determine pagination info
-    has_next_page = False
-    has_previous_page = False
-    start_cursor = edges[0].cursor if edges else None
-    end_cursor = edges[-1].cursor if edges else None
-
-    if forward or backward:
-        # For connection pagination (simplified logic)
-        if first and len(edges) == first:
-            has_next_page = True  # Could be more accurate with additional service call
-        if last and len(edges) == last:
-            has_previous_page = True  # Could be more accurate with additional service call
-    else:
-        # For offset/limit pagination
-        current_offset = offset or 0
-        has_next_page = (current_offset + len(edges)) < action_result.total_count
-        has_previous_page = current_offset > 0
-
-    artifact_connection = ArtifactConnection(
-        count=action_result.total_count,
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
-            start_cursor=start_cursor,
-            end_cursor=end_cursor,
-        ),
-    )
-
-    return artifact_connection
+async def resolve_artifact_revisions(
+    artifact: Artifact, info: Info[StrawberryGQLContext]
+) -> list[ArtifactRevision]:
+    raise NotImplementedError("Artifact revision retrieval not implemented yet.")
 
 
 # Query Fields
@@ -322,6 +296,11 @@ def artifact(id: ID) -> Optional[Artifact]:
     raise NotImplementedError("Artifact retrieval not implemented yet.")
 
 
+@strawberry.field
+def artifact_revision(id: ID) -> Optional[ArtifactRevision]:
+    raise NotImplementedError("Artifact revision retrieval not implemented yet.")
+
+
 @strawberry.mutation
 async def scan_artifacts(
     input: ScanArtifactInput, info: Info[StrawberryGQLContext]
@@ -337,7 +316,7 @@ async def scan_artifacts(
         )
     )
 
-    artifacts = [Artifact.from_dataclass(item) for item in action_result.result]
+    artifacts = [Artifact.from_dataclass(item.artifact) for item in action_result.result]
     return ScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -347,10 +326,11 @@ async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
-    for artifact_id in input.artifact_ids:
+    for artifact in input.artifacts:
         action_result = await info.context.processors.artifact.import_.wait_for_complete(
             ImportArtifactAction(
-                artifact_id=uuid.UUID(artifact_id),
+                artifact_id=uuid.UUID(artifact.artifact_id),
+                artifact_version=artifact.revision,
                 storage_id=uuid.UUID(input.storage_id),
                 bucket_name=input.bucket_name,
             )

@@ -317,6 +317,9 @@ class HuggingFaceService:
                     ModelImportDoneEvent(
                         model_id=model_id,
                         revision=revision,
+                        registry_name=registry_name,
+                        # TODO: Use ArtifactRegistryType
+                        registry_type="huggingface",
                         total_size=artifact_total_size,
                     )
                 )

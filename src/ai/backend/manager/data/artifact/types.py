@@ -52,6 +52,7 @@ class ArtifactRevisionData:
     updated_at: datetime
 
 
+# TODO: Should we keep this for REST API?
 @dataclass
 class ArtifactDataWithRevisions:
     artifact: ArtifactData
