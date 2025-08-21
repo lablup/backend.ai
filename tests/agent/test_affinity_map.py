@@ -1,3 +1,4 @@
+from collections import defaultdict
 from decimal import Decimal
 from pprint import pprint
 from typing import Any, Sequence
@@ -138,7 +139,7 @@ def test_affinity_map_first_allocation() -> None:
 @pytest.mark.parametrize(
     "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
 )
-def test_affinity_map_prefer_larger_chunks(allocation_strategy) -> None:
+def test_affinity_map_prefer_larger_chunks(allocation_strategy: AllocationStrategy) -> None:
     device_init_args: dict[str, Any] = {
         "hw_location": "",
         "memory_size": 0,
@@ -210,7 +211,7 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy) -> None:
     assert alloc_map.allocations[SlotName("x")][DeviceId("a3")] == 1
 
 
-def test_affinity_map_secondary_allocation() -> None:
+def test_affinity_map_neighbor_devices() -> None:
     devices = [
         DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
         DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
@@ -311,3 +312,188 @@ def test_affinity_map_secondary_allocation() -> None:
     )
     assert _devid(primary[0]) == {"x0"}
     assert _devid(secondary) == {"x1", "x2", "x3"}
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_secondary_alloaction_simulated(
+    allocation_strategy: AllocationStrategy,
+) -> None:
+    devices = [
+        DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a2"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b0"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b1"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b2"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c0"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c1"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c2"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d0"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d1"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d2"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("x0"), "", 0, 1, numa_node=0, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x1"), "", 0, 1, numa_node=1, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x2"), "", 0, 1, numa_node=2, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x3"), "", 0, 1, numa_node=3, device_name=DeviceName("cuda")),
+    ]
+    affinity_map = AffinityMap.build(devices)
+
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("x0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    primary = affinity_map.get_device_clusters_with_lowest_distance(DeviceName("cuda"))
+    assert [_devid(dev_set) for dev_set in primary] == [{"x0"}, {"x1"}, {"x2"}, {"x3"}]
+
+    primary = affinity_map.get_device_clusters_with_lowest_distance(DeviceName("cpu"))
+    assert sorted([_devid(dev_set) for dev_set in primary], key=lambda s: next(iter(s))) == [
+        # sorted by the alphabetical order of the first-seen item in each set
+        {"a0", "a1", "a2"},
+        {"b0", "b1", "b2"},
+        {"c0", "c1", "c2"},
+        {"d0", "d1", "d2"},
+    ]
+
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+
+    # Simulate the first resource slot allocation to allocate two devices from different NUMA nodes.
+    alloc_map.allocations[SlotName("cuda")] = {
+        DeviceId("x0"): Decimal(0),
+        DeviceId("x1"): Decimal(1),
+        DeviceId("x2"): Decimal(0),
+        DeviceId("x3"): Decimal(1),
+    }
+    alloc_map.update_affinity_hint(alloc_map.allocations[SlotName("cuda")], affinity_hint)
+
+    # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    alloc_map.allocate(
+        {SlotName("cpu"): Decimal("4")},
+        affinity_hint=affinity_hint,
+    )
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("a0")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("a1")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("a2")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("b0")] == Decimal(1)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("b1")] == Decimal(1)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("b2")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("c0")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("c1")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("c2")] == Decimal(0)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("d0")] == Decimal(1)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("d1")] == Decimal(1)
+    assert alloc_map.allocations[SlotName("cpu")][DeviceId("d2")] == Decimal(0)
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_secondary_alloaction_integrated(
+    allocation_strategy: AllocationStrategy,
+) -> None:
+    devices = [
+        DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a2"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b0"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b1"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b2"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c0"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c1"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c2"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d0"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d1"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d2"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("x0"), "", 0, 1, numa_node=0, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x1"), "", 0, 1, numa_node=1, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x2"), "", 0, 1, numa_node=2, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x3"), "", 0, 1, numa_node=3, device_name=DeviceName("cuda")),
+    ]
+    affinity_map = AffinityMap.build(devices)
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("b2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("c2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("d2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("x0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("x3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+
+    # Do the first resource slot allocation to allocate two devices from different NUMA nodes.
+    alloc_map.allocate(
+        {SlotName("cuda"): Decimal("2")},
+        affinity_hint=affinity_hint,
+    )
+    per_node_cuda_alloc = defaultdict(int)
+    for dev_id, alloc in alloc_map.allocations[SlotName("cuda")].items():
+        if dev_id == "x0":
+            per_node_cuda_alloc[0] += int(alloc)
+        elif dev_id == "x1":
+            per_node_cuda_alloc[1] += int(alloc)
+        elif dev_id == "x2":
+            per_node_cuda_alloc[2] += int(alloc)
+        elif dev_id == "x3":
+            per_node_cuda_alloc[3] += int(alloc)
+
+    print(alloc_map.allocations[SlotName("cuda")])
+    assert sorted(per_node_cuda_alloc.values()) == [0, 0, 1, 1]
+
+    # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    alloc_map.allocate(
+        {SlotName("cpu"): Decimal("4")},
+        affinity_hint=affinity_hint,
+    )
+
+    per_node_cpu_alloc = defaultdict(int)
+    for dev_id, alloc in alloc_map.allocations[SlotName("cpu")].items():
+        if dev_id.startswith("a"):
+            per_node_cpu_alloc[0] += int(alloc)
+        elif dev_id.startswith("b"):
+            per_node_cpu_alloc[1] += int(alloc)
+        elif dev_id.startswith("c"):
+            per_node_cpu_alloc[2] += int(alloc)
+        elif dev_id.startswith("d"):
+            per_node_cpu_alloc[3] += int(alloc)
+
+    print(alloc_map.allocations[SlotName("cpu")])
+    assert sorted(per_node_cpu_alloc.values()) == [0, 0, 2, 2]

@@ -17,6 +17,7 @@ from typing import (
     Optional,
     Sequence,
     TypeVar,
+    final,
 )
 
 import attr
@@ -94,11 +95,13 @@ class AbstractAllocMap(metaclass=ABCMeta):
         for dev_id, dev_slot_info in self.device_slots.items():
             self.allocations[dev_slot_info.slot_name][dev_id] = Decimal(0)
 
+    @final
     def clear(self) -> None:
         self.allocations.clear()
         for dev_id, dev_slot_info in self.device_slots.items():
             self.allocations[dev_slot_info.slot_name][dev_id] = Decimal(0)
 
+    @final
     def check_exclusive(self, a: SlotName, b: SlotName) -> bool:
         if not self.exclusive_slot_types:
             return False
@@ -123,6 +126,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 bufs.append(f"  {device_id}: {alloc}")
         return "\n".join(bufs)
 
+    @final
     def get_current_allocations(
         self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
@@ -214,6 +218,23 @@ class AbstractAllocMap(metaclass=ABCMeta):
             return [
                 *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
             ] + secondary_sorted_dev_alloc
+
+    @final
+    def update_affinity_hint(
+        self,
+        device_alloc: Mapping[DeviceId, Decimal],
+        affinity_hint: Optional[AffinityHint] = None,
+    ) -> None:
+        if affinity_hint is None:
+            return
+        hint_for_next_allocation: list[AbstractComputeDevice] = []
+        for dev_id, alloc in device_alloc.items():
+            if alloc == Decimal(0):
+                continue
+            for dev in affinity_hint.affinity_map.nodes:
+                if dev.device_id == dev_id:
+                    hint_for_next_allocation.append(dev)
+        affinity_hint.devices = hint_for_next_allocation
 
     @abstractmethod
     def allocate(
@@ -360,6 +381,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if remaining_alloc == 0:
                     break
             allocation[slot_name] = slot_allocation
+            self.update_affinity_hint(slot_allocation, affinity_hint)
 
         return allocation
 
@@ -448,6 +470,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             for dev_id, allocated in new_alloc.items():
                 self.allocations[slot_name][dev_id] += allocated
             allocation[slot_name] = {k: v for k, v in new_alloc.items() if v > 0}
+            self.update_affinity_hint(new_alloc, affinity_hint)
             if log_alloc_map:
                 log.debug("DiscretePropertyAllocMap(EVENLY): new-alloc: {!r}", new_alloc)
 
@@ -629,6 +652,7 @@ class FractionAllocMap(AbstractAllocMap):
                     break
 
             allocation[slot_name] = slot_allocation
+            self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
     def _allocate_evenly(
@@ -847,6 +871,7 @@ class FractionAllocMap(AbstractAllocMap):
             allocation[slot_name] = slot_allocation
             for dev_id, value in slot_allocation.items():
                 self.allocations[slot_name][dev_id] += value
+            self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
     def apply_allocation(
