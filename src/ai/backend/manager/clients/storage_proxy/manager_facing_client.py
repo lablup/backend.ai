@@ -6,6 +6,7 @@ from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
+from ai.backend.common.dto.storage.response import VFolderCloneResponse
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
@@ -92,7 +93,7 @@ class StorageProxyManagerFacingClient:
         src_vfid: str,
         dst_volume: str,
         dst_vfid: str,
-    ) -> None:
+    ) -> VFolderCloneResponse:
         """
         Clone a folder to another location.
 
@@ -107,7 +108,8 @@ class StorageProxyManagerFacingClient:
             "dst_volume": dst_volume,
             "dst_vfid": dst_vfid,
         }
-        await self._client.request("POST", "folder/clone", body=body)
+        data = await self._client.request_with_response("POST", "folder/clone", body=body)
+        return VFolderCloneResponse.model_validate(data)
 
     @client_decorator()
     async def get_mount_path(
