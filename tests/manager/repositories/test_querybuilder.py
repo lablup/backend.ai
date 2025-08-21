@@ -479,7 +479,3 @@ class TestGenericQueryBuilderStructure:
         result = paginator.model_converter.convert_to_data(mock_model_instance)
         assert result["specialized"]
         assert result["id"] == "special-test-id"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
