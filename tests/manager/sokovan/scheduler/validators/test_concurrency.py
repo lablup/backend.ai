@@ -63,7 +63,7 @@ class TestConcurrencyValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -98,7 +98,7 @@ class TestConcurrencyValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -134,7 +134,7 @@ class TestConcurrencyValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={
@@ -170,7 +170,7 @@ class TestConcurrencyValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={}, by_user={}, by_group={}, by_domain={}
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},  # No policy for user1
@@ -189,3 +189,80 @@ class TestConcurrencyValidator:
 
         # Should not raise when no policy is defined
         validator.validate(snapshot, workload)
+
+    def test_passes_when_limit_is_none(
+        self, validator: ConcurrencyValidator, workload: SessionWorkload
+    ) -> None:
+        """Test that None values in max_concurrent_sessions means unlimited."""
+        snapshot = SystemSnapshot(
+            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            resource_occupancy=ResourceOccupancySnapshot(
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
+            ),
+            resource_policy=ResourcePolicySnapshot(
+                keypair_policies={
+                    AccessKey("user1"): KeyPairResourcePolicy(
+                        name="unlimited",
+                        total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                        max_concurrent_sessions=None,  # None means unlimited
+                        max_concurrent_sftp_sessions=None,  # None means unlimited
+                        max_pending_session_count=None,
+                        max_pending_session_resource_slots=None,
+                    )
+                },
+                user_policies={},
+                group_limits={},
+                domain_limits={},
+            ),
+            concurrency=ConcurrencySnapshot(
+                sessions_by_keypair={AccessKey("user1"): 100},  # Many sessions
+                sftp_sessions_by_keypair={AccessKey("user1"): 50},  # Many SFTP sessions
+            ),
+            pending_sessions=PendingSessionSnapshot(by_keypair={}),
+            session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
+        )
+
+        # Should not raise when limit is None (unlimited)
+        validator.validate(snapshot, workload)
+
+    def test_passes_when_limit_is_zero(
+        self,
+        validator: ConcurrencyValidator,
+        sftp_validator: ConcurrencyValidator,
+        workload: SessionWorkload,
+        sftp_workload: SessionWorkload,
+    ) -> None:
+        """Test that 0 in max_concurrent_sessions means unlimited."""
+        snapshot = SystemSnapshot(
+            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            resource_occupancy=ResourceOccupancySnapshot(
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
+            ),
+            resource_policy=ResourcePolicySnapshot(
+                keypair_policies={
+                    AccessKey("user1"): KeyPairResourcePolicy(
+                        name="unlimited",
+                        total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                        max_concurrent_sessions=0,  # 0 also means unlimited
+                        max_concurrent_sftp_sessions=0,  # 0 also means unlimited
+                        max_pending_session_count=None,
+                        max_pending_session_resource_slots=None,
+                    )
+                },
+                user_policies={},
+                group_limits={},
+                domain_limits={},
+            ),
+            concurrency=ConcurrencySnapshot(
+                sessions_by_keypair={AccessKey("user1"): 100},  # Many sessions
+                sftp_sessions_by_keypair={AccessKey("user1"): 50},  # Many SFTP sessions
+            ),
+            pending_sessions=PendingSessionSnapshot(by_keypair={}),
+            session_dependencies=SessionDependencySnapshot(by_session={}),
+            known_slot_types={},
+        )
+
+        # Should not raise when limit is 0 (unlimited)
+        validator.validate(snapshot, workload)
+        sftp_validator.validate(snapshot, sftp_workload)

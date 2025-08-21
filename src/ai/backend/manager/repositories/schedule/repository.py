@@ -246,10 +246,9 @@ class TerminatingKernelData:
 class MarkTerminatingResult:
     """Result of marking sessions for termination."""
 
-    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING/PULLING)
+    cancelled_sessions: list[str]  # Sessions that were cancelled (PENDING)
     terminating_sessions: list[str]  # Sessions marked as TERMINATING
-    skipped_sessions: list[str]  # Sessions already TERMINATED/CANCELLED/TERMINATING
-    not_found_sessions: list[str]  # Sessions that don't exist
+    skipped_sessions: list[str]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
@@ -511,12 +510,11 @@ class ScheduleRepository:
             cancelled_sessions=[],
             terminating_sessions=[],
             skipped_sessions=[],
-            not_found_sessions=[],
         )
 
         for session_id in session_ids:
             if session_id not in existing_sessions:
-                result.not_found_sessions.append(session_id)
+                result.skipped_sessions.append(session_id)
                 log.warning("Session {} not found", session_id)
                 continue
 
@@ -664,7 +662,6 @@ class ScheduleRepository:
                 cancelled_sessions=[],
                 terminating_sessions=[],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
 
         async with self._db.begin_session() as db_sess:
@@ -1914,8 +1911,13 @@ class ScheduleRepository:
                 keypair_policies[session_data.access_key] = KeyPairResourcePolicy(
                     name=session_data.keypair_policy_name,
                     total_resource_slots=total_resource_slots,
-                    max_concurrent_sessions=session_data.keypair_max_concurrent or 0,
-                    max_concurrent_sftp_sessions=session_data.keypair_max_sftp or 0,
+                    max_concurrent_sessions=session_data.keypair_max_concurrent
+                    if session_data.keypair_max_concurrent
+                    and session_data.keypair_max_concurrent > 0
+                    else None,
+                    max_concurrent_sftp_sessions=session_data.keypair_max_sftp
+                    if session_data.keypair_max_sftp and session_data.keypair_max_sftp > 0
+                    else None,
                     max_pending_session_count=session_data.keypair_max_pending_count,
                     max_pending_session_resource_slots=session_data.keypair_max_pending_slots,
                 )
@@ -2274,13 +2276,22 @@ class ScheduleRepository:
         )
 
         # Process occupancy data
-        occupancy_by_keypair: dict[AccessKey, ResourceSlot] = defaultdict(ResourceSlot)
+        from ai.backend.manager.sokovan.scheduler.types import KeypairOccupancy
+
+        def keypair_occupancy_factory() -> KeypairOccupancy:
+            return KeypairOccupancy(
+                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+            )
+
+        occupancy_by_keypair: dict[AccessKey, KeypairOccupancy] = defaultdict(
+            keypair_occupancy_factory
+        )
         occupancy_by_user: dict[uuid.UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_group: dict[uuid.UUID, ResourceSlot] = defaultdict(ResourceSlot)
         occupancy_by_domain: dict[str, ResourceSlot] = defaultdict(ResourceSlot)
 
         for row in occupancy_result:
-            occupancy_by_keypair[row.access_key] += row.occupied_slots
+            occupancy_by_keypair[row.access_key].occupied_slots += row.occupied_slots
             occupancy_by_user[row.user_uuid] += row.occupied_slots
             occupancy_by_group[row.group_id] += row.occupied_slots
             occupancy_by_domain[row.domain_name] += row.occupied_slots
@@ -2290,6 +2301,7 @@ class ScheduleRepository:
             by_user=dict(occupancy_by_user),
             by_group=dict(occupancy_by_group),
             by_domain=dict(occupancy_by_domain),
+            by_agent={},  # TODO: Add agent-level occupancy calculation
         )
 
         # Get session resource policies and limits for active sessions
@@ -2507,7 +2519,7 @@ class ScheduleRepository:
             system_snapshot = SystemSnapshot(
                 total_capacity=ResourceSlot(),
                 resource_occupancy=ResourceOccupancySnapshot(
-                    by_keypair={}, by_user={}, by_group={}, by_domain={}
+                    by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
                 ),
                 resource_policy=ResourcePolicySnapshot(
                     keypair_policies={}, user_policies={}, group_limits={}, domain_limits={}

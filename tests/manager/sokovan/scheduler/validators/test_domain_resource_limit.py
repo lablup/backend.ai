@@ -38,6 +38,7 @@ class TestDomainResourceLimitValidator:
                 by_user={},
                 by_group={},
                 by_domain={workload.domain_name: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -69,6 +70,7 @@ class TestDomainResourceLimitValidator:
                 by_user={},
                 by_group={},
                 by_domain={workload.domain_name: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -103,6 +105,7 @@ class TestDomainResourceLimitValidator:
                 by_domain={
                     workload.domain_name: ResourceSlot(cpu=Decimal("50"), mem=Decimal("50"))
                 },
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -131,7 +134,8 @@ class TestDomainResourceLimitValidator:
                 by_keypair={},
                 by_user={},
                 by_group={},
-                by_domain={},  # No current occupancy for domain
+                by_domain={},  # No current occupancy for domain,
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},

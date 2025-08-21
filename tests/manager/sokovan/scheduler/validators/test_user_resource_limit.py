@@ -39,6 +39,7 @@ class TestUserResourceLimitValidator:
                 by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -73,6 +74,7 @@ class TestUserResourceLimitValidator:
                 by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -104,10 +106,7 @@ class TestUserResourceLimitValidator:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={},
-                by_user={},
-                by_group={},
-                by_domain={},
+                by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
@@ -137,6 +136,7 @@ class TestUserResourceLimitValidator:
                 by_user={},  # No current occupancy for user
                 by_group={},
                 by_domain={},
+                by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},

@@ -45,7 +45,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[session_ids[0]],  # PENDING session
                 terminating_sessions=[session_ids[1], session_ids[2]],  # RUNNING sessions
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
         )
 
@@ -74,7 +73,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[],
                 terminating_sessions=[session_id],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
         )
 
@@ -106,7 +104,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[pending_session],
                 terminating_sessions=[running_session],
                 skipped_sessions=[terminating_session, terminated_session],
-                not_found_sessions=[],
             )
         )
 
@@ -136,7 +133,6 @@ class TestAsyncDestroy:
                     cancelled_sessions=[str(uuid4())],
                     terminating_sessions=[],
                     skipped_sessions=[],
-                    not_found_sessions=[],
                 ),
                 {"status": "cancelled"},
             ),
@@ -146,7 +142,6 @@ class TestAsyncDestroy:
                     cancelled_sessions=[],
                     terminating_sessions=[str(uuid4())],
                     skipped_sessions=[],
-                    not_found_sessions=[],
                 ),
                 {"status": "terminated"},
             ),
@@ -156,7 +151,6 @@ class TestAsyncDestroy:
                     cancelled_sessions=[],
                     terminating_sessions=[],
                     skipped_sessions=[str(uuid4())],
-                    not_found_sessions=[],
                 ),
                 {},
             ),
@@ -194,7 +188,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[],
                 terminating_sessions=all_sessions,
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
         )
 
@@ -219,8 +212,7 @@ class TestAsyncDestroy:
             MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
-                skipped_sessions=[],
-                not_found_sessions=[fake_session],
+                skipped_sessions=[fake_session],  # Not found sessions go to skipped
             )
         )
 
@@ -231,7 +223,7 @@ class TestAsyncDestroy:
         )
 
         # Verify
-        assert fake_session in result.not_found_sessions
+        assert fake_session in result.skipped_sessions
         assert result.has_processed() is False
 
     async def test_destroy_session_forced_flag(
@@ -248,7 +240,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[],
                 terminating_sessions=[session_id],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
         )
 
@@ -276,7 +267,6 @@ class TestAsyncDestroy:
                 cancelled_sessions=[],
                 terminating_sessions=[session_id],
                 skipped_sessions=[],
-                not_found_sessions=[],
             )
         )
         mock_schedule_coordinator.request_scheduling = AsyncMock()

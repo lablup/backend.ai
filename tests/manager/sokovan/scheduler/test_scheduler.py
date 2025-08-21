@@ -246,7 +246,6 @@ class TestSchedulerAllocation:
             config_provider=MagicMock(),
             lock_factory=MagicMock(),
             agent_pool=MagicMock(),
-            valkey_stat=MagicMock(),
         )
         return Scheduler(args)
 

@@ -1,7 +1,10 @@
 """Validator for keypair resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.types import (
+    SessionWorkload,
+    SystemSnapshot,
+)
 
 from .exceptions import KeypairResourceQuotaExceeded
 from .validator import ValidatorRule
@@ -29,9 +32,11 @@ class KeypairResourceLimitValidator(ValidatorRule):
             return
 
         # Get current keypair occupancy
-        key_occupied = snapshot.resource_occupancy.by_keypair.get(
-            workload.access_key, ResourceSlot()
-        )
+        key_occupancy = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
+        if key_occupancy:
+            key_occupied = key_occupancy.occupied_slots
+        else:
+            key_occupied = ResourceSlot()
 
         # Check if adding this workload would exceed the limit
         total_after = key_occupied + workload.requested_slots

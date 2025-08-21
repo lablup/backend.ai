@@ -1,5 +1,4 @@
 import logging
-from typing import TYPE_CHECKING
 
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
@@ -18,34 +17,36 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ScheduleEventHandler:
     _scheduler_dispatcher: SchedulerDispatcher
-    _schedule_coordinator: "ScheduleCoordinator"
+    _schedule_coordinator: ScheduleCoordinator
+    _scheduling_controller: SchedulingController
     _use_sokovan: bool
 
     def __init__(
         self,
         scheduler_dispatcher: SchedulerDispatcher,
-        schedule_coordinator: "ScheduleCoordinator",
+        schedule_coordinator: ScheduleCoordinator,
+        scheduling_controller: SchedulingController,
         use_sokovan: bool = False,
     ) -> None:
         self._scheduler_dispatcher = scheduler_dispatcher
         self._schedule_coordinator = schedule_coordinator
+        self._scheduling_controller = scheduling_controller
         self._use_sokovan = use_sokovan
 
     async def handle_session_enqueued(
         self, context: None, agent_id: str, ev: SessionEnqueuedAnycastEvent
     ) -> None:
         if self._use_sokovan:
-            # Request scheduling for next cycle
-            await self._schedule_coordinator.request_scheduling(ScheduleType.SCHEDULE)
+            # Request scheduling for next cycle through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -53,8 +54,8 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: SessionTerminatedAnycastEvent
     ) -> None:
         if self._use_sokovan:
-            # Request scheduling for next cycle
-            await self._schedule_coordinator.request_scheduling(ScheduleType.SCHEDULE)
+            # Request scheduling for next cycle through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -62,15 +63,15 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: AgentStartedEvent
     ) -> None:
         if self._use_sokovan:
-            # Request scheduling for next cycle
-            await self._schedule_coordinator.request_scheduling(ScheduleType.SCHEDULE)
+            # Request scheduling for next cycle through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
     async def handle_do_schedule(self, context: None, agent_id: str, ev: DoScheduleEvent) -> None:
         if self._use_sokovan:
-            # Request scheduling for next cycle
-            await self._schedule_coordinator.request_scheduling(ScheduleType.SCHEDULE)
+            # Request scheduling for next cycle through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -78,8 +79,8 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: DoStartSessionEvent
     ) -> None:
         if self._use_sokovan:
-            # Process start if needed (checks mark)
-            await self._schedule_coordinator.request_scheduling(ScheduleType.START)
+            # Request start scheduling through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.START)
         else:
             await self._scheduler_dispatcher.start(ev.event_name())
 
@@ -87,8 +88,8 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: DoCheckPrecondEvent
     ) -> None:
         if self._use_sokovan:
-            # Process check precondition if needed (checks mark)
-            await self._schedule_coordinator.request_scheduling(ScheduleType.CHECK_PRECONDITION)
+            # Request check precondition through SchedulingController
+            await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
         else:
             await self._scheduler_dispatcher.check_precond(ev.event_name())
 

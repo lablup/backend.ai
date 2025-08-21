@@ -153,6 +153,7 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
@@ -245,6 +246,8 @@ class AgentRegistry:
     """
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
+    _scheduling_controller: SchedulingController
+    _use_sokovan: bool
 
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
@@ -264,10 +267,12 @@ class AgentRegistry:
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
+        scheduling_controller: SchedulingController,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
+        use_sokovan: bool = True,
     ) -> None:
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
@@ -281,6 +286,8 @@ class AgentRegistry:
         self.hook_plugin_ctx = hook_plugin_ctx
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
+        self._scheduling_controller = scheduling_controller
+        self._use_sokovan = use_sokovan
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
@@ -896,6 +903,71 @@ class AgentRegistry:
             if session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
 
+    async def _enqueue_session_via_sokovan(
+        self,
+        session_creation_id: str,
+        session_name: str,
+        access_key: AccessKey,
+        session_enqueue_configs: SessionEnqueueingConfig,
+        scaling_group: Optional[str],
+        session_type: SessionTypes,
+        resource_policy: dict,
+        *,
+        user_scope: UserScope,
+        priority: int,
+        public_sgroup_only: bool,
+        cluster_mode: ClusterMode,
+        cluster_size: int,
+        session_tag: Optional[str],
+        internal_data: Optional[dict],
+        starts_at: Optional[datetime],
+        batch_timeout: Optional[timedelta],
+        agent_list: Optional[Sequence[str]],
+        dependency_sessions: Optional[Sequence[SessionId]],
+        callback_url: Optional[URL],
+        route_id: Optional[uuid.UUID],
+        sudo_session_enabled: bool,
+        network: NetworkRow | None,
+    ) -> SessionId:
+        """Enqueue session using Sokovan scheduling controller."""
+        from ai.backend.manager.repositories.scheduler.types.session_creation import (
+            SessionCreationSpec,
+        )
+
+        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
+            "kernel_configs"
+        ]
+
+        # Create SessionCreationSpec
+        spec = SessionCreationSpec(
+            session_creation_id=session_creation_id,
+            session_name=session_name,
+            access_key=access_key,
+            user_scope=user_scope,
+            session_type=session_type,
+            cluster_mode=cluster_mode,
+            cluster_size=cluster_size,
+            priority=priority,
+            resource_policy=resource_policy,
+            kernel_specs=kernel_enqueue_configs,
+            creation_spec=session_enqueue_configs["creation_config"],
+            scaling_group=scaling_group,
+            session_tag=session_tag,
+            starts_at=starts_at,
+            batch_timeout=batch_timeout,
+            dependency_sessions=list(dependency_sessions) if dependency_sessions else None,
+            callback_url=callback_url,
+            route_id=route_id,
+            sudo_session_enabled=sudo_session_enabled,
+            network=network,
+            agent_list=list(agent_list) if agent_list else None,
+            internal_data=internal_data,
+            public_sgroup_only=public_sgroup_only,
+        )
+
+        # Delegate to scheduling controller
+        return await self._scheduling_controller.enqueue_session(spec)
+
     async def enqueue_session(
         self,
         session_creation_id: str,
@@ -922,11 +994,37 @@ class AgentRegistry:
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
     ) -> SessionId:
+        # Use sokovan scheduling controller if enabled
+        if self._use_sokovan:
+            return await self._enqueue_session_via_sokovan(
+                session_creation_id=session_creation_id,
+                session_name=session_name,
+                access_key=access_key,
+                session_enqueue_configs=session_enqueue_configs,
+                scaling_group=scaling_group,
+                session_type=session_type,
+                resource_policy=resource_policy,
+                user_scope=user_scope,
+                priority=priority,
+                public_sgroup_only=public_sgroup_only,
+                cluster_mode=cluster_mode,
+                cluster_size=cluster_size,
+                session_tag=session_tag,
+                internal_data=internal_data,
+                starts_at=starts_at,
+                batch_timeout=batch_timeout,
+                agent_list=agent_list,
+                dependency_sessions=dependency_sessions,
+                callback_url=callback_url,
+                route_id=route_id,
+                sudo_session_enabled=sudo_session_enabled,
+                network=network,
+            )
+
+        # Original implementation
         session_id = SessionId(uuid.uuid4())
 
-        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
-            "kernel_configs"
-        ]
+        kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
         assert len(kernel_enqueue_configs) >= 1
         main_kernel_config = kernel_enqueue_configs[0]
         assert main_kernel_config["cluster_role"] == DEFAULT_ROLE
@@ -2666,6 +2764,7 @@ class AgentRegistry:
 
         # Get the main container's agent info
 
+        # TODO: Separate VOLATILE network cleanup method
         if session.network_type == NetworkType.VOLATILE:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
