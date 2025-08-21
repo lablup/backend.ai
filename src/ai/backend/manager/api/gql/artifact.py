@@ -210,8 +210,9 @@ class Artifact(Node):
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            registry=SourceInfo(name=None, url=None),
-            source=SourceInfo(name=None, url=None),
+            # TODO: Inject url
+            registry=SourceInfo(name=data.registry_type.value, url=None),
+            source=SourceInfo(name=data.source_registry_type.value, url=None),
         )
 
     @strawberry.field
