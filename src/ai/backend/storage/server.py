@@ -11,7 +11,7 @@ import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Sequence, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Sequence
 
 import aiomonitor
 import aiotools
@@ -77,10 +77,10 @@ async def server_main_logwrapper(
         asyncio.get_child_watcher()
     except (AttributeError, NotImplementedError):
         pass
-    local_config = cast(StorageProxyUnifiedConfig, _args[0])
+    local_config: StorageProxyUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        local_config.logging,
+        local_config.logging.model_dump(),
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -103,7 +103,7 @@ async def server_main(
     from .migration import check_latest
     from .watcher import WatcherClient
 
-    local_config = cast(StorageProxyUnifiedConfig, _args[0])
+    local_config: StorageProxyUnifiedConfig = _args[0]
     loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
         loop,
@@ -423,10 +423,9 @@ def main(
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        local_config.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                local_config.logging,
+                local_config.logging.model_dump(),
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

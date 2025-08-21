@@ -36,6 +36,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.config_pydantic import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes
@@ -781,9 +782,15 @@ class EtcdConfig(BaseModel):
         description="Etcd namespace",
         examples=["local", "backend"],
     )
-    addr: HostPortPair = Field(
+    addr: HostPortPair | list[HostPortPair] = Field(
         description="Etcd address and port",
-        examples=[{"host": "127.0.0.1", "port": 2379}],
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
+            ],  # multiple endpoints
+        ],
     )
     user: Optional[str] = Field(
         default=None,
@@ -799,7 +806,7 @@ class EtcdConfig(BaseModel):
     def to_dataclass(self) -> EtcdConfigData:
         return EtcdConfigData(
             namespace=self.namespace,
-            addr=self.addr,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
             user=self.user,
             password=self.password,
         )
@@ -895,8 +902,8 @@ class AgentUnifiedConfig(BaseModel):
         default_factory=PyroscopeConfig,
         description="Pyroscope configuration",
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="Logging configuration",
     )
     resource: ResourceConfig = Field(

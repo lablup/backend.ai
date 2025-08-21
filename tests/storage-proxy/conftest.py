@@ -42,7 +42,7 @@ def local_volume(vfroot) -> Iterator[Path]:
 @pytest.fixture
 def mock_etcd() -> Iterator[AsyncEtcd]:
     yield AsyncEtcd(
-        addr=HostPortPair("", 0),
+        addrs=[HostPortPair("", 0)],
         namespace="",
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",

@@ -4,14 +4,18 @@ Configuration management CLI commands for Backend.AI Manager.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+import logging
 import pathlib
 
 import click
 
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.logging.utils import BraceStyleAdapter
 
+from ..config.unified import ManagerUnifiedConfig
 from .context import CLIContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -72,9 +76,8 @@ Generated automatically from the ManagerUnifiedConfig schema.
         generate_sample_config_file(
             ManagerUnifiedConfig, str(output), header_comment=header_comment.strip()
         )
-        click.echo(f"Sample configuration file generated successfully: {output}")
+        log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        click.echo(f"Error generating sample configuration: {e}", err=True)
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 
 

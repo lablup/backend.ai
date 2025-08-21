@@ -69,7 +69,7 @@ def test_node_id() -> str:
 @pytest.fixture
 async def etcd(etcd_container, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     etcd = AsyncEtcd(
-        addr=etcd_container[1],
+        addrs=[etcd_container[1]],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",
@@ -188,7 +188,7 @@ async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[
 @pytest.fixture
 async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     etcd = AsyncEtcd(
-        addr=etcd_container[1],
+        addrs=[etcd_container[1]],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",

@@ -4,14 +4,18 @@ Configuration management CLI commands for Backend.AI Web Server.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+import logging
 import pathlib
 
 import click
 
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
-from ai.backend.web.config.unified import WebServerUnifiedConfig
+from ai.backend.logging.utils import BraceStyleAdapter
 
+from ..config.unified import WebServerUnifiedConfig
 from .context import CLIContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -72,9 +76,8 @@ Generated automatically from the WebServerUnifiedConfig schema.
         generate_sample_config_file(
             WebServerUnifiedConfig, str(output), header_comment=header_comment.strip()
         )
-        click.echo(f"Sample configuration file generated successfully: {output}")
+        log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        click.echo(f"Error generating sample configuration: {e}", err=True)
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 
 

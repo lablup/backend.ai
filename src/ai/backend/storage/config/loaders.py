@@ -8,7 +8,6 @@ from pprint import pformat
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.logging import LogLevel
 
 from .unified import StorageProxyUnifiedConfig
@@ -60,12 +59,9 @@ def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
         ConfigScopes.NODE: f"nodes/storage/{local_config.storage_proxy.node_id}",
     }
 
-    # Convert to common HostPortPair
-    addr = local_config.etcd.addr
-    common_addr = CommonHostPortPair(host=addr.host, port=addr.port)
-
+    etcd_config_data = local_config.etcd.to_dataclass()
     etcd = AsyncEtcd(
-        common_addr,
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
