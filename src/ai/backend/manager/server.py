@@ -660,6 +660,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
                 scheduling_controller=root_ctx.scheduling_controller,
+                deployment_controller=root_ctx.deployment_controller,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -926,6 +927,25 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_schedule=root_ctx.valkey_schedule,
         )
     )
+
+    # Create deployment controller if Sokovan is enabled
+    if root_ctx.config_provider.config.manager.use_sokovan:
+        from ai.backend.manager.sokovan.deployment import DeploymentController
+        from ai.backend.manager.sokovan.deployment.deployment_controller import (
+            DeploymentControllerArgs,
+        )
+
+        root_ctx.deployment_controller = DeploymentController(
+            DeploymentControllerArgs(
+                scheduling_controller=root_ctx.scheduling_controller,
+                deployment_repository=root_ctx.repositories.deployment.repository,
+                config_provider=root_ctx.config_provider,
+                storage_manager=root_ctx.storage_manager,
+                event_producer=root_ctx.event_producer,
+            )
+        )
+    else:
+        root_ctx.deployment_controller = None
 
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
