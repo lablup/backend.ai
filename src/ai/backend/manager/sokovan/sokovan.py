@@ -167,7 +167,7 @@ class SokovanOrchestrator:
                 None,  # No short-cycle timer for retry tasks
                 LockID.LOCKID_SOKOVAN_RETRY_PREPARING_TIMER,
                 short_interval=None,  # No short-cycle timer
-                long_interval=30.0,  # 30 seconds for retry operations
+                long_interval=10.0,  # 10 seconds for retry operations
                 initial_delay=10.0,  # Wait a bit before first retry
             ),
             SchedulerTimerSpec(
@@ -175,7 +175,7 @@ class SokovanOrchestrator:
                 None,  # No short-cycle timer for retry tasks
                 LockID.LOCKID_SOKOVAN_RETRY_CREATING_TIMER,
                 short_interval=None,  # No short-cycle timer
-                long_interval=30.0,  # 30 seconds for retry operations
+                long_interval=10.0,  # 10 seconds for retry operations
                 initial_delay=10.0,  # Wait a bit before first retry
             ),
         ]

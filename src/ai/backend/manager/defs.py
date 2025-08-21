@@ -105,6 +105,8 @@ class LockID(enum.IntEnum):
     # Retry timers (only long cycle - 30 seconds)
     LOCKID_SOKOVAN_RETRY_PREPARING_TIMER = 220
     LOCKID_SOKOVAN_RETRY_CREATING_TIMER = 221
+    # Deployment auto-scaler timer
+    LOCKID_DEPLOYMENT_AUTO_SCALER = 222
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
