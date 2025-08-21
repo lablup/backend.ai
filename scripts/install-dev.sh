@@ -87,6 +87,11 @@ usage() {
   echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
+  echo "  ${LWHITE}--enable-rocm-mock${NC}"
+  echo "    Install ROCm accelerator mock plugin and pull a"
+  echo "    TensorFlow ROCm kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
   echo "    If you are on the main branch, this will be automatically enabled."
@@ -297,6 +302,7 @@ SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
 ENABLE_CUDA_MIG_MOCK=0
+ENABLE_ROCM_MOCK=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -341,6 +347,7 @@ while [ $# -gt 0 ]; do
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
     --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
+    --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -701,10 +708,10 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   fi
 fi
 
-count=$(( (ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA) ))
+count=$(( (ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK) ))
 if [ $count -gt 1 ]; then
-  show_error "You can't use multiple CUDA plugins at once!"
-  show_error "Please remove --enable-cuda, --enable-cuda-mock, or --enable-cuda-mig-mock flag to continue."
+  show_error "You can't use multiple CUDA/ROCm plugins at once!"
+  show_error "Please remove --enable-cuda, --enable-cuda-mock, --enable-cuda-mig-mock, --enable-rocm-mock flag to continue."
   exit 1
 fi
 
@@ -905,6 +912,10 @@ configure_backendai() {
 
   if [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
     cp "configs/accelerator/cuda-mock-mig.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    cp "configs/accelerator/rocm-mock.toml" mock-accelerator.toml
   fi
 
   # configure manager

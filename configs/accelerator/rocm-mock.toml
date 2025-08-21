@@ -1,0 +1,17 @@
+slot_name = "rocm"
+device_plugin_name = "ROCm"
+
+devices = [
+  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d01", model_name = "AMD MI250", numa_node = 0, subproc_count = 108, memory_size = "40G", is_mig_device = false },
+  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d02", model_name = "AMD MI250", numa_node = 1, subproc_count = 108, memory_size = "40G", is_mig_device = false },
+  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d03", model_name = "AMD MI250", numa_node = 0, subproc_count = 108, memory_size = "40G", is_mig_device = false },
+  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d04", model_name = "AMD MI250", numa_node = 1, subproc_count = 108, memory_size = "40G", is_mig_device = false },
+]
+
+
+[formats.device]
+display_unit = "GPU"
+display_icon = "gpu1"
+human_readable_name = "GPU"
+description = "AMD ROCm GPU"
+number_format = { binary = false, round_length = 0 }
