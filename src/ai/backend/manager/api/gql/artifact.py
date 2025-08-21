@@ -197,22 +197,28 @@ class Artifact(Node):
         )
 
     @strawberry.field
-    async def revisions(self, info: Info[StrawberryGQLContext]) -> ArtifactRevisionConnection:
-        loader = info.context.dataloader_manager.get_loader_by_func(
-            info.context, ArtifactRevision.batch_load_by_artifact_id
-        )
-
-        revision = await loader.load(self.id)
-        edges = [ArtifactRevisionEdge(node=revision, cursor=str(revision.id))]
-
-        return ArtifactRevisionConnection(
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            edges=edges,
+    async def revisions(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Optional[ArtifactRevisionFilter] = None,
+        order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> ArtifactRevisionConnection:
+        return await resolve_artifact_revisions(
+            info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
     @strawberry.field
@@ -568,9 +574,43 @@ def _build_artifact_revision_connection(
 
 
 async def resolve_artifact_revisions(
-    artifact: Artifact, info: Info[StrawberryGQLContext]
-) -> list[ArtifactRevision]:
-    raise NotImplementedError("Artifact revision retrieval not implemented yet.")
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ArtifactRevisionFilter] = None,
+    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ArtifactRevisionConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    # Convert GraphQL ordering to repository ordering
+    repo_ordering = _convert_gql_ordering_to_repo_ordering_revision(order_by)
+
+    # Set up pagination options
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    # Get artifact revisions using list action
+    action_result = await info.context.processors.artifact_revision.list_.wait_for_complete(
+        ListArtifactRevisionsAction(
+            pagination=pagination_options,
+            ordering=repo_ordering,
+            filters=repo_filter,
+        )
+    )
+
+    # Build GraphQL connection response
+    return _build_artifact_revision_connection(
+        artifact_revisions=action_result.data,
+        total_count=action_result.total_count,
+        pagination_options=pagination_options,
+    )
 
 
 # Query Fields
@@ -622,45 +662,28 @@ async def artifact_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactRevisionConnection:
-    repo_filter = None
-    if filter:
-        repo_filter = filter.to_repo_filter()
-
-    # Convert GraphQL ordering to repository ordering
-    repo_ordering = _convert_gql_ordering_to_repo_ordering_revision(order_by)
-
-    # Set up pagination options
-    pagination_options = build_pagination_options(
-        before=before, after=after, first=first, last=last, limit=limit, offset=offset
-    )
-
-    # Get artifact revisions using list action
-    action_result = await info.context.processors.artifact.list_revisions.wait_for_complete(
-        ListArtifactRevisionsAction(
-            pagination=pagination_options,
-            ordering=repo_ordering,
-            filters=repo_filter,
-        )
-    )
-
-    # Build GraphQL connection response
-    return _build_artifact_revision_connection(
-        artifact_revisions=action_result.data,
-        total_count=action_result.total_count,
-        pagination_options=pagination_options,
+    return await resolve_artifact_revisions(
+        info,
+        filter,
+        order_by,
+        before,
+        after,
+        first,
+        last,
+        limit,
+        offset,
     )
 
 
 @strawberry.field
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
-    action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
-        GetArtifactRevisionsAction(
-            artifact_id=uuid.UUID(id),
+    action_result = await info.context.processors.artifact_revision.get.wait_for_complete(
+        GetArtifactRevisionAction(
+            revision_id=uuid.UUID(id),
         )
     )
 
-    # Return the most recent revision
-    return ArtifactRevision.from_dataclass(max(action_result.revisions, key=lambda r: r.updated_at))
+    return ArtifactRevision.from_dataclass(action_result.revision)
 
 
 @strawberry.mutation
