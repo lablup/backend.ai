@@ -56,10 +56,6 @@ class DownloadObjectResponse(BaseResponseModel):
     pass
 
 
-class DeleteObjectResponse(BaseResponseModel):
-    pass
-
-
 class ObjectMetaResponse(BaseResponseModel):
     content_length: Optional[int]
     content_type: Optional[str]
@@ -93,3 +89,7 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
         """,
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
+
+
+class DeleteObjectResponse(BaseResponseModel):
+    pass

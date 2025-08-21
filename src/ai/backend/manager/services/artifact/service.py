@@ -1,8 +1,10 @@
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.storage.request import (
+    DeleteObjectReq,
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
 )
+from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -172,11 +174,43 @@ class ArtifactService:
         return UnauthorizeArtifactActionResult(result=result)
 
     async def delete(self, action: DeleteArtifactAction) -> DeleteArtifactActionResult:
-        result = await self._artifact_repository.delete_artifact(action.artifact_id)
+        artifact_row = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
+        revision_row = await self._artifact_repository.get_artifact_revision(
+            action.artifact_id, action.artifact_version
+        )
+
+        if revision_row.status in [ArtifactStatus.SCANNED, ArtifactStatus.PULLING]:
+            raise ArtifactDeletionBadRequestError(
+                "Artifact revision status not ready to be deleted"
+            )
+
+        result = await self._artifact_repository.reset_artifact_revision_status(revision_row.id)
+        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+
+        key = f"{artifact_row.name}/{action.artifact_version}"
+
+        try:
+            await storage_proxy_client.delete_s3_file(
+                storage_name=storage_data.name,
+                bucket_name=action.bucket_name,
+                req=DeleteObjectReq(
+                    key=key,
+                ),
+            )
+        except Exception as e:
+            raise ArtifactDeletionError("Failed to delete artifact from storage") from e
+
         return DeleteArtifactActionResult(artifact_id=result)
 
     async def cancel_import(self, action: CancelImportAction) -> CancelImportActionResult:
-        artifact_id = await self._artifact_repository.cancel_import_artifact(action.artifact_id)
+        revision_row = await self._artifact_repository.get_artifact_revision(
+            action.artifact_id, action.artifact_version
+        )
+
+        artifact_id = await self._artifact_repository.reset_artifact_revision_status(
+            revision_row.id
+        )
         return CancelImportActionResult(artifact_id=artifact_id)
 
     async def get(self, action: GetArtifactAction) -> GetArtifactActionResult:

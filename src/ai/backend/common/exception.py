@@ -602,6 +602,32 @@ class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ArtifactDeletionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
+    error_title = "Artifact Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
+    error_title = "Artifact Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-cursor-type"
     error_title = "Invalid Cursor Type"

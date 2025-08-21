@@ -618,30 +618,15 @@ class ArtifactRepository:
             return updated_row.to_dataclass()
 
     @repository_decorator()
-    async def delete_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
-            )
-            row: ArtifactRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactNotFoundError()
-
-            await db_sess.delete(row)
-            await db_sess.flush()
-
-            return artifact_id
-
-    @repository_decorator()
-    async def cancel_import_artifact(self, artifact_id: uuid.UUID) -> uuid.UUID:
+    async def reset_artifact_revision_status(self, revision_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
             stmt = (
-                sa.update(ArtifactRow)
-                .where(ArtifactRow.id == artifact_id)
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == revision_id)
                 .values(status=ArtifactStatus.SCANNED)
             )
             await db_sess.execute(stmt)
-            return artifact_id
+            return revision_id
 
     @repository_decorator()
     async def update_artifact_revision_status(

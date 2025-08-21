@@ -9,6 +9,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 @dataclass
 class CancelImportAction(ArtifactAction):
     artifact_id: uuid.UUID
+    artifact_version: str
 
     @override
     def entity_id(self) -> Optional[str]:

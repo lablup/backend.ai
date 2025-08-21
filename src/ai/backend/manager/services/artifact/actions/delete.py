@@ -9,6 +9,9 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 @dataclass
 class DeleteArtifactAction(ArtifactAction):
     artifact_id: uuid.UUID
+    artifact_version: str
+    storage_id: uuid.UUID
+    bucket_name: str
 
     @override
     def entity_id(self) -> Optional[str]:

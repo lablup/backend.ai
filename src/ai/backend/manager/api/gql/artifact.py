@@ -144,8 +144,17 @@ class UpdateArtifactInput:
 
 
 @strawberry.input
+class CancelArtifactInput:
+    artifact_id: ID
+    artifact_version: str
+
+
+@strawberry.input
 class DeleteArtifactInput:
     artifact_id: ID
+    artifact_version: str
+    storage_id: ID
+    bucket_name: str
 
 
 @strawberry.input
@@ -748,6 +757,9 @@ async def delete_artifact(
     action_result = await info.context.processors.artifact.delete.wait_for_complete(
         DeleteArtifactAction(
             artifact_id=uuid.UUID(input.artifact_id),
+            artifact_version=input.artifact_version,
+            storage_id=uuid.UUID(input.storage_id),
+            bucket_name=input.bucket_name,
         )
     )
 
@@ -756,15 +768,15 @@ async def delete_artifact(
 
 @strawberry.mutation
 async def cancel_import_artifact(
-    artifact_id: ID, info: Info[StrawberryGQLContext]
+    input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
     # TODO: Cancel actual import bgtask
     action_result = await info.context.processors.artifact.cancel_import.wait_for_complete(
         CancelImportAction(
-            artifact_id=uuid.UUID(artifact_id),
+            artifact_id=uuid.UUID(input.artifact_id),
+            artifact_version=input.artifact_version,
         )
     )
-
     return CancelImportArtifactPayload(artifact_id=ID(str(action_result.artifact_id)))
 
 
