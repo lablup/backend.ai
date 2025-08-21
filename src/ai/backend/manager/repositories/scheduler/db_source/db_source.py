@@ -56,6 +56,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ImageIdentifier,
     KernelBindingData,
     KernelCreationInfo,
+    KernelTransitionData,
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
@@ -68,6 +69,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
+    SessionTransitionData,
     UserResourcePolicy,
 )
 
@@ -450,8 +452,12 @@ class ScheduleDBSource:
                 keypair_policies[row.access_key] = KeyPairResourcePolicy(
                     name=row.name,
                     total_resource_slots=total_resource_slots,
-                    max_concurrent_sessions=row.max_concurrent_sessions or 0,
-                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions or 0,
+                    max_concurrent_sessions=row.max_concurrent_sessions
+                    if row.max_concurrent_sessions and row.max_concurrent_sessions > 0
+                    else None,
+                    max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions
+                    if row.max_concurrent_sftp_sessions and row.max_concurrent_sftp_sessions > 0
+                    else None,
                     max_pending_session_count=row.max_pending_session_count,
                     max_pending_session_resource_slots=row.max_pending_session_resource_slots,
                 )
@@ -2138,6 +2144,63 @@ class ScheduleDBSource:
                 )
             )
             await db_sess.execute(stmt)
+
+    async def get_sessions_for_transition(
+        self,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition based on current session and kernel status.
+
+        :param session_status: Current session status to filter by
+        :param kernel_status: Required kernel status for transition
+        :return: List of sessions ready for transition with detailed information
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Find sessions in specified state
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.status == session_status)
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_sessions: list[SessionTransitionData] = []
+            for session in sessions:
+                # Check if all kernels have the required status
+                all_ready = all(kernel.status == kernel_status for kernel in session.kernels)
+                if not all_ready or not session.kernels:
+                    continue
+
+                # Build kernel transition data
+                kernel_data = [
+                    KernelTransitionData(
+                        kernel_id=str(kernel.id),
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                        cluster_role=kernel.cluster_role,
+                        container_id=kernel.container_id,
+                        startup_command=kernel.startup_command,
+                    )
+                    for kernel in session.kernels
+                ]
+
+                # Build session transition data
+                session_data = SessionTransitionData(
+                    session_id=session.id,
+                    session_name=session.name,
+                    session_type=session.session_type,
+                    access_key=session.access_key,
+                    cluster_mode=session.cluster_mode,
+                    kernels=kernel_data,
+                    batch_timeout=session.batch_timeout,
+                )
+
+                ready_sessions.append(session_data)
+
+            return ready_sessions
 
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """

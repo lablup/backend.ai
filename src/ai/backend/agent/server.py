@@ -641,10 +641,11 @@ class AgentRPCServer(aobject):
     @rpc_function
     @collect_error
     async def check_creating(self, kernel_id: str) -> bool:
-        """Check if a kernel is being created."""
+        """Check if a kernel is being created or already exists."""
         log.debug("rpc::check_creating(k:{})", kernel_id)
         kid = KernelId(UUID(kernel_id))
-        return kid in self.agent._active_creates
+        # Check if kernel is being created OR already exists in registry
+        return kid in self.agent._active_creates or kid in self.agent.kernel_registry
 
     @rpc_function
     @collect_error

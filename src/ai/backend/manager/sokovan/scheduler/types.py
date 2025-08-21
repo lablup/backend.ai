@@ -54,8 +54,8 @@ class KeyPairResourcePolicy:
 
     name: str
     total_resource_slots: ResourceSlot
-    max_concurrent_sessions: int
-    max_concurrent_sftp_sessions: int
+    max_concurrent_sessions: Optional[int]
+    max_concurrent_sftp_sessions: Optional[int]
     max_pending_session_count: Optional[int]
     max_pending_session_resource_slots: Optional[ResourceSlot]
 
@@ -763,3 +763,41 @@ class KernelCreationInfo:
                     slots[slot_name] = str(sum(total_allocs))
 
         return slots
+
+
+@dataclass(frozen=True)
+class KernelTransitionData:
+    """Kernel information for state transitions."""
+
+    kernel_id: str
+    agent_id: AgentId
+    agent_addr: str
+    cluster_role: str  # DEFAULT_ROLE for main kernel
+    container_id: Optional[str]
+    startup_command: Optional[str]
+
+
+@dataclass(frozen=True)
+class SessionTransitionData:
+    """
+    Session data for state transitions.
+    Contains all necessary information for hooks without exposing database rows.
+    """
+
+    session_id: SessionId
+    session_name: str
+    session_type: SessionTypes
+    access_key: AccessKey
+    cluster_mode: Optional[ClusterMode]
+    kernels: list[KernelTransitionData]
+    batch_timeout: Optional[int]  # For batch sessions
+
+    @property
+    def main_kernel(self) -> KernelTransitionData:
+        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
+        main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise ValueError(f"Session {self.session_id} has more than 1 main kernel")
+        if len(main_kernels) == 0:
+            raise ValueError(f"Session {self.session_id} has no main kernel")
+        return main_kernels[0]

@@ -1911,8 +1911,13 @@ class ScheduleRepository:
                 keypair_policies[session_data.access_key] = KeyPairResourcePolicy(
                     name=session_data.keypair_policy_name,
                     total_resource_slots=total_resource_slots,
-                    max_concurrent_sessions=session_data.keypair_max_concurrent or 0,
-                    max_concurrent_sftp_sessions=session_data.keypair_max_sftp or 0,
+                    max_concurrent_sessions=session_data.keypair_max_concurrent
+                    if session_data.keypair_max_concurrent
+                    and session_data.keypair_max_concurrent > 0
+                    else None,
+                    max_concurrent_sftp_sessions=session_data.keypair_max_sftp
+                    if session_data.keypair_max_sftp and session_data.keypair_max_sftp > 0
+                    else None,
                     max_pending_session_count=session_data.keypair_max_pending_count,
                     max_pending_session_resource_slots=session_data.keypair_max_pending_slots,
                 )
