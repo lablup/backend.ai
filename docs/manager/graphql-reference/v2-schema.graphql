@@ -23,7 +23,8 @@ type Artifact implements Node {
   description: String
   registry: SourceInfo!
   source: SourceInfo!
-  size: ByteSize!
+  revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+  updatedAt: DateTime!
 }
 
 """Added in 25.14.0"""
@@ -157,17 +158,6 @@ type ArtifactStatusChangedPayload {
   artifact: Artifact!
 }
 
-"""Added in 25.14.0"""
-input ArtifactTarget {
-  artifactId: ID!
-  revision: String!
-}
-
-input ArtifactTarget {
-  artifactId: ID!
-  revision: String!
-}
-
 enum ArtifactType {
   MODEL
   PACKAGE
@@ -181,7 +171,6 @@ input CancelArtifactInput {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
 type CancelImportArtifactPayload {
   artifactRevisionId: ID!
 }
