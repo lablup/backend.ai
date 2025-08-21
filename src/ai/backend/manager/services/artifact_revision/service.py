@@ -141,7 +141,7 @@ class ArtifactRevisionService:
             )
         )
 
-        await self.associate_with_storage(AssociateWithStorageAction(artifact.id, storage.id))
+        await self.associate_with_storage(AssociateWithStorageAction(revision_data.id, storage.id))
         await self._artifact_repository.update_artifact_revision_status(
             revision_row.id, ArtifactStatus.PULLED
         )
