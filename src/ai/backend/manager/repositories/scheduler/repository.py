@@ -16,6 +16,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.scheduler.types import (
@@ -23,6 +24,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KernelCreationInfo,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
+    SessionTransitionData,
 )
 
 from .cache_source.cache_source import ScheduleCacheSource
@@ -279,6 +281,20 @@ class SchedulerRepository:
         These sessions are ready to transition to RUNNING state.
         """
         return await self._db_source.get_sessions_ready_to_run()
+
+    async def get_sessions_for_transition(
+        self,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition based on current session and kernel status.
+
+        :param session_status: Current session status to filter by
+        :param kernel_status: Required kernel status for transition
+        :return: List of sessions ready for transition with detailed information
+        """
+        return await self._db_source.get_sessions_for_transition(session_status, kernel_status)
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
