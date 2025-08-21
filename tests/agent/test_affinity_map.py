@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from collections import defaultdict
+from collections.abc import MutableMapping, Sequence
 from decimal import Decimal
 from pprint import pprint
-from typing import Any, Sequence
+from typing import Any
 
 import pytest
 
@@ -317,7 +320,7 @@ def test_affinity_map_neighbor_devices() -> None:
 @pytest.mark.parametrize(
     "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
 )
-def test_affinity_map_secondary_alloaction_simulated(
+def test_affinity_map_secondary_allocation_simulated(
     allocation_strategy: AllocationStrategy,
 ) -> None:
     devices = [
@@ -410,7 +413,7 @@ def test_affinity_map_secondary_alloaction_simulated(
 @pytest.mark.parametrize(
     "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
 )
-def test_affinity_map_secondary_alloaction_integrated(
+def test_affinity_map_secondary_allocation_integrated(
     allocation_strategy: AllocationStrategy,
 ) -> None:
     devices = [
@@ -464,7 +467,7 @@ def test_affinity_map_secondary_alloaction_integrated(
         {SlotName("cuda"): Decimal("2")},
         affinity_hint=affinity_hint,
     )
-    per_node_cuda_alloc = defaultdict(int)
+    per_node_cuda_alloc: MutableMapping[int, int] = defaultdict(int)
     for dev_id, alloc in alloc_map.allocations[SlotName("cuda")].items():
         if dev_id == "x0":
             per_node_cuda_alloc[0] += int(alloc)
@@ -484,7 +487,7 @@ def test_affinity_map_secondary_alloaction_integrated(
         affinity_hint=affinity_hint,
     )
 
-    per_node_cpu_alloc = defaultdict(int)
+    per_node_cpu_alloc: MutableMapping[int, int] = defaultdict(int)
     for dev_id, alloc in alloc_map.allocations[SlotName("cpu")].items():
         if dev_id.startswith("a"):
             per_node_cpu_alloc[0] += int(alloc)
