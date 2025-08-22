@@ -43,7 +43,7 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.disapprove import (
+from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
