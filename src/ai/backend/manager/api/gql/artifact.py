@@ -55,9 +55,9 @@ class ArtifactFilter:
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
 
-    AND: Optional["ArtifactFilter"] = None
-    OR: Optional["ArtifactFilter"] = None
-    NOT: Optional["ArtifactFilter"] = None
+    AND: Optional[list["ArtifactFilter"]] = None
+    OR: Optional[list["ArtifactFilter"]] = None
+    NOT: Optional[list["ArtifactFilter"]] = None
     DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactFilterOptions:
@@ -73,11 +73,11 @@ class ArtifactFilter:
 
         # Handle logical operations
         if self.AND:
-            repo_filter.AND = self.AND.to_repo_filter()
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
         if self.OR:
-            repo_filter.OR = self.OR.to_repo_filter()
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
         if self.NOT:
-            repo_filter.NOT = self.NOT.to_repo_filter()
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
 
         return repo_filter
 
@@ -100,9 +100,9 @@ class ArtifactRevisionFilter:
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
 
-    AND: Optional["ArtifactRevisionFilter"] = None
-    OR: Optional["ArtifactRevisionFilter"] = None
-    NOT: Optional["ArtifactRevisionFilter"] = None
+    AND: Optional[list["ArtifactRevisionFilter"]] = None
+    OR: Optional[list["ArtifactRevisionFilter"]] = None
+    NOT: Optional[list["ArtifactRevisionFilter"]] = None
     DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
@@ -124,11 +124,11 @@ class ArtifactRevisionFilter:
 
         # Handle logical operations
         if self.AND:
-            repo_filter.AND = self.AND.to_repo_filter()
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
         if self.OR:
-            repo_filter.OR = self.OR.to_repo_filter()
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
         if self.NOT:
-            repo_filter.NOT = self.NOT.to_repo_filter()
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
 
         return repo_filter
 

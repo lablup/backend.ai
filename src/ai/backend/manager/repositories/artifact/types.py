@@ -44,9 +44,9 @@ class ArtifactFilterOptions:
     source_registry_type: Optional[ArtifactRegistryType] = None
 
     # Logical operations
-    AND: Optional["ArtifactFilterOptions"] = None
-    OR: Optional["ArtifactFilterOptions"] = None
-    NOT: Optional["ArtifactFilterOptions"] = None
+    AND: Optional[list["ArtifactFilterOptions"]] = None
+    OR: Optional[list["ArtifactFilterOptions"]] = None
+    NOT: Optional[list["ArtifactFilterOptions"]] = None
 
 
 @dataclass
@@ -58,6 +58,6 @@ class ArtifactRevisionFilterOptions:
     version_filter: Optional["StringFilter"] = None
 
     # Logical operations
-    AND: Optional["ArtifactRevisionFilterOptions"] = None
-    OR: Optional["ArtifactRevisionFilterOptions"] = None
-    NOT: Optional["ArtifactRevisionFilterOptions"] = None
+    AND: Optional[list["ArtifactRevisionFilterOptions"]] = None
+    OR: Optional[list["ArtifactRevisionFilterOptions"]] = None
+    NOT: Optional[list["ArtifactRevisionFilterOptions"]] = None

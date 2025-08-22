@@ -52,9 +52,9 @@ input ArtifactFilter {
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
-  AND: ArtifactFilter = null
-  OR: ArtifactFilter = null
-  NOT: ArtifactFilter = null
+  AND: [ArtifactFilter!] = null
+  OR: [ArtifactFilter!] = null
+  NOT: [ArtifactFilter!] = null
   DISTINCT: Boolean = null
 }
 
@@ -113,9 +113,9 @@ input ArtifactRevisionFilter {
   status: ArtifactRevisionStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
-  AND: ArtifactRevisionFilter = null
-  OR: ArtifactRevisionFilter = null
-  NOT: ArtifactRevisionFilter = null
+  AND: [ArtifactRevisionFilter!] = null
+  OR: [ArtifactRevisionFilter!] = null
+  NOT: [ArtifactRevisionFilter!] = null
   DISTINCT: Boolean = null
 }
 

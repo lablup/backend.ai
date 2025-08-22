@@ -120,27 +120,41 @@ class ArtifactFilterApplier:
         # Handle logical operations
         logical_conditions = []
 
-        # Handle AND operation
+        # Handle AND operation (list-based)
         if filters.AND is not None:
-            and_condition, stmt = self._build_filter_condition(stmt, filters.AND)
-            if and_condition is not None:
-                logical_conditions.append(and_condition)
+            and_conditions = []
+            for and_filter in filters.AND:
+                and_condition, stmt = self._build_filter_condition(stmt, and_filter)
+                if and_condition is not None:
+                    and_conditions.append(and_condition)
+            if and_conditions:
+                logical_conditions.append(sa.and_(*and_conditions))
 
-        # Handle OR operation
+        # Handle OR operation (list-based)
         if filters.OR is not None:
-            or_condition, stmt = self._build_filter_condition(stmt, filters.OR)
-            if or_condition is not None:
+            or_conditions = []
+            for or_filter in filters.OR:
+                or_condition, stmt = self._build_filter_condition(stmt, or_filter)
+                if or_condition is not None:
+                    or_conditions.append(or_condition)
+            if or_conditions:
+                combined_or_condition = sa.or_(*or_conditions)
                 if base_condition is not None:
                     # Combine base condition OR logical condition
-                    base_condition = sa.or_(base_condition, or_condition)
+                    base_condition = sa.or_(base_condition, combined_or_condition)
                 else:
-                    base_condition = or_condition
+                    base_condition = combined_or_condition
 
-        # Handle NOT operation
+        # Handle NOT operation (list-based)
         if filters.NOT is not None:
-            not_condition, stmt = self._build_filter_condition(stmt, filters.NOT)
-            if not_condition is not None:
-                logical_conditions.append(~not_condition)  # SQLAlchemy NOT operator
+            not_conditions = []
+            for not_filter in filters.NOT:
+                not_condition, stmt = self._build_filter_condition(stmt, not_filter)
+                if not_condition is not None:
+                    not_conditions.append(not_condition)
+            if not_conditions:
+                # Apply NOT to the AND combination of all NOT conditions
+                logical_conditions.append(~sa.and_(*not_conditions))
 
         # Combine all conditions
         all_conditions = []
@@ -229,27 +243,41 @@ class ArtifactRevisionFilterApplier:
         # Handle logical operations
         logical_conditions = []
 
-        # Handle AND operation
+        # Handle AND operation (list-based)
         if filters.AND is not None:
-            and_condition, stmt = self._build_filter_condition(stmt, filters.AND)
-            if and_condition is not None:
-                logical_conditions.append(and_condition)
+            and_conditions = []
+            for and_filter in filters.AND:
+                and_condition, stmt = self._build_filter_condition(stmt, and_filter)
+                if and_condition is not None:
+                    and_conditions.append(and_condition)
+            if and_conditions:
+                logical_conditions.append(sa.and_(*and_conditions))
 
-        # Handle OR operation
+        # Handle OR operation (list-based)
         if filters.OR is not None:
-            or_condition, stmt = self._build_filter_condition(stmt, filters.OR)
-            if or_condition is not None:
+            or_conditions = []
+            for or_filter in filters.OR:
+                or_condition, stmt = self._build_filter_condition(stmt, or_filter)
+                if or_condition is not None:
+                    or_conditions.append(or_condition)
+            if or_conditions:
+                combined_or_condition = sa.or_(*or_conditions)
                 if base_condition is not None:
                     # Combine base condition OR logical condition
-                    base_condition = sa.or_(base_condition, or_condition)
+                    base_condition = sa.or_(base_condition, combined_or_condition)
                 else:
-                    base_condition = or_condition
+                    base_condition = combined_or_condition
 
-        # Handle NOT operation
+        # Handle NOT operation (list-based)
         if filters.NOT is not None:
-            not_condition, stmt = self._build_filter_condition(stmt, filters.NOT)
-            if not_condition is not None:
-                logical_conditions.append(~not_condition)  # SQLAlchemy NOT operator
+            not_conditions = []
+            for not_filter in filters.NOT:
+                not_condition, stmt = self._build_filter_condition(stmt, not_filter)
+                if not_condition is not None:
+                    not_conditions.append(not_condition)
+            if not_conditions:
+                # Apply NOT to the AND combination of all NOT conditions
+                logical_conditions.append(~sa.and_(*not_conditions))
 
         # Combine all conditions
         all_conditions = []
