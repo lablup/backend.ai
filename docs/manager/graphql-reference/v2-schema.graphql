@@ -588,7 +588,7 @@ input ModelRuntimeConfigInput {
 
 type Mutation {
   """Added in 25.14.0"""
-  scanArtifacts(input: ScanArtifactInput!): ScanArtifactsPayload!
+  scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
 
   """Added in 25.14.0"""
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
@@ -814,7 +814,7 @@ type ScalingRule {
 }
 
 """Added in 25.14.0"""
-input ScanArtifactInput {
+input ScanArtifactsInput {
   registryId: ID!
   storageId: ID!
   limit: Int!

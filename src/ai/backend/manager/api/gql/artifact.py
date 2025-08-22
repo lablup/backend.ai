@@ -140,7 +140,7 @@ class ArtifactRevisionOrderBy:
 
 
 @strawberry.input(description="Added in 25.14.0")
-class ScanArtifactInput:
+class ScanArtifactsInput:
     registry_id: ID
     storage_id: ID
     limit: int
@@ -290,18 +290,18 @@ ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactConnection(Connection[Artifact]):
-    count: int = 0
+    count: int
 
-    def __init__(self, *args, count: int = 0, **kwargs):
+    def __init__(self, *args, count: int, **kwargs):
         super().__init__(*args, **kwargs)
         self.count = count
 
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
-    count: int = 0
+    count: int
 
-    def __init__(self, *args, count: int = 0, **kwargs):
+    def __init__(self, *args, count: int, **kwargs):
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -666,7 +666,7 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
 
 @strawberry.mutation(description="Added in 25.14.0")
 async def scan_artifacts(
-    input: ScanArtifactInput, info: Info[StrawberryGQLContext]
+    input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
