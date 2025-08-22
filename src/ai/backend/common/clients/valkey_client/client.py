@@ -587,6 +587,7 @@ def create_layer_aware_valkey_decorator(
                             success=False,
                             duration=time.perf_counter() - start,
                         )
+                        raise e
                     except Exception as e:
                         if attempt < retry_count - 1:
                             log.debug(

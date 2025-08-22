@@ -4,7 +4,7 @@ Schedule operation handlers that bundle the operation with its post-processing l
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, final
+from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import (
@@ -75,17 +75,6 @@ class ScheduleHandler(ABC):
             result: The result from execute()
         """
         raise NotImplementedError("Subclasses must implement post_process()")
-
-    @final
-    async def handle(self) -> ScheduleResult:
-        """Execute the operation and run post-processing."""
-        result = await self.execute()
-        if result.needs_post_processing():
-            try:
-                await self.post_process(result)
-            except Exception as e:
-                log.error("Error during post-processing: {}", e)
-        return result
 
 
 class ScheduleSessionsHandler(ScheduleHandler):
@@ -245,10 +234,12 @@ class TerminateSessionsHandler(ScheduleHandler):
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
+        repository: SchedulerRepository,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
+        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -267,6 +258,10 @@ class TerminateSessionsHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions and invalidate cache."""
         log.info("Try to terminate {} sessions", len(result.scheduled_sessions))
+        affected_keys: set[AccessKey] = {
+            event_data.access_key for event_data in result.scheduled_sessions
+        }
+        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -275,8 +270,10 @@ class SweepSessionsHandler(ScheduleHandler):
     def __init__(
         self,
         scheduler: Scheduler,
+        repository: SchedulerRepository,
     ):
         self._scheduler = scheduler
+        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -295,6 +292,12 @@ class SweepSessionsHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of swept sessions."""
         log.info("Swept {} stale sessions", len(result.scheduled_sessions))
+        # Invalidate cache for affected access keys
+        affected_keys: set[AccessKey] = {
+            event_data.access_key for event_data in result.scheduled_sessions
+        }
+        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+        log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
 
 class CheckPullingProgressHandler(ScheduleHandler):

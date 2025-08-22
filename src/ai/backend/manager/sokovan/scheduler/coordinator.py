@@ -1,4 +1,5 @@
 import logging
+from contextlib import AsyncExitStack
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -88,8 +89,9 @@ class ScheduleCoordinator:
                 scheduler,
                 self._scheduling_controller,
                 event_producer,
+                scheduler._repository,
             ),
-            ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
+            ScheduleType.SWEEP: SweepSessionsHandler(scheduler, scheduler._repository),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
                 scheduler, self._scheduling_controller, event_producer
             ),
@@ -129,18 +131,24 @@ class ScheduleCoordinator:
                 return False
 
             # Execute the handler with optional locking
-            with self._operation_metrics.measure_operation(handler.name()):
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
                 if handler.lock_id is not None:
-                    # Use unified lock lifetime for all operations
                     lock_lifetime = (
                         self._config_provider.config.manager.session_schedule_lock_lifetime
                     )
-                    # Acquire lock for the entire operation
-                    async with self._lock_factory(handler.lock_id, lock_lifetime):
-                        await handler.handle()
-                else:
-                    # No lock needed
-                    await handler.handle()
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
+                result = await handler.execute()
+                self._operation_metrics.observe_success(
+                    operation=handler.name(), count=result.success_count()
+                )
+                if result.needs_post_processing():
+                    try:
+                        await handler.post_process(result)
+                    except Exception as e:
+                        log.error("Error during post-processing: {}", e)
             return True
         except Exception as e:
             log.exception(
