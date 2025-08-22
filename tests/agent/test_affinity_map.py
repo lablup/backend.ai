@@ -532,7 +532,7 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     allocation_strategy: AllocationStrategy,
 ) -> None:
     devices: Sequence[AbstractComputeDevice] = [
-        *generate_numa_cpu([(0, 72), (1, 72)]),
+        *generate_numa_cpu([(0, 36), (1, 36), (0, 36), (1, 36)]),
         DummyDevice(DeviceId("npu0"), "", 0, 1, numa_node=0, device_name=DeviceName("npu")),
         DummyDevice(DeviceId("npu1"), "", 0, 1, numa_node=0, device_name=DeviceName("npu")),
         DummyDevice(DeviceId("npu2"), "", 0, 1, numa_node=1, device_name=DeviceName("npu")),
@@ -580,9 +580,9 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     new_alloc_per_node: MutableMapping[int, int] = defaultdict(int)
     print("new_alloc:", new_alloc[SlotName("cpu")])
     for dev_id, alloc in new_alloc[SlotName("cpu")].items():
-        if 0 <= int(dev_id) < 72:
+        if 0 <= int(dev_id) < 36 or 72 <= int(dev_id) < 108:
             new_alloc_per_node[0] += int(alloc)
-        elif 72 <= int(dev_id) < 144:
+        elif 36 <= int(dev_id) < 72 or 108 <= int(dev_id) < 144:
             new_alloc_per_node[1] += int(alloc)
     # Since npu3 is in the second NUMA node, we should see the new allocations there only.
     assert new_alloc_per_node[0] == 0
