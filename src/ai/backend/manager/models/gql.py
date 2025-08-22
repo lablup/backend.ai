@@ -322,9 +322,10 @@ class GraphQueryContext:
     scheduler_repository: SchedulerRepository
 
 
-class Mutations(graphene.ObjectType):
+class Mutation(graphene.ObjectType):
     """
     All available GraphQL mutations.
+    Type name changed from 'Mutations' to 'Mutation' in 25.13.0
     """
 
     # super-admin only
@@ -497,9 +498,10 @@ class Mutations(graphene.ObjectType):
     delete_network = DeleteNetwork.Field()
 
 
-class Queries(graphene.ObjectType):
+class Query(graphene.ObjectType):
     """
     All available GraphQL queries.
+    Type name changed from 'Queries' to 'Query' in 25.13.0
     """
 
     node = AsyncNode.Field()
@@ -3188,7 +3190,7 @@ class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
-            mutation_field: GraphQLField | None = getattr(Mutations, info.field_name, None)  # noqa
+            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)  # noqa
             if mutation_field is None:
                 return next(root, info, **args)
             mutation_cls = mutation_field.type

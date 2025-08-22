@@ -272,6 +272,10 @@
   # Override default log level for specific scope of package
   [logging.pkg_ns]
 
+[apollo-router]
+  # endpoint of apollo router
+  endpoint = "http://127.0.0.1:4000,http://api.example.com:4000"
+
 [debug]
   # Whether to enable debug mode.
   enabled = false

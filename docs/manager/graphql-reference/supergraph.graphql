@@ -2,7 +2,7 @@ schema
   @link(url: "https://specs.apollo.dev/link/v1.0")
   @link(url: "https://specs.apollo.dev/join/v0.4", for: EXECUTION)
 {
-  query: Queries
+  query: Query
   mutation: Mutation
   subscription: Subscription
 }
@@ -2122,7 +2122,7 @@ scalar join__FieldSet
 
 enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
-  STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/v2")
+  STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/strawberry")
 }
 
 """
@@ -3139,7 +3139,10 @@ input ModifyUserResourcePolicyInput
   max_customized_image_count: Int
 }
 
-"""All available GraphQL mutations."""
+"""
+All available GraphQL mutations.
+Type name changed from 'Mutations' to 'Mutation' in 25.13.0
+"""
 type Mutation
   @join__type(graph: GRAPHENE)
   @join__type(graph: STRAWBERRY)
@@ -3682,7 +3685,7 @@ input PurgeUserInput
   delegate_endpoint_ownership: Boolean
 }
 
-type Queries
+type Query
   @join__type(graph: GRAPHENE)
   @join__type(graph: STRAWBERRY)
 {

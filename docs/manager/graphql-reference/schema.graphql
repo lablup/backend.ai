@@ -1,11 +1,6 @@
 extend schema
 	@link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "@shareable"])
 
-schema {
-  query: Queries
-  mutation: Mutations
-}
-
 """
 The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
 """
@@ -23,7 +18,7 @@ type PageInfo @shareable {
   endCursor: String
 }
 
-type Queries {
+type Query {
   node(
     """The ID of the object"""
     id: ID!
@@ -2208,8 +2203,11 @@ type _Service {
   sdl: String
 }
 
-"""All available GraphQL mutations."""
-type Mutations {
+"""
+All available GraphQL mutations.
+Type name changed from 'Mutations' to 'Mutation' in 25.13.0
+"""
+type Mutation {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
   create_domain(name: String!, props: DomainInput!): CreateDomain
   modify_domain(name: String!, props: ModifyDomainInput!): ModifyDomain
