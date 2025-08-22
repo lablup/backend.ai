@@ -1,4 +1,5 @@
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, Protocol, TypeVar
 
@@ -324,3 +325,149 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
             rows = list(reversed(rows))
 
         return [self.model_converter.convert_to_data(row) for row in rows]
+
+
+T = TypeVar("T", bound="BaseFilterOptions")
+
+
+class BaseFilterOptions(Protocol):
+    """Protocol for filter options that support logical operations"""
+
+    AND: Optional[list[Any]]
+    OR: Optional[list[Any]]
+    NOT: Optional[list[Any]]
+
+
+class BaseFilterApplier(ABC, Generic[T]):
+    """Base class for applying filters to queries with common logical operations"""
+
+    def apply_filters(self, stmt: Select, filters: T) -> Select:
+        """Apply filters to the query statement"""
+        condition, stmt = self._build_filter_condition(stmt, filters)
+        if condition is not None:
+            stmt = stmt.where(condition)
+        return stmt
+
+    def _build_filter_condition(self, stmt: Select, filters: T) -> tuple[Optional[Any], Select]:
+        """Build a filter condition from FilterOptions, handling logical operations"""
+        conditions = []
+
+        # Apply entity-specific filters
+        entity_conditions, stmt = self.apply_entity_filters(stmt, filters)
+        if entity_conditions:
+            conditions.extend(entity_conditions)
+
+        # Combine basic conditions with AND
+        base_condition = None
+        if conditions:
+            base_condition = sa.and_(*conditions)
+
+        # Handle logical operations
+        logical_conditions = []
+
+        # Handle AND operation (list-based)
+        and_filters = getattr(filters, "AND", None)
+        if and_filters is not None:
+            and_conditions = []
+            for and_filter in and_filters:
+                and_condition, stmt = self._build_filter_condition(stmt, and_filter)
+                if and_condition is not None:
+                    and_conditions.append(and_condition)
+            if and_conditions:
+                logical_conditions.append(sa.and_(*and_conditions))
+
+        # Handle OR operation (list-based)
+        or_filters = getattr(filters, "OR", None)
+        if or_filters is not None:
+            or_conditions = []
+            for or_filter in or_filters:
+                or_condition, stmt = self._build_filter_condition(stmt, or_filter)
+                if or_condition is not None:
+                    or_conditions.append(or_condition)
+            if or_conditions:
+                combined_or_condition = sa.or_(*or_conditions)
+                if base_condition is not None:
+                    # Combine base condition OR logical condition
+                    base_condition = sa.or_(base_condition, combined_or_condition)
+                else:
+                    base_condition = combined_or_condition
+
+        # Handle NOT operation (list-based)
+        not_filters = getattr(filters, "NOT", None)
+        if not_filters is not None:
+            not_conditions = []
+            for not_filter in not_filters:
+                not_condition, stmt = self._build_filter_condition(stmt, not_filter)
+                if not_condition is not None:
+                    not_conditions.append(not_condition)
+            if not_conditions:
+                # Apply NOT to the AND combination of all NOT conditions
+                logical_conditions.append(~sa.and_(*not_conditions))
+
+        # Combine all conditions
+        all_conditions = []
+        if base_condition is not None:
+            all_conditions.append(base_condition)
+        if logical_conditions:
+            all_conditions.extend(logical_conditions)
+
+        final_condition = None
+        if all_conditions:
+            if len(all_conditions) == 1:
+                final_condition = all_conditions[0]
+            else:
+                final_condition = sa.and_(*all_conditions)
+
+        return final_condition, stmt
+
+    @abstractmethod
+    def apply_entity_filters(self, stmt: Select, filters: T) -> tuple[list[Any], Select]:
+        """Apply entity-specific filters and return list of conditions and updated statement
+
+        Args:
+            stmt: The SQL select statement
+            filters: The filter options
+
+        Returns:
+            Tuple of (list of conditions, updated statement)
+        """
+        ...
+
+
+TOrderingOptions = TypeVar("TOrderingOptions", bound="BaseOrderingOptions")
+
+
+class BaseOrderingOptions(Protocol):
+    """Protocol for ordering options"""
+
+    order_by: list[tuple[Any, bool]]
+
+
+class BaseOrderingApplier(ABC, Generic[TOrderingOptions]):
+    """Base class for applying ordering to queries"""
+
+    def apply_ordering(
+        self, stmt: Select, ordering: TOrderingOptions
+    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
+        """Apply ordering to the query statement and return order clauses for cursor pagination"""
+        order_clauses = []
+        sql_order_clauses = []
+
+        for field, desc in ordering.order_by:
+            order_column = self.get_order_column(field)
+            order_clauses.append((order_column, desc))
+
+            if desc:
+                sql_order_clauses.append(order_column.desc())
+            else:
+                sql_order_clauses.append(order_column.asc())
+
+        if sql_order_clauses:
+            stmt = stmt.order_by(*sql_order_clauses)
+
+        return stmt, order_clauses
+
+    @abstractmethod
+    def get_order_column(self, field: Any) -> sa.Column:
+        """Get the SQLAlchemy column for the given field"""
+        ...

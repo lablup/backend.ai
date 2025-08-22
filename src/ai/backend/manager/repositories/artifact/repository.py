@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
@@ -39,6 +39,8 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
 )
 from ai.backend.manager.repositories.types import (
+    BaseFilterApplier,
+    BaseOrderingApplier,
     GenericQueryBuilder,
     PaginationOptions,
 )
@@ -47,34 +49,27 @@ from ai.backend.manager.repositories.types import (
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
 
 
-class ArtifactFilterApplier:
+class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
     """Applies artifact-specific filters to queries"""
 
-    def apply_filters(self, stmt: Select, filters: ArtifactFilterOptions) -> Select:
-        """Apply artifact filters to the query statement"""
-        condition, stmt = self._build_filter_condition(stmt, filters)
-        if condition is not None:
-            stmt = stmt.where(condition)
-        return stmt
-
-    def _build_filter_condition(
+    @override
+    def apply_entity_filters(
         self, stmt: Select, filters: ArtifactFilterOptions
-    ) -> tuple[Optional[Any], Select]:
-        """Build a filter condition from ArtifactFilterOptions, handling logical operations"""
+    ) -> tuple[list[Any], Select]:
+        """Apply artifact-specific filters and return list of conditions and updated statement"""
         conditions = []
 
         # Handle basic filters
         if filters.artifact_type is not None:
             conditions.append(ArtifactRow.type == filters.artifact_type)
 
-        # Handle new StringFilter-based filters
+        # Handle StringFilter-based filters
         if filters.name_filter is not None:
             name_condition = filters.name_filter.apply_to_column(ArtifactRow.name)
             if name_condition is not None:
                 conditions.append(name_condition)
 
         # Handle registry_filter by joining with registry tables
-
         # TODO: Handle to join with proper table?
         if filters.registry_filter is not None:
             from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
@@ -103,6 +98,8 @@ class ArtifactFilterApplier:
                     source_registry.id == ArtifactRow.source_registry_id,
                 )
                 conditions.append(source_condition)
+
+        # Handle ID and type filters
         if filters.registry_id is not None:
             conditions.append(ArtifactRow.registry_id == filters.registry_id)
         if filters.registry_type is not None:
@@ -112,90 +109,16 @@ class ArtifactFilterApplier:
         if filters.source_registry_type is not None:
             conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
 
-        # Combine basic conditions with AND
-        base_condition = None
-        if conditions:
-            base_condition = sa.and_(*conditions)
-
-        # Handle logical operations
-        logical_conditions = []
-
-        # Handle AND operation (list-based)
-        if filters.AND is not None:
-            and_conditions = []
-            for and_filter in filters.AND:
-                and_condition, stmt = self._build_filter_condition(stmt, and_filter)
-                if and_condition is not None:
-                    and_conditions.append(and_condition)
-            if and_conditions:
-                logical_conditions.append(sa.and_(*and_conditions))
-
-        # Handle OR operation (list-based)
-        if filters.OR is not None:
-            or_conditions = []
-            for or_filter in filters.OR:
-                or_condition, stmt = self._build_filter_condition(stmt, or_filter)
-                if or_condition is not None:
-                    or_conditions.append(or_condition)
-            if or_conditions:
-                combined_or_condition = sa.or_(*or_conditions)
-                if base_condition is not None:
-                    # Combine base condition OR logical condition
-                    base_condition = sa.or_(base_condition, combined_or_condition)
-                else:
-                    base_condition = combined_or_condition
-
-        # Handle NOT operation (list-based)
-        if filters.NOT is not None:
-            not_conditions = []
-            for not_filter in filters.NOT:
-                not_condition, stmt = self._build_filter_condition(stmt, not_filter)
-                if not_condition is not None:
-                    not_conditions.append(not_condition)
-            if not_conditions:
-                # Apply NOT to the AND combination of all NOT conditions
-                logical_conditions.append(~sa.and_(*not_conditions))
-
-        # Combine all conditions
-        all_conditions = []
-        if base_condition is not None:
-            all_conditions.append(base_condition)
-        if logical_conditions:
-            all_conditions.extend(logical_conditions)
-
-        final_condition = None
-        if all_conditions:
-            if len(all_conditions) == 1:
-                final_condition = all_conditions[0]
-            else:
-                final_condition = sa.and_(*all_conditions)
-
-        return final_condition, stmt
+        return conditions, stmt
 
 
-class ArtifactOrderingApplier:
+class ArtifactOrderingApplier(BaseOrderingApplier[ArtifactOrderingOptions]):
     """Applies artifact-specific ordering to queries"""
 
-    def apply_ordering(
-        self, stmt: Select, ordering: ArtifactOrderingOptions
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
-        """Apply artifact ordering to the query statement"""
-        order_clauses = []
-        sql_order_clauses = []
-
-        for field, desc in ordering.order_by:
-            order_column = getattr(ArtifactRow, field.value, ArtifactRow.name)
-            order_clauses.append((order_column, desc))
-
-            if desc:
-                sql_order_clauses.append(order_column.desc())
-            else:
-                sql_order_clauses.append(order_column.asc())
-
-        if sql_order_clauses:
-            stmt = stmt.order_by(*sql_order_clauses)
-
-        return stmt, order_clauses
+    @override
+    def get_order_column(self, field) -> sa.Column:
+        """Get the SQLAlchemy column for the given artifact field"""
+        return getattr(ArtifactRow, field.value, ArtifactRow.name)
 
 
 class ArtifactModelConverter:
@@ -206,20 +129,14 @@ class ArtifactModelConverter:
         return model.to_dataclass()
 
 
-class ArtifactRevisionFilterApplier:
+class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOptions]):
     """Applies artifact revision-specific filters to queries"""
 
-    def apply_filters(self, stmt: Select, filters: ArtifactRevisionFilterOptions) -> Select:
-        """Apply artifact revision filters to the query statement"""
-        condition, stmt = self._build_filter_condition(stmt, filters)
-        if condition is not None:
-            stmt = stmt.where(condition)
-        return stmt
-
-    def _build_filter_condition(
+    @override
+    def apply_entity_filters(
         self, stmt: Select, filters: ArtifactRevisionFilterOptions
-    ) -> tuple[Optional[Any], Select]:
-        """Build a filter condition from ArtifactRevisionFilterOptions, handling logical operations"""
+    ) -> tuple[list[Any], Select]:
+        """Apply artifact revision-specific filters and return list of conditions and updated statement"""
         conditions = []
 
         # Handle basic filters
@@ -229,98 +146,23 @@ class ArtifactRevisionFilterApplier:
             # Support multiple status values using IN clause
             status_values = [status.value for status in filters.status]
             conditions.append(ArtifactRevisionRow.status.in_(status_values))
+
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
             version_condition = filters.version_filter.apply_to_column(ArtifactRevisionRow.version)
             if version_condition is not None:
                 conditions.append(version_condition)
 
-        # Combine basic conditions with AND
-        base_condition = None
-        if conditions:
-            base_condition = sa.and_(*conditions)
-
-        # Handle logical operations
-        logical_conditions = []
-
-        # Handle AND operation (list-based)
-        if filters.AND is not None:
-            and_conditions = []
-            for and_filter in filters.AND:
-                and_condition, stmt = self._build_filter_condition(stmt, and_filter)
-                if and_condition is not None:
-                    and_conditions.append(and_condition)
-            if and_conditions:
-                logical_conditions.append(sa.and_(*and_conditions))
-
-        # Handle OR operation (list-based)
-        if filters.OR is not None:
-            or_conditions = []
-            for or_filter in filters.OR:
-                or_condition, stmt = self._build_filter_condition(stmt, or_filter)
-                if or_condition is not None:
-                    or_conditions.append(or_condition)
-            if or_conditions:
-                combined_or_condition = sa.or_(*or_conditions)
-                if base_condition is not None:
-                    # Combine base condition OR logical condition
-                    base_condition = sa.or_(base_condition, combined_or_condition)
-                else:
-                    base_condition = combined_or_condition
-
-        # Handle NOT operation (list-based)
-        if filters.NOT is not None:
-            not_conditions = []
-            for not_filter in filters.NOT:
-                not_condition, stmt = self._build_filter_condition(stmt, not_filter)
-                if not_condition is not None:
-                    not_conditions.append(not_condition)
-            if not_conditions:
-                # Apply NOT to the AND combination of all NOT conditions
-                logical_conditions.append(~sa.and_(*not_conditions))
-
-        # Combine all conditions
-        all_conditions = []
-        if base_condition is not None:
-            all_conditions.append(base_condition)
-        if logical_conditions:
-            all_conditions.extend(logical_conditions)
-
-        final_condition = None
-        if all_conditions:
-            if len(all_conditions) == 1:
-                final_condition = all_conditions[0]
-            else:
-                final_condition = sa.and_(*all_conditions)
-
-        return final_condition, stmt
+        return conditions, stmt
 
 
-class ArtifactRevisionOrderingApplier:
+class ArtifactRevisionOrderingApplier(BaseOrderingApplier[ArtifactRevisionOrderingOptions]):
     """Applies artifact revision-specific ordering to queries"""
 
-    def apply_ordering(
-        self, stmt: Select, ordering: ArtifactRevisionOrderingOptions
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
-        """Apply artifact revision ordering to the query statement"""
-        order_clauses = []
-        sql_order_clauses = []
-
-        for field, desc in ordering.order_by:
-            order_column = getattr(
-                ArtifactRevisionRow, field.value.lower(), ArtifactRevisionRow.created_at
-            )
-            order_clauses.append((order_column, desc))
-
-            if desc:
-                sql_order_clauses.append(order_column.desc())
-            else:
-                sql_order_clauses.append(order_column.asc())
-
-        if sql_order_clauses:
-            stmt = stmt.order_by(*sql_order_clauses)
-
-        return stmt, order_clauses
+    @override
+    def get_order_column(self, field) -> sa.Column:
+        """Get the SQLAlchemy column for the given artifact revision field"""
+        return getattr(ArtifactRevisionRow, field.value.lower(), ArtifactRevisionRow.created_at)
 
 
 class ArtifactRevisionModelConverter:
