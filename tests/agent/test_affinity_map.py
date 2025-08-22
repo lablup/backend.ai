@@ -64,6 +64,7 @@ def generate_numa_cpu(
 
 
 def _devid(value: Sequence[AbstractComputeDevice]) -> set[DeviceId]:
+    """Converts the sequence of devices into the set of deivce IDs."""
     return {d.device_id for d in value}
 
 
@@ -475,8 +476,10 @@ def test_affinity_map_secondary_allocation_integrated(
         affinity_map,
         AffinityPolicy.PREFER_SINGLE_NODE,
     )
+    print()
 
-    # Do the first resource slot allocation to allocate two devices from different NUMA nodes.
+    # Do the first resource slot (cuda) allocation to allocate two devices from different NUMA nodes.
+    print("[cuda]")
     alloc_map.allocate(
         {SlotName("cuda"): Decimal("2")},
         affinity_hint=affinity_hint,
@@ -491,17 +494,16 @@ def test_affinity_map_secondary_allocation_integrated(
             per_node_cuda_alloc[2] += int(alloc)
         elif dev_id == "x3":
             per_node_cuda_alloc[3] += int(alloc)
-
-    print(alloc_map.allocations[SlotName("cuda")])
+    print("after-alloc:", alloc_map.allocations[SlotName("cuda")])
     assert sorted(per_node_cuda_alloc.values()) == [0, 0, 1, 1]
     used_numa_nodes = {node for node, count in per_node_cuda_alloc.items() if count > 0}
 
-    # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    # Continue resource slot (cpu) allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    print("[cpu]")
     alloc_map.allocate(
         {SlotName("cpu"): Decimal("4")},
         affinity_hint=affinity_hint,
     )
-
     per_node_cpu_alloc: MutableMapping[int, int] = defaultdict(int)
     for dev_id, alloc in alloc_map.allocations[SlotName("cpu")].items():
         if dev_id.startswith("a"):
@@ -512,8 +514,7 @@ def test_affinity_map_secondary_allocation_integrated(
             per_node_cpu_alloc[2] += int(alloc)
         elif dev_id.startswith("d"):
             per_node_cpu_alloc[3] += int(alloc)
-
-    print(alloc_map.allocations[SlotName("cpu")])
+    print("after-alloc:", alloc_map.allocations[SlotName("cpu")])
     for node_idx, count in per_node_cpu_alloc.items():
         if node_idx in used_numa_nodes:
             assert count == 2
@@ -551,7 +552,7 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     for npu_id in ("npu0", "npu1", "npu2"):
         alloc_map.allocations[SlotName("npu")][DeviceId(npu_id)] = Decimal(1)
 
-    # Do the first resource slot (npu) allocation to allocate two devices from different NUMA nodes.
+    # Do the first resource slot (npu) allocation for the last remaining NPU device.
     affinity_hint = AffinityHint(
         None,
         affinity_map,
@@ -567,7 +568,7 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     # The only remaining one, "npu3", is allocated.
     assert new_alloc[SlotName("npu")] == {DeviceId("npu3"): Decimal(1)}
 
-    # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    # Continue the next resource slot (cpu) allocation
     print("[cpu]")
     print("current_alloc:", alloc_map.allocations[SlotName("cpu")])
     new_alloc = alloc_map.allocate(
