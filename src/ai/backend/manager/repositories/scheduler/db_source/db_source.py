@@ -147,8 +147,11 @@ class ScheduleDBSource:
         Begin a read-only session with READ COMMITTED isolation level.
         """
         async with self._db.connect() as conn:
-            # Set isolation level to READ COMMITTED
-            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            # Set isolation level to READ COMMITTED and readonly mode
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
                 sess_factory = sessionmaker(
