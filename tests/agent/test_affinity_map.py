@@ -13,6 +13,7 @@ from ai.backend.agent.alloc_map import (
     AllocationStrategy,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+    FractionAllocMap,
 )
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.exception import ConfigurationError
@@ -587,3 +588,254 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     # Since npu3 is in the second NUMA node, we should see the new allocations there only.
     assert new_alloc_per_node[0] == 0
     assert new_alloc_per_node[1] == 8
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_mixed_discrete_fraction_devices(
+    allocation_strategy: AllocationStrategy,
+) -> None:
+    """Test FractionAllocMap with NUMA affinity and multiple processor counts."""
+    devices: Sequence[AbstractComputeDevice] = [
+        # CPUs (discrete)
+        DummyDevice(DeviceId("cpu0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu2"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu3"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu4"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu5"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        # GPUs (fraction)
+        DummyDevice(
+            DeviceId("gpu0"), "", 0, Decimal("2.5"), numa_node=0, device_name=DeviceName("cuda")
+        ),
+        DummyDevice(
+            DeviceId("gpu1"), "", 0, Decimal("2.5"), numa_node=1, device_name=DeviceName("cuda")
+        ),
+        DummyDevice(
+            DeviceId("gpu2"), "", 0, Decimal("2.5"), numa_node=2, device_name=DeviceName("cuda")
+        ),
+        # NPUs (discrete)
+        DummyDevice(DeviceId("npu0"), "", 0, 1, numa_node=0, device_name=DeviceName("npu")),
+        DummyDevice(DeviceId("npu1"), "", 0, 1, numa_node=1, device_name=DeviceName("npu")),
+        DummyDevice(DeviceId("npu2"), "", 0, 1, numa_node=2, device_name=DeviceName("npu")),
+    ]
+    affinity_map = AffinityMap.build(devices)
+
+    alloc_map_npu = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("npu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("npu"), Decimal(1)),
+            DeviceId("npu1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("npu"), Decimal(1)),
+            DeviceId("npu2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("npu"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    alloc_map_cuda = FractionAllocMap(
+        device_slots={
+            DeviceId("gpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal("1.0")),
+            DeviceId("gpu1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal("1.0")),
+            DeviceId("gpu2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal("1.0")),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    alloc_map_cpu = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("cpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("cpu1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("cpu2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("cpu3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("cpu4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+            DeviceId("cpu5"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    print()
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+
+    # Simulate NPU allocation.
+    npu_allocations = {DeviceId("npu1"): Decimal(1)}
+    alloc_map_npu.allocations[SlotName("npu")].update(npu_allocations)
+    alloc_map_npu.update_affinity_hint(npu_allocations, affinity_hint)
+    print("[NPU allocation (simulated)]")
+    print(f"allocation: {npu_allocations}")
+
+    # Do GPU allocation first
+    print("[CUDA allocation]")
+    result_cuda = alloc_map_cuda.allocate(
+        {SlotName("cuda"): Decimal("1.5")},
+        affinity_hint=affinity_hint,
+    )
+    total_gpu_allocated = sum(result_cuda[SlotName("cuda")].values())
+    assert total_gpu_allocated == Decimal("1.5")
+    print(f"allocation: {result_cuda[SlotName('cuda')]}")
+    assert result_cuda[SlotName("cuda")][DeviceId("gpu1")] > Decimal(0), (
+        "The node 1 must be used for GPU allocation regardless of allocation strategy."
+    )
+
+    # Check CUDA allocation per node
+    cuda_alloc_per_node = defaultdict(lambda: Decimal(0))
+    cuda_used_nodes = set()
+    for dev_id, alloc in result_cuda[SlotName("cuda")].items():
+        if dev_id == "gpu0":
+            cuda_alloc_per_node[0] += alloc
+            cuda_used_nodes.add(0)
+        elif dev_id == "gpu1":
+            cuda_alloc_per_node[1] += alloc
+            cuda_used_nodes.add(1)
+        elif dev_id == "gpu2":
+            cuda_alloc_per_node[2] += alloc
+            cuda_used_nodes.add(2)
+    print(f"allocation per NUMA node: {dict(cuda_alloc_per_node)}")
+    assert len(cuda_used_nodes) == 2, (
+        "It should be two nodes: one for the same node and the other in another node, but no more."
+    )
+
+    # Now do CPU allocation - should prefer same NUMA nodes as GPUs
+    print("[CPU allocation]")
+    result_cpu = alloc_map_cpu.allocate(
+        # Each node has 2 cores, so we need spilling out.
+        {SlotName("cpu"): Decimal(3)},
+        affinity_hint=affinity_hint,
+    )
+    total_cpu_allocated = sum(result_cpu[SlotName("cpu")].values())
+    assert total_cpu_allocated == Decimal(3)
+    print(f"allocation: {result_cpu[SlotName('cpu')]}")
+
+    # Check CPU allocation per node
+    cpu_alloc_per_node = defaultdict(int)
+    for dev_id, alloc in result_cpu[SlotName("cpu")].items():
+        if dev_id in ["cpu0", "cpu1"]:
+            cpu_alloc_per_node[0] += int(alloc)
+        elif dev_id in ["cpu2", "cpu3"]:
+            cpu_alloc_per_node[1] += int(alloc)
+        elif dev_id in ["cpu4", "cpu5"]:
+            cpu_alloc_per_node[2] += int(alloc)
+    print(f"allocation per NUMA node: {dict(cpu_alloc_per_node)}")
+
+    # # CPUs should be allocated primarily on the same NUMA nodes as the GPUs
+    # # However, due to capacity constraints and existing allocations, this might not always be strict
+    # # At least some allocation should happen on the GPU-assigned nodes when possible
+    # gpu_assigned_cpu_allocation = sum(cpu_alloc_per_node[node] for node in used_numa_nodes)
+    # total_cpu_allocation = sum(cpu_alloc_per_node.values())
+
+    # # Most of the CPU allocation should be on nodes that have allocated GPUs, but allow some flexibility
+    # assert gpu_assigned_cpu_allocation >= total_cpu_allocation * Decimal("0.5"), (
+    #     f"Expected at least 50% of CPU allocation on GPU nodes, got {gpu_assigned_cpu_allocation}/{total_cpu_allocation}"
+    # )
+
+    # # The total should match
+    # assert sum(cpu_alloc_per_node.values()) == Decimal("10.0")
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_secondary_allocation_simulated_with_multiple_capacity(
+    allocation_strategy: AllocationStrategy,
+) -> None:
+    """Test the affinity map behvaior combined with DiscreteAllocMap with multi-processor devices."""
+    devices = [
+        # NUMA node 0
+        DummyDevice(DeviceId("cpu0"), "", 0, 4, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu1"), "", 0, 4, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu2"), "", 0, 4, numa_node=0, device_name=DeviceName("cpu")),
+        # NUMA node 1
+        DummyDevice(DeviceId("cpu3"), "", 0, 4, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu4"), "", 0, 4, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu5"), "", 0, 4, numa_node=1, device_name=DeviceName("cpu")),
+        # NUMA node 2
+        DummyDevice(DeviceId("cpu6"), "", 0, 4, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu7"), "", 0, 4, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("cpu8"), "", 0, 4, numa_node=2, device_name=DeviceName("cpu")),
+        # GPUs
+        DummyDevice(DeviceId("gpu0"), "", 0, 1, numa_node=0, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("gpu1"), "", 0, 1, numa_node=1, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("gpu2"), "", 0, 1, numa_node=2, device_name=DeviceName("cuda")),
+    ]
+    affinity_map = AffinityMap.build(devices)
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("cpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu5"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu6"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu7"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("cpu8"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(4)),
+            DeviceId("gpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("gpu1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+            DeviceId("gpu2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda"), Decimal(1)),
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+    print()
+
+    # Simulate allocation pattern: first allocate GPU, then allocate CPUs following NUMA affinity
+    print("[Primary allocation - GPU]")
+
+    # Simulate a prior GPU allocation from nodes 1 and 2
+    alloc_map.allocations[SlotName("cuda")] = {
+        DeviceId("gpu0"): Decimal(0),
+        DeviceId("gpu1"): Decimal(1),  # NUMA node 1
+        DeviceId("gpu2"): Decimal(1),  # NUMA node 2
+    }
+    alloc_map.update_affinity_hint(alloc_map.allocations[SlotName("cuda")], affinity_hint)
+    print(f"Simulated GPU allocation: {alloc_map.allocations[SlotName('cuda')]}")
+
+    # Now allocate CPUs following the GPU affinity
+    print("[Secondary allocation - CPU with affinity]")
+    result = alloc_map.allocate(
+        # Since each NUMA node has 12 cores, this allocation needs spilling out
+        # to the NUMA node 0 after using the NUMA node 1 and 2.
+        {SlotName("cpu"): Decimal(26)},
+        affinity_hint=affinity_hint,
+    )
+    print(f"CPU allocation result: {result[SlotName('cpu')]}")
+    # The total allocation should succeed anyway.
+    total_cpu_allocated = sum(result[SlotName("cpu")].values())
+    assert total_cpu_allocated == Decimal(26)
+
+    # Analyze allocation per NUMA node
+    cpu_alloc_per_node = {0: Decimal("0"), 1: Decimal("0"), 2: Decimal("0")}
+    for dev_id, alloc in result[SlotName("cpu")].items():
+        if dev_id in ["cpu0", "cpu1", "cpu2"]:
+            cpu_alloc_per_node[0] += alloc
+        elif dev_id in ["cpu3", "cpu4", "cpu5"]:
+            cpu_alloc_per_node[1] += alloc
+        elif dev_id in ["cpu6", "cpu7", "cpu8"]:
+            cpu_alloc_per_node[2] += alloc
+    print(f"CPU allocation per NUMA node: {cpu_alloc_per_node}")
+
+    if allocation_strategy == AllocationStrategy.FILL:
+        # FILL strategy should fill higher-priority NUMA nodes first.
+        print("Testing FILL strategy behavior")
+        assert cpu_alloc_per_node[0] == Decimal(2)
+        assert cpu_alloc_per_node[1] == Decimal(12)
+        assert cpu_alloc_per_node[2] == Decimal(12)
+
+        # CPUs in the NUMA node 1 and 2 are fully utilized.
+        fully_used_cpus = 0
+        for dev_id, alloc in result[SlotName("cpu")].items():
+            device_capacity = alloc_map.device_slots[dev_id].amount
+            if alloc == device_capacity:
+                fully_used_cpus += 1
+        assert fully_used_cpus == 6
+
+    elif allocation_strategy == AllocationStrategy.EVENLY:
+        # EVENLY strategy should distribute more evenly across the NUMA nodes,
+        # but it should still prefer the NUMA nodes used in prior resource slot.
+        print("Testing EVENLY strategy behavior")
+        assert cpu_alloc_per_node[0] == Decimal(8)
+        assert cpu_alloc_per_node[1] == Decimal(9)
+        assert cpu_alloc_per_node[2] == Decimal(9)
