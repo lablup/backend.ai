@@ -87,6 +87,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from ..repositories.scheduler.repository import SchedulerRepository
     from .storage import StorageSessionManager
 
 from ..data.image.types import ImageStatus
@@ -318,6 +319,7 @@ class GraphQueryContext:
     idle_checker_host: IdleCheckerHost
     metric_observer: GraphQLMetricObserver
     processors: Processors
+    scheduler_repository: SchedulerRepository
 
 
 class Mutations(graphene.ObjectType):

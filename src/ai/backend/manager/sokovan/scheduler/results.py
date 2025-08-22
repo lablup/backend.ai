@@ -4,7 +4,7 @@ Result type for scheduling operations.
 
 from dataclasses import dataclass, field
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import AccessKey, SessionId
 
 
 @dataclass
@@ -13,6 +13,7 @@ class ScheduledSessionData:
 
     session_id: SessionId
     creation_id: str
+    access_key: AccessKey
 
 
 @dataclass

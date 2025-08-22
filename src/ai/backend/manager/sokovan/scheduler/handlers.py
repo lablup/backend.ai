@@ -11,9 +11,11 @@ from ai.backend.common.events.event_types.session.broadcast import (
     BatchSchedulingBroadcastEvent,
     SessionSchedulingEventData,
 )
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -94,10 +96,12 @@ class ScheduleSessionsHandler(ScheduleHandler):
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
+        repository: SchedulerRepository,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
+        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -115,12 +119,19 @@ class ScheduleSessionsHandler(ScheduleHandler):
         return await self._scheduler.schedule_all_scaling_groups()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Request precondition check if sessions were scheduled."""
+        """Request precondition check if sessions were scheduled and invalidate cache."""
         # Request next phase first
         await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
         log.info(
             "Scheduled {} sessions, requesting precondition check", len(result.scheduled_sessions)
         )
+
+        # Invalidate cache for affected access keys
+        affected_keys: set[AccessKey] = {
+            session.access_key for session in result.scheduled_sessions
+        }
+        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+        log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for scheduled sessions
         event = BatchSchedulingBroadcastEvent(
@@ -254,8 +265,8 @@ class TerminateSessionsHandler(ScheduleHandler):
         return await self._scheduler.terminate_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of terminated sessions."""
-        log.info("Terminated {} sessions", len(result.scheduled_sessions))
+        """Log the number of terminated sessions and invalidate cache."""
+        log.info("Try to terminate {} sessions", len(result.scheduled_sessions))
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -387,10 +398,12 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
+        repository: SchedulerRepository,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
+        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -407,9 +420,16 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         return await self._scheduler.check_terminating_progress()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of sessions that transitioned to TERMINATED."""
+        """Log the number of sessions that transitioned to TERMINATED and invalidate cache."""
         await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
         log.info("{} sessions transitioned to TERMINATED state", len(result.scheduled_sessions))
+
+        # Invalidate cache for affected access keys
+        affected_keys: set[AccessKey] = {
+            event_data.access_key for event_data in result.scheduled_sessions
+        }
+        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+        log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for sessions that transitioned to TERMINATED
         if result.scheduled_sessions:
