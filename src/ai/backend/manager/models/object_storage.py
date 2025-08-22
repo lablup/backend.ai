@@ -15,6 +15,7 @@ from .base import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 __all__ = ("ObjectStorageRow",)
 
 
@@ -26,7 +27,7 @@ class ObjectStorageRow(Base):
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services
-    such as access keys, endpoints, and associated buckets.
+    such as access keys, endpoints.
     """
 
     __tablename__ = "object_storages"

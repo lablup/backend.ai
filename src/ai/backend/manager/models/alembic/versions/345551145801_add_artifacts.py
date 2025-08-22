@@ -25,9 +25,9 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("artifact_id", GUID(), nullable=False),
         sa.Column("version", sa.String(), nullable=False),
-        sa.Column("size", sa.BigInteger(), nullable=False),
+        sa.Column("size", sa.BigInteger(), nullable=True, default=None),
         sa.Column("status", sa.String(), nullable=False),
-        sa.Column("readme", sa.TEXT(), nullable=False),
+        sa.Column("readme", sa.TEXT(), nullable=True, default=None),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -40,6 +40,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.Column("readonly", sa.Boolean(), default=False, nullable=False),
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
     )
     op.create_index(
@@ -77,7 +78,6 @@ def upgrade() -> None:
         sa.Column("description", sa.String(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifacts")),
     )
-    op.create_index(op.f("ix_artifacts_created_at"), "artifacts", ["created_at"], unique=False)
     op.create_index(op.f("ix_artifacts_name"), "artifacts", ["name"], unique=False)
     op.create_index(op.f("ix_artifacts_registry_id"), "artifacts", ["registry_id"], unique=False)
     op.create_index(
@@ -86,7 +86,6 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_artifacts_registry_type"), "artifacts", ["registry_type"], unique=False
     )
-    op.create_index(op.f("ix_artifacts_status"), "artifacts", ["status"], unique=False)
     op.create_index(
         op.f("ix_artifacts_source_registry_type"),
         "artifacts",
@@ -94,7 +93,6 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_artifacts_type"), "artifacts", ["type"], unique=False)
-    op.create_index(op.f("ix_artifacts_updated_at"), "artifacts", ["updated_at"], unique=False)
 
     op.create_table(
         "association_artifacts_storages",
@@ -104,10 +102,10 @@ def upgrade() -> None:
             server_default=sa.text("uuid_generate_v4()"),
             nullable=False,
         ),
-        sa.Column("artifact_id", GUID(), nullable=False),
+        sa.Column("artifact_revision_id", GUID(), nullable=False),
         sa.Column("storage_id", GUID(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_association_artifacts_storages")),
-        sa.UniqueConstraint("artifact_id", "storage_id", name="uq_artifact_id_storage_id"),
+        sa.UniqueConstraint("artifact_revision_id", name="uq_artifact_revision_id"),
     )
     # ### end Alembic commands ###
 

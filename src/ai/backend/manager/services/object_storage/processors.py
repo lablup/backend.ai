@@ -15,6 +15,14 @@ from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
+    GetDownloadPresignedURLAction,
+    GetDownloadPresignedURLActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
+    GetUploadPresignedURLAction,
+    GetUploadPresignedURLActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
@@ -32,6 +40,12 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
     delete: ActionProcessor[DeleteObjectStorageAction, DeleteObjectStorageActionResult]
     get: ActionProcessor[GetObjectStorageAction, GetObjectStorageActionResult]
     list_: ActionProcessor[ListObjectStorageAction, ListObjectStorageActionResult]
+    get_presigned_download_url: ActionProcessor[
+        GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
+    ]
+    get_presigned_upload_url: ActionProcessor[
+        GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
+    ]
 
     def __init__(self, service: ObjectStorageService, action_monitors: list[ActionMonitor]) -> None:
         self.create = ActionProcessor(service.create, action_monitors)
@@ -39,6 +53,12 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
         self.list_ = ActionProcessor(service.list, action_monitors)
+        self.get_presigned_download_url = ActionProcessor(
+            service.get_presigned_download_url, action_monitors
+        )
+        self.get_presigned_upload_url = ActionProcessor(
+            service.get_presigned_upload_url, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -48,4 +68,6 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
             DeleteObjectStorageAction.spec(),
             GetObjectStorageAction.spec(),
             ListObjectStorageAction.spec(),
+            GetDownloadPresignedURLAction.spec(),
+            GetUploadPresignedURLAction.spec(),
         ]

@@ -36,6 +36,17 @@ class HuggingFaceRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.name == name)
+            )
+            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Registry with name {name} not found")
+            return row.to_dataclass()
+
+    @repository_decorator()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> HuggingFaceRegistryData:
@@ -107,18 +118,3 @@ class HuggingFaceRepository:
             result = await db_session.execute(query)
             rows: list[HuggingFaceRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
-
-    @repository_decorator()
-    async def get_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
-        """
-        Get an existing Hugging Face registry entry from the database by ID.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(HuggingFaceRegistryRow).where(
-                HuggingFaceRegistryRow.id == registry_id
-            )
-            result = await db_session.execute(query)
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
-            if row is None:
-                raise ValueError(f"Hugging Face registry with ID {registry_id} not found.")
-            return row.to_dataclass()
