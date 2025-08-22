@@ -293,12 +293,15 @@ class BackgroundTaskManager:
         task_name: Optional[str],
         **kwargs,
     ) -> None:
-        bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-        cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
-        await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
-        log.info(
-            "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
-        )
+        try:
+            bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
+            cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
+            await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
+            log.info(
+                "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
+            )
+        finally:
+            self._ongoing_tasks.pop(TaskID(task_id), None)
 
     def _get_task_func_by_name(self, name: TaskName) -> BaseBackgroundTask:
         try:
