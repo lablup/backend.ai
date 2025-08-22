@@ -7,8 +7,6 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from .types import CacheConcurrencyData
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -23,50 +21,39 @@ class ScheduleCacheSource:
     def __init__(self, valkey_stat: ValkeyStatClient):
         self._valkey_stat = valkey_stat
 
-    async def get_concurrency_snapshot(self, access_keys: set[AccessKey]) -> CacheConcurrencyData:
+    async def get_keypair_concurrency(
+        self, access_key: AccessKey, is_sftp: bool = False
+    ) -> Optional[int]:
         """
-        Get current concurrency data from cache for the given access keys.
-        Returns concurrency counts for regular and SFTP sessions.
+        Get single keypair concurrency value from cache.
+
+        :param access_key: The access key to query
+        :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
+        :return: Concurrency count if cached, None if not in cache
         """
-        if not access_keys:
-            return CacheConcurrencyData(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            )
-
-        # Prepare all keys for batch retrieval
-        access_key_list = list(access_keys)
-        regular_keys = [f"keypair.concurrency_used.{ak}" for ak in access_key_list]
-        sftp_keys = [f"keypair.sftp_concurrency_used.{ak}" for ak in access_key_list]
-        all_keys = regular_keys + sftp_keys
-
-        # Batch get all values
-        results = await self._get_multiple_keys(all_keys)
-
-        # Process results
-        sessions_by_keypair: dict[AccessKey, int] = {}
-        sftp_sessions_by_keypair: dict[AccessKey, int] = {}
-
-        for i, ak in enumerate(access_key_list):
-            # Regular concurrency
-            regular_result = results[i] if i < len(results) else None
-            sessions_by_keypair[ak] = int(regular_result.decode()) if regular_result else 0
-
-            # SFTP concurrency
-            sftp_idx = len(access_key_list) + i
-            sftp_result = results[sftp_idx] if sftp_idx < len(results) else None
-            sftp_sessions_by_keypair[ak] = int(sftp_result.decode()) if sftp_result else 0
-
-        return CacheConcurrencyData(
-            sessions_by_keypair=sessions_by_keypair,
-            sftp_sessions_by_keypair=sftp_sessions_by_keypair,
+        # Use the extended public method that supports both regular and SFTP concurrency
+        # This now returns None for cache miss, distinguishing from actual 0 value
+        return await self._valkey_stat.get_keypair_concurrency_used(
+            str(access_key), is_private=is_sftp
         )
 
-    async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def set_keypair_concurrencies(
+        self,
+        access_key: AccessKey,
+        regular_concurrency: int,
+        sftp_concurrency: int,
+    ) -> None:
         """
-        Get multiple keys from cache in a single operation.
+        Set both regular and SFTP concurrency values in cache in a batch.
 
-        :param keys: List of cache keys to retrieve
-        :return: List of values (bytes or None if key doesn't exist)
+        :param access_key: The access key to set
+        :param regular_concurrency: The regular concurrency count to cache
+        :param sftp_concurrency: The SFTP concurrency count to cache
         """
-        return await self._valkey_stat._get_multiple_keys(keys)
+        # Use batch operation from ValkeyStatClient to set both values at once
+        # This reduces network round trips to Redis/Valkey
+        await self._valkey_stat.set_keypair_concurrencies(
+            access_key=str(access_key),
+            regular_concurrency=regular_concurrency,
+            sftp_concurrency=sftp_concurrency,
+        )

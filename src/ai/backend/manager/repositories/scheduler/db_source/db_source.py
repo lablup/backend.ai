@@ -96,7 +96,7 @@ from ..types.session_creation import (
     SessionEnqueueData,
 )
 from ..types.snapshot import ResourcePolicies, SnapshotData
-from .types import SessionRowCache
+from .types import KeypairConcurrencyData, SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -2924,3 +2924,38 @@ class ScheduleDBSource:
             )
             result = await db_sess.execute(stmt)
             return {row.id: row.container_id for row in result}
+
+    async def get_keypair_concurrencies_from_db(
+        self, access_key: AccessKey
+    ) -> KeypairConcurrencyData:
+        """
+        Calculate both regular and SFTP concurrency from database with two simple queries.
+
+        :param access_key: The access key to query
+        :return: KeypairConcurrencyData with both regular and sftp counts
+        """
+        from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
+
+        async with self._db.begin_readonly_session() as db_sess:
+            # Base query for active kernels
+            base_query = (
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(
+                    (KernelRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+
+            # Query for regular sessions
+            regular_query = base_query.where(KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+            regular_result = await db_sess.execute(regular_query)
+            regular_count = regular_result.scalar() or 0
+
+            # Query for SFTP sessions
+            sftp_query = base_query.where(KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
+            sftp_result = await db_sess.execute(sftp_query)
+            sftp_count = sftp_result.scalar() or 0
+
+            return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
