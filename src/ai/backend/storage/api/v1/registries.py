@@ -19,6 +19,7 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
 )
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
@@ -36,9 +37,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
+    _event_producer: EventProducer
 
-    def __init__(self, huggingface_service: HuggingFaceService) -> None:
+    def __init__(
+        self, huggingface_service: HuggingFaceService, event_producer: EventProducer
+    ) -> None:
         self._huggingface_service = huggingface_service
+        self._event_producer = event_producer
 
     @api_handler
     async def scan_models(
@@ -98,7 +103,7 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries"
 
-    storage_service = StorageService([])
+    storage_service = StorageService(storage_configs=ctx.local_config.storages)
 
     huggingface_registry_configs = dict(
         (r.name, r.config)
@@ -111,9 +116,12 @@ def create_app(ctx: RootContext) -> web.Application:
             background_task_manager=ctx.background_task_manager,
             storage_service=storage_service,
             registry_configs=huggingface_registry_configs,
+            event_producer=ctx.event_producer,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service, event_producer=ctx.event_producer
+    )
 
     # HuggingFace registry endpoints
     app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)

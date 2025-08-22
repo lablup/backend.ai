@@ -617,6 +617,22 @@ class ObjectStorageConfig(BaseModel):
         """,
         examples=["us-west-1", "eu-central-1"],
     )
+    upload_chunk_size: int = Field(
+        default=5 * 1024 * 1024,
+        ge=5 * 1024 * 1024,
+        description="""
+        Chunk size (in bytes) for uploading files to the object storage.
+        Should be greater than or equal to 5 MiB due to S3 requirements.
+        """,
+        examples=[5 * 1024 * 1024],
+    )
+    download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the object storage.
+        """,
+        examples=[8192],
+    )
 
 
 class HuggingfaceConfig(BaseModel):
@@ -642,6 +658,13 @@ class HuggingfaceConfig(BaseModel):
         HuggingFace API token for authentication.
         You cannot access the gated repositories without this token.
         """,
+    )
+    download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the HuggingFace API.
+        """,
+        examples=[8192],
     )
 
 
