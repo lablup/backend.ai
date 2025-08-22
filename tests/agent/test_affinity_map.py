@@ -49,6 +49,20 @@ class CPUDevice(AbstractComputeDevice):
         return self.device_id
 
 
+def generate_numa_cpu(
+    node_id_core_seq: Sequence[tuple[int, int]],
+) -> Sequence[AbstractComputeDevice]:
+    devices = []
+    core_idx = 0
+    for node_id, count in node_id_core_seq:
+        for _ in range(count):
+            dev_id = DeviceId(str(core_idx))
+            dev = DummyDevice(dev_id, "", 0, 1, numa_node=node_id, device_name=DeviceName("cpu"))
+            devices.append(dev)
+            core_idx += 1
+    return devices
+
+
 def _devid(value: Sequence[AbstractComputeDevice]) -> set[DeviceId]:
     return {d.device_id for d in value}
 
@@ -506,3 +520,67 @@ def test_affinity_map_secondary_allocation_integrated(
         else:
             assert count == 0
     assert sorted(per_node_cpu_alloc.values()) == [0, 0, 2, 2]
+
+
+@pytest.mark.parametrize(
+    "allocation_strategy", [AllocationStrategy.EVENLY, AllocationStrategy.FILL]
+)
+def test_affinity_map_secondary_allocation_with_existing_alloc(
+    allocation_strategy: AllocationStrategy,
+) -> None:
+    devices: Sequence[AbstractComputeDevice] = [
+        *generate_numa_cpu([(0, 72), (1, 72)]),
+        DummyDevice(DeviceId("npu0"), "", 0, 1, numa_node=0, device_name=DeviceName("npu")),
+        DummyDevice(DeviceId("npu1"), "", 0, 1, numa_node=0, device_name=DeviceName("npu")),
+        DummyDevice(DeviceId("npu2"), "", 0, 1, numa_node=1, device_name=DeviceName("npu")),
+        DummyDevice(DeviceId("npu3"), "", 0, 1, numa_node=1, device_name=DeviceName("npu")),
+    ]
+    affinity_map = AffinityMap.build(devices)
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, SlotName(dev.device_name), Decimal(1))
+            for dev in devices
+        },
+        allocation_strategy=allocation_strategy,
+    )
+    print()
+
+    # Simulate a prior session already allocated.
+    for core_idx in range(0, 24):
+        alloc_map.allocations[SlotName("cpu")][DeviceId(str(core_idx))] = Decimal(1)
+    for npu_id in ("npu0", "npu1", "npu2"):
+        alloc_map.allocations[SlotName("npu")][DeviceId(npu_id)] = Decimal(1)
+
+    # Do the first resource slot (npu) allocation to allocate two devices from different NUMA nodes.
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        AffinityPolicy.PREFER_SINGLE_NODE,
+    )
+    print("[npu]")
+    print("current_alloc:", alloc_map.allocations[SlotName("npu")])
+    new_alloc = alloc_map.allocate(
+        {SlotName("npu"): Decimal("1")},
+        affinity_hint=affinity_hint,
+    )
+    print("new_alloc:", new_alloc[SlotName("npu")])
+    # The only remaining one, "npu3", is allocated.
+    assert new_alloc[SlotName("npu")] == {DeviceId("npu3"): Decimal(1)}
+
+    # The continued resource slot allocation should allocate devices from those two NUMA nodes used in the prior allocation.
+    print("[cpu]")
+    print("current_alloc:", alloc_map.allocations[SlotName("cpu")])
+    new_alloc = alloc_map.allocate(
+        {SlotName("cpu"): Decimal("8")},
+        affinity_hint=affinity_hint,
+    )
+    new_alloc_per_node: MutableMapping[int, int] = defaultdict(int)
+    print("new_alloc:", new_alloc[SlotName("cpu")])
+    for dev_id, alloc in new_alloc[SlotName("cpu")].items():
+        if 0 <= int(dev_id) < 72:
+            new_alloc_per_node[0] += int(alloc)
+        elif 72 <= int(dev_id) < 144:
+            new_alloc_per_node[1] += int(alloc)
+    # Since npu3 is in the second NUMA node, we should see the new allocations there only.
+    assert new_alloc_per_node[0] == 0
+    assert new_alloc_per_node[1] == 8
