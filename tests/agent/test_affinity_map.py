@@ -480,10 +480,12 @@ def test_affinity_map_secondary_allocation_integrated(
 
     # Do the first resource slot (cuda) allocation to allocate two devices from different NUMA nodes.
     print("[cuda]")
+    assert affinity_hint.devices is None
     alloc_map.allocate(
         {SlotName("cuda"): Decimal("2")},
         affinity_hint=affinity_hint,
     )
+    assert affinity_hint.devices is not None, "update_affinity_hint() should have been called."
     per_node_cuda_alloc: MutableMapping[int, int] = defaultdict(int)
     for dev_id, alloc in alloc_map.allocations[SlotName("cuda")].items():
         if dev_id == "x0":
