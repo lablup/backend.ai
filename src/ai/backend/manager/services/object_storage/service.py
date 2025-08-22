@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
@@ -113,14 +114,20 @@ class ObjectStorageService:
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
+        artifact_data = await self._artifact_repository.get_artifact_by_id(
+            revision_data.artifact_id
+        )
 
         if revision_data.status != ArtifactStatus.AVAILABLE:
             raise ArtifactNotApproved("Only available artifacts can be downloaded.")
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
+        # Build S3 key
+        object_path = Path(artifact_data.name) / revision_data.version / action.key
+
         result = await storage_proxy_client.get_s3_presigned_download_url(
-            storage_data.name, action.bucket_name, PresignedDownloadObjectReq(key=action.key)
+            storage_data.name, action.bucket_name, PresignedDownloadObjectReq(key=str(object_path))
         )
 
         return GetDownloadPresignedURLActionResult(
