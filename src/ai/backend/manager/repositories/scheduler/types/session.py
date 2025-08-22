@@ -165,6 +165,7 @@ class SweptSessionInfo:
 
     session_id: SessionId
     creation_id: str
+    access_key: AccessKey
 
 
 @dataclass

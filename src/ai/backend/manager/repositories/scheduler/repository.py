@@ -268,13 +268,6 @@ class SchedulerRepository:
             vfolder_mounts,
         )
 
-    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
-        """
-        Get sessions in PULLING or PREPARING state where all kernels have reached PREPARED state.
-        These sessions are ready to transition to PREPARED state.
-        """
-        return await self._db_source.get_sessions_ready_to_prepare()
-
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
@@ -290,17 +283,17 @@ class SchedulerRepository:
 
     async def get_sessions_for_transition(
         self,
-        session_status: SessionStatus,
+        session_statuses: list[SessionStatus],
         kernel_status: KernelStatus,
     ) -> list[SessionTransitionData]:
         """
         Get sessions ready for state transition based on current session and kernel status.
 
-        :param session_status: Current session status to filter by
+        :param session_statuses: List of current session statuses to filter by
         :param kernel_status: Required kernel status for transition
         :return: List of sessions ready for transition with detailed information
         """
-        return await self._db_source.get_sessions_for_transition(session_status, kernel_status)
+        return await self._db_source.get_sessions_for_transition(session_statuses, kernel_status)
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
@@ -496,19 +489,11 @@ class SchedulerRepository:
         # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
 
-    async def refresh_keypair_concurrency_cache(self, access_key: AccessKey) -> None:
+    async def invalidate_keypair_concurrency_cache(self, access_keys: list[AccessKey]) -> None:
         """
-        Force refresh concurrency cache from database for both regular and SFTP sessions.
-        Uses a single DB query to get both values and batch update to cache.
+        Invalidate concurrency cache for multiple access keys.
+        This removes cached values, forcing the next read to fetch from database.
 
-        :param access_key: The access key to refresh cache for
+        :param access_keys: List of access keys to invalidate cache for
         """
-        # Get both values from DB
-        concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-
-        # Update cache with both values at once
-        await self._cache_source.set_keypair_concurrencies(
-            access_key,
-            concurrency_data.regular_count,
-            concurrency_data.sftp_count,
-        )
+        await self._cache_source.invalidate_keypair_concurrencies(access_keys)

@@ -820,6 +820,28 @@ class ValkeyStatClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
+    async def delete_keypair_concurrencies(self, access_keys: list[str]) -> None:
+        """
+        Delete concurrency counters for multiple access keys in a batch.
+        Removes both regular and SFTP concurrency values for all provided keys.
+
+        :param access_keys: List of access keys to delete concurrency for.
+        """
+        if not access_keys:
+            return
+
+        # Prepare all keys for deletion
+        keys_to_delete = []
+        for access_key in access_keys:
+            regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
+            sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
+            keys_to_delete.extend([regular_key, sftp_key])
+
+        # Delete all keys in a single operation
+        if keys_to_delete:
+            await self._client.client.delete(cast(list[str | bytes], keys_to_delete))
+
+    @valkey_decorator()
     async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple keys efficiently using batch operations.

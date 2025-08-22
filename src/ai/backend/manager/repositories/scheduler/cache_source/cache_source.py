@@ -57,3 +57,16 @@ class ScheduleCacheSource:
             regular_concurrency=regular_concurrency,
             sftp_concurrency=sftp_concurrency,
         )
+
+    async def invalidate_keypair_concurrencies(self, access_keys: list[AccessKey]) -> None:
+        """
+        Invalidate cache for multiple access keys by deleting their entries.
+        Removes both regular and SFTP concurrency values.
+
+        :param access_keys: List of access keys to invalidate cache for
+        """
+        if not access_keys:
+            return
+
+        # Convert AccessKey objects to strings and delete
+        await self._valkey_stat.delete_keypair_concurrencies([str(ak) for ak in access_keys])

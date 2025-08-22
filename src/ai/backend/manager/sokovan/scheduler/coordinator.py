@@ -78,14 +78,16 @@ class ScheduleCoordinator:
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
             ScheduleType.SCHEDULE: ScheduleSessionsHandler(
-                scheduler, self._scheduling_controller, event_producer
+                scheduler, self._scheduling_controller, event_producer, scheduler._repository
             ),
             ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
                 scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.START: StartSessionsHandler(scheduler, event_producer),
             ScheduleType.TERMINATE: TerminateSessionsHandler(
-                scheduler, self._scheduling_controller, event_producer
+                scheduler,
+                self._scheduling_controller,
+                event_producer,
             ),
             ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
@@ -95,7 +97,7 @@ class ScheduleCoordinator:
                 scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
-                scheduler, self._scheduling_controller, event_producer
+                scheduler, self._scheduling_controller, event_producer, scheduler._repository
             ),
             ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
                 scheduler, self._scheduling_controller, event_producer

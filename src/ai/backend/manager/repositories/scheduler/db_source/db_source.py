@@ -791,6 +791,7 @@ class ScheduleDBSource:
                 sa.select(
                     SessionRow.id,
                     SessionRow.creation_id,
+                    SessionRow.access_key,
                     SessionRow.created_at,
                     SessionRow.scaling_group_name,
                     ScalingGroupRow.scheduler_opts,
@@ -818,6 +819,7 @@ class ScheduleDBSource:
                         SweptSessionInfo(
                             session_id=row.id,
                             creation_id=row.creation_id,
+                            access_key=row.access_key,
                         )
                     )
 
@@ -1301,22 +1303,24 @@ class ScheduleDBSource:
                     affected_agent_ids.add(kernel_alloc.agent_id)
 
         async with self._db.begin_session() as db_sess:
-            # First, fetch session data to get creation_id
+            # First, fetch session data to get creation_id and access_key
             session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
             if session_ids:
-                query = sa.select(SessionRow.id, SessionRow.creation_id).where(
-                    SessionRow.id.in_(session_ids)
-                )
+                query = sa.select(
+                    SessionRow.id, SessionRow.creation_id, SessionRow.access_key
+                ).where(SessionRow.id.in_(session_ids))
                 result = await db_sess.execute(query)
-                session_creation_map = {row.id: row.creation_id for row in result}
+                session_data_map = {row.id: (row.creation_id, row.access_key) for row in result}
 
                 # Create SessionEventData for each allocated session
                 for allocation in allocation_batch.allocations:
-                    if creation_id := session_creation_map.get(allocation.session_id):
+                    if session_data := session_data_map.get(allocation.session_id):
+                        creation_id, access_key = session_data
                         scheduled_sessions.append(
                             ScheduledSessionData(
                                 session_id=allocation.session_id,
                                 creation_id=creation_id,
+                                access_key=access_key,
                             )
                         )
 
@@ -2105,41 +2109,6 @@ class ScheduleDBSource:
                 return result.rowcount > 0
         return False
 
-    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
-        """
-        Get sessions in PULLING or PREPARING state where all kernels are in PREPARED state.
-        Returns session IDs that can transition to PREPARED state.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in PULLING or PREPARING state where ALL kernels are PREPARED (or beyond)
-            stmt = (
-                sa.select(SessionRow)
-                .where(
-                    SessionRow.status.in_([
-                        SessionStatus.PULLING,
-                        SessionStatus.PREPARING,
-                    ])
-                )
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_session_ids: list[SessionId] = []
-            for session in sessions:
-                # Early exit if no kernels
-                if not session.kernels:
-                    continue
-
-                # Check if all kernels are in PREPARED state
-                all_prepared = all(
-                    kernel.status == KernelStatus.PREPARED for kernel in session.kernels
-                )
-                if all_prepared:
-                    ready_session_ids.append(session.id)
-
-            return ready_session_ids
-
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
@@ -2174,21 +2143,21 @@ class ScheduleDBSource:
 
     async def get_sessions_for_transition(
         self,
-        session_status: SessionStatus,
+        session_statuses: list[SessionStatus],
         kernel_status: KernelStatus,
     ) -> list[SessionTransitionData]:
         """
         Get sessions ready for state transition based on current session and kernel status.
 
-        :param session_status: Current session status to filter by
+        :param session_statuses: List of current session statuses to filter by
         :param kernel_status: Required kernel status for transition
         :return: List of sessions ready for transition with detailed information
         """
         async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in specified state
+            # Find sessions in specified states
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.status == session_status)
+                .where(SessionRow.status.in_(session_statuses))
                 .options(selectinload(SessionRow.kernels))
             )
             result = await db_sess.execute(stmt)
@@ -2459,6 +2428,7 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id,
+                access_key=session.access_key,
             )
             scheduled_sessions.append(scheduled_session)
 
@@ -2502,6 +2472,7 @@ class ScheduleDBSource:
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id,
+                    access_key=session.access_key,
                 )
             )
 
