@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from typing import Optional
 
 import aiohttp
-from huggingface_hub import HfApi, hf_hub_url, list_models, list_repo_files, model_info
+from huggingface_hub import (
+    HfApi,
+    hf_hub_url,
+    list_models,
+    list_repo_files,
+    list_repo_refs,
+    model_info,
+)
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
@@ -73,6 +80,32 @@ class HuggingFaceClient:
         except Exception as e:
             log.error(f"Failed to list models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list models: {str(e)}") from e
+
+    async def list_model_revisions(self, model_id: str) -> list[str]:
+        """List all available revisions (branches and tags) for a model.
+
+        Args:
+            model_id: HuggingFace model ID
+
+        Returns:
+            List of revision names
+        """
+        try:
+            refs = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: list_repo_refs(model_id, token=self._token)
+            )
+            revisions = []
+            for branch in refs.branches:
+                revisions.append(branch.name)
+
+            # TODO: Should we consider tag?
+            # for tag in refs.tags:
+            #     revisions.append(tag.name)
+            return revisions
+        except Exception as e:
+            log.error(f"Failed to list revisions for {model_id}: {str(e)}")
+            # Fall back to main revision if revision listing fails
+            return ["main"]
 
     async def scan_model(self, model: ModelTarget) -> HfModelInfo:
         """Get detailed information about a specific model.
@@ -188,7 +221,7 @@ class HuggingFaceScanner:
         sort: ModelSortKey,
         search: Optional[str] = None,
     ) -> list[ModelData]:
-        """Scan HuggingFace models concurrently and retrieve metadata."""
+        """Scan HuggingFace models concurrently and retrieve metadata for all revisions."""
         try:
             log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
             models = await self._client.scan_models(search=search, sort=sort, limit=limit)
@@ -198,36 +231,57 @@ class HuggingFaceScanner:
 
             sem = asyncio.Semaphore(8)
 
-            async def build_model_data(model: HfModelInfo) -> Optional[ModelData]:
-                """Download README and build a ModelData object for a single model."""
+            async def build_model_data_for_revisions(model: HfModelInfo) -> list[ModelData]:
+                """Build ModelData objects for all revisions of a single model."""
+                model_data_list = []
                 try:
-                    async with sem:
-                        readme_content = await self._download_readme(
-                            ModelTarget(model_id=model.id, revision="main")
-                        )
+                    # Get all revisions for this model
+                    revisions = await self._client.list_model_revisions(model.id)
 
-                    filename = model.id.split("/")[-1]
-                    return ModelData(
-                        id=model.id,
-                        name=filename,
-                        author=model.author,
-                        tags=model.tags or [],
-                        created_at=model.created_at,
-                        modified_at=model.last_modified,
-                        readme=readme_content,
-                    )
+                    for revision in revisions:
+                        try:
+                            async with sem:
+                                readme_content = await self._download_readme(
+                                    ModelTarget(model_id=model.id, revision=revision)
+                                )
+
+                            filename = model.id.split("/")[-1]
+                            model_data = ModelData(
+                                id=model.id,
+                                name=filename,
+                                author=model.author,
+                                revision=revision,
+                                tags=model.tags or [],
+                                created_at=model.created_at,
+                                modified_at=model.last_modified,
+                                readme=readme_content,
+                            )
+                            model_data_list.append(model_data)
+
+                        except Exception as e:
+                            # Log and skip this revision, but continue with others
+                            log.warning(
+                                f"Failed to get details for revision: model_id={model.id}, revision={revision}, error={str(e)}"
+                            )
+                            continue
+
                 except Exception as e:
-                    # Log and skip this model, do not fail the whole scan.
+                    # Log and skip this entire model if we can't get revisions
                     log.warning(
-                        f"Failed to get details for model: model_id={model.id}, error={str(e)}"
+                        f"Failed to get revisions for model: model_id={model.id}, error={str(e)}"
                     )
-                    return None
+
+                return model_data_list
 
             # Fire tasks concurrently and collect results
-            tasks = [asyncio.create_task(build_model_data(m)) for m in models]
+            tasks = [asyncio.create_task(build_model_data_for_revisions(m)) for m in models]
             results = await asyncio.gather(*tasks, return_exceptions=False)
 
-            model_infos: list[ModelData] = [r for r in results if r is not None]
+            # Flatten the list of lists
+            model_infos: list[ModelData] = []
+            for model_data_list in results:
+                model_infos.extend(model_data_list)
+
             log.info(f"Successfully scanned HuggingFace models: count={len(model_infos)}")
             return model_infos
 
