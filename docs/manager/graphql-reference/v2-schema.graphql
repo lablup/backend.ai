@@ -1,5 +1,5 @@
 schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
-  query: Queries
+  query: Query
   mutation: Mutation
   subscription: Subscription
 }
@@ -447,7 +447,7 @@ type PageInfo @shareable {
   endCursor: String
 }
 
-type Queries {
+type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
   artifact(id: ID!): Artifact

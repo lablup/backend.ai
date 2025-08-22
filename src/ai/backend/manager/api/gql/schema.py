@@ -32,7 +32,7 @@ from .model_deployment.model_revision import (
 
 
 @strawberry.type
-class Queries:
+class Query:
     artifact = artifact
     artifacts = artifacts
     artifact_group = artifact_group
@@ -67,18 +67,15 @@ class Subscription:
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
         sdl = super().as_str()
-        sdl = (
-            sdl.replace("type Query", "type Queries")
-            .replace("query: Query", "query: Queries")
-            .replace("type PageInfo", "type PageInfo @shareable")
-            .replace('import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]')
+        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
+            'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
         )
 
         return sdl
 
 
 schema = CustomizedSchema(
-    query=Queries,
+    query=Query,
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),

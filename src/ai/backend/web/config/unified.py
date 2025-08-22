@@ -1083,6 +1083,23 @@ class OTELConfig(BaseModel):
     )
 
 
+class ApolloRouterConfig(BaseModel):
+    enabled: bool = Field(
+        default=False,
+        description="""
+        Whether to enable Apollo Router.
+        """,
+        examples=[True, False],
+    )
+    endpoint: str = Field(
+        default="http://127.0.0.1:4000",
+        description="""
+        Apollo Router endpoint.
+        """,
+        examples=["http://127.0.0.1:4000"],
+    )
+
+
 class DebugConfig(BaseModel):
     enabled: bool = Field(
         default=False,
@@ -1164,6 +1181,12 @@ class WebServerUnifiedConfig(BaseModel):
         default_factory=OTELConfig,
         description="""
         OpenTelemetry configuration.
+        """,
+    )
+    apollo_router: ApolloRouterConfig = Field(
+        default_factory=ApolloRouterConfig,
+        description="""
+        Apollo Router configuration.
         """,
     )
     logging: LoggingConfig = Field(

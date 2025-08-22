@@ -33,8 +33,8 @@ from ..models.gql import (
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
-    Mutations,
-    Queries,
+    Mutation,
+    Query,
 )
 from .auth import auth_required, auth_required_for_method
 from .manager import GQLMutationUnfrozenRequiredMiddleware
@@ -137,7 +137,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
     })
 )
-async def handle_gql(request: web.Request, params: Any) -> web.Response:
+async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
     return web.json_response(result.formatted, status=HTTPStatus.OK)
 
@@ -164,10 +164,10 @@ class GQLInspectionConfigCtx(MiddlewareParam):
         )
 
 
-class V2APIHandler:
+class GQLAPIHandler:
     @auth_required_for_method
     @api_handler
-    async def handle_gql_v2(
+    async def handle_gql_strawberry(
         self,
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
@@ -269,8 +269,8 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
     app_ctx.gql_schema = graphene.Schema(
-        query=Queries,
-        mutation=Mutations,
+        query=Query,
+        mutation=Mutation,
         auto_camelcase=False,
     )
     app_ctx.gql_v2_schema = strawberry_schema
@@ -295,8 +295,10 @@ def create_app(
     app["admin.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
-    cors.add(app.router.add_route("POST", r"/gql", handle_gql))
+    cors.add(app.router.add_route("POST", r"/gql", handle_gql_graphene))
 
-    v2_api_handler = V2APIHandler()
-    cors.add(app.router.add_route("POST", r"/gql/v2", v2_api_handler.handle_gql_v2))
+    gql_api_handler = GQLAPIHandler()
+    cors.add(
+        app.router.add_route("POST", r"/gql/strawberry", gql_api_handler.handle_gql_strawberry)
+    )
     return app, []

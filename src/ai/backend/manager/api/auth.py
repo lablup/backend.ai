@@ -9,6 +9,7 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
+from urllib.parse import urlparse
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -360,12 +361,18 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
                 # read the whole body if neither streaming nor bodyless
                 body = await request.read()
         body_hash = hashlib.new(hash_type, body).hexdigest()
+        path = request.raw_path
+        host = request.host
+        if upstream_url := request.headers.get("X-Forwarded-URL", None):
+            parsed_url = urlparse(upstream_url)
+            path = parsed_url.path
+            host = parsed_url.netloc
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
-            str(request.raw_path),
+            str(path),
             request["raw_date"],
-            request.host,
+            host,
             request.content_type,
             api_version,
             body_hash,
@@ -374,7 +381,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         sign_key = hmac.new(
             secret_key.encode(), request["date"].strftime("%Y%m%d").encode(), hash_type
         ).digest()
-        sign_key = hmac.new(sign_key, request.host.encode(), hash_type).digest()
+        sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
     except ValueError:
         raise AuthorizationFailed("Invalid signature")

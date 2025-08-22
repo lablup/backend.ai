@@ -4679,9 +4679,9 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "//gql": {
+    "//gql/graphene": {
       "post": {
-        "operationId": "root.handle_gql",
+        "operationId": "root.handle_gql_graphene",
         "tags": [
           "root"
         ],
@@ -4725,9 +4725,9 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "//gql/v2": {
+    "//gql/strawberry": {
       "post": {
-        "operationId": "root.handle_gql_v2",
+        "operationId": "root.handle_gql_strawberry",
         "tags": [
           "root"
         ],
@@ -4747,7 +4747,7 @@
     },
     "/spec/graphiql": {
       "get": {
-        "operationId": "spec.render_graphiql_html",
+        "operationId": "spec.render_graphiql_graphene_html",
         "tags": [
           "spec"
         ],
@@ -4765,9 +4765,9 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/spec/graphiql/v2": {
+    "/spec/graphiql/strawberry": {
       "get": {
-        "operationId": "spec.render_graphiql_v2_html",
+        "operationId": "spec.render_graphiql_strawberry_html",
         "tags": [
           "spec"
         ],

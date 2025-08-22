@@ -4,7 +4,7 @@ from graphene.test import Client
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 CONTAINER_REGISTRY_FIELDS = """
@@ -23,7 +23,7 @@ CONTAINER_REGISTRY_FIELDS = """
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
