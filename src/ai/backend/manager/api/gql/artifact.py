@@ -44,7 +44,7 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.disapprove import (
-    DisapproveArtifactRevisionAction,
+    RejectArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_ import ImportArtifactAction
@@ -181,7 +181,7 @@ class ApproveArtifactInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DisapproveArtifactInput:
+class RejectArtifactInput:
     artifact_revision_id: ID
 
 
@@ -345,7 +345,7 @@ class ApproveArtifactPayload:
 
 
 @strawberry.type(description="Added in 25.13.0")
-class DisapproveArtifactPayload:
+class RejectArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
@@ -805,16 +805,16 @@ async def approve_artifact_revision(
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def disapprove_artifact_revision(
-    input: DisapproveArtifactInput, info: Info[StrawberryGQLContext]
-) -> DisapproveArtifactPayload:
-    action_result = await info.context.processors.artifact_revision.disapprove.wait_for_complete(
-        DisapproveArtifactRevisionAction(
+async def reject_artifact_revision(
+    input: RejectArtifactInput, info: Info[StrawberryGQLContext]
+) -> RejectArtifactPayload:
+    action_result = await info.context.processors.artifact_revision.reject.wait_for_complete(
+        RejectArtifactRevisionAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
         )
     )
 
-    return DisapproveArtifactPayload(
+    return RejectArtifactPayload(
         artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
     )
 

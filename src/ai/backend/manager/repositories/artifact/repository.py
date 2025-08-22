@@ -9,7 +9,6 @@ from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.exception import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
-    ArtifactNotAvailable,
     ArtifactNotFoundError,
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
@@ -471,7 +470,7 @@ class ArtifactRepository:
             return updated_row.to_dataclass()
 
     @repository_decorator()
-    async def disapprove_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
+    async def reject_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
@@ -480,13 +479,10 @@ class ArtifactRepository:
             if row is None:
                 raise ArtifactRevisionNotFoundError()
 
-            if row.status != ArtifactStatus.AVAILABLE:
-                raise ArtifactNotAvailable("Only approved artifacts could be disapproved")
-
             update_stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == revision_id)
-                .values(status=ArtifactStatus.NEEDS_APPROVAL.value)
+                .values(status=ArtifactStatus.REJECTED.value)
                 .returning(ArtifactRevisionRow)
             )
 

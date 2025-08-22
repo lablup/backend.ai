@@ -8,7 +8,7 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 
 @dataclass
-class DisapproveArtifactRevisionAction(ArtifactRevisionAction):
+class RejectArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
 
     @override
@@ -18,11 +18,11 @@ class DisapproveArtifactRevisionAction(ArtifactRevisionAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "disapprove"
+        return "reject"
 
 
 @dataclass
-class DisapproveArtifactRevisionActionResult(BaseActionResult):
+class RejectArtifactRevisionActionResult(BaseActionResult):
     result: ArtifactRevisionData
 
     @override

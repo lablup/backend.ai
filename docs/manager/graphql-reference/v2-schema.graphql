@@ -147,6 +147,7 @@ enum ArtifactStatus {
   NEEDS_APPROVAL
   AVAILABLE
   FAILED
+  REJECTED
 }
 
 """Added in 25.13.0"""
@@ -328,16 +329,6 @@ enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
   CANARY
-}
-
-"""Added in 25.13.0"""
-input DisapproveArtifactInput {
-  artifactRevisionId: ID!
-}
-
-"""Added in 25.13.0"""
-type DisapproveArtifactPayload {
-  artifactRevision: ArtifactRevision!
 }
 
 extend type EndpointAutoScalingRuleNode @key(fields: "id") {
@@ -635,7 +626,7 @@ type Mutation {
   approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
 
   """Added in 25.13.0"""
-  disapproveArtifactRevision(input: DisapproveArtifactInput!): DisapproveArtifactPayload!
+  rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -762,6 +753,16 @@ type Queries {
 type RawServiceConfig {
   config: JSONString!
   extraCliParameters: String
+}
+
+"""Added in 25.13.0"""
+input RejectArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""Added in 25.13.0"""
+type RejectArtifactPayload {
+  artifactRevision: ArtifactRevision!
 }
 
 type ReplicaState {

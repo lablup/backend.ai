@@ -26,6 +26,7 @@ class ArtifactStatus(enum.StrEnum):
     NEEDS_APPROVAL = "NEEDS_APPROVAL"
     AVAILABLE = "AVAILABLE"
     FAILED = "FAILED"
+    REJECTED = "REJECTED"
 
 
 @dataclass

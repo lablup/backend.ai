@@ -22,10 +22,6 @@ from ai.backend.manager.services.artifact_revision.actions.delete import (
     DeleteArtifactAction,
     DeleteArtifactActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.disapprove import (
-    DisapproveArtifactRevisionAction,
-    DisapproveArtifactRevisionActionResult,
-)
 from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
@@ -41,6 +37,10 @@ from ai.backend.manager.services.artifact_revision.actions.import_ import (
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
     ListArtifactRevisionsActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.reject import (
+    RejectArtifactRevisionAction,
+    RejectArtifactRevisionActionResult,
 )
 
 
@@ -83,11 +83,11 @@ class ArtifactRevisionService:
         result = await self._artifact_repository.approve_artifact(action.artifact_revision_id)
         return ApproveArtifactRevisionActionResult(result=result)
 
-    async def disapprove(
-        self, action: DisapproveArtifactRevisionAction
-    ) -> DisapproveArtifactRevisionActionResult:
-        result = await self._artifact_repository.disapprove_artifact(action.artifact_revision_id)
-        return DisapproveArtifactRevisionActionResult(result=result)
+    async def reject(
+        self, action: RejectArtifactRevisionAction
+    ) -> RejectArtifactRevisionActionResult:
+        result = await self._artifact_repository.reject_artifact(action.artifact_revision_id)
+        return RejectArtifactRevisionActionResult(result=result)
 
     async def associate_with_storage(
         self, action: AssociateWithStorageAction
