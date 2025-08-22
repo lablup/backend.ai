@@ -1,9 +1,12 @@
 """HuggingFace model scanner implementation for Backend.AI storage."""
 
+import asyncio
 import logging
+import ssl
+import time
 import uuid
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
+from typing import Callable, Optional, Protocol
 
 import aiohttp
 
@@ -14,6 +17,8 @@ from ai.backend.common.data.storage.registries.types import (
     ModelSortKey,
     ModelTarget,
 )
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -31,8 +36,85 @@ from ai.backend.storage.services.storages import StorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_CHUNK_SIZE = 8192  # Default chunk size for streaming downloads
-_DEFAULT_FILE_DOWNLOAD_TIMEOUT = 300  # Default timeout for file downloads in seconds
+_MiB = 1024 * 1024
+_DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS = 15
+_DEFAULT_BYTESIZE_INTERVAL = 64 * _MiB
+
+_DOWNLOAD_RETRIABLE_ERROR = (
+    aiohttp.ClientPayloadError,
+    aiohttp.ServerDisconnectedError,
+    aiohttp.ClientOSError,
+    asyncio.TimeoutError,
+    ssl.SSLError,
+)
+
+
+class _DownloadProgressLogger(Protocol):
+    def __call__(self, offset: int, final: bool = False) -> None: ...
+
+
+def _make_download_progress_logger(
+    *,
+    total_getter: Callable[[], Optional[int]],
+    bytes_interval: int = _DEFAULT_BYTESIZE_INTERVAL,
+    secs_interval: float = _DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS,
+) -> _DownloadProgressLogger:
+    """
+    Return a lightweight progress logging callback.
+
+    Args:
+        total_getter: A callable that returns the total number of bytes to download.
+        bytes_interval: The number of bytes to download before logging progress.
+        secs_interval: The number of seconds to wait before logging progress.
+    """
+
+    last_t = time.monotonic()
+    last_bytes = 0
+
+    def _fmt_eta(eta_sec: Optional[float]) -> str:
+        """Format ETA seconds as H:MM:SS or '?' if unknown."""
+        if eta_sec is None or eta_sec >= 1e9:
+            return "?"
+        m, s = divmod(int(eta_sec), 60)
+        h, m = divmod(m, 60)
+        return f"{h:d}:{m:02d}:{s:02d}"
+
+    def log_progress(offset: int, final: bool = False) -> None:
+        nonlocal last_t, last_bytes
+
+        now = time.monotonic()
+        bytes_since = offset - last_bytes
+        secs_since = now - last_t
+
+        # Skip if neither interval threshold is met (and not final)
+        if not final and bytes_since < bytes_interval and secs_since < secs_interval:
+            return
+
+        inst_mibs = (bytes_since / _MiB) / secs_since if secs_since > 0 else 0.0
+        total = total_getter()
+
+        if total:
+            pct = (offset * 100.0) / total if total > 0 else 0.0
+            remain = max(total - offset, 0)
+            eta_sec = (remain / (inst_mibs * _MiB)) if inst_mibs > 0 else None
+            eta_str = _fmt_eta(eta_sec)
+
+            log.trace(
+                "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                    pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
+                )
+            )
+        else:
+            log.trace(
+                "Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                    offset / _MiB, inst_mibs
+                )
+            )
+
+        last_t = now
+        last_bytes = offset
+
+    return log_progress
 
 
 @dataclass
@@ -40,6 +122,7 @@ class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
     storage_service: StorageService
+    event_producer: EventProducer
 
 
 class HuggingFaceService:
@@ -48,11 +131,13 @@ class HuggingFaceService:
     _storages_service: StorageService
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
+    _event_producer: EventProducer
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storages_service = args.storage_service
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs
+        self._event_producer = args.event_producer
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -81,7 +166,7 @@ class HuggingFaceService:
             registry_name: Name of the HuggingFace registry
             limit: Maximum number of models to retrieve
             search: Search query to filter models
-            sort: Sort criteria ("downloads", "likes", "created", "modified")
+            sort: Sort criteria ("downloads", "likes", "created_at", "last_modified")
 
         Returns:
             UUID of the background task that will perform the scan
@@ -105,7 +190,7 @@ class HuggingFaceService:
             model: ModelTarget containing model_id and revision
 
         Returns:
-            ModelInfo object with complete metadata
+            ModelData object with complete metadata
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
@@ -169,7 +254,13 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
 
+        registry_config = self._registry_configs.get(registry_name)
+        if not registry_config:
+            raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
+        chunk_size = registry_config.download_chunk_size
+
         async def _import_model(reporter: ProgressReporter) -> None:
+            artifact_total_size = 0
             model_id = model.model_id
             revision = model.revision
             try:
@@ -184,18 +275,20 @@ class HuggingFaceService:
                     f"Found files to import: model_id={model_id}@{revision}, file_count={file_count}, "
                     f"total_size={file_total_size / (1024 * 1024)} MB"
                 )
+                artifact_total_size += file_total_size
 
                 successful_uploads = 0
                 failed_uploads = 0
 
                 for file_info in file_infos:
                     try:
-                        await self._upload_single_file_to_storage(
+                        await self._pipe_single_file_to_storage(
                             file_info=file_info,
                             model_id=model_id,
                             revision=revision,
                             storage_name=storage_name,
                             bucket_name=bucket_name,
+                            download_chunk_size=chunk_size,
                         )
 
                         successful_uploads += 1
@@ -219,6 +312,18 @@ class HuggingFaceService:
                     log.warning(
                         f"Some files failed to import: model_id={model_id}@{revision}, failed_count={failed_uploads}"
                     )
+
+                await self._event_producer.anycast_event(
+                    ModelImportDoneEvent(
+                        model_id=model_id,
+                        revision=revision,
+                        registry_name=registry_name,
+                        # TODO: Use ArtifactRegistryType
+                        registry_type="huggingface",
+                        total_size=artifact_total_size,
+                    )
+                )
+
             except HuggingFaceModelNotFoundError:
                 log.error(f"Model not found: model_id={model_id}@{revision}")
                 raise
@@ -230,6 +335,27 @@ class HuggingFaceService:
 
         bgtask_id = await self._background_task_manager.start(_import_model)
         return bgtask_id
+
+    async def _download_readme_content(self, download_url: str) -> Optional[str]:
+        """Download README content from the given URL.
+
+        Args:
+            download_url: The URL to download README content from
+
+        Returns:
+            README content as string if successful, None otherwise
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(download_url) as resp:
+                    if resp.status == 200:
+                        return await resp.text()
+                    else:
+                        log.warning(f"Failed to download README.md: HTTP {resp.status}")
+                        return None
+        except Exception as e:
+            log.error(f"Error downloading README.md: {str(e)}")
+            return None
 
     async def import_models_batch(
         self,
@@ -330,42 +456,145 @@ class HuggingFaceService:
         return bgtask_id
 
     async def _make_download_file_stream(
-        self, url: str, timeout: int = _DEFAULT_FILE_DOWNLOAD_TIMEOUT
-    ) -> AsyncIterator[bytes]:
-        """Download file from URL as async byte stream.
-
-        Args:
-            url: URL to download from
-            timeout: Request timeout in seconds
-
-        Yields:
-            Chunks of file data as bytes
-
-        Raises:
-            HuggingFaceAPIError: If download fails
-        """
-        try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=timeout)
-            ) as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        raise HuggingFaceAPIError(
-                            f"Download failed with status {response.status}: {url}"
-                        )
-
-                    async for chunk in response.content.iter_chunked(_DEFAULT_CHUNK_SIZE):
-                        yield chunk
-        except aiohttp.ClientError as e:
-            raise HuggingFaceAPIError(f"HTTP client error downloading {url}: {str(e)}") from e
-        except Exception as e:
-            raise HuggingFaceAPIError(f"Unexpected error downloading {url}: {str(e)}") from e
-
-    async def _upload_single_file_to_storage(
         self,
+        url: str,
+        chunk_size: int,
+        *,
+        max_retries: int = 8,
+    ):
+        """
+        Stream bytes from `url`.
+        """
+        session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
+            auto_decompress=False,
+        )
+
+        headers_base = {"Accept-Encoding": "identity"}
+        total: Optional[int] = None
+        etag: Optional[str] = None
+        accept_ranges = False
+
+        progress_logger = _make_download_progress_logger(
+            total_getter=lambda: total,
+        )
+
+        async def _probe_head() -> None:
+            """
+            Probe metadata via HEAD.
+            - May set total size, etag, and Accept-Ranges support.
+            - Any failure is swallowed (best effort).
+            """
+            nonlocal total, etag, accept_ranges
+            try:
+                async with session.head(url, headers=headers_base, allow_redirects=True) as resp:
+                    content_length = resp.headers.get("Content-Length")
+                    if content_length and content_length.isdigit():
+                        total = int(content_length)
+
+                    new_etag = resp.headers.get("ETag")
+                    if etag and new_etag and new_etag != etag:
+                        raise aiohttp.ClientPayloadError("ETag changed on HEAD")
+                    etag = etag or new_etag
+
+                    accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
+            except Exception:
+                # HEAD is best-effort; ignore failures.
+                pass
+
+        offset = 0
+        backoff = 1.0
+        retries = 0
+
+        try:
+            await _probe_head()
+
+            while True:
+                headers = dict(headers_base)
+                if offset and accept_ranges:
+                    headers["Range"] = f"bytes={offset}-"
+
+                try:
+                    async with session.get(url, headers=headers, allow_redirects=True) as resp:
+                        # Validate partial content when resuming
+                        if offset and accept_ranges and resp.status != 206:
+                            raise aiohttp.ClientPayloadError(f"Expected 206, got {resp.status}")
+
+                        # Validate ETag across resumes
+                        resp_etag = resp.headers.get("ETag")
+                        if etag and resp_etag and resp_etag != etag:
+                            raise aiohttp.ClientPayloadError("ETag changed during resume")
+
+                        # Fill total size from response headers if still unknown
+                        if total is None:
+                            if resp.status == 200:
+                                content_length = resp.headers.get("Content-Length")
+                                if content_length and content_length.isdigit():
+                                    total = int(content_length)
+                            elif resp.status == 206:
+                                content_range = resp.headers.get(
+                                    "Content-Range"
+                                )  # e.g. "bytes 123-456/789"
+                                if content_range and "/" in content_range:
+                                    try:
+                                        total = int(content_range.split("/")[-1])
+                                    except ValueError:
+                                        pass
+                            # TODO: Handle else case
+
+                        async for chunk in resp.content.iter_chunked(chunk_size):
+                            if not chunk:
+                                continue
+                            offset += len(chunk)
+                            progress_logger(offset)
+                            yield chunk
+
+                    # total unknown
+                    if total is None:
+                        progress_logger(offset, final=True)
+                        log.warning("Skipped download of %s since total size is unknown", url)
+                        break
+
+                    # Completed
+                    if offset >= total:
+                        progress_logger(offset, final=True)
+                        break
+
+                    # Unexpected early EOF → retry
+                    raise aiohttp.ClientPayloadError("Early EOF before Content-Length")
+
+                except _DOWNLOAD_RETRIABLE_ERROR as e:
+                    retries += 1
+                    if retries > max_retries:
+                        progress_logger(offset, final=True)
+                        raise aiohttp.ClientPayloadError(
+                            f"Exceeded retries while downloading {url} at offset={offset}"
+                        ) from e
+
+                    log.warning(
+                        "Download retry {}/{} at offset {:.1f} MiB (backoff={:.1f}s, err={})",
+                        retries,
+                        max_retries,
+                        offset / _MiB,
+                        backoff,
+                        e.__class__.__name__,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 30.0)
+
+                    # Refresh metadata before retry
+                    await _probe_head()
+                    continue
+        finally:
+            await session.close()
+
+    async def _pipe_single_file_to_storage(
+        self,
+        *,
         file_info: FileObjectData,
         model_id: str,
         revision: str,
+        download_chunk_size: int,
         storage_name: str,
         bucket_name: str,
     ) -> None:
@@ -375,6 +604,7 @@ class HuggingFaceService:
             file_info: File information with download URL
             model_id: HuggingFace model ID
             revision: Git revision (branch, tag, or commit hash)
+            download_chunk_size: Chunk size for file download
             storage_name: Target storage name
             bucket_name: Target bucket name
         """
@@ -386,14 +616,15 @@ class HuggingFaceService:
             # Create storage key path: {model_id}/{revision}/{file_path}
             storage_key = f"{model_id}/{revision}/{file_info.path}"
 
-            # Create token data for the upload
-            log.debug(
+            log.info(
                 f"Starting file upload to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
             # Download from HuggingFace and stream directly to storage
-            download_stream = self._make_download_file_stream(file_info.download_url)
+            download_stream = self._make_download_file_stream(
+                file_info.download_url, download_chunk_size
+            )
 
             # Upload to storage using existing service
             await self._storages_service.stream_upload(
@@ -402,7 +633,6 @@ class HuggingFaceService:
                 filepath=storage_key,
                 data_stream=download_stream,
                 content_type=None,
-                content_length=None,
             )
 
             log.info(
@@ -411,9 +641,6 @@ class HuggingFaceService:
             )
 
         except Exception as e:
-            log.error(
-                f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
-            )
             raise HuggingFaceAPIError(
                 f"Unexpected error uploading {file_info.path}: {str(e)}"
             ) from e

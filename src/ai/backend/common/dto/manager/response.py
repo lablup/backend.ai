@@ -42,3 +42,58 @@ GraphQLResponse.model_rebuild(
         "FormattedSourceLocation": FormattedSourceLocation,
     }
 )
+
+
+# Artifact API Response Models
+class ImportArtifactResponse(BaseResponseModel):
+    artifact_id: str = Field(description="ID of the imported artifact")
+    name: str = Field(description="Name of the artifact")
+    version: str = Field(description="Version of the artifact")
+    size: int = Field(description="Size of the artifact in bytes")
+
+
+class UpdateArtifactResponse(BaseResponseModel):
+    artifact_id: str = Field(description="ID of the updated artifact")
+    name: str = Field(description="Name of the artifact")
+    version: str = Field(description="Version of the artifact")
+
+
+class DeleteArtifactResponse(BaseResponseModel):
+    artifact_id: str = Field(description="ID of the deleted artifact")
+    message: str = Field(description="Deletion confirmation message")
+
+
+# ObjectStorage API Response Models
+class ObjectStorageResponse(BaseResponseModel):
+    id: str = Field(description="ID of the object storage")
+    name: str = Field(description="Name of the object storage")
+    host: str = Field(description="Host address of the object storage")
+    access_key: str = Field(description="Access key for authentication")
+    secret_key: str = Field(description="Secret key for authentication")
+    endpoint: str = Field(description="Endpoint URL of the object storage")
+    region: str = Field(description="Region of the object storage")
+
+
+class ObjectStorageListResponse(BaseResponseModel):
+    storages: list[ObjectStorageResponse] = Field(description="List of object storages")
+
+
+class DeleteObjectStorageResponse(BaseResponseModel):
+    pass
+
+
+# Association Artifact-Storage API Response Models
+class AssociationArtifactStorageResponse(BaseResponseModel):
+    id: str = Field(description="ID of the association")
+    artifact_id: str = Field(description="ID of the associated artifact")
+    storage_id: str = Field(description="ID of the associated storage")
+
+
+class AssociateArtifactWithStorageResponse(BaseResponseModel):
+    association: AssociationArtifactStorageResponse = Field(description="Created association")
+    message: str = Field(description="Success message")
+
+
+class DisassociateArtifactWithStorageResponse(BaseResponseModel):
+    association: AssociationArtifactStorageResponse = Field(description="Removed association")
+    message: str = Field(description="Success message")

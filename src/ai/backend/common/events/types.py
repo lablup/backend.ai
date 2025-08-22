@@ -27,6 +27,7 @@ class EventDomain(enum.StrEnum):
     IDLE_CHECK = "idle_check"
     SESSION = "session"
     AGENT = "agent"
+    ARTIFACT = "artifact"
     VFOLDER = "vfolder"
     VOLUME = "volume"
     LOG = "log"

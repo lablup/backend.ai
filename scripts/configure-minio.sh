@@ -95,9 +95,64 @@ configure_minio() {
     fi
 }
 
+configure_storage_proxy_minio() {
+    local storage_proxy_config="${1:-./storage-proxy.toml}"
+
+    if [ ! -f "$storage_proxy_config" ]; then
+        show_error "Storage proxy configuration file not found: $storage_proxy_config"
+        return 1
+    fi
+
+    show_info "Updating storage-proxy configuration with MinIO settings..."
+
+    # Check if sed_inplace function is available, otherwise define it
+    if ! command -v sed_inplace >/dev/null 2>&1; then
+        sed_inplace() {
+            if sed --version 2>/dev/null | grep -q GNU; then
+                sed -i "$@"
+            else
+                # macOS sed
+                sed -i '' "$@"
+            fi
+        }
+    fi
+
+    # Replace placeholder values in the [[storages]] section with actual MinIO configuration
+    sed_inplace "s/buckets = \[\"enter_bucket_name\"\]/buckets = [\"backendai-storage\"]/" "$storage_proxy_config"
+    sed_inplace 's#endpoint = "http://minio.example.com:9000"#endpoint = "http://127.0.0.1:9000"#' "$storage_proxy_config"
+    sed_inplace "s/access-key = \"<minio-access-key>\"/access-key = \"${MINIO_ACCESS_KEY}\"/" "$storage_proxy_config"
+    sed_inplace "s/secret-key = \"<minio-secret-key>\"/secret-key = \"${MINIO_SECRET_KEY}\"/" "$storage_proxy_config"
+
+    show_info "Storage proxy MinIO configuration updated successfully"
+}
+
 # Main function when script is called directly
 main() {
-    configure_minio
+    if [ $# -eq 0 ]; then
+        configure_minio
+        configure_storage_proxy_minio
+    else
+        case "$1" in
+            configure)
+                configure_minio "$2"
+                ;;
+            update-config)
+                configure_storage_proxy_minio "$2"
+                ;;
+            full)
+                configure_minio "$2"
+                configure_storage_proxy_minio "$3"
+                ;;
+            *)
+                echo "Usage: $0 [configure|update-config|full] [compose-file] [config-file]"
+                echo "  configure      - Set up MinIO container with user and bucket"
+                echo "  update-config  - Update storage-proxy.toml with MinIO settings"
+                echo "  full          - Do both configure and update-config"
+                echo "  (no args)     - Same as 'full' with default files"
+                exit 1
+                ;;
+        esac
+    fi
 }
 
 # Only run main if script is executed directly (not sourced)
