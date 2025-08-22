@@ -114,7 +114,7 @@ class ObjectStorageService:
             action.artifact_revision_id
         )
 
-        if not revision_data.status != ArtifactStatus.AVAILABLE:
+        if revision_data.status != ArtifactStatus.AVAILABLE:
             raise ArtifactNotApproved("Only available artifacts can be downloaded.")
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
