@@ -135,8 +135,8 @@ enum ArtifactRevisionOrderField {
 
 """Added in 25.14.0"""
 input ArtifactRevisionStatusFilter {
-  IN: [ArtifactStatus!] = null
-  EQ: [ArtifactStatus!] = null
+  in: [ArtifactStatus!]
+  equals: [ArtifactStatus!] = null
 }
 
 enum ArtifactStatus {
