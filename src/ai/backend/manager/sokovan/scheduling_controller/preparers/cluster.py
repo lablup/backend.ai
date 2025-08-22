@@ -49,11 +49,11 @@ class ClusterConfigurationRule(SessionPreparerRule):
             main_kernel_config["cluster_hostname"] = "main1"
             kernel_configs.append(main_kernel_config)
 
-            # Configure sub kernels (cluster_idx = 1, 2, ...)
+            # Configure sub kernels (cluster_idx starts from 1 for sub1, 2 for sub2, etc.)
             for i in range(spec.cluster_size - 1):
                 sub_kernel_config = cast(KernelEnqueueingConfig, {**main_kernel_config})
                 sub_kernel_config["cluster_role"] = "sub"
-                sub_kernel_config["cluster_idx"] = i + 1  # sub1 = idx 1, sub2 = idx 2, etc.
+                sub_kernel_config["cluster_idx"] = i + 1  # sub1: 1, sub2: 2, ...
                 sub_kernel_config["local_rank"] = i + 1  # sub1: 1, sub2: 2, ...
                 sub_kernel_config["cluster_hostname"] = f"sub{i + 1}"
                 kernel_configs.append(sub_kernel_config)
@@ -63,18 +63,34 @@ class ClusterConfigurationRule(SessionPreparerRule):
             for idx, kernel_spec in enumerate(spec.kernel_specs):
                 kernel_config = kernel_spec.copy()
 
-                # Common fields for all kernels
-                kernel_config["cluster_idx"] = idx + 1
-                kernel_config["local_rank"] = idx
+                # Check if cluster_role is already defined
+                if "cluster_role" not in kernel_config:
+                    # Assign default roles based on position
+                    if idx == 0:
+                        kernel_config["cluster_role"] = DEFAULT_ROLE
+                    else:
+                        kernel_config["cluster_role"] = "sub"
 
-                if idx == 0:
-                    # First kernel is main
-                    kernel_config["cluster_role"] = "main"
-                    kernel_config["cluster_hostname"] = "main1"
-                else:
-                    # Rest are sub kernels
-                    kernel_config["cluster_role"] = "sub"
-                    kernel_config["cluster_hostname"] = f"sub{idx}"
+                # Set cluster_idx if not already set
+                if "cluster_idx" not in kernel_config:
+                    if kernel_config["cluster_role"] == DEFAULT_ROLE:
+                        kernel_config["cluster_idx"] = 1
+                    else:
+                        # For sub kernels, find the count of previous sub kernels
+                        sub_count = sum(
+                            1 for i in range(idx) if kernel_configs[i].get("cluster_role") == "sub"
+                        )
+                        kernel_config["cluster_idx"] = sub_count + 1
+
+                # Set local_rank if not already set
+                if "local_rank" not in kernel_config:
+                    kernel_config["local_rank"] = idx
+
+                # Set cluster_hostname if not already set
+                if "cluster_hostname" not in kernel_config:
+                    role = kernel_config["cluster_role"]
+                    idx_val = kernel_config["cluster_idx"]
+                    kernel_config["cluster_hostname"] = f"{role}{idx_val}"
 
                 kernel_configs.append(kernel_config)
 

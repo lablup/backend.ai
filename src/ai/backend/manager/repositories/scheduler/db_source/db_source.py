@@ -1023,12 +1023,19 @@ class ScheduleDBSource:
                 vfolder_mounts,
             )
 
+            # Fetch user container info
+            user_container_info = await self._fetch_user_container_info(
+                db_sess,
+                spec.user_scope.user_uuid,
+            )
+
             return SessionCreationContext(
                 scaling_group_network=network_info,
                 allowed_scaling_groups=allowed_groups,
                 image_infos=image_infos,
                 vfolder_mounts=vfolder_mounts,
                 dotfile_data=dotfile_data,
+                user_container_info=user_container_info,
             )
 
     async def fetch_session_creation_context(
@@ -1191,6 +1198,29 @@ class ScheduleDBSource:
             vfolder_mounts,
         )
         return dict(dotfile_data)
+
+    async def _fetch_user_container_info(
+        self,
+        db_sess: SASession,
+        user_uuid: UUID,
+    ):
+        """
+        Fetch user container UID/GID information.
+        """
+        from ..types.session_creation import UserContainerInfo
+
+        user_row = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+
+        if not user_row:
+            return None
+
+        user_row = cast(UserRow, user_row)
+
+        return UserContainerInfo(
+            uid=user_row.container_uid or 1000,
+            main_gid=user_row.container_main_gid or 1000,
+            supplementary_gids=user_row.container_gids or [],
+        )
 
     async def prepare_vfolder_mounts(
         self,

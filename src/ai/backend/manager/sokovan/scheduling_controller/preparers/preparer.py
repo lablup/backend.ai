@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from dateutil.tz import tzutc
 
@@ -87,7 +87,7 @@ class SessionPreparer:
         environ = dict(spec.creation_spec.get("environ") or {})
 
         # Determine network configuration
-        network_type, network_id = self._determine_network_config(spec)
+        network_type, network_id = self._determine_network_config(spec, context)
 
         # Extract bootstrap script and timeout
         bootstrap_script = spec.creation_spec.get("bootstrap_script")
@@ -155,11 +155,16 @@ class SessionPreparer:
     def _determine_network_config(
         self,
         spec: SessionCreationSpec,
+        context: SessionCreationContext,
     ) -> tuple[NetworkType | None, str | None]:
         """Determine network type and ID from spec."""
         if spec.network:
-            return NetworkType.PERSISTENT, spec.network.name
-        return None, None
+            return NetworkType.PERSISTENT, str(spec.network.id)
+        elif context.scaling_group_network.use_host_network:
+            return NetworkType.HOST, None
+        else:
+            # Default to VOLATILE for multi-container or single-container sessions
+            return NetworkType.VOLATILE, None
 
     async def _prepare_kernels(
         self,
@@ -208,10 +213,11 @@ class SessionPreparer:
                 cluster_mode=spec.cluster_mode.value,
                 cluster_size=spec.cluster_size,
                 cluster_role=kernel_config.get("cluster_role", DEFAULT_ROLE),
-                cluster_idx=idx,
-                local_rank=idx,
-                cluster_hostname=f"{spec.session_name}-{kernel_config.get('cluster_role', DEFAULT_ROLE)}",
-                agent=str(kernel_config.get("agent_id")) if kernel_config.get("agent_id") else None,
+                cluster_idx=kernel_config.get("cluster_idx", idx),
+                local_rank=kernel_config.get("local_rank", idx),
+                cluster_hostname=kernel_config.get("cluster_hostname")
+                or f"{kernel_config.get('cluster_role', DEFAULT_ROLE)}{kernel_config.get('cluster_idx', idx + 1)}",
+                agent=self._get_preassigned_agent(spec, kernel_config, idx),
                 scaling_group=validated_scaling_group,
                 domain_name=spec.user_scope.domain_name,
                 group_id=spec.user_scope.group_id,
@@ -241,16 +247,38 @@ class SessionPreparer:
                 vfolder_mounts=vfolder_mounts,
                 preopen_ports=preopen_ports if isinstance(preopen_ports, list) else [],
                 use_host_network=context.scaling_group_network.use_host_network,
-                uid=int(kernel_config.get("uid") or 1000),
-                main_gid=int(kernel_config.get("main_gid") or 1000),
-                gids=list(kernel_config.get("supplementary_gids", []))
-                if isinstance(kernel_config.get("supplementary_gids"), list)
-                else [],
+                uid=kernel_config.get("uid")
+                or (context.user_container_info.uid if context.user_container_info else 1000),
+                main_gid=kernel_config.get("main_gid")
+                or (context.user_container_info.main_gid if context.user_container_info else 1000),
+                gids=kernel_config.get("supplementary_gids")
+                or (
+                    context.user_container_info.supplementary_gids
+                    if context.user_container_info
+                    else []
+                ),
             )
 
             kernel_data_list.append(kernel_data)
 
         return kernel_data_list
+
+    def _get_preassigned_agent(
+        self,
+        spec: SessionCreationSpec,
+        kernel_config: KernelEnqueueingConfig,
+        kernel_idx: int,
+    ) -> Optional[str]:
+        """Get pre-assigned agent for a kernel."""
+        # Check if agent is specified in kernel config
+        if agent_id := kernel_config.get("agent"):
+            return str(agent_id)
+
+        # Check if agent list is provided and use by index
+        if spec.agent_list and kernel_idx < len(spec.agent_list):
+            return spec.agent_list[kernel_idx]
+
+        return None
 
     def _collect_session_images(
         self,
