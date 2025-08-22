@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 
 import sqlalchemy as sa
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
     Base,
@@ -13,14 +15,19 @@ from .base import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 __all__ = ("ObjectStorageRow",)
+
+
+def _get_object_storage_association_artifact_join_cond():
+    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)
 
 
 class ObjectStorageRow(Base):
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services
-    such as access keys, endpoints, and associated buckets.
+    such as access keys, endpoints.
     """
 
     __tablename__ = "object_storages"
@@ -47,6 +54,12 @@ class ObjectStorageRow(Base):
         "region",
         sa.String,
         nullable=True,
+    )
+
+    association_artifacts_storages_rows = relationship(
+        "AssociationArtifactsStorageRow",
+        back_populates="object_storage_row",
+        primaryjoin=_get_object_storage_association_artifact_join_cond,
     )
 
     def __str__(self) -> str:

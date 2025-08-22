@@ -2,16 +2,19 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .artifact_registry import (
+from .artifact import (
+    approve_artifact_revision,
     artifact,
-    artifact_group,
-    artifact_groups,
     artifact_import_progress_updated,
+    artifact_revision,
+    artifact_revisions,
     artifact_status_changed,
     artifacts,
     cancel_import_artifact,
     delete_artifact,
-    import_artifact,
+    import_artifacts,
+    reject_artifact_revision,
+    scan_artifacts,
     update_artifact,
 )
 from .huggingface_registry import (
@@ -39,6 +42,8 @@ from .model_deployment.model_revision import (
 from .object_storage import (
     create_object_storage,
     delete_object_storage,
+    get_presigned_download_url,
+    get_presigned_upload_url,
     object_storage,
     object_storages,
     update_object_storage,
@@ -49,8 +54,8 @@ from .object_storage import (
 class Queries:
     artifact = artifact
     artifacts = artifacts
-    artifact_group = artifact_group
-    artifact_groups = artifact_groups
+    artifact_revision = artifact_revision
+    artifact_revisions = artifact_revisions
     deployments = deployments
     deployment = deployment
     revisions = revisions
@@ -64,7 +69,8 @@ class Queries:
 
 @strawberry.type
 class Mutation:
-    import_artifact = import_artifact
+    scan_artifacts = scan_artifacts
+    import_artifacts = import_artifacts
     update_artifact = update_artifact
     delete_artifact = delete_artifact
     cancel_import_artifact = cancel_import_artifact
@@ -78,6 +84,10 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    get_presigned_download_url = get_presigned_download_url
+    get_presigned_upload_url = get_presigned_upload_url
+    approve_artifact_revision = approve_artifact_revision
+    reject_artifact_revision = reject_artifact_revision
 
 
 @strawberry.type

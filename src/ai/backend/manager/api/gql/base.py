@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import orjson
 import strawberry
 from graphql import StringValueNode
+from graphql_relay.utils import unbase64
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import (
+        PaginationOptions,
+    )
 
 
 @strawberry.scalar
@@ -41,6 +47,39 @@ class StringFilter:
     i_ends_with: Optional[str] = strawberry.field(name="iEndsWith", default=None)
     i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
     i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
+
+    def apply_to_column(self, column):
+        """Apply this string filter to a SQLAlchemy column and return the condition.
+
+        Args:
+            column: SQLAlchemy column to apply the filter to
+
+        Returns:
+            SQLAlchemy condition expression or None if no filter is set
+        """
+
+        if self.equals:
+            return column == self.equals
+        elif self.i_equals:
+            return column.ilike(self.i_equals)
+        elif self.not_equals:
+            return column != self.not_equals
+        elif self.i_not_equals:
+            return ~column.ilike(self.i_not_equals)
+        elif self.starts_with:
+            return column.like(f"{self.starts_with}%")
+        elif self.i_starts_with:
+            return column.ilike(f"{self.i_starts_with}%")
+        elif self.ends_with:
+            return column.like(f"%{self.ends_with}")
+        elif self.i_ends_with:
+            return column.ilike(f"%{self.i_ends_with}")
+        elif self.contains:
+            return column.like(f"%{self.contains}%")
+        elif self.i_contains:
+            return column.ilike(f"%{self.i_contains}%")
+
+        return None
 
 
 @strawberry.enum
@@ -86,3 +125,41 @@ def parse_json(value: str | bytes) -> Any:
 )
 class JSONString:
     pass
+
+
+def resolve_global_id(global_id: str) -> tuple[str, str]:
+    unbased_global_id = unbase64(global_id)
+    type_, _, id_ = unbased_global_id.partition(":")
+    return type_, id_
+
+
+def build_pagination_options(
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> PaginationOptions:
+    from ai.backend.manager.repositories.types import (
+        BackwardPaginationOptions,
+        ForwardPaginationOptions,
+        OffsetBasedPaginationOptions,
+        PaginationOptions,
+    )
+
+    """Build pagination options from GraphQL arguments"""
+    pagination = PaginationOptions()
+
+    # Handle offset-based pagination
+    if offset is not None or limit is not None:
+        pagination.offset = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+        return pagination
+
+    # Handle cursor-based pagination
+    if after is not None or first is not None:
+        pagination.forward = ForwardPaginationOptions(after=after, first=first)
+    elif before is not None or last is not None:
+        pagination.backward = BackwardPaginationOptions(before=before, last=last)
+
+    return pagination

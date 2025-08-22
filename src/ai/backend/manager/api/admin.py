@@ -19,7 +19,6 @@ from pydantic import ConfigDict, Field
 
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
@@ -197,13 +196,9 @@ class V2APIHandler:
                     ),
                 )
 
-        user = current_user()
-        if not user:
-            raise web.HTTPUnauthorized(
-                text="Unauthorized: User identity is required for GraphQL v2 API."
-            )
-
-        strawberry_ctx = StrawberryGQLContext(user=user, processors=processors_ctx.processors)
+        strawberry_ctx = StrawberryGQLContext(
+            processors=processors_ctx.processors,
+        )
 
         query, variables, operation_name = (
             body.parsed.query,

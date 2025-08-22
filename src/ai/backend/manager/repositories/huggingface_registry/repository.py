@@ -1,6 +1,7 @@
 import uuid
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
@@ -9,6 +10,7 @@ from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegist
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -21,6 +23,43 @@ class HuggingFaceRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    @repository_decorator()
+    async def get_registry_data_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.id == registry_id)
+            )
+            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Registry with ID {registry_id} not found")
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.name == name)
+            )
+            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Registry with name {name} not found")
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_registry_data_by_artifact_id(
+        self, artifact_id: uuid.UUID
+    ) -> HuggingFaceRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow)
+                .where(ArtifactRow.id == artifact_id)
+                .options(selectinload(ArtifactRow.huggingface_registry))
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Artifact with ID {artifact_id} not found")
+            return row.huggingface_registry.to_dataclass()
 
     @repository_decorator()
     async def create(self, creator: HuggingFaceRegistryCreator) -> HuggingFaceRegistryData:
@@ -79,18 +118,3 @@ class HuggingFaceRepository:
             result = await db_session.execute(query)
             rows: list[HuggingFaceRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
-
-    @repository_decorator()
-    async def get_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
-        """
-        Get an existing Hugging Face registry entry from the database by ID.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(HuggingFaceRegistryRow).where(
-                HuggingFaceRegistryRow.id == registry_id
-            )
-            result = await db_session.execute(query)
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
-            if row is None:
-                raise ValueError(f"Hugging Face registry with ID {registry_id} not found.")
-            return row.to_dataclass()
