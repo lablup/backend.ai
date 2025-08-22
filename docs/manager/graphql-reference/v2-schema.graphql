@@ -4,17 +4,17 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ApproveArtifactInput {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ApproveArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -28,7 +28,7 @@ type Artifact implements Node {
   updatedAt: DateTime!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ArtifactConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -47,7 +47,7 @@ type ArtifactEdge {
   node: Artifact!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactFilter {
   type: [ArtifactType!] = null
   name: StringFilter = null
@@ -59,14 +59,14 @@ input ArtifactFilter {
   DISTINCT: Boolean = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ArtifactImportProgressUpdatedPayload {
   artifactId: ID!
   progress: Float!
   status: ArtifactStatus!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactOrderBy {
   field: ArtifactOrderField!
   direction: OrderDirection! = ASC
@@ -78,7 +78,7 @@ enum ArtifactOrderField {
   SIZE
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -90,7 +90,7 @@ type ArtifactRevision implements Node {
   size: ByteSize!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ArtifactRevisionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -109,7 +109,7 @@ type ArtifactRevisionEdge {
   node: ArtifactRevision!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactRevisionFilter {
   status: ArtifactRevisionStatusFilter = null
   version: StringFilter = null
@@ -120,7 +120,7 @@ input ArtifactRevisionFilter {
   DISTINCT: Boolean = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactRevisionOrderBy {
   field: ArtifactRevisionOrderField!
   direction: OrderDirection! = ASC
@@ -133,7 +133,7 @@ enum ArtifactRevisionOrderField {
   UPDATED_AT
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactRevisionStatusFilter {
   in: [ArtifactStatus!]
   equals: [ArtifactStatus!] = null
@@ -149,12 +149,12 @@ enum ArtifactStatus {
   FAILED
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ArtifactStatusChangedInput {
   artifactRevisionIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ArtifactStatusChangedPayload {
   artifactRevision: ArtifactRevision!
 }
@@ -167,7 +167,7 @@ enum ArtifactType {
 
 scalar ByteSize
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input CancelArtifactInput {
   artifactRevisionId: ID!
 }
@@ -191,14 +191,14 @@ enum ClusterMode {
   MULTI_NODE
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input CreateHuggingFaceRegistryInput {
   url: String!
   name: String!
   token: String = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
@@ -228,7 +228,7 @@ type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input CreateObjectStorageInput {
   name: String!
   host: String!
@@ -238,7 +238,7 @@ input CreateObjectStorageInput {
   region: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type CreateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
@@ -246,24 +246,24 @@ type CreateObjectStoragePayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input DeleteArtifactInput {
   artifactRevisionId: ID!
   storageId: ID!
   bucketName: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type DeleteArtifactPayload {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type DeleteHuggingFaceRegistryPayload {
   id: ID!
 }
@@ -276,12 +276,12 @@ type DeleteModelDeploymentPayload {
   deployment: ModelDeployment
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input DeleteObjectStorageInput {
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type DeleteObjectStoragePayload {
   id: ID!
 }
@@ -330,12 +330,12 @@ enum DeploymentStrategyType {
   CANARY
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input DisapproveArtifactInput {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type DisapproveArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
@@ -348,7 +348,7 @@ extend type EndpointToken @key(fields: "token") {
   token: String! @external
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
   storageId: ID!
@@ -356,12 +356,12 @@ input GetPresignedDownloadURLInput {
   key: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type GetPresignedDownloadURLPayload {
   presignedUrl: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input GetPresignedUploadURLInput {
   artifactRevisionId: ID!
   bucketName: String!
@@ -372,13 +372,13 @@ input GetPresignedUploadURLInput {
   maxSize: Int = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type GetPresignedUploadURLPayload {
   presignedUrl: String!
   fields: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -387,7 +387,7 @@ type HuggingFaceRegistry implements Node {
   token: String
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type HuggingFaceRegistryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -415,14 +415,14 @@ extend type ImageNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
   storageId: ID!
   bucketName: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
   taskIds: [UUID!]!
@@ -588,53 +588,53 @@ input ModelRuntimeConfigInput {
 }
 
 type Mutation {
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   disapproveArtifactRevision(input: DisapproveArtifactInput!): DisapproveArtifactPayload!
 }
 
@@ -644,7 +644,7 @@ interface Node {
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -656,7 +656,7 @@ type ObjectStorage implements Node {
   region: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ObjectStorageConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -699,16 +699,16 @@ type Queries {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifact(id: ID!): Artifact
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifactRevision(id: ID!): ArtifactRevision
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
   deployments(
     filter: DeploymentFilter = null
@@ -746,16 +746,16 @@ type Queries {
   revision(id: ID!): ModelRevision
   replica(id: ID!): ModelReplica
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   objectStorage(id: ID!): ObjectStorage
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   huggingfaceRegistry(id: ID!): HuggingFaceRegistry
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
 }
 
@@ -814,7 +814,7 @@ type ScalingRule {
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input ScanArtifactsInput {
   registryId: ID!
   storageId: ID!
@@ -822,7 +822,7 @@ input ScanArtifactsInput {
   search: String = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
@@ -830,7 +830,7 @@ type ScanArtifactsPayload {
 """Different service configurations for model runtime"""
 union ServiceConfig = RawServiceConfig
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type SourceInfo {
   name: String
   url: String
@@ -850,10 +850,10 @@ input StringFilter {
 }
 
 type Subscription {
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.13.0"""
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
@@ -861,17 +861,17 @@ type Subscription {
 
 scalar UUID
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input UpdateArtifactInput {
   artifactId: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input UpdateHuggingFaceRegistryInput {
   id: ID!
   url: String
@@ -879,7 +879,7 @@ input UpdateHuggingFaceRegistryInput {
   token: String
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
@@ -896,7 +896,7 @@ type UpdateModelDeploymentPayload {
   deployment: ModelDeployment
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 input UpdateObjectStorageInput {
   id: ID!
   name: String
@@ -907,7 +907,7 @@ input UpdateObjectStorageInput {
   region: String
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.13.0"""
 type UpdateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
