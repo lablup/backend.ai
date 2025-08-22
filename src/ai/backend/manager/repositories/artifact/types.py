@@ -35,9 +35,9 @@ class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
     artifact_type: Optional[ArtifactType] = None
-    name_filter: Optional["StringFilter"] = None
-    registry_filter: Optional["StringFilter"] = None
-    source_filter: Optional["StringFilter"] = None
+    name_filter: Optional[StringFilter] = None
+    registry_filter: Optional[StringFilter] = None
+    source_filter: Optional[StringFilter] = None
     registry_id: Optional[uuid.UUID] = None
     registry_type: Optional[ArtifactRegistryType] = None
     source_registry_id: Optional[uuid.UUID] = None
@@ -55,7 +55,7 @@ class ArtifactRevisionFilterOptions:
 
     artifact_id: Optional[uuid.UUID] = None
     status: Optional[list[ArtifactStatus]] = None
-    version_filter: Optional["StringFilter"] = None
+    version_filter: Optional[StringFilter] = None
 
     # Logical operations
     AND: Optional[list["ArtifactRevisionFilterOptions"]] = None

@@ -179,17 +179,6 @@ class ArtifactRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-        # Initialize the generic paginator with artifact-specific components
-        self._paginator = GenericQueryBuilder[
-            ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
-        ](
-            model_class=ArtifactRow,
-            filter_applier=ArtifactFilterApplier(),
-            ordering_applier=ArtifactOrderingApplier(),
-            model_converter=ArtifactModelConverter(),
-            cursor_type_name="Artifact",
-        )
-
     @repository_decorator()
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
@@ -545,8 +534,19 @@ class ArtifactRepository:
         if filters is None:
             filters = ArtifactFilterOptions()
 
+        # Initialize the generic paginator with artifact-specific components
+        artifact_paginator = GenericQueryBuilder[
+            ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
+        ](
+            model_class=ArtifactRow,
+            filter_applier=ArtifactFilterApplier(),
+            ordering_applier=ArtifactOrderingApplier(),
+            model_converter=ArtifactModelConverter(),
+            cursor_type_name="Artifact",
+        )
+
         # Build query using the generic paginator
-        querybuild_result = self._paginator.build_pagination_queries(
+        querybuild_result = artifact_paginator.build_pagination_queries(
             pagination=pagination or PaginationOptions(),
             ordering=ordering,
             filters=filters,
@@ -563,7 +563,7 @@ class ArtifactRepository:
             total_count = count_result.scalar()
 
             # Convert to data objects using paginator
-            data_objects = self._paginator.convert_rows_to_data(
+            data_objects = artifact_paginator.convert_rows_to_data(
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
