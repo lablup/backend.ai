@@ -1,11 +1,15 @@
 """Database source implementation for deployment repository."""
 
 import uuid
+from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import sessionmaker
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
@@ -41,6 +45,60 @@ class DeploymentDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @actxmgr
+    async def _begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-only connection with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
+
+    @actxmgr
+    async def _begin_readonly_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-only session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED and readonly mode
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+
+    @actxmgr
+    async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+                await session.commit()
+
     # Endpoint operations
 
     async def create_endpoint(
@@ -50,7 +108,7 @@ class DeploymentDBSource:
         """Create a new endpoint in the database."""
         endpoint_id = uuid.uuid4()
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Extract resource_group from resource_opts if not provided
             resource_group = args.scaling_group or (args.resource_opts or {}).get(
                 "scaling_group", "default"
@@ -84,7 +142,7 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
     ) -> Optional[EndpointData]:
         """Get endpoint by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
@@ -110,7 +168,7 @@ class DeploymentDBSource:
 
     async def get_all_active_endpoints(self) -> list[EndpointData]:
         """Get all active endpoints."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             rows = await self._fetch_active_endpoints(db_sess)
 
         return self._transform_endpoint_rows(rows)
@@ -159,7 +217,7 @@ class DeploymentDBSource:
         lifecycle: EndpointLifecycle,
     ) -> bool:
         """Update endpoint lifecycle status."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
@@ -174,7 +232,7 @@ class DeploymentDBSource:
         desired_session_count: int,
     ) -> bool:
         """Update endpoint desired session count."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
@@ -189,7 +247,7 @@ class DeploymentDBSource:
         target_replicas: int,
     ) -> bool:
         """Update endpoint replicas and rebalance traffic ratios in a single transaction."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Update endpoint replica count
             updated = await self._update_endpoint_replicas(db_sess, endpoint_id, target_replicas)
             if not updated:
@@ -237,7 +295,7 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
     ) -> bool:
         """Delete an endpoint and all its routes in a single transaction."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Delete routes first, then endpoint
             deleted = await self._delete_routes_and_endpoint(db_sess, endpoint_id)
             return deleted
@@ -252,7 +310,7 @@ class DeploymentDBSource:
         """Create a new route for an endpoint."""
         route_id = uuid.uuid4()
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # First get the endpoint to get owner, domain, and project info
             query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
@@ -280,7 +338,7 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
     ) -> list[RouteData]:
         """Get all routes for an endpoint."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
             result = await db_sess.execute(query)
             rows = result.scalars().all()
@@ -304,7 +362,7 @@ class DeploymentDBSource:
         session_id: SessionId,
     ) -> bool:
         """Update route with session ID."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(RoutingRow)
                 .where(RoutingRow.id == route_id)
@@ -320,7 +378,7 @@ class DeploymentDBSource:
         error_data: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Update route status."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             values: dict[str, Any] = {"status": status}
             if error_data is not None:
                 values["error_data"] = error_data
@@ -335,7 +393,7 @@ class DeploymentDBSource:
         traffic_ratio: float,
     ) -> bool:
         """Update route traffic ratio."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(RoutingRow)
                 .where(RoutingRow.id == route_id)
@@ -349,7 +407,7 @@ class DeploymentDBSource:
         route_id: uuid.UUID,
     ) -> bool:
         """Delete a route."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = sa.delete(RoutingRow).where(RoutingRow.id == route_id)
             result = await db_sess.execute(query)
             return result.rowcount > 0
@@ -374,7 +432,7 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
     ) -> Optional[EndpointWithRoutesData]:
         """Get endpoint with all its routes in a single database query."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Fetch all data from database in one session
             raw_data = await self._fetch_endpoint_and_routes(db_sess, endpoint_id)
 
@@ -467,7 +525,7 @@ class DeploymentDBSource:
         """Create a new auto-scaling rule."""
         rule_id = uuid.uuid4()
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             rule = EndpointAutoScalingRuleRow(
                 id=rule_id,
                 endpoint_id=endpoint_id,
@@ -489,7 +547,7 @@ class DeploymentDBSource:
         rule_id: uuid.UUID,
     ) -> Optional[AutoScalingRuleData]:
         """Get auto-scaling rule by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointAutoScalingRuleRow).where(
                 EndpointAutoScalingRuleRow.id == rule_id
             )
@@ -520,7 +578,7 @@ class DeploymentDBSource:
         updates: dict[str, Any],
     ) -> bool:
         """Update auto-scaling rule."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(EndpointAutoScalingRuleRow)
                 .where(EndpointAutoScalingRuleRow.id == rule_id)
@@ -534,7 +592,7 @@ class DeploymentDBSource:
         rule_id: uuid.UUID,
     ) -> bool:
         """Delete an auto-scaling rule."""
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             query = sa.delete(EndpointAutoScalingRuleRow).where(
                 EndpointAutoScalingRuleRow.id == rule_id
             )
