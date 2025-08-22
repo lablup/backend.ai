@@ -88,8 +88,9 @@ class ScheduleCoordinator:
                 scheduler,
                 self._scheduling_controller,
                 event_producer,
+                scheduler._repository,
             ),
-            ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
+            ScheduleType.SWEEP: SweepSessionsHandler(scheduler, scheduler._repository),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
                 scheduler, self._scheduling_controller, event_producer
             ),

@@ -36,6 +36,7 @@ from .types.session import (
     MarkTerminatingResult,
     SessionTerminationResult,
     SweptSessionInfo,
+    TerminatingSessionData,
 )
 from .types.session_creation import (
     AllowedScalingGroup,
@@ -133,7 +134,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_schedulable_scaling_groups()
 
-    async def get_terminating_sessions(self) -> list:
+    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
         """
         Get sessions with TERMINATING status.
         For sokovan scheduler compatibility.
@@ -486,11 +487,18 @@ class SchedulerRepository:
         concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
 
         # Update cache with both values at once
-        await self._cache_source.set_keypair_concurrencies(
-            access_key,
-            concurrency_data.regular_count,
-            concurrency_data.sftp_count,
-        )
+        try:
+            await self._cache_source.set_keypair_concurrencies(
+                access_key,
+                concurrency_data.regular_count,
+                concurrency_data.sftp_count,
+            )
+        except Exception as e:
+            log.warning(
+                "Failed to update keypair concurrency cache for {}: {}",
+                access_key,
+                e,
+            )
 
         # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
