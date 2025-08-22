@@ -5,7 +5,9 @@ from datetime import datetime
 from typing import AsyncGenerator, Optional, Self, Sequence
 
 import strawberry
+from aiotools import apartial
 from strawberry import ID, Info
+from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
@@ -15,6 +17,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     build_pagination_options,
 )
+from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
@@ -205,15 +208,14 @@ class Artifact(Node):
     readonly: bool
 
     @classmethod
-    def from_dataclass(cls, data: ArtifactData) -> Self:
+    def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
         return cls(
             id=ID(str(data.id)),
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            # TODO: Inject url
-            registry=SourceInfo(name=data.registry_type.value, url=None),
-            source=SourceInfo(name=data.source_registry_type.value, url=None),
+            registry=SourceInfo(name=data.registry_type.value, url=registry_url),
+            source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
         )
 
@@ -387,8 +389,13 @@ async def resolve_artifacts(
         )
     )
 
+    registry_loader = DataLoader(
+        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    )
+
     # Build GraphQL connection response
-    return _build_artifact_connection(
+    return await _build_artifact_connection(
+        registry_loader,
         artifacts=action_result.data,
         total_count=action_result.total_count,
         pagination_options=pagination_options,
@@ -425,15 +432,21 @@ def _convert_gql_artifact_revision_ordering_to_repo_ordering(
     return ArtifactRevisionOrderingOptions(order_by=repo_order_by)
 
 
-def _build_artifact_connection(
+async def _build_artifact_connection(
+    registry_loader: DataLoader,
     artifacts: list[ArtifactData],
     total_count: int,
     pagination_options: PaginationOptions,
 ) -> ArtifactConnection:
     """Build GraphQL connection from artifacts data"""
     edges = []
+
     for i, artifact_data in enumerate(artifacts):
-        artifact = Artifact.from_dataclass(artifact_data)
+        registry_data = await registry_loader.load(artifact_data.registry_id)
+        source_registry_data = await registry_loader.load(artifact_data.source_registry_id)
+        artifact = Artifact.from_dataclass(
+            artifact_data, registry_url=registry_data.url, source_url=source_registry_data.url
+        )
         cursor = str(artifact_data.id)  # Use artifact ID as cursor
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
@@ -627,7 +640,16 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
         )
     )
 
-    return Artifact.from_dataclass(action_result.result)
+    registry_loader = DataLoader(
+        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    )
+
+    registry_data = await registry_loader.load(action_result.result.registry_id)
+    source_registry_data = await registry_loader.load(action_result.result.source_registry_id)
+
+    return Artifact.from_dataclass(
+        action_result.result, registry_data.url, source_registry_data.url
+    )
 
 
 @strawberry.field(description="Added in 25.14.0")
@@ -681,7 +703,16 @@ async def scan_artifacts(
         )
     )
 
-    artifacts = [Artifact.from_dataclass(item.artifact) for item in action_result.result]
+    registry_loader = DataLoader(
+        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    )
+    artifacts = []
+    for item in action_result.result:
+        registry_data = await registry_loader.load(item.artifact.registry_id)
+        source_registry_data = await registry_loader.load(item.artifact.source_registry_id)
+        artifacts.append(
+            Artifact.from_dataclass(item.artifact, registry_data.url, source_registry_data.url)
+        )
     return ScanArtifactsPayload(artifacts=artifacts)
 
 

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from typing import Optional, Self
 
 import strawberry
@@ -43,6 +44,20 @@ class HuggingFaceRegistry(Node):
             url=data.url,
             token=data.token,
         )
+
+    @classmethod
+    async def load_by_id(
+        cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
+    ) -> list["HuggingFaceRegistry"]:
+        registries = []
+        for registry_id in registry_ids:
+            action_result = (
+                await ctx.processors.artifact_registry.get_huggingface_registry.wait_for_complete(
+                    GetHuggingFaceRegistryAction(registry_id=registry_id)
+                )
+            )
+            registries.append(HuggingFaceRegistry.from_dataclass(action_result.result))
+        return registries
 
 
 HuggingFaceRegistryEdge = Edge[HuggingFaceRegistry]
