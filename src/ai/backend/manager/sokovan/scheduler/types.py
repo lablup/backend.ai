@@ -786,6 +786,7 @@ class SessionTransitionData:
     """
 
     session_id: SessionId
+    creation_id: str
     session_name: str
     session_type: SessionTypes
     access_key: AccessKey

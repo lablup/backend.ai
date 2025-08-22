@@ -732,7 +732,7 @@ class Scheduler:
             scheduled_data = [
                 ScheduledSessionData(
                     session_id=session.session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    creation_id=session.creation_id,
                     access_key=session.access_key,
                 )
                 for session in sessions_data
@@ -782,7 +782,7 @@ class Scheduler:
             scheduled_data = [
                 ScheduledSessionData(
                     session_id=session.session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    creation_id=session.creation_id,
                     access_key=session.access_key,
                 )
                 for session in sessions_data
@@ -833,7 +833,7 @@ class Scheduler:
             scheduled_data = [
                 ScheduledSessionData(
                     session_id=session.session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    creation_id=session.creation_id,
                     access_key=session.access_key,
                 )
                 for session in sessions_data

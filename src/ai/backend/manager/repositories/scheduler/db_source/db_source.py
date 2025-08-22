@@ -2186,6 +2186,7 @@ class ScheduleDBSource:
                 # Build session transition data
                 session_data = SessionTransitionData(
                     session_id=session.id,
+                    creation_id=session.creation_id,
                     session_name=session.name,
                     session_type=session.session_type,
                     access_key=session.access_key,
