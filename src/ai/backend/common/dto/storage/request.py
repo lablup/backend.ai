@@ -96,15 +96,6 @@ class GetObjectMetaReq(BaseRequestModel):
     )
 
 
-class DeleteObjectReq(BaseRequestModel):
-    """
-    Data model for deleting a file in object storage.
-    This is used to specify the target bucket and key for the file deletion.
-    """
-
-    key: str = Field(description="The object key (path) within the bucket to delete the file from.")
-
-
 # HuggingFace API Request Models
 class HuggingFaceScanModelsReq(BaseRequestModel):
     """Request for scanning HuggingFace models."""
@@ -177,3 +168,11 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["models", "huggingface-models", "ai-models"],
     )
+
+
+class DeleteObjectReq(BaseRequestModel):
+    """
+    Data model for file deletion requests from object storage.
+    """
+
+    key: str = Field(description="The object key (path) within the bucket to delete the file from.")

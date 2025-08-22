@@ -16,9 +16,9 @@ __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
 
 
 def _get_association_artifact_join_cond():
-    from .artifact import ArtifactRow
+    from .artifact_revision import ArtifactRevisionRow
 
-    return ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id)
+    return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
 def _get_association_object_storage_join_cond():
@@ -35,12 +35,12 @@ class AssociationArtifactsStorageRow(Base):
     __tablename__ = "association_artifacts_storages"
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("artifact_id", "storage_id", name="uq_artifact_id_storage_id"),
+        sa.UniqueConstraint("artifact_revision_id", name="uq_artifact_revision_id"),
     )
 
     id = IDColumn()
-    artifact_id = sa.Column(
-        "artifact_id",
+    artifact_revision_id = sa.Column(
+        "artifact_revision_id",
         GUID,
         nullable=False,
     )
@@ -50,8 +50,8 @@ class AssociationArtifactsStorageRow(Base):
         nullable=False,
     )
 
-    artifact_row = relationship(
-        "ArtifactRow",
+    artifact_revision_row = relationship(
+        "ArtifactRevisionRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin=_get_association_artifact_join_cond,
     )

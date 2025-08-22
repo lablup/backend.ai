@@ -134,6 +134,7 @@ class ErrorDomain(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
+    OBJECT_STORAGE = "object-storage"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
     KERNEL = "kernel"
@@ -498,6 +499,19 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
         )
 
 
+class ObjectStorageNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-not-found"
+    error_title = "Object Storage Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-not-found"
     error_title = "Artifact Not Found"
@@ -537,6 +551,19 @@ class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
         )
 
 
+class ArtifactReadonly(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/artifact-readonly"
+    error_title = "You cannot upload files to readonly artifact storage"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
@@ -546,7 +573,20 @@ class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactNotAvailable(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-not-available"
+    error_title = "Artifact Not Available"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )
 
 
@@ -599,6 +639,32 @@ class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.ARTIFACT_ASSOCIATION,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactDeletionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
+    error_title = "Artifact Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
+    error_title = "Artifact Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )
 
 

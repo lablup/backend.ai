@@ -12,6 +12,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
     ArtifactStatus,
 )
+from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
     GUID,
@@ -44,7 +45,7 @@ class ArtifactRevisionRow(Base):
         index=True,
     )
     version = sa.Column("version", sa.String, nullable=False)
-    readme = sa.Column("readme", sa.TEXT, nullable=True)
+    readme = sa.Column("readme", sa.TEXT, nullable=True, default=None)
     size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
 
     # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.
@@ -70,6 +71,13 @@ class ArtifactRevisionRow(Base):
         "ArtifactRow",
         back_populates="revision_rows",
         primaryjoin=_get_artifact_join_cond,
+    )
+
+    association_artifacts_storages_rows = relationship(
+        "AssociationArtifactsStorageRow",
+        back_populates="artifact_revision_row",
+        primaryjoin=lambda: ArtifactRevisionRow.id
+        == foreign(AssociationArtifactsStorageRow.artifact_revision_id),
     )
 
     def __str__(self) -> str:
@@ -106,8 +114,8 @@ class ArtifactRevisionRow(Base):
         return cls(
             artifact_id=artifact_id,
             version=model_data.revision,
-            readme="",
-            size=None,
+            readme=model_data.readme,
+            size=None,  # will be populated later
             status=ArtifactStatus.SCANNED.value,
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,

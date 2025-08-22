@@ -3,16 +3,18 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from .artifact import (
+    approve_artifact_revision,
     artifact,
     artifact_import_progress_updated,
+    artifact_revision,
+    artifact_revisions,
     artifact_status_changed,
     artifacts,
-    authorize_artifact,
     cancel_import_artifact,
     delete_artifact,
     import_artifacts,
+    reject_artifact_revision,
     scan_artifacts,
-    unauthorize_artifact,
     update_artifact,
 )
 from .huggingface_registry import (
@@ -52,6 +54,8 @@ from .object_storage import (
 class Queries:
     artifact = artifact
     artifacts = artifacts
+    artifact_revision = artifact_revision
+    artifact_revisions = artifact_revisions
     deployments = deployments
     deployment = deployment
     revisions = revisions
@@ -82,8 +86,8 @@ class Mutation:
     delete_huggingface_registry = delete_huggingface_registry
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
-    authorize_artifact = authorize_artifact
-    unauthorize_artifact = unauthorize_artifact
+    approve_artifact_revision = approve_artifact_revision
+    reject_artifact_revision = reject_artifact_revision
 
 
 @strawberry.type

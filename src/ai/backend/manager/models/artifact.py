@@ -8,12 +8,9 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
-    ArtifactDataWithRevisions,
-    ArtifactRevisionData,
-    ArtifactStatus,
+    ArtifactRegistryType,
     ArtifactType,
 )
-from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 
 from .base import (
@@ -50,12 +47,7 @@ class ArtifactRow(Base):
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=False, index=True)
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
-
-    association_artifacts_storages_rows = relationship(
-        "AssociationArtifactsStorageRow",
-        back_populates="artifact_row",
-        primaryjoin=lambda: ArtifactRow.id == foreign(AssociationArtifactsStorageRow.artifact_id),
-    )
+    readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
@@ -79,7 +71,8 @@ class ArtifactRow(Base):
             f"registry_type={self.registry_type}, "
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
-            f"description={self.description})"
+            f"description={self.description}, "
+            f"readonly={self.readonly})"
         )
 
     def __repr__(self) -> str:
@@ -91,36 +84,9 @@ class ArtifactRow(Base):
             type=self.type,
             name=self.name,
             registry_id=self.registry_id,
-            registry_type=self.registry_type,
+            registry_type=ArtifactRegistryType(self.registry_type),
             source_registry_id=self.source_registry_id,
-            source_registry_type=self.source_registry_type,
+            source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
-        )
-
-    def to_dataclass_with_revisions(self) -> ArtifactDataWithRevisions:
-        return ArtifactDataWithRevisions(
-            artifact=ArtifactData(
-                id=self.id,
-                type=self.type,
-                name=self.name,
-                registry_id=self.registry_id,
-                registry_type=self.registry_type,
-                source_registry_id=self.source_registry_id,
-                source_registry_type=self.source_registry_type,
-                description=self.description,
-                authorized=self.authorized,
-            ),
-            revisions=[
-                ArtifactRevisionData(
-                    id=revision.id,
-                    artifact_id=revision.artifact_id,
-                    version=revision.version,
-                    readme=revision.readme,
-                    size=revision.size,
-                    status=ArtifactStatus(revision.status),
-                    created_at=revision.created_at,
-                    updated_at=revision.updated_at,
-                )
-                for revision in self.revision_rows
-            ],
+            readonly=self.readonly,
         )

@@ -80,3 +80,20 @@ class ObjectStorageListResponse(BaseResponseModel):
 
 class DeleteObjectStorageResponse(BaseResponseModel):
     pass
+
+
+# Association Artifact-Storage API Response Models
+class AssociationArtifactStorageResponse(BaseResponseModel):
+    id: str = Field(description="ID of the association")
+    artifact_id: str = Field(description="ID of the associated artifact")
+    storage_id: str = Field(description="ID of the associated storage")
+
+
+class AssociateArtifactWithStorageResponse(BaseResponseModel):
+    association: AssociationArtifactStorageResponse = Field(description="Created association")
+    message: str = Field(description="Success message")
+
+
+class DisassociateArtifactWithStorageResponse(BaseResponseModel):
+    association: AssociationArtifactStorageResponse = Field(description="Removed association")
+    message: str = Field(description="Success message")

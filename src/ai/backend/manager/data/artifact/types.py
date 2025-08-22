@@ -20,12 +20,13 @@ class ArtifactStatus(enum.StrEnum):
     """
 
     SCANNED = "SCANNED"
-    PULLED = "PULLED"
     PULLING = "PULLING"
+    PULLED = "PULLED"
     VERIFYING = "VERIFYING"
     NEEDS_APPROVAL = "NEEDS_APPROVAL"
     AVAILABLE = "AVAILABLE"
     FAILED = "FAILED"
+    REJECTED = "REJECTED"
 
 
 @dataclass
@@ -38,6 +39,7 @@ class ArtifactData:
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    readonly: bool
 
 
 @dataclass

@@ -25,7 +25,7 @@ from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ObjectStorage(Node):
     id: NodeID[str]
     name: str
@@ -51,14 +51,14 @@ class ObjectStorage(Node):
 ObjectStorageEdge = Edge[ObjectStorage]
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ObjectStorageConnection(Connection[ObjectStorage]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.field
+@strawberry.field(description="Added in 25.13.0")
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ObjectStorage]:
     processors = info.context.processors
     action_result = await processors.object_storage.get.wait_for_complete(
@@ -67,7 +67,7 @@ async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[O
     return ObjectStorage.from_dataclass(action_result.result)
 
 
-@strawberry.field
+@strawberry.field(description="Added in 25.13.0")
 async def object_storages(
     info: Info[StrawberryGQLContext],
     before: Optional[str] = None,
@@ -99,7 +99,7 @@ async def object_storages(
     )
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class CreateObjectStorageInput:
     name: str
     host: str
@@ -119,7 +119,7 @@ class CreateObjectStorageInput:
         )
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class UpdateObjectStorageInput:
     id: ID
     name: Optional[str] = UNSET
@@ -140,22 +140,22 @@ class UpdateObjectStorageInput:
         )
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class DeleteObjectStorageInput:
     id: ID
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class GetPresignedDownloadURLInput:
-    artifact_id: ID
+    artifact_revision_id: ID
     storage_id: ID
     bucket_name: str
     key: str
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class GetPresignedUploadURLInput:
-    storage_id: ID
+    artifact_revision_id: ID
     bucket_name: str
     key: str
     content_type: Optional[str] = None
@@ -164,33 +164,33 @@ class GetPresignedUploadURLInput:
     max_size: Optional[int] = None
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class DeleteObjectStoragePayload:
     id: ID
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class GetPresignedDownloadURLPayload:
     presigned_url: str
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class GetPresignedUploadURLPayload:
     presigned_url: str
     fields: str  # JSON string containing the form fields
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
@@ -207,7 +207,7 @@ async def create_object_storage(
     )
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
@@ -225,7 +225,7 @@ async def update_object_storage(
     )
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload:
@@ -240,7 +240,7 @@ async def delete_object_storage(
     return DeleteObjectStoragePayload(id=ID(str(action_result.deleted_storage_id)))
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
@@ -248,7 +248,7 @@ async def get_presigned_download_url(
 
     action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
         GetDownloadPresignedURLAction(
-            artifact_id=uuid.UUID(input.artifact_id),
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             storage_id=uuid.UUID(input.storage_id),
             bucket_name=input.bucket_name,
             key=input.key,
@@ -258,7 +258,7 @@ async def get_presigned_download_url(
     return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:
@@ -266,7 +266,7 @@ async def get_presigned_upload_url(
 
     action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
         GetUploadPresignedURLAction(
-            storage_id=uuid.UUID(input.storage_id),
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             bucket_name=input.bucket_name,
             key=input.key,
             content_type=input.content_type,

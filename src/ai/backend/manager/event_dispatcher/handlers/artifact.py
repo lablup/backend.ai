@@ -7,6 +7,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 
@@ -46,4 +47,18 @@ class ArtifactEventHandler:
 
         await self._artifact_repository.update_artifact_revision_bytesize(
             revision.id, artifact_total_size
+        )
+
+        await self._artifact_repository.update_artifact_revision_bytesize(
+            revision.id, artifact_total_size
+        )
+        await self._artifact_repository.update_artifact_revision_status(
+            revision.id, ArtifactStatus.PULLED
+        )
+        # TODO: Add verify step
+        await self._artifact_repository.update_artifact_revision_status(
+            revision.id, ArtifactStatus.VERIFYING
+        )
+        await self._artifact_repository.update_artifact_revision_status(
+            revision.id, ArtifactStatus.NEEDS_APPROVAL
         )

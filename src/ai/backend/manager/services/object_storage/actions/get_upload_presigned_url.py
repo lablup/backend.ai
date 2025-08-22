@@ -8,7 +8,7 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 
 @dataclass
 class GetUploadPresignedURLAction(ObjectStorageAction):
-    storage_id: uuid.UUID
+    artifact_revision_id: uuid.UUID
     bucket_name: str
     key: str
     content_type: Optional[str] = None
@@ -18,7 +18,7 @@ class GetUploadPresignedURLAction(ObjectStorageAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.storage_id)
+        return None
 
     @override
     @classmethod
