@@ -471,10 +471,16 @@ class SchedulerRepository:
         :return: Current concurrency count
         """
         # Try to get from cache first
-        cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
-
-        if cached_value is not None:
-            return cached_value
+        try:
+            cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
+            if cached_value is not None:
+                return cached_value
+        except Exception as e:
+            log.warning(
+                "Failed to get keypair concurrency from cache for {}: {}",
+                access_key,
+                e,
+            )
 
         # Cache miss - refresh both values from DB
         concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
