@@ -26,3 +26,7 @@ class ScheduleResult:
     def needs_post_processing(self) -> bool:
         """Check if post-processing is needed based on the result."""
         return len(self.scheduled_sessions) > 0
+
+    def success_count(self) -> int:
+        """Get the count of successfully scheduled sessions."""
+        return len(self.scheduled_sessions)

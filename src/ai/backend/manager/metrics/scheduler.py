@@ -13,6 +13,7 @@ class SchedulerOperationMetricObserver:
     _instance: Optional[Self] = None
 
     _operation_count: Counter
+    _operation_success_count: Counter
     _operation_duration_sec: Histogram
 
     def __init__(self) -> None:
@@ -20,6 +21,11 @@ class SchedulerOperationMetricObserver:
             name="backendai_scheduler_operation_count",
             documentation="Total number of scheduler operations",
             labelnames=["operation", "status"],
+        )
+        self._operation_success_count = Counter(
+            name="backendai_scheduler_operation_success_count",
+            documentation="Total number of successful scheduler operations",
+            labelnames=["operation"],
         )
         self._operation_duration_sec = Histogram(
             name="backendai_scheduler_operation_duration_sec",
@@ -71,6 +77,16 @@ class SchedulerOperationMetricObserver:
         finally:
             duration = time.perf_counter() - start
             self.observe_operation(operation=operation, status=status, duration=duration)
+
+    def observe_success(self, operation: str, count: int) -> None:
+        """
+        Record a successful operation.
+
+        Args:
+            operation: The operation type
+            count: The number of successful operations
+        """
+        self._operation_success_count.labels(operation=operation).inc(count)
 
 
 class SchedulerPhaseMetricObserver:

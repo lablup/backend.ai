@@ -4,7 +4,7 @@ Schedule operation handlers that bundle the operation with its post-processing l
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, final
+from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import (
@@ -75,17 +75,6 @@ class ScheduleHandler(ABC):
             result: The result from execute()
         """
         raise NotImplementedError("Subclasses must implement post_process()")
-
-    @final
-    async def handle(self) -> ScheduleResult:
-        """Execute the operation and run post-processing."""
-        result = await self.execute()
-        if result.needs_post_processing():
-            try:
-                await self.post_process(result)
-            except Exception as e:
-                log.error("Error during post-processing: {}", e)
-        return result
 
 
 class ScheduleSessionsHandler(ScheduleHandler):
