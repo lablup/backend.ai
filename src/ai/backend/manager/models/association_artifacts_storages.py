@@ -35,9 +35,7 @@ class AssociationArtifactsStorageRow(Base):
     __tablename__ = "association_artifacts_storages"
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint(
-            "artifact_revision_id", "storage_id", name="uq_artifact_revision_id_storage_id"
-        ),
+        sa.UniqueConstraint("artifact_revision_id", name="uq_artifact_revision_id"),
     )
 
     id = IDColumn()

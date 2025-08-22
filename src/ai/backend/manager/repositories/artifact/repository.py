@@ -252,12 +252,12 @@ class ArtifactRepository:
                 raise ArtifactAssociationNotFoundError()
 
             result = await db_sess.execute(
-                sa.select(ObjectStorageRow).where(ObjectStorageRow.id == row.object_storage_id)
+                sa.select(ObjectStorageRow).where(ObjectStorageRow.id == row.storage_id)
             )
             storage_row: ObjectStorageRow = result.scalar_one_or_none()
             if storage_row is None:
                 raise ObjectStorageNotFoundError()
-            return row.to_dataclass()
+            return storage_row.to_dataclass()
 
     @repository_decorator()
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
