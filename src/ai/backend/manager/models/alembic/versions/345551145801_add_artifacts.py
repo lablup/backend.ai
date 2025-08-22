@@ -40,6 +40,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.Column("readonly", sa.Boolean(), default=False, nullable=False),
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
     )
     op.create_index(

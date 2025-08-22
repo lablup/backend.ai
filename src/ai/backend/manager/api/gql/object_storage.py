@@ -155,7 +155,7 @@ class GetPresignedDownloadURLInput:
 
 @strawberry.input(description="Added in 25.14.0")
 class GetPresignedUploadURLInput:
-    storage_id: ID
+    artifact_revision_id: ID
     bucket_name: str
     key: str
     content_type: Optional[str] = None
@@ -266,7 +266,7 @@ async def get_presigned_upload_url(
 
     action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
         GetUploadPresignedURLAction(
-            storage_id=uuid.UUID(input.storage_id),
+            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             bucket_name=input.bucket_name,
             key=input.key,
             content_type=input.content_type,

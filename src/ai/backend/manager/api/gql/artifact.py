@@ -202,6 +202,7 @@ class Artifact(Node):
     description: Optional[str]
     registry: SourceInfo
     source: SourceInfo
+    readonly: bool
 
     @classmethod
     def from_dataclass(cls, data: ArtifactData) -> Self:
@@ -213,6 +214,7 @@ class Artifact(Node):
             # TODO: Inject url
             registry=SourceInfo(name=data.registry_type.value, url=None),
             source=SourceInfo(name=data.source_registry_type.value, url=None),
+            readonly=data.readonly,
         )
 
     @strawberry.field

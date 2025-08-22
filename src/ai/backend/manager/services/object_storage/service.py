@@ -5,7 +5,7 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
 )
-from ai.backend.common.exception import ArtifactNotApproved
+from ai.backend.common.exception import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.artifact.types import ArtifactStatus
@@ -140,16 +140,33 @@ class ObjectStorageService:
         """
         Get a presigned upload URL for an existing object storage.
         """
-        log.info("Getting presigned upload URL for object storage with id: {}", action.storage_id)
-        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+        log.info(
+            "Getting presigned upload URL for object storage with artifact id: {}",
+            action.artifact_revision_id,
+        )
+        revision_data = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
+        )
+        artifact_data = await self._artifact_repository.get_artifact_by_id(
+            revision_data.artifact_id
+        )
 
+        if artifact_data.readonly:
+            raise ArtifactReadonly("Cannot upload to a readonly artifact.")
+
+        storage_data = await self._artifact_repository.get_artifact_installed_storage(
+            action.artifact_revision_id
+        )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+
+        # Build S3 key
+        object_path = Path(artifact_data.name) / revision_data.version / action.key
 
         result = await storage_proxy_client.get_s3_presigned_upload_url(
             storage_data.name,
             action.bucket_name,
             PresignedUploadObjectReq(
-                key=action.key,
+                key=str(object_path),
                 content_type=action.content_type,
                 expiration=action.expiration,
                 min_size=action.min_size,

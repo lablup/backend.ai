@@ -47,6 +47,7 @@ class ArtifactRow(Base):
     source_registry_id = sa.Column("source_registry_id", GUID, nullable=False, index=True)
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
+    readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
@@ -70,7 +71,8 @@ class ArtifactRow(Base):
             f"registry_type={self.registry_type}, "
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
-            f"description={self.description})"
+            f"description={self.description}, "
+            f"readonly={self.readonly})"
         )
 
     def __repr__(self) -> str:
@@ -86,4 +88,5 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
+            readonly=self.readonly,
         )

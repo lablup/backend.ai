@@ -38,6 +38,7 @@ class ArtifactData:
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    readonly: bool
 
 
 @dataclass
