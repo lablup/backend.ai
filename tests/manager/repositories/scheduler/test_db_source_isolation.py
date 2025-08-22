@@ -37,8 +37,11 @@ async def test_read_committed_isolation_level():
     async with db_source._begin_readonly_session_read_committed():
         pass
 
-    # Verify that execution_options was called with READ COMMITTED
-    mock_conn.execution_options.assert_called_with(isolation_level="READ COMMITTED")
+    # Verify that execution_options was called with READ COMMITTED and postgresql_readonly
+    mock_conn.execution_options.assert_called_with(
+        isolation_level="READ COMMITTED",
+        postgresql_readonly=True,
+    )
 
     # Reset mock for next test
     mock_conn.execution_options.reset_mock()
