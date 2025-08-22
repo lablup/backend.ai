@@ -140,6 +140,7 @@ class RootContext:
         local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         *,
+        background_task_manager: BackgroundTaskManager,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
         watcher: WatcherClient | None,
@@ -170,10 +171,7 @@ class RootContext:
             event_producer=self.event_producer,
         )
         self.metric_registry = metric_registry
-        self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            # TODO: Add `bgtask_observer`
-        )
+        self.background_task_manager = background_task_manager
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.

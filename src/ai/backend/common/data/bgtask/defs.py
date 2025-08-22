@@ -1,0 +1,2 @@
+TASK_METADATA_TTL = 7200  # 2 hours
+TASK_TTL_THRESHOLD = 6900  # 1 hour 55 minutes

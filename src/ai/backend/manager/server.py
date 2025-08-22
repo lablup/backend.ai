@@ -45,6 +45,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
@@ -56,6 +57,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
+    REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
@@ -556,6 +558,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db_id=REDIS_LIVE_DB,
         human_readable_name="schedule",  # scheduling marks and coordination
     )
+    root_ctx.valkey_bgtask = await ValkeyBgtaskClient.create(
+        valkey_profile_target.profile_target(RedisRole.BGTASK),
+        human_readable_name="bgtask",
+        db_id=REDIS_BGTASK_DB,
+    )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
@@ -567,6 +574,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_live.close()
     await root_ctx.valkey_stream.close()
     await root_ctx.valkey_schedule.close()
+    await root_ctx.valkey_bgtask.close()
 
 
 @actxmgr
@@ -1090,6 +1098,8 @@ class background_task_ctx:
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
             self.root_ctx.event_producer,
+            valkey_client=self.root_ctx.valkey_bgtask,
+            server_id=self.root_ctx.config_provider.config.manager.id,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 

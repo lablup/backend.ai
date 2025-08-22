@@ -19,11 +19,13 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.config import (
     ConfigurationError,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
+from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -185,12 +187,24 @@ async def server_main(
             await watcher_client.init()
         else:
             watcher_client = None
+
+        valkey_client = await ValkeyBgtaskClient.create(
+            redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
+            human_readable_name="storage_bgtask",
+            db_id=REDIS_BGTASK_DB,
+        )
+        bgtask_mgr = BackgroundTaskManager(
+            event_producer=event_producer,
+            valkey_client=valkey_client,
+            server_id=local_config.storage_proxy.node_id,
+        )
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config.storage_proxy.node_id,
             pidx=pidx,
             local_config=local_config,
             etcd=etcd,
+            background_task_manager=bgtask_mgr,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
@@ -329,6 +343,7 @@ async def server_main(
                 await client_api_runner.cleanup()
                 await event_producer.close()
                 await event_dispatcher.close()
+                await valkey_client.close()
                 if watcher_client is not None:
                     await watcher_client.close()
                 sd_loop.close()
