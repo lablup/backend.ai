@@ -417,6 +417,19 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-not-registered"
+    error_title = "Background Task Not Registered"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"

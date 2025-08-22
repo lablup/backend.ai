@@ -18,8 +18,8 @@ class BaseBackgroundTaskArgs(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
         """
         Create an instance from a metadata body dictionary.
@@ -29,7 +29,6 @@ class BaseBackgroundTaskArgs(ABC):
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    @classmethod
     def to_dict(cls) -> dict[str, Any]:
         """
         Convert the arguments to a dictionary representation.
@@ -40,18 +39,11 @@ class BaseBackgroundTaskArgs(ABC):
 
 
 TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
-TFunctionContext = TypeVar("TFunctionContext")
 
 
-class BaseBackgroundTask(Generic[TFunctionArgs, TFunctionContext], ABC):
-    def __init__(self, context: TFunctionContext) -> None:
-        self._context = context
-
+class BaseBackgroundTask(Generic[TFunctionArgs], ABC):
     @abstractmethod
-    @staticmethod
-    async def execute(
-        reporter: ProgressReporter, args: TFunctionArgs
-    ) -> DispatchResult | str | None:
+    async def execute(self, reporter: ProgressReporter, args: TFunctionArgs) -> DispatchResult:
         """
         Execute the background task with the provided reporter and arguments.
         This method should be implemented by subclasses to provide
@@ -59,8 +51,8 @@ class BaseBackgroundTask(Generic[TFunctionArgs, TFunctionContext], ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def name(cls) -> TaskName:
         """
         Return the name of the background task.
@@ -69,11 +61,11 @@ class BaseBackgroundTask(Generic[TFunctionArgs, TFunctionContext], ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    @abstractmethod
     @classmethod
-    def get_args_from_metadata(cls, body: Mapping[str, Any]) -> TFunctionArgs:
+    @abstractmethod
+    def args_type(cls) -> type[TFunctionArgs]:
         """
-        Return the type of arguments that this task accepts.
+        Return the type of arguments that this task expects.
         This method should be implemented by subclasses to provide
         the specific argument type.
         """
