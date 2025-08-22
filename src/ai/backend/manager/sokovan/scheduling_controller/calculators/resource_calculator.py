@@ -164,6 +164,15 @@ class ResourceCalculator:
             known_slot_types,
         )
 
+        # Validate requested slots against image limits
+        self._validate_resource_limits(
+            requested_slots,
+            image_min_slots,
+            image_max_slots,
+            resource_opts.get("shmem"),
+            known_slot_types,
+        )
+
         return requested_slots, resource_opts
 
     async def _calculate_requested_slots(
@@ -283,3 +292,36 @@ class ResourceCalculator:
         image_min_slots["mem"] += shmem
 
         return resource_opts
+
+    def _validate_resource_limits(
+        self,
+        requested_slots: ResourceSlot,
+        image_min_slots: ResourceSlot,
+        image_max_slots: ResourceSlot,
+        shmem: Optional[BinarySize],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> None:
+        """Validate requested resources against image limits."""
+        # Check if: requested >= image-minimum
+        if image_min_slots > requested_slots:
+            min_humanized = " ".join(
+                f"{k}={v}" for k, v in image_min_slots.to_humanized(known_slot_types).items()
+            )
+            raise InvalidAPIParameters(
+                f"Your resource request is smaller than the minimum required by the image. ({min_humanized})"
+            )
+
+        # Check if: requested <= image-maximum
+        if not (requested_slots <= image_max_slots):
+            max_humanized = " ".join(
+                f"{k}={v}" for k, v in image_max_slots.to_humanized(known_slot_types).items()
+            )
+            raise InvalidAPIParameters(
+                f"Your resource request is larger than the maximum allowed by the image. ({max_humanized})"
+            )
+
+        # Check if: shmem < memory
+        if shmem and shmem >= requested_slots["mem"]:
+            raise InvalidAPIParameters(
+                f"Shared memory should be less than the main memory. (s:{shmem}, m:{BinarySize(requested_slots['mem'])})"
+            )

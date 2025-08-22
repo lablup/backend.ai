@@ -4,9 +4,16 @@ Schedule operation handlers that bundle the operation with its post-processing l
 
 import logging
 from abc import ABC, abstractmethod
-from typing import final
+from typing import Optional, final
 
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.session.broadcast import (
+    BatchSchedulingBroadcastEvent,
+    SessionSchedulingEventData,
+)
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -38,6 +45,16 @@ class ScheduleHandler(ABC):
     def name(cls) -> str:
         """Get the name of the handler."""
         raise NotImplementedError("Subclasses must implement name()")
+
+    @property
+    @abstractmethod
+    def lock_id(self) -> Optional[LockID]:
+        """Get the lock ID for this handler.
+
+        Returns:
+            LockID to acquire before execution, or None if no lock needed
+        """
+        raise NotImplementedError("Subclasses must implement lock_id")
 
     @abstractmethod
     async def execute(self) -> ScheduleResult:
@@ -76,14 +93,21 @@ class ScheduleSessionsHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "schedule-sessions"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PENDING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PENDING
 
     async def execute(self) -> ScheduleResult:
         """Schedule all pending sessions across scaling groups."""
@@ -92,9 +116,24 @@ class ScheduleSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were scheduled."""
-        # Request next phase
+        # Request next phase first
         await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
-        log.info("Scheduled {} sessions, requesting precondition check", result.succeeded_count)
+        log.info(
+            "Scheduled {} sessions, requesting precondition check", len(result.scheduled_sessions)
+        )
+
+        # Broadcast batch event for scheduled sessions
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.SCHEDULED),
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class CheckPreconditionHandler(ScheduleHandler):
@@ -104,14 +143,21 @@ class CheckPreconditionHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-precondition"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
     async def execute(self) -> ScheduleResult:
         """Check preconditions for scheduled sessions."""
@@ -119,8 +165,22 @@ class CheckPreconditionHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if preconditions are met."""
-        log.info("Checked preconditions for {} sessions", result.succeeded_count)
+        # Request next phase first
+        log.info("Checked preconditions for {} sessions", len(result.scheduled_sessions))
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
+
+        # Broadcast batch event for sessions that passed precondition check
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.PREPARING),  # Sessions transition to PREPARING
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class StartSessionsHandler(ScheduleHandler):
@@ -129,21 +189,41 @@ class StartSessionsHandler(ScheduleHandler):
     def __init__(
         self,
         scheduler: Scheduler,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "start-sessions"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
+
     async def execute(self) -> ScheduleResult:
         """Start sessions that passed precondition checks."""
         return await self._scheduler.start_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of started sessions."""
-        log.info("Started {} sessions", result.succeeded_count)
+        """Log the number of started sessions and broadcast event."""
+        log.info("Started {} sessions", len(result.scheduled_sessions))
+
+        # Broadcast batch event for started sessions
+        event = BatchSchedulingBroadcastEvent(
+            session_events=[
+                SessionSchedulingEventData(
+                    session_id=event_data.session_id,
+                    creation_id=event_data.creation_id,
+                )
+                for event_data in result.scheduled_sessions
+            ],
+            status_transition=str(SessionStatus.CREATING),
+        )
+        await self._event_producer.broadcast_event(event)
 
 
 class TerminateSessionsHandler(ScheduleHandler):
@@ -153,14 +233,21 @@ class TerminateSessionsHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "terminate-sessions"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting TERMINATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
     async def execute(self) -> ScheduleResult:
         """Terminate sessions marked for termination."""
@@ -168,7 +255,7 @@ class TerminateSessionsHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of terminated sessions."""
-        log.info("Terminated {} sessions", result.succeeded_count)
+        log.info("Terminated {} sessions", len(result.scheduled_sessions))
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -185,13 +272,18 @@ class SweepSessionsHandler(ScheduleHandler):
         """Get the name of the handler."""
         return "sweep-sessions"
 
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """No lock needed for sweeping stale sessions."""
+        return None
+
     async def execute(self) -> ScheduleResult:
         """Sweep stale sessions including those with pending timeout."""
         return await self._scheduler.sweep_stale_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of swept sessions."""
-        log.info("Swept {} stale sessions", result.succeeded_count)
+        log.info("Swept {} stale sessions", len(result.scheduled_sessions))
 
 
 class CheckPullingProgressHandler(ScheduleHandler):
@@ -201,14 +293,21 @@ class CheckPullingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-pulling-progress"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING/PULLING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
     async def execute(self) -> ScheduleResult:
         """Check if sessions in PULLING state have all kernels ready."""
@@ -216,7 +315,21 @@ class CheckPullingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request START scheduling if sessions transitioned to PREPARED."""
-        log.info("{} sessions transitioned to PREPARED state", result.succeeded_count)
+        log.info("{} sessions transitioned to PREPARED state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to PREPARED
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.PREPARED),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 class CheckCreatingProgressHandler(ScheduleHandler):
@@ -226,14 +339,21 @@ class CheckCreatingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-creating-progress"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 
     async def execute(self) -> ScheduleResult:
         """Check if sessions in CREATING state have all kernels running."""
@@ -241,8 +361,22 @@ class CheckCreatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to RUNNING."""
-        log.info("{} sessions transitioned to RUNNING state", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
+        log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to RUNNING
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.RUNNING),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 class CheckTerminatingProgressHandler(ScheduleHandler):
@@ -252,14 +386,21 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-terminating-progress"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting TERMINATING sessions."""
+        return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
     async def execute(self) -> ScheduleResult:
         """Check if sessions in TERMINATING state have all kernels terminated."""
@@ -267,8 +408,22 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to TERMINATED."""
-        log.info("{} sessions transitioned to TERMINATED state", result.succeeded_count)
         await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
+        log.info("{} sessions transitioned to TERMINATED state", len(result.scheduled_sessions))
+
+        # Broadcast batch event for sessions that transitioned to TERMINATED
+        if result.scheduled_sessions:
+            event = BatchSchedulingBroadcastEvent(
+                session_events=[
+                    SessionSchedulingEventData(
+                        session_id=event_data.session_id,
+                        creation_id=event_data.creation_id,
+                    )
+                    for event_data in result.scheduled_sessions
+                ],
+                status_transition=str(SessionStatus.TERMINATED),
+            )
+            await self._event_producer.broadcast_event(event)
 
 
 # Time thresholds for health checks
@@ -283,14 +438,21 @@ class RetryPreparingHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "retry-preparing"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting PREPARING sessions (retry)."""
+        return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
     async def execute(self) -> ScheduleResult:
         """Check and retry stuck PREPARING/PULLING sessions."""
@@ -301,7 +463,7 @@ class RetryPreparingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were retried."""
-        log.info("Retried {} stuck PREPARING/PULLING sessions", result.succeeded_count)
+        log.info("Retried {} stuck PREPARING/PULLING sessions", len(result.scheduled_sessions))
 
 
 class RetryCreatingHandler(ScheduleHandler):
@@ -311,14 +473,21 @@ class RetryCreatingHandler(ScheduleHandler):
         self,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
     ):
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "retry-creating"
+
+    @property
+    def lock_id(self) -> Optional[LockID]:
+        """Lock for operations targeting CREATING sessions (retry)."""
+        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 
     async def execute(self) -> ScheduleResult:
         """Check and retry stuck CREATING sessions."""
@@ -329,4 +498,4 @@ class RetryCreatingHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Request session start if sessions were retried."""
-        log.info("Retried {} stuck CREATING sessions", result.succeeded_count)
+        log.info("Retried {} stuck CREATING sessions", len(result.scheduled_sessions))

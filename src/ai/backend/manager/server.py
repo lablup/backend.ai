@@ -962,6 +962,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_live,
         root_ctx.valkey_image,
         root_ctx.event_producer,
+        root_ctx.event_hub,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
@@ -1009,7 +1010,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
-        root_ctx.valkey_stat,
     )
 
     # Create sokovan orchestrator with lock factory for timers

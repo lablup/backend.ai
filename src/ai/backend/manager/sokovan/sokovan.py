@@ -80,6 +80,9 @@ class SokovanOrchestrator:
             valkey_schedule=valkey_schedule,
             scheduler=scheduler,
             scheduling_controller=scheduling_controller,
+            event_producer=event_producer,
+            lock_factory=lock_factory,
+            config_provider=scheduler._config_provider,
         )
         self._event_producer = event_producer
         self._lock_factory = lock_factory

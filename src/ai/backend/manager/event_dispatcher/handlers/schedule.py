@@ -14,6 +14,9 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.session.broadcast import BatchSchedulingBroadcastEvent
+from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -27,6 +30,7 @@ class ScheduleEventHandler:
     _scheduler_dispatcher: SchedulerDispatcher
     _schedule_coordinator: ScheduleCoordinator
     _scheduling_controller: SchedulingController
+    _event_hub: EventHub
     _use_sokovan: bool
 
     def __init__(
@@ -34,11 +38,13 @@ class ScheduleEventHandler:
         scheduler_dispatcher: SchedulerDispatcher,
         schedule_coordinator: ScheduleCoordinator,
         scheduling_controller: SchedulingController,
+        event_hub: EventHub,
         use_sokovan: bool = False,
     ) -> None:
         self._scheduler_dispatcher = scheduler_dispatcher
         self._schedule_coordinator = schedule_coordinator
         self._scheduling_controller = scheduling_controller
+        self._event_hub = event_hub
         self._use_sokovan = use_sokovan
 
     async def handle_session_enqueued(
@@ -116,3 +122,21 @@ class ScheduleEventHandler:
         if self._use_sokovan:
             schedule_type = ScheduleType(ev.schedule_type)
             await self._schedule_coordinator.process_schedule(schedule_type)
+
+    async def handle_batch_scheduling_broadcast(
+        self, context: None, source: AgentId, ev: BatchSchedulingBroadcastEvent
+    ) -> None:
+        """Handle batch scheduling broadcast event and propagate individual events through EventHub."""
+        if self._use_sokovan:
+            # Generate individual events from the batch event
+            individual_events = ev.generate_events()
+
+            # Propagate each individual event through the event hub
+            for individual_event in individual_events:
+                await self._event_hub.propagate_event(individual_event)
+
+            log.trace(
+                "Propagated {} individual scheduling events for status transition: {}",
+                len(individual_events),
+                ev.status_transition,
+            )

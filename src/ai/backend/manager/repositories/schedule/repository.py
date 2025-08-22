@@ -300,6 +300,7 @@ class SessionTerminationResult:
 
     session_id: SessionId
     access_key: AccessKey
+    creation_id: str
     session_type: SessionTypes
     reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
     kernel_results: list[KernelTerminationResult] = field(default_factory=list)

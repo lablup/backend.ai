@@ -108,6 +108,12 @@ class LockID(enum.IntEnum):
     # Deployment auto-scaler timer
     LOCKID_DEPLOYMENT_AUTO_SCALER = 222
 
+    # Sokovan target status locks (prevent concurrent operations on same status)
+    LOCKID_SOKOVAN_TARGET_PENDING = 230  # For operations targeting PENDING sessions
+    LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions
+    LOCKID_SOKOVAN_TARGET_CREATING = 232  # For operations targeting CREATING/PREPARED sessions
+    LOCKID_SOKOVAN_TARGET_TERMINATING = 233  # For operations targeting TERMINATING sessions
+
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
 

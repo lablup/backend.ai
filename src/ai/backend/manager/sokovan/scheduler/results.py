@@ -2,15 +2,26 @@
 Result type for scheduling operations.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from ai.backend.common.types import SessionId
+
+
+@dataclass
+class ScheduledSessionData:
+    """Data for a scheduled session."""
+
+    session_id: SessionId
+    creation_id: str
 
 
 @dataclass
 class ScheduleResult:
     """Result of a scheduling operation."""
 
-    succeeded_count: int = 0
+    # List of scheduled session data
+    scheduled_sessions: list[ScheduledSessionData] = field(default_factory=list)
 
     def needs_post_processing(self) -> bool:
         """Check if post-processing is needed based on the result."""
-        return self.succeeded_count > 0
+        return len(self.scheduled_sessions) > 0
