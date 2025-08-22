@@ -123,3 +123,10 @@ class ModelData(BaseModel):
         Indicates the freshness and maintenance status of the model.
         """,
     )
+    readme: Optional[str] = Field(
+        default=None,
+        description="""
+        README file content for the model.
+        Provides documentation and usage instructions for the model.
+        """,
+    )
