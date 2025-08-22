@@ -43,12 +43,12 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.reject import (
-    RejectArtifactRevisionAction,
-)
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_ import ImportArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.list import ListArtifactRevisionsAction
+from ai.backend.manager.services.artifact_revision.actions.reject import (
+    RejectArtifactRevisionAction,
+)
 
 
 @strawberry.input(description="Added in 25.13.0")
