@@ -708,7 +708,7 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   fi
 fi
 
-count=$(( (ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK) ))
+count=$(( ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK ))
 if [ $count -gt 1 ]; then
   show_error "You can't use multiple CUDA/ROCm plugins at once!"
   show_error "Please remove --enable-cuda, --enable-cuda-mock, --enable-cuda-mig-mock, --enable-rocm-mock flag to continue."
