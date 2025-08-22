@@ -6,6 +6,7 @@ import attrs
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
     from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
         ValkeyContainerLogClient,
     )
@@ -68,6 +69,7 @@ class RootContext(BaseContext):
     valkey_stream: ValkeyStreamClient
     valkey_schedule: ValkeyScheduleClient
     valkey_profile_target: ValkeyProfileTarget
+    valkey_bgtask: ValkeyBgtaskClient
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions
 

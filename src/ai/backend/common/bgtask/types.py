@@ -38,14 +38,14 @@ class BackgroundTaskMetadata(BaseModel):
     def create(
         cls,
         task_id: TaskID,
-        task_name: str | TaskName,
+        task_name: TaskName,
         body: Mapping[str, Any],
         server_id: str,
         tags: Optional[Iterable[str]] = None,
     ) -> Self:
         return cls(
             task_id=task_id,
-            task_name=TaskName(task_name),
+            task_name=task_name,
             body=body,
             server_id=server_id,
             tags=set(tags) if tags is not None else set(),

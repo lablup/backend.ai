@@ -265,6 +265,7 @@ async def check_and_upgrade(
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
+        background_task_manager=None,  # type: ignore[arg-type]
     )
 
     async with ctx:
