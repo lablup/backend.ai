@@ -18,6 +18,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -83,11 +84,13 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.repositories import Repositories
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -117,6 +120,7 @@ class DispatcherArgs:
     db: ExtendedAsyncSAEngine
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    repositories: Repositories
     use_sokovan: bool = True
 
 
@@ -131,6 +135,7 @@ class Dispatchers:
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
+    _artifact_event_handler: ArtifactEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -173,6 +178,10 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
+        self._artifact_event_handler = ArtifactEventHandler(
+            args.repositories.artifact.repository,
+            args.repositories.huggingface_registry.repository,
+        )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -187,6 +196,7 @@ class Dispatchers:
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
+        self._dispatch_artifact_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -493,6 +503,14 @@ class Dispatchers:
             VFolderCloneFailureEvent,
             None,
             self._vfolder_event_handler.handle_vfolder_clone_failure,
+        )
+
+    def _dispatch_artifact_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            ModelImportDoneEvent,
+            None,
+            self._artifact_event_handler.handle_artifact_import_done,
         )
 
     def _dispatch_idle_check_events(

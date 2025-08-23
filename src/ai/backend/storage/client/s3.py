@@ -8,8 +8,6 @@ from ai.backend.common.dto.storage.response import ObjectMetaResponse, Presigned
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE = 8192  # Default chunk size for streaming downloads
-
 
 class S3Client:
     """
@@ -67,17 +65,18 @@ class S3Client:
         self,
         data_stream: AsyncIterable[bytes],
         s3_key: str,
+        part_size: int,
+        *,
         content_type: Optional[str] = None,
-        content_length: Optional[int] = None,
     ) -> None:
         """
-        Upload data stream to S3 bucket.
+        Upload data stream to S3 using streaming.
 
         Args:
             data_stream: Async iterator of bytes to upload
             s3_key: The S3 object key (destination path in bucket)
+            part_size: Size of each part in bytes
             content_type: MIME type of the file (optional)
-            content_length: Total content length if known (optional)
         """
         async with self.session.client(
             "s3",
@@ -86,30 +85,67 @@ class S3Client:
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
-            # For streaming upload, we need to use put_object with data
-            data_chunks = []
-            async for chunk in data_stream:
-                data_chunks.append(chunk)
-
-            data = b"".join(data_chunks)
-
-            put_object_args = {
-                "Bucket": self.bucket_name,
-                "Key": s3_key,
-                "Body": data,
-            }
-
+            create_args = {"Bucket": self.bucket_name, "Key": s3_key}
             if content_type:
-                put_object_args["ContentType"] = content_type
-            if content_length:
-                put_object_args["ContentLength"] = str(content_length)
+                create_args["ContentType"] = content_type
 
-            await s3_client.put_object(**put_object_args)
+            resp = await s3_client.create_multipart_upload(**create_args)
+            upload_id = resp["UploadId"]
+
+            parts = []
+            part_no = 1
+            buf = bytearray()
+
+            try:
+                async for downloaded_chunk in data_stream:
+                    if not downloaded_chunk:
+                        continue
+                    buf.extend(downloaded_chunk)
+
+                    while len(buf) >= part_size:
+                        piece = bytes(buf[:part_size])
+                        del buf[:part_size]
+
+                        upload_resp = await s3_client.upload_part(
+                            Bucket=self.bucket_name,
+                            Key=s3_key,
+                            PartNumber=part_no,
+                            UploadId=upload_id,
+                            Body=piece,
+                        )
+                        parts.append({"PartNumber": part_no, "ETag": upload_resp["ETag"]})
+                        part_no += 1
+
+                if buf:
+                    upload_resp = await s3_client.upload_part(
+                        Bucket=self.bucket_name,
+                        Key=s3_key,
+                        PartNumber=part_no,
+                        UploadId=upload_id,
+                        Body=bytes(buf),
+                    )
+                    parts.append({"PartNumber": part_no, "ETag": upload_resp["ETag"]})
+
+                await s3_client.complete_multipart_upload(
+                    Bucket=self.bucket_name,
+                    Key=s3_key,
+                    UploadId=upload_id,
+                    MultipartUpload={"Parts": parts},
+                )
+
+            except Exception:
+                try:
+                    await s3_client.abort_multipart_upload(
+                        Bucket=self.bucket_name, Key=s3_key, UploadId=upload_id
+                    )
+                finally:
+                    # Reraise original exception, not abort exception
+                    raise
 
     async def download_stream(
         self,
         s3_key: str,
-        chunk_size: int = _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE,
+        chunk_size: int,
     ) -> AsyncIterator[bytes]:
         """
         Download and stream S3 object content as bytes chunks.

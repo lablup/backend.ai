@@ -1,11 +1,21 @@
 """Types for database source operations."""
 
+from dataclasses import dataclass
+
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models import SessionRow
+
+
+@dataclass
+class KeypairConcurrencyData:
+    """Data class for keypair concurrency counts."""
+
+    regular_count: int
+    sftp_count: int
 
 
 class SessionRowCache:

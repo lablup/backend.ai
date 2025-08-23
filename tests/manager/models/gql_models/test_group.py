@@ -10,7 +10,7 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import ResourceSlot, SlotName, SlotTypes, VFolderHostPermission
 from ai.backend.common.utils import b64encode
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
@@ -22,7 +22,7 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 def get_graphquery_context(
@@ -49,6 +49,7 @@ def get_graphquery_context(
         services_ctx=services_ctx,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 

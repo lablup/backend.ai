@@ -614,6 +614,7 @@ class Scheduler:
             ScheduledSessionData(
                 session_id=result.session_id,
                 creation_id=result.creation_id,
+                access_key=result.access_key,
             )
             for result in session_results
             if result.should_terminate_session
@@ -699,6 +700,7 @@ class Scheduler:
                 ScheduledSessionData(
                     session_id=session.session_id,
                     creation_id=session.creation_id,
+                    access_key=session.access_key,
                 )
                 for session in timed_out_sessions
             ]
@@ -713,18 +715,27 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that progressed
         """
-        # Check sessions with all kernels that have reached PREPARED state
-        sessions_to_update = await self._repository.get_sessions_ready_to_prepare()
+        # Get sessions with all kernels that have reached PREPARED state
+        # Check both PREPARING and PULLING statuses
+        sessions_data = await self._repository.get_sessions_for_transition(
+            [SessionStatus.PREPARING, SessionStatus.PULLING],
+            KernelStatus.PREPARED,
+        )
+
+        if not sessions_data:
+            return ScheduleResult()
+
+        sessions_to_update = [session.session_id for session in sessions_data]
         if sessions_to_update:
             await self._repository.update_sessions_to_prepared(sessions_to_update)
             # Convert updated sessions to ScheduledSessionData format
-            # Note: sessions_to_update is a list of SessionId
             scheduled_data = [
                 ScheduledSessionData(
-                    session_id=session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
                 )
-                for session_id in sessions_to_update
+                for session in sessions_data
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
         return ScheduleResult()
@@ -737,7 +748,7 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions that transitioned to RUNNING
         """
         sessions_data = await self._repository.get_sessions_for_transition(
-            SessionStatus.CREATING,
+            [SessionStatus.CREATING],
             KernelStatus.RUNNING,
         )
 
@@ -770,10 +781,12 @@ class Scheduler:
             # Convert updated sessions to ScheduledSessionData format
             scheduled_data = [
                 ScheduledSessionData(
-                    session_id=session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
                 )
-                for session_id in sessions_to_update
+                for session in sessions_data
+                if session.session_id in sessions_to_update
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
 
@@ -787,7 +800,7 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions that transitioned to TERMINATED
         """
         sessions_data = await self._repository.get_sessions_for_transition(
-            SessionStatus.TERMINATING,
+            [SessionStatus.TERMINATING],
             KernelStatus.TERMINATED,
         )
 
@@ -819,10 +832,12 @@ class Scheduler:
             # Convert updated sessions to ScheduledSessionData format
             scheduled_data = [
                 ScheduledSessionData(
-                    session_id=session_id,
-                    creation_id="",  # Creation ID not available in this context
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
                 )
-                for session_id in sessions_to_update
+                for session in sessions_data
+                if session.session_id in sessions_to_update
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
 
@@ -857,6 +872,7 @@ class Scheduler:
             ScheduledSessionData(
                 session_id=session.session_id,
                 creation_id=session.creation_id,
+                access_key=session.access_key,
             )
             for session in scheduled_sessions
         ]
@@ -932,6 +948,7 @@ class Scheduler:
             ScheduledSessionData(
                 session_id=session.session_id,
                 creation_id=session.creation_id,
+                access_key=session.access_key,
             )
             for session in prepared_sessions
         ]
@@ -1475,6 +1492,7 @@ class Scheduler:
             ScheduledSessionData(
                 session_id=session.session_id,
                 creation_id=session.creation_id,
+                access_key=session.access_key,
             )
             for session in truly_stuck_sessions
         ]
@@ -1593,6 +1611,7 @@ class Scheduler:
             ScheduledSessionData(
                 session_id=session.session_id,
                 creation_id=session.creation_id,
+                access_key=session.access_key,
             )
             for session in truly_stuck_sessions
         ]

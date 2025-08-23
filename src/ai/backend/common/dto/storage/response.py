@@ -52,7 +52,7 @@ class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
 
 
-class DeleteObjectResponse(BaseResponseModel):
+class DownloadObjectResponse(BaseResponseModel):
     pass
 
 
@@ -93,3 +93,7 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
         """,
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
+
+
+class DeleteObjectResponse(BaseResponseModel):
+    pass

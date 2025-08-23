@@ -14,7 +14,7 @@ from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
 
 from ..api.gql.schema import schema as strawberry_schema
-from ..models.gql import Mutations, Queries
+from ..models.gql import Mutation, Query
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -29,8 +29,8 @@ def cli(args) -> None:
 
 async def generate_graphene_gql_schema(output_path: Path) -> None:
     schema = graphene_federation.build_schema(
-        query=Queries,
-        mutation=Mutations,
+        query=Query,
+        mutation=Mutation,
         auto_camelcase=False,
         federation_version=graphene_federation.LATEST_VERSION,
     )
@@ -91,13 +91,6 @@ def generate_supergraph_schema(
         )
 
         supergraph_path.write_text(result.stdout, encoding="utf-8")
-
-        # Post-process the supergraph file
-        supergraph_content = supergraph_path.read_text(encoding="utf-8")
-        supergraph_content = supergraph_content.replace("type Query", "type Queries").replace(
-            "query: Query", "query: Queries"
-        )
-        supergraph_path.write_text(supergraph_content, encoding="utf-8")
         print(f"Supergraph generated at: {supergraph_path}")
     except subprocess.CalledProcessError:
         # Restore original schema file on error

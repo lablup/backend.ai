@@ -4,7 +4,7 @@ Result type for scheduling operations.
 
 from dataclasses import dataclass, field
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import AccessKey, SessionId
 
 
 @dataclass
@@ -13,6 +13,7 @@ class ScheduledSessionData:
 
     session_id: SessionId
     creation_id: str
+    access_key: AccessKey
 
 
 @dataclass
@@ -25,3 +26,7 @@ class ScheduleResult:
     def needs_post_processing(self) -> bool:
         """Check if post-processing is needed based on the result."""
         return len(self.scheduled_sessions) > 0
+
+    def success_count(self) -> int:
+        """Get the count of successfully scheduled sessions."""
+        return len(self.scheduled_sessions)

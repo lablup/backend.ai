@@ -14,7 +14,7 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.server import (
     agent_registry_ctx,
     background_task_ctx,
@@ -35,7 +35,7 @@ from ai.backend.manager.server import (
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
@@ -60,6 +60,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 

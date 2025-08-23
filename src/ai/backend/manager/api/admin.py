@@ -19,11 +19,11 @@ from pydantic import ConfigDict, Field
 
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.dto.context import ProcessorsCtx
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -33,8 +33,8 @@ from ..models.gql import (
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
-    Mutations,
-    Queries,
+    Mutation,
+    Query,
 )
 from .auth import auth_required, auth_required_for_method
 from .manager import GQLMutationUnfrozenRequiredMiddleware
@@ -101,6 +101,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         idle_checker_host=root_ctx.idle_checker_host,
         metric_observer=root_ctx.metrics.gql,
         processors=root_ctx.processors,
+        scheduler_repository=root_ctx.repositories.scheduler.repository,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
@@ -136,7 +137,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
     })
 )
-async def handle_gql(request: web.Request, params: Any) -> web.Response:
+async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
     return web.json_response(result.formatted, status=HTTPStatus.OK)
 
@@ -163,13 +164,14 @@ class GQLInspectionConfigCtx(MiddlewareParam):
         )
 
 
-class V2APIHandler:
+class GQLAPIHandler:
     @auth_required_for_method
     @api_handler
-    async def handle_gql_v2(
+    async def handle_gql_strawberry(
         self,
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
+        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         rules = []
 
@@ -195,14 +197,8 @@ class V2APIHandler:
                     ),
                 )
 
-        user = current_user()
-        if not user:
-            raise web.HTTPUnauthorized(
-                text="Unauthorized: User identity is required for GraphQL v2 API."
-            )
-
         strawberry_ctx = StrawberryGQLContext(
-            user=user,
+            processors=processors_ctx.processors,
         )
 
         query, variables, operation_name = (
@@ -268,8 +264,8 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
     app_ctx.gql_schema = graphene.Schema(
-        query=Queries,
-        mutation=Mutations,
+        query=Query,
+        mutation=Mutation,
         auto_camelcase=False,
     )
     app_ctx.gql_v2_schema = strawberry_schema
@@ -294,8 +290,10 @@ def create_app(
     app["admin.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
-    cors.add(app.router.add_route("POST", r"/gql", handle_gql))
+    cors.add(app.router.add_route("POST", r"/gql", handle_gql_graphene))
 
-    v2_api_handler = V2APIHandler()
-    cors.add(app.router.add_route("POST", r"/gql/v2", v2_api_handler.handle_gql_v2))
+    gql_api_handler = GQLAPIHandler()
+    cors.add(
+        app.router.add_route("POST", r"/gql/strawberry", gql_api_handler.handle_gql_strawberry)
+    )
     return app, []

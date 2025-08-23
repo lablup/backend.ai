@@ -4,6 +4,6 @@ subgraphs:
     schema:
       file: ../../docs/manager/graphql-reference/schema.graphql
   strawberry:
-    routing_url: http://host.docker.internal:8091/admin/gql/v2
+    routing_url: http://host.docker.internal:8091/admin/gql/strawberry
     schema:
       file: ../../docs/manager/graphql-reference/v2-schema.graphql
