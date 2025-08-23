@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from http import HTTPStatus
+from importlib.resources import files
 from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -31,7 +32,6 @@ from uuid import UUID
 import aiofiles
 import aiohttp
 import aiotools
-import pkg_resources
 import zmq
 import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
@@ -449,22 +449,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # directories when the agent is running as non-root.
             def _clone_dotfiles() -> None:
                 jupyter_custom_css_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
+                    str(files("ai.backend.runner").joinpath("jupyter-custom.css"))
                 )
-                logo_path = Path(pkg_resources.resource_filename("ai.backend.runner", "logo.svg"))
-                font_path = Path(pkg_resources.resource_filename("ai.backend.runner", "roboto.ttf"))
+                logo_path = Path(str(files("ai.backend.runner").joinpath("logo.svg")))
+                font_path = Path(str(files("ai.backend.runner").joinpath("roboto.ttf")))
                 font_italic_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", "roboto-italic.ttf")
+                    str(files("ai.backend.runner").joinpath("roboto-italic.ttf"))
                 )
-                bashrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".bashrc"))
-                bash_profile_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
-                )
-                zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
-                vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
-                tmux_conf_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
-                )
+                bashrc_path = Path(str(files("ai.backend.runner").joinpath(".bashrc")))
+                bash_profile_path = Path(str(files("ai.backend.runner").joinpath(".bash_profile")))
+                zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
+                vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
+                tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
                 jupyter_custom_dir = self.work_dir / ".jupyter" / "custom"
                 jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
@@ -643,12 +639,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
-        return Path(
-            pkg_resources.resource_filename(
-                "ai.backend.runner",
-                "../" + filename,
-            )
-        ).resolve()
+        return Path(str(files("ai.backend.runner").joinpath("../" + filename))).resolve()
 
     @override
     def get_runner_mount(

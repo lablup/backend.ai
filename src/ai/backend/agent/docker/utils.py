@@ -4,10 +4,10 @@ import logging
 import subprocess
 from collections.abc import Mapping
 from contextlib import closing
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final
 
-import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
@@ -40,16 +40,18 @@ class PersistentServiceContainer:
         self.container_config = container_config
         self.img_version = int(
             Path(
-                pkg_resources.resource_filename(
-                    "ai.backend.agent.docker",
-                    f"{default_container_name}.version.txt",
+                str(
+                    files("ai.backend.agent.docker").joinpath(
+                        f"{default_container_name}.version.txt"
+                    )
                 )
             ).read_text()
         )
         self.img_path = Path(
-            pkg_resources.resource_filename(
-                "ai.backend.agent.docker",
-                f"{default_container_name}.img.{arch}.tar.gz",
+            str(
+                files("ai.backend.agent.docker").joinpath(
+                    f"{default_container_name}.img.{arch}.tar.gz"
+                )
             )
         )
 
