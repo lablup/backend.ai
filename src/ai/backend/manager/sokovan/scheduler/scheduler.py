@@ -32,7 +32,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC, LockID
+from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -51,7 +51,7 @@ from ai.backend.manager.types import DistributedLockFactory
 
 from .allocators.allocator import SchedulingAllocator
 from .hooks.registry import HookRegistry
-from .results import ScheduleResult
+from .results import ScheduledSessionData, ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
@@ -172,46 +172,41 @@ class Scheduler:
         Returns:
             ScheduleResult: Result of the scheduling operation.
         """
-        lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-        total_scheduled_count = 0
-        # Acquire distributed lock before scheduling
-        async with self._lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
-            # Get all schedulable scaling groups from repository
-            scaling_groups = await self._repository.get_schedulable_scaling_groups()
-            for scaling_group in scaling_groups:
-                try:
-                    log.trace("Scheduling sessions for scaling group: {}", scaling_group)
-                    # Schedule sessions for this scaling group
-                    with self._phase_metrics.measure_phase(
-                        "scheduler", scaling_group, "scheduling"
-                    ):
-                        scheduled_count = await self._schedule_scaling_group(scaling_group)
-                    total_scheduled_count += scheduled_count
-                    if scheduled_count > 0:
-                        log.info(
-                            "Scheduled {} sessions for scaling group: {}",
-                            scheduled_count,
-                            scaling_group,
-                        )
-                except Exception as e:
-                    log.error(
-                        "Failed to schedule sessions for scaling group {}: {}",
+        all_scheduled_sessions: list[ScheduledSessionData] = []
+        # Get all schedulable scaling groups from repository
+        scaling_groups = await self._repository.get_schedulable_scaling_groups()
+        for scaling_group in scaling_groups:
+            try:
+                log.trace("Scheduling sessions for scaling group: {}", scaling_group)
+                # Schedule sessions for this scaling group
+                with self._phase_metrics.measure_phase("scheduler", scaling_group, "scheduling"):
+                    scheduled_result = await self._schedule_scaling_group(scaling_group)
+                all_scheduled_sessions.extend(scheduled_result.scheduled_sessions)
+                if scheduled_result.scheduled_sessions:
+                    log.info(
+                        "Scheduled {} sessions for scaling group: {}",
+                        len(scheduled_result.scheduled_sessions),
                         scaling_group,
-                        str(e),
-                        exc_info=True,
                     )
-                    # Continue with other scaling groups even if one fails
-                    continue
+            except Exception as e:
+                log.error(
+                    "Failed to schedule sessions for scaling group {}: {}",
+                    scaling_group,
+                    str(e),
+                    exc_info=True,
+                )
+                # Continue with other scaling groups even if one fails
+                continue
 
-            return ScheduleResult(succeeded_count=total_scheduled_count)
+        return ScheduleResult(scheduled_sessions=all_scheduled_sessions)
 
-    async def _schedule_scaling_group(self, scaling_group: str) -> int:
+    async def _schedule_scaling_group(self, scaling_group: str) -> ScheduleResult:
         """
         Schedule sessions for a specific scaling group.
         Args:
             scaling_group: The scaling group to schedule for.
         Returns:
-            int: The number of sessions successfully scheduled.
+            ScheduleResult containing count and session data
         """
         # Single optimized call to get all scheduling data
         # This consolidates: get_scaling_group_info_for_sokovan, get_pending_sessions,
@@ -223,14 +218,14 @@ class Scheduler:
                 "No pending sessions for scaling group {}. Skipping scheduling.",
                 scaling_group,
             )
-            return 0
+            return ScheduleResult()
 
         # Schedule using the scheduling data - no more DB calls needed
         return await self._schedule_queued_sessions_with_data(scaling_group, scheduling_data)
 
     async def _schedule_queued_sessions_with_data(
         self, scaling_group: str, scheduling_data: SchedulingData
-    ) -> int:
+    ) -> ScheduleResult:
         """
         Schedule all queued sessions using pre-fetched scheduling data.
         No database calls are made in this method - all data comes from scheduling_data.
@@ -248,7 +243,7 @@ class Scheduler:
 
         if not scheduling_data.snapshot_data:
             log.warning("Missing snapshot data for scaling group {}", scaling_group)
-            return 0
+            return ScheduleResult()
 
         # Convert snapshot data to SystemSnapshot
         system_snapshot = scheduling_data.snapshot_data.to_system_snapshot(
@@ -357,9 +352,11 @@ class Scheduler:
             failures=scheduling_failures,
         )
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
-            await self._allocator.allocate(batch)
+            scheduled_sessions = await self._allocator.allocate(batch)
 
-        return len(session_allocations)
+        return ScheduleResult(
+            scheduled_sessions=scheduled_sessions,
+        )
 
     async def _schedule_workload(
         self,
@@ -542,7 +539,7 @@ class Scheduler:
 
         if not terminating_sessions:
             log.debug("No sessions to terminate")
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         log.info("Processing {} sessions for termination", len(terminating_sessions))
 
@@ -553,6 +550,7 @@ class Scheduler:
             session_result = SessionTerminationResult(
                 session_id=session.session_id,
                 access_key=session.access_key,
+                creation_id=session.creation_id,
                 session_type=session.session_type,
                 reason=session.status_info,
                 kernel_results=[],
@@ -611,7 +609,17 @@ class Scheduler:
             len(session_results) - terminated_session_count,
         )
 
-        return ScheduleResult(succeeded_count=terminated_session_count)
+        # Convert only successfully terminated sessions to ScheduledSessionData format
+        scheduled_data = [
+            ScheduledSessionData(
+                session_id=result.session_id,
+                creation_id=result.creation_id,
+                access_key=result.access_key,
+            )
+            for result in session_results
+            if result.should_terminate_session
+        ]
+        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     async def _terminate_kernel(
         self,
@@ -687,7 +695,18 @@ class Scheduler:
                 reason="PENDING_TIMEOUT",
             )
 
-        return ScheduleResult(succeeded_count=len(timed_out_sessions))
+            # Convert swept sessions to ScheduledSessionData format
+            scheduled_data = [
+                ScheduledSessionData(
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                )
+                for session in timed_out_sessions
+            ]
+            return ScheduleResult(scheduled_sessions=scheduled_data)
+
+        return ScheduleResult()
 
     async def check_pulling_progress(self) -> ScheduleResult:
         """
@@ -696,11 +715,30 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions that progressed
         """
-        # Check sessions with all kernels that have reached PREPARED state
-        sessions_to_update = await self._repository.get_sessions_ready_to_prepare()
+        # Get sessions with all kernels that have reached PREPARED state
+        # Check both PREPARING and PULLING statuses
+        sessions_data = await self._repository.get_sessions_for_transition(
+            [SessionStatus.PREPARING, SessionStatus.PULLING],
+            KernelStatus.PREPARED,
+        )
+
+        if not sessions_data:
+            return ScheduleResult()
+
+        sessions_to_update = [session.session_id for session in sessions_data]
         if sessions_to_update:
             await self._repository.update_sessions_to_prepared(sessions_to_update)
-        return ScheduleResult(succeeded_count=len(sessions_to_update))
+            # Convert updated sessions to ScheduledSessionData format
+            scheduled_data = [
+                ScheduledSessionData(
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                )
+                for session in sessions_data
+            ]
+            return ScheduleResult(scheduled_sessions=scheduled_data)
+        return ScheduleResult()
 
     async def check_creating_progress(self) -> ScheduleResult:
         """
@@ -710,12 +748,12 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions that transitioned to RUNNING
         """
         sessions_data = await self._repository.get_sessions_for_transition(
-            SessionStatus.CREATING,
+            [SessionStatus.CREATING],
             KernelStatus.RUNNING,
         )
 
         if not sessions_data:
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
 
@@ -740,8 +778,19 @@ class Scheduler:
 
         if sessions_to_update:
             await self._repository.update_sessions_to_running(sessions_to_update)
+            # Convert updated sessions to ScheduledSessionData format
+            scheduled_data = [
+                ScheduledSessionData(
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                )
+                for session in sessions_data
+                if session.session_id in sessions_to_update
+            ]
+            return ScheduleResult(scheduled_sessions=scheduled_data)
 
-        return ScheduleResult(succeeded_count=len(sessions_to_update))
+        return ScheduleResult()
 
     async def check_terminating_progress(self) -> ScheduleResult:
         """
@@ -751,12 +800,12 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions that transitioned to TERMINATED
         """
         sessions_data = await self._repository.get_sessions_for_transition(
-            SessionStatus.TERMINATING,
+            [SessionStatus.TERMINATING],
             KernelStatus.TERMINATED,
         )
 
         if not sessions_data:
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
 
@@ -780,8 +829,19 @@ class Scheduler:
 
         if sessions_to_update:
             await self._repository.update_sessions_to_terminated(sessions_to_update)
+            # Convert updated sessions to ScheduledSessionData format
+            scheduled_data = [
+                ScheduledSessionData(
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                )
+                for session in sessions_data
+                if session.session_id in sessions_to_update
+            ]
+            return ScheduleResult(scheduled_sessions=scheduled_data)
 
-        return ScheduleResult(succeeded_count=len(sessions_to_update))
+        return ScheduleResult()
 
     async def check_preconditions(self) -> ScheduleResult:
         """
@@ -790,28 +850,33 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions transitioned
         """
-        lock_lifetime = (
-            self._config_provider.config.manager.session_check_precondition_lock_lifetime
-        )
-        async with self._lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
-            # Get scheduled sessions for image pulling
-            result = await self._repository.get_sessions_for_pull([SessionStatus.SCHEDULED])
-            scheduled_sessions = result.sessions
-            image_configs = result.image_configs
+        # Get scheduled sessions for image pulling
+        result = await self._repository.get_sessions_for_pull([SessionStatus.SCHEDULED])
+        scheduled_sessions = result.sessions
+        image_configs = result.image_configs
 
-            if not scheduled_sessions:
-                return ScheduleResult(succeeded_count=0)
+        if not scheduled_sessions:
+            return ScheduleResult()
 
-            # Extract session IDs for status update
-            session_ids = [s.session_id for s in scheduled_sessions]
+        # Extract session IDs for status update
+        session_ids = [s.session_id for s in scheduled_sessions]
 
-            # Update sessions to PREPARING status
-            await self._repository.update_sessions_to_preparing(session_ids)
+        # Update sessions to PREPARING status
+        await self._repository.update_sessions_to_preparing(session_ids)
 
-            # Trigger image checking and pulling on agents
-            await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
+        # Trigger image checking and pulling on agents
+        await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
 
-            return ScheduleResult(succeeded_count=len(scheduled_sessions))
+        # Convert to ScheduledSessionData format
+        scheduled_data = [
+            ScheduledSessionData(
+                session_id=session.session_id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+            )
+            for session in scheduled_sessions
+        ]
+        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     async def _trigger_image_pulling_for_sessions(
         self,
@@ -860,27 +925,34 @@ class Scheduler:
 
         :return: ScheduleResult with the count of sessions started
         """
-        lock_lifetime = self._config_provider.config.manager.session_start_lock_lifetime
-        async with self._lock_factory(LockID.LOCKID_START, lock_lifetime):
-            # Get prepared sessions for starting
-            sessions_with_images = await self._repository.get_sessions_for_start([
-                SessionStatus.PREPARED
-            ])
-            prepared_sessions = sessions_with_images.sessions
-            image_configs = sessions_with_images.image_configs
+        # Get prepared sessions for starting
+        sessions_with_images = await self._repository.get_sessions_for_start([
+            SessionStatus.PREPARED
+        ])
+        prepared_sessions = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
 
-            if not prepared_sessions:
-                return ScheduleResult(succeeded_count=0)
-            # Extract session IDs for status update
-            session_ids = [s.session_id for s in prepared_sessions]
+        if not prepared_sessions:
+            return ScheduleResult()
+        # Extract session IDs for status update
+        session_ids = [s.session_id for s in prepared_sessions]
 
-            # Update sessions and kernels to CREATING status
-            await self._repository.update_sessions_and_kernels_to_creating(session_ids)
+        # Update sessions and kernels to CREATING status
+        await self._repository.update_sessions_and_kernels_to_creating(session_ids)
 
-            # Start sessions concurrently
-            await self._start_sessions_concurrently(prepared_sessions, image_configs)
+        # Start sessions concurrently
+        await self._start_sessions_concurrently(prepared_sessions, image_configs)
 
-            return ScheduleResult(succeeded_count=len(prepared_sessions))
+        # Convert prepared sessions to ScheduledSessionData format
+        scheduled_data = [
+            ScheduledSessionData(
+                session_id=session.session_id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+            )
+            for session in prepared_sessions
+        ]
+        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     async def _start_sessions_concurrently(
         self,
@@ -1393,13 +1465,13 @@ class Scheduler:
 
         if not sessions:
             log.trace("No sessions found with PREPARING/PULLING status")
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         # Filter sessions that haven't changed status for threshold time
         stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
 
         if not stuck_sessions:
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         # Check which sessions are actually stuck (not actively pulling)
         truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
@@ -1408,14 +1480,23 @@ class Scheduler:
 
         if not truly_stuck_sessions:
             log.debug("All sessions are actively pulling, no retry needed")
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
 
         # Use the existing _trigger_image_pulling_for_sessions method
         await self._trigger_image_pulling_for_sessions(truly_stuck_sessions, image_configs)
 
-        return ScheduleResult(succeeded_count=len(truly_stuck_sessions))
+        # Convert retried sessions to ScheduledSessionData format
+        scheduled_data = [
+            ScheduledSessionData(
+                session_id=session.session_id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+            )
+            for session in truly_stuck_sessions
+        ]
+        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     def _filter_stuck_sessions_for_start(
         self,
@@ -1504,24 +1585,34 @@ class Scheduler:
         image_configs = sessions_with_images.image_configs
 
         if not sessions:
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         # Filter sessions that haven't changed status for threshold time
         stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
 
         if not stuck_sessions:
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         # Check which sessions are truly stuck (not actively creating)
         truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
 
         if not truly_stuck_sessions:
             log.debug("All sessions are actively creating kernels, no retry needed")
-            return ScheduleResult(succeeded_count=0)
+            return ScheduleResult()
 
         log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
         # Use the existing _start_sessions_concurrently method to retry
         # This will re-trigger kernel creation for stuck sessions
         await self._start_sessions_concurrently(truly_stuck_sessions, image_configs)
-        return ScheduleResult(succeeded_count=len(truly_stuck_sessions))
+
+        # Convert retried sessions to ScheduledSessionData format
+        scheduled_data = [
+            ScheduledSessionData(
+                session_id=session.session_id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+            )
+            for session in truly_stuck_sessions
+        ]
+        return ScheduleResult(scheduled_sessions=scheduled_data)

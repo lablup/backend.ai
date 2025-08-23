@@ -1404,6 +1404,10 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    kernel_id: str  # the kernel's ID
+    session_id: str  # the session's ID
+    owner_user_id: str  # the owner user's ID
+    owner_project_id: Optional[str]  # the owner project's ID (for project-owned sessions)
     network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
@@ -1411,6 +1415,7 @@ class KernelCreationConfig(TypedDict):
     cluster_role: str  # the kernel's role in the cluster
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
+    local_rank: int  # the kernel's local rank in the cluster
     uid: Optional[int]
     main_gid: Optional[int]
     supplementary_gids: list[int]

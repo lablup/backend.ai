@@ -71,6 +71,7 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
@@ -78,6 +79,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
+    REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
@@ -902,9 +904,16 @@ class AbstractAgent(
             human_readable_name="agent.stat",
             db_id=REDIS_STATISTICS_DB,
         )
+        self.valkey_bgtask_client = await ValkeyBgtaskClient.create(
+            redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
+            human_readable_name="agent.bgtask",
+            db_id=REDIS_BGTASK_DB,
+        )
 
         self.background_task_manager = BackgroundTaskManager(
             self.event_producer,
+            valkey_client=self.valkey_bgtask_client,
+            server_id=self.id,
             bgtask_observer=self._metric_registry.bgtask,
         )
 
@@ -1063,6 +1072,7 @@ class AbstractAgent(
         await self.valkey_container_log_client.close()
         await self.valkey_stream_client.close()
         await self.valkey_stat_client.close()
+        await self.valkey_bgtask_client.close()
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config.debug.log_heartbeats:

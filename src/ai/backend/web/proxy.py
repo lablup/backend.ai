@@ -218,13 +218,34 @@ async def web_handler(
                     api_request.headers[hdr] = request.headers[hdr]
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
+            config = cast(WebServerUnifiedConfig, request.app["config"])
             async with api_request.fetch() as up_resp:
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
-                down_resp.headers.update(up_resp.headers)
+
+                final_headers = dict(up_resp.headers)
+
+                # figure out if the response body is gzipped by checking the first chunk
+                first_chunk = await up_resp.read(8192)
+                if config.apollo_router.enabled:
+                    if first_chunk:
+                        body_is_actually_gzipped = first_chunk.startswith(b"\x1f\x8b")
+                        header_says_gzipped = (
+                            "gzip" in final_headers.get("Content-Encoding", "").lower()
+                        )
+                        # If reponse header says gzipped but the body is not actually gzipped,
+                        # remove the header to prevent confusion.
+                        if header_says_gzipped and not body_is_actually_gzipped:
+                            del final_headers["Content-Encoding"]
+
                 # We already have configured CORS handlers and the API server
                 # also provides those headers.  Just let them as-is.
+                down_resp.headers.update(final_headers)
                 await down_resp.prepare(request)
+
+                if first_chunk:
+                    await down_resp.write(first_chunk)
+
                 while True:
                     chunk = await up_resp.read(8192)
                     if not chunk:

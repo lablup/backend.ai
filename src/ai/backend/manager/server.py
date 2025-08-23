@@ -45,6 +45,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
@@ -56,6 +57,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
+    REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
@@ -556,6 +558,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db_id=REDIS_LIVE_DB,
         human_readable_name="schedule",  # scheduling marks and coordination
     )
+    root_ctx.valkey_bgtask = await ValkeyBgtaskClient.create(
+        valkey_profile_target.profile_target(RedisRole.BGTASK),
+        human_readable_name="bgtask",
+        db_id=REDIS_BGTASK_DB,
+    )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
@@ -567,6 +574,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_live.close()
     await root_ctx.valkey_stream.close()
     await root_ctx.valkey_schedule.close()
+    await root_ctx.valkey_bgtask.close()
 
 
 @actxmgr
@@ -768,6 +776,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.db,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
+            root_ctx.repositories,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
@@ -962,6 +971,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_live,
         root_ctx.valkey_image,
         root_ctx.event_producer,
+        root_ctx.event_hub,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
@@ -1009,7 +1019,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
-        root_ctx.valkey_stat,
     )
 
     # Create sokovan orchestrator with lock factory for timers
@@ -1090,6 +1099,8 @@ class background_task_ctx:
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
             self.root_ctx.event_producer,
+            valkey_client=self.root_ctx.valkey_bgtask,
+            server_id=self.root_ctx.config_provider.config.manager.id,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 

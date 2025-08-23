@@ -92,7 +92,7 @@ class TestTerminateSessions:
 
         # Verify
         assert isinstance(result, ScheduleResult)
-        assert result.succeeded_count == 0
+        assert len(result.scheduled_sessions) == 0
         mock_repository.batch_update_terminated_status.assert_not_called()
 
     async def test_terminate_sessions_single_success(
@@ -136,7 +136,10 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        assert result.succeeded_count == 1
+        # Single session should be successfully terminated
+        assert len(result.scheduled_sessions) == 1
+        assert result.scheduled_sessions[0].session_id == session_id
+        assert result.scheduled_sessions[0].creation_id == "test-creation"
 
         # Verify agent destroy_kernel was called with correct parameters
         mock_agent.destroy_kernel.assert_called_once_with(
@@ -192,7 +195,10 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        assert result.succeeded_count == 1
+        # Session with multiple kernels should be successfully terminated
+        assert len(result.scheduled_sessions) == 1
+        assert result.scheduled_sessions[0].session_id == session_id
+        assert result.scheduled_sessions[0].creation_id == "test-creation"
 
         # Verify all kernels were terminated
         for i in range(3):
@@ -256,7 +262,7 @@ class TestTerminateSessions:
 
         # Verify
         # Session should not be counted as terminated due to partial failure
-        assert result.succeeded_count == 0
+        assert len(result.scheduled_sessions) == 0
 
         # Verify batch update was still called
         mock_repository.batch_update_terminated_status.assert_called_once()
@@ -326,7 +332,10 @@ class TestTerminateSessions:
         elapsed = time.time() - start_time
 
         # Verify
-        assert result.succeeded_count == 3
+        # All sessions should be successfully terminated
+        assert len(result.scheduled_sessions) == 3
+        for i, scheduled in enumerate(result.scheduled_sessions):
+            assert scheduled.creation_id == f"creation-{i}"
 
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)
         # With concurrent execution, it should be much faster
@@ -420,7 +429,7 @@ class TestTerminateSessions:
 
         # Verify
         # Session without kernels cannot be terminated
-        assert result.succeeded_count == 0
+        assert len(result.scheduled_sessions) == 0
 
         # Batch update should still be called
         mock_repository.batch_update_terminated_status.assert_called_once()

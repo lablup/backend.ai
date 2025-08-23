@@ -11,10 +11,12 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import SessionId
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -63,18 +65,48 @@ def mock_scheduling_controller():
 
 
 @pytest.fixture
+def mock_lock_factory():
+    """Mock DistributedLockFactory."""
+    from ai.backend.manager.types import DistributedLockFactory
+
+    mock = MagicMock(spec=DistributedLockFactory)
+    # Make it return an async context manager
+    lock_mock = AsyncMock()
+    lock_mock.__aenter__ = AsyncMock(return_value=None)
+    lock_mock.__aexit__ = AsyncMock(return_value=None)
+    mock.return_value = lock_mock
+    return mock
+
+
+@pytest.fixture
+def mock_config_provider():
+    """Mock ManagerConfigProvider."""
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+
+    mock = MagicMock(spec=ManagerConfigProvider)
+    # Set up config.manager.session_schedule_lock_lifetime
+    mock.config.manager.session_schedule_lock_lifetime = 60.0
+    return mock
+
+
+@pytest.fixture
 def schedule_coordinator(
     mock_scheduler,
     mock_valkey_schedule,
     mock_event_producer,
     mock_scheduler_dispatcher,
     mock_scheduling_controller,
+    mock_lock_factory,
+    mock_config_provider,
 ):
     """Create ScheduleCoordinator with mocked dependencies."""
     return ScheduleCoordinator(
         valkey_schedule=mock_valkey_schedule,
         scheduler=mock_scheduler,
         scheduling_controller=mock_scheduling_controller,
+        event_producer=mock_event_producer,
+        lock_factory=mock_lock_factory,
+        config_provider=mock_config_provider,
     )
 
 
@@ -87,10 +119,24 @@ class TestScheduleCoordinator:
         mock_valkey_schedule,
     ):
         """Test process_if_needed method."""
+        # Create a proper ScheduleResult instance
+        mock_result = ScheduleResult()
+
+        # Setup mock handler
+        mock_handler = MagicMock()
+        mock_handler.name = MagicMock(return_value="schedule")
+        mock_handler.lock_id = LockID.LOCKID_SCHEDULE
+        mock_handler.execute = AsyncMock(return_value=mock_result)
+        mock_handler.post_process = AsyncMock()
+
+        # Directly set handlers
+        schedule_coordinator._schedule_handlers = {ScheduleType.SCHEDULE: mock_handler}
+
         # Test that process_if_needed can be called
-        # This is mainly testing that the method exists and delegates correctly
         await schedule_coordinator.process_if_needed(ScheduleType.SCHEDULE)
-        # The actual implementation would depend on handlers
+
+        # Verify handler was called
+        mock_handler.execute.assert_called_once()
 
     async def test_process_schedule(
         self,
@@ -98,10 +144,24 @@ class TestScheduleCoordinator:
         mock_valkey_schedule,
     ):
         """Test process_schedule method."""
+        # Create a proper ScheduleResult instance
+        mock_result = ScheduleResult()
+
+        # Setup mock handler
+        mock_handler = MagicMock()
+        mock_handler.name = MagicMock(return_value="start")
+        mock_handler.lock_id = LockID.LOCKID_START
+        mock_handler.execute = AsyncMock(return_value=mock_result)
+        mock_handler.post_process = AsyncMock()
+
+        # Directly set handlers
+        schedule_coordinator._schedule_handlers = {ScheduleType.START: mock_handler}
+
         # Test that process_schedule can be called
-        # This is mainly testing that the method exists and delegates correctly
         await schedule_coordinator.process_schedule(ScheduleType.START)
-        # The actual implementation would depend on handlers
+
+        # Verify handler was called
+        mock_handler.execute.assert_called_once()
 
     async def test_mark_sessions_for_termination_success(
         self,

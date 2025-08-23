@@ -402,6 +402,8 @@ class LayerType(enum.StrEnum):
     # Repository layers
     AGENT = "agent"
     AUTH = "auth"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
     CONTAINER_REGISTRY = "container_registry"
     DOMAIN = "domain"
     GROUP = "group"
@@ -417,6 +419,7 @@ class LayerType(enum.StrEnum):
     USER_RESOURCE_POLICY = "user_resource_policy"
     VFOLDER = "vfolder"
     PERMISSION_CONTROL = "permission_control"
+    OBJECT_STORAGE = "object_storage"
 
     # Valkey client layers
     VALKEY_CONTAINER_LOG = "valkey_container_log"
@@ -427,6 +430,7 @@ class LayerType(enum.StrEnum):
     VALKEY_SESSION = "valkey_session"
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
+    VALKEY_BGTASK = "valkey_bgtask"
 
     # Client layers
     AGENT_CLIENT = "agent_client"

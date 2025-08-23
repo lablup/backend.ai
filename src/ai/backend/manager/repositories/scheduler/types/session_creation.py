@@ -185,6 +185,15 @@ class AllowedScalingGroup:
 
 
 @dataclass
+class UserContainerInfo:
+    """User container UID/GID information."""
+
+    uid: int
+    main_gid: int
+    supplementary_gids: list[int]
+
+
+@dataclass
 class SessionCreationContext:
     """All data needed for session creation, fetched in a single batch."""
 
@@ -202,3 +211,6 @@ class SessionCreationContext:
 
     # Dotfile data
     dotfile_data: dict[str, Any]
+
+    # User container info
+    user_container_info: Optional[UserContainerInfo] = None

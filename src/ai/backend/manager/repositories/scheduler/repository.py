@@ -19,6 +19,7 @@ from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
@@ -35,6 +36,7 @@ from .types.session import (
     MarkTerminatingResult,
     SessionTerminationResult,
     SweptSessionInfo,
+    TerminatingSessionData,
 )
 from .types.session_creation import (
     AllowedScalingGroup,
@@ -84,12 +86,17 @@ class SchedulerRepository:
 
         return scheduling_data
 
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
+    async def allocate_sessions(
+        self, allocation_batch: AllocationBatch
+    ) -> list[ScheduledSessionData]:
         """
         Allocate sessions by updating DB.
         Agent occupied slots are synced directly in the DB.
+
+        Returns:
+            List of ScheduledSessionData for allocated sessions
         """
-        await self._db_source.allocate_sessions(allocation_batch)
+        return await self._db_source.allocate_sessions(allocation_batch)
 
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """
@@ -127,7 +134,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_schedulable_scaling_groups()
 
-    async def get_terminating_sessions(self) -> list:
+    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
         """
         Get sessions with TERMINATING status.
         For sokovan scheduler compatibility.
@@ -262,13 +269,6 @@ class SchedulerRepository:
             vfolder_mounts,
         )
 
-    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
-        """
-        Get sessions in PULLING or PREPARING state where all kernels have reached PREPARED state.
-        These sessions are ready to transition to PREPARED state.
-        """
-        return await self._db_source.get_sessions_ready_to_prepare()
-
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
@@ -284,17 +284,17 @@ class SchedulerRepository:
 
     async def get_sessions_for_transition(
         self,
-        session_status: SessionStatus,
+        session_statuses: list[SessionStatus],
         kernel_status: KernelStatus,
     ) -> list[SessionTransitionData]:
         """
         Get sessions ready for state transition based on current session and kernel status.
 
-        :param session_status: Current session status to filter by
+        :param session_statuses: List of current session statuses to filter by
         :param kernel_status: Required kernel status for transition
         :return: List of sessions ready for transition with detailed information
         """
-        return await self._db_source.get_sessions_for_transition(session_status, kernel_status)
+        return await self._db_source.get_sessions_for_transition(session_statuses, kernel_status)
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
@@ -461,3 +461,53 @@ class SchedulerRepository:
         Get container IDs for kernels in a session.
         """
         return await self._db_source.get_container_info_for_kernels(session_id)
+
+    async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
+        """
+        Get keypair concurrency with cache-through pattern.
+        First checks cache, falls back to DB if not cached, and updates cache.
+
+        :param access_key: The access key to query
+        :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
+        :return: Current concurrency count
+        """
+        # Try to get from cache first
+        try:
+            cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
+            if cached_value is not None:
+                return cached_value
+        except Exception as e:
+            log.warning(
+                "Failed to get keypair concurrency from cache for {}: {}",
+                access_key,
+                e,
+            )
+
+        # Cache miss - refresh both values from DB
+        concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
+
+        # Update cache with both values at once
+        try:
+            await self._cache_source.set_keypair_concurrencies(
+                access_key,
+                concurrency_data.regular_count,
+                concurrency_data.sftp_count,
+            )
+        except Exception as e:
+            log.warning(
+                "Failed to update keypair concurrency cache for {}: {}",
+                access_key,
+                e,
+            )
+
+        # Return the requested value
+        return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
+
+    async def invalidate_keypair_concurrency_cache(self, access_keys: list[AccessKey]) -> None:
+        """
+        Invalidate concurrency cache for multiple access keys.
+        This removes cached values, forcing the next read to fetch from database.
+
+        :param access_keys: List of access keys to invalidate cache for
+        """
+        await self._cache_source.invalidate_keypair_concurrencies(access_keys)

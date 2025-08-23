@@ -2,17 +2,27 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .artifact_registry import (
+from .artifact import (
+    approve_artifact_revision,
     artifact,
-    artifact_group,
-    artifact_groups,
     artifact_import_progress_updated,
+    artifact_revision,
+    artifact_revisions,
     artifact_status_changed,
     artifacts,
     cancel_import_artifact,
     delete_artifact,
-    import_artifact,
+    import_artifacts,
+    reject_artifact_revision,
+    scan_artifacts,
     update_artifact,
+)
+from .huggingface_registry import (
+    create_huggingface_registry,
+    delete_huggingface_registry,
+    huggingface_registries,
+    huggingface_registry,
+    update_huggingface_registry,
 )
 from .model_deployment.model_deployment import (
     create_model_deployment,
@@ -29,24 +39,38 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
+from .object_storage import (
+    create_object_storage,
+    delete_object_storage,
+    get_presigned_download_url,
+    get_presigned_upload_url,
+    object_storage,
+    object_storages,
+    update_object_storage,
+)
 
 
 @strawberry.type
-class Queries:
+class Query:
     artifact = artifact
     artifacts = artifacts
-    artifact_group = artifact_group
-    artifact_groups = artifact_groups
+    artifact_revision = artifact_revision
+    artifact_revisions = artifact_revisions
     deployments = deployments
     deployment = deployment
     revisions = revisions
     revision = revision
     replica = replica
+    object_storage = object_storage
+    object_storages = object_storages
+    huggingface_registry = huggingface_registry
+    huggingface_registries = huggingface_registries
 
 
 @strawberry.type
 class Mutation:
-    import_artifact = import_artifact
+    scan_artifacts = scan_artifacts
+    import_artifacts = import_artifacts
     update_artifact = update_artifact
     delete_artifact = delete_artifact
     cancel_import_artifact = cancel_import_artifact
@@ -54,6 +78,16 @@ class Mutation:
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
     create_model_revision = create_model_revision
+    create_object_storage = create_object_storage
+    update_object_storage = update_object_storage
+    delete_object_storage = delete_object_storage
+    create_huggingface_registry = create_huggingface_registry
+    update_huggingface_registry = update_huggingface_registry
+    delete_huggingface_registry = delete_huggingface_registry
+    get_presigned_download_url = get_presigned_download_url
+    get_presigned_upload_url = get_presigned_upload_url
+    approve_artifact_revision = approve_artifact_revision
+    reject_artifact_revision = reject_artifact_revision
 
 
 @strawberry.type
@@ -67,18 +101,15 @@ class Subscription:
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
         sdl = super().as_str()
-        sdl = (
-            sdl.replace("type Query", "type Queries")
-            .replace("query: Query", "query: Queries")
-            .replace("type PageInfo", "type PageInfo @shareable")
-            .replace('import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]')
+        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
+            'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
         )
 
         return sdl
 
 
 schema = CustomizedSchema(
-    query=Queries,
+    query=Query,
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),

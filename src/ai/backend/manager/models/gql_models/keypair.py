@@ -192,7 +192,14 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        return await ctx.valkey_stat.get_keypair_concurrency_used(self.access_key)
+
+        # Get repository from context
+        repository = ctx.scheduler_repository
+
+        # Get concurrency through repository (cache-through pattern)
+        # Convert graphene.String to str, then to AccessKey type
+        access_key = AccessKey(str(self.access_key))
+        return await repository.get_keypair_concurrency(access_key, is_sftp=False)
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
@@ -553,7 +560,7 @@ class DeleteKeyPair(graphene.Mutation):
         result = await simple_db_mutate(cls, ctx, delete_query)
         if result.ok:
             await ctx.valkey_stat.delete_keypair_concurrency(
-                access_key=access_key,
+                access_key=str(access_key),
                 is_private=False,
             )
         return result

@@ -2,14 +2,16 @@
 
 import logging
 from collections import defaultdict
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import Any, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Mapping, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, selectinload, sessionmaker
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
@@ -49,6 +51,7 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     AllocationBatch,
@@ -60,7 +63,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
-    ScheduledSessionData,
     SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
@@ -96,7 +98,7 @@ from ..types.session_creation import (
     SessionEnqueueData,
 )
 from ..types.snapshot import ResourcePolicies, SnapshotData
-from .types import SessionRowCache
+from .types import KeypairConcurrencyData, SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -125,12 +127,66 @@ class ScheduleDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine):
         self._db = db
 
+    @actxmgr
+    async def _begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-only connection with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
+
+    @actxmgr
+    async def _begin_readonly_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-only session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED and readonly mode
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+
+    @actxmgr
+    async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+                await session.commit()
+
     async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:
         """
         Fetch all scheduling data from database in a single session.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # 1. Get scaling group
             scaling_group_meta = await self._fetch_scaling_group(db_sess, scaling_group)
 
@@ -607,7 +663,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # 1. Cancel pending sessions
             cancelled_sessions = await self._cancel_pending_sessions(
                 db_sess, session_ids, reason, now
@@ -720,7 +776,7 @@ class ScheduleDBSource:
 
     async def get_schedulable_scaling_groups(self) -> list[str]:
         """Get list of scaling groups that have schedulable agents."""
-        async with self._db.begin_readonly_session() as session:
+        async with self._begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(AgentRow.scaling_group)
                 .where(
@@ -733,7 +789,7 @@ class ScheduleDBSource:
 
     async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
         """Fetch all sessions with TERMINATING status."""
-        async with self._db.begin_readonly_session() as session:
+        async with self._begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(SessionRow)
                 .where(SessionRow.status == SessionStatus.TERMINATING)
@@ -786,11 +842,12 @@ class ScheduleDBSource:
         now = datetime.now(tzutc())
         timed_out_sessions: list[SweptSessionInfo] = []
 
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(
                     SessionRow.id,
                     SessionRow.creation_id,
+                    SessionRow.access_key,
                     SessionRow.created_at,
                     SessionRow.scaling_group_name,
                     ScalingGroupRow.scheduler_opts,
@@ -818,6 +875,7 @@ class ScheduleDBSource:
                         SweptSessionInfo(
                             session_id=row.id,
                             creation_id=row.creation_id,
+                            access_key=row.access_key,
                         )
                     )
 
@@ -836,7 +894,7 @@ class ScheduleDBSource:
         Returns:
             SessionId: The ID of the created session
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Validate dependencies if any
             matched_dependency_ids = []
             if session_data.dependencies:
@@ -973,7 +1031,7 @@ class ScheduleDBSource:
         Returns:
             SessionCreationContext with all required data
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Collect all unique image references from kernel specs
             image_refs: list[ImageRef] = []
             for kernel_spec in spec.kernel_specs:
@@ -1023,12 +1081,19 @@ class ScheduleDBSource:
                 vfolder_mounts,
             )
 
+            # Fetch user container info
+            user_container_info = await self._fetch_user_container_info(
+                db_sess,
+                spec.user_scope.user_uuid,
+            )
+
             return SessionCreationContext(
                 scaling_group_network=network_info,
                 allowed_scaling_groups=allowed_groups,
                 image_infos=image_infos,
                 vfolder_mounts=vfolder_mounts,
                 dotfile_data=dotfile_data,
+                user_container_info=user_container_info,
             )
 
     async def fetch_session_creation_context(
@@ -1040,7 +1105,7 @@ class ScheduleDBSource:
         Legacy method for backward compatibility.
         Use fetch_session_creation_data instead.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Collect all unique image references from kernel specs
             image_refs: list[ImageRef] = []
             for kernel_spec in spec.kernel_specs:
@@ -1133,7 +1198,7 @@ class ScheduleDBSource:
         """
         Query allowed scaling groups for a user (public method for external use).
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             return await self._query_allowed_scaling_groups(
                 db_sess, domain_name, group_id, access_key
             )
@@ -1192,6 +1257,29 @@ class ScheduleDBSource:
         )
         return dict(dotfile_data)
 
+    async def _fetch_user_container_info(
+        self,
+        db_sess: SASession,
+        user_uuid: UUID,
+    ):
+        """
+        Fetch user container UID/GID information.
+        """
+        from ..types.session_creation import UserContainerInfo
+
+        user_row = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+
+        if not user_row:
+            return None
+
+        user_row = cast(UserRow, user_row)
+
+        return UserContainerInfo(
+            uid=user_row.container_uid or 1000,
+            main_gid=user_row.container_main_gid or 1000,
+            supplementary_gids=user_row.container_gids or [],
+        )
+
     async def prepare_vfolder_mounts(
         self,
         storage_manager,
@@ -1207,7 +1295,7 @@ class ScheduleDBSource:
         """
         from ai.backend.manager.models import prepare_vfolder_mounts
 
-        async with self._db.begin_readonly() as conn:
+        async with self._begin_readonly_read_committed() as conn:
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
                 storage_manager,
@@ -1232,7 +1320,7 @@ class ScheduleDBSource:
 
         from ai.backend.manager.models import prepare_dotfiles
 
-        async with self._db.begin_readonly() as conn:
+        async with self._begin_readonly_read_committed() as conn:
             dotfile_data = await prepare_dotfiles(
                 conn,
                 user_scope,
@@ -1275,7 +1363,9 @@ class ScheduleDBSource:
             for sg in allowed_sgroups
         ]
 
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> None:
+    async def allocate_sessions(
+        self, allocation_batch: AllocationBatch
+    ) -> list[ScheduledSessionData]:
         """
         Allocate resources for sessions in the batch.
         Updates session/kernel statuses and syncs agent occupied slots.
@@ -1285,16 +1375,41 @@ class ScheduleDBSource:
         2. Processing successful allocations by updating session/kernel statuses
         3. Processing scheduling failures by updating their status data
         4. Syncing agent occupied slots to AgentRow
+
+        Returns:
+            List of ScheduledSessionData for allocated sessions
         """
         # Collect all affected agents
         affected_agent_ids: set[AgentId] = set()
+        scheduled_sessions: list[ScheduledSessionData] = []
 
         for allocation in allocation_batch.allocations:
             for kernel_alloc in allocation.kernel_allocations:
                 if kernel_alloc.agent_id:
                     affected_agent_ids.add(kernel_alloc.agent_id)
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
+            # First, fetch session data to get creation_id and access_key
+            session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
+            if session_ids:
+                query = sa.select(
+                    SessionRow.id, SessionRow.creation_id, SessionRow.access_key
+                ).where(SessionRow.id.in_(session_ids))
+                result = await db_sess.execute(query)
+                session_data_map = {row.id: (row.creation_id, row.access_key) for row in result}
+
+                # Create SessionEventData for each allocated session
+                for allocation in allocation_batch.allocations:
+                    if session_data := session_data_map.get(allocation.session_id):
+                        creation_id, access_key = session_data
+                        scheduled_sessions.append(
+                            ScheduledSessionData(
+                                session_id=allocation.session_id,
+                                creation_id=creation_id,
+                                access_key=access_key,
+                            )
+                        )
+
             # Process successful allocations
             for allocation in allocation_batch.allocations:
                 try:
@@ -1334,6 +1449,8 @@ class ScheduleDBSource:
             # Sync agent occupied slots to AgentRow
             # This must be done within the same transaction to ensure consistency
             await self._sync_agent_occupied_slots(db_sess, affected_agent_ids)
+
+        return scheduled_sessions
 
     async def _prefetch_session_rows(
         self, db_sess: SASession, session_ids: set[SessionId]
@@ -1507,7 +1624,7 @@ class ScheduleDBSource:
                 if kernel.success and kernel.agent_id:
                     affected_agent_ids.add(kernel.agent_id)
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Process each session's results
             for session_result in session_results:
                 # Collect successful kernel IDs
@@ -1574,7 +1691,7 @@ class ScheduleDBSource:
 
         :param agent_ids: Optional set of agent IDs to sync, None for all agents
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # If no specific agents provided, get all agents
             if agent_ids is None:
                 query = sa.select(AgentRow.id)
@@ -1660,7 +1777,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1694,7 +1811,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1731,7 +1848,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1772,7 +1889,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1806,7 +1923,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1850,7 +1967,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1889,7 +2006,7 @@ class ScheduleDBSource:
         """
         now = datetime.now(tzutc())
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1916,7 +2033,7 @@ class ScheduleDBSource:
         :param image_ref: Optional image reference (canonical format)
         :return: Number of kernels updated
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
@@ -1954,7 +2071,7 @@ class ScheduleDBSource:
         :param image_ref: Optional image reference (canonical format)
         :return: Number of kernels updated
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
@@ -1997,7 +2114,7 @@ class ScheduleDBSource:
         :param image_ref: Optional image reference (canonical format)
         :return: Set of affected session IDs
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
@@ -2036,7 +2153,7 @@ class ScheduleDBSource:
         :param session_id: The session ID to check
         :return: True if session was cancelled, False otherwise
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             # Check if all kernels for this session are cancelled
             kernel_check = await db_sess.execute(
                 sa.select(sa.func.count())
@@ -2078,41 +2195,6 @@ class ScheduleDBSource:
                 return result.rowcount > 0
         return False
 
-    async def get_sessions_ready_to_prepare(self) -> list[SessionId]:
-        """
-        Get sessions in PULLING or PREPARING state where all kernels are in PREPARED state.
-        Returns session IDs that can transition to PREPARED state.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in PULLING or PREPARING state where ALL kernels are PREPARED (or beyond)
-            stmt = (
-                sa.select(SessionRow)
-                .where(
-                    SessionRow.status.in_([
-                        SessionStatus.PULLING,
-                        SessionStatus.PREPARING,
-                    ])
-                )
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_session_ids: list[SessionId] = []
-            for session in sessions:
-                # Early exit if no kernels
-                if not session.kernels:
-                    continue
-
-                # Check if all kernels are in PREPARED state
-                all_prepared = all(
-                    kernel.status == KernelStatus.PREPARED for kernel in session.kernels
-                )
-                if all_prepared:
-                    ready_session_ids.append(session.id)
-
-            return ready_session_ids
-
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
@@ -2120,7 +2202,7 @@ class ScheduleDBSource:
         if not session_ids:
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             stmt = (
                 sa.update(SessionRow)
@@ -2147,21 +2229,21 @@ class ScheduleDBSource:
 
     async def get_sessions_for_transition(
         self,
-        session_status: SessionStatus,
+        session_statuses: list[SessionStatus],
         kernel_status: KernelStatus,
     ) -> list[SessionTransitionData]:
         """
         Get sessions ready for state transition based on current session and kernel status.
 
-        :param session_status: Current session status to filter by
+        :param session_statuses: List of current session statuses to filter by
         :param kernel_status: Required kernel status for transition
         :return: List of sessions ready for transition with detailed information
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            # Find sessions in specified state
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Find sessions in specified states
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.status == session_status)
+                .where(SessionRow.status.in_(session_statuses))
                 .options(selectinload(SessionRow.kernels))
             )
             result = await db_sess.execute(stmt)
@@ -2190,6 +2272,7 @@ class ScheduleDBSource:
                 # Build session transition data
                 session_data = SessionTransitionData(
                     session_id=session.id,
+                    creation_id=session.creation_id,
                     session_name=session.name,
                     session_type=session.session_type,
                     access_key=session.access_key,
@@ -2207,7 +2290,7 @@ class ScheduleDBSource:
         Get sessions in CREATING state where all kernels are RUNNING.
         Returns sessions that can transition to RUNNING state.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Find sessions in CREATING state where ALL kernels are RUNNING
             stmt = (
                 sa.select(SessionRow)
@@ -2235,7 +2318,7 @@ class ScheduleDBSource:
         if not session_ids:
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             stmt = (
                 sa.update(SessionRow)
@@ -2262,7 +2345,7 @@ class ScheduleDBSource:
         Get sessions in TERMINATING state where all kernels are TERMINATED.
         Returns sessions that can transition to TERMINATED state.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Find sessions in TERMINATING state where ALL kernels are TERMINATED
             stmt = (
                 sa.select(SessionRow)
@@ -2290,7 +2373,7 @@ class ScheduleDBSource:
         if not session_ids:
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
             # Update session status to TERMINATED
             stmt = (
@@ -2433,9 +2516,6 @@ class ScheduleDBSource:
                 session_id=session.id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
-                session_type=session.session_type,
-                name=session.name,
-                kernels=kernels_data,
             )
             scheduled_sessions.append(scheduled_session)
 
@@ -2475,25 +2555,11 @@ class ScheduleDBSource:
 
         scheduled_sessions: list[ScheduledSessionData] = []
         for session in sessions:
-            kernel_bindings = [
-                KernelBindingData(
-                    kernel_id=kernel.id,
-                    agent_id=kernel.agent,
-                    agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
-                )
-                for kernel in session.kernels
-            ]
             scheduled_sessions.append(
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
-                    session_type=session.session_type,
-                    name=session.name,
-                    kernels=kernel_bindings,
                 )
             )
 
@@ -2510,7 +2576,7 @@ class ScheduleDBSource:
         :param statuses: Session statuses to filter by (typically SCHEDULED, PREPARING, PULLING)
         :return: SessionsForPullWithImages object
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Get sessions with minimal fields needed for pulling
             sessions_for_pull = await self._get_sessions_for_pull(db_sess, statuses)
 
@@ -2540,7 +2606,7 @@ class ScheduleDBSource:
         :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
         :return: SessionsForStartWithImages object
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             # Get sessions with all fields needed for starting
             sessions_for_start = await self._get_sessions_for_start(db_sess, statuses)
 
@@ -2600,6 +2666,7 @@ class ScheduleDBSource:
                 ),
                 load_only(
                     SessionRow.id,
+                    SessionRow.creation_id,
                     SessionRow.access_key,
                 ),
             )
@@ -2644,6 +2711,7 @@ class ScheduleDBSource:
             sessions_for_pull.append(
                 SessionDataForPull(
                     session_id=session.id,
+                    creation_id=session.creation_id,
                     access_key=session.access_key,
                     kernels=kernel_bindings,
                 )
@@ -2779,7 +2847,7 @@ class ScheduleDBSource:
         if not session_ids:
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
 
             # Update session status
@@ -2827,7 +2895,7 @@ class ScheduleDBSource:
         if not session_ids:
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
 
             # Update session status
@@ -2874,7 +2942,7 @@ class ScheduleDBSource:
         Mark a session as cancelled with error information.
         Used when session fails to start.
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
 
             # Update session status
@@ -2908,9 +2976,44 @@ class ScheduleDBSource:
         Get container IDs for kernels in a session.
         Used for cleanup when session fails to start.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             stmt = sa.select(KernelRow.id, KernelRow.container_id).where(
                 KernelRow.session_id == session_id
             )
             result = await db_sess.execute(stmt)
             return {row.id: row.container_id for row in result}
+
+    async def get_keypair_concurrencies_from_db(
+        self, access_key: AccessKey
+    ) -> KeypairConcurrencyData:
+        """
+        Calculate both regular and SFTP concurrency from database with two simple queries.
+
+        :param access_key: The access key to query
+        :return: KeypairConcurrencyData with both regular and sftp counts
+        """
+        from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Base query for active kernels
+            base_query = (
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(
+                    (KernelRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+
+            # Query for regular sessions
+            regular_query = base_query.where(KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+            regular_result = await db_sess.execute(regular_query)
+            regular_count = regular_result.scalar() or 0
+
+            # Query for SFTP sessions
+            sftp_query = base_query.where(KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
+            sftp_result = await db_sess.execute(sftp_query)
+            sftp_count = sftp_result.scalar() or 0
+
+            return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)

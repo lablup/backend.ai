@@ -1,7 +1,9 @@
 import logging
+from contextlib import AsyncExitStack
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
@@ -13,10 +15,12 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 )
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.types import DistributedLockFactory
 
 from .handlers import (
     CheckCreatingProgressHandler,
@@ -49,16 +53,24 @@ class ScheduleCoordinator:
     _schedule_handlers: dict[ScheduleType, ScheduleHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
+    _lock_factory: DistributedLockFactory
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         valkey_schedule: ValkeyScheduleClient,
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
+        event_producer: EventProducer,
+        lock_factory: DistributedLockFactory,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
+        self._event_producer = event_producer
+        self._lock_factory = lock_factory
+        self._config_provider = config_provider
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize kernel state engine with the scheduler's repository
@@ -66,29 +78,34 @@ class ScheduleCoordinator:
 
         # Initialize handlers for each schedule type
         self._schedule_handlers = {
-            ScheduleType.SCHEDULE: ScheduleSessionsHandler(scheduler, self._scheduling_controller),
+            ScheduleType.SCHEDULE: ScheduleSessionsHandler(
+                scheduler, self._scheduling_controller, event_producer, scheduler._repository
+            ),
             ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
-            ScheduleType.START: StartSessionsHandler(scheduler),
+            ScheduleType.START: StartSessionsHandler(scheduler, event_producer),
             ScheduleType.TERMINATE: TerminateSessionsHandler(
-                scheduler, self._scheduling_controller
+                scheduler,
+                self._scheduling_controller,
+                event_producer,
+                scheduler._repository,
             ),
-            ScheduleType.SWEEP: SweepSessionsHandler(scheduler),
+            ScheduleType.SWEEP: SweepSessionsHandler(scheduler, scheduler._repository),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer, scheduler._repository
             ),
             ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
             ScheduleType.RETRY_CREATING: RetryCreatingHandler(
-                scheduler, self._scheduling_controller
+                scheduler, self._scheduling_controller, event_producer
             ),
         }
 
@@ -113,9 +130,25 @@ class ScheduleCoordinator:
                 log.warning("No handler for schedule type: {}", schedule_type.value)
                 return False
 
-            # Execute the handler (includes operation and post-processing)
-            with self._operation_metrics.measure_operation(handler.name()):
-                await handler.handle()
+            # Execute the handler with optional locking
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
+                result = await handler.execute()
+                self._operation_metrics.observe_success(
+                    operation=handler.name(), count=result.success_count()
+                )
+                if result.needs_post_processing():
+                    try:
+                        await handler.post_process(result)
+                    except Exception as e:
+                        log.error("Error during post-processing: {}", e)
             return True
         except Exception as e:
             log.exception(
