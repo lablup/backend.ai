@@ -1300,7 +1300,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
-    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     app.add_subapp("/v1/storages", create_storages_app(ctx))
     app.add_subapp("/v1/registries", create_registries_app(ctx))
 

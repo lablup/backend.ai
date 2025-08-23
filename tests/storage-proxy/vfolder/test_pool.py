@@ -1,4 +1,4 @@
-from typing import Mapping
+from pathlib import Path, PurePath
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -6,9 +6,10 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
-from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.exception import InvalidVolumeError
+from ai.backend.storage.plugin import StoragePluginContext
 from ai.backend.storage.types import VolumeInfo
+from ai.backend.storage.volumes.abc import AbstractVolume
 from ai.backend.storage.volumes.pool import VolumePool
 
 
@@ -27,78 +28,57 @@ def mock_event_producer():
     return MagicMock(spec=EventProducer)
 
 
-def list_volumes(self) -> Mapping[str, VolumeInfo]:
-    return {
-        volume_id: VolumeInfo(
-            backend=info["backend"],
-            path=info["path"],
-            fsprefix=info.get("fsprefix", ""),
-            options=None,
-        )
-        for volume_id, info in self._local_config["volume"].items()
-    }
-
-
-def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
-    if volume_id not in self._local_config["volume"]:
-        raise InvalidVolumeError(volume_id)
-    volume_config = self._local_config["volume"][volume_id]
-    return VolumeInfo(
-        backend=volume_config["backend"],
-        path=volume_config["path"],
-        fsprefix=volume_config.get("fsprefix", ""),
-        options=None,
+@pytest.fixture
+def mock_volume():
+    volume = AsyncMock(spec=AbstractVolume)
+    volume.info.return_value = VolumeInfo(
+        backend="vfs",
+        path=Path("/mnt/test_volume"),
+        fsprefix=PurePath("vfs-test"),
+        options={},
     )
+    volume.init = AsyncMock()
+    volume.shutdown = AsyncMock()
+    return volume
+
+
+@pytest.fixture
+def mock_storage_plugin_ctx():
+    ctx = AsyncMock(spec=StoragePluginContext)
+    ctx.init = AsyncMock()
+    ctx.cleanup = AsyncMock()
+    ctx.plugins = {}
+    return ctx
 
 
 @pytest.mark.asyncio
-async def test_get_volume():
-    raw_config = {
-        "volume": {
-            "test_volume": {
-                "backend": "vfs",
-                "path": "/mnt/test_volume",
-                "options": {},
-                "fsprefix": "vfs-test",
-            }
-        },
-        "storage-proxy": {
-            "node-id": "storage-proxy-1",
-            "scandir-limit": 1000,
-            "secret": "test-secret",
-            "session-expire": "1d",
-        },
-        "api": {
-            "client": {
-                "service-addr": {"host": "127.0.0.1", "port": 6021},
-                "ssl-enabled": False,
-            },
-            "manager": {
-                "service-addr": {"host": "127.0.0.1", "port": 6022},
-                "announce-addr": {"host": "127.0.0.1", "port": 6022},
-                "internal-addr": {"host": "127.0.0.1", "port": 6023},
-                "announce-internal-addr": {"host": "127.0.0.1", "port": 6023},
-                "ssl-enabled": False,
-                "secret": "test-secret",
-            },
-        },
-        "etcd": {
-            "namespace": "local",
-            "addr": {"host": "127.0.0.1", "port": 2379},
-        },
-        "logging": {},
-        "debug": {},
-    }
-    local_config = StorageProxyUnifiedConfig.model_validate(raw_config)
+async def test_get_volume(mock_volume, mock_storage_plugin_ctx):
+    # Create a VolumePool with mocked volumes
+    volume_id = VolumeID("550e8400-e29b-41d4-a716-446655440000")
+    volumes = {volume_id: mock_volume}
+    volumes_by_name = {"test_volume": mock_volume}
 
-    mock_etcd = AsyncMock()
-    mock_event_dispatcher = MagicMock()
-    mock_event_producer = MagicMock()
+    pool = VolumePool(
+        volumes=volumes,
+        volumes_by_name=volumes_by_name,
+        storage_backend_plugin_ctx=mock_storage_plugin_ctx,
+    )
 
-    pool = VolumePool(local_config, mock_etcd, mock_event_dispatcher, mock_event_producer)
-    await pool.__aenter__()
-    async with pool.get_volume("test_volume") as volume:
-        assert volume is not None
+    # Test get_volume with valid volume ID
+    async with pool.get_volume(volume_id) as volume:
+        assert volume is mock_volume
 
-    async with pool.get_volume("test_volume") as volume2:
-        assert volume is volume2
+    # Test get_volume_by_name with valid name
+    async with pool.get_volume_by_name("test_volume") as volume:
+        assert volume is mock_volume
+
+    # Test get_volume with invalid volume ID
+    invalid_id = VolumeID("00000000-0000-0000-0000-000000000000")
+    with pytest.raises(InvalidVolumeError):
+        async with pool.get_volume(invalid_id) as volume:
+            pass
+
+    # Test get_volume_by_name with invalid name
+    with pytest.raises(InvalidVolumeError):
+        async with pool.get_volume_by_name("nonexistent") as volume:
+            pass
