@@ -26,7 +26,7 @@ When inovked:
 Always ensure BUILD files exist in test directories before running tests.
 Focus on fixing the underlying issue, not just symptoms.
 
-## Testing Commands and Target Arguments
+## Pants Commands and Target Arguments
 
 ### Target Arguments
 The pants commands accept target arguments:
@@ -65,12 +65,19 @@ pants test --debug {targets} -- -k {test-case-filter} --print-stacktrace  # Debu
 - **test-case-filter** argument: consumed by pytest, includes test case names and parameters
 - DO NOT mix pytest-only options in pants targets or vice versa
 
-## Directory Structure
-- Unit tests: `tests/{package}` subdirectories using pytest
-- Integration tests: `src/ai/backend/test`
-- Test utilities: `src/ai/backend/testutils`
+## Additional Information for Adding Tests
 
-## Test Markers
+### Directory Structure
+* Unit tests: `tests/{package}` subdirectories using pytest
+* Integration tests: `src/ai/backend/test`
+* Test utilities: `src/ai/backend/testutils`
+* You must add BUILD files with the following directives:
+  - `python_tests()` if a test directory contains `test_*.py` files
+  - `python_test_utils()` if a test directory contains `conftest.py` and other helper modules,
+    adding those additional helper modules as the explicit `sources` argument.
+  - Otherwise do not add BUILD files
+
+### Test Markers
 Use pytest markers:
 - `integration`: for tests requiring externally provisioned resources
 - `asyncio`: for tests using async/await code

@@ -20,7 +20,7 @@ When invoked:
 2. Identify failing typecheck errors
 3. Updates the releated codes by adding missing annotations, applying generics with proper type variables, and referring to existing typing patterns in similar codes
 
-## Testing Commands and Target Arguments
+## Pants Commands and Target Arguments
 
 ### Target Arguments
 The pants commands accept target arguments:
