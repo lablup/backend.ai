@@ -11,8 +11,8 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.types import AbstractAnycastEvent
 from ai.backend.common.leader import LeadershipChecker
 from ai.backend.common.leader.tasks import (
-    EventTask,
-    EventTaskArgs,
+    EventProducerTask,
+    EventTaskSpec,
     LeaderCron,
     PeriodicTask,
 )
@@ -87,16 +87,16 @@ async def leader_cron(mock_tasks):
 
 @pytest.fixture
 async def event_tasks(mock_event_producer, mock_event):
-    """Create EventTask instances."""
+    """Create EventProducerTask instances."""
     tasks = []
     for i in range(2):
-        args = EventTaskArgs(
+        spec = EventTaskSpec(
             name=f"event-task-{i}",
             event_factory=MagicMock(return_value=mock_event),
             interval=0.1,
             initial_delay=0.0,
         )
-        tasks.append(EventTask(args, mock_event_producer))
+        tasks.append(EventProducerTask(spec, mock_event_producer))
     return tasks
 
 
@@ -310,13 +310,13 @@ class TestLeaderCron:
         # Create different types of tasks
         mock_task = MockTask(name="mock-task", interval=0.1)
 
-        args = EventTaskArgs(
+        spec = EventTaskSpec(
             name="event-task",
             event_factory=MagicMock(return_value=mock_event),
             interval=0.1,
             initial_delay=0.0,
         )
-        event_task = EventTask(args, mock_event_producer)
+        event_task = EventProducerTask(spec, mock_event_producer)
 
         # Create LeaderCron with mixed tasks
         leader_cron = LeaderCron(tasks=[mock_task, event_task])

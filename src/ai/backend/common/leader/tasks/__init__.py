@@ -1,12 +1,12 @@
 """Leader tasks subpackage for periodic and event-driven tasks."""
 
 from .base import PeriodicTask
-from .event_task import EventTask, EventTaskArgs
+from .event_task import EventProducerTask, EventTaskSpec
 from .leader_cron import LeaderCron
 
 __all__ = [
-    "EventTask",
-    "EventTaskArgs",
+    "EventProducerTask",
+    "EventTaskSpec",
     "LeaderCron",
     "PeriodicTask",
 ]

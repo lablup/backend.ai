@@ -15,7 +15,7 @@ from ai.backend.common.leader import (
     LeaderTask,
     ValkeyLeaderElection,
 )
-from ai.backend.common.leader.tasks import EventTask, EventTaskArgs, LeaderCron
+from ai.backend.common.leader.tasks import EventProducerTask, EventTaskSpec, LeaderCron
 from ai.backend.common.leader.valkey_leader_election import ValkeyLeaderElectionConfig
 
 
@@ -213,13 +213,13 @@ class TestLeaderTaskIntegration:
         # Create event tasks
         event = MagicMock()
         event_factory = MagicMock(return_value=event)
-        args = EventTaskArgs(
+        spec = EventTaskSpec(
             name="test-event",
             event_factory=event_factory,
             interval=0.2,
             initial_delay=0.0,
         )
-        event_task = EventTask(args, mock_event_producer)
+        event_task = EventProducerTask(spec, mock_event_producer)
 
         # Create LeaderCron with tasks
         leader_cron = LeaderCron(tasks=[event_task])
@@ -253,13 +253,13 @@ class TestLeaderTaskIntegration:
         # Create event task for LeaderCron
         event = MagicMock()
         event_factory = MagicMock(return_value=event)
-        args = EventTaskArgs(
+        spec = EventTaskSpec(
             name="periodic-event",
             event_factory=event_factory,
             interval=0.2,
             initial_delay=0.0,
         )
-        event_task = EventTask(args, mock_event_producer)
+        event_task = EventProducerTask(spec, mock_event_producer)
         leader_cron = LeaderCron(tasks=[event_task])
 
         # Register both tasks with election
