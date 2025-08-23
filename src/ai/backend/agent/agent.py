@@ -29,6 +29,7 @@ from collections.abc import (
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
+from importlib.resources import files
 from io import SEEK_END, BytesIO
 from pathlib import Path
 from types import TracebackType
@@ -46,7 +47,6 @@ from uuid import UUID, uuid4
 
 import aiotools
 import attrs
-import pkg_resources
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -499,9 +499,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             try:
                 krunner_pyver = (
                     Path(
-                        pkg_resources.resource_filename(
-                            f"ai.backend.krunner.{matched_distro_pkgname}",
-                            f"krunner-python.{matched_distro}.txt",
+                        str(
+                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
+                                f"krunner-python.{matched_distro}.txt"
+                            )
                         )
                     )
                     .read_text()
@@ -565,7 +566,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             krunner_volume,
             krunner_pyver,
         ) = self.get_krunner_info()
-        artifact_path = Path(pkg_resources.resource_filename("ai.backend.agent", "../runner"))
+        artifact_path = Path(str(files("ai.backend.agent").joinpath("../runner")))
 
         def find_artifacts(pattern: str) -> Mapping[str, str]:
             artifacts = {}
