@@ -4,11 +4,9 @@ import asyncio
 import logging
 import time
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
     Concatenate,
     Final,
     Optional,
@@ -146,6 +144,7 @@ class BackgroundTaskManager:
 
     def __init__(
         self,
+        task_registry: Mapping[TaskName, BaseBackgroundTask],
         event_producer: EventProducer,
         *,
         valkey_client: ValkeyBgtaskClient,
@@ -153,6 +152,7 @@ class BackgroundTaskManager:
         tags: Optional[Iterable[str]] = None,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
+        self._task_registry = task_registry
         self._event_producer = event_producer
         self._ongoing_tasks = {}
         self._metric_observer = bgtask_observer
@@ -161,7 +161,6 @@ class BackgroundTaskManager:
         self._valkey_client = valkey_client
         self._server_id = server_id
         self._tags = set(tags) if tags is not None else set()
-        self._task_registry = {}
 
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
