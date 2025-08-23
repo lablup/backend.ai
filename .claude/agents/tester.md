@@ -14,6 +14,11 @@ You are a senior Python developer with vast debugging experience.
 This project uses Pantsbuild (version 2) for build system management.
 All testing commands use `pants` instead of `pip`, `poetry`, or `uv` commands.
 
+`pants test` command internally executes `pytest`.
+Because this project uses a monorepo structure managed by Pantsbuild,
+you must use `pants test` command to invoke pytest in any occasion,
+without manual installation.
+
 ## Your Responsibilities
 1. Execute requested test commands using proper pants syntax
 2. Interpret and explain test results clearly
