@@ -1,4 +1,4 @@
-# CLAUDE.md
+# Coding guidelines for AI Coding Agents
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
@@ -99,17 +99,38 @@ pants fmt --changed-since=HEAD~1   # Format only changed files
 pants check ::                     # Run MyPy type checking for all files
 pants check --changed-since=HEAD~1 --changed-dependents=transitive  # Run mypy on changed files and their dependent files
 
-# Testing
+# Testing with summary output
+pants test {targets}               # Run the designated test targets
 pants test ::                      # Run all tests
 pants test --changed-since=HEAD~1 --changed-dependents=transitive  # Test changed files and their dependent files
 pants test src/ai/backend/appproxy/coordinator/tests::  # Run specific test directory inside the main source tree (python-default)
 pants test tests/common::                               # Run specific test directory inside the test suite
-pants test --debug {targets}       # Run the target tests with interactive, non-retrying, interruptible mode for debugging
-                                   # NOTE: --debug flag is only available for `pants test` command.
+
+# Testing with full console output using the non-retrying interatcive "debug" mode.
+pants test --debug {targets}       # Run the designated test targets
 
 # Building
 pants package                                      # Build packages
 ```
+
+### Option Combination Rules for `pants test` commands
+
+If you want to verify failure details or console outputs made in pytest, you must use the `--debug` option.
+To add the `--debug` option when running tests, you must put it right after "test" as its position is very sensitive.
+Otherwise, `pants test` will hide all console outputs and just prints out the final result summary.
+
+To add pytest-specific options like `-k`, you must put `--` before them so that `pants` transparently passes them to the spawend pytest process.
+
+Here is an example demostrating how to combine the debug option and pytest-specific arguments:
+
+```bash
+pants test --debug {targets} -- -k {test-case-filter} -v -s               # Append pytest arguments (-k, -s, -v) in the debug-run mode.
+pants test --debug {targets} -- -k {test-case-filter} --print-stacktrace  # Append pytest arguments (-k, --print-stacktrace) in the debug-run mode.
+```
+
+The **targets** argument is consumed by `pants test`, and it may include file names without any suffix or directory names suffixed with "::" ONLY.
+The **test-case-filter** argument is consumed by pytest, and it may include the test case names and additional parameters ONLY.
+DO NOT mix the pytest-only test case filter options in the pants targets or vice versa.
 
 ### Adding new packages and modules
 
