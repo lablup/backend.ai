@@ -677,7 +677,7 @@ def test_affinity_map_mixed_discrete_fraction_devices(
     )
 
     # Check CUDA allocation per node
-    cuda_alloc_per_node = defaultdict(lambda: Decimal(0))
+    cuda_alloc_per_node: MutableMapping[int, Decimal] = defaultdict(lambda: Decimal(0))
     cuda_used_nodes = set()
     for dev_id, alloc in result_cuda[SlotName("cuda")].items():
         if dev_id == "gpu0":
@@ -706,7 +706,7 @@ def test_affinity_map_mixed_discrete_fraction_devices(
     print(f"allocation: {result_cpu[SlotName('cpu')]}")
 
     # Check CPU allocation per node
-    cpu_alloc_per_node = defaultdict(int)
+    cpu_alloc_per_node: MutableMapping[int, int] = defaultdict(int)
     for dev_id, alloc in result_cpu[SlotName("cpu")].items():
         if dev_id in ["cpu0", "cpu1"]:
             cpu_alloc_per_node[0] += int(alloc)
