@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.leader import ValkeyLeaderElection
     from ai.backend.common.message_queue.queue import AbstractMessageQueue
     from ai.backend.common.metrics.metric import CommonMetricRegistry
     from ai.backend.common.plugin.event import EventDispatcherPluginContext
@@ -87,6 +88,7 @@ class RootContext(BaseContext):
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController | None
+    leader_election: ValkeyLeaderElection
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

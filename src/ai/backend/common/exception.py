@@ -137,6 +137,7 @@ class ErrorDomain(enum.StrEnum):
     OBJECT_STORAGE = "object-storage"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
+    LEADER_ELECTION = "leader-election"
     KERNEL = "kernel"
     USER = "user"
     KEYPAIR = "keypair"
