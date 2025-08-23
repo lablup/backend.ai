@@ -143,7 +143,7 @@ class VolumePool:
             await volume.shutdown()
         await self._storage_backend_plugin_ctx.cleanup()
 
-    def list_volumes(self) -> dict[str, VolumeInfo]:
+    def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {str(volume_id): volume.info() for volume_id, volume in self._volumes.items()}
 
     def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
