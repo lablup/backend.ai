@@ -581,8 +581,14 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        def mount_static_binary(filename: str, target_path: str) -> None:
+        def mount_static_binary(
+            filename: str,
+            target_path: str,
+            skip_missing: bool = False,
+        ) -> None:
             resolved_path = self.resolve_krunner_filepath("runner/" + filename)
+            if not skip_missing and not resolved_path.exists():
+                raise FileNotFoundError(resolved_path)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
         mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
@@ -591,6 +597,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
+        mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
 
         jail_path: Optional[Path]
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
