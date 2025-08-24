@@ -24,6 +24,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.config import LoggingConfig
 
 __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
@@ -265,62 +266,73 @@ async def watcher_server(
 
     app = web.Application()
     app["config"] = args[0]
-
-    etcd_credentials = None
-    if app["config"]["etcd"]["user"]:
-        etcd_credentials = {
-            "user": app["config"]["etcd"]["user"],
-            "password": app["config"]["etcd"]["password"],
+    logging_config: LoggingConfig = args[0]["logging"]
+    log_endpoint: str = args[1]
+    logger = Logger(
+        logging_config,
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
+    with logger:
+        etcd_credentials = None
+        if app["config"]["etcd"]["user"]:
+            etcd_credentials = {
+                "user": app["config"]["etcd"]["user"],
+                "password": app["config"]["etcd"]["password"],
+            }
+        scope_prefix_map = {
+            ConfigScopes.GLOBAL: "",
         }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-    }
-    etcd = AsyncEtcd(
-        app["config"]["etcd"]["addr"],
-        app["config"]["etcd"]["namespace"],
-        scope_prefix_map=scope_prefix_map,
-        credentials=etcd_credentials,
-    )
-    app["config_server"] = etcd
-
-    token = await etcd.get("config/watcher/token")
-    if token is None:
-        token = "insecure"
-    log.debug("watcher authentication token: {}", token)
-    app["token"] = token
-
-    app.middlewares.append(auth_middleware)
-    app.on_shutdown.append(shutdown_app)
-    app.on_startup.append(init_app)
-    app.on_response_prepare.append(prepare_hook)
-    ssl_ctx = None
-    if app["config"]["watcher"]["ssl-enabled"]:
-        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_ctx.load_cert_chain(
-            str(app["config"]["watcher"]["ssl-cert"]),
-            str(app["config"]["watcher"]["ssl-privkey"]),
+        etcd = AsyncEtcd(
+            app["config"]["etcd"]["addr"],
+            app["config"]["etcd"]["namespace"],
+            scope_prefix_map=scope_prefix_map,
+            credentials=etcd_credentials,
         )
-    runner = web.AppRunner(app)
-    await runner.setup()
-    watcher_addr = app["config"]["watcher"]["service-addr"]
-    site = web.TCPSite(
-        runner,
-        str(watcher_addr.host),
-        watcher_addr.port,
-        backlog=5,
-        reuse_port=True,
-        ssl_context=ssl_ctx,
-    )
-    await site.start()
-    log.info("started at {}", watcher_addr)
-    try:
-        stop_sig = yield
-    finally:
-        log.info("shutting down...")
-        if stop_sig == signal.SIGALRM and shutdown_enabled:
-            log.warning("shutting down the agent node!")
-            subprocess.run(["shutdown", "-h", "now"])
-        await runner.cleanup()
+        app["config_server"] = etcd
+
+        token = await etcd.get("config/watcher/token")
+        if token is None:
+            token = "insecure"
+        log.debug("watcher authentication token: {}", token)
+        app["token"] = token
+
+        app.middlewares.append(auth_middleware)
+        app.on_shutdown.append(shutdown_app)
+        app.on_startup.append(init_app)
+        app.on_response_prepare.append(prepare_hook)
+        ssl_ctx = None
+        if app["config"]["watcher"]["ssl-enabled"]:
+            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_ctx.load_cert_chain(
+                str(app["config"]["watcher"]["ssl-cert"]),
+                str(app["config"]["watcher"]["ssl-privkey"]),
+            )
+        runner = web.AppRunner(app)
+        await runner.setup()
+        watcher_addr = app["config"]["watcher"]["service-addr"]
+        site = web.TCPSite(
+            runner,
+            str(watcher_addr.host),
+            watcher_addr.port,
+            backlog=5,
+            reuse_port=True,
+            ssl_context=ssl_ctx,
+        )
+        await site.start()
+        log.info("started at {}", watcher_addr)
+        try:
+            stop_sig = yield
+        finally:
+            log.info("shutting down...")
+            if stop_sig == signal.SIGALRM and shutdown_enabled:
+                log.warning("shutting down the agent node!")
+                subprocess.run(["shutdown", "-h", "now"])
+            await runner.cleanup()
 
 
 @click.command()
@@ -381,11 +393,13 @@ def main(
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
+    logging_config = LoggingConfig.model_validate(raw_cfg["logging"])
     if debug:
         log_level = LogLevel.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+    if log_level != LogLevel.NOTSET:
+        logging_config.level = log_level
+        logging_config.pkg_ns["ai.backend"] = log_level
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)
@@ -393,6 +407,7 @@ def main(
             print("== Watcher configuration ==")
             pprint(cfg)
         cfg["_src"] = cfg_src_path
+        cfg["logging"] = logging_config
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -402,9 +417,8 @@ def main(
     log_sockpath = Path(f"/tmp/backend.ai/ipc/watcher-logger-{os.getpid()}.sock")
     log_sockpath.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{log_sockpath}"
-    cfg["logging"]["endpoint"] = log_endpoint
     logger = Logger(
-        cfg["logging"],
+        logging_config,
         is_master=True,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -412,9 +426,10 @@ def main(
             "unpack_opts": DEFAULT_UNPACK_OPTS,
         },
     )
-    if "file" in cfg["logging"]["drivers"]:
-        fn = Path(cfg["logging"]["file"]["filename"])
-        cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"
+    if "file" in logging_config.drivers:
+        assert logging_config.file is not None
+        fn = Path(logging_config.file.filename)
+        logging_config.file.filename = f"{fn.stem}-watcher{fn.suffix}"
 
     setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
     with logger:
@@ -427,7 +442,7 @@ def main(
         aiotools.start_server(
             watcher_server,
             num_workers=1,
-            args=(cfg,),
+            args=(cfg, log_endpoint),
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
         log.info("exit.")
