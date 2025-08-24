@@ -29,7 +29,11 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
 
         info = await self.docker.system.info()
         if info["Swarm"]["LocalNodeState"] != "active":
-            raise OverlayNetworkError("Docker swarm not enabled on system!")
+            raise OverlayNetworkError(
+                "Docker Swarm is not enabled on this system. "
+                "To use overlay networks for multi-node sessions, initialize Docker Swarm with: "
+                "'docker swarm init' or 'docker swarm init --advertise-addr <IP_ADDRESS>'"
+            )
 
     async def cleanup(self) -> None:
         await self.docker.close()

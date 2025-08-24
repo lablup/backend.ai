@@ -10,6 +10,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerPhaseMetricObserver
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
@@ -48,6 +49,7 @@ class SchedulingControllerArgs:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
+    network_plugin_ctx: NetworkPluginContext
 
 
 class SchedulingController:
@@ -58,6 +60,7 @@ class SchedulingController:
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
+    _network_plugin_ctx: NetworkPluginContext
 
     # Services
     _scaling_group_resolver: ScalingGroupResolver
@@ -73,6 +76,7 @@ class SchedulingController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
+        self._network_plugin_ctx = args.network_plugin_ctx
 
         # Initialize metric observer (singleton)
         self._metric_observer = SchedulerPhaseMetricObserver.instance()

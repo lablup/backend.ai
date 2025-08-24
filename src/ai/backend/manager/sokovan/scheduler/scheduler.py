@@ -40,6 +40,7 @@ from ai.backend.manager.metrics.scheduler import (
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
@@ -104,6 +105,7 @@ class SchedulerArgs:
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
     agent_pool: AgentPool
+    network_plugin_ctx: NetworkPluginContext
 
 
 class Scheduler:
@@ -115,6 +117,7 @@ class Scheduler:
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
     _agent_pool: AgentPool
+    _network_plugin_ctx: NetworkPluginContext
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
     _phase_metrics: SchedulerPhaseMetricObserver
@@ -129,6 +132,7 @@ class Scheduler:
         self._config_provider = args.config_provider
         self._lock_factory = args.lock_factory
         self._agent_pool = args.agent_pool
+        self._network_plugin_ctx = args.network_plugin_ctx
         self._sequencer_pool = self._make_sequencer_pool()
         self._agent_selector_pool = self._make_agent_selector_pool(
             args.config_provider.config.manager.agent_selection_resource_priority
@@ -1275,13 +1279,35 @@ class Scheduler:
                     "network_name": network_name,
                 }
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
-                # For multi-node, would need network plugin support
-                # Simplified for now
-                network_name = f"overlay-{session.session_id}"
-                network_config = {
-                    "mode": "overlay",
-                    "network_name": network_name,
-                }
+                # Create overlay network for multi-node sessions
+                driver = self._config_provider.config.network.inter_container.default_driver
+                if driver is None:
+                    raise ValueError("No inter-container network driver is configured.")
+
+                # Check if plugin is available
+                if driver not in self._network_plugin_ctx.plugins:
+                    available_plugins = list(self._network_plugin_ctx.plugins.keys())
+                    log.error(
+                        f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
+                        f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                    )
+                    raise KeyError(
+                        f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
+                        f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                    )
+
+                network_plugin = self._network_plugin_ctx.plugins[driver]
+                try:
+                    network_info = await network_plugin.create_network(
+                        identifier=str(session.session_id)
+                    )
+                    network_config = dict(network_info.options)
+                    network_name = network_info.network_id
+                except Exception:
+                    log.exception(
+                        f"Failed to create the inter-container network (plugin: {driver})"
+                    )
+                    raise
         elif network_type == NetworkType.HOST:
             network_config = {"mode": "host"}
             network_name = "host"
