@@ -158,7 +158,7 @@ class Logger(AbstractLogger):
 
     @override
     def __enter__(self) -> Self:
-        # Including the parent itself, each service processes have its own RelayHandler
+        # Including the parent itself, each service process has its own RelayHandler
         # to send the log records to the log processor thread in the parent process.
         self.worker_logging_config.handlers["relay"] = RelayLogHandlerConfig(
             class_="ai.backend.logging.handler.intrinsic.RelayHandler",
