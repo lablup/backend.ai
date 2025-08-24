@@ -4,9 +4,7 @@ import asyncio
 import functools
 import importlib
 import logging
-import logging.config
 import os
-import os.path
 import shutil
 import signal
 import ssl
@@ -1133,7 +1131,7 @@ async def server_main_logwrapper(
     local_cfg: AgentUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        local_cfg.logging.model_dump(),
+        local_cfg.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1423,17 +1421,16 @@ def main(
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
-    if debug:
-        log_level = LogLevel.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
-    if log_level != LogLevel.NOTSET:
-        config.override_key(raw_cfg, ("logging", "level"), log_level)
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
         unified_conf = AgentUnifiedConfig.model_validate(raw_cfg)
+        if debug:
+            log_level = LogLevel.DEBUG
+        unified_conf.debug.enabled = log_level == LogLevel.DEBUG
+        if log_level != LogLevel.NOTSET:
+            unified_conf.logging.level = log_level
+            unified_conf.logging.pkg_ns["ai.backend"] = log_level
         if unified_conf.agent.backend == AgentBackend.KUBERNETES:
             if unified_conf.container.scratch_type == "k8s-nfs" and (
                 unified_conf.container.scratch_nfs_address is None
@@ -1516,7 +1513,7 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         try:
             logger = Logger(
-                unified_conf.logging.model_dump(),
+                unified_conf.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, MutableMapping, Self
+from typing import Self
 
-from .utils import _register_custom_loglevels
+from .config_pydantic import LoggingConfig
 
 
 class AbstractLogger(metaclass=ABCMeta):
-    def __init__(
-        self,
-        logging_config: MutableMapping[str, Any],
-    ) -> None:
-        _register_custom_loglevels()
+    def __init__(self, config: LoggingConfig) -> None: ...
 
     @abstractmethod
     def __enter__(self) -> Self:

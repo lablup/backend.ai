@@ -641,7 +641,7 @@ async def server_main_logwrapper(
     config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        config.logging.model_dump(),
+        config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -916,7 +916,7 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         try:
             logger = Logger(
-                cfg.logging.model_dump(),
+                cfg.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

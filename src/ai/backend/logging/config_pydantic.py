@@ -1,12 +1,19 @@
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Self
 
-from pydantic import AliasChoices, ByteSize, Field
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ByteSize,
+    ConfigDict,
+    Field,
+    model_serializer,
+    model_validator,
+)
 
-from ai.backend.common.config import BaseConfigModel
-
-from .types import LogFormat, LogLevel
+from .exceptions import ConfigurationError
+from .types import LogFormat, LogLevel, MsgpackOptions
 
 default_pkg_ns = {
     "": LogLevel.WARNING,
@@ -27,6 +34,22 @@ class LogstashProtocol(StrEnum):
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"
     UDP = "udp"
+
+
+class BaseConfigModel(BaseModel):
+    @staticmethod
+    def snake_to_kebab_case(string: str) -> str:
+        if string == "class_":
+            return "class"
+        return string.replace("_", "-")
+
+    model_config = ConfigDict(
+        validate_by_name=True,
+        from_attributes=True,
+        use_enum_values=True,
+        extra="allow",
+        alias_generator=snake_to_kebab_case,
+    )
 
 
 class HostPortPair(BaseConfigModel):
@@ -89,6 +112,14 @@ class GraylogConfig(BaseConfigModel):
     host: str = Field(description="Graylog hostname.", examples=["127.0.0.1"])
     port: int = Field(description="Graylog server port number.", examples=[8000])
     level: LogLevel = Field(description="Log level.", default=LogLevel.INFO)
+    localname: Optional[str] = Field(
+        default=None,
+        description="The custom source identifier. If not specified, fqdn will be used instead.",
+    )
+    fqdn: Optional[str] = Field(
+        default=None,
+        description="The fuly qualified domain name of the source.",
+    )
     ssl_verify: bool = Field(
         description="Verify validity of TLS certificate when communicating with logstash.",
         default=True,
@@ -110,18 +141,91 @@ class GraylogConfig(BaseConfigModel):
     )
 
 
+class LogHandlerConfig(BaseConfigModel):
+    class_: str = Field(
+        alias="class",
+        description="The class name of the log handler.",
+    )
+    level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level to filter messages from this handler.",
+    )
+
+    @model_serializer(mode="wrap")
+    def rename_class(self, handler):
+        data = handler(self)
+        if "class_" in data:
+            data["class"] = data.pop("class_")
+        return data
+
+
+class RelayLogHandlerConfig(LogHandlerConfig):
+    class_: str = Field(
+        alias="class",
+        description="The class name of the log handler.",
+    )
+    level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level to filter messages from this handler.",
+    )
+    endpoint: str
+    msgpack_options: MsgpackOptions
+
+
+class LoggerConfig(BaseConfigModel):
+    handlers: list[str] = Field(
+        default_factory=list,
+        description="The name of handlers receiving messages from this logger.",
+    )
+    level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level to filter messages from this logger.",
+    )
+    propagate: bool = Field(
+        default=True,
+        description="Whether to propagate messages to pre-existing loggers.",
+    )
+
+
 class LoggingConfig(BaseConfigModel):
-    level: LogLevel = Field(default=LogLevel.INFO, description="Log level.")
+    # Fields to be dumped for Python's standard logging
+    version: int = Field(default=1, description="The version used by logging.dictConfig().")
+    level: LogLevel = Field(
+        default=LogLevel.INFO, description="The main log level to filter messages from all loggers."
+    )
     drivers: list[LogDriver] = Field(
         default=[LogDriver.CONSOLE], description="Array of log drivers to print."
     )
+    disable_existing_loggers: bool = Field(
+        default=False,
+        description="Disable the existing loggers when applying the config.",
+    )
+    handlers: dict[str, LogHandlerConfig | RelayLogHandlerConfig] = Field(
+        default_factory=dict, description="The mapping of log handler configurations."
+    )
+    loggers: dict[str, LoggerConfig] = Field(
+        default_factory=dict, description="The mapping of per-namespace logger configurations."
+    )
+
+    # Per-driver configs
     console: ConsoleConfig = Field(default=ConsoleConfig(colored=None, format=LogFormat.VERBOSE))
     file: Optional[FileConfig] = Field(default=None)
     logstash: Optional[LogstashConfig] = Field(default=None)
     graylog: Optional[GraylogConfig] = Field(default=None)
+
+    # Per-pkg log levels
     pkg_ns: dict[str, LogLevel] = Field(
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
         validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
         serialization_alias="pkg-ns",
     )
+
+    @model_validator(mode="after")
+    def validate_driver_configs(self) -> Self:
+        for driver in self.drivers:
+            if getattr(self, driver, None) is None:
+                raise ConfigurationError({
+                    "logging": f"{driver} driver is activated but no config given."
+                })
+        return self

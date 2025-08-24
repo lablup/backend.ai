@@ -4,6 +4,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.logging.config_pydantic import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
     DatabaseConfig,
@@ -46,8 +47,8 @@ class BootstrapConfig(BaseModel):
         Includes network settings, process management, and service parameters.
         """,
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
