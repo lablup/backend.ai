@@ -11,6 +11,8 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import KernelEnqueueingConfig, SessionId, SessionTypes, VFolderMount
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -63,6 +65,29 @@ class DeploymentController:
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
+
+    async def create_deployment(
+        self,
+        spec: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """
+        Create a new deployment using the new DeploymentCreator specification.
+
+        Returns:
+            DeploymentInfo: Information about the created deployment
+        """
+        # TODO: Implement the actual deployment creation logic
+        # For now, create a deployment with the provided spec
+
+        # This is a placeholder implementation
+        # The actual implementation should:
+        # 1. Create endpoint in database
+        # 2. Create routing entries
+        # 3. Schedule sessions for replicas
+        # 4. Return the complete DeploymentInfo
+
+        # TODO: Implement actual deployment creation logic here
+        raise NotImplementedError("Deployment creation logic not yet implemented")
 
     async def create_model_service(
         self,

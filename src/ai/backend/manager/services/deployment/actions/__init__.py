@@ -16,7 +16,6 @@ from .modify_auto_scaling_rule import (
     ModifyAutoScalingRuleActionResult,
 )
 from .modify_deployment import ModifyDeploymentAction, ModifyDeploymentActionResult
-from .update import UpdateDeploymentAction, UpdateDeploymentActionResult
 
 __all__ = [
     "AutoscaleAction",
@@ -37,6 +36,4 @@ __all__ = [
     "ModifyAutoScalingRuleActionResult",
     "ModifyDeploymentAction",
     "ModifyDeploymentActionResult",
-    "UpdateDeploymentAction",
-    "UpdateDeploymentActionResult",
 ]
