@@ -49,6 +49,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentState,
     ExecutionSpec,
     ModelRevisionSpec,
     MountMetadata,
@@ -648,9 +649,11 @@ class EndpointRow(Base):
                 created_user=self.created_user,
                 session_owner=self.session_owner,
                 tag=self.tag,
-                lifecycle_stage=self.lifecycle_stage,
-                retries=self.retries,
                 created_at=self.created_at,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retries,
             ),
             replica_spec=ReplicaSpec(
                 replica_count=self.replicas,

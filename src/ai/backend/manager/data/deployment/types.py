@@ -18,10 +18,14 @@ class DeploymentMetadata:
     resource_group: str
     created_user: UUID
     session_owner: UUID
-    lifecycle_stage: EndpointLifecycle
-    retries: int
     created_at: Optional[datetime]
     tag: Optional[str] = None
+
+
+@dataclass
+class DeploymentState:
+    lifecycle: EndpointLifecycle
+    retry_count: int
 
 
 @dataclass
@@ -72,6 +76,7 @@ class DeploymentNetworkSpec:
 class DeploymentInfo:
     id: UUID
     metadata: DeploymentMetadata
+    state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]

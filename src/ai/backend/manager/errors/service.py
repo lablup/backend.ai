@@ -29,6 +29,18 @@ class EndpointNotFound(ObjectNotFound):
         )
 
 
+class NoUpdatesToApply(BackendAIError, web.HTTPBadRequest):
+    error_title = "No updates to apply"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class RoutingNotFound(ObjectNotFound):
     object_name = "routing"
 

@@ -16,6 +16,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
@@ -84,10 +85,34 @@ class DeploymentController:
 
         return await self._deployment_repository.create_endpoint(spec)
 
+    async def update_deployment(
+        self,
+        deployment_id: uuid.UUID,
+        modifier: DeploymentModifier,
+    ) -> DeploymentInfo:
+        """
+        Update a deployment using the modifier specification.
+
+        Args:
+            deployment_id: ID of the deployment to update
+            modifier: Partial modifier containing fields to update
+
+        Returns:
+            DeploymentInfo: Updated deployment information
+        """
+        # Pass the modifier to repository which will handle the updates and return updated info
+        deployment_info = await self._deployment_repository.update_endpoint_with_modifier(
+            deployment_id, modifier
+        )
+
+        # TODO: In the future, add mark operations here to trigger
+        # post-update actions through the event system
+
+        return deployment_info
+
     async def delete_model_service(
         self,
         endpoint_id: uuid.UUID,
-        force: bool = False,
     ) -> bool:
         """
         Delete a model service deployment.

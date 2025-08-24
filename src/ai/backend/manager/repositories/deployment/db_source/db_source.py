@@ -13,8 +13,10 @@ from sqlalchemy.orm import sessionmaker
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.errors.service import EndpointNotFound, NoUpdatesToApply
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -118,15 +120,19 @@ class DeploymentDBSource:
     async def get_endpoint(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[DeploymentInfo]:
-        """Get endpoint by ID."""
+    ) -> DeploymentInfo:
+        """Get endpoint by ID.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
 
             if not row:
-                return None
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             return row.to_deployment_info()
 
@@ -151,6 +157,28 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         return result.scalars().all()
 
+    async def list_endpoints_by_name(
+        self,
+        session_owner_id: uuid.UUID,
+        name: Optional[str] = None,
+    ) -> list[DeploymentInfo]:
+        """List endpoints owned by a specific user with optional name filter."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Build query with base conditions
+            query = sa.select(EndpointRow).where(
+                EndpointRow.session_owner == session_owner_id,
+                EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
+            )
+
+            # Add name filter if provided
+            if name is not None:
+                query = query.where(EndpointRow.name == name)
+
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+
+            return [row.to_deployment_info() for row in rows]
+
     async def update_endpoint_lifecycle(
         self,
         endpoint_id: uuid.UUID,
@@ -162,21 +190,6 @@ class DeploymentDBSource:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .values(lifecycle_stage=lifecycle)
-            )
-            result = await db_sess.execute(query)
-            return result.rowcount > 0
-
-    async def update_endpoint_replicas(
-        self,
-        endpoint_id: uuid.UUID,
-        desired_session_count: int,
-    ) -> bool:
-        """Update endpoint desired session count."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(replicas=desired_session_count)
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
@@ -229,6 +242,46 @@ class DeploymentDBSource:
             .values(traffic_ratio=new_ratio)
         )
         await db_sess.execute(query)
+
+    async def update_endpoint_with_modifier(
+        self,
+        endpoint_id: uuid.UUID,
+        modifier: DeploymentModifier,
+    ) -> DeploymentInfo:
+        """Update endpoint using a deployment modifier.
+
+        Args:
+            endpoint_id: ID of the endpoint to update
+            modifier: Deployment modifier containing partial updates
+
+        Returns:
+            DeploymentInfo: Updated deployment information
+
+        Raises:
+            NoUpdatesToApply: If there are no updates to apply
+            EndpointNotFound: If the endpoint does not exist
+        """
+        # Extract updates from the modifier
+        updates = modifier.fields_to_update()
+
+        if not updates:
+            raise NoUpdatesToApply(f"No updates to apply for endpoint {endpoint_id}")
+
+        async with self._begin_session_read_committed() as db_sess:
+            # Directly use the updates since fields_to_update returns column-ready values
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(**updates)
+                .returning(EndpointRow)
+            )
+            result = await db_sess.execute(query)
+            updated_row = result.scalar_one_or_none()
+
+            if not updated_row:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+
+            return updated_row.to_deployment_info()
 
     async def delete_endpoint_with_routes(
         self,
@@ -370,14 +423,18 @@ class DeploymentDBSource:
     async def get_endpoint_with_routes(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointWithRoutesData]:
-        """Get endpoint with all its routes in a single database query."""
+    ) -> EndpointWithRoutesData:
+        """Get endpoint with all its routes in a single database query.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             # Fetch all data from database in one session
             raw_data = await self._fetch_endpoint_and_routes(db_sess, endpoint_id)
 
             if not raw_data:
-                return None
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             # Transform database rows to data objects
             return self._transform_endpoint_and_routes(raw_data)

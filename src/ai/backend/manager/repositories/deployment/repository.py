@@ -9,8 +9,10 @@ from pydantic import HttpUrl
 from ai.backend.common.types import RuntimeVariant, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.types import RouteInfo, ServiceInfo
 
@@ -40,8 +42,12 @@ class DeploymentRepository:
     async def get_endpoint_info(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[DeploymentInfo]:
-        """Get endpoint information."""
+    ) -> DeploymentInfo:
+        """Get endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         return await self._db_source.get_endpoint(endpoint_id)
 
     async def get_all_active_endpoints(self) -> list[DeploymentInfo]:
@@ -56,14 +62,6 @@ class DeploymentRepository:
         """Update endpoint lifecycle status."""
         return await self._db_source.update_endpoint_lifecycle(endpoint_id, lifecycle)
 
-    async def update_endpoint_replicas(
-        self,
-        endpoint_id: uuid.UUID,
-        desired_session_count: int,
-    ) -> bool:
-        """Update endpoint desired session count."""
-        return await self._db_source.update_endpoint_replicas(endpoint_id, desired_session_count)
-
     async def update_endpoint_replicas_and_rebalance(
         self,
         endpoint_id: uuid.UUID,
@@ -73,6 +71,26 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint_replicas_and_rebalance(
             endpoint_id, target_replicas
         )
+
+    async def update_endpoint_with_modifier(
+        self,
+        endpoint_id: uuid.UUID,
+        modifier: DeploymentModifier,
+    ) -> DeploymentInfo:
+        """Update endpoint using a deployment modifier.
+
+        Args:
+            endpoint_id: ID of the endpoint to update
+            modifier: Deployment modifier containing partial updates
+
+        Returns:
+            DeploymentInfo: Updated deployment information
+
+        Raises:
+            NoUpdatesToApply: If there are no updates to apply
+            EndpointNotFound: If the endpoint does not exist
+        """
+        return await self._db_source.update_endpoint_with_modifier(endpoint_id, modifier)
 
     async def delete_endpoint(
         self,
@@ -86,10 +104,13 @@ class DeploymentRepository:
         endpoint_id: uuid.UUID,
     ) -> Optional[HttpUrl]:
         """Get service endpoint URL."""
-        endpoint = await self._db_source.get_endpoint(endpoint_id)
-        if not endpoint or not endpoint.network.url:
+        try:
+            endpoint = await self._db_source.get_endpoint(endpoint_id)
+            if not endpoint.network.url:
+                return None
+            return HttpUrl(endpoint.network.url)
+        except EndpointNotFound:
             return None
-        return HttpUrl(endpoint.network.url)
 
     # Route operations
 
@@ -140,8 +161,6 @@ class DeploymentRepository:
         """Delete a route."""
         return await self._db_source.delete_route(route_id)
 
-    # delete_routes_by_endpoint is now handled internally by delete_endpoint
-
     # Additional operations for model serving
 
     async def list_endpoints_by_owner(
@@ -150,13 +169,7 @@ class DeploymentRepository:
         name: Optional[str] = None,
     ) -> list[DeploymentInfo]:
         """List endpoints by owner with optional name filter."""
-        endpoints = await self._db_source.get_all_active_endpoints()
-        # Filter by owner - using metadata.session_owner
-        endpoints = [e for e in endpoints if e.metadata.session_owner == owner_id]
-        # Filter by name if provided
-        if name:
-            endpoints = [e for e in endpoints if e.metadata.name == name]
-        return endpoints
+        return await self._db_source.list_endpoints_by_name(owner_id, name)
 
     async def get_service_info(
         self,
@@ -164,8 +177,9 @@ class DeploymentRepository:
     ) -> Optional[ServiceInfo]:
         """Get complete service information for an endpoint."""
         # Get endpoint and routes in a single database operation
-        result = await self._db_source.get_endpoint_with_routes(endpoint_id)
-        if not result:
+        try:
+            result = await self._db_source.get_endpoint_with_routes(endpoint_id)
+        except EndpointNotFound:
             return None
 
         endpoint = result.endpoint
@@ -212,17 +226,6 @@ class DeploymentRepository:
             is_public=endpoint.is_public,
             runtime_variant=RuntimeVariant(endpoint.runtime_variant),
         )
-
-    async def update_endpoint_public_access(
-        self,
-        endpoint_id: uuid.UUID,
-        is_public: bool,
-    ) -> bool:
-        """Update endpoint public access setting."""
-        # TODO: Add this method to db_source when needed
-        # For now, return True to indicate success
-        log.warning("update_endpoint_public_access not yet implemented in db_source")
-        return True
 
     async def clear_endpoint_errors(
         self,

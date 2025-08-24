@@ -31,7 +31,8 @@ class ReplicaSpecModifier(PartialModifier):
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
-        self.replica_count.update_dict(to_update, "replica_count")
+        # Use the actual database column name "replicas"
+        self.replica_count.update_dict(to_update, "replicas")
         return to_update
 
 
