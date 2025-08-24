@@ -31,20 +31,27 @@ The pants commands accept target arguments:
 - Files changed after last commit: `--changed-since=HEAD~1`
 - Files changed and their dependents: `--changed-since=HEAD~1 --changed-dependents=transitive`
 
+### Global Options
+To ensure readable output when piped, always add these options:
+- `--no-colors`: Avoid using terminal color sequences
+- `--no-dynamic-ui`: Avoid using dynamically updated progress animation
+
+The global options must be put after `pants` and before other subcommands like `lint`.
+
 ### Pants Command Examples
 ```bash
-pants lint ::                      # Lint all files
-pants lint src/ai/backend/manager/example.py  # Lint a specific file
-pants lint src/ai/backend/manager::           # Lint all files in a directory
-pants lint --changed-since=HEAD~1 --changed-dependents=transitive  # Lint changed files and their dependent files
+pants --no-colors --no-dynamic-ui lint ::                      # Lint all files
+pants --no-colors --no-dynamic-ui lint src/ai/backend/manager/example.py  # Lint a specific file
+pants --no-colors --no-dynamic-ui lint src/ai/backend/manager::           # Lint all files in a directory
+pants --no-colors --no-dynamic-ui lint --changed-since=HEAD~1 --changed-dependents=transitive  # Lint changed files and their dependent files
 
-pants fix ::                       # Auto-fix linting issues in all files
-pants fix src/ai/backend/manager/example.py  # Auto-fix a specific file
-pants fix src/ai/backend/manager::           # Auto-fix all files in a directory
-pants fix --changed-since=HEAD~1   # Auto-fix linting issues in files changed since the last commit
+pants --no-colors --no-dynamic-ui fix ::                       # Auto-fix linting issues in all files
+pants --no-colors --no-dynamic-ui fix src/ai/backend/manager/example.py  # Auto-fix a specific file
+pants --no-colors --no-dynamic-ui fix src/ai/backend/manager::           # Auto-fix all files in a directory
+pants --no-colors --no-dynamic-ui fix --changed-since=HEAD~1   # Auto-fix linting issues in files changed since the last commit
 
-pants fmt ::                       # Auto-format all files
-pants fmt src/ai/backend/manager/example.py  # Auto-format a specific file
-pants fmt src/ai/backend/manager::           # Auto-format all files in a directory
-pants fmt --changed-since=HEAD~1   # Auto-format files changed since the last commit
+pants --no-colors --no-dynamic-ui fmt ::                       # Auto-format all files
+pants --no-colors --no-dynamic-ui fmt src/ai/backend/manager/example.py  # Auto-format a specific file
+pants --no-colors --no-dynamic-ui fmt src/ai/backend/manager::           # Auto-format all files in a directory
+pants --no-colors --no-dynamic-ui fmt --changed-since=HEAD~1   # Auto-format files changed since the last commit
 ```

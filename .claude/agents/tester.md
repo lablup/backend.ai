@@ -36,17 +36,24 @@ The pants commands accept target arguments:
 - Test modules affected by files changed after last commit: `--changed-since=HEAD~1`
 - Test modules affected by files changed and their dependents: `--changed-since=HEAD~1 --changed-dependents=transitive`
 
+### Global Options
+To ensure readable output when piped, always add these options:
+- `--no-colors`: Avoid using terminal color sequences
+- `--no-dynamic-ui`: Avoid using dynamically updated progress animation
+
+The global options must be put after `pants` and before other subcommands like `lint`.
+
 ### Pants Command Examples
 ```bash
 # Testing with summary output
-pants test {targets}               # Run designated test targets
-pants test ::                      # Run all tests
-pants test tests/common::          # Run specific test directory in test suite
-pants test tests/agent/test_affinity_map.py  # Run a specific test module
-pants test --changed-since=HEAD~1 --changed-dependents=transitive  # Test changed files and dependents
+pants --no-colors --no-dynamic-ui test {targets}               # Run designated test targets
+pants --no-colors --no-dynamic-ui test ::                      # Run all tests
+pants --no-colors --no-dynamic-ui test tests/common::          # Run specific test directory in test suite
+pants --no-colors --no-dynamic-ui test tests/agent/test_affinity_map.py  # Run a specific test module
+pants --no-colors --no-dynamic-ui test --changed-since=HEAD~1 --changed-dependents=transitive  # Test changed files and dependents
 
 # Testing with full console output (debug mode)
-pants test --debug {targets}       # Run tests with full output
+pants --no-colors --no-dynamic-ui test --debug {targets}       # Run tests with full output
 ```
 
 ### Advanced Option Combinations
@@ -56,8 +63,8 @@ pants test --debug {targets}       # Run tests with full output
 
 ### Advanced Pants Command Examples
 ```bash
-pants test --debug {targets} -- -k {test-case-filter} -v -s               # Debug mode with pytest args
-pants test --debug {targets} -- -k {test-case-filter} --print-stacktrace  # Debug mode with stacktrace
+pants --no-colors --no-dynamic-ui test --debug {targets} -- -k {test-case-filter} -v -s               # Debug mode with pytest args
+pants --no-colors --no-dynamic-ui test --debug {targets} -- -k {test-case-filter} --print-stacktrace  # Debug mode with stacktrace
 ```
 
 ### Important Rules

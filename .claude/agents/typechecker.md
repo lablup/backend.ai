@@ -29,10 +29,17 @@ The pants commands accept target arguments:
 - Files changed after last commit: `--changed-since=HEAD~1`
 - Files changed and their dependents: `--changed-since=HEAD~1 --changed-dependents=transitive`
 
+### Global Options
+To ensure readable output when piped, always add these options:
+- `--no-colors`: Avoid using terminal color sequences
+- `--no-dynamic-ui`: Avoid using dynamically updated progress animation
+
+The global options must be put after `pants` and before other subcommands like `lint`.
+
 ### Pants Command Examples
 ```bash
-pants check ::                      # Typecheck all files
-pants check src/ai/backend/manager/example.py  # Typecheck a specific file
-pants check src/ai/backend/manager::           # Typecheck all files in a directory
-pants check --changed-since=HEAD~1 --changed-dependents=transitive  # Typecheck changed files and their dependent files
+pants --no-colors --no-dynamic-ui check ::                      # Typecheck all files
+pants --no-colors --no-dynamic-ui check src/ai/backend/manager/example.py  # Typecheck a specific file
+pants --no-colors --no-dynamic-ui check src/ai/backend/manager::           # Typecheck all files in a directory
+pants --no-colors --no-dynamic-ui check --changed-since=HEAD~1 --changed-dependents=transitive  # Typecheck changed files and their dependent files
 ```
