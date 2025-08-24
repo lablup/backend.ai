@@ -6,8 +6,13 @@
 #
 # Generated automatically from the StorageProxyUnifiedConfig schema.
 
-# Configuration for external registries.
-# Defines how to connect and interact with external model registries.
+# List of object storage configurations.
+# Each configuration defines how to connect to and use an object storage
+# service.
+storages = []
+# List of artifact registry configurations.
+# Each configuration defines how to connect to and use an artifact registry
+# service.
 registries = []
 
 [storage-proxy]
@@ -83,13 +88,23 @@ registries = []
   ## sample-rate = 10
 
 [logging]
-  # Log level.
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
   level = "INFO"
   # Array of log drivers to print.
   drivers = [ "console",]
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
 
   [logging.console]
     # Opt to print colorized log.
@@ -102,6 +117,9 @@ registries = []
 
 [api]
   [api.client]
+    # Network address and port where the client API service will listen.
+    # This is the address accessible by clients for file operations.
+    service-addr = { host = "127.0.0.1", port = 6021 }
     # Whether to enable SSL/TLS for client API connections.
     # Required for secure communication with clients.
     ssl-enabled = true
@@ -112,17 +130,19 @@ registries = []
     # Required if ssl_enabled is True.
     ## ssl-privkey = "/etc/ssl/private/storage-proxy.key"
 
-    [api.client.service-addr]
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
-
   [api.manager]
+    # Network address and port where the manager API service will listen.
+    # This is the address accessible by managers for control operations.
+    service-addr = { host = "127.0.0.1", port = 6022 }
+    # Address and port to announce to managers for service discovery.
+    # Should be accessible by other manager components.
+    announce-addr = { host = "127.0.0.1", port = 6022 }
+    # Address and port to announce for internal manager API requests.
+    # Used for service discovery within container environments.
+    announce-internal-addr = { host = "host.docker.internal", port = 6023 }
+    # Internal address where manager API listens for internal requests.
+    # Used for internal communication between services.
+    internal-addr = { host = "127.0.0.1", port = 16023 }
     # Whether to enable SSL/TLS for manager API connections.
     # Required for secure communication with managers.
     ssl-enabled = true
@@ -135,46 +155,6 @@ registries = []
     # Secret key for authenticating managers with the storage-proxy.
     # Must be shared between manager and storage-proxy instances.
     secret = "manager-secret-key"
-
-    [api.manager.service-addr]
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
-
-    [api.manager.announce-addr]
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
-
-    [api.manager.announce-internal-addr]
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
-
-    [api.manager.internal-addr]
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
 
 # Volume configuration.
 # Defines available storage backends and their settings.

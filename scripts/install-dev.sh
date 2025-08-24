@@ -1016,9 +1016,6 @@ configure_backendai() {
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
-  # # configure wsproxy (deprecated)
-  # cp configs/wsproxy/halfstack.toml ./wsproxy.toml
-
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
     sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
@@ -1055,7 +1052,7 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
-  
+
   # Populate artifact registries with substituted MinIO credentials
   TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
   cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"

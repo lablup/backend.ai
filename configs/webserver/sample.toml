@@ -210,6 +210,11 @@
     # Controls how long operations wait before timing out.
     # If None, uses the default timeout configured in the Redis client.
     ## request_timeout =   
+    # Whether to use TLS for Redis connections.
+    use_tls = false
+    # Whether to skip TLS certificate verification.
+    # Set to True for self-signed certificates or development environments.
+    tls_skip_verify = false
     # Optional override configurations for specific Redis contexts.
     # Allows different Redis settings for different services within Backend.AI.
     # Each key represents a context name, and the value is a complete Redis
@@ -254,14 +259,30 @@
   # OpenTelemetry endpoint.
   endpoint = "http://127.0.0.1:4317"
 
+[apollo_router]
+  # Whether to enable Apollo Router.
+  enabled = false
+  # Apollo Router endpoint.
+  endpoint = "http://127.0.0.1:4000"
+
 [logging]
-  # Log level.
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
   level = "INFO"
   # Array of log drivers to print.
   drivers = [ "console",]
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
 
   [logging.console]
     # Opt to print colorized log.
@@ -271,10 +292,6 @@
 
   # Override default log level for specific scope of package
   [logging.pkg_ns]
-
-[apollo-router]
-  # endpoint of apollo router
-  endpoint = "http://127.0.0.1:4000,http://api.example.com:4000"
 
 [debug]
   # Whether to enable debug mode.

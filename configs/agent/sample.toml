@@ -151,13 +151,23 @@
   ## sample-rate = 10
 
 [logging]
-  # Log level.
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
   level = "INFO"
   # Array of log drivers to print.
   drivers = [ "console",]
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
 
   [logging.console]
     # Opt to print colorized log.
