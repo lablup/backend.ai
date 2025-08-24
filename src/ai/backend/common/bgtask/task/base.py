@@ -28,20 +28,11 @@ class BaseBackgroundTaskArgs(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    @abstractmethod
-    def to_dict(cls) -> dict[str, Any]:
-        """
-        Convert the arguments to a dictionary representation.
-        This method should be implemented by subclasses to provide
-        the specific conversion logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
 
 TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 
 
-class BaseBackgroundTask(Generic[TFunctionArgs], ABC):
+class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
     @abstractmethod
     async def execute(self, reporter: ProgressReporter, args: TFunctionArgs) -> DispatchResult:
         """

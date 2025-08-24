@@ -56,12 +56,15 @@ jobs:
       - name: Move binaries to target location
         run: |
           TARGET_DIR="src/ai/backend/runner"
-          mkdir -p "$TARGET_DIR"
+          mkdir -p "${TARGET_DIR}"
+          # Move executable binaries
           for ARCH in aarch64 x86_64; do
-            mv "all-smi.${ARCH}.bin" "$TARGET_DIR/"
-            echo "Binary moved to $TARGET_DIR/all-smi.${ARCH}.bin"
-            ls -la "$TARGET_DIR/all-smi.${ARCH}.bin"
+            mv "all-smi.${ARCH}.bin" "${TARGET_DIR}/"
+            echo "Binary moved to ${TARGET_DIR}/all-smi.${ARCH}.bin"
+            ls -la "${TARGET_DIR}/all-smi.${ARCH}.bin"
           done
+          # Move manpages
+          mv all-smi.1 "${TARGET_DIR}/"
 
       - name: Add news fragment
         run: |

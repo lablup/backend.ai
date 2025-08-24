@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
+from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.data.storage.registries.types import ModelData
 
 from ...api_handlers import BaseResponseModel
@@ -65,7 +66,7 @@ class ObjectMetaResponse(BaseResponseModel):
 
 
 class VFolderCloneResponse(BaseResponseModel):
-    bgtask_id: uuid.UUID
+    bgtask_id: TaskID
 
 
 # HuggingFace API Response Models

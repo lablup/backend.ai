@@ -101,8 +101,10 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
+    from .bgtask.registry import BgtaskHandlerRegistryCreator
     from .context import RootContext
     from .migration import check_latest
+    from .volumes.pool import VolumePool
     from .watcher import WatcherClient
 
     local_config: StorageProxyUnifiedConfig = _args[0]
@@ -193,8 +195,17 @@ async def server_main(
             human_readable_name="storage_bgtask",
             db_id=REDIS_BGTASK_DB,
         )
+        volume_pool = await VolumePool.create(
+            local_config=local_config,
+            etcd=etcd,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+        )
+        bgtask_registry_creator = BgtaskHandlerRegistryCreator(volume_pool, event_producer)
+        registry = bgtask_registry_creator.create()
         bgtask_mgr = BackgroundTaskManager(
             event_producer=event_producer,
+            task_registry=registry,
             valkey_client=valkey_client,
             server_id=local_config.storage_proxy.node_id,
         )
@@ -204,6 +215,7 @@ async def server_main(
             pidx=pidx,
             local_config=local_config,
             etcd=etcd,
+            volume_pool=volume_pool,
             background_task_manager=bgtask_mgr,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,

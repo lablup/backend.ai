@@ -32,13 +32,10 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.storage.response import VFolderCloneResponse
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
-    VFolderCloneFailureEvent,
-    VFolderCloneSuccessEvent,
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -66,6 +63,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
+from ..bgtask.tasks.clone import VFolderCloneTaskArgs
 from ..exception import (
     ExecutionError,
     ExternalError,
@@ -474,46 +472,12 @@ async def delete_vfolder(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.ACCEPTED)
 
 
-async def _clone(
-    reporter: ProgressReporter,
-    *,
-    volume: AbstractVolume,
-    src_vfid: VFolderID,
-    dst_vfid: VFolderID,
-    event_producer: EventProducer,
-) -> None:
-    try:
-        await volume.clone_vfolder(
-            src_vfid,
-            dst_vfid,
-        )
-    except Exception as e:
-        log.exception(
-            f"VFolder cloning task failed. (src_vfid:{src_vfid}, dst_vfid:{src_vfid}, e:{str(e)})"
-        )
-        await event_producer.anycast_event(
-            VFolderCloneFailureEvent(
-                src_vfid,
-                dst_vfid,
-                str(e),
-            )
-        )
-    else:
-        await event_producer.anycast_event(
-            VFolderCloneSuccessEvent(
-                src_vfid,
-                dst_vfid,
-            )
-        )
-
-
 async def clone_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         src_volume: str
         src_vfid: VFolderID
         dst_volume: str | None  # deprecated
         dst_vfid: VFolderID
-        options: dict[str, Any] | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],
@@ -525,9 +489,8 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                     t.Key("src_vfid"): tx.VFolderID(),
                     t.Key("dst_volume"): t.String() | t.Null,
                     t.Key("dst_vfid"): tx.VFolderID(),
-                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
-            ),
+            ).allow_extra("*"),
         ),
     ) as params:
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
@@ -536,14 +499,15 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
-        async with ctx.get_volume(params["src_volume"]) as src_volume:
-            task_id = await ctx.background_task_manager.start(
-                _clone,
-                volume=src_volume,
-                src_vfid=params["src_vfid"],
-                dst_vfid=params["dst_vfid"],
-                event_producer=ctx.event_producer,
-            )
+        clone_args = VFolderCloneTaskArgs(
+            volume=params["src_volume"],
+            src_vfolder=params["src_vfid"],
+            dst_vfolder=params["dst_vfid"],
+        )
+        task_id = await ctx.background_task_manager.start_retriable(
+            TaskName.CLONE_VFOLDER,
+            clone_args,
+        )
         data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data)
 
@@ -1300,7 +1264,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
-    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     app.add_subapp("/v1/storages", create_storages_app(ctx))
     app.add_subapp("/v1/registries", create_registries_app(ctx))
 

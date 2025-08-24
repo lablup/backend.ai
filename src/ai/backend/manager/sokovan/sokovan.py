@@ -2,17 +2,14 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-import aiotools
-
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
 )
+from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.defs import LockID
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
@@ -25,13 +22,11 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 @dataclass
-class SchedulerTimerSpec:
-    """Specification and behavior for a scheduler's periodic operation."""
+class SchedulerTaskSpec:
+    """Specification for a scheduler's periodic task."""
 
     schedule_type: ScheduleType
-    short_lock_id: Optional[LockID]  # None means no short-cycle timer
-    long_lock_id: LockID
-    short_interval: Optional[float] = 2.0  # None means no short-cycle timer
+    short_interval: Optional[float] = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
@@ -44,13 +39,13 @@ class SchedulerTimerSpec:
         return DoSokovanProcessScheduleEvent(self.schedule_type.value)
 
     @property
-    def short_timer_name(self) -> str:
-        """Name for the short-cycle timer."""
+    def short_task_name(self) -> str:
+        """Name for the short-cycle task."""
         return f"sokovan_process_if_needed_{self.schedule_type.value}"
 
     @property
-    def long_timer_name(self) -> str:
-        """Name for the long-cycle timer."""
+    def long_task_name(self) -> str:
+        """Name for the long-cycle task."""
         return f"sokovan_process_schedule_{self.schedule_type.value}"
 
 
@@ -64,9 +59,6 @@ class SokovanOrchestrator:
     _event_producer: EventProducer
     _lock_factory: "DistributedLockFactory"
     _scheduling_controller: SchedulingController
-
-    # GlobalTimers for scheduling operations
-    timers: list[GlobalTimer] = []
 
     def __init__(
         self,
@@ -94,133 +86,98 @@ class SokovanOrchestrator:
         return self._coordinator
 
     @staticmethod
-    def _create_timer_specs() -> list[SchedulerTimerSpec]:
-        """Create timer specifications for all schedule types."""
+    def _create_task_specs() -> list[SchedulerTaskSpec]:
+        """Create task specifications for all schedule types."""
         return [
-            # Regular scheduling operations with both short and long cycle timers
-            SchedulerTimerSpec(
+            # Regular scheduling operations with both short and long cycle tasks
+            SchedulerTaskSpec(
                 ScheduleType.SCHEDULE,
-                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_SCHEDULE_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.CHECK_PRECONDITION,
-                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_CHECK_PRECOND_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.START,
-                LockID.LOCKID_SOKOVAN_START_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_START_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.TERMINATE,
-                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_TERMINATE_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            # Sweep is a maintenance task - only needs long cycle timer
-            SchedulerTimerSpec(
+            # Sweep is a maintenance task - only needs long cycle task
+            SchedulerTaskSpec(
                 ScheduleType.SWEEP,
-                None,  # No short-cycle timer for maintenance tasks
-                LockID.LOCKID_SOKOVAN_SWEEP_TIMER,
-                short_interval=None,  # No short-cycle timer for maintenance tasks
+                short_interval=None,  # No short-cycle task for maintenance
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            # Progress check operations with both short and long cycle timers
-            SchedulerTimerSpec(
+            # Progress check operations with both short and long cycle tasks
+            SchedulerTaskSpec(
                 ScheduleType.CHECK_PULLING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_PULLING_PROGRESS_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_CHECK_PULLING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.CHECK_CREATING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_CREATING_PROGRESS_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_CHECK_CREATING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.CHECK_TERMINATING_PROGRESS,
-                LockID.LOCKID_SOKOVAN_CHECK_TERMINATING_PROGRESS_TIMER_SHORT,
-                LockID.LOCKID_SOKOVAN_CHECK_TERMINATING_PROGRESS_TIMER_LONG,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            # Retry operations - only long cycle timers (30 seconds)
-            SchedulerTimerSpec(
+            # Retry operations - only long cycle tasks
+            SchedulerTaskSpec(
                 ScheduleType.RETRY_PREPARING,
-                None,  # No short-cycle timer for retry tasks
-                LockID.LOCKID_SOKOVAN_RETRY_PREPARING_TIMER,
-                short_interval=None,  # No short-cycle timer
+                short_interval=None,  # No short-cycle task
                 long_interval=10.0,  # 10 seconds for retry operations
                 initial_delay=10.0,  # Wait a bit before first retry
             ),
-            SchedulerTimerSpec(
+            SchedulerTaskSpec(
                 ScheduleType.RETRY_CREATING,
-                None,  # No short-cycle timer for retry tasks
-                LockID.LOCKID_SOKOVAN_RETRY_CREATING_TIMER,
-                short_interval=None,  # No short-cycle timer
+                short_interval=None,  # No short-cycle task
                 long_interval=10.0,  # 10 seconds for retry operations
                 initial_delay=10.0,  # Wait a bit before first retry
             ),
         ]
 
-    async def init_timers(self) -> None:
-        """Initialize GlobalTimers for scheduled operations."""
-        timer_specs = self._create_timer_specs()
+    def create_task_specs(self) -> list[EventTaskSpec]:
+        """Create task specifications for leader-based scheduling."""
+        timer_specs = self._create_task_specs()
+        specs: list[EventTaskSpec] = []
 
-        # Create timers based on specifications
         for spec in timer_specs:
-            if spec.short_interval is not None and spec.short_lock_id is not None:
-                # Lock timeout should be slightly longer than interval to prevent overlap
-                short_lock_timeout = spec.short_interval * 1.5
-                process_if_needed_timer = GlobalTimer(
-                    self._lock_factory(spec.short_lock_id, short_lock_timeout),
-                    self._event_producer,
-                    spec.create_if_needed_event,
+            # Create short-cycle task spec if specified
+            if spec.short_interval is not None:
+                short_spec = EventTaskSpec(
+                    name=spec.short_task_name,
+                    event_factory=spec.create_if_needed_event,
                     interval=spec.short_interval,
-                    task_name=spec.short_timer_name,
+                    initial_delay=0.0,  # Start immediately for short tasks
                 )
-                self.timers.append(process_if_needed_timer)
-            # Lock timeout should be slightly longer than interval to prevent overlap
-            long_lock_timeout = spec.long_interval * 1.5
-            process_schedule_timer = GlobalTimer(
-                self._lock_factory(spec.long_lock_id, long_lock_timeout),
-                self._event_producer,
-                spec.create_process_event,
+                specs.append(short_spec)
+
+            # Create long-cycle task spec (always present)
+            long_spec = EventTaskSpec(
+                name=spec.long_task_name,
+                event_factory=spec.create_process_event,
                 interval=spec.long_interval,
                 initial_delay=spec.initial_delay,
-                task_name=spec.long_timer_name,
             )
-            self.timers.append(process_schedule_timer)
+            specs.append(long_spec)
 
-        # Join all timers to start them
-        for timer in self.timers:
-            await timer.join()
-
-        log.info("Sokovan scheduler timers initialized for all schedule types")
-
-    async def shutdown_timers(self) -> None:
-        """Shutdown GlobalTimers gracefully."""
-        async with aiotools.TaskGroup() as tg:
-            for timer in self.timers:
-                tg.create_task(timer.leave())
-        log.info("Sokovan scheduler timers stopped")
+        return specs

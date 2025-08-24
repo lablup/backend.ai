@@ -871,6 +871,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
+    log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
     yield
     await ctx.cleanup()
 
@@ -934,6 +935,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             storage_manager=root_ctx.storage_manager,
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
+            network_plugin_ctx=root_ctx.network_plugin_ctx,
         )
     )
 
@@ -1005,6 +1007,60 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize leader election for distributed coordination."""
+    import socket
+
+    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
+    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+    from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
+
+    # Create ValkeyLeaderClient for leader election
+    valkey_leader_client = await ValkeyLeaderClient.create(
+        valkey_target=root_ctx.valkey_profile_target.profile_target(RedisRole.STREAM),
+        db_id=REDIS_STREAM_LOCK,  # Use a dedicated DB for leader election
+        human_readable_name="leader",
+    )
+
+    # Create leader election configuration
+    server_id = f"manager-{socket.gethostname()}-{root_ctx.pidx}"
+    leader_config = ValkeyLeaderElectionConfig(
+        server_id=server_id,
+        leader_key="leader:sokovan:scheduler",
+        lease_duration=30,
+        renewal_interval=10.0,
+        failure_threshold=3,
+    )
+
+    # Create leader election instance
+    root_ctx.leader_election = ValkeyLeaderElection(
+        leader_client=valkey_leader_client,
+        config=leader_config,
+    )
+
+    # Get task specifications from sokovan and register them
+    task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
+
+    # Create event producer tasks from specs
+    leader_tasks: list[PeriodicTask] = [
+        EventProducerTask(spec, root_ctx.event_producer) for spec in task_specs
+    ]
+
+    # Register tasks with the election system
+    leader_cron = LeaderCron(tasks=leader_tasks)
+    root_ctx.leader_election.register_task(leader_cron)
+
+    # Start leader election (will start tasks when becoming leader)
+    await root_ctx.leader_election.start()
+    log.info(f"Leader election started for server {server_id}")
+
+    yield
+
+    # Cleanup leader election
+    await root_ctx.leader_election.stop()
+
+
+@actxmgr
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .clients.agent import AgentPool
     from .sokovan.scheduler.factory import create_default_scheduler
@@ -1019,6 +1075,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
+        root_ctx.network_plugin_ctx,
     )
 
     # Create sokovan orchestrator with lock factory for timers
@@ -1030,14 +1087,13 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         scheduling_controller=root_ctx.scheduling_controller,
     )
 
-    # Initialize the GlobalTimers for scheduling operations
-    await root_ctx.sokovan_orchestrator.init_timers()
+    log.info("Sokovan orchestrator initialized")
 
     try:
         yield
     finally:
-        # Shutdown timers gracefully
-        await root_ctx.sokovan_orchestrator.shutdown_timers()
+        # Leader election will handle task cleanup
+        pass
 
 
 @actxmgr
@@ -1294,6 +1350,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             sokovan_orchestrator_ctx,
+            leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,

@@ -48,7 +48,8 @@ from ..events.event_types.bgtask.broadcast import (
 )
 from ..types import DispatchResult, Sentinel
 from .reporter import ProgressReporter
-from .task.base import BaseBackgroundTask, BaseBackgroundTaskArgs
+from .task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
+from .task.registry import BackgroundTaskHandlerRegistry
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -142,12 +143,13 @@ class BackgroundTaskManager:
     _valkey_client: ValkeyBgtaskClient
     _server_id: str
     _tags: set[str]
-    _task_registry: Mapping[TaskName, BaseBackgroundTask]
+    _task_registry: BackgroundTaskHandlerRegistry
 
     def __init__(
         self,
         event_producer: EventProducer,
         *,
+        task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
         tags: Optional[Iterable[str]] = None,
@@ -161,7 +163,7 @@ class BackgroundTaskManager:
         self._valkey_client = valkey_client
         self._server_id = server_id
         self._tags = set(tags) if tags is not None else set()
-        self._task_registry = {}
+        self._task_registry = task_registry or BackgroundTaskHandlerRegistry()
 
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
@@ -303,14 +305,8 @@ class BackgroundTaskManager:
         finally:
             self._ongoing_tasks.pop(TaskID(task_id), None)
 
-    def _get_task_func_by_name(self, name: TaskName) -> BaseBackgroundTask:
-        try:
-            func = self._task_registry[name]
-        except KeyError:
-            raise BgtaskNotRegisteredError(
-                f"Task {name} is not registered in {self._server_id} server"
-            )
-        return func
+    def _get_task_func_by_name(self, name: TaskName) -> BaseBackgroundTaskHandler:
+        return self._task_registry.get_task(name)
 
     async def start_retriable(
         self,
@@ -343,7 +339,7 @@ class BackgroundTaskManager:
 
     async def _process_retriable_task(
         self,
-        func: BaseBackgroundTask,
+        func: BaseBackgroundTaskHandler,
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
@@ -359,7 +355,7 @@ class BackgroundTaskManager:
 
     async def _wrapper_broadcast_result(
         self,
-        func: BaseBackgroundTask,
+        func: BaseBackgroundTaskHandler,
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
@@ -379,7 +375,7 @@ class BackgroundTaskManager:
 
     async def _observe_retriable_bgtask(
         self,
-        func: BaseBackgroundTask,
+        func: BaseBackgroundTaskHandler,
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> BaseBgtaskDoneEvent:
@@ -434,7 +430,7 @@ class BackgroundTaskManager:
 
     async def _run_retriable_bgtask(
         self,
-        func: BaseBackgroundTask,
+        func: BaseBackgroundTaskHandler,
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> DispatchResult:

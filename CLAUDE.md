@@ -76,7 +76,12 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 This project uses **Pantsbuild** (version 2) and Python as specified in the `pants.toml` configuration.
 All development commands use `pants` instead of `pip`, `poetry`, or `uv` commands.
 
-### Essential Commands
+### Predefined sub-agents
+
+There are predefined sub-agents for this project: linter, typechecker, and tester.
+Use them proactively as their description specifies.
+
+### Running generic pants commands
 
 Most pants command accepts a special target argument which can indicate a set of files or the files
 changed for a specific revision range with optional transitive dependent files of the changed files.
@@ -86,58 +91,12 @@ changed for a specific revision range with optional transitive dependent files o
 - Files changed after the last commit: `--changed-since=HEAD~1` (here, the revision range syntax is that used by Git)
 - Files changed after the last commit and their dependent files as inferred: `--changed-dependents=transitive` (this option must be used with `--changed-since`)
 
-Here are the practical examples (where `{targets}` is a placeholder for an arbitrary target argument):
-
-```bash
-# Linting and formatting
-pants lint ::                      # Lint all files
-pants lint --changed-since=HEAD~1 --changed-dependents=transitive  # Lint changed files and their dependent files
-pants fmt ::                       # Format all files
-pants fmt --changed-since=HEAD~1   # Format only changed files
-
-# Type checking
-pants check ::                     # Run MyPy type checking for all files
-pants check --changed-since=HEAD~1 --changed-dependents=transitive  # Run mypy on changed files and their dependent files
-
-# Testing with summary output
-pants test {targets}               # Run the designated test targets
-pants test ::                      # Run all tests
-pants test --changed-since=HEAD~1 --changed-dependents=transitive  # Test changed files and their dependent files
-pants test src/ai/backend/appproxy/coordinator/tests::  # Run specific test directory inside the main source tree (python-default)
-pants test tests/common::                               # Run specific test directory inside the test suite
-
-# Testing with full console output using the non-retrying interatcive "debug" mode.
-pants test --debug {targets}       # Run the designated test targets
-
-# Building
-pants package                                      # Build packages
-```
-
-### Option Combination Rules for `pants test` commands
-
-If you want to verify failure details or console outputs made in pytest, you must use the `--debug` option.
-To add the `--debug` option when running tests, you must put it right after "test" as its position is very sensitive.
-Otherwise, `pants test` will hide all console outputs and just prints out the final result summary.
-
-To add pytest-specific options like `-k`, you must put `--` before them so that `pants` transparently passes them to the spawend pytest process.
-
-Here is an example demostrating how to combine the debug option and pytest-specific arguments:
-
-```bash
-pants test --debug {targets} -- -k {test-case-filter} -v -s               # Append pytest arguments (-k, -s, -v) in the debug-run mode.
-pants test --debug {targets} -- -k {test-case-filter} --print-stacktrace  # Append pytest arguments (-k, --print-stacktrace) in the debug-run mode.
-```
-
-The **targets** argument is consumed by `pants test`, and it may include file names without any suffix or directory names suffixed with "::" ONLY.
-The **test-case-filter** argument is consumed by pytest, and it may include the test case names and additional parameters ONLY.
-DO NOT mix the pytest-only test case filter options in the pants targets or vice versa.
-
 ### Adding new packages and modules
 
 When adding new packages and modules, ensure that `BUILD` files are present in their directories so that the Pantsbuild system could detect them.
 
-Under the `src` directory, use `python_sources()` with explicit name set to "src".
-Under the `tests` directory, use `python_tests()` and/or `python_testutils()`.
+- Under the `src` directory, generate or update the top-level `BUILD` files in each package (e.g., `src/ai/backend/manager/BUILD`, `src/ai/backend/appproxy/coordinator/BUILD`, `src/ai/backend/agent/BUILD`) referring to sibling package's `BUILD` files.
+- Under the `tests` directory, use `python_tests()` and/or `python_testutils()`.
 
 The `BUILD` files must be created or updated BEFORE running linting, typecheck, and tests via the `pants` command.
 

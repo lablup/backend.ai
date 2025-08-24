@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, override
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd
@@ -18,6 +18,7 @@ from ...types import (
     Stat,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
 from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 
@@ -116,6 +117,15 @@ class NoopFSOpModel(AbstractFSOpModel):
 
 class NoopVolume(AbstractVolume):
     name = NOOP_STORAGE_BACKEND_TYPE
+
+    @override
+    def info(self) -> VolumeInfo:
+        return VolumeInfo(
+            backend=NOOP_STORAGE_BACKEND_TYPE,
+            path=self.mount_path,
+            fsprefix=None,
+            options=None,
+        )
 
     async def create_quota_model(self) -> AbstractQuotaModel:
         return NoopQuotaModel()

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator, Mapping, Type
+from typing import AsyncIterator, Mapping, Self, Type
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
+from ai.backend.logging import BraceStyleAdapter
 
-from ..config.unified import StorageProxyUnifiedConfig
+from ..config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
 from ..exception import InvalidVolumeError
+from ..plugin import StoragePluginContext
 from ..types import VolumeInfo
 from .abc import AbstractVolume
 from .cephfs import CephFSVolume
@@ -22,6 +25,8 @@ from .vast import VASTVolume
 from .vfs import BaseVolume
 from .weka import WekaVolume
 from .xfs import XfsVolume
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     FlashBladeVolume.name: FlashBladeVolume,
@@ -41,59 +46,121 @@ _DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
 
 
 class VolumePool:
-    _volumes: dict[VolumeID, AbstractVolume]
-    _local_config: StorageProxyUnifiedConfig
-    _etcd: AsyncEtcd
-    _event_dispatcher: EventDispatcher
-    _event_producer: EventProducer
+    _volumes: Mapping[VolumeID, AbstractVolume]
+    _volumes_by_name: Mapping[str, AbstractVolume]
+    _storage_backend_plugin_ctx: StoragePluginContext
 
     def __init__(
         self,
+        volumes: Mapping[VolumeID, AbstractVolume],
+        volumes_by_name: Mapping[str, AbstractVolume],
+        storage_backend_plugin_ctx: StoragePluginContext,
+    ) -> None:
+        self._volumes = volumes
+        self._volumes_by_name = volumes_by_name
+        self._storage_backend_plugin_ctx = storage_backend_plugin_ctx
+
+    @classmethod
+    async def create(
+        cls,
         local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-    ):
-        self._volumes = {}
-        self._local_config = local_config
-        self._etcd = etcd
-        self._event_dispatcher = event_dispatcher
-        self._event_producer = event_producer
+    ) -> Self:
+        backends = {**_DEFAULT_BACKENDS}
+        storage_backend_plugin_ctx = await cls._init_storage_backend_plugin(
+            backends, local_config, etcd
+        )
 
-    async def __aenter__(self) -> None:
-        self._backends = {**_DEFAULT_BACKENDS}
+        volumes: dict[VolumeID, AbstractVolume] = {}
+        volumes_by_name: dict[str, AbstractVolume] = {}
+        for raw_volume_id, config in local_config.volume.items():
+            try:
+                volume_id = VolumeID(raw_volume_id)
+            except (ValueError, TypeError):
+                volumes_by_name[raw_volume_id] = await cls._init_volume(
+                    config,
+                    backends[config.backend],
+                    local_config,
+                    etcd,
+                    event_dispatcher,
+                    event_producer,
+                )
+            else:
+                volumes[volume_id] = await cls._init_volume(
+                    config,
+                    backends[config.backend],
+                    local_config,
+                    etcd,
+                    event_dispatcher,
+                    event_producer,
+                )
+        return cls(
+            volumes=volumes,
+            volumes_by_name=volumes_by_name,
+            storage_backend_plugin_ctx=storage_backend_plugin_ctx,
+        )
+
+    @classmethod
+    async def _init_volume(
+        cls,
+        volume_config: VolumeInfoConfig,
+        volume_type: Type[AbstractVolume],
+        local_config: StorageProxyUnifiedConfig,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+    ) -> AbstractVolume:
+        volume_obj = volume_type(
+            local_config=local_config.model_dump(by_alias=True),
+            mount_path=Path(volume_config.path),
+            etcd=etcd,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            options=volume_config.options or {},
+        )
+        await volume_obj.init()
+        return volume_obj
+
+    @classmethod
+    async def _init_storage_backend_plugin(
+        cls,
+        backends: dict[str, Type[AbstractVolume]],
+        local_config: StorageProxyUnifiedConfig,
+        etcd: AsyncEtcd,
+    ) -> StoragePluginContext:
+        plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
+        await plugin_ctx.init()
+        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
+            log.info("Loading storage plugin: {0}", plugin_name)
+            volume_cls = plugin_instance.get_volume_class()
+            backends[plugin_name] = volume_cls
+        return plugin_ctx
+
+    async def shutdown(self) -> None:
+        for volume in self._volumes.values():
+            await volume.shutdown()
+        await self._storage_backend_plugin_ctx.cleanup()
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
-        return {
-            volume_id: info.to_dataclass() for volume_id, info in self._local_config.volume.items()
-        }
+        return {str(volume_id): volume.info() for volume_id, volume in self._volumes.items()}
 
     def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
-        if str(volume_id) not in self._local_config.volume:
+        if volume_id not in self._volumes:
             raise InvalidVolumeError(volume_id)
-        return self._local_config.volume[str(volume_id)].to_dataclass()
+        return self._volumes[volume_id].info()
 
     @actxmgr
     async def get_volume(self, volume_id: VolumeID) -> AsyncIterator[AbstractVolume]:
-        if volume_id in self._volumes:
+        try:
             yield self._volumes[volume_id]
-        else:
-            try:
-                volume_config = self._local_config.volume[str(volume_id)]
-            except KeyError:
-                raise InvalidVolumeError(volume_id)
+        except KeyError:
+            raise InvalidVolumeError(volume_id)
 
-            volume_cls: Type[AbstractVolume] = self._backends[volume_config.backend]
-            volume_obj = volume_cls(
-                local_config=self._local_config.model_dump(by_alias=True),
-                mount_path=Path(volume_config.path),
-                etcd=self._etcd,
-                event_dispatcher=self._event_dispatcher,
-                event_producer=self._event_producer,
-                options=volume_config.options or {},
-            )
-
-            await volume_obj.init()
-            self._volumes[volume_id] = volume_obj
-
-            yield volume_obj
+    @actxmgr
+    async def get_volume_by_name(self, name: str) -> AsyncIterator[AbstractVolume]:
+        try:
+            yield self._volumes_by_name[name]
+        except KeyError:
+            raise InvalidVolumeError(name)

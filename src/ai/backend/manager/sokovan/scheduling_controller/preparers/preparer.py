@@ -197,8 +197,24 @@ class SessionPreparer:
                 requested_slots = kernel_resource.requested_slots
                 resource_opts = kernel_resource.resource_opts
                 preopen_ports = kernel_config.get("preopen_ports") or []
+                log.debug(
+                    "Kernel {} (idx={}, role={}) using calculated resources: {}",
+                    kernel_id,
+                    idx,
+                    kernel_config.get("cluster_role", "unknown"),
+                    requested_slots,
+                )
             else:
                 # Fallback if no calculated resources
+                log.warning(
+                    "Kernel {} (idx={}, role={}) has no calculated resources! "
+                    "calculated_resources has {} entries but need idx={}",
+                    kernel_id,
+                    idx,
+                    kernel_config.get("cluster_role", "unknown"),
+                    len(calculated_resources.kernel_resources),
+                    idx,
+                )
                 requested_slots = ResourceSlot()
                 resource_opts = {}
                 preopen_ports = []

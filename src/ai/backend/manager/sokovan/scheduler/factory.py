@@ -2,6 +2,7 @@
 
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
 from ai.backend.manager.sokovan.scheduler.scheduler import (
@@ -43,6 +44,7 @@ def create_default_scheduler(
     config_provider: ManagerConfigProvider,
     lock_factory: DistributedLockFactory,
     agent_pool: AgentPool,
+    network_plugin_ctx: NetworkPluginContext,
 ) -> Scheduler:
     """
     Create a scheduler with default components.
@@ -52,6 +54,7 @@ def create_default_scheduler(
         config_provider: The manager configuration provider
         lock_factory: Factory for creating distributed locks
         agent_pool: Pool for managing agent clients
+        network_plugin_ctx: Network plugin context for network management
 
     Returns:
         A configured Scheduler instance
@@ -80,6 +83,7 @@ def create_default_scheduler(
         config_provider=config_provider,
         lock_factory=lock_factory,
         agent_pool=agent_pool,
+        network_plugin_ctx=network_plugin_ctx,
     )
 
     return Scheduler(args)
