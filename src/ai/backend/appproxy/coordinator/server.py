@@ -62,7 +62,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
-    config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
     ping_redis_connection,
@@ -964,11 +963,10 @@ async def server_main_logwrapper(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
-    log_endpoint = _args[1]
-    logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
-    logging_config["endpoint"] = log_endpoint
+    local_config: ServerConfig = _args[0]
+    log_endpoint: str = _args[1]
     logger = Logger(
-        logging_config,
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1033,11 +1031,9 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
         ipc_base_path.mkdir(exist_ok=True, parents=True)
         log_sockpath = ipc_base_path / f"coordinator-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
-        logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
-        logging_config["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                logging_config,
+                cfg.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
