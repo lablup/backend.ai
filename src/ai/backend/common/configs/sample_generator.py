@@ -442,7 +442,10 @@ def generate_sample_config_file(
         output_path: Path where the configuration file will be written
         header_comment: Optional header comment to add at the top of the file
     """
-    config_content = _generate_sample_config(model_class)
+    try:
+        config_content = _generate_sample_config(model_class)
+    except Exception:
+        log.exception("Error while generating sample config schema")
     with open(output_path, "w") as f:
         if header_comment:
             f.write(_wrap_comment(header_comment))

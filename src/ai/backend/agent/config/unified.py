@@ -298,14 +298,12 @@ class AgentConfig(BaseModel):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="0.0.0.0", port=6003),
         description="Service address and port",
-        examples=[{"host": "0.0.0.0", "port": 6003}],
         validation_alias=AliasChoices("service-addr", "internal-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
         default=HostPortPair(host="host.docker.internal", port=6003),
         description="Announce address and port",
-        examples=[{"host": "host.docker.internal", "port": 6003}],
         validation_alias=AliasChoices("announce-addr", "announce-internal-addr", "announce_addr"),
         serialization_alias="announce-addr",
     )

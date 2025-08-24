@@ -57,8 +57,8 @@ def last_execution_time(
     """Queries manager's scheduler execution footprint from Redis. When scheduler name is not specified, this command will return informations of all schedulers in store."""
 
     async def _impl():
-        cfg = cli_ctx.get_bootstrap_config()
-        _manager_id = manager_id or cfg.manager.id
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
+        _manager_id = manager_id or bootstrap_config.manager.id
         async with redis_ctx(cli_ctx) as redis_conn_set:
             if not scheduler_name:
                 keys = await redis_helper.execute(

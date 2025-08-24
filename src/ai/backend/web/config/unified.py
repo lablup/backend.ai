@@ -832,7 +832,7 @@ class EtcdConfig(BaseModel):
         examples=["local", "backend"],
     )
     addr: HostPortPair | list[HostPortPair] = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379),
+        default=HostPortPair(host="127.0.0.1", port=2379),
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.

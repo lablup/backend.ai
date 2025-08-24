@@ -92,7 +92,7 @@ class EtcdConfig(BaseModel):
         examples=["local", "backend"],
     )
     addr: HostPortPair | list[HostPortPair] = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379),
+        default=HostPortPair(host="127.0.0.1", port=2379),
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.
@@ -181,11 +181,11 @@ class PyroscopeConfig(BaseModel):
 
 class ClientAPIConfig(BaseModel):
     service_addr: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=6021),
         description="""
         Network address and port where the client API service will listen.
         This is the address accessible by clients for file operations.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6021}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
@@ -222,41 +222,38 @@ class ClientAPIConfig(BaseModel):
 
 class ManagerAPIConfig(BaseModel):
     service_addr: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
         Network address and port where the manager API service will listen.
         This is the address accessible by managers for control operations.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6022}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=6022),
+        default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
         Address and port to announce to managers for service discovery.
         Should be accessible by other manager components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6022}],
         validation_alias=AliasChoices("announce-addr", "announce_addr"),
         serialization_alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="host.docker.internal", port=6023),
+        default=HostPortPair(host="host.docker.internal", port=6023),
         description="""
         Address and port to announce for internal manager API requests.
         Used for service discovery within container environments.
         """,
-        examples=[{"host": "host.docker.internal", "port": 6023}],
         validation_alias=AliasChoices("announce-internal-addr", "announce_internal_addr"),
         serialization_alias="announce-internal-addr",
     )
     internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=16023),
+        default=HostPortPair(host="127.0.0.1", port=16023),
         description="""
         Internal address where manager API listens for internal requests.
         Used for internal communication between services.
         """,
-        examples=[{"host": "127.0.0.1", "port": 16023}],
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
