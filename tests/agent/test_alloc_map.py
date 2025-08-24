@@ -26,7 +26,7 @@ class DummyDevice(AbstractComputeDevice):
 
 
 @pytest.mark.parametrize("alloc_strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
-def test_discrete_alloc_map(alloc_strategy: AllocationStrategy):
+def test_discrete_alloc_map(alloc_strategy: AllocationStrategy) -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
@@ -57,7 +57,7 @@ def test_discrete_alloc_map(alloc_strategy: AllocationStrategy):
     assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == 0
 
 
-def test_discrete_alloc_map_large_number_fill():
+def test_discrete_alloc_map_large_number_fill() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(100)),
@@ -88,7 +88,7 @@ def test_discrete_alloc_map_large_number_fill():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == 0
 
 
-def test_discrete_alloc_map_large_number_even():
+def test_discrete_alloc_map_large_number_even() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(100)),
@@ -128,7 +128,7 @@ def test_discrete_alloc_map_large_number_even():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == 0
 
 
-def test_discrete_alloc_map_even_to_tightly_fill():
+def test_discrete_alloc_map_even_to_tightly_fill() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(10)),
@@ -168,7 +168,7 @@ def test_discrete_alloc_map_even_to_tightly_fill():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == 0
 
 
-def test_discrete_alloc_map_cpu_even():
+def test_discrete_alloc_map_cpu_even() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("cpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal(2)),
@@ -234,7 +234,7 @@ def test_discrete_alloc_map_cpu_even():
     check_clean()
 
 
-def test_fraction_alloc_map():
+def test_fraction_alloc_map() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1.0)),
@@ -265,7 +265,7 @@ def test_fraction_alloc_map():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == Decimal("0")
 
 
-def test_fraction_alloc_map_many_device():
+def test_fraction_alloc_map_many_device() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1.0)),
@@ -305,7 +305,7 @@ def test_fraction_alloc_map_many_device():
         assert alloc_map.allocations[SlotName("x")][DeviceId(f"a{idx}")] == Decimal("0")
 
 
-def test_fraction_alloc_map_iteration():
+def test_fraction_alloc_map_iteration() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1.0)),
@@ -334,7 +334,7 @@ def test_fraction_alloc_map_iteration():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == Decimal("0.005")
 
 
-def test_fraction_alloc_map_random_generated_allocations():
+def test_fraction_alloc_map_random_generated_allocations() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1.0)),
@@ -361,19 +361,18 @@ def test_fraction_alloc_map_random_generated_allocations():
         assert alloc_map.allocations[SlotName("x")][DeviceId("a1")] == Decimal("0")
 
 
-def test_fraction_alloc_map_even_allocation():
+def test_fraction_alloc_map_even_allocation() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
-            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(0.05)),
-            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(0.1)),
-            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(0.2)),
-            DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(0.3)),
-            DeviceId("a4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(0.0)),
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.05")),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.1")),
+            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.2")),
+            DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.3")),
+            DeviceId("a4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.0")),
         },
         allocation_strategy=AllocationStrategy.EVENLY,
     )
-    for idx in range(5):
-        assert alloc_map.allocations[SlotName("x")][DeviceId(f"a{idx}")] == Decimal("0")
+    assert sum(alloc_map.allocations[SlotName("x")].values(), start=Decimal(0)) == 0
 
     with pytest.raises(InsufficientResource):
         alloc_map.allocate({
@@ -402,8 +401,7 @@ def test_fraction_alloc_map_even_allocation():
             DeviceId("a2"): Decimal("0.05"),
         }
     })
-    for idx in range(0):
-        assert alloc_map.allocations[SlotName("x")][DeviceId(f"a{idx}")] == Decimal("0")
+    assert sum(alloc_map.allocations[SlotName("x")].values(), start=Decimal(0)) == 0
 
     result = alloc_map.allocate({
         SlotName("x"): Decimal("0.2"),
@@ -472,7 +470,7 @@ def test_fraction_alloc_map_even_allocation():
     assert alloc_map.allocations[SlotName("x")][DeviceId("a2")] == Decimal("0.4")
 
 
-def test_fraction_alloc_map_even_allocation_fractions():
+def test_fraction_alloc_map_even_allocation_fractions() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("0.8")),
@@ -505,7 +503,7 @@ def test_fraction_alloc_map_even_allocation_fractions():
         assert alloc_map.allocations[SlotName("x")][DeviceId(f"a{idx}")] == Decimal("0")
 
 
-def test_fraction_alloc_map_even_allocation_many_devices():
+def test_fraction_alloc_map_even_allocation_many_devices() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(2)),
@@ -526,15 +524,15 @@ def test_fraction_alloc_map_even_allocation_many_devices():
 
     alloc_map = FractionAllocMap(
         device_slots={
-            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
-            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1.5)),
-            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(2)),
-            DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(3)),
-            DeviceId("a4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(3)),
-            DeviceId("a5"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(4)),
-            DeviceId("a6"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(4.5)),
-            DeviceId("a7"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(5)),
-            DeviceId("a8"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(5)),
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("1.0")),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("1.5")),
+            DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("2.0")),
+            DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("3.0")),
+            DeviceId("a4"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("3.0")),
+            DeviceId("a5"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("4.0")),
+            DeviceId("a6"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("4.5")),
+            DeviceId("a7"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("5.0")),
+            DeviceId("a8"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("5.0")),
         },
         allocation_strategy=AllocationStrategy.EVENLY,
     )
@@ -566,7 +564,7 @@ def test_fraction_alloc_map_even_allocation_many_devices():
         assert alloc_map.allocations[SlotName("x")][DeviceId(f"a{idx}")] == Decimal("0")
 
 
-def test_fraction_alloc_map_even_allocation_many_devices_2():
+def test_fraction_alloc_map_even_allocation_many_devices_2() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal("1.0")),
@@ -604,7 +602,7 @@ def test_fraction_alloc_map_even_allocation_many_devices_2():
     "alloc_strategy",
     [AllocationStrategy.FILL, AllocationStrategy.EVENLY],
 )
-def test_quantum_size(alloc_strategy):
+def test_quantum_size(alloc_strategy: AllocationStrategy) -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),  # noqa
@@ -711,7 +709,7 @@ def test_quantum_size(alloc_strategy):
         alloc_map.free(result)
 
 
-def test_exclusive_resource_slots():
+def test_exclusive_resource_slots() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
@@ -750,7 +748,7 @@ def test_exclusive_resource_slots():
     check_clean()
 
 
-def test_heterogeneous_resource_slots_with_discrete_alloc_map():
+def test_heterogeneous_resource_slots_with_discrete_alloc_map() -> None:
     alloc_map = DiscretePropertyAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
@@ -840,7 +838,7 @@ def test_heterogeneous_resource_slots_with_discrete_alloc_map():
     check_clean()
 
 
-def test_heterogeneous_resource_slots_with_fractional_alloc_map():
+def test_heterogeneous_resource_slots_with_fractional_alloc_map() -> None:
     alloc_map = FractionAllocMap(
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
