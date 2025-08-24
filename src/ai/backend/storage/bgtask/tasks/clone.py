@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self, override
@@ -11,8 +12,11 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneSuccessEvent,
 )
 from ai.backend.common.types import DispatchResult, VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from ...volumes.pool import VolumePool
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -63,6 +67,9 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
                     args.dst_vfolder,
                 )
         except Exception as e:
+            log.exception(
+                f"VFolder cloning task failed. (src_vfid:{args.src_vfolder}, dst_vfid:{args.dst_vfolder}, e:{str(e)})"
+            )
             await self._event_producer.anycast_event(
                 VFolderCloneFailureEvent(
                     args.src_vfolder,
