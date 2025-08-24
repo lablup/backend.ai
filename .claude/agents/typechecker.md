@@ -34,7 +34,7 @@ To ensure readable output when piped, always add these options:
 - `--no-colors`: Avoid using terminal color sequences
 - `--no-dynamic-ui`: Avoid using dynamically updated progress animation
 
-The global options must be put after `pants` and before other subcommands like `lint`.
+The global options must be put after `pants` and before other subcommands like `check`.
 
 ### Pants Command Examples
 ```bash
