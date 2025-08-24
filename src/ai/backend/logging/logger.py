@@ -124,7 +124,7 @@ class Logger(AbstractLogger):
     log_endpoint: str
     parent_logging_config: LoggingConfig
     worker_logging_config: LoggingConfig
-    log_worker: threading.Thread
+    log_processor: threading.Thread
 
     def __init__(
         self,
@@ -158,6 +158,8 @@ class Logger(AbstractLogger):
 
     @override
     def __enter__(self) -> Self:
+        # Including the parent itself, each service processes have its own RelayHandler
+        # to send the log records to the log processor thread in the parent process.
         self.worker_logging_config.handlers["relay"] = RelayLogHandlerConfig(
             class_="ai.backend.logging.handler.intrinsic.RelayHandler",
             level=self.parent_logging_config.level,
@@ -172,8 +174,8 @@ class Logger(AbstractLogger):
             self.relay_handler = logging.getLogger("").handlers[0]
             self.ready_event = threading.Event()
             assert isinstance(self.relay_handler, RelayHandler)
-            self.log_worker = threading.Thread(
-                target=log_worker,
+            self.log_processor = threading.Thread(
+                target=log_processor,
                 name="Logger",
                 args=(
                     self.parent_logging_config,
@@ -183,7 +185,7 @@ class Logger(AbstractLogger):
                     self.msgpack_options,
                 ),
             )
-            self.log_worker.start()
+            self.log_processor.start()
             self.ready_event.wait()
         return self
 
@@ -196,8 +198,8 @@ class Logger(AbstractLogger):
         is_active.reset(self._is_active_token)
         if self.is_master and self.log_endpoint:
             assert isinstance(self.relay_handler, RelayHandler)
-            self.relay_handler.emit(None)
-            self.log_worker.join()
+            self.relay_handler.emit(None)  # sentinel to stop log_processor
+            self.log_processor.join()
             self.relay_handler.close()
             ep_url = yarl.URL(self.log_endpoint)
             if ep_url.scheme.lower() == "ipc" and (ep_sock := Path(ep_url.path)).exists():
@@ -321,13 +323,16 @@ def setup_graylog_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
     graylog_handler.close()
 
 
-def log_worker(
+def log_processor(
     config: LoggingConfig,
     parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
     msgpack_options: MsgpackOptions,
 ) -> None:
+    """
+    A thread function that runs in the parent process to invoke log handlers configured from the drivers.
+    """
     # For future references: when implementing new kind of logging adapters,
     # make sure to adapt our custom `Formatter.formatException()` approach;
     # Otherwise it won't print out EXCEPTION level log (along with the traceback).
