@@ -72,7 +72,6 @@ class LocalLogger(AbstractLogger):
                 handlers={
                     "null": LogHandlerConfig(class_="logging.NullHandler"),
                 },
-                level=log_level if log_level != LogLevel.NOTSET else LogLevel.INFO,
                 loggers={
                     **{
                         k: LoggerConfig(
@@ -86,9 +85,9 @@ class LocalLogger(AbstractLogger):
             )
         else:
             self.config = config
-            if log_level != LogLevel.NOTSET:
-                self.config.level = log_level
-                self.config.pkg_ns["ai.backend"] = log_level
+        if log_level != LogLevel.NOTSET:
+            self.config.level = log_level
+            self.config.pkg_ns["ai.backend"] = log_level
         logging.config.dictConfig(self.config.model_dump())
 
     @override
