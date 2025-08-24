@@ -871,6 +871,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
+    log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
     yield
     await ctx.cleanup()
 
@@ -934,6 +935,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             storage_manager=root_ctx.storage_manager,
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
+            network_plugin_ctx=root_ctx.network_plugin_ctx,
         )
     )
 
@@ -1073,6 +1075,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
+        root_ctx.network_plugin_ctx,
     )
 
     # Create sokovan orchestrator with lock factory for timers

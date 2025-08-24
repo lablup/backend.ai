@@ -48,19 +48,37 @@ class ResourceCalculator:
         Returns:
             CalculatedResources with pre-calculated resource information
         """
-        kernel_resources = []
+        kernel_resources: list[KernelResourceInfo] = []
         session_requested_slots = ResourceSlot()
 
+        # Determine the actual number of kernels that will be created
+        # For multi-node sessions with a single kernel spec, we replicate it for all nodes
+        kernel_specs_to_calculate = []
+        if spec.cluster_size > 1 and len(spec.kernel_specs) == 1:
+            # Multi-node session with single spec - will be replicated for each node
+            log.debug("Multi-node session: replicating single spec for {} nodes", spec.cluster_size)
+            for _ in range(spec.cluster_size):
+                kernel_specs_to_calculate.append(spec.kernel_specs[0])
+        else:
+            # Single node or multi-spec multi-node - use specs as-is
+            kernel_specs_to_calculate = spec.kernel_specs
+
+        log.debug(
+            "Resource calculation: cluster_size={}, original_specs={}, calculating_for={} kernels",
+            spec.cluster_size,
+            len(spec.kernel_specs),
+            len(kernel_specs_to_calculate),
+        )
+
         # Calculate resources for each kernel
-        for kernel_spec in spec.kernel_specs:
+        for kernel_spec in kernel_specs_to_calculate:
             # Get image info for this kernel
             image_ref = kernel_spec.get("image_ref")
             if not image_ref:
                 continue
 
-            image_info = context.image_infos.get(image_ref.canonical)
-            if not image_info:
-                continue
+            # Image info must exist at this point (already checked before)
+            image_info = context.image_infos[image_ref.canonical]
 
             # Calculate kernel resources
             requested_slots, resource_opts = await self.calculate_kernel_resources(
@@ -79,6 +97,12 @@ class ResourceCalculator:
 
             # Accumulate for session total
             session_requested_slots += requested_slots
+
+        log.debug(
+            "Resource calculation complete: calculated resources for {} kernels, total slots={}",
+            len(kernel_resources),
+            session_requested_slots,
+        )
 
         return CalculatedResources(
             session_requested_slots=session_requested_slots,
