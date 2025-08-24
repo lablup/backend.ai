@@ -193,9 +193,6 @@ class LoggingConfig(BaseConfigModel):
     level: LogLevel = Field(
         default=LogLevel.INFO, description="The main log level to filter messages from all loggers."
     )
-    drivers: list[LogDriver] = Field(
-        default=[LogDriver.CONSOLE], description="Array of log drivers to print."
-    )
     disable_existing_loggers: bool = Field(
         default=False,
         description="Disable the existing loggers when applying the config.",
@@ -205,6 +202,11 @@ class LoggingConfig(BaseConfigModel):
     )
     loggers: dict[str, LoggerConfig] = Field(
         default_factory=dict, description="The mapping of per-namespace logger configurations."
+    )
+
+    # Backend.AI-specific configs from here
+    drivers: list[LogDriver] = Field(
+        default=[LogDriver.CONSOLE], description="The list of log drivers to activate."
     )
 
     # Per-driver configs

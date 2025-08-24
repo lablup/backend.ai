@@ -48,6 +48,8 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
+from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
+from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -166,20 +168,23 @@ def vfolder_host():
 
 @pytest.fixture(scope="session")
 def logging_config():
-    config = {
-        "drivers": ["console"],
-        "console": {"colored": None, "format": "verbose"},
-        "level": "DEBUG",
-        "pkg-ns": {
-            "": "INFO",
-            "ai.backend": "DEBUG",
-            "tests": "DEBUG",
-            "alembic": "INFO",
-            "aiotools": "INFO",
-            "aiohttp": "INFO",
-            "sqlalchemy": "WARNING",
+    config = LoggingConfig(
+        drivers=[LogDriver.CONSOLE],
+        console=ConsoleConfig(
+            colored=None,
+            format=LogFormat.VERBOSE,
+        ),
+        level=LogLevel.DEBUG,
+        pkg_ns={
+            "": LogLevel.INFO,
+            "ai.backend": LogLevel.DEBUG,
+            "tests": LogLevel.DEBUG,
+            "alembic": LogLevel.INFO,
+            "aiotools": LogLevel.INFO,
+            "aiohttp": LogLevel.INFO,
+            "sqlalchemy": LogLevel.WARNING,
         },
-    }
+    )
     logger = LocalLogger(config)
     with logger:
         yield config
@@ -208,7 +213,7 @@ def bootstrap_config(
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
     # Establish a self-contained config.
-    cfg = BootstrapConfig.model_validate({
+    bootstrap_config = BootstrapConfig.model_validate({
         "etcd": {
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
@@ -258,15 +263,15 @@ def bootstrap_config(
     try:
         # Override external database config with the current environment's config.
         fs_boostrap_config = asyncio.run(BootstrapConfig.load_from_file(Path("dummy-manager.toml")))
-        cfg.etcd.addr = fs_boostrap_config.etcd.addr
-        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "user")
-        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "password")
-        cfg.db.addr = fs_boostrap_config.db.addr
-        _override_if_exists(fs_boostrap_config.db, cfg.db, "user")
-        _override_if_exists(fs_boostrap_config.db, cfg.db, "password")
+        bootstrap_config.etcd.addr = fs_boostrap_config.etcd.addr
+        _override_if_exists(fs_boostrap_config.etcd, bootstrap_config.etcd, "user")
+        _override_if_exists(fs_boostrap_config.etcd, bootstrap_config.etcd, "password")
+        bootstrap_config.db.addr = fs_boostrap_config.db.addr
+        _override_if_exists(fs_boostrap_config.db, bootstrap_config.db, "user")
+        _override_if_exists(fs_boostrap_config.db, bootstrap_config.db, "password")
     except ConfigurationError:
         pass
-    yield cfg
+    yield bootstrap_config
     try:
         shutil.rmtree(ipc_base_path)
     except IOError:

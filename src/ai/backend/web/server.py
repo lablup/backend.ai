@@ -904,19 +904,19 @@ def main(
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    cfg = WebServerUnifiedConfig.model_validate(raw_cfg)
-    if cfg.pipeline.frontend_endpoint is None:
-        cfg.pipeline.frontend_endpoint = str(cfg.pipeline.endpoint)
+    server_config = WebServerUnifiedConfig.model_validate(raw_cfg)
+    if server_config.pipeline.frontend_endpoint is None:
+        server_config.pipeline.frontend_endpoint = str(server_config.pipeline.endpoint)
 
     if ctx.invoked_subcommand is None:
-        cfg.webserver.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.webserver.ipc_base_path
+        server_config.webserver.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.webserver.ipc_base_path
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
         try:
             logger = Logger(
-                cfg.logging,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -925,7 +925,9 @@ def main(
                 },
             )
             with logger:
-                setproctitle(f"backend.ai: webserver {cfg.service.ip}:{cfg.service.port}")
+                setproctitle(
+                    f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
+                )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
@@ -933,9 +935,9 @@ def main(
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
-                    pprint(cfg.model_dump())
-                log.info("serving at {0}:{1}", cfg.service.ip, cfg.service.port)
-                if cfg.webserver.event_loop == "uvloop":
+                    pprint(server_config.model_dump())
+                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                if server_config.webserver.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -944,14 +946,14 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=min(4, os.cpu_count() or 1),
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.webserver.pid_file.is_file():
+            if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.webserver.pid_file.unlink()
+                server_config.webserver.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass
