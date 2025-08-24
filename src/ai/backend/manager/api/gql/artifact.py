@@ -93,7 +93,7 @@ class ArtifactOrderBy:
 
 @strawberry.input(description="Added in 25.13.0")
 class ArtifactRevisionStatusFilter:
-    in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in")
+    in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[list[ArtifactStatus]] = None
 
 
