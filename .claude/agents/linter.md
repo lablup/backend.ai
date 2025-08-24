@@ -22,7 +22,7 @@ When invoked:
 
 Always run `pants lint` first and then apply `pants fix` and `pants fmt` as appropriate.
 
-## Testing Commands and Target Arguments
+## Pants Command Arguments and Options
 
 ### Target Arguments
 The pants commands accept target arguments:

@@ -26,7 +26,7 @@ When inovked:
 Always ensure BUILD files exist in test directories before running tests.
 Focus on fixing the underlying issue, not just symptoms.
 
-## Pants Commands and Target Arguments
+## Pants Command Arguments and Options
 
 ### Target Arguments
 The pants commands accept target arguments:
