@@ -207,7 +207,7 @@ from ai.backend.common.typed_validators import (
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 

@@ -22,7 +22,7 @@ from ai.backend.common.typed_validators import (
     UserID,
 )
 from ai.backend.common.types import ServiceDiscoveryType
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.storage.types import VolumeInfo
 
 _max_cpu_count = os.cpu_count()

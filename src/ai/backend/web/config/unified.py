@@ -22,7 +22,7 @@ from ai.backend.common.typed_validators import (
     CommaSeparatedStrList,
     HostPortPair,
 )
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 
 
 class ServiceMode(enum.StrEnum):

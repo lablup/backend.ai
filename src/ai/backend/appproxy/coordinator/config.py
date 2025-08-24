@@ -25,7 +25,7 @@ from ai.backend.appproxy.common.types import EventLoopType
 from ai.backend.common import config
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 

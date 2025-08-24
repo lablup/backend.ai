@@ -4,7 +4,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
     DatabaseConfig,

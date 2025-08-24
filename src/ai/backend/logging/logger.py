@@ -15,10 +15,11 @@ from typing import Optional, Self, override
 import msgpack
 import yarl
 import zmq
+from glide.exceptions import ConfigurationError
 from pydantic import ByteSize
 
 from .abc import AbstractLogger
-from .config_pydantic import (
+from .config import (
     LoggerConfig,
     LoggingConfig,
     LogHandlerConfig,
@@ -133,22 +134,6 @@ class Logger(AbstractLogger):
         log_endpoint: str,
         msgpack_options: MsgpackOptions,
     ) -> None:
-        if config.file is not None:
-            # FIXME: Refactor using layered config loader pattern
-            if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
-                p = Path(env_legacy_logfile_path)
-                config.file.path = p.parent
-                config.file.filename = p.name
-            if (
-                env_legacy_backup_count := os.environ.get("BACKEND_LOG_FILE_COUNT", None)
-            ) is not None:
-                config.file.backup_count = int(env_legacy_backup_count)
-            if (
-                env_legacy_logfile_size := os.environ.get("BACKEND_LOG_FILE_SIZE", None)
-            ) is not None:
-                legacy_logfile_size = f"{env_legacy_logfile_size}M"
-                config.file.rotation_size = ByteSize(legacy_logfile_size)
-
         self.is_master = is_master
         self.msgpack_options = msgpack_options
         self.log_endpoint = log_endpoint
@@ -267,13 +252,28 @@ def setup_console_log_handler(config: LoggingConfig) -> Iterator[logging.Handler
 
 @contextlib.contextmanager
 def setup_file_log_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
-    drv_config = config.file
+    if config.file is None:
+        raise ConfigurationError(
+            "logging.setup_file_log_handler: "
+            "The 'file' logging driver is active but its config is missing"
+        )
+
+    # FIXME: Refactor using layered config loader pattern
+    if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
+        p = Path(env_legacy_logfile_path)
+        config.file.path = p.parent
+        config.file.filename = p.name
+    if (env_legacy_backup_count := os.environ.get("BACKEND_LOG_FILE_COUNT", None)) is not None:
+        config.file.backup_count = int(env_legacy_backup_count)
+    if (env_legacy_logfile_size := os.environ.get("BACKEND_LOG_FILE_SIZE", None)) is not None:
+        legacy_logfile_size = f"{env_legacy_logfile_size}M"
+        config.file.rotation_size = ByteSize(legacy_logfile_size)
+
     fmt = "%(timestamp) %(level) %(name) %(processName) %(message)"
-    assert drv_config is not None
     file_handler = logging.handlers.RotatingFileHandler(
-        filename=drv_config.path / drv_config.filename,
-        backupCount=drv_config.backup_count,
-        maxBytes=drv_config.rotation_size,
+        filename=config.file.path / config.file.filename,
+        backupCount=config.file.backup_count,
+        maxBytes=config.file.rotation_size,
         encoding="utf-8",
     )
     file_handler.setLevel(config.level)
@@ -283,10 +283,15 @@ def setup_file_log_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
 
 @contextlib.contextmanager
 def setup_logstash_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
+    if config.logstash is None:
+        raise ConfigurationError(
+            "logging.setup_logstash_log_handler: "
+            "The 'logstash' logging driver is active but its config is missing"
+        )
+
     from .handler.logstash import LogstashHandler
 
     drv_config = config.logstash
-    assert drv_config is not None
     logstash_handler = LogstashHandler(
         endpoint=(drv_config.endpoint.host, drv_config.endpoint.port),
         protocol=drv_config.protocol,
@@ -302,6 +307,12 @@ def setup_logstash_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
 
 @contextlib.contextmanager
 def setup_graylog_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
+    if config.graylog is None:
+        raise ConfigurationError(
+            "logging.setup_graylog_log_handler: "
+            "The 'graylog' logging driver is active but its config is missing"
+        )
+
     from .handler.graylog import setup_graylog_handler as setup_impl
 
     graylog_handler = setup_impl(config)

@@ -36,7 +36,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
-from .config_pydantic import LoggingConfig
+if TYPE_CHECKING:
+    from .config import LoggingConfig
 
 
 class AbstractLogger(metaclass=ABCMeta):

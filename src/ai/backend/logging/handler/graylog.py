@@ -6,7 +6,7 @@ import ssl
 
 import graypy
 
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 
 
 class GELFTLSHandler(graypy.GELFTLSHandler):
