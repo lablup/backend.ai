@@ -1,11 +1,13 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
 import yarl
 
 from ai.backend.common.types import RuntimeVariant, VFolderMount
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 
 
 @dataclass
@@ -16,6 +18,9 @@ class DeploymentMetadata:
     resource_group: str
     created_user: UUID
     session_owner: UUID
+    lifecycle_stage: EndpointLifecycle
+    retries: int
+    created_at: Optional[datetime]
     tag: Optional[str] = None
 
 

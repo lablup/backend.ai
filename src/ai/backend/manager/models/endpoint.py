@@ -44,6 +44,17 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    ExecutionSpec,
+    ModelRevisionSpec,
+    MountMetadata,
+    ReplicaSpec,
+    ResourceSpec,
+)
 
 from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ..data.model_serving.creator import EndpointCreator
@@ -556,7 +567,7 @@ class EndpointRow(Base):
         )
 
     @classmethod
-    def from_creator(cls, creator: EndpointCreator) -> Self:
+    def from_endpoint_creator(cls, creator: EndpointCreator) -> Self:
         """
         Create an EndpointRow instance from an EndpointCreator instance.
         """
@@ -584,6 +595,94 @@ class EndpointRow(Base):
             environ=creator.environ,
             resource_opts=creator.resource_opts,
             open_to_public=creator.open_to_public,
+        )
+
+    @classmethod
+    def from_deployment_creator(cls, creator: DeploymentCreator) -> Self:
+        """
+        Create an EndpointRow instance from a DeploymentCreator instance.
+        """
+        return cls(
+            id=uuid4(),
+            name=creator.metadata.name,
+            model_definition_path=creator.model_revision.mounts.model_definition_path,
+            created_user=creator.metadata.created_user,
+            session_owner=creator.metadata.session_owner,
+            replicas=creator.replica_spec.replica_count,
+            image=creator.model_revision.image,
+            model=creator.model_revision.mounts.model_vfolder_id,
+            domain=creator.metadata.domain,
+            project=creator.metadata.project,
+            resource_group=creator.metadata.resource_group,
+            resource_slots=creator.model_revision.resource_spec.resource_slots,
+            cluster_mode=creator.model_revision.resource_spec.cluster_mode,
+            cluster_size=creator.model_revision.resource_spec.cluster_size,
+            extra_mounts=creator.model_revision.mounts.extra_mounts,
+            runtime_variant=creator.model_revision.execution.runtime_variant,
+            model_mount_destination=creator.model_revision.mounts.model_definition_path,
+            tag=creator.metadata.tag,
+            startup_command=creator.model_revision.execution.startup_command,
+            bootstrap_script=creator.model_revision.execution.bootstrap_script,
+            callback_url=creator.model_revision.execution.callback_url,
+            environ=creator.model_revision.execution.environ,
+            resource_opts=creator.model_revision.resource_spec.resource_opts,
+            open_to_public=creator.network.open_to_public,
+            # Additional fields with defaults
+            lifecycle_stage=EndpointLifecycle.CREATED,
+            url=creator.network.url,
+            retries=0,
+            # created_at and destroyed_at will be handled by database defaults
+        )
+
+    def to_deployment_info(self) -> DeploymentInfo:
+        """
+        Convert EndpointRow to DeploymentInfo.
+        """
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                tag=self.tag,
+                lifecycle_stage=self.lifecycle_stage,
+                retries=self.retries,
+                created_at=self.created_at,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            model_revisions=[
+                ModelRevisionSpec(
+                    image=self.image,
+                    resource_spec=ResourceSpec(
+                        replicas=self.replicas,
+                        cluster_mode=self.cluster_mode,
+                        cluster_size=self.cluster_size,
+                        resource_slots=self.resource_slots,
+                        resource_opts=self.resource_opts,
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=self.model,
+                        model_definition_path=self.model_definition_path or "/models",
+                        extra_mounts=self.extra_mounts,
+                    ),
+                    execution=ExecutionSpec(
+                        startup_command=self.startup_command,
+                        bootstrap_script=self.bootstrap_script,
+                        environ=self.environ,
+                        runtime_variant=self.runtime_variant,
+                        callback_url=self.callback_url,
+                    ),
+                ),
+            ],
         )
 
 

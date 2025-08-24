@@ -8,12 +8,14 @@ from pydantic import HttpUrl
 
 from ai.backend.common.types import RuntimeVariant, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.types import RouteInfo, ServiceInfo
 
 from .db_source import DeploymentDBSource
-from .types import EndpointCreationArgs, EndpointData, RouteData
+from .types import RouteData
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -30,19 +32,19 @@ class DeploymentRepository:
 
     async def create_endpoint(
         self,
-        args: EndpointCreationArgs,
-    ) -> uuid.UUID:
-        """Create a new endpoint."""
-        return await self._db_source.create_endpoint(args)
+        creator: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """Create a new endpoint and return DeploymentInfo."""
+        return await self._db_source.create_endpoint(creator)
 
     async def get_endpoint_info(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointData]:
+    ) -> Optional[DeploymentInfo]:
         """Get endpoint information."""
         return await self._db_source.get_endpoint(endpoint_id)
 
-    async def get_all_active_endpoints(self) -> list[EndpointData]:
+    async def get_all_active_endpoints(self) -> list[DeploymentInfo]:
         """Get all active endpoints for synchronization."""
         return await self._db_source.get_all_active_endpoints()
 
@@ -85,9 +87,9 @@ class DeploymentRepository:
     ) -> Optional[HttpUrl]:
         """Get service endpoint URL."""
         endpoint = await self._db_source.get_endpoint(endpoint_id)
-        if not endpoint or not endpoint.service_endpoint:
+        if not endpoint or not endpoint.network.url:
             return None
-        return HttpUrl(endpoint.service_endpoint)
+        return HttpUrl(endpoint.network.url)
 
     # Route operations
 
@@ -146,14 +148,14 @@ class DeploymentRepository:
         self,
         owner_id: uuid.UUID,
         name: Optional[str] = None,
-    ) -> list[EndpointData]:
+    ) -> list[DeploymentInfo]:
         """List endpoints by owner with optional name filter."""
         endpoints = await self._db_source.get_all_active_endpoints()
-        # Filter by owner
-        endpoints = [e for e in endpoints if e.owner_id == owner_id]
+        # Filter by owner - using metadata.session_owner
+        endpoints = [e for e in endpoints if e.metadata.session_owner == owner_id]
         # Filter by name if provided
         if name:
-            endpoints = [e for e in endpoints if e.name == name]
+            endpoints = [e for e in endpoints if e.metadata.name == name]
         return endpoints
 
     async def get_service_info(

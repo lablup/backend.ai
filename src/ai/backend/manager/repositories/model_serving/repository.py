@@ -159,7 +159,7 @@ class ModelServingRepository:
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
-            endpoint_row = EndpointRow.from_creator(endpoint_creator)
+            endpoint_row = EndpointRow.from_endpoint_creator(endpoint_creator)
             db_sess.add(endpoint_row)
             await db_sess.flush()
             endpoint_row = await EndpointRow.get(

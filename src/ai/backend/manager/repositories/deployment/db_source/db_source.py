@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import sessionmaker
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -22,7 +24,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..types import (
     AutoScalingRuleData,
-    EndpointCreationArgs,
     EndpointData,
     EndpointWithRoutesData,
     RouteData,
@@ -103,44 +104,21 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        args: EndpointCreationArgs,
-    ) -> uuid.UUID:
-        """Create a new endpoint in the database."""
-        endpoint_id = uuid.uuid4()
-
+        creator: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """Create a new endpoint in the database and return DeploymentInfo."""
         async with self._begin_session_read_committed() as db_sess:
-            # Extract resource_group from resource_opts if not provided
-            resource_group = args.scaling_group or (args.resource_opts or {}).get(
-                "scaling_group", "default"
-            )
-
-            # Extract resource_slots from resource_opts
-            resource_slots = (args.resource_opts or {}).get("resources", {})
-
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=args.name,
-                model=args.model_id,
-                created_user=args.owner_id,
-                session_owner=args.owner_id,  # Also set session_owner
-                project=args.group_id,
-                domain=args.domain_name,
-                resource_group=resource_group,  # Required field
-                lifecycle_stage=EndpointLifecycle.CREATED,
-                open_to_public=args.is_public,
-                runtime_variant=args.runtime_variant,
-                replicas=args.desired_session_count,
-                resource_slots=resource_slots,  # Required field
-                resource_opts=args.resource_opts or {},
-            )
+            endpoint = EndpointRow.from_deployment_creator(creator)
             db_sess.add(endpoint)
+            await db_sess.flush()
+            deployment_info = endpoint.to_deployment_info()
 
-        return endpoint_id
+        return deployment_info
 
     async def get_endpoint(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointData]:
+    ) -> Optional[DeploymentInfo]:
         """Get endpoint by ID."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
@@ -150,28 +128,14 @@ class DeploymentDBSource:
             if not row:
                 return None
 
-            return EndpointData(
-                endpoint_id=row.id,
-                name=row.name,
-                model_id=row.model,
-                owner_id=row.created_user,
-                group_id=row.project,
-                domain_name=row.domain,
-                lifecycle=row.lifecycle_stage,
-                is_public=row.open_to_public,
-                runtime_variant=row.runtime_variant,
-                desired_session_count=row.replicas,
-                created_at=row.created_at,
-                service_endpoint=row.url,
-                resource_opts=row.resource_opts or {},
-            )
+            return row.to_deployment_info()
 
-    async def get_all_active_endpoints(self) -> list[EndpointData]:
+    async def get_all_active_endpoints(self) -> list[DeploymentInfo]:
         """Get all active endpoints."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             rows = await self._fetch_active_endpoints(db_sess)
 
-        return self._transform_endpoint_rows(rows)
+        return [row.to_deployment_info() for row in rows]
 
     async def _fetch_active_endpoints(
         self,
@@ -186,30 +150,6 @@ class DeploymentDBSource:
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
-
-    def _transform_endpoint_rows(
-        self,
-        rows: list[EndpointRow],
-    ) -> list[EndpointData]:
-        """Transform endpoint rows to data objects."""
-        return [
-            EndpointData(
-                endpoint_id=row.id,
-                name=row.name,
-                model_id=row.model,
-                owner_id=row.created_user,
-                group_id=row.project,
-                domain_name=row.domain,
-                lifecycle=row.lifecycle_stage,
-                is_public=row.open_to_public,
-                runtime_variant=row.runtime_variant,
-                desired_session_count=row.replicas,
-                created_at=row.created_at,
-                service_endpoint=row.url,
-                resource_opts=row.resource_opts or {},
-            )
-            for row in rows
-        ]
 
     async def update_endpoint_lifecycle(
         self,

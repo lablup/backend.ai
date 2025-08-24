@@ -5,10 +5,14 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 
-import yarl
-
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.types import KernelEnqueueingConfig, SessionId, SessionTypes, VFolderMount
+from ai.backend.common.types import (
+    AccessKey,
+    ClusterMode,
+    KernelEnqueueingConfig,
+    SessionTypes,
+    VFolderMount,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
@@ -18,8 +22,6 @@ from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import (
-    EndpointCreationArgs,
-    EndpointData,
     RouteData,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
@@ -27,10 +29,9 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     UserScope,
 )
 from ai.backend.manager.services.model_serving.types import (
-    ModelServiceCreator,
-    RouteInfo,
     ServiceInfo,
 )
+from ai.backend.manager.sokovan.deployment.validators.validator import DeploymentValidator
 
 from ..scheduling_controller import SchedulingController
 from .exceptions import EndpointNotFound, ServiceInfoRetrievalFailed
@@ -43,6 +44,7 @@ class DeploymentControllerArgs:
     """Arguments for initializing DeploymentController."""
 
     scheduling_controller: SchedulingController
+    deployment_validator: DeploymentValidator
     deployment_repository: DeploymentRepository
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
@@ -53,6 +55,7 @@ class DeploymentController:
     """Controller for deployment and model service management."""
 
     _scheduling_controller: SchedulingController
+    _deployment_validator: DeploymentValidator
     _deployment_repository: DeploymentRepository
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
@@ -61,6 +64,7 @@ class DeploymentController:
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
         self._scheduling_controller = args.scheduling_controller
+        self._deployment_validator = args.deployment_validator
         self._deployment_repository = args.deployment_repository
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
@@ -76,153 +80,9 @@ class DeploymentController:
         Returns:
             DeploymentInfo: Information about the created deployment
         """
-        # TODO: Implement the actual deployment creation logic
-        # For now, create a deployment with the provided spec
+        await self._deployment_validator.validate(spec)
 
-        # This is a placeholder implementation
-        # The actual implementation should:
-        # 1. Create endpoint in database
-        # 2. Create routing entries
-        # 3. Schedule sessions for replicas
-        # 4. Return the complete DeploymentInfo
-
-        # TODO: Implement actual deployment creation logic here
-        raise NotImplementedError("Deployment creation logic not yet implemented")
-
-    async def create_model_service(
-        self,
-        spec: ModelServiceCreator,
-    ) -> ServiceInfo:
-        """
-        Create a new model service deployment.
-
-        This method orchestrates the creation of a model service by:
-        1. Validating the specification
-        2. Creating endpoint and routing entries
-        3. Preparing session specifications for each replica
-        4. Enqueuing sessions through the SchedulingController
-
-        Args:
-            spec: Model service creation specification
-
-        Returns:
-            ServiceInfo: Information about the created model service
-        """
-        log.info(
-            "Creating model service '{}' with {} replicas",
-            spec.service_name,
-            spec.replicas,
-        )
-
-        # Prepare resource_opts to store for future scaling operations
-        endpoint_resource_opts = {
-            "image_ref": spec.image,
-            "architecture": spec.architecture,
-            "access_key": spec.model_service_prepare_ctx.owner_access_key,
-            "scaling_group": spec.config.scaling_group,
-            "cluster_size": spec.cluster_size,
-            "cluster_mode": spec.cluster_mode,
-            "resources": spec.config.resources,
-            "resource_opts": spec.config.resource_opts,
-            "environ": spec.config.environ or {},
-            "model_mount_destination": spec.config.model_mount_destination,
-            "extra_mounts": [
-                {
-                    "vfolder_id": str(vfolder_id),
-                    "mount_path": mount_option.mount_destination or f"/mnt/{vfolder_id}",
-                    "permission": mount_option.permission.value
-                    if mount_option.permission
-                    else "rw",
-                }
-                for vfolder_id, mount_option in spec.config.extra_mounts.items()
-            ],
-            "sudo_session_enabled": spec.sudo_session_enabled,
-            "bootstrap_script": spec.bootstrap_script,
-            "startup_command": spec.startup_command or spec.config.model_definition_path,
-            "callback_url": spec.callback_url,
-            "tag": spec.tag,
-        }
-
-        # Create endpoint in database
-        endpoint_args = EndpointCreationArgs(
-            name=spec.service_name,
-            model_id=spec.model_service_prepare_ctx.model_id,
-            owner_id=spec.model_service_prepare_ctx.owner_uuid,
-            group_id=spec.model_service_prepare_ctx.group_id,
-            domain_name=spec.domain_name,
-            is_public=spec.open_to_public,
-            runtime_variant=spec.runtime_variant,
-            desired_session_count=spec.replicas,
-            resource_opts=endpoint_resource_opts,
-            scaling_group=spec.config.scaling_group,
-        )
-        endpoint_id = await self._deployment_repository.create_endpoint(endpoint_args)
-
-        # Create routing entries for replicas
-        route_ids = []
-        for _ in range(spec.replicas):
-            route_id = await self._deployment_repository.create_route(
-                endpoint_id,
-                traffic_ratio=1.0 / spec.replicas,  # Equal distribution initially
-            )
-            route_ids.append(route_id)
-
-        # Prepare session specifications for replicas
-        session_ids: list[SessionId] = []
-        active_routes: list[RouteInfo] = []
-
-        for replica_idx in range(spec.replicas):
-            session_spec = await self._prepare_session_spec_for_replica(
-                spec,
-                replica_idx,
-                endpoint_id,
-                route_ids[replica_idx],
-            )
-
-            # Enqueue session through SchedulingController
-            session_id = await self._scheduling_controller.enqueue_session(session_spec)
-            session_ids.append(session_id)
-
-            # Update route with session ID
-            await self._deployment_repository.update_route_session(
-                route_ids[replica_idx],
-                session_id,
-            )
-
-            active_routes.append(
-                RouteInfo(
-                    route_id=route_ids[replica_idx],
-                    session_id=session_id,
-                    traffic_ratio=1.0 / spec.replicas,
-                )
-            )
-
-            log.debug(
-                "Enqueued replica {} for service '{}' with session ID {}",
-                replica_idx,
-                spec.service_name,
-                session_id,
-            )
-
-        # Fetch service endpoint URL if needed
-        service_endpoint = await self._deployment_repository.get_service_endpoint(endpoint_id)
-
-        # Return complete service information
-        return ServiceInfo(
-            endpoint_id=endpoint_id,
-            model_id=spec.model_service_prepare_ctx.model_id,
-            extra_mounts=[
-                mount.vfid.folder_id for mount in spec.model_service_prepare_ctx.extra_mounts
-            ],
-            name=spec.service_name,
-            model_definition_path=spec.config.model_definition_path,
-            replicas=spec.replicas,
-            desired_session_count=spec.replicas,
-            active_routes=active_routes,
-            service_endpoint=service_endpoint,
-            is_public=spec.open_to_public,
-            runtime_variant=spec.runtime_variant,
-        )
+        return await self._deployment_repository.create_endpoint(spec)
 
     async def delete_model_service(
         self,
@@ -329,7 +189,7 @@ class DeploymentController:
     async def _scale_out(
         self,
         endpoint_id: uuid.UUID,
-        endpoint_info: Optional[EndpointData],
+        endpoint_info: Optional[DeploymentInfo],
         current_replicas: int,
         target_replicas: int,
     ) -> None:
@@ -418,7 +278,7 @@ class DeploymentController:
 
     async def _prepare_session_spec_from_endpoint(
         self,
-        endpoint_info: EndpointData,
+        endpoint_info: DeploymentInfo,
         replica_idx: int,
         endpoint_id: uuid.UUID,
         route_id: uuid.UUID,
@@ -436,18 +296,16 @@ class DeploymentController:
             SessionCreationSpec: Session specification ready for enqueuing
         """
         # Prepare environment variables
-        environ = (
-            endpoint_info.resource_opts.get("environ", {}) if endpoint_info.resource_opts else {}
-        )
+        # Get the first model revision (assuming single revision for now)
+        model_revision = endpoint_info.model_revisions[0] if endpoint_info.model_revisions else None
+        environ = model_revision.execution.environ or {} if model_revision else {}
         environ.update({
             "BACKEND_ENDPOINT_ID": str(endpoint_id),
             "BACKEND_ROUTE_ID": str(route_id),
-            "BACKEND_MODEL_PATH": endpoint_info.resource_opts.get(
-                "model_mount_destination", "/models"
-            )
-            if endpoint_info.resource_opts
+            "BACKEND_MODEL_PATH": model_revision.mounts.model_definition_path
+            if model_revision
             else "/models",
-            "BACKEND_SERVICE_NAME": endpoint_info.name,
+            "BACKEND_SERVICE_NAME": endpoint_info.metadata.name,
             "BACKEND_REPLICA_INDEX": str(replica_idx),
         })
 
@@ -460,28 +318,29 @@ class DeploymentController:
             "model_service": True,
             "endpoint_id": str(endpoint_id),
             "route_id": str(route_id),
-            "service_name": endpoint_info.name,
+            "service_name": endpoint_info.metadata.name,
             "replica_index": replica_idx,
         }
 
-        # Get other necessary fields from resource_opts
-        resource_opts = endpoint_info.resource_opts or {}
+        # Get resource and execution specs from model revision
+        resource_spec = model_revision.resource_spec if model_revision else None
+        execution_spec = model_revision.execution if model_revision else None
 
-        # Create kernel specifications from resource_opts
+        # Create kernel specifications
         kernel_config = KernelEnqueueingConfig(
-            image_ref=resource_opts.get("image_ref", ""),  # type: ignore[typeddict-item]
+            image_ref=str(model_revision.image) if model_revision else "",  # type: ignore[typeddict-item]
             cluster_role="main",
             cluster_idx=0,
             local_rank=0,
-            cluster_hostname=f"{endpoint_info.name}-{replica_idx}",
+            cluster_hostname=f"{endpoint_info.metadata.name}-{replica_idx}",
             creation_config={
-                "architecture": resource_opts.get("architecture", "x86_64"),
-                "resource_opts": resource_opts.get("resource_opts", {}),
-                "resource_slots": resource_opts.get("resources", {}),
+                "architecture": "x86_64",  # TODO: Get from somewhere
+                "resource_opts": resource_spec.resource_opts or {} if resource_spec else {},
+                "resource_slots": resource_spec.resource_slots if resource_spec else {},
                 "environ": environ,
             },
-            bootstrap_script=resource_opts.get("bootstrap_script", ""),
-            startup_command=resource_opts.get("startup_command"),
+            bootstrap_script=execution_spec.bootstrap_script or "" if execution_spec else "",
+            startup_command=execution_spec.startup_command if execution_spec else None,
             uid=None,
             main_gid=None,
             supplementary_gids=[],
@@ -491,142 +350,34 @@ class DeploymentController:
         creation_spec = {
             "mounts": mounts,
             "environ": environ,
-            "resources": resource_opts.get("resources", {}),
-            "resource_opts": resource_opts.get("resource_opts", {}),
+            "resources": resource_spec.resource_slots if resource_spec else {},
+            "resource_opts": resource_spec.resource_opts or {} if resource_spec else {},
         }
 
         return SessionCreationSpec(
-            session_creation_id=f"{endpoint_info.name}-{replica_idx:03d}-{uuid.uuid4().hex[:8]}",
-            session_name=f"{endpoint_info.name}-{replica_idx:03d}",
+            session_creation_id=f"{endpoint_info.metadata.name}-{replica_idx:03d}-{uuid.uuid4().hex[:8]}",
+            session_name=f"{endpoint_info.metadata.name}-{replica_idx:03d}",
             session_type=SessionTypes.INFERENCE,
             user_scope=UserScope(
-                domain_name=endpoint_info.domain_name,
-                group_id=endpoint_info.group_id,
-                user_uuid=endpoint_info.owner_id,
+                domain_name=endpoint_info.metadata.domain,
+                group_id=endpoint_info.metadata.project,
+                user_uuid=endpoint_info.metadata.session_owner,
                 user_role="user",  # Default role for model service
             ),
-            access_key=resource_opts.get("access_key", ""),
-            scaling_group=resource_opts.get("scaling_group", "default"),
-            cluster_size=resource_opts.get("cluster_size", 1),
-            cluster_mode=resource_opts.get("cluster_mode", "single-node"),
+            access_key=AccessKey(""),  # TODO: Get from somewhere
+            scaling_group=endpoint_info.metadata.resource_group,
+            cluster_size=resource_spec.cluster_size if resource_spec else 1,
+            cluster_mode=ClusterMode(resource_spec.cluster_mode)
+            if resource_spec
+            else ClusterMode.SINGLE_NODE,
             priority=0,
             resource_policy={},  # Would need to be fetched from somewhere
             kernel_specs=[kernel_config],
             creation_spec=creation_spec,
-            sudo_session_enabled=resource_opts.get("sudo_session_enabled", False),
-            callback_url=yarl.URL(str(resource_opts.get("callback_url")))
-            if resource_opts.get("callback_url")
-            else None,
+            sudo_session_enabled=False,  # TODO: Get from somewhere
+            callback_url=execution_spec.callback_url if execution_spec else None,
             internal_data=internal_data,
-            session_tag=resource_opts.get("tag"),
-            route_id=route_id,
-        )
-
-    async def _prepare_session_spec_for_replica(
-        self,
-        model_spec: ModelServiceCreator,
-        replica_idx: int,
-        endpoint_id: uuid.UUID,
-        route_id: uuid.UUID,
-    ) -> SessionCreationSpec:
-        """
-        Prepare a session creation specification for a model service replica.
-
-        Args:
-            model_spec: Model service specification
-            replica_idx: Index of the replica
-            endpoint_id: ID of the endpoint
-            route_id: ID of the route
-
-        Returns:
-            SessionCreationSpec: Session specification ready for enqueuing
-        """
-        # Convert ModelServiceCreator to SessionCreationSpec
-
-        # Convert extra mounts to VFolderMount list
-        # VFolderMount expects different fields based on common/types.py
-        # For now, we'll use the model_service_prepare_ctx.extra_mounts which already has VFolderMount objects
-        mounts: list[VFolderMount] = list(model_spec.model_service_prepare_ctx.extra_mounts)
-
-        # Prepare environment variables
-        environ = model_spec.config.environ or {}
-        # Add model service specific environment variables
-        environ.update({
-            "BACKEND_ENDPOINT_ID": str(endpoint_id),
-            "BACKEND_ROUTE_ID": str(route_id),
-            "BACKEND_MODEL_PATH": model_spec.config.model_mount_destination,
-            "BACKEND_SERVICE_NAME": model_spec.service_name,
-            "BACKEND_REPLICA_INDEX": str(replica_idx),
-        })
-
-        # Resolve group ID properly
-        try:
-            group_id = uuid.UUID(model_spec.group_name)
-        except ValueError:
-            # If group_name is not a UUID, use the group_id from prepare context
-            group_id = model_spec.model_service_prepare_ctx.group_id
-
-        # Prepare internal data for session
-        internal_data = {
-            "model_service": True,
-            "endpoint_id": str(endpoint_id),
-            "route_id": str(route_id),
-            "service_name": model_spec.service_name,
-            "replica_index": replica_idx,
-        }
-
-        # Create kernel specifications based on the model spec
-        kernel_config = KernelEnqueueingConfig(
-            image_ref=model_spec.image,  # type: ignore[typeddict-item]
-            cluster_role="main",
-            cluster_idx=0,
-            local_rank=0,
-            cluster_hostname=f"{model_spec.service_name}-{replica_idx}",
-            creation_config={
-                "architecture": model_spec.architecture,
-                "resource_opts": model_spec.config.resource_opts,
-                "resource_slots": model_spec.config.resources,
-                "environ": environ,
-            },
-            bootstrap_script=model_spec.bootstrap_script or "",
-            startup_command=model_spec.startup_command or model_spec.config.model_definition_path,
-            uid=None,
-            main_gid=None,
-            supplementary_gids=[],
-        )
-
-        # Prepare creation spec with proper field structure
-        creation_spec = {
-            "mounts": mounts,
-            "environ": environ,
-            "resources": model_spec.config.resources,
-            "resource_opts": model_spec.config.resource_opts,
-        }
-
-        return SessionCreationSpec(
-            session_creation_id=f"{model_spec.service_name}-{replica_idx:03d}-{uuid.uuid4().hex[:8]}",
-            session_name=f"{model_spec.service_name}-{replica_idx:03d}",
-            session_type=SessionTypes.INFERENCE,
-            user_scope=UserScope(
-                domain_name=model_spec.domain_name,
-                group_id=group_id,
-                user_uuid=model_spec.model_service_prepare_ctx.owner_uuid,
-                user_role="user",  # Default role for model service
-            ),
-            access_key=model_spec.model_service_prepare_ctx.owner_access_key,
-            scaling_group=model_spec.config.scaling_group,
-            cluster_size=model_spec.cluster_size,
-            cluster_mode=model_spec.cluster_mode,
-            priority=0,
-            resource_policy=model_spec.model_service_prepare_ctx.resource_policy,
-            kernel_specs=[kernel_config],
-            creation_spec=creation_spec,
-            sudo_session_enabled=model_spec.sudo_session_enabled,
-            callback_url=yarl.URL(str(model_spec.callback_url))
-            if model_spec.callback_url
-            else None,
-            internal_data=internal_data,
-            session_tag=model_spec.tag,
+            session_tag=endpoint_info.metadata.tag,
             route_id=route_id,
         )
 
@@ -657,9 +408,7 @@ class DeploymentController:
         for endpoint in endpoints:
             try:
                 # Get all routes for this endpoint
-                routes = await self._deployment_repository.get_routes_by_endpoint(
-                    endpoint.endpoint_id
-                )
+                routes = await self._deployment_repository.get_routes_by_endpoint(endpoint.id)
 
                 healthy_routes = 0
                 failed_routes = []
@@ -681,37 +430,37 @@ class DeploymentController:
                     # All routes healthy
                     sync_stats["healthy"] += 1
                     await self._deployment_repository.update_endpoint_lifecycle(
-                        endpoint.endpoint_id,
+                        endpoint.id,
                         EndpointLifecycle.CREATED,  # Use CREATED instead of READY
                     )
                 elif healthy_routes > 0:
                     # Some routes healthy - degraded state
                     sync_stats["degraded"] += 1
                     await self._deployment_repository.update_endpoint_lifecycle(
-                        endpoint.endpoint_id,
+                        endpoint.id,
                         EndpointLifecycle.CREATED,  # Keep as CREATED but track degraded status separately
                     )
                 else:
                     # No healthy routes
                     sync_stats["failed"] += 1
                     await self._deployment_repository.update_endpoint_lifecycle(
-                        endpoint.endpoint_id,
+                        endpoint.id,
                         EndpointLifecycle.DESTROYING,  # Mark for cleanup if all routes failed
                     )
 
                 # Handle failed routes - mark for recovery in next cycle
                 # Auto-scaling and recovery will be handled by periodic timer
-                if failed_routes and endpoint.desired_session_count > healthy_routes:
+                if failed_routes and endpoint.replica_spec.replica_count > healthy_routes:
                     log.debug(
                         "Endpoint {} has {} failed routes, will be handled in next auto-scaling cycle",
-                        endpoint.endpoint_id,
+                        endpoint.id,
                         len(failed_routes),
                     )
 
             except Exception as e:
                 log.error(
                     "Error synchronizing endpoint {}: {}",
-                    endpoint.endpoint_id,
+                    endpoint.id,
                     e,
                 )
 
