@@ -36,8 +36,10 @@ type AccessToken implements Node
   """Added in 25.13.0: The creation timestamp of the access token."""
   createdAt: DateTime!
 
-  """Added in 25.13.0: The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  """
+  Added in 25.13.0: The expiration timestamp of the access token. The absolute token expiry date expressed in the Unix epoch format.
+  """
+  validUntil: Int!
 }
 
 """Added in 25.13.0"""
@@ -1103,6 +1105,21 @@ type ContainerUtilizationMetricMetadata
   @join__type(graph: GRAPHENE)
 {
   metric_names: [String]
+}
+
+input CreateAccessTokenInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Added in 25.13.0. The absolute token expiry date expressed in the Unix epoch format.
+  """
+  validUntil: Int!
+}
+
+type CreateAccessTokenPayload
+  @join__type(graph: STRAWBERRY)
+{
+  accessToken: AccessToken!
 }
 
 """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
@@ -3955,6 +3972,9 @@ type Mutation
 
   """Added in 25.13.0"""
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""

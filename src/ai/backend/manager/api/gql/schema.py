@@ -24,6 +24,7 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .model_deployment.access_token import create_access_token
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
@@ -94,6 +95,7 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
+    create_access_token = create_access_token
 
 
 @strawberry.type

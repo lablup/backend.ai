@@ -14,8 +14,10 @@ type AccessToken implements Node {
   """Added in 25.13.0: The creation timestamp of the access token."""
   createdAt: DateTime!
 
-  """Added in 25.13.0: The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  """
+  Added in 25.13.0: The expiration timestamp of the access token. The absolute token expiry date expressed in the Unix epoch format.
+  """
+  validUntil: Int!
 }
 
 """Added in 25.13.0"""
@@ -281,6 +283,17 @@ input ClusterConfigInput {
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
+}
+
+input CreateAccessTokenInput {
+  """
+  Added in 25.13.0. The absolute token expiry date expressed in the Unix epoch format.
+  """
+  validUntil: Int!
+}
+
+type CreateAccessTokenPayload {
+  accessToken: AccessToken!
 }
 
 """Added in 25.13.0"""
@@ -854,6 +867,9 @@ type Mutation {
 
   """Added in 25.13.0"""
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
+
+  """Added in 25.13.0"""
+  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
 }
 
 """An object with a Globally Unique ID"""
