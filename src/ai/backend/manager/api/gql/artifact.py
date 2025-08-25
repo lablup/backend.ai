@@ -42,6 +42,9 @@ from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifa
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
+from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
+    ListHuggingFaceRegistryAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
@@ -57,6 +60,7 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
 from ai.backend.manager.types import TriState
 
 
@@ -273,9 +277,9 @@ class Artifact(Node):
             GetArtifactRevisionsAction(uuid.UUID(self.id))
         )
 
-        updated_at_list = (
+        updated_at_list = [
             r.updated_at for r in action_result.revisions if r.updated_at is not None
-        )
+        ]
         return max(updated_at_list) if updated_at_list else None
 
 
@@ -644,8 +648,9 @@ async def artifacts(
     last: Optional[int] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
+    search_from_remote: Optional[str] = None,
 ) -> ArtifactConnection:
-    return await resolve_artifacts(
+    artifacts = await resolve_artifacts(
         info,
         filter=filter,
         order_by=order_by,
@@ -656,6 +661,72 @@ async def artifacts(
         limit=limit,
         offset=offset,
     )
+
+    # Fetch from the remote registries
+    if len(artifacts.edges) == 0 and search_from_remote:
+        storage_list_action_result = (
+            await info.context.processors.object_storage.list_.wait_for_complete(
+                ListObjectStorageAction()
+            )
+        )
+        if len(storage_list_action_result.data) == 0:
+            return artifacts
+
+        # Just pick first storage info
+        storage_data = storage_list_action_result.data[0]
+
+        action_result = await info.context.processors.artifact_registry.list_huggingface_registries.wait_for_complete(
+            ListHuggingFaceRegistryAction()
+        )
+        huggingface_registries = action_result.data
+
+        for registry in huggingface_registries:
+            action_scan_action_result = (
+                await info.context.processors.artifact.scan.wait_for_complete(
+                    ScanArtifactsAction(
+                        registry_id=registry.id,
+                        storage_id=storage_data.id,
+                        limit=limit or 10,
+                        search=search_from_remote,
+                        order=ModelSortKey.DOWNLOADS,
+                    )
+                )
+            )
+            action_scan_action_result.result
+            # Convert scan results to ArtifactConnection
+            registry_loader = DataLoader(
+                apartial(HuggingFaceRegistry.load_by_id, info.context),
+            )
+
+            scan_artifacts = []
+            for item in action_scan_action_result.result:
+                registry_data = await registry_loader.load(item.artifact.registry_id)
+                source_registry_data = await registry_loader.load(item.artifact.source_registry_id)
+                scan_artifacts.append(
+                    Artifact.from_dataclass(
+                        item.artifact, registry_data.url, source_registry_data.url
+                    )
+                )
+
+            # Create ArtifactConnection for scan results
+            edges = [
+                ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in scan_artifacts
+            ]
+
+            page_info = strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            )
+
+            return ArtifactConnection(
+                count=len(scan_artifacts),
+                edges=edges,
+                page_info=page_info,
+            )
+
+    return artifacts
 
 
 @strawberry.field(description="Added in 25.13.0")
