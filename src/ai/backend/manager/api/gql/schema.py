@@ -11,7 +11,7 @@ from .artifact import (
     artifact_status_changed,
     artifacts,
     cancel_import_artifact,
-    delete_artifact_revision,
+    delete_artifact_revisions,
     import_artifacts,
     reject_artifact_revision,
     scan_artifacts,
@@ -74,7 +74,7 @@ class Mutation:
     scan_artifacts = scan_artifacts
     import_artifacts = import_artifacts
     update_artifact = update_artifact
-    delete_artifact = delete_artifact_revision
+    delete_artifact_revisions = delete_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment

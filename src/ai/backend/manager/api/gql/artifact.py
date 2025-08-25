@@ -182,10 +182,15 @@ class CancelArtifactInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactInput:
+class DeleteArtifactRevisionTarget:
     artifact_revision_id: ID
     storage_id: ID
     bucket_name: str
+
+
+@strawberry.input(description="Added in 25.13.0")
+class DeleteArtifactRevisionsInput:
+    targets: list[DeleteArtifactRevisionTarget]
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -356,8 +361,8 @@ class UpdateArtifactPayload:
 
 
 @strawberry.type(description="Added in 25.13.0")
-class DeleteArtifactPayload:
-    artifact_revision_id: ID
+class DeleteArtifactRevisionsPayload:
+    artifact_revision_ids: list[ID]
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -801,18 +806,21 @@ async def update_artifact(
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def delete_artifact_revision(
-    input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactPayload:
-    action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
-        DeleteArtifactRevisionAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            storage_id=uuid.UUID(input.storage_id),
-            bucket_name=input.bucket_name,
+async def delete_artifact_revisions(
+    input: DeleteArtifactRevisionsInput, info: Info[StrawberryGQLContext]
+) -> DeleteArtifactRevisionsPayload:
+    artifact_revision_ids = []
+    for target in input.targets:
+        action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
+            DeleteArtifactRevisionAction(
+                artifact_revision_id=uuid.UUID(target.artifact_revision_id),
+                storage_id=uuid.UUID(target.storage_id),
+                bucket_name=target.bucket_name,
+            )
         )
-    )
+        artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))
 
-    return DeleteArtifactPayload(artifact_revision_id=ID(str(action_result.artifact_revision_id)))
+    return DeleteArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
 
 
 @strawberry.mutation(description="Added in 25.13.0")

@@ -249,15 +249,20 @@ type CreateObjectStoragePayload {
 scalar DateTime
 
 """Added in 25.13.0"""
-input DeleteArtifactInput {
+input DeleteArtifactRevisionTarget {
   artifactRevisionId: ID!
   storageId: ID!
   bucketName: String!
 }
 
 """Added in 25.13.0"""
-type DeleteArtifactPayload {
-  artifactRevisionId: ID!
+input DeleteArtifactRevisionsInput {
+  targets: [DeleteArtifactRevisionTarget!]!
+}
+
+"""Added in 25.13.0"""
+type DeleteArtifactRevisionsPayload {
+  artifactRevisionIds: [ID!]!
 }
 
 """Added in 25.13.0"""
@@ -590,7 +595,7 @@ type Mutation {
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
   """Added in 25.13.0"""
-  deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
+  deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload!
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
