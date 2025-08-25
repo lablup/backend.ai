@@ -139,16 +139,26 @@ class KernelStatus(CIStrEnum):
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
-        return frozenset(
-            e
-            for e in KernelStatus
-            if e
-            not in (
-                cls.PENDING,
-                cls.TERMINATED,
-                cls.CANCELLED,
-            )
-        )
+        return frozenset((
+            cls.RUNNING,
+            cls.RESTARTING,
+            cls.RESIZING,
+            cls.TERMINATING,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_requested_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns a set of kernel statuses that are considered as resource-occupying.
+        """
+        return frozenset((
+            cls.SCHEDULED,
+            cls.PREPARING,
+            cls.PULLING,
+            cls.PREPARED,
+            cls.CREATING,
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
