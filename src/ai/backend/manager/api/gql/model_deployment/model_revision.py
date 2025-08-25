@@ -127,21 +127,19 @@ def _generate_random_name() -> str:
     return f"revision-{uuid4()}"
 
 
-mock_inference_runtime_config = (
-    {
-        "tp_size": 2,
-        "pp_size": 4,
-        "ep_enable": True,
-        "sp_size": 8,
-        "max_model_length": 4096,
-        "batch_size": 32,
-        "memory_util_percentage": Decimal("0.90"),
-        "kv_storage_dtype": "float16",
-        "trust_remote_code": True,
-        "tool_call_parser": "granite",
-        "reasoning_parser": "deepseek_r1",
-    },
-)
+mock_inference_runtime_config = {
+    "tp_size": 2,
+    "pp_size": 4,
+    "ep_enable": True,
+    "sp_size": 8,
+    "max_model_length": 4096,
+    "batch_size": 32,
+    "memory_util_percentage": Decimal("0.90"),
+    "kv_storage_dtype": "float16",
+    "trust_remote_code": True,
+    "tool_call_parser": "granite",
+    "reasoning_parser": "deepseek_r1",
+}
 
 mock_revision_id_1 = "d19f8f78-f308-45a9-ab7b-1c63346024fd"
 mock_resource_group_id_1 = "1bd4a689-8dab-4355-aadd-9957932d896a"
