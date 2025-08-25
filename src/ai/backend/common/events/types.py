@@ -172,6 +172,7 @@ class EventCacheDomain(enum.StrEnum):
     """
 
     BGTASK = "bgtask"
+    SESSION_SCHEDULER = "session_scheduler"
 
     def cache_id(self, id: uuid.UUID) -> str:
         """

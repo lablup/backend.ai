@@ -20,6 +20,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.message_queue.types import CacheEvent
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -30,7 +31,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STREAM)
 
 _MAX_STREAM_LENGTH = 128
-_DEFAULT_CACHE_EXPIRATION = 60  # 1 minutes
+_DEFAULT_CACHE_EXPIRATION = 300  # 5 minutes
 _DEFAULT_AUTOCLAIM_COUNT = 10
 
 
@@ -327,6 +328,34 @@ class ValkeyStreamClient:
             return None
         payload = load_json(result)
         return cast(Mapping[str, str], payload)
+
+    @valkey_decorator()
+    async def broadcast_with_cache_batch(
+        self,
+        channel: str,
+        events: list[CacheEvent],
+        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+    ) -> None:
+        """
+        Broadcast multiple messages to a channel with caching in a batch.
+
+        :param channel: The channel to broadcast the messages to.
+        :param events: List of CacheEvent objects containing cache_id and payload.
+        :param timeout: The expiration time for the cached messages in seconds.
+        :raises: GlideClientError if the messages cannot be broadcasted or cached.
+        """
+        if not events:
+            return
+        
+        tx = self._create_batch()
+        for event in events:
+            message = dump_json(event.payload)
+            tx.set(key=event.cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+            tx.publish(
+                message=message,
+                channel=channel,
+            )
+        await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_decorator()
     async def receive_broadcast_message(
