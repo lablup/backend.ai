@@ -10,6 +10,9 @@
   # Type of the database system to use.
   # Currently, only PostgreSQL is supported as the main database backend.
   type = "postgresql"
+  # Network address and port of the database server.
+  # Default is the standard PostgreSQL port on localhost.
+  addr = { host = "127.0.0.1", port = 5432 }
   # Database name to use.
   # This database must exist and be accessible by the configured user.
   # Length must be between 2 and 64 characters due to database naming constraints.
@@ -42,16 +45,6 @@
   # 0 means wait indefinitely.
   # If connections cannot be acquired within this time, an exception is raised.
   lock-conn-timeout = 0
-
-  [db.addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
 
 [etcd]
   # Namespace prefix for etcd keys used by Backend.AI.
@@ -94,6 +87,20 @@
   # If not specified, defaults to the GID of the server.py file.
   # Important for proper file permissions when creating files/sockets.
   ## group = "501"
+  # Network address and port where the manager service will listen.
+  # Default is all interfaces (0.0.0.0) on port 8080.
+  # For private deployments, consider using 127.0.0.1 instead.
+  service-addr = { host = "0.0.0.0", port = 8080 }
+  # Address and port to announce to other components.
+  # This is used for service discovery and should be accessible by other
+  # components.
+  announce-addr = { host = "127.0.0.1", port = 5432 }
+  # Address and port to announce for internal API requests.
+  # This is used for service discovery and should be accessible by other
+  # components.
+  announce-internal-addr = { host = "host.docker.internal", port = 18080 }
+  # Set the internal hostname/port to accept internal API requests.
+  internal-addr = { host = "0.0.0.0", port = 18080 }
   # Path to the keypair file used for RPC authentication.
   # This file contains key pairs used for secure communication between manager
   # components.
@@ -205,46 +212,11 @@
   # If specified, metrics will be available at this port.
   # Leave as None to disable public metrics exposure.
   ## public-metrics-port = 8080  # min=1 max=65535
-
-  [manager.service-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-  [manager.announce-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-  [manager.announce-internal-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-  [manager.internal-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
+  # Whether to use the Sokovan orchestrator for session scheduling.
+  # When enabled, uses the new Sokovan orchestrator for improved scheduling
+  # performance.
+  # When disabled, falls back to the legacy scheduling system.
+  use-sokovan = true
 
   # Configuration for PostgreSQL advisory locks.
   # This is used when distributed_lock is set to pg_advisory.
@@ -270,13 +242,23 @@
   ssl-verify = true
 
 [logging]
-  # Log level.
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
   level = "INFO"
   # Array of log drivers to print.
   drivers = [ "console",]
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
 
   [logging.console]
     # Opt to print colorized log.
@@ -393,6 +375,11 @@
   # Controls how long operations wait before timing out.
   # If None, uses the default timeout configured in the Redis client.
   ## request_timeout =   
+  # Whether to use TLS for Redis connections.
+  use_tls = false
+  # Whether to skip TLS certificate verification.
+  # Set to True for self-signed certificates or development environments.
+  tls_skip_verify = false
   # Optional override configurations for specific Redis contexts.
   # Allows different Redis settings for different services within Backend.AI.
   # Each key represents a context name, and the value is a complete Redis
@@ -507,20 +494,12 @@
       ## TERMINATING = "..."
 
 [metric]
+  # Address for the metric collection service.
+  addr = { host = "127.0.0.1", port = 9090 }
   # Time window for metric collection.
   # Controls how often metrics are collected and reported.
   # Format is a duration string like "1h" for 1 hour.
   timewindow = "1m"
-
-  [metric.addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
 
 [volumes]
   # Default volume host for new virtual folders.

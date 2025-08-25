@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import grp
@@ -82,7 +84,7 @@ async def server_main_logwrapper(
     local_config: StorageProxyUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
-        local_config.logging.model_dump(),
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -452,7 +454,7 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         try:
             logger = Logger(
-                local_config.logging.model_dump(),
+                local_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={

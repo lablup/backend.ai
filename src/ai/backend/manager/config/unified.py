@@ -204,10 +204,9 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -248,7 +247,6 @@ class DatabaseConfig(BaseModel):
         Network address and port of the database server.
         Default is the standard PostgreSQL port on localhost.
         """,
-        examples=[{"host": "127.0.0.1", "port": 5432}],
     )
     name: str = Field(
         default="DB_NAME",
@@ -363,7 +361,7 @@ class EtcdConfig(BaseModel):
         examples=["local", "backend"],
     )
     addr: HostPortPair | list[HostPortPair] = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379),
+        default=HostPortPair(host="127.0.0.1", port=2379),
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.
@@ -460,40 +458,36 @@ class ManagerConfig(BaseModel):
         examples=[_file_perm.st_gid],
     )
     service_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="0.0.0.0", port=8080),
+        default=HostPortPair(host="0.0.0.0", port=8080),
         description="""
         Network address and port where the manager service will listen.
         Default is all interfaces (0.0.0.0) on port 8080.
         For private deployments, consider using 127.0.0.1 instead.
         """,
-        examples=[{"host": "127.0.0.1", "port": 8080}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=5432),
+        default=HostPortPair(host="127.0.0.1", port=5432),
         description="""
         Address and port to announce to other components.
         This is used for service discovery and should be accessible by other components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 5432}],
         alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="host.docker.internal", port=18080),
+        default=HostPortPair(host="host.docker.internal", port=18080),
         description="""
         Address and port to announce for internal API requests.
         This is used for service discovery and should be accessible by other components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 18080}],
         alias="announce-internal-addr",
     )
     internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
+        default=HostPortPair(host="0.0.0.0", port=18080),
         description="""
         Set the internal hostname/port to accept internal API requests.
         """,
-        examples=[{"host": "127.0.0.1", "port": 18080}],
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
@@ -504,7 +498,6 @@ class ManagerConfig(BaseModel):
         This file contains key pairs used for secure communication between manager components.
         In production, should be stored in a secure location with restricted access.
         """,
-        examples=["fixtures/manager/manager.key_secret"],
         validation_alias=AliasChoices("rpc-auth-manager-keypair", "rpc_auth_manager_keypair"),
         serialization_alias="rpc-auth-manager-keypair",
     )
@@ -516,7 +509,6 @@ class ManagerConfig(BaseModel):
         If an agent doesn't respond within this time, it's considered offline.
         Should be set higher than the agent's heartbeat interval.
         """,
-        examples=[1.0, 40.0],
         validation_alias=AliasChoices("heartbeat-timeout", "heartbeat_timeout"),
         serialization_alias="heartbeat-timeout",
     )
@@ -1464,12 +1456,11 @@ class SessionConfig(BaseModel):
 
 
 class MetricConfig(BaseModel):
-    address: HostPortPairModel = Field(
-        default=HostPortPairModel(host="127.0.0.1", port=9090),
+    address: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=9090),
         description="""
         Address for the metric collection service.
         """,
-        examples=[None, {"host": "127.0.0.1", "port": 9090}],
         alias="addr",
     )
     timewindow: str = Field(
@@ -1483,7 +1474,7 @@ class MetricConfig(BaseModel):
     )
 
     @field_serializer("address")
-    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info: Any) -> Optional[str]:
+    def _serialize_addr(self, addr: Optional[HostPortPair], _info: Any) -> Optional[str]:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 

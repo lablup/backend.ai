@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import os
 import sys
 from pathlib import Path
 from pprint import pformat
@@ -40,15 +38,15 @@ class CLIContext:
         self.log_level = log_level
         self._bootstrap_config = None
 
-    def get_bootstrap_config(self) -> BootstrapConfig:
+    async def get_bootstrap_config(self) -> BootstrapConfig:
         # Lazy-load the configuration only when requested.
         try:
             if self._bootstrap_config is None:
                 if self.config_path is None:
                     self.config_path = find_config_file("manager")
 
-                self._bootstrap_config = asyncio.run(
-                    BootstrapConfig.load_from_file(self.config_path, self.log_level)
+                self._bootstrap_config = await BootstrapConfig.load_from_file(
+                    self.config_path, self.log_level
                 )
         except ConfigurationError as e:
             print(
@@ -65,23 +63,7 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            _log_level = LogLevel.INFO if self.log_level == LogLevel.NOTSET else self.log_level
-            logging_config = {
-                "level": _log_level,
-                "pkg-ns": {
-                    "": LogLevel.WARNING,
-                    "ai.backend": _log_level,
-                },
-            }
-            try:
-                # Try getting the logging config but silently fallback to the default if not
-                # present (e.g., when `mgr gql show` command used in CI without installation as
-                # addressed in #1686).
-                with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
-                    logging_config = self.get_bootstrap_config().logging
-            except click.Abort:
-                pass
-            self._logger = LocalLogger(logging_config)
+            self._logger = LocalLogger(log_level=self.log_level)
             self._logger.__enter__()
         return self
 
@@ -93,7 +75,8 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    etcd_config_data = cli_ctx.get_bootstrap_config().etcd.to_dataclass()
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
     creds = None
     if etcd_config_data.user:
         if not etcd_config_data.password:
@@ -125,7 +108,9 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
-    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    etcd = AsyncEtcd.initialize(etcd_config_data)
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
     unified_config = ManagerUnifiedConfig(**redis_config)
@@ -146,7 +131,9 @@ class RedisConnectionSet:
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    etcd = AsyncEtcd.initialize(etcd_config_data)
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)

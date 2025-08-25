@@ -8,16 +8,18 @@ import trafaret as t
 
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.logging import BraceStyleAdapter, LocalLogger, Logger
+from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.logger import MsgpackOptions
+from ai.backend.logging.types import LogLevel
 
-test_log_config = {
-    "level": "DEBUG",
-    "drivers": ["console"],
-    "pkg-ns": {"": "DEBUG"},
-    "console": {
-        "colored": True,
-    },
-}
+test_log_config = LoggingConfig(
+    level=LogLevel.DEBUG,
+    pkg_ns={"": LogLevel.DEBUG},
+    drivers=[LogDriver.CONSOLE],
+    console=ConsoleConfig(
+        colored=True,
+    ),
+)
 
 test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
 msgpack_opts: MsgpackOptions = {

@@ -351,7 +351,7 @@ def main(
     """
     log_level = LogLevel.DEBUG if debug else log_level
     local_config = load_local_config(config_path, log_level=log_level)
-    with LocalLogger(local_config.logging.model_dump()):
+    with LocalLogger(local_config.logging):
         asyncio.run(
             check_and_upgrade(
                 local_config,

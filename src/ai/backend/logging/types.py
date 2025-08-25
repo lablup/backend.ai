@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, Self, TypeVar, override
+from typing import Any, Generic, Self, TypedDict, TypeVar, override
 
 import trafaret as t
 
@@ -137,3 +138,8 @@ class DirPathTrafaret(t.Trafaret):
             if not p.is_dir():
                 self._failure("value is not a directory", value=value)
             return p
+
+
+class MsgpackOptions(TypedDict):
+    pack_opts: Mapping[str, Any]
+    unpack_opts: Mapping[str, Any]

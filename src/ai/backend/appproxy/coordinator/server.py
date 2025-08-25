@@ -62,7 +62,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
-    config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
     ping_redis_connection,
@@ -964,11 +963,10 @@ async def server_main_logwrapper(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
-    log_endpoint = _args[1]
-    logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
-    logging_config["endpoint"] = log_endpoint
+    local_config: ServerConfig = _args[0]
+    log_endpoint: str = _args[1]
     logger = Logger(
-        logging_config,
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1014,30 +1012,28 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
     Start the proxy-coordinator service as a foreground process.
     """
     log_level = LogLevel.DEBUG if debug else log_level
-    cfg = load_config(config_path, log_level)
+    server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
-        if cfg.profiling.enable_pyroscope:
-            assert cfg.profiling.pyroscope_config
-            pyroscope.configure(**cfg.profiling.pyroscope_config.model_dump())
-        if cfg.profiling.enable_memray:
+        if server_config.profiling.enable_pyroscope:
+            assert server_config.profiling.pyroscope_config
+            pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
+        if server_config.profiling.enable_memray:
             tracker = memray.Tracker(
-                cfg.profiling.memray_output_destination,
+                server_config.profiling.memray_output_destination,
                 follow_fork=True,
             )
             tracker.__enter__()
-        cfg.proxy_coordinator.pid_file.touch(exist_ok=True)
-        cfg.proxy_coordinator.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.proxy_coordinator.ipc_base_path
+        server_config.proxy_coordinator.pid_file.touch(exist_ok=True)
+        server_config.proxy_coordinator.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.proxy_coordinator.ipc_base_path
         ipc_base_path.mkdir(exist_ok=True, parents=True)
         log_sockpath = ipc_base_path / f"coordinator-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
-        logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
-        logging_config["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                logging_config,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -1049,13 +1045,13 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                 setproctitle("backend.ai: proxy-coordinator")
                 log.info("Backend.AI AppProxy Coordinator {0}", __version__)
                 log.info("runtime: {0}", env_info())
-                if cfg.profiling.enable_pyroscope:
+                if server_config.profiling.enable_pyroscope:
                     log.info("Pyroscope tracing enabled")
-                if cfg.profiling.enable_memray:
+                if server_config.profiling.enable_memray:
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
-                if cfg.proxy_coordinator.event_loop == "uvloop":
+                if server_config.proxy_coordinator.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -1064,15 +1060,15 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                     aiotools.start_server(
                         server_main_logwrapper,  # type: ignore
                         num_workers=1,
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.proxy_coordinator.pid_file.is_file():
+            if server_config.proxy_coordinator.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.proxy_coordinator.pid_file.unlink()
+                server_config.proxy_coordinator.pid_file.unlink()
             if tracker:
                 tracker.__exit__(None, None, None)
     else:

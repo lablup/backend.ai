@@ -411,10 +411,10 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
     # (allow_extra will make configs to be forward-copmatible)
     try:
         raw_cfg = config_key_to_snake_case(raw_cfg)
-        cfg = ServerConfig(**raw_cfg)
-        if cfg.debug.enabled:
+        server_config = ServerConfig(**raw_cfg)
+        if server_config.debug.enabled:
             print("== Account Manager configuration ==", file=sys.stderr)
-            print(pformat(cfg.model_dump()), file=sys.stderr)
+            print(pformat(server_config.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
             "ConfigurationError: Could not read or validate the account manager local config:",
@@ -423,7 +423,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
         print(pformat(e), file=sys.stderr)
         raise click.Abort()
     else:
-        return cfg
+        return server_config
 
 
 class Undefined:

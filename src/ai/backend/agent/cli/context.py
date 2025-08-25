@@ -21,15 +21,7 @@ class CLIContext(AbstractContextManager):
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            _log_level = LogLevel.INFO if self.log_level == LogLevel.NOTSET else self.log_level
-            logging_config = {
-                "level": _log_level,
-                "pkg-ns": {
-                    "": LogLevel.WARNING,
-                    "ai.backend": _log_level,
-                },
-            }
-            self._logger = LocalLogger(logging_config)
+            self._logger = LocalLogger(log_level=self.log_level)
             self._logger.__enter__()
         return self
 

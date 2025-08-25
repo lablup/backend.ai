@@ -34,7 +34,7 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            self._logger = LocalLogger({})
+            self._logger = LocalLogger(log_level=self.log_level)
             self._logger.__enter__()
         return self
 

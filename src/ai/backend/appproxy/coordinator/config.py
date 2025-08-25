@@ -25,7 +25,7 @@ from ai.backend.appproxy.common.types import EventLoopType
 from ai.backend.common import config
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
-from ai.backend.logging.config_pydantic import LoggingConfig
+from ai.backend.logging.config import LoggingConfig
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
 
@@ -316,19 +316,22 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
-        cfg = ServerConfig(**raw_cfg)
-        if cfg.profiling.enable_pyroscope:
-            if not cfg.profiling.pyroscope_config:
+        server_config = ServerConfig(**raw_cfg)
+        if server_config.profiling.enable_pyroscope:
+            if not server_config.profiling.pyroscope_config:
                 raise ConfigValidationError("Pyroscope enabled but config is not populated")
-            if cfg.profiling.pyroscope_config.application_name is None:
-                cfg.profiling.pyroscope_config.application_name = (
-                    f"proxy-coordinator-{cfg.proxy_coordinator.bind_addr.port}"
+            if server_config.profiling.pyroscope_config.application_name is None:
+                server_config.profiling.pyroscope_config.application_name = (
+                    f"proxy-coordinator-{server_config.proxy_coordinator.bind_addr.port}"
                 )
-        if cfg.proxy_coordinator.enable_traefik and not cfg.proxy_coordinator.traefik:
+        if (
+            server_config.proxy_coordinator.enable_traefik
+            and not server_config.proxy_coordinator.traefik
+        ):
             raise ConfigValidationError("Traefik enabled but configuration is not populated")
-        if cfg.debug.enabled:
+        if server_config.debug.enabled:
             print("== Proxy Coordinator configuration ==", file=sys.stderr)
-            print(pformat(cfg.model_dump()), file=sys.stderr)
+            print(pformat(server_config.model_dump()), file=sys.stderr)
     except (ValidationError, ConfigValidationError) as e:
         print(
             "ConfigurationError: Could not read or validate the manager local config:",
@@ -337,4 +340,4 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
         print(pformat(e), file=sys.stderr)
         raise click.Abort()
     else:
-        return cfg
+        return server_config
