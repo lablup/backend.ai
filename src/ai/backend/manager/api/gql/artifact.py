@@ -32,6 +32,8 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
+    ArtifactStatusFilter,
+    ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
@@ -118,9 +120,13 @@ class ArtifactRevisionFilter:
         # Handle status filter using ArtifactRevisionStatusFilter
         if self.status:
             if self.status.in_:
-                repo_filter.status = self.status.in_
+                repo_filter.status_filter = ArtifactStatusFilter(
+                    type=ArtifactStatusFilterType.IN, values=self.status.in_
+                )
             elif self.status.equals:
-                repo_filter.status = self.status.equals
+                repo_filter.status_filter = ArtifactStatusFilter(
+                    type=ArtifactStatusFilterType.EQUALS, values=self.status.equals
+                )
 
         # Pass StringFilter directly for processing in repository
         repo_filter.version_filter = self.version

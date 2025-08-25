@@ -39,6 +39,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
+    ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
@@ -144,10 +145,14 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
         # Handle basic filters
         if filters.artifact_id is not None:
             conditions.append(ArtifactRevisionRow.artifact_id == filters.artifact_id)
-        if filters.status is not None:
-            # Support multiple status values using IN clause
-            status_values = [status.value for status in filters.status]
-            conditions.append(ArtifactRevisionRow.status.in_(status_values))
+        if filters.status_filter is not None:
+            # Handle different status filter types
+            status_values = [status.value for status in filters.status_filter.values]
+            if filters.status_filter.type == ArtifactStatusFilterType.IN:
+                conditions.append(ArtifactRevisionRow.status.in_(status_values))
+            elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
+                # conditions.append(ArtifactRevisionRow.status == status_values[0])
+                conditions.append(ArtifactRevisionRow.status.in_(status_values))
 
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
@@ -648,9 +653,14 @@ class ArtifactRepository:
                 count_stmt = count_stmt.where(
                     ArtifactRevisionRow.artifact_id == filters.artifact_id
                 )
-            if filters.status is not None:
-                status_values = [status.value for status in filters.status]
-                count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
+            if filters.status_filter is not None:
+                status_values = [status.value for status in filters.status_filter.values]
+                if filters.status_filter.type == ArtifactStatusFilterType.IN:
+                    count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
+                elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
+                    # TODO: Is this correct?
+                    # count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
+                    count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
             if filters.version_filter is not None:
                 version_condition = filters.version_filter.apply_to_column(
                     ArtifactRevisionRow.version
