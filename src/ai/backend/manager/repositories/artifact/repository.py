@@ -13,6 +13,7 @@ from ai.backend.common.exception import (
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
+    InvalidArtifactModifierTypeError,
     ObjectStorageNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -247,7 +248,7 @@ class ArtifactRepository:
         async with self._db.begin_session() as db_sess:
             data = modifier.fields_to_update()
             if not data:
-                raise ValueError("No valid fields to update")
+                raise InvalidArtifactModifierTypeError("No valid fields to update")
 
             await db_sess.execute(
                 sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(**data)

@@ -30,7 +30,7 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_ import (
+from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
 )
@@ -66,7 +66,9 @@ class ArtifactRevisionService:
         revision = await self._artifact_repository.get_artifact_revision_by_id(action.revision_id)
         return GetArtifactRevisionActionResult(revision=revision)
 
-    async def list_(self, action: ListArtifactRevisionsAction) -> ListArtifactRevisionsActionResult:
+    async def list_revision(
+        self, action: ListArtifactRevisionsAction
+    ) -> ListArtifactRevisionsActionResult:
         (
             artifacts_data,
             total_count,
@@ -112,7 +114,7 @@ class ArtifactRevisionService:
         await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
         return CancelImportActionResult(artifact_revision_id=revision_data.id)
 
-    async def import_(
+    async def import_revision(
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(

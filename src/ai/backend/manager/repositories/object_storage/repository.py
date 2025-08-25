@@ -2,6 +2,7 @@ import uuid
 
 import sqlalchemy as sa
 
+from ai.backend.common.exception import ObjectStorageBucketNotFoundError
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
@@ -99,7 +100,7 @@ class ObjectStorageRepository:
             return deleted_id
 
     @repository_decorator()
-    async def list_(self) -> list[ObjectStorageData]:
+    async def list_object_storages(self) -> list[ObjectStorageData]:
         """
         List all object storage configurations from the database.
         """
@@ -139,7 +140,7 @@ class ObjectStorageRepository:
             result = await db_session.execute(delete_query)
             deleted_storage_id = result.scalar()
             if deleted_storage_id is None:
-                raise ValueError(f"Bucket '{bucket_name}' not found for storage ID {storage_id}")
+                raise ObjectStorageBucketNotFoundError()
             return deleted_storage_id
 
     @repository_decorator()

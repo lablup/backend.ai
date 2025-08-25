@@ -108,7 +108,7 @@ class ObjectStorageService:
         List all object storages.
         """
         log.info("Listing object storages")
-        storage_data_list = await self._object_storage_repository.list_()
+        storage_data_list = await self._object_storage_repository.list_object_storages()
         return ListObjectStorageActionResult(data=storage_data_list)
 
     async def get_presigned_download_url(
