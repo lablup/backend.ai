@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncGenerator, Mapping, Optional
 
-from .types import BroadcastMessage, CacheEvent, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 
 class AbstractMessageQueue(ABC):
@@ -59,11 +59,11 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_with_cache_batch(self, events: list[CacheEvent]) -> None:
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
-        Broadcast multiple messages with cache in a batch.
-        This method broadcasts multiple messages to all subscribers with caching.
-        Each event contains a cache_id and payload.
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
+        Each event contains a payload and optional cache_id.
         Messages are not guaranteed to be delivered.
         """
         raise NotImplementedError

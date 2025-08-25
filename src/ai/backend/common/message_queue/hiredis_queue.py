@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import Any, AsyncGenerator, Mapping, Optional
+from typing import AsyncGenerator, Mapping, Optional
 
 import hiredis
 from aiotools.server import process_index
@@ -14,7 +14,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..types import RedisTarget
 from .queue import AbstractMessageQueue
-from .types import BroadcastMessage, CacheEvent, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -122,36 +122,39 @@ class HiRedisQueue(AbstractMessageQueue):
                 return None
             return load_json(reply)
 
-    async def broadcast_with_cache_batch(self, events: list[CacheEvent]) -> None:
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
-        Broadcast multiple messages with cache in a batch.
-        This method broadcasts multiple messages to all subscribers with caching.
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
         """
         if self._closed:
             raise RuntimeError("Queue is closed")
         if not events:
             return
-        
+
         async with RedisConnection(self._target, db=self._db) as client:
-            pipeline_commands = []
+            pipeline_commands: list[list[str | bytes | int]] = []
             for event in events:
-                payload_bytes = dump_json(event.payload)
-                pipeline_commands.extend([
-                    [
-                        "SET",
-                        event.cache_id,
-                        payload_bytes,
-                    ],
-                    [
-                        "EXPIRE",
-                        event.cache_id,
-                        60,  # Set a default expiration time of 60 seconds
-                    ],
-                    [
-                        "PUBLISH",
-                        self._broadcast_channel,
-                        payload_bytes,
-                    ],
+                payload_bytes: bytes = dump_json(event.payload)
+                # Only add cache commands if cache_id is provided
+                if event.cache_id:
+                    pipeline_commands.extend([
+                        [
+                            "SET",
+                            event.cache_id,
+                            payload_bytes,
+                        ],
+                        [
+                            "EXPIRE",
+                            event.cache_id,
+                            60,  # Set a default expiration time of 60 seconds
+                        ],
+                    ])
+                # Always publish the message
+                pipeline_commands.append([
+                    "PUBLISH",
+                    self._broadcast_channel,
+                    payload_bytes,
                 ])
             await client.pipeline(pipeline_commands)
 

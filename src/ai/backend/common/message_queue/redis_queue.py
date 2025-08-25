@@ -14,7 +14,7 @@ from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from .queue import AbstractMessageQueue
-from .types import BroadcastMessage, CacheEvent, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -130,14 +130,14 @@ class RedisQueue(AbstractMessageQueue):
             raise RuntimeError("Queue is closed")
         return await self._client.fetch_cached_broadcast_message(cache_id)
 
-    async def broadcast_with_cache_batch(self, events: list[CacheEvent]) -> None:
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
-        Broadcast multiple messages with cache in a batch.
-        This method broadcasts multiple messages to all subscribers with caching.
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
         """
         if self._closed:
             raise RuntimeError("Queue is closed")
-        await self._client.broadcast_with_cache_batch(self._broadcast_channel, events)
+        await self._client.broadcast_batch(self._broadcast_channel, events)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """

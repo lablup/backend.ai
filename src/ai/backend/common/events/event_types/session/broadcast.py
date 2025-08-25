@@ -6,6 +6,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.types import (
     AbstractBroadcastEvent,
     BatchBroadcastEvent,
+    EventCacheDomain,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -260,6 +261,11 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
     @override
     def user_event(self) -> Optional[UserEvent]:
         return None
+
+    @classmethod
+    @override
+    def cache_domain(cls) -> Optional[EventCacheDomain]:
+        return EventCacheDomain.SESSION_SCHEDULER
 
 
 @dataclass

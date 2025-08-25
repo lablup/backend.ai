@@ -17,10 +17,11 @@ type MessageId = bytes
 
 
 @dataclass
-class CacheEvent:
-    """Event data for broadcasting with cache."""
-    cache_id: str
+class BroadcastPayload:
+    """Payload data for broadcasting with optional cache."""
+
     payload: Mapping[str, str]
+    cache_id: Optional[str] = None
 
 
 @dataclass
