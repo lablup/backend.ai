@@ -36,10 +36,8 @@ type AccessToken implements Node
   """Added in 25.13.0: The creation timestamp of the access token."""
   createdAt: DateTime!
 
-  """
-  Added in 25.13.0: The expiration timestamp of the access token. The absolute token expiry date expressed in the Unix epoch format.
-  """
-  validUntil: Int!
+  """Added in 25.13.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
 }
 
 """Added in 25.13.0"""
@@ -1134,10 +1132,8 @@ type ContainerUtilizationMetricMetadata
 input CreateAccessTokenInput
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Added in 25.13.0. The absolute token expiry date expressed in the Unix epoch format.
-  """
-  validUntil: Int!
+  """Added in 25.13.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
 }
 
 type CreateAccessTokenPayload
