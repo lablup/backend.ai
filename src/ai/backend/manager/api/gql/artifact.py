@@ -44,9 +44,13 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.delete import (
+    DeleteArtifactRevisionAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
-from ai.backend.manager.services.artifact_revision.actions.import_ import ImportArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.import_ import (
+    ImportArtifactRevisionAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.list import ListArtifactRevisionsAction
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
@@ -734,7 +738,7 @@ async def import_artifacts(
     task_ids = []
     for revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
-            ImportArtifactAction(
+            ImportArtifactRevisionAction(
                 artifact_revision_id=uuid.UUID(revision_id),
                 storage_id=uuid.UUID(input.storage_id),
                 bucket_name=input.bucket_name,
@@ -768,11 +772,11 @@ def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def delete_artifact(
+async def delete_artifact_revision(
     input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactPayload:
     action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
-        DeleteArtifactAction(
+        DeleteArtifactRevisionAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             storage_id=uuid.UUID(input.storage_id),
             bucket_name=input.bucket_name,

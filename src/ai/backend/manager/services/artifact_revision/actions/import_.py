@@ -8,7 +8,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class ImportArtifactAction(ArtifactAction):
+class ImportArtifactRevisionAction(ArtifactAction):
     artifact_revision_id: uuid.UUID
     storage_id: uuid.UUID
     bucket_name: str
@@ -24,7 +24,7 @@ class ImportArtifactAction(ArtifactAction):
 
 
 @dataclass
-class ImportArtifactActionResult(BaseActionResult):
+class ImportArtifactRevisionActionResult(BaseActionResult):
     result: ArtifactRevisionData
     task_id: uuid.UUID
 
