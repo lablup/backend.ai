@@ -10,7 +10,15 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.model_deployment.access_token import AccessToken
+from ai.backend.manager.api.gql.model_deployment.access_token import (
+    AccessTokenConnection,
+    AccessTokenEdge,
+    mock_access_token_1,
+    mock_access_token_2,
+    mock_access_token_3,
+    mock_access_token_4,
+    mock_access_token_5,
+)
 from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     AutoScalingMetricSource,
     AutoScalingRule,
@@ -131,7 +139,7 @@ class ModelDeploymentNetworkAccess:
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
-    access_tokens: list[AccessToken]
+    access_tokens: AccessTokenConnection
 
 
 # Main ModelDeployment Type
@@ -384,7 +392,21 @@ mock_model_deployment_1 = ModelDeployment(
         endpoint_url="https://api.backend.ai/models/dep-001",
         preferred_domain_name="llama-3-8b.models.backend.ai",
         open_to_public=True,
-        access_tokens=[],
+        access_tokens=AccessTokenConnection(
+            edges=[
+                AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
+                AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
+                AccessTokenEdge(node=mock_access_token_3, cursor="token-cursor-3"),
+                AccessTokenEdge(node=mock_access_token_4, cursor="token-cursor-4"),
+                AccessTokenEdge(node=mock_access_token_5, cursor="token-cursor-5"),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor="token-cursor-1",
+                end_cursor="token-cursor-5",
+            ),
+        ),
     ),
     revision=mock_model_revision_1,
     revision_history=ModelRevisionConnection(
@@ -485,7 +507,18 @@ mock_model_deployment_2 = ModelDeployment(
         endpoint_url="https://api.backend.ai/models/dep-002",
         preferred_domain_name="mistral-7b.models.backend.ai",
         open_to_public=False,
-        access_tokens=[],
+        access_tokens=AccessTokenConnection(
+            edges=[
+                AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
+                AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor="token-cursor-1",
+                end_cursor="token-cursor-5",
+            ),
+        ),
     ),
     revision=mock_model_revision_3,
     revision_history=ModelRevisionConnection(
@@ -555,7 +588,20 @@ mock_model_deployment_3 = ModelDeployment(
         endpoint_url=None,
         preferred_domain_name=None,
         open_to_public=False,
-        access_tokens=[],
+        access_tokens=AccessTokenConnection(
+            edges=[
+                AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
+                AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
+                AccessTokenEdge(node=mock_access_token_3, cursor="token-cursor-3"),
+                AccessTokenEdge(node=mock_access_token_4, cursor="token-cursor-4"),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor="token-cursor-1",
+                end_cursor="token-cursor-5",
+            ),
+        ),
     ),
     revision=None,
     revision_history=ModelRevisionConnection(

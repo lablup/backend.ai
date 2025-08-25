@@ -19,6 +19,25 @@ type AccessToken implements Node {
 }
 
 """Added in 25.13.0"""
+type AccessTokenConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AccessTokenEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AccessTokenEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AccessToken!
+}
+
+"""Added in 25.13.0"""
 input AddModelRevisionInput {
   name: String = null
   deploymentId: ID!
@@ -652,7 +671,7 @@ type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens: [AccessToken!]!
+  accessTokens: AccessTokenConnection!
 }
 
 """Added in 25.13.0"""
