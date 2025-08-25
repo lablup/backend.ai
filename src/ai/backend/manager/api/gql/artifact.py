@@ -245,6 +245,11 @@ class Artifact(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactRevisionConnection:
+        if filter is None:
+            filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
+        else:
+            filter.artifact_id = ID(self.id)
+
         return await resolve_artifact_revisions(
             info,
             filter=filter,
