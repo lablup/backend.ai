@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -100,8 +101,6 @@ class TestBaseBackgroundTaskHandler:
 
     @pytest.mark.asyncio
     async def test_concrete_handler_execute(self):
-        from unittest.mock import AsyncMock
-
         handler = ConcreteTaskHandler()
         args = ConcreteTaskArgs(value="test-value", count=3)
 

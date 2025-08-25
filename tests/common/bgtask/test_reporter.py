@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from unittest.mock import AsyncMock
 
@@ -125,8 +126,6 @@ class TestProgressReporter:
 
     @pytest.mark.asyncio
     async def test_concurrent_updates(self, progress_reporter):
-        import asyncio
-
         async def update_task(increment: int, message: str):
             await progress_reporter.update(increment=increment, message=message)
 
