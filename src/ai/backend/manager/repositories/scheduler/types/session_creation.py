@@ -185,7 +185,7 @@ class AllowedScalingGroup:
 
 
 @dataclass
-class UserContainerInfo:
+class ContainerUserInfo:
     """User container UID/GID information."""
 
     uid: Optional[int] = None
@@ -212,5 +212,5 @@ class SessionCreationContext:
     # Dotfile data
     dotfile_data: dict[str, Any]
 
-    # User container info
-    user_container_info: UserContainerInfo
+    # User (UID/GID) inside container
+    container_user_info: ContainerUserInfo

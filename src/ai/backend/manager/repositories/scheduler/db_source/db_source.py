@@ -1,5 +1,7 @@
 """Database source for schedule repository operations."""
 
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
@@ -91,12 +93,12 @@ from ..types.session import (
 )
 from ..types.session_creation import (
     AllowedScalingGroup,
+    ContainerUserInfo,
     ImageInfo,
     ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
     SessionEnqueueData,
-    UserContainerInfo,
 )
 from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import KeypairConcurrencyData, SessionRowCache
@@ -1094,14 +1096,14 @@ class ScheduleDBSource:
                 image_infos=image_infos,
                 vfolder_mounts=vfolder_mounts,
                 dotfile_data=dotfile_data,
-                user_container_info=user_container_info,
+                container_user_info=user_container_info,
             )
 
     async def fetch_session_creation_context(
         self,
         spec: SessionCreationSpec,
         scaling_group_name: str,
-    ) -> "SessionCreationContext":
+    ) -> SessionCreationContext:
         """
         Legacy method for backward compatibility.
         Use fetch_session_creation_data instead.
@@ -1132,11 +1134,12 @@ class ScheduleDBSource:
                 image_infos=image_infos,
                 vfolder_mounts=[],
                 dotfile_data={},
+                container_user_info=ContainerUserInfo(),
             )
 
     async def _get_scaling_group_network_info(
         self, db_sess: SASession, scaling_group_name: str
-    ) -> "ScalingGroupNetworkInfo":
+    ) -> ScalingGroupNetworkInfo:
         """
         Get network configuration from scaling group.
 
@@ -1262,7 +1265,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         user_uuid: UUID,
-    ) -> UserContainerInfo:
+    ) -> ContainerUserInfo:
         """
         Fetch user container UID/GID information.
         """
@@ -1270,8 +1273,8 @@ class ScheduleDBSource:
             sa.select(UserRow).where(UserRow.uuid == user_uuid)
         )
         if user_row is None:
-            return UserContainerInfo()
-        return UserContainerInfo(
+            return ContainerUserInfo()
+        return ContainerUserInfo(
             uid=user_row.container_uid,
             main_gid=user_row.container_main_gid,
             supplementary_gids=user_row.container_gids,
