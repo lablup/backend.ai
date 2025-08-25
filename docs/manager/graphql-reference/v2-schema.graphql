@@ -712,7 +712,7 @@ type Query {
   artifact(id: ID!): Artifact
 
   """Added in 25.13.0"""
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null, searchFromRemote: String = null): ArtifactConnection!
 
   """Added in 25.13.0"""
   artifactRevision(id: ID!): ArtifactRevision
