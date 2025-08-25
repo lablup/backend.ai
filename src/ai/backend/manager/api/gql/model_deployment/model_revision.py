@@ -13,7 +13,18 @@ from strawberry.scalars import JSON
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.image import Image, ResourceLimit
 from ai.backend.manager.api.gql.resource_group import ResourceGroup
-from ai.backend.manager.api.gql.vfolder import VFolder
+from ai.backend.manager.api.gql.vfolder import (
+    ExtraVFolderMountConnection,
+    ExtraVFolderMountEdge,
+    VFolder,
+    mock_extra_mount_1,
+    mock_extra_mount_2,
+    mock_model_vfolder_1,
+    mock_model_vfolder_2,
+    mock_model_vfolder_3,
+    mock_model_vfolder_4,
+    mock_model_vfolder_5,
+)
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_deployment.inference_runtime_config import (
     MOJORuntimeConfig,
@@ -23,7 +34,6 @@ from ai.backend.manager.data.model_deployment.inference_runtime_config import (
 )
 from ai.backend.manager.models.rbac.permission_defs import (
     ImagePermission,
-    VFolderPermission,
 )
 
 
@@ -78,7 +88,7 @@ class ModelRevision(relay.Node):
 
     model_runtime_config: ModelRuntimeConfig
     model_mount_config: ModelMountConfig
-    extra_mounts: list[VFolder]
+    extra_mounts: ExtraVFolderMountConnection
 
     image: Image
 
@@ -135,7 +145,6 @@ mock_inference_runtime_config = (
 
 mock_revision_id_1 = "d19f8f78-f308-45a9-ab7b-1c63346024fd"
 mock_resource_group_id_1 = "1bd4a689-8dab-4355-aadd-9957932d896a"
-mock_vfolder_id_1 = "79b7e9e2-37d0-4238-936d-8078f417f383"
 mock_image_id_1 = "7609ac08-d5e0-410a-a045-10c42119ed21"
 mock_model_revision_1 = ModelRevision(
     id=UUID(mock_revision_id_1),
@@ -172,35 +181,19 @@ mock_model_revision_1 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(
-            id=UUID(mock_vfolder_id_1),
-            row_id=uuid4(),
-            name="llama-3-8b-model",
-            host="storage-01",
-            quota_scope_id="default",
-            user=uuid4(),
-            user_email="user@example.com",
-            group=uuid4(),
-            group_name="default",
-            creator="admin",
-            unmanaged_path="",
-            usage_mode="model",
-            permission="read-only",
-            ownership_type="user",
-            max_files=1000,
-            max_size=50000,  # type: ignore
-            created_at=datetime.now() - timedelta(days=30),
-            last_used=datetime.now() - timedelta(days=1),
-            num_files=10,
-            cur_size=45000,  # type: ignore
-            cloneable=True,
-            status="ready",
-            permissions=[VFolderPermission.READ_CONTENT],  # type: ignore
-        ),
+        vfolder=mock_model_vfolder_1,
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    extra_mounts=[],
+    extra_mounts=ExtraVFolderMountConnection(
+        edges=[
+            ExtraVFolderMountEdge(node=mock_extra_mount_1, cursor="extra-mount-cursor-1"),
+            ExtraVFolderMountEdge(node=mock_extra_mount_2, cursor="extra-mount-cursor-2"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+        ),
+    ),
     image=Image(
         id=UUID(mock_image_id_1),
         row_id=uuid4(),
@@ -231,7 +224,6 @@ mock_model_revision_1 = ModelRevision(
 
 mock_revision_id_2 = "3c81bc63-24c1-4a8f-9ad2-8a19899690c3"
 mock_resource_id_2 = "0cc27c4c-7fa1-49ae-aa53-9c485205c78b"
-mock_vfolder_id_2 = "870b9bac-a9b5-4b5b-a8f2-e78ef727f2c3"
 mock_image_id_2 = "18c39ba3-e9c4-4353-9892-115e557b60a7"
 mock_model_revision_2 = ModelRevision(
     id=UUID(mock_revision_id_2),
@@ -268,35 +260,19 @@ mock_model_revision_2 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0,1"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(
-            id=UUID(mock_vfolder_id_2),
-            row_id=uuid4(),
-            name="llama-3-8b-model-v1.1",
-            host="storage-02",
-            quota_scope_id="default",
-            user=uuid4(),
-            user_email="user2@example.com",
-            group=uuid4(),
-            group_name="research",
-            creator="admin",
-            unmanaged_path="",
-            usage_mode="model",
-            permission="read-only",
-            ownership_type="group",
-            max_files=2000,
-            max_size=75000,  # type: ignore
-            created_at=datetime.now() - timedelta(days=20),
-            last_used=datetime.now() - timedelta(hours=12),
-            num_files=15,
-            cur_size=70000,  # type: ignore
-            cloneable=True,
-            status="ready",
-            permissions=[VFolderPermission.READ_CONTENT],  # type: ignore
-        ),
+        vfolder=mock_model_vfolder_2,
         mount_destination="/models",
         definition_path="models/llama-3-8b/config.yaml",
     ),
-    extra_mounts=[],
+    extra_mounts=ExtraVFolderMountConnection(
+        edges=[
+            ExtraVFolderMountEdge(node=mock_extra_mount_1, cursor="extra-mount-cursor-1"),
+            ExtraVFolderMountEdge(node=mock_extra_mount_2, cursor="extra-mount-cursor-2"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+        ),
+    ),
     image=Image(
         id=UUID(mock_image_id_2),
         row_id=uuid4(),
@@ -328,7 +304,6 @@ mock_model_revision_2 = ModelRevision(
 
 mock_revision_id_3 = "86d1a714-b177-4851-897f-da36f306fe30"
 mock_resource_id_3 = "135f7fd4-60fc-4b0d-9913-f3497d730b31"
-mock_vfolder_id_3 = "039022f8-c0ed-47e6-9223-cbb1bddd4bd3"
 mock_image_id_3 = "7b6ffbda-a0f4-48da-b589-b9889d33e5e9"
 mock_model_revision_3 = ModelRevision(
     id=UUID(mock_revision_id_3),
@@ -365,35 +340,16 @@ mock_model_revision_3 = ModelRevision(
         environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "2"}'),
     ),
     model_mount_config=ModelMountConfig(
-        vfolder=VFolder(
-            id=UUID(mock_vfolder_id_3),
-            row_id=uuid4(),
-            name="mistral-7b-model",
-            host="storage-03",
-            quota_scope_id="default",
-            user=uuid4(),
-            user_email="user3@example.com",
-            group=uuid4(),
-            group_name="default",
-            creator="admin",
-            unmanaged_path="",
-            usage_mode="model",
-            permission="read-write",
-            ownership_type="user",
-            max_files=500,
-            max_size=25000,  # type: ignore
-            created_at=datetime.now() - timedelta(days=7),
-            last_used=datetime.now() - timedelta(hours=6),
-            num_files=5,
-            cur_size=20000,  # type: ignore
-            cloneable=True,
-            status="ready",
-            permissions=[VFolderPermission.READ_CONTENT, VFolderPermission.WRITE_CONTENT],  # type: ignore
-        ),
+        vfolder=mock_model_vfolder_3,
         mount_destination="/models",
         definition_path="models/mistral-7b/config.yaml",
     ),
-    extra_mounts=[],
+    extra_mounts=ExtraVFolderMountConnection(
+        edges=[],
+        page_info=PageInfo(
+            has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+        ),
+    ),
     image=Image(
         id=UUID(mock_image_id_3),
         row_id=uuid4(),
@@ -507,6 +463,7 @@ class AddModelRevisionInput:
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
+    extra_mounts: Optional[list[ExtraVFolderMountInput]]
 
 
 ModelRevisionEdge = Edge[ModelRevision]
@@ -635,35 +592,16 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
             environ=None,
         ),
         model_mount_config=ModelMountConfig(
-            vfolder=VFolder(
-                id=UUID("544bd43d-0e3d-4656-a14e-42c185708d8f"),
-                row_id=uuid4(),
-                name="model-vfolder",
-                host="storage-default",
-                quota_scope_id="default",
-                user=uuid4(),
-                user_email="default@example.com",
-                group=uuid4(),
-                group_name="default",
-                creator="system",
-                unmanaged_path="",
-                usage_mode="model",
-                permission="read-only",
-                ownership_type="user",
-                max_files=1000,
-                max_size=100000,  # type: ignore
-                created_at=datetime.now(),
-                last_used=datetime.now(),
-                num_files=1,
-                cur_size=1000,  # type: ignore
-                cloneable=False,
-                status="ready",
-                permissions=[VFolderPermission.READ_CONTENT],  # type: ignore
-            ),
+            vfolder=mock_model_vfolder_4,
             mount_destination="/models",
             definition_path="model.yaml",
         ),
-        extra_mounts=[],
+        extra_mounts=ExtraVFolderMountConnection(
+            edges=[],
+            page_info=PageInfo(
+                has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+            ),
+        ),
         image=Image(
             id=UUID("3e52a88d-5ad1-4f72-83d0-d372a23b2a76"),
             row_id=uuid4(),
@@ -735,35 +673,16 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
             environ=None,
         ),
         model_mount_config=ModelMountConfig(
-            vfolder=VFolder(
-                id=UUID("53d0182b-74fe-41b3-9c1d-c1674ad53653"),
-                row_id=uuid4(),
-                name="model-vfolder",
-                host="storage-default",
-                quota_scope_id="default",
-                user=uuid4(),
-                user_email="default@example.com",
-                group=uuid4(),
-                group_name="default",
-                creator="system",
-                unmanaged_path="",
-                usage_mode="model",
-                permission="read-only",
-                ownership_type="user",
-                max_files=1000,
-                max_size=100000,  # type: ignore
-                created_at=datetime.now(),
-                last_used=datetime.now(),
-                num_files=1,
-                cur_size=1000,  # type: ignore
-                cloneable=False,
-                status="ready",
-                permissions=[VFolderPermission.READ_CONTENT],  # type: ignore
-            ),
+            vfolder=mock_model_vfolder_5,
             mount_destination="/models",
             definition_path="model.yaml",
         ),
-        extra_mounts=[],
+        extra_mounts=ExtraVFolderMountConnection(
+            edges=[],
+            page_info=PageInfo(
+                has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+            ),
+        ),
         image=Image(
             id=UUID("7be39d9a-a7a6-4101-a0fa-5689ce41f5de"),
             row_id=uuid4(),
