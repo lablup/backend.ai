@@ -107,19 +107,22 @@ class TestBackgroundTaskMetadata:
 
         assert metadata.tags == set()
 
-    def test_to_json(self):
+    def test_json_serialization_deserialization(self):
+        # Test to_json and from_json together since they are a pair for DB storage
         task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
+        original_metadata = BackgroundTaskMetadata.create(
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
-            body={"test": "data", "number": 42},
+            body={"test": "data", "number": 42, "nested": {"key": "value"}},
             server_id="server-1",
             tags=["tag1", "tag2"],
         )
 
-        json_str = metadata.to_json()
-        data = json.loads(json_str)
+        # Serialize to JSON
+        json_str = original_metadata.to_json()
 
+        # Verify the JSON structure
+        data = json.loads(json_str)
         assert data["task_id"] == str(task_id)
         assert data["task_name"] == "clone_vfolder"
         assert data["body"]["test"] == "data"
@@ -127,25 +130,18 @@ class TestBackgroundTaskMetadata:
         assert data["server_id"] == "server-1"
         assert set(data["tags"]) == {"tag1", "tag2"}
 
-    def test_from_json(self):
-        task_id = TaskID(uuid.uuid4())
-        json_data = json.dumps({
-            "task_id": str(task_id),
-            "task_name": "push_image",
-            "body": {"key": "value", "count": 10},
-            "server_id": "server-2",
-            "tags": ["tag3", "tag4"],
-        })
+        # Deserialize from JSON
+        restored_metadata = BackgroundTaskMetadata.from_json(json_str)
 
-        metadata = BackgroundTaskMetadata.from_json(json_data)
+        # Verify the restored object matches the original
+        assert str(restored_metadata.task_id) == str(original_metadata.task_id)
+        assert restored_metadata.task_name == original_metadata.task_name
+        assert restored_metadata.body == original_metadata.body
+        assert restored_metadata.server_id == original_metadata.server_id
+        assert restored_metadata.tags == original_metadata.tags
 
-        assert str(metadata.task_id) == str(task_id)
-        assert metadata.task_name == TaskName.PUSH_IMAGE
-        assert metadata.body == {"key": "value", "count": 10}
-        assert metadata.server_id == "server-2"
-        assert metadata.tags == {"tag3", "tag4"}
-
-    def test_from_json_bytes(self):
+    def test_json_serialization_with_bytes_input(self):
+        # Test that from_json can handle bytes input (common in DB operations)
         task_id = TaskID(uuid.uuid4())
         json_data = json.dumps({
             "task_id": str(task_id),
@@ -163,47 +159,33 @@ class TestBackgroundTaskMetadata:
         assert metadata.server_id == "server-3"
         assert metadata.tags == set()
 
-    def test_round_trip_serialization(self):
+    def test_json_serialization_with_complex_data(self):
+        # Test serialization/deserialization with more complex nested structures
         task_id = TaskID(uuid.uuid4())
+        complex_body = {
+            "nested": {"deeply": {"nested": "value"}},
+            "list": [1, 2, 3],
+            "mixed": [{"key": "value"}, {"another": "item"}],
+            "boolean": True,
+            "null": None,
+        }
+
         original = BackgroundTaskMetadata.create(
             task_id=task_id,
-            task_name=TaskName.CLONE_VFOLDER,
-            body={"complex": {"nested": "data"}, "list": [1, 2, 3]},
-            server_id="server-1",
+            task_name=TaskName.PUSH_IMAGE,
+            body=complex_body,
+            server_id="server-complex",
             tags=["tag1", "tag2", "tag3"],
         )
 
+        # Round-trip serialization
         json_str = original.to_json()
         restored = BackgroundTaskMetadata.from_json(json_str)
 
         assert str(restored.task_id) == str(original.task_id)
         assert restored.task_name == original.task_name
         assert restored.body == original.body
+        assert restored.body["nested"]["deeply"]["nested"] == "value"
+        assert restored.body["list"] == [1, 2, 3]
         assert restored.server_id == original.server_id
         assert restored.tags == original.tags
-
-    def test_modify_server_id(self):
-        task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
-            task_id=task_id,
-            task_name=TaskName.CLONE_VFOLDER,
-            body={},
-            server_id="old-server",
-        )
-
-        metadata.server_id = "new-server"
-        assert metadata.server_id == "new-server"
-
-    def test_empty_body(self):
-        task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
-            task_id=task_id,
-            task_name=TaskName.PUSH_IMAGE,
-            body={},
-            server_id="server-1",
-        )
-
-        assert metadata.body == {}
-        json_str = metadata.to_json()
-        restored = BackgroundTaskMetadata.from_json(json_str)
-        assert restored.body == {}

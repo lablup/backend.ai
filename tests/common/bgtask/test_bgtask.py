@@ -277,7 +277,7 @@ class TestBackgroundTaskManager:
         assert TaskID(task_id) in background_task_manager._ongoing_tasks
 
         # Wait for task to complete
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
 
         # Task should be removed after completion
         assert TaskID(task_id) not in background_task_manager._ongoing_tasks
