@@ -7,10 +7,17 @@ from typing import Optional
 
 import yarl
 
+
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import KernelEnqueueingConfig, SessionId, SessionTypes, VFolderMount
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.creator import (
+    ModelServiceCreator,
+    RouteInfo,
+    ServiceInfo,
+)
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -24,12 +31,12 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
     UserScope,
 )
-from ai.backend.manager.services.model_serving.types import (
-    ModelServiceCreator,
-    RouteInfo,
-    ServiceInfo,
-)
 
+# from ai.backend.manager.services.model_serving.types import (
+#     ModelServiceCreator,
+#     RouteInfo,
+#     ServiceInfo,
+# )
 from ..scheduling_controller import SchedulingController
 from .exceptions import EndpointNotFound, ServiceInfoRetrievalFailed
 
@@ -119,18 +126,19 @@ class DeploymentController:
         }
 
         # Create endpoint in database
-        endpoint_args = EndpointCreationArgs(
-            name=spec.service_name,
-            model_id=spec.model_service_prepare_ctx.model_id,
-            owner_id=spec.model_service_prepare_ctx.owner_uuid,
-            group_id=spec.model_service_prepare_ctx.group_id,
-            domain_name=spec.domain_name,
-            is_public=spec.open_to_public,
-            runtime_variant=spec.runtime_variant,
-            desired_session_count=spec.replicas,
-            resource_opts=endpoint_resource_opts,
-            scaling_group=spec.config.scaling_group,
-        )
+        endpoint_args = EndpointCreationArgs.from_creator(spec)
+        # endpoint_args = EndpointCreationArgs(
+        #     name=spec.service_name,
+        #     model_id=spec.model_service_prepare_ctx.model_id,
+        #     owner_id=spec.model_service_prepare_ctx.owner_uuid,
+        #     group_id=spec.model_service_prepare_ctx.group_id,
+        #     domain_name=spec.domain_name,
+        #     is_public=spec.open_to_public,
+        #     runtime_variant=spec.runtime_variant,
+        #     desired_session_count=spec.replicas,
+        #     resource_opts=endpoint_resource_opts,
+        #     scaling_group=spec.config.scaling_group,
+        # )
         endpoint_id = await self._deployment_repository.create_endpoint(endpoint_args)
 
         # Create routing entries for replicas
@@ -550,9 +558,10 @@ class DeploymentController:
             "replica_index": replica_idx,
         }
 
+        image_ref = ImageRef.from_image_str(model_spec.image, None, "", architecture=model_spec.architecture)
         # Create kernel specifications based on the model spec
         kernel_config = KernelEnqueueingConfig(
-            image_ref=model_spec.image,  # type: ignore[typeddict-item]
+            image_ref=image_ref,
             cluster_role="main",
             cluster_idx=0,
             local_rank=0,

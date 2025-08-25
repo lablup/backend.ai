@@ -17,6 +17,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
 )
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -116,9 +117,16 @@ class DeploymentDBSource:
 
             # Extract resource_slots from resource_opts
             resource_slots = (args.resource_opts or {}).get("resources", {})
+            image_ref_str = args.resource_opts["image_ref"]
+            print(f"{type(image_ref_str) = }, {image_ref_str = }")
+            # image_ref = ImageRef.from_image_str(image_ref_str, None, "")
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(image_ref_str, args.resource_opts["architecture"])]
+            )
 
             endpoint = EndpointRow(
                 id=endpoint_id,
+                image=image_row.id,
                 name=args.name,
                 model=args.model_id,
                 created_user=args.owner_id,
