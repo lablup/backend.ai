@@ -131,6 +131,7 @@ enum ArtifactRevisionOrderField {
   SIZE
   CREATED_AT
   UPDATED_AT
+  STATUS
 }
 
 """Added in 25.13.0"""

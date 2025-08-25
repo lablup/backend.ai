@@ -73,3 +73,4 @@ class ArtifactRevisionOrderField(enum.StrEnum):
     SIZE = "SIZE"
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
+    STATUS = "STATUS"
