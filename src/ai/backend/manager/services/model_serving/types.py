@@ -23,6 +23,7 @@ from ai.backend.manager.types import Creator, OptionalState, PartialModifier, Tr
 
 @dataclass
 class ModelServicePrepareCtx:
+    # Legacy. User `ai.backend.manager.data.model_serving.creator.ModelServicePrepareCtx` instead.
     model_id: uuid.UUID
     model_definition_path: Optional[str]
     requester_access_key: AccessKey
@@ -37,6 +38,7 @@ class ModelServicePrepareCtx:
 
 @dataclass
 class MountOption:
+    # Legacy. User `ai.backend.manager.data.model_serving.creator.MountOption` instead.
     mount_destination: Optional[str]
     type: MountTypes
     permission: Optional[MountPermission]
@@ -51,6 +53,7 @@ class MountOption:
 
 @dataclass
 class RouteInfo:
+    # Legacy. User `ai.backend.manager.data.model_serving.creator.RouteInfo` instead.
     route_id: uuid.UUID
     session_id: Optional[uuid.UUID]
     traffic_ratio: float
@@ -65,6 +68,7 @@ class RouteConnectionInfo:
 
 @dataclass
 class ServiceConfig:
+    # Legacy. User `ai.backend.manager.data.model_serving.creator.ServiceConfig` instead.
     model: str
     model_definition_path: Optional[str]
     model_version: int
@@ -90,6 +94,7 @@ class ServiceConfig:
 
 @dataclass
 class ServiceInfo:
+    # Legacy. Use `ai.backend.manager.data.model_serving.creator.ServiceInfo` instead.
     endpoint_id: uuid.UUID
     model_id: uuid.UUID
     extra_mounts: Sequence[uuid.UUID]
