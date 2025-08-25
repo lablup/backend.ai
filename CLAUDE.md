@@ -39,7 +39,7 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
     - Example: `container_user_info` vs. `user_container_info` means completely different things.
       The former represents container-specific "user" information,
       while the latter represents user-specific "container" information.
-  - Legacy stuffs should be distinguishable names
+  - Legacy stuffs should have distinguishable names
   - Be cautious when naming similar but different stuffs to avoid reader's confusion
 * Avoid replicating legacy patterns when writing new codes
   - Stick to the user prompts about the new code patterns
