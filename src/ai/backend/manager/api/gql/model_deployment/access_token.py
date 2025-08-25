@@ -15,8 +15,8 @@ class AccessToken(Node):
     created_at: datetime = strawberry.field(
         description="Added in 25.13.0: The creation timestamp of the access token."
     )
-    valid_until: int = strawberry.field(
-        description="Added in 25.13.0: The expiration timestamp of the access token. The absolute token expiry date expressed in the Unix epoch format."
+    valid_until: datetime = strawberry.field(
+        description="Added in 25.13.0: The expiration timestamp of the access token."
     )
 
 
@@ -55,42 +55,42 @@ mock_access_token_1 = AccessToken(
     id=UUID("13cd8325-9307-49e4-94eb-ded2581363f8"),
     token="mock-token-1",
     created_at=datetime.now(),
-    valid_until=int((datetime.now() + timedelta(hours=12)).timestamp()),
+    valid_until=datetime.now() + timedelta(hours=12),
 )
 
 mock_access_token_2 = AccessToken(
     id=UUID("dc1a223a-7437-4e6f-aedf-23417d0486dd"),
     token="mock-token-2",
     created_at=datetime.now(),
-    valid_until=int((datetime.now() + timedelta(hours=1)).timestamp()),
+    valid_until=datetime.now() + timedelta(hours=1),
 )
 
 mock_access_token_3 = AccessToken(
     id=UUID("39f8b49e-0ddf-4dfb-92d6-003c771684b7"),
     token="mock-token-3",
     created_at=datetime.now(),
-    valid_until=int((datetime.now() + timedelta(hours=100)).timestamp()),
+    valid_until=datetime.now() + timedelta(hours=100),
 )
 
 mock_access_token_4 = AccessToken(
     id=UUID("85a6ed1e-133b-4f58-9c06-f667337c6111"),
     token="mock-token-4",
     created_at=datetime.now(),
-    valid_until=int((datetime.now() + timedelta(hours=10)).timestamp()),
+    valid_until=datetime.now() + timedelta(hours=10),
 )
 
 mock_access_token_5 = AccessToken(
     id=UUID("c42f8578-b31d-4203-b858-93f93b4b9549"),
     token="mock-token-5",
     created_at=datetime.now(),
-    valid_until=int((datetime.now() + timedelta(hours=3)).timestamp()),
+    valid_until=datetime.now() + timedelta(hours=3),
 )
 
 
 @strawberry.input
 class CreateAccessTokenInput:
-    valid_until: int = strawberry.field(
-        description="Added in 25.13.0. The absolute token expiry date expressed in the Unix epoch format."
+    valid_until: datetime = strawberry.field(
+        description="Added in 25.13.0: The expiration timestamp of the access token."
     )
 
 
