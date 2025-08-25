@@ -16,5 +16,12 @@
             "endpoint": "http://127.0.0.1:9000",
             "region": "us-east-1"
         }
+    ],
+    "object_storage_meta": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce08",
+            "storage_id": "fe878f09-06cc-4b91-9242-4c71015cce07",
+            "bucket": "backendai-storage"
+        }
     ]
 }

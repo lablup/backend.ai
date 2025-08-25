@@ -13,9 +13,11 @@ from ai.backend.common.exception import (
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
+    InvalidArtifactModifierTypeError,
     ObjectStorageNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -39,6 +41,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
+    ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
@@ -144,10 +147,13 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
         # Handle basic filters
         if filters.artifact_id is not None:
             conditions.append(ArtifactRevisionRow.artifact_id == filters.artifact_id)
-        if filters.status is not None:
-            # Support multiple status values using IN clause
-            status_values = [status.value for status in filters.status]
-            conditions.append(ArtifactRevisionRow.status.in_(status_values))
+        if filters.status_filter is not None:
+            # Handle different status filter types
+            status_values = [status.value for status in filters.status_filter.values]
+            if filters.status_filter.type == ArtifactStatusFilterType.IN:
+                conditions.append(ArtifactRevisionRow.status.in_(status_values))
+            elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
+                conditions.append(ArtifactRevisionRow.status == status_values[0])
 
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
@@ -232,6 +238,28 @@ class ArtifactRepository:
             row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError()
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def update_artifact(
+        self, artifact_id: uuid.UUID, modifier: ArtifactModifier
+    ) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            data = modifier.fields_to_update()
+            if not data:
+                raise InvalidArtifactModifierTypeError("No valid fields to update")
+
+            await db_sess.execute(
+                sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(**data)
+            )
+            await db_sess.commit()
+
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError()
             return row.to_dataclass()
 
     @repository_decorator()
@@ -321,10 +349,8 @@ class ArtifactRepository:
                 if existing_revision is not None:
                     # Update existing revision
                     # TODO: Reset to SCANNED?
-                    if model.readme:
-                        existing_revision.readme = model.readme
-                    if model.modified_at:
-                        existing_revision.updated_at = model.modified_at
+                    existing_revision.readme = model.readme
+                    existing_revision.updated_at = model.modified_at
 
                     # Create revision row if it doesn't exist
                     if existing_revision is None:
@@ -648,9 +674,12 @@ class ArtifactRepository:
                 count_stmt = count_stmt.where(
                     ArtifactRevisionRow.artifact_id == filters.artifact_id
                 )
-            if filters.status is not None:
-                status_values = [status.value for status in filters.status]
-                count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
+            if filters.status_filter is not None:
+                status_values = [status.value for status in filters.status_filter.values]
+                if filters.status_filter.type == ArtifactStatusFilterType.IN:
+                    count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
+                elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
+                    count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
             if filters.version_filter is not None:
                 version_condition = filters.version_filter.apply_to_column(
                     ArtifactRevisionRow.version

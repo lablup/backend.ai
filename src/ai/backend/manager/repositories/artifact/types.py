@@ -1,5 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
 
 from ai.backend.manager.api.gql.base import StringFilter
@@ -49,12 +50,25 @@ class ArtifactFilterOptions:
     NOT: Optional[list["ArtifactFilterOptions"]] = None
 
 
+class ArtifactStatusFilterType(Enum):
+    IN = "in"
+    EQUALS = "equals"
+
+
+@dataclass
+class ArtifactStatusFilter:
+    """Status filter with operation type and values."""
+
+    type: ArtifactStatusFilterType
+    values: list[ArtifactStatus]
+
+
 @dataclass
 class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
 
     artifact_id: Optional[uuid.UUID] = None
-    status: Optional[list[ArtifactStatus]] = None
+    status_filter: Optional[ArtifactStatusFilter] = None
     version_filter: Optional[StringFilter] = None
 
     # Logical operations

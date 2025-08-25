@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Optional, Self, Sequence
 
 import strawberry
 from aiotools import apartial
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactOrderField,
@@ -32,23 +33,31 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactOrderingOptions,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
+    ArtifactStatusFilter,
+    ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.delete import DeleteArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.delete import (
+    DeleteArtifactRevisionAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
-from ai.backend.manager.services.artifact_revision.actions.import_ import ImportArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+    ImportArtifactRevisionAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.list import ListArtifactRevisionsAction
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
+from ai.backend.manager.types import TriState
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -93,8 +102,8 @@ class ArtifactOrderBy:
 
 @strawberry.input(description="Added in 25.13.0")
 class ArtifactRevisionStatusFilter:
-    in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in")
-    equals: Optional[list[ArtifactStatus]] = None
+    in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
+    equals: Optional[ArtifactStatus] = None
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -118,9 +127,13 @@ class ArtifactRevisionFilter:
         # Handle status filter using ArtifactRevisionStatusFilter
         if self.status:
             if self.status.in_:
-                repo_filter.status = self.status.in_
+                repo_filter.status_filter = ArtifactStatusFilter(
+                    type=ArtifactStatusFilterType.IN, values=self.status.in_
+                )
             elif self.status.equals:
-                repo_filter.status = self.status.equals
+                repo_filter.status_filter = ArtifactStatusFilter(
+                    type=ArtifactStatusFilterType.EQUALS, values=[self.status.equals]
+                )
 
         # Pass StringFilter directly for processing in repository
         repo_filter.version_filter = self.version
@@ -157,10 +170,10 @@ class ImportArtifactsInput:
     bucket_name: str
 
 
-# TODO: Remove this?
 @strawberry.input(description="Added in 25.13.0")
 class UpdateArtifactInput:
     artifact_id: ID
+    readonly: Optional[bool] = UNSET
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -169,10 +182,15 @@ class CancelArtifactInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactInput:
+class DeleteArtifactRevisionTarget:
     artifact_revision_id: ID
     storage_id: ID
     bucket_name: str
+
+
+@strawberry.input(description="Added in 25.13.0")
+class DeleteArtifactRevisionsInput:
+    targets: list[DeleteArtifactRevisionTarget]
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -232,6 +250,11 @@ class Artifact(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactRevisionConnection:
+        if filter is None:
+            filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
+        else:
+            filter.artifact_id = ID(self.id)
+
         return await resolve_artifact_revisions(
             info,
             filter=filter,
@@ -245,34 +268,37 @@ class Artifact(Node):
         )
 
     @strawberry.field
-    async def updated_at(self, info: Info[StrawberryGQLContext]) -> datetime:
+    async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
         action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
             GetArtifactRevisionsAction(uuid.UUID(self.id))
         )
 
-        return max(action_result.revisions, key=lambda r: r.updated_at).updated_at
+        updated_at_list = [
+            r.updated_at for r in action_result.revisions if r.updated_at is not None
+        ]
+        return max(updated_at_list) if updated_at_list else None
 
 
 @strawberry.type(description="Added in 25.13.0")
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
-    created_at: datetime
-    updated_at: datetime
-    readme: str
     version: str
-    size: ByteSize
+    readme: Optional[str]
+    size: Optional[ByteSize]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
         return cls(
             id=ID(str(data.id)),
             status=ArtifactStatus(data.status),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
             readme=data.readme,
             version=data.version,
-            size=ByteSize(data.size),
+            size=ByteSize(data.size) if data.size is not None else None,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
         )
 
     @classmethod
@@ -335,8 +361,8 @@ class UpdateArtifactPayload:
 
 
 @strawberry.type(description="Added in 25.13.0")
-class DeleteArtifactPayload:
-    artifact_revision_id: ID
+class DeleteArtifactRevisionsPayload:
+    artifact_revision_ids: list[ID]
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -619,7 +645,7 @@ async def artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    return await resolve_artifacts(
+    artifacts = await resolve_artifacts(
         info,
         filter=filter,
         order_by=order_by,
@@ -630,6 +656,8 @@ async def artifacts(
         limit=limit,
         offset=offset,
     )
+
+    return artifacts
 
 
 @strawberry.field(description="Added in 25.13.0")
@@ -725,7 +753,7 @@ async def import_artifacts(
     task_ids = []
     for revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
-            ImportArtifactAction(
+            ImportArtifactRevisionAction(
                 artifact_revision_id=uuid.UUID(revision_id),
                 storage_id=uuid.UUID(input.storage_id),
                 bucket_name=input.bucket_name,
@@ -754,23 +782,47 @@ async def import_artifacts(
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
-    raise NotImplementedError("Update artifact functionality is not implemented yet.")
-
-
-@strawberry.mutation(description="Added in 25.13.0")
-async def delete_artifact(
-    input: DeleteArtifactInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactPayload:
-    action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
-        DeleteArtifactAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            storage_id=uuid.UUID(input.storage_id),
-            bucket_name=input.bucket_name,
+async def update_artifact(
+    input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
+) -> UpdateArtifactPayload:
+    action_result = await info.context.processors.artifact.update.wait_for_complete(
+        UpdateArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+            modifier=ArtifactModifier(readonly=TriState.from_graphql(input.readonly)),
         )
     )
 
-    return DeleteArtifactPayload(artifact_revision_id=ID(str(action_result.artifact_revision_id)))
+    artifact = action_result.result
+    registry_loader = DataLoader(
+        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    )
+
+    registry_data = await registry_loader.load(artifact.registry_id)
+    source_registry_data = await registry_loader.load(artifact.source_registry_id)
+
+    return UpdateArtifactPayload(
+        artifact=Artifact.from_dataclass(
+            artifact, registry_url=registry_data.url, source_url=source_registry_data.url
+        )
+    )
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def delete_artifact_revisions(
+    input: DeleteArtifactRevisionsInput, info: Info[StrawberryGQLContext]
+) -> DeleteArtifactRevisionsPayload:
+    artifact_revision_ids = []
+    for target in input.targets:
+        action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
+            DeleteArtifactRevisionAction(
+                artifact_revision_id=uuid.UUID(target.artifact_revision_id),
+                storage_id=uuid.UUID(target.storage_id),
+                bucket_name=target.bucket_name,
+            )
+        )
+        artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))
+
+    return DeleteArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
 
 
 @strawberry.mutation(description="Added in 25.13.0")

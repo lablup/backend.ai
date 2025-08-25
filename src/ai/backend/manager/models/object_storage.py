@@ -7,9 +7,11 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
+    GUID,
     Base,
     IDColumn,
 )
@@ -21,6 +23,39 @@ __all__ = ("ObjectStorageRow",)
 
 def _get_object_storage_association_artifact_join_cond():
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)
+
+
+def _get_object_storage_meta_join_cond():
+    return foreign(ObjectStorageMetaRow.storage_id) == ObjectStorageRow.id
+
+
+class ObjectStorageMetaRow(Base):
+    __tablename__ = "object_storage_meta"
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("storage_id", "bucket", name="uq_storage_id_bucket"),
+    )
+
+    id = IDColumn("id")
+    storage_id = sa.Column(
+        "storage_id",
+        GUID,
+        nullable=False,
+    )
+    bucket = sa.Column("bucket", sa.String, nullable=False)
+
+    object_storage_row = relationship(
+        "ObjectStorageRow",
+        back_populates="meta_rows",
+        primaryjoin=_get_object_storage_meta_join_cond,
+    )
+
+    def to_dataclass(self) -> ObjectStorageMetaData:
+        return ObjectStorageMetaData(
+            id=self.id,
+            storage_id=self.storage_id,
+            bucket=self.bucket,
+        )
 
 
 class ObjectStorageRow(Base):
@@ -60,6 +95,11 @@ class ObjectStorageRow(Base):
         "AssociationArtifactsStorageRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_association_artifact_join_cond,
+    )
+    meta_rows = relationship(
+        "ObjectStorageMetaRow",
+        back_populates="object_storage_row",
+        primaryjoin=_get_object_storage_meta_join_cond,
     )
 
     def __str__(self) -> str:

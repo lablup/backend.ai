@@ -3,29 +3,28 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
+from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
 @dataclass
-class DeleteArtifactRevisionAction(ArtifactRevisionAction):
-    artifact_revision_id: uuid.UUID
+class UnregisterBucketAction(ObjectStorageAction):
     storage_id: uuid.UUID
     bucket_name: str
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.artifact_revision_id)
+        return str(self.storage_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "delete"
+        return "unregister_bucket"
 
 
 @dataclass
-class DeleteArtifactRevisionActionResult(BaseActionResult):
-    artifact_revision_id: uuid.UUID
+class UnregisterBucketActionResult(BaseActionResult):
+    storage_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.artifact_revision_id)
+        return str(self.storage_id)

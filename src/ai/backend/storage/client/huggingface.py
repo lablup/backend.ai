@@ -229,8 +229,6 @@ class HuggingFaceScanner:
                 log.info("No models returned from scan_models()")
                 return []
 
-            sem = asyncio.Semaphore(8)
-
             async def build_model_data_for_revisions(model: HfModelInfo) -> list[ModelData]:
                 """Build ModelData objects for all revisions of a single model."""
                 model_data_list = []
@@ -239,31 +237,18 @@ class HuggingFaceScanner:
                     revisions = await self._client.list_model_revisions(model.id)
 
                     for revision in revisions:
-                        try:
-                            async with sem:
-                                readme_content = await self._download_readme(
-                                    ModelTarget(model_id=model.id, revision=revision)
-                                )
-
-                            filename = model.id.split("/")[-1]
-                            model_data = ModelData(
-                                id=model.id,
-                                name=filename,
-                                author=model.author,
-                                revision=revision,
-                                tags=model.tags or [],
-                                created_at=model.created_at,
-                                modified_at=model.last_modified,
-                                readme=readme_content,
-                            )
-                            model_data_list.append(model_data)
-
-                        except Exception as e:
-                            # Log and skip this revision, but continue with others
-                            log.warning(
-                                f"Failed to get details for revision: model_id={model.id}, revision={revision}, error={str(e)}"
-                            )
-                            continue
+                        filename = model.id.split("/")[-1]
+                        model_data = ModelData(
+                            id=model.id,
+                            name=filename,
+                            author=model.author,
+                            revision=revision,
+                            tags=model.tags or [],
+                            created_at=model.created_at,
+                            modified_at=model.last_modified,
+                            readme=None,
+                        )
+                        model_data_list.append(model_data)
 
                 except Exception as e:
                     # Log and skip this entire model if we can't get revisions
