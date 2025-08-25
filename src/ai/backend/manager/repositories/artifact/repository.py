@@ -153,8 +153,7 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
             if filters.status_filter.type == ArtifactStatusFilterType.IN:
                 conditions.append(ArtifactRevisionRow.status.in_(status_values))
             elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
-                # conditions.append(ArtifactRevisionRow.status == status_values[0])
-                conditions.append(ArtifactRevisionRow.status.in_(status_values))
+                conditions.append(ArtifactRevisionRow.status == status_values[0])
 
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
@@ -680,9 +679,7 @@ class ArtifactRepository:
                 if filters.status_filter.type == ArtifactStatusFilterType.IN:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
                 elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
-                    # TODO: Is this correct?
-                    # count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
-                    count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
+                    count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
             if filters.version_filter is not None:
                 version_condition = filters.version_filter.apply_to_column(
                     ArtifactRevisionRow.version

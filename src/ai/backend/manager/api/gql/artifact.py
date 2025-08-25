@@ -103,7 +103,7 @@ class ArtifactOrderBy:
 @strawberry.input(description="Added in 25.13.0")
 class ArtifactRevisionStatusFilter:
     in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[list[ArtifactStatus]] = None
+    equals: Optional[ArtifactStatus] = None
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -132,7 +132,7 @@ class ArtifactRevisionFilter:
                 )
             elif self.status.equals:
                 repo_filter.status_filter = ArtifactStatusFilter(
-                    type=ArtifactStatusFilterType.EQUALS, values=self.status.equals
+                    type=ArtifactStatusFilterType.EQUALS, values=[self.status.equals]
                 )
 
         # Pass StringFilter directly for processing in repository
