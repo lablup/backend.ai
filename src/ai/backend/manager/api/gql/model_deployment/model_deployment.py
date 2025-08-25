@@ -147,7 +147,7 @@ class ModelDeployment(Node):
     scaling_rule: ScalingRule
     replica_state: ReplicaState
 
-    deployment_strategy: DeploymentStrategy
+    default_deployment_strategy: DeploymentStrategy
 
     created_user: User
 
@@ -276,7 +276,7 @@ class DeploymentStrategyInput:
 class CreateModelDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
-    deployment_strategy: DeploymentStrategyInput
+    default_deployment_strategy: DeploymentStrategyInput
     desired_replica_count: int
     initial_revision: CreateModelRevisionInput
 
@@ -286,7 +286,7 @@ class UpdateModelDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
     tags: Optional[list[str]] = None
-    deployment_strategy: Optional[DeploymentStrategyInput] = None
+    default_deployment_strategy: Optional[DeploymentStrategyInput] = None
     active_revision_id: Optional[ID] = None
 
 
@@ -445,7 +445,7 @@ mock_model_deployment_1 = ModelDeployment(
             ),
         ),
     ),
-    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
+    default_deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
     created_user=User(
         id=UUID(mock_created_user_id_1),
         username="admin",
@@ -515,7 +515,7 @@ mock_model_deployment_2 = ModelDeployment(
             ),
         ),
     ),
-    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
+    default_deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
     created_user=User(
         id=UUID(mock_created_user_id_2),
         username="mlops_user",
@@ -580,7 +580,7 @@ mock_model_deployment_3 = ModelDeployment(
             ),
         ),
     ),
-    deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
+    default_deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
     created_user=User(
         id=UUID(mock_created_user_id_3),
         username="dev_user",

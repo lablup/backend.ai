@@ -1269,7 +1269,7 @@ input CreateModelDeploymentInput
 {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
-  deploymentStrategy: DeploymentStrategyInput!
+  defaultDeploymentStrategy: DeploymentStrategyInput!
   desiredReplicaCount: Int!
   initialRevision: CreateModelRevisionInput!
 }
@@ -1671,6 +1671,11 @@ enum DeploymentStatus
 {
   ACTIVE @join__enumValue(graph: STRAWBERRY)
   INACTIVE @join__enumValue(graph: STRAWBERRY)
+  CREATED @join__enumValue(graph: STRAWBERRY)
+  DEPLOYING @join__enumValue(graph: STRAWBERRY)
+  READY @join__enumValue(graph: STRAWBERRY)
+  STOPPING @join__enumValue(graph: STRAWBERRY)
+  STOPPED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.13.0"""
@@ -2820,7 +2825,7 @@ type ModelDeployment implements Node
   revisionHistory: ModelRevisionConnection!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
-  deploymentStrategy: DeploymentStrategy!
+  defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserDetail!
 }
 
@@ -5142,7 +5147,7 @@ input UpdateModelDeploymentInput
   id: ID!
   openToPublic: Boolean = null
   tags: [String!] = null
-  deploymentStrategy: DeploymentStrategyInput = null
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
 }
 
