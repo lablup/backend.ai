@@ -18,6 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import (
@@ -114,9 +115,10 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
-from ai.backend.common.events.types import EventDomain
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
+from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -637,7 +639,9 @@ class AgentRegistry:
 
             if not enqueue_only:
                 # Create and register propagator for event hub
-                propagator = AsyncBypassPropagator()
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
 
@@ -647,17 +651,16 @@ class AgentRegistry:
                 )
                 try:
                     # Wait for SchedulingBroadcastEvent with RUNNING status
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            async for event in propagator.receive():
-                                if isinstance(event, SchedulingBroadcastEvent):
-                                    if event.status_transition == str(SessionStatus.RUNNING):
-                                        break
-                    else:
-                        async for event in propagator.receive():
+                    cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+                    with ExitStack() as stack:
+                        if max_wait > 0:
+                            stack.enter_context(_timeout(max_wait))
+                        async for event in propagator.receive(cache_id):
                             if isinstance(event, SchedulingBroadcastEvent):
                                 if event.status_transition == str(SessionStatus.RUNNING):
                                     break
+                                if event.status_transition == str(SessionStatus.TERMINATED):
+                                    raise SessionNotFound("Session terminated during scheduling")
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -877,7 +880,9 @@ class AgentRegistry:
 
             if not enqueue_only:
                 # Create and register propagator for event hub
-                propagator = AsyncBypassPropagator()
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
 
@@ -887,17 +892,16 @@ class AgentRegistry:
                 )
                 try:
                     # Wait for SchedulingBroadcastEvent with RUNNING status
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            async for event in propagator.receive():
-                                if isinstance(event, SchedulingBroadcastEvent):
-                                    if event.status_transition == str(SessionStatus.RUNNING):
-                                        break
-                    else:
-                        async for event in propagator.receive():
+                    cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+                    with ExitStack() as stack:
+                        if max_wait > 0:
+                            stack.enter_context(_timeout(max_wait))
+                        async for event in propagator.receive(cache_id):
                             if isinstance(event, SchedulingBroadcastEvent):
                                 if event.status_transition == str(SessionStatus.RUNNING):
                                     break
+                                if event.status_transition == str(SessionStatus.TERMINATED):
+                                    raise SessionNotFound("Session terminated during scheduling")
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:

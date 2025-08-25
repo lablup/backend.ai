@@ -190,7 +190,7 @@ async def push_background_task_events(
             propagator, [(EventDomain.BGTASK, str(task_id))]
         )
         try:
-            cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
+            cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             async for event in propagator.receive(cache_id):
                 user_event = event.user_event()
                 if user_event is None:
