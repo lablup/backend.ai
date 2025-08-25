@@ -372,7 +372,12 @@ class ScheduleDBSource:
         self, db_sess: SASession, scaling_group: str
     ) -> ResourceOccupancySnapshot:
         """Fetch kernel occupancy data from active kernels and session counts."""
-        # First, fetch kernel occupancy data
+        # Fetch kernel occupancy data for both occupied (RUNNING, TERMINATING) and requested (SCHEDULED, PREPARING, etc.) statuses
+        # resource_occupied_statuses: RUNNING, TERMINATING - use occupied_slots
+        # resource_requested_statuses: SCHEDULED, PREPARING, PULLING, PREPARED, CREATING - use requested_slots
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
         occupancy_result = await db_sess.execute(
             sa.select(
                 KernelRow.session_id,
@@ -382,10 +387,12 @@ class ScheduleDBSource:
                 KernelRow.domain_name,
                 KernelRow.agent,
                 KernelRow.occupied_slots,
+                KernelRow.requested_slots,
+                KernelRow.status,
                 KernelRow.session_type,
             ).where(
                 sa.and_(
-                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    KernelRow.status.in_(all_resource_statuses),
                     KernelRow.scaling_group == scaling_group,
                 )
             )
@@ -416,12 +423,22 @@ class ScheduleDBSource:
 
         for row in occupancy_result:
             session_type = cast(SessionTypes, row.session_type)
+            kernel_status = cast(KernelStatus, row.status)
+
+            # Determine which slots to use based on kernel status
+            # For RUNNING/TERMINATING: use occupied_slots (actual allocated resources)
+            # For SCHEDULED/PREPARING/etc: use requested_slots (estimated allocation)
+            if kernel_status in KernelStatus.resource_occupied_statuses():
+                slots_to_use = row.occupied_slots
+            else:  # kernel_status in resource_requested_statuses
+                slots_to_use = row.requested_slots
+
             # Only accumulate resource slots for non-private sessions
             if not session_type.is_private():
-                occupancy_by_keypair[row.access_key].occupied_slots += row.occupied_slots
-                occupancy_by_user[row.user_uuid] += row.occupied_slots
-                occupancy_by_group[row.group_id] += row.occupied_slots
-                occupancy_by_domain[row.domain_name] += row.occupied_slots
+                occupancy_by_keypair[row.access_key].occupied_slots += slots_to_use
+                occupancy_by_user[row.user_uuid] += slots_to_use
+                occupancy_by_group[row.group_id] += slots_to_use
+                occupancy_by_domain[row.domain_name] += slots_to_use
 
                 # Track regular sessions
                 sessions_by_keypair[row.access_key].add(row.session_id)
@@ -430,7 +447,7 @@ class ScheduleDBSource:
                 sftp_sessions_by_keypair[row.access_key].add(row.session_id)
 
             if row.agent:
-                occupancy_by_agent[row.agent].occupied_slots += row.occupied_slots
+                occupancy_by_agent[row.agent].occupied_slots += slots_to_use
                 occupancy_by_agent[row.agent].container_count += 1
 
         # Update session counts in keypair occupancy
@@ -1745,24 +1762,37 @@ class ScheduleDBSource:
             agent_id: ResourceSlot() for agent_id in agent_ids
         }
 
-        # Query all kernels' occupied slots for affected agents
-        # We need to aggregate in Python since occupied_slots is a custom type (JSONB)
+        # Query all kernels' slots for affected agents
+        # Include both resource_occupied_statuses and resource_requested_statuses
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
         query = sa.select(
             KernelRow.agent,
             KernelRow.occupied_slots,
+            KernelRow.requested_slots,
+            KernelRow.status,
         ).where(
             sa.and_(
                 KernelRow.agent.in_(agent_ids),
-                KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                KernelRow.status.in_(all_resource_statuses),
             )
         )
 
         result = await db_sess.execute(query)
 
-        # Aggregate occupied slots per agent in Python
+        # Aggregate slots per agent in Python
         for row in result:
-            if row.agent and row.occupied_slots:
-                agent_slots[row.agent] += row.occupied_slots
+            if row.agent:
+                kernel_status = cast(KernelStatus, row.status)
+                # Use occupied_slots for RUNNING/TERMINATING, requested_slots for pre-running states
+                if kernel_status in KernelStatus.resource_occupied_statuses():
+                    slots_to_use = row.occupied_slots
+                else:  # kernel_status in resource_requested_statuses
+                    slots_to_use = row.requested_slots
+
+                if slots_to_use:
+                    agent_slots[row.agent] += slots_to_use
 
         return agent_slots
 

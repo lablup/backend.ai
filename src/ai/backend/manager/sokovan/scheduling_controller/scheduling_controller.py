@@ -8,7 +8,10 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.metrics.scheduler import SchedulerPhaseMetricObserver
+from ai.backend.manager.metrics.scheduler import (
+    SchedulerOperationMetricObserver,
+    SchedulerPhaseMetricObserver,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
@@ -68,6 +71,7 @@ class SchedulingController:
     _preparer: SessionPreparer
     _resource_calculator: ResourceCalculator
     _metric_observer: SchedulerPhaseMetricObserver
+    _operation_metrics: SchedulerOperationMetricObserver
 
     def __init__(self, args: SchedulingControllerArgs) -> None:
         """Initialize the scheduling controller with required services."""
@@ -78,8 +82,9 @@ class SchedulingController:
         self._valkey_schedule = args.valkey_schedule
         self._network_plugin_ctx = args.network_plugin_ctx
 
-        # Initialize metric observer (singleton)
+        # Initialize metric observers (singletons)
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
+        self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize services
         self._scaling_group_resolver = ScalingGroupResolver()
@@ -266,6 +271,11 @@ class SchedulingController:
                 result.processed_count(),
                 len(result.cancelled_sessions),
                 len(result.terminating_sessions),
+            )
+            # Record metric for termination attempts
+            self._operation_metrics.observe_success(
+                operation="mark_sessions_terminating",
+                count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
             await self.request_scheduling(ScheduleType.TERMINATE)
