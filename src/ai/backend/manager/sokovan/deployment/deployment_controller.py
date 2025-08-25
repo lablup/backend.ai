@@ -90,6 +90,18 @@ class DeploymentController:
             spec.replicas,
         )
 
+        # Resolve image to get the database ID
+        async with self._deployment_repository._db_source._db.begin_readonly_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(spec.image, spec.architecture),
+                    ImageAlias(spec.image),
+                ],
+            )
+
+        log.info("Resolved image '{}' to database ID: {}", spec.image, image_row.id)
+
         # Prepare resource_opts to store for future scaling operations
         endpoint_resource_opts = {
             "image_ref": spec.image,  # Keep as string for JSON serialization
@@ -129,6 +141,7 @@ class DeploymentController:
             is_public=spec.open_to_public,
             runtime_variant=spec.runtime_variant,
             desired_session_count=spec.replicas,
+            image=image_row.id,  # Add the resolved image ID
             resource_opts=endpoint_resource_opts,
             scaling_group=spec.config.scaling_group,
         )

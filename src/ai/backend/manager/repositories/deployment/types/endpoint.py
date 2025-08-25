@@ -21,6 +21,7 @@ class EndpointCreationArgs:
     is_public: bool
     runtime_variant: str
     desired_session_count: int
+    image: Optional[uuid.UUID] = None
     resource_opts: Optional[dict[str, Any]] = None
     scaling_group: Optional[str] = None
 
