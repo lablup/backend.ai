@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncGenerator, Mapping, Optional
 
-from .types import BroadcastMessage, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 
 class AbstractMessageQueue(ABC):
@@ -55,6 +55,16 @@ class AbstractMessageQueue(ABC):
         If the message is not found, it will return None.
         This is useful for subscribers to get the last message that was broadcasted
         when they were not online.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+        """
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
+        Each event contains a payload and optional cache_id.
+        Messages are not guaranteed to be delivered.
         """
         raise NotImplementedError
 

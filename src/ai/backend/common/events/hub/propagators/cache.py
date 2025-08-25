@@ -37,21 +37,41 @@ class WithCachePropagator(EventPropagator):
         """
         return self._id
 
+    async def _fetch_cached_event_safe(self, cache_id: str) -> Optional[AbstractEvent]:
+        """
+        Safely fetch cached event, handling any errors that may occur.
+        Returns None if fetching fails or no cached event exists.
+        """
+        try:
+            return await self._event_fetcher.fetch_cached_event(cache_id)
+        except Exception as e:
+            log.warning("Failed to fetch cached event for cache_id {}: {}", cache_id, e)
+            return None
+
     async def receive(self, cache_id: str) -> AsyncIterator[AbstractEvent]:
         """
         First, it fetches the last event for a given cache ID using the event fetcher.
         If the last event is not None, it yields that event.
-        Then, it enters a loop to receive events from the queue until closed.
+        Then, it enters a loop to receive events from the queue until closed,
+        checking for cached events periodically.
         """
-        cached_event = await self._event_fetcher.fetch_cached_event(cache_id)
+        # Initial check for cached event
+        cached_event = await self._fetch_cached_event_safe(cache_id)
         if cached_event is not None:
             yield cached_event
+
         while not self._closed:
-            event = await self._queue.get()
             try:
+                # Try to get from queue with a 30 second timeout
+                event = await asyncio.wait_for(self._queue.get(), timeout=30.0)
                 if event is None:
                     break
                 yield event
+            except asyncio.TimeoutError:
+                # On timeout, check for cached event again
+                cached_event = await self._fetch_cached_event_safe(cache_id)
+                if cached_event is not None:
+                    yield cached_event
             except Exception as e:
                 log.error("Error propagating event: {}", e)
 

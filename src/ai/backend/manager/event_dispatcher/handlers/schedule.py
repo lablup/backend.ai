@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
-from ai.backend.common.events.event_types.session.broadcast import BatchSchedulingBroadcastEvent
+from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -123,20 +123,9 @@ class ScheduleEventHandler:
             schedule_type = ScheduleType(ev.schedule_type)
             await self._schedule_coordinator.process_schedule(schedule_type)
 
-    async def handle_batch_scheduling_broadcast(
-        self, context: None, source: AgentId, ev: BatchSchedulingBroadcastEvent
+    async def handle_scheduling_broadcast(
+        self, context: None, source: AgentId, ev: SchedulingBroadcastEvent
     ) -> None:
-        """Handle batch scheduling broadcast event and propagate individual events through EventHub."""
+        """Handle scheduling broadcast event (individual)."""
         if self._use_sokovan:
-            # Generate individual events from the batch event
-            individual_events = ev.generate_events()
-
-            # Propagate each individual event through the event hub
-            for individual_event in individual_events:
-                await self._event_hub.propagate_event(individual_event)
-
-            log.trace(
-                "Propagated {} individual scheduling events for status transition: {}",
-                len(individual_events),
-                ev.status_transition,
-            )
+            await self._event_hub.propagate_event(ev)

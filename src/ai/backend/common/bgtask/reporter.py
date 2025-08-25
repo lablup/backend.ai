@@ -35,7 +35,7 @@ class ProgressReporter:
         # due to interleaving at await statements below.
         current, total = self.current_progress, self.total_progress
         await self._event_producer.broadcast_event_with_cache(
-            EventCacheDomain.BGTASK.cache_id(self._task_id),
+            EventCacheDomain.BGTASK.cache_id(str(self._task_id)),
             BgtaskUpdatedEvent(
                 self._task_id,
                 message=message,

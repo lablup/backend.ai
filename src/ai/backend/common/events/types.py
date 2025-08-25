@@ -1,7 +1,6 @@
 import enum
-import uuid
 from abc import ABC, abstractmethod
-from typing import Optional, Self, override
+from typing import Optional, Self, final, override
 
 from ai.backend.common.message_queue.types import MessagePayload
 
@@ -32,6 +31,23 @@ class EventDomain(enum.StrEnum):
     VOLUME = "volume"
     LOG = "log"
     WORKFLOW = "workflow"
+
+
+class EventCacheDomain(enum.StrEnum):
+    """
+    Enum for event cache domains.
+    This is used to identify the domain of the cached event.
+    """
+
+    BGTASK = "bgtask"
+    SESSION_SCHEDULER = "session_scheduler"
+
+    def cache_id(self, id: str) -> str:
+        """
+        Return the cache ID for the event.
+        The cache ID is a string that identifies the cached event.
+        """
+        return f"{self.value}.{id}"
 
 
 class DeliveryPattern(enum.StrEnum):
@@ -147,6 +163,28 @@ class AbstractBroadcastEvent(AbstractEvent):
         """
         return [self]
 
+    @classmethod
+    def cache_domain(cls) -> Optional[EventCacheDomain]:
+        """
+        Return the event domain.
+        """
+        return None
+
+    @final
+    def cache_id(self) -> Optional[str]:
+        """
+        Return the cache ID for this event.
+        If None is returned, the event will not be cached.
+        Subclasses can override to provide a cache ID.
+        """
+        cache_domain = self.cache_domain()
+        if cache_domain is None:
+            return None
+        domain_id = self.domain_id()
+        if domain_id is None:
+            return None
+        return cache_domain.cache_id(domain_id)
+
 
 class BatchBroadcastEvent(AbstractBroadcastEvent):
     """
@@ -163,19 +201,3 @@ class BatchBroadcastEvent(AbstractBroadcastEvent):
         Must be overridden by subclasses to generate multiple events.
         """
         raise NotImplementedError
-
-
-class EventCacheDomain(enum.StrEnum):
-    """
-    Enum for event cache domains.
-    This is used to identify the domain of the cached event.
-    """
-
-    BGTASK = "bgtask"
-
-    def cache_id(self, id: uuid.UUID) -> str:
-        """
-        Return the cache ID for the event.
-        The cache ID is a string that identifies the cached event.
-        """
-        return f"{self.value}.{str(id)}"
