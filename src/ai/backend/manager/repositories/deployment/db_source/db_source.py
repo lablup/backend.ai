@@ -3,26 +3,28 @@
 import uuid
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any, AsyncIterator, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import selectinload, sessionmaker
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.modifier import DeploymentModifier
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.errors.service import EndpointNotFound, NoUpdatesToApply
 from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
     EndpointRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 
 from ..types import (
-    AutoScalingRuleData,
-    EndpointCreationArgs,
     EndpointData,
     EndpointWithRoutesData,
     RouteData,
@@ -103,113 +105,97 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        args: EndpointCreationArgs,
-    ) -> uuid.UUID:
-        """Create a new endpoint in the database."""
-        endpoint_id = uuid.uuid4()
-
+        creator: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """Create a new endpoint in the database and return DeploymentInfo."""
         async with self._begin_session_read_committed() as db_sess:
-            # Extract resource_group from resource_opts if not provided
-            resource_group = args.scaling_group or (args.resource_opts or {}).get(
-                "scaling_group", "default"
-            )
-
-            # Extract resource_slots from resource_opts
-            resource_slots = (args.resource_opts or {}).get("resources", {})
-
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=args.name,
-                model=args.model_id,
-                created_user=args.owner_id,
-                session_owner=args.owner_id,  # Also set session_owner
-                project=args.group_id,
-                domain=args.domain_name,
-                resource_group=resource_group,  # Required field
-                lifecycle_stage=EndpointLifecycle.CREATED,
-                open_to_public=args.is_public,
-                runtime_variant=args.runtime_variant,
-                replicas=args.desired_session_count,
-                resource_slots=resource_slots,  # Required field
-                resource_opts=args.resource_opts or {},
-            )
+            endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
             db_sess.add(endpoint)
+            await db_sess.flush()
 
-        return endpoint_id
+            # Load image_row relationship for to_deployment_info
+            await db_sess.refresh(endpoint, ["image_row"])
+            deployment_info = endpoint.to_deployment_info()
+
+        return deployment_info
 
     async def get_endpoint(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointData]:
-        """Get endpoint by ID."""
+    ) -> DeploymentInfo:
+        """Get endpoint by ID.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(selectinload(EndpointRow.image_row))
+            )
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
+            row: Optional[EndpointRow] = result.scalar_one_or_none()
 
             if not row:
-                return None
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            return EndpointData(
-                endpoint_id=row.id,
-                name=row.name,
-                model_id=row.model,
-                owner_id=row.created_user,
-                group_id=row.project,
-                domain_name=row.domain,
-                lifecycle=row.lifecycle_stage,
-                is_public=row.open_to_public,
-                runtime_variant=row.runtime_variant,
-                desired_session_count=row.replicas,
-                created_at=row.created_at,
-                service_endpoint=row.url,
-                resource_opts=row.resource_opts or {},
-            )
+            return row.to_deployment_info()
 
-    async def get_all_active_endpoints(self) -> list[EndpointData]:
+    async def get_all_active_endpoints(self) -> list[DeploymentInfo]:
         """Get all active endpoints."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             rows = await self._fetch_active_endpoints(db_sess)
 
-        return self._transform_endpoint_rows(rows)
+        return [row.to_deployment_info() for row in rows]
 
     async def _fetch_active_endpoints(
         self,
-        db_sess,
+        db_sess: SASession,
     ) -> list[EndpointRow]:
         """Fetch all active endpoints from database."""
-        query = sa.select(EndpointRow).where(
-            EndpointRow.lifecycle_stage.in_([
-                EndpointLifecycle.CREATED,
-                EndpointLifecycle.DESTROYING,
-            ])
+        from sqlalchemy.orm import selectinload
+
+        query = (
+            sa.select(EndpointRow)
+            .where(
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
+            )
+            .options(selectinload(EndpointRow.image_row))
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
 
-    def _transform_endpoint_rows(
+    async def list_endpoints_by_name(
         self,
-        rows: list[EndpointRow],
-    ) -> list[EndpointData]:
-        """Transform endpoint rows to data objects."""
-        return [
-            EndpointData(
-                endpoint_id=row.id,
-                name=row.name,
-                model_id=row.model,
-                owner_id=row.created_user,
-                group_id=row.project,
-                domain_name=row.domain,
-                lifecycle=row.lifecycle_stage,
-                is_public=row.open_to_public,
-                runtime_variant=row.runtime_variant,
-                desired_session_count=row.replicas,
-                created_at=row.created_at,
-                service_endpoint=row.url,
-                resource_opts=row.resource_opts or {},
+        session_owner_id: uuid.UUID,
+        name: Optional[str] = None,
+    ) -> list[DeploymentInfo]:
+        """List endpoints owned by a specific user with optional name filter."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            from sqlalchemy.orm import selectinload
+
+            # Build query with base conditions
+            query = (
+                sa.select(EndpointRow)
+                .where(
+                    EndpointRow.session_owner == session_owner_id,
+                    EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
+                )
+                .options(selectinload(EndpointRow.image_row))
             )
-            for row in rows
-        ]
+
+            # Add name filter if provided
+            if name is not None:
+                query = query.where(EndpointRow.name == name)
+
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+
+            return [row.to_deployment_info() for row in rows]
 
     async def update_endpoint_lifecycle(
         self,
@@ -222,21 +208,6 @@ class DeploymentDBSource:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .values(lifecycle_stage=lifecycle)
-            )
-            result = await db_sess.execute(query)
-            return result.rowcount > 0
-
-    async def update_endpoint_replicas(
-        self,
-        endpoint_id: uuid.UUID,
-        desired_session_count: int,
-    ) -> bool:
-        """Update endpoint desired session count."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(replicas=desired_session_count)
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
@@ -259,7 +230,7 @@ class DeploymentDBSource:
 
     async def _update_endpoint_replicas(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
         target_replicas: int,
     ) -> bool:
@@ -274,7 +245,7 @@ class DeploymentDBSource:
 
     async def _rebalance_traffic_ratios(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
         target_replicas: int,
     ) -> None:
@@ -289,6 +260,46 @@ class DeploymentDBSource:
             .values(traffic_ratio=new_ratio)
         )
         await db_sess.execute(query)
+
+    async def update_endpoint_with_modifier(
+        self,
+        endpoint_id: uuid.UUID,
+        modifier: DeploymentModifier,
+    ) -> DeploymentInfo:
+        """Update endpoint using a deployment modifier.
+
+        Args:
+            endpoint_id: ID of the endpoint to update
+            modifier: Deployment modifier containing partial updates
+
+        Returns:
+            DeploymentInfo: Updated deployment information
+
+        Raises:
+            NoUpdatesToApply: If there are no updates to apply
+            EndpointNotFound: If the endpoint does not exist
+        """
+        # Extract updates from the modifier
+        updates = modifier.fields_to_update()
+
+        if not updates:
+            raise NoUpdatesToApply(f"No updates to apply for endpoint {endpoint_id}")
+
+        async with self._begin_session_read_committed() as db_sess:
+            # Directly use the updates since fields_to_update returns column-ready values
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(**updates)
+                .returning(EndpointRow)
+            )
+            result = await db_sess.execute(query)
+            updated_row = result.scalar_one_or_none()
+
+            if not updated_row:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+
+            return updated_row.to_deployment_info()
 
     async def delete_endpoint_with_routes(
         self,
@@ -414,7 +425,7 @@ class DeploymentDBSource:
 
     async def _delete_routes_and_endpoint(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> bool:
         """Private method to delete routes and endpoint in a single transaction."""
@@ -430,21 +441,25 @@ class DeploymentDBSource:
     async def get_endpoint_with_routes(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointWithRoutesData]:
-        """Get endpoint with all its routes in a single database query."""
+    ) -> EndpointWithRoutesData:
+        """Get endpoint with all its routes in a single database query.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             # Fetch all data from database in one session
             raw_data = await self._fetch_endpoint_and_routes(db_sess, endpoint_id)
 
             if not raw_data:
-                return None
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             # Transform database rows to data objects
             return self._transform_endpoint_and_routes(raw_data)
 
     async def _fetch_endpoint_and_routes(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> Optional[EndpointWithRoutesRawData]:
         """Fetch endpoint and routes from database."""
@@ -508,93 +523,46 @@ class DeploymentDBSource:
             routes=routes_data,
         )
 
-    # Auto-scaling rule operations
-
-    async def create_auto_scaling_rule(
+    async def _resolve_group_id(
         self,
-        endpoint_id: uuid.UUID,
-        metric_source: str,
-        metric_name: str,
-        threshold: str,
-        comparator: str,
-        step_size: int,
-        cooldown_seconds: int,
-        min_replicas: Optional[int] = None,
-        max_replicas: Optional[int] = None,
-    ) -> uuid.UUID:
-        """Create a new auto-scaling rule."""
-        rule_id = uuid.uuid4()
+        db_sess: SASession,
+        domain_name: str,
+        group_name: str,
+    ) -> Optional[uuid.UUID]:
+        """Private method to resolve group ID."""
+        from ai.backend.manager.models.group import GroupRow
 
-        async with self._begin_session_read_committed() as db_sess:
-            rule = EndpointAutoScalingRuleRow(
-                id=rule_id,
-                endpoint_id=endpoint_id,
-                metric_source=metric_source,
-                metric_name=metric_name,
-                threshold=Decimal(threshold),
-                comparator=comparator,
-                step_size=step_size,
-                cooldown_seconds=cooldown_seconds,
-                min_replicas=min_replicas,
-                max_replicas=max_replicas,
+        query = sa.select(GroupRow.id).where(
+            sa.and_(
+                GroupRow.domain_name == domain_name,
+                GroupRow.name == group_name,
             )
-            db_sess.add(rule)
+        )
+        result = await db_sess.execute(query)
+        return result.scalar_one_or_none()
 
-        return rule_id
-
-    async def get_auto_scaling_rule(
+    async def get_vfolder_by_id(
         self,
-        rule_id: uuid.UUID,
-    ) -> Optional[AutoScalingRuleData]:
-        """Get auto-scaling rule by ID."""
+        vfolder_id: uuid.UUID,
+    ) -> Optional[VFolderLocation]:
+        """Get vfolder location information by ID.
+
+        Args:
+            vfolder_id: ID of the vfolder
+
+        Returns:
+            VFolderLocation if found, None otherwise
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointAutoScalingRuleRow).where(
-                EndpointAutoScalingRuleRow.id == rule_id
-            )
+            query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
 
-            if not row:
+            if row is None:
                 return None
 
-            return AutoScalingRuleData(
-                rule_id=row.id,
-                endpoint_id=row.endpoint_id,
-                metric_source=row.metric_source,
-                metric_name=row.metric_name,
-                threshold=row.threshold,
-                comparator=row.comparator,
-                step_size=row.step_size,
-                cooldown_seconds=row.cooldown_seconds,
-                min_replicas=row.min_replicas,
-                max_replicas=row.max_replicas,
-                enabled=row.enabled,
-                created_at=row.created_at,
+            return VFolderLocation(
+                id=row.id,
+                quota_scope_id=row.quota_scope_id,
+                host=row.host,
             )
-
-    async def update_auto_scaling_rule(
-        self,
-        rule_id: uuid.UUID,
-        updates: dict[str, Any],
-    ) -> bool:
-        """Update auto-scaling rule."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = (
-                sa.update(EndpointAutoScalingRuleRow)
-                .where(EndpointAutoScalingRuleRow.id == rule_id)
-                .values(**updates)
-            )
-            result = await db_sess.execute(query)
-            return result.rowcount > 0
-
-    async def delete_auto_scaling_rule(
-        self,
-        rule_id: uuid.UUID,
-    ) -> bool:
-        """Delete an auto-scaling rule."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = sa.delete(EndpointAutoScalingRuleRow).where(
-                EndpointAutoScalingRuleRow.id == rule_id
-            )
-            result = await db_sess.execute(query)
-            return result.rowcount > 0

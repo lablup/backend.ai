@@ -21,6 +21,7 @@ from ai.backend.manager.models.user import UserRow
 
 
 class EndpointLifecycle(enum.Enum):
+    PENDING = "pending"
     CREATED = "created"
     DESTROYING = "destroying"
     DESTROYED = "destroyed"

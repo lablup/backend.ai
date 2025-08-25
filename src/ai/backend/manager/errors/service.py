@@ -17,6 +17,21 @@ from ai.backend.common.exception import (
 from .common import ObjectNotFound
 
 
+class NoUpdatesToApply(BackendAIError):
+    """Raised when there are no updates to apply to an endpoint."""
+
+    def __init__(self, message: str = "No updates to apply") -> None:
+        super().__init__(message)
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
 

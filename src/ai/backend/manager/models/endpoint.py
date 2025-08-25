@@ -44,6 +44,19 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    DeploymentState,
+    ExecutionSpec,
+    ModelRevisionSpec,
+    MountMetadata,
+    ReplicaSpec,
+    ResourceSpec,
+)
+from ai.backend.manager.data.image.types import ImageIdentifier
 
 from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ..data.model_serving.creator import EndpointCreator
@@ -105,6 +118,14 @@ class EndpointRow(Base):
                 sa.column("image").isnot(None),
             ),
             name="ck_image_required_unless_destroyed",
+        ),
+        sa.Index(
+            "ix_endpoints_unique_name_when_not_destroyed",
+            "name",
+            "domain",
+            "project",
+            unique=True,
+            postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
         ),
     )
 
@@ -584,6 +605,131 @@ class EndpointRow(Base):
             environ=creator.environ,
             resource_opts=creator.resource_opts,
             open_to_public=creator.open_to_public,
+        )
+
+    @classmethod
+    async def from_deployment_creator(
+        cls,
+        db_session: AsyncSession,
+        creator: DeploymentCreator,
+    ) -> Self:
+        """
+        Create an EndpointRow instance from a DeploymentCreator instance.
+
+        Args:
+            db_session: Database session for resolving image information
+            creator: DeploymentCreator containing deployment configuration
+
+        Returns:
+            EndpointRow instance with image ID resolved from ImageIdentifier
+
+        Raises:
+            InvalidAPIParameters: If image is not specified in creator
+            ImageNotFound: If image cannot be resolved
+        """
+        # Image is required
+        if not creator.model_revision.image:
+            raise InvalidAPIParameters("Image must be specified in DeploymentCreator")
+
+        # Resolve image ID from ImageIdentifier
+        image_row = await ImageRow.lookup(
+            db_session,
+            creator.model_revision.image,
+        )
+
+        return cls(
+            name=creator.metadata.name,
+            created_user=creator.metadata.created_user,
+            session_owner=creator.metadata.session_owner,
+            replicas=creator.replica_spec.replica_count,
+            image=image_row.id,
+            model=creator.model_revision.mounts.model_vfolder_id,
+            model_mount_destination=creator.model_revision.mounts.model_mount_destination,
+            model_definition_path=creator.model_revision.mounts.model_definition_path,
+            domain=creator.metadata.domain,
+            project=creator.metadata.project,
+            resource_group=creator.metadata.resource_group,
+            tag=creator.metadata.tag,
+            startup_command=creator.model_revision.execution.startup_command,
+            bootstrap_script=creator.model_revision.execution.bootstrap_script,
+            callback_url=creator.model_revision.execution.callback_url,
+            environ=creator.model_revision.execution.environ,
+            open_to_public=creator.network.open_to_public,
+            runtime_variant=creator.model_revision.execution.runtime_variant,
+            resource_slots=creator.model_revision.resource_spec.resource_slots,
+            url=creator.network.url,
+            resource_opts=creator.model_revision.resource_spec.resource_opts,
+            cluster_mode=creator.model_revision.resource_spec.cluster_mode,
+            cluster_size=creator.model_revision.resource_spec.cluster_size,
+            extra_mounts=creator.model_revision.mounts.extra_mounts,
+            # Fields not in creator - use defaults
+            lifecycle_stage=EndpointLifecycle.CREATED,
+            retries=0,
+        )
+
+    def to_deployment_info(self) -> DeploymentInfo:
+        """
+        Convert EndpointRow to DeploymentInfo dataclass.
+
+        If image_row is loaded (via selectinload), ImageIdentifier will be populated.
+        Otherwise, ImageIdentifier will be None.
+        """
+        # Create ImageIdentifier only if image_row is loaded
+        image_identifier: Optional[ImageIdentifier] = None
+        if self.image_row:
+            image_identifier = ImageIdentifier(
+                canonical=self.image_row.name,
+                architecture=self.image_row.architecture,
+            )
+
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                created_at=self.created_at,
+                tag=self.tag,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retries,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            model_revisions=[
+                ModelRevisionSpec(
+                    image=image_identifier,
+                    resource_spec=ResourceSpec(
+                        replicas=self.replicas,
+                        cluster_mode=self.cluster_mode,
+                        cluster_size=self.cluster_size,
+                        resource_slots=self.resource_slots,
+                        resource_opts=self.resource_opts,
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=self.model,
+                        model_definition_path=self.model_definition_path,
+                        model_mount_destination=self.model_mount_destination,
+                        extra_mounts=self.extra_mounts,
+                    ),
+                    execution=ExecutionSpec(
+                        startup_command=self.startup_command,
+                        bootstrap_script=self.bootstrap_script,
+                        environ=self.environ,
+                        runtime_variant=self.runtime_variant,
+                        callback_url=self.callback_url,
+                    ),
+                ),
+            ],
         )
 
 

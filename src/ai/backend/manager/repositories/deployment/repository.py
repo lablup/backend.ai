@@ -8,12 +8,24 @@ from pydantic import HttpUrl
 
 from ai.backend.common.types import RuntimeVariant, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.modifier import DeploymentModifier
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.model_serving.types import RouteInfo, ServiceInfo
+from ai.backend.manager.services.model_serving.types import (
+    ModelServiceDefinition,
+    RouteInfo,
+    ServiceInfo,
+)
+from ai.backend.manager.sokovan.deployment.exceptions import (
+    EndpointNotFound,
+)
 
 from .db_source import DeploymentDBSource
-from .types import EndpointCreationArgs, EndpointData, RouteData
+from .storage_source import DeploymentStorageSource
+from .types import RouteData
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -22,46 +34,61 @@ class DeploymentRepository:
     """Repository for deployment-related operations."""
 
     _db_source: DeploymentDBSource
+    _storage_source: DeploymentStorageSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        storage_manager: StorageSessionManager,
+    ) -> None:
         self._db_source = DeploymentDBSource(db)
+        self._storage_source = DeploymentStorageSource(storage_manager)
 
     # Endpoint operations
 
     async def create_endpoint(
         self,
-        args: EndpointCreationArgs,
-    ) -> uuid.UUID:
-        """Create a new endpoint."""
-        return await self._db_source.create_endpoint(args)
+        creator: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """Create a new endpoint and return DeploymentInfo."""
+        return await self._db_source.create_endpoint(creator)
+
+    async def update_endpoint_with_modifier(
+        self,
+        endpoint_id: uuid.UUID,
+        modifier: DeploymentModifier,
+    ) -> DeploymentInfo:
+        """Update endpoint using a deployment modifier.
+
+        Args:
+            endpoint_id: ID of the endpoint to update
+            modifier: Deployment modifier containing partial updates
+
+        Returns:
+            DeploymentInfo: Updated deployment information
+
+        Raises:
+            NoUpdatesToApply: If there are no updates to apply
+            EndpointNotFound: If the endpoint does not exist
+        """
+        return await self._db_source.update_endpoint_with_modifier(endpoint_id, modifier)
 
     async def get_endpoint_info(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointData]:
-        """Get endpoint information."""
+    ) -> DeploymentInfo:
+        """Get endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
         return await self._db_source.get_endpoint(endpoint_id)
 
-    async def get_all_active_endpoints(self) -> list[EndpointData]:
+    async def get_all_active_endpoints(self) -> list[DeploymentInfo]:
         """Get all active endpoints for synchronization."""
         return await self._db_source.get_all_active_endpoints()
 
-    async def update_endpoint_lifecycle(
-        self,
-        endpoint_id: uuid.UUID,
-        lifecycle: EndpointLifecycle,
-    ) -> bool:
-        """Update endpoint lifecycle status."""
-        return await self._db_source.update_endpoint_lifecycle(endpoint_id, lifecycle)
-
-    async def update_endpoint_replicas(
-        self,
-        endpoint_id: uuid.UUID,
-        desired_session_count: int,
-    ) -> bool:
-        """Update endpoint desired session count."""
-        return await self._db_source.update_endpoint_replicas(endpoint_id, desired_session_count)
-
+    # Deprecated - use update_endpoint_with_modifier instead
     async def update_endpoint_replicas_and_rebalance(
         self,
         endpoint_id: uuid.UUID,
@@ -70,6 +97,15 @@ class DeploymentRepository:
         """Update endpoint replicas and rebalance traffic ratios in a single transaction."""
         return await self._db_source.update_endpoint_replicas_and_rebalance(
             endpoint_id, target_replicas
+        )
+
+    async def terminate_endpoint(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> bool:
+        """Terminate an endpoint and all its routes."""
+        return await self._db_source.update_endpoint_lifecycle(
+            endpoint_id, EndpointLifecycle.DESTROYING
         )
 
     async def delete_endpoint(
@@ -84,10 +120,13 @@ class DeploymentRepository:
         endpoint_id: uuid.UUID,
     ) -> Optional[HttpUrl]:
         """Get service endpoint URL."""
-        endpoint = await self._db_source.get_endpoint(endpoint_id)
-        if not endpoint or not endpoint.service_endpoint:
+        try:
+            endpoint = await self._db_source.get_endpoint(endpoint_id)
+            if not endpoint.network.url:
+                return None
+            return HttpUrl(endpoint.network.url)
+        except EndpointNotFound:
             return None
-        return HttpUrl(endpoint.service_endpoint)
 
     # Route operations
 
@@ -138,7 +177,52 @@ class DeploymentRepository:
         """Delete a route."""
         return await self._db_source.delete_route(route_id)
 
-    # delete_routes_by_endpoint is now handled internally by delete_endpoint
+    # Data fetching operations
+
+    async def fetch_service_definition(
+        self,
+        vfolder_id: uuid.UUID,
+    ) -> Optional[ModelServiceDefinition]:
+        """Fetch service definition from model vfolder.
+
+        Args:
+            vfolder_id: ID of the model vfolder
+
+        Returns:
+            Parsed service definition or None if not found
+        """
+        # Get vfolder info from DB
+        vfolder_row = await self._db_source.get_vfolder_by_id(vfolder_id)
+        if not vfolder_row:
+            return None
+
+        # Read service definition from storage
+        return await self._storage_source.fetch_service_config(vfolder_row)
+
+    async def check_model_definition_exists(
+        self,
+        vfolder_id: uuid.UUID,
+        model_definition_path: str,
+    ) -> bool:
+        """Check if model definition file exists in vfolder.
+
+        Args:
+            vfolder_id: ID of the model vfolder
+            model_definition_path: Path to model definition file
+
+        Returns:
+            True if file exists, False otherwise
+        """
+        # Get vfolder info from DB
+        vfolder_row = await self._db_source.get_vfolder_by_id(vfolder_id)
+        if not vfolder_row:
+            return False
+
+        # Check file existence in storage
+        return await self._storage_source.check_model_definition_exists(
+            vfolder_row,
+            model_definition_path,
+        )
 
     # Additional operations for model serving
 
@@ -146,15 +230,9 @@ class DeploymentRepository:
         self,
         owner_id: uuid.UUID,
         name: Optional[str] = None,
-    ) -> list[EndpointData]:
+    ) -> list[DeploymentInfo]:
         """List endpoints by owner with optional name filter."""
-        endpoints = await self._db_source.get_all_active_endpoints()
-        # Filter by owner
-        endpoints = [e for e in endpoints if e.owner_id == owner_id]
-        # Filter by name if provided
-        if name:
-            endpoints = [e for e in endpoints if e.name == name]
-        return endpoints
+        return await self._db_source.list_endpoints_by_name(owner_id, name)
 
     async def get_service_info(
         self,
@@ -162,8 +240,9 @@ class DeploymentRepository:
     ) -> Optional[ServiceInfo]:
         """Get complete service information for an endpoint."""
         # Get endpoint and routes in a single database operation
-        result = await self._db_source.get_endpoint_with_routes(endpoint_id)
-        if not result:
+        try:
+            result = await self._db_source.get_endpoint_with_routes(endpoint_id)
+        except EndpointNotFound:
             return None
 
         endpoint = result.endpoint
@@ -210,17 +289,6 @@ class DeploymentRepository:
             is_public=endpoint.is_public,
             runtime_variant=RuntimeVariant(endpoint.runtime_variant),
         )
-
-    async def update_endpoint_public_access(
-        self,
-        endpoint_id: uuid.UUID,
-        is_public: bool,
-    ) -> bool:
-        """Update endpoint public access setting."""
-        # TODO: Add this method to db_source when needed
-        # For now, return True to indicate success
-        log.warning("update_endpoint_public_access not yet implemented in db_source")
-        return True
 
     async def clear_endpoint_errors(
         self,

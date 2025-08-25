@@ -62,9 +62,6 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
-from ai.backend.manager.services.model_serving.services.model_serving_with_deployment import (
-    ModelServingServiceWithDeployment,
-)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -217,22 +214,16 @@ class Services:
         )
 
         # Use deployment-based model serving if deployment_controller is available
-        model_serving_service: ModelServingServiceProtocol
-        if args.deployment_controller is not None:
-            model_serving_service = ModelServingServiceWithDeployment(
-                deployment_controller=args.deployment_controller,
-            )
-        else:
-            model_serving_service = ModelServingService(
-                agent_registry=args.agent_registry,
-                background_task_manager=args.background_task_manager,
-                event_dispatcher=args.event_dispatcher,
-                storage_manager=args.storage_manager,
-                config_provider=args.config_provider,
-                valkey_live=args.valkey_live,
-                repository=repositories.model_serving.repository,
-                admin_repository=repositories.model_serving.admin_repository,
-            )
+        model_serving_service = ModelServingService(
+            agent_registry=args.agent_registry,
+            background_task_manager=args.background_task_manager,
+            event_dispatcher=args.event_dispatcher,
+            storage_manager=args.storage_manager,
+            config_provider=args.config_provider,
+            valkey_live=args.valkey_live,
+            repository=repositories.model_serving.repository,
+            admin_repository=repositories.model_serving.admin_repository,
+        )
 
         model_serving_auto_scaling = AutoScalingService(
             repository=repositories.model_serving.repository,

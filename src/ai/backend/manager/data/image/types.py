@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, NamedTuple, Optional
 
 from ai.backend.common.types import CIStrEnum
 
@@ -19,6 +19,15 @@ class ImageType(CIStrEnum):
     COMPUTE = "compute"
     SYSTEM = "system"
     SERVICE = "service"
+
+
+class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
+    canonical: str
+    architecture: str
 
 
 @dataclass

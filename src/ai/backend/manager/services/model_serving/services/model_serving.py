@@ -36,6 +36,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
@@ -50,7 +51,6 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.session import KernelLoadingStrategy
 from ai.backend.manager.models.storage import StorageSessionManager

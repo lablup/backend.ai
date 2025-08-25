@@ -54,6 +54,7 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -72,7 +73,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,

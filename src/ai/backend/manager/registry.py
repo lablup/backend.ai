@@ -153,9 +153,9 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.utils import query_userinfo
