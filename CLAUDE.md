@@ -59,6 +59,8 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
   - Use the pattern matching syntax when there are self-repeating if-elif statements
 * **Async-first**: All I/O operations use async/await
 * **Type Hints**: Comprehensive type annotations required
+  - Put `from __future__ import annotations` if not exists and do not stringify type annotations
+  - Use `typing.TYPE_CHECKING` to import annotation-only references to avoid circular imports and break deep dependency chains between Python modules
   - Use `typing.cast()` sparingly but explicitly specify the types in the LHS of assignments when the RHS expression is `Any` or has unknown types
   - DO NOT forget adding return type annotations of all functions and methods
   - Use `collections.abc` when referring to generic collection/container types such as `Mapping`, `Sequence`, `Iterable`, `Awaitable`, etc.
@@ -104,6 +106,7 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
   - Add return type annotations to the fixture functions
   - Add return type annotation (`-> None`) to the test functions
 * Utilize `typing.Protocol` and `typing.TypedDict` when typing mocked objects and functions if applicable
+  - When using partial data structures, use `typing.cast()` to minimal scopes.
 * Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
 * Prefer pytest-style module-level test functions rather than unittest-style test classes
 

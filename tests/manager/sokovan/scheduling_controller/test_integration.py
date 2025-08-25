@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime, timedelta
 from pathlib import PurePosixPath
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,18 +12,22 @@ from dateutil.tz import tzutc
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    KernelEnqueueingConfig,
+    MountPermission,
     SessionId,
     SessionTypes,
+    VFolderID,
     VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
+    ContainerUserInfo,
     ImageInfo,
     ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
-    UserContainerInfo,
 )
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
@@ -80,7 +85,9 @@ async def scheduling_controller(
 class TestSingleKernelSession:
     """Test cases for single kernel sessions."""
 
-    async def test_basic_single_kernel_session(self, scheduling_controller, mock_repository):
+    async def test_basic_single_kernel_session(
+        self, scheduling_controller, mock_repository
+    ) -> None:
         """Test creating a basic single kernel session."""
         spec = SessionCreationSpec(
             session_creation_id="test-001",
@@ -100,10 +107,13 @@ class TestSingleKernelSession:
                 "max_containers_per_session": 5,
             },
             kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="python:3.9"),
-                    "resources": {"cpu": "2", "mem": "4g"},
-                }
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="python:3.9"),
+                        "resources": {"cpu": "2", "mem": "4g"},
+                    },
+                )
             ],
             creation_spec={
                 "mounts": ["home"],
@@ -130,16 +140,16 @@ class TestSingleKernelSession:
             vfolder_mounts=[
                 VFolderMount(
                     name="home",
-                    vfid=uuid.uuid4(),
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
                     vfsubpath=PurePosixPath("."),
                     host_path=PurePosixPath("/data/vfolders/home"),
                     kernel_path=PurePosixPath("/home/work"),
-                    mount_perm="rw",
-                    usage_mode="general",
+                    mount_perm=MountPermission.READ_WRITE,
+                    usage_mode=VFolderUsageMode.GENERAL,
                 )
             ],
             dotfile_data={"bashrc": "export PS1='$ '"},
-            user_container_info=UserContainerInfo(
+            container_user_info=ContainerUserInfo(
                 uid=1000,
                 main_gid=1000,
                 supplementary_gids=[100, 200],
@@ -166,7 +176,9 @@ class TestSingleKernelSession:
 class TestMultiContainerSession:
     """Test cases for multi-container sessions."""
 
-    async def test_multi_container_replication(self, scheduling_controller, mock_repository):
+    async def test_multi_container_replication(
+        self, scheduling_controller, mock_repository
+    ) -> None:
         """Test multi-container session with single spec replication."""
         spec = SessionCreationSpec(
             session_creation_id="test-002",
@@ -186,10 +198,13 @@ class TestMultiContainerSession:
                 "max_containers_per_session": 10,
             },
             kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="tensorflow:2.0"),
-                    "resources": {"cpu": "4", "mem": "8g", "cuda.shares": "0.5"},
-                }
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="tensorflow:2.0"),
+                        "resources": {"cpu": "4", "mem": "8g", "cuda.shares": "0.5"},
+                    },
+                )
             ],
             creation_spec={
                 "preopen_ports": [7007, 7008],  # Custom ports (not overlapping with services)
@@ -219,7 +234,7 @@ class TestMultiContainerSession:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         # Execute
@@ -247,7 +262,9 @@ class TestMultiContainerSession:
         assert session_data.starts_at is not None
         assert session_data.batch_timeout == 30 * 60  # 30 minutes in seconds
 
-    async def test_multi_container_different_images(self, scheduling_controller, mock_repository):
+    async def test_multi_container_different_images(
+        self, scheduling_controller, mock_repository
+    ) -> None:
         """Test multi-container session with different images per kernel."""
         spec = SessionCreationSpec(
             session_creation_id="test-003",
@@ -266,23 +283,26 @@ class TestMultiContainerSession:
             resource_policy={
                 "max_containers_per_session": 10,
             },
-            kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="nginx:latest"),
-                    "resources": {"cpu": "2", "mem": "2g"},
-                    "cluster_role": "main",
-                },
-                {
-                    "image_ref": MagicMock(canonical="python:3.9"),
-                    "resources": {"cpu": "4", "mem": "8g"},
-                    "cluster_role": "worker",
-                },
-                {
-                    "image_ref": MagicMock(canonical="redis:6"),
-                    "resources": {"cpu": "1", "mem": "1g"},
-                    "cluster_role": "cache",
-                },
-            ],
+            kernel_specs=cast(
+                list[KernelEnqueueingConfig],
+                [
+                    {
+                        "image_ref": MagicMock(canonical="nginx:latest"),
+                        "resources": {"cpu": "2", "mem": "2g"},
+                        "cluster_role": "main",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="python:3.9"),
+                        "resources": {"cpu": "4", "mem": "8g"},
+                        "cluster_role": "worker",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="redis:6"),
+                        "resources": {"cpu": "1", "mem": "1g"},
+                        "cluster_role": "cache",
+                    },
+                ],
+            ),
             creation_spec={},
         )
 
@@ -324,7 +344,7 @@ class TestMultiContainerSession:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         # Execute
@@ -350,7 +370,7 @@ class TestMultiContainerSession:
 class TestEdgeCases:
     """Test edge cases and error scenarios."""
 
-    async def test_agent_preassignment(self, scheduling_controller, mock_repository):
+    async def test_agent_preassignment(self, scheduling_controller, mock_repository) -> None:
         """Test session with pre-assigned agents."""
         spec = SessionCreationSpec(
             session_creation_id="test-preassigned",
@@ -367,11 +387,14 @@ class TestEdgeCases:
             cluster_size=3,
             priority=30,
             resource_policy={"max_containers_per_session": 10},
-            kernel_specs=[
-                {"image_ref": MagicMock(canonical="python:3.9")},
-                {"image_ref": MagicMock(canonical="python:3.9")},
-                {"image_ref": MagicMock(canonical="python:3.9")},
-            ],
+            kernel_specs=cast(
+                list[KernelEnqueueingConfig],
+                [
+                    {"image_ref": MagicMock(canonical="python:3.9")},
+                    {"image_ref": MagicMock(canonical="python:3.9")},
+                    {"image_ref": MagicMock(canonical="python:3.9")},
+                ],
+            ),
             creation_spec={},
             agent_list=["agent-001", "agent-002", "agent-003"],
         )
@@ -393,7 +416,7 @@ class TestEdgeCases:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         # Execute
@@ -405,7 +428,7 @@ class TestEdgeCases:
         assert session_data.kernels[1].agent == "agent-002"
         assert session_data.kernels[2].agent == "agent-003"
 
-    async def test_network_types(self, scheduling_controller, mock_repository):
+    async def test_network_types(self, scheduling_controller, mock_repository) -> None:
         """Test different network type configurations."""
         # Test VOLATILE network (default)
         spec_volatile = SessionCreationSpec(
@@ -423,7 +446,9 @@ class TestEdgeCases:
             cluster_size=2,
             priority=10,
             resource_policy={"max_containers_per_session": 5},
-            kernel_specs=[{"image_ref": MagicMock(canonical="python:3.9")}],
+            kernel_specs=[
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="python:3.9")}),
+            ],
             creation_spec={},
             network=None,  # No persistent network
         )
@@ -447,7 +472,7 @@ class TestEdgeCases:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         await scheduling_controller.enqueue_session(spec_volatile)
@@ -474,7 +499,7 @@ class TestEdgeCases:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         spec_host = SessionCreationSpec(
@@ -492,7 +517,9 @@ class TestEdgeCases:
             cluster_size=1,
             priority=10,
             resource_policy={"max_containers_per_session": 5},
-            kernel_specs=[{"image_ref": MagicMock(canonical="python:3.9")}],
+            kernel_specs=[
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="python:3.9")})
+            ],
             creation_spec={},
         )
 
@@ -500,7 +527,7 @@ class TestEdgeCases:
         session_data = mock_repository.enqueue_session.call_args[0][0]
         assert session_data.network_type == NetworkType.HOST
 
-    async def test_session_dependencies(self, scheduling_controller, mock_repository):
+    async def test_session_dependencies(self, scheduling_controller, mock_repository) -> None:
         """Test session with dependencies."""
         dependency_ids = [SessionId(uuid.uuid4()) for _ in range(3)]
 
@@ -519,7 +546,9 @@ class TestEdgeCases:
             cluster_size=1,
             priority=5,
             resource_policy={},
-            kernel_specs=[{"image_ref": MagicMock(canonical="python:3.9")}],
+            kernel_specs=[
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="python:3.9")}),
+            ],
             creation_spec={},
             dependency_sessions=dependency_ids,
         )
@@ -541,7 +570,7 @@ class TestEdgeCases:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         await scheduling_controller.enqueue_session(spec)
@@ -555,7 +584,7 @@ class TestMultiClusterScenarios:
 
     async def test_multi_cluster_single_kernel_replication(
         self, scheduling_controller, mock_repository
-    ):
+    ) -> None:
         """Test MULTI_NODE cluster with single kernel spec being replicated across nodes."""
         spec = SessionCreationSpec(
             session_creation_id="test-mc-001",
@@ -573,10 +602,13 @@ class TestMultiClusterScenarios:
             priority=15,
             resource_policy={"max_containers_per_session": 10},
             kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="pytorch:2.0"),
-                    "resources": {"cpu": "8", "mem": "16g", "cuda.shares": "1"},
-                }
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="pytorch:2.0"),
+                        "resources": {"cpu": "8", "mem": "16g", "cuda.shares": "1"},
+                    },
+                )
             ],  # Single spec to be replicated
             creation_spec={
                 "mounts": ["datasets", "checkpoints"],
@@ -605,7 +637,7 @@ class TestMultiClusterScenarios:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=UserContainerInfo(
+            container_user_info=ContainerUserInfo(
                 uid=2000,
                 main_gid=2000,
                 supplementary_gids=[2001, 2002],
@@ -639,7 +671,9 @@ class TestMultiClusterScenarios:
             assert session_data.kernels[i].local_rank == i
             assert session_data.kernels[i].cluster_hostname == f"sub{i}"
 
-    async def test_multi_cluster_heterogeneous_config(self, scheduling_controller, mock_repository):
+    async def test_multi_cluster_heterogeneous_config(
+        self, scheduling_controller, mock_repository
+    ) -> None:
         """Test MULTI_NODE cluster with different configurations per node."""
         spec = SessionCreationSpec(
             session_creation_id="test-mc-002",
@@ -656,33 +690,36 @@ class TestMultiClusterScenarios:
             cluster_size=5,
             priority=25,
             resource_policy={"max_containers_per_session": 10},
-            kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="spark:master"),
-                    "resources": {"cpu": "16", "mem": "64g"},
-                    "cluster_role": "main",
-                },
-                {
-                    "image_ref": MagicMock(canonical="spark:worker"),
-                    "resources": {"cpu": "8", "mem": "32g"},
-                    "cluster_role": "worker",
-                },
-                {
-                    "image_ref": MagicMock(canonical="spark:worker"),
-                    "resources": {"cpu": "8", "mem": "32g"},
-                    "cluster_role": "worker",
-                },
-                {
-                    "image_ref": MagicMock(canonical="spark:worker"),
-                    "resources": {"cpu": "8", "mem": "32g"},
-                    "cluster_role": "worker",
-                },
-                {
-                    "image_ref": MagicMock(canonical="jupyter:notebook"),
-                    "resources": {"cpu": "4", "mem": "16g"},
-                    "cluster_role": "notebook",
-                },
-            ],
+            kernel_specs=cast(
+                list[KernelEnqueueingConfig],
+                [
+                    {
+                        "image_ref": MagicMock(canonical="spark:master"),
+                        "resources": {"cpu": "16", "mem": "64g"},
+                        "cluster_role": "main",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="spark:worker"),
+                        "resources": {"cpu": "8", "mem": "32g"},
+                        "cluster_role": "worker",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="spark:worker"),
+                        "resources": {"cpu": "8", "mem": "32g"},
+                        "cluster_role": "worker",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="spark:worker"),
+                        "resources": {"cpu": "8", "mem": "32g"},
+                        "cluster_role": "worker",
+                    },
+                    {
+                        "image_ref": MagicMock(canonical="jupyter:notebook"),
+                        "resources": {"cpu": "4", "mem": "16g"},
+                        "cluster_role": "notebook",
+                    },
+                ],
+            ),
             creation_spec={
                 "scaling_group": "gpu-cluster",
             },
@@ -734,7 +771,7 @@ class TestMultiClusterScenarios:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         # Execute
@@ -762,7 +799,7 @@ class TestMultiClusterScenarios:
 
     async def test_multi_cluster_with_agent_assignment(
         self, scheduling_controller, mock_repository
-    ):
+    ) -> None:
         """Test MULTI_NODE cluster with pre-assigned agents for each node."""
         spec = SessionCreationSpec(
             session_creation_id="test-mc-003",
@@ -780,10 +817,13 @@ class TestMultiClusterScenarios:
             priority=50,
             resource_policy={"max_containers_per_session": 10},
             kernel_specs=[
-                {
-                    "image_ref": MagicMock(canonical="llm:server"),
-                    "resources": {"cpu": "8", "mem": "32g", "cuda.shares": "2"},
-                },
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="llm:server"),
+                        "resources": {"cpu": "8", "mem": "32g", "cuda.shares": "2"},
+                    },
+                ),
             ],  # Single spec to replicate with resources
             creation_spec={
                 "scaling_group": "inference-cluster",
@@ -815,7 +855,7 @@ class TestMultiClusterScenarios:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
         # Execute

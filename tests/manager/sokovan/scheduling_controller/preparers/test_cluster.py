@@ -7,6 +7,7 @@ import pytest
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    ContainerUserInfo,
     SessionCreationContext,
     SessionCreationSpec,
 )
@@ -30,7 +31,7 @@ def basic_context():
         image_infos={},
         vfolder_mounts=[],
         dotfile_data={},
-        user_container_info=None,
+        container_user_info=ContainerUserInfo(),
     )
 
 

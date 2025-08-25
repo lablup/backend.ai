@@ -263,16 +263,10 @@ class SessionPreparer:
                 vfolder_mounts=vfolder_mounts,
                 preopen_ports=preopen_ports if isinstance(preopen_ports, list) else [],
                 use_host_network=context.scaling_group_network.use_host_network,
-                uid=kernel_config.get("uid")
-                or (context.user_container_info.uid if context.user_container_info else 1000),
-                main_gid=kernel_config.get("main_gid")
-                or (context.user_container_info.main_gid if context.user_container_info else 1000),
+                uid=kernel_config.get("uid") or context.container_user_info.uid,
+                main_gid=kernel_config.get("main_gid") or context.container_user_info.main_gid,
                 gids=kernel_config.get("supplementary_gids")
-                or (
-                    context.user_container_info.supplementary_gids
-                    if context.user_container_info
-                    else []
-                ),
+                or context.container_user_info.supplementary_gids,
             )
 
             kernel_data_list.append(kernel_data)
