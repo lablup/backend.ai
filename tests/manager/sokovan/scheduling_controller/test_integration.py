@@ -18,11 +18,11 @@ from ai.backend.common.types import (
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
+    ContainerUserInfo,
     ImageInfo,
     ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
-    UserContainerInfo,
 )
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
@@ -139,7 +139,7 @@ class TestSingleKernelSession:
                 )
             ],
             dotfile_data={"bashrc": "export PS1='$ '"},
-            user_container_info=UserContainerInfo(
+            user_container_info=ContainerUserInfo(
                 uid=1000,
                 main_gid=1000,
                 supplementary_gids=[100, 200],
@@ -605,7 +605,7 @@ class TestMultiClusterScenarios:
             },
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=UserContainerInfo(
+            user_container_info=ContainerUserInfo(
                 uid=2000,
                 main_gid=2000,
                 supplementary_gids=[2001, 2002],
