@@ -104,6 +104,7 @@ pytest>=8.3.3
 pytest-aiohttp~=1.0.5
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
+testcontainers[postgres,redis,minio]~=4.8.1
 
 # type stubs
 types-six
