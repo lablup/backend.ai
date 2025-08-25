@@ -42,9 +42,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifa
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
-    ListHuggingFaceRegistryAction,
-)
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
@@ -60,7 +57,6 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
 from ai.backend.manager.types import TriState
 
 
@@ -646,7 +642,6 @@ async def artifacts(
     last: Optional[int] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
-    search_from_remote: Optional[str] = None,
 ) -> ArtifactConnection:
     artifacts = await resolve_artifacts(
         info,
