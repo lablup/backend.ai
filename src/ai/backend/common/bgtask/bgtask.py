@@ -334,7 +334,7 @@ class BackgroundTaskManager:
         )
         await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
-        self._ongoing_tasks[task_id] = task
+        self._ongoing_tasks[TaskID(task_id)] = task
         return task_id
 
     async def _process_retriable_task(
