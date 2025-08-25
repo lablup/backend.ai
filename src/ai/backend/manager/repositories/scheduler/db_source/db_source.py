@@ -96,6 +96,7 @@ from ..types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,
     SessionEnqueueData,
+    UserContainerInfo,
 )
 from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import KeypairConcurrencyData, SessionRowCache
@@ -1261,23 +1262,19 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         user_uuid: UUID,
-    ):
+    ) -> UserContainerInfo:
         """
         Fetch user container UID/GID information.
         """
-        from ..types.session_creation import UserContainerInfo
-
-        user_row = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
-
-        if not user_row:
-            return None
-
-        user_row = cast(UserRow, user_row)
-
+        user_row: UserRow | None = await db_sess.scalar(
+            sa.select(UserRow).where(UserRow.uuid == user_uuid)
+        )
+        if user_row is None:
+            return UserContainerInfo()
         return UserContainerInfo(
-            uid=user_row.container_uid or 1000,
-            main_gid=user_row.container_main_gid or 1000,
-            supplementary_gids=user_row.container_gids or [],
+            uid=user_row.container_uid,
+            main_gid=user_row.container_main_gid,
+            supplementary_gids=user_row.container_gids,
         )
 
     async def prepare_vfolder_mounts(
