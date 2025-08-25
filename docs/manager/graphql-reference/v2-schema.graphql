@@ -87,7 +87,7 @@ type ArtifactRevision implements Node {
   updatedAt: DateTime!
   readme: String!
   version: String!
-  size: ByteSize!
+  size: ByteSize
 }
 
 """Added in 25.13.0"""
@@ -135,7 +135,7 @@ enum ArtifactRevisionOrderField {
 
 """Added in 25.13.0"""
 input ArtifactRevisionStatusFilter {
-  in: [ArtifactStatus!]
+  in: [ArtifactStatus!] = null
   equals: [ArtifactStatus!] = null
 }
 
