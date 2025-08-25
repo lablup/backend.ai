@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -57,14 +58,14 @@ class MockBackgroundTaskHandler(BaseBackgroundTaskHandler[MockBackgroundTaskArgs
 
 
 @pytest.fixture
-def mock_event_producer():
+def mock_event_producer() -> AsyncMock:
     producer = AsyncMock(spec=EventProducer)
     producer.broadcast_event_with_cache = AsyncMock()
     return producer
 
 
 @pytest.fixture
-def mock_valkey_client():
+def mock_valkey_client() -> AsyncMock:
     client = AsyncMock(spec=ValkeyBgtaskClient)
     client.register_task = AsyncMock()
     client.unregister_task = AsyncMock()
@@ -75,14 +76,14 @@ def mock_valkey_client():
 
 
 @pytest.fixture
-def mock_task_registry():
+def mock_task_registry() -> BackgroundTaskHandlerRegistry:
     registry = BackgroundTaskHandlerRegistry()
     registry.register(MockBackgroundTaskHandler())
     return registry
 
 
 @pytest.fixture
-def mock_observer():
+def mock_observer() -> Mock:
     observer = Mock(spec=BackgroundTaskObserver)
     observer.observe_bgtask_started = Mock()
     observer.observe_bgtask_done = Mock()
@@ -91,7 +92,10 @@ def mock_observer():
 
 @pytest.fixture
 async def background_task_manager(
-    mock_event_producer, mock_valkey_client, mock_task_registry, mock_observer
+    mock_event_producer: AsyncMock,
+    mock_valkey_client: AsyncMock,
+    mock_task_registry: BackgroundTaskHandlerRegistry,
+    mock_observer: Mock,
 ):
     manager = BackgroundTaskManager(
         mock_event_producer,
@@ -106,7 +110,7 @@ async def background_task_manager(
 
 
 class TestBgTaskInfo:
-    def test_started(self):
+    def test_started(self) -> None:
         info = BgTaskInfo.started("Starting task")
         assert info.status == BgtaskStatus.STARTED
         assert info.msg == "Starting task"
@@ -115,7 +119,7 @@ class TestBgTaskInfo:
         assert float(info.started_at) > 0
         assert info.started_at == info.last_update
 
-    def test_finished(self):
+    def test_finished(self) -> None:
         info = BgTaskInfo.finished(BgtaskStatus.DONE, "Task completed")
         assert info.status == BgtaskStatus.DONE
         assert info.msg == "Task completed"
@@ -124,7 +128,7 @@ class TestBgTaskInfo:
         assert info.current == "0"
         assert info.total == "0"
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         info = BgTaskInfo.started("Test")
         data = info.to_dict()
         assert "status" in data
@@ -138,7 +142,7 @@ class TestBgTaskInfo:
 
 
 class TestNopBackgroundTaskObserver:
-    def test_nop_observer(self):
+    def test_nop_observer(self) -> None:
         observer = NopBackgroundTaskObserver()
         observer.observe_bgtask_started(task_name="test")
         observer.observe_bgtask_done(task_name="test", status="done", duration=1.0, error_code=None)
@@ -146,7 +150,9 @@ class TestNopBackgroundTaskObserver:
 
 class TestBackgroundTaskManager:
     @pytest.mark.asyncio
-    async def test_init(self, mock_event_producer, mock_valkey_client):
+    async def test_init(
+        self, mock_event_producer: AsyncMock, mock_valkey_client: AsyncMock
+    ) -> None:
         manager = BackgroundTaskManager(
             mock_event_producer,
             valkey_client=mock_valkey_client,
@@ -158,7 +164,9 @@ class TestBackgroundTaskManager:
         await manager.shutdown()
 
     @pytest.mark.asyncio
-    async def test_init_with_tags(self, mock_event_producer, mock_valkey_client):
+    async def test_init_with_tags(
+        self, mock_event_producer: AsyncMock, mock_valkey_client: AsyncMock
+    ) -> None:
         manager = BackgroundTaskManager(
             mock_event_producer,
             valkey_client=mock_valkey_client,
@@ -169,7 +177,7 @@ class TestBackgroundTaskManager:
         await manager.shutdown()
 
     @pytest.mark.asyncio
-    async def test_start_simple_task(self, background_task_manager):
+    async def test_start_simple_task(self, background_task_manager: BackgroundTaskManager) -> None:
         async def simple_task(reporter: ProgressReporter, value: str) -> str:
             await reporter.update(1, "Processing")
             return f"Result: {value}"
@@ -182,7 +190,9 @@ class TestBackgroundTaskManager:
         assert TaskID(task_id) not in background_task_manager._ongoing_tasks
 
     @pytest.mark.asyncio
-    async def test_start_task_with_exception(self, background_task_manager, mock_observer):
+    async def test_start_task_with_exception(
+        self, background_task_manager: BackgroundTaskManager, mock_observer: Mock
+    ) -> None:
         async def failing_task(reporter: ProgressReporter) -> None:
             raise ValueError("Test error")
 
@@ -196,7 +206,9 @@ class TestBackgroundTaskManager:
         assert call_args.kwargs["task_name"] == "failing"
 
     @pytest.mark.asyncio
-    async def test_start_task_with_backend_error(self, background_task_manager, mock_observer):
+    async def test_start_task_with_backend_error(
+        self, background_task_manager: BackgroundTaskManager, mock_observer: Mock
+    ) -> None:
         async def backend_error_task(reporter: ProgressReporter) -> None:
             raise BgtaskFailedError("Backend error")
 
@@ -208,7 +220,9 @@ class TestBackgroundTaskManager:
         assert call_args.kwargs["status"] == BgtaskStatus.FAILED
 
     @pytest.mark.asyncio
-    async def test_start_task_cancelled(self, background_task_manager, mock_observer):
+    async def test_start_task_cancelled(
+        self, background_task_manager: BackgroundTaskManager, mock_observer: Mock
+    ) -> None:
         cancel_event = asyncio.Event()
 
         async def long_task(reporter: ProgressReporter) -> None:
@@ -231,7 +245,7 @@ class TestBackgroundTaskManager:
         assert call_args.kwargs["status"] == BgtaskStatus.CANCELLED
 
     @pytest.mark.asyncio
-    async def test_start_retriable(self, background_task_manager):
+    async def test_start_retriable(self, background_task_manager: BackgroundTaskManager) -> None:
         args = MockBackgroundTaskArgs("test_value")
         task_id = await background_task_manager.start_retriable(
             TaskName.CLONE_VFOLDER, args, tags=["test-tag"]
@@ -244,7 +258,9 @@ class TestBackgroundTaskManager:
         assert task_id not in background_task_manager._ongoing_tasks
 
     @pytest.mark.asyncio
-    async def test_convert_bgtask_to_event(self, background_task_manager):
+    async def test_convert_bgtask_to_event(
+        self, background_task_manager: BackgroundTaskManager
+    ) -> None:
         task_id = uuid.uuid4()
 
         event = background_task_manager._convert_bgtask_to_event(task_id, None)
@@ -266,7 +282,9 @@ class TestBackgroundTaskManager:
         assert event.errors == ["test error"]
 
     @pytest.mark.asyncio
-    async def test_heartbeat_loop(self, background_task_manager, mock_valkey_client):
+    async def test_heartbeat_loop(
+        self, background_task_manager: BackgroundTaskManager, mock_valkey_client: AsyncMock
+    ) -> None:
         # The heartbeat loop runs periodically - we'll just check that the task starts
         async def long_task(reporter: ProgressReporter) -> None:
             await asyncio.sleep(0.01)
@@ -284,8 +302,11 @@ class TestBackgroundTaskManager:
 
     @pytest.mark.asyncio
     async def test_retry_loop_server_tasks(
-        self, background_task_manager, mock_valkey_client, mock_task_registry
-    ):
+        self,
+        background_task_manager: BackgroundTaskManager,
+        mock_valkey_client: AsyncMock,
+        mock_task_registry: BackgroundTaskHandlerRegistry,
+    ) -> None:
         metadata = BackgroundTaskMetadata.create(
             task_id=TaskID(uuid.uuid4()),
             task_name=TaskName.CLONE_VFOLDER,
@@ -300,7 +321,9 @@ class TestBackgroundTaskManager:
         assert metadata.server_id == "test-server"
 
     @pytest.mark.asyncio
-    async def test_retry_loop_tagged_tasks(self, background_task_manager, mock_valkey_client):
+    async def test_retry_loop_tagged_tasks(
+        self, background_task_manager: BackgroundTaskManager, mock_valkey_client: AsyncMock
+    ) -> None:
         metadata = BackgroundTaskMetadata.create(
             task_id=TaskID(uuid.uuid4()),
             task_name=TaskName.CLONE_VFOLDER,
@@ -315,7 +338,9 @@ class TestBackgroundTaskManager:
         assert metadata.task_id in background_task_manager._ongoing_tasks
 
     @pytest.mark.asyncio
-    async def test_retry_task_not_registered(self, background_task_manager, mock_valkey_client):
+    async def test_retry_task_not_registered(
+        self, background_task_manager: BackgroundTaskManager, mock_valkey_client: AsyncMock
+    ) -> None:
         metadata = BackgroundTaskMetadata.create(
             task_id=TaskID(uuid.uuid4()),
             task_name=TaskName.PUSH_IMAGE,
@@ -327,7 +352,9 @@ class TestBackgroundTaskManager:
         assert metadata.task_id not in background_task_manager._ongoing_tasks
 
     @pytest.mark.asyncio
-    async def test_shutdown(self, mock_event_producer, mock_valkey_client):
+    async def test_shutdown(
+        self, mock_event_producer: AsyncMock, mock_valkey_client: AsyncMock
+    ) -> None:
         manager = BackgroundTaskManager(
             mock_event_producer,
             valkey_client=mock_valkey_client,
@@ -347,7 +374,9 @@ class TestBackgroundTaskManager:
             assert task.done() or task.cancelled()
 
     @pytest.mark.asyncio
-    async def test_task_with_dispatch_result(self, background_task_manager):
+    async def test_task_with_dispatch_result(
+        self, background_task_manager: BackgroundTaskManager
+    ) -> None:
         async def task_with_result(reporter: ProgressReporter) -> DispatchResult:
             await reporter.update(1, "Processing")
             return DispatchResult(result={"result": "success"})
@@ -359,8 +388,8 @@ class TestBackgroundTaskManager:
 
     @pytest.mark.asyncio
     async def test_observe_retriable_bgtask_with_exception(
-        self, background_task_manager, mock_observer
-    ):
+        self, background_task_manager: BackgroundTaskManager, mock_observer: Mock
+    ) -> None:
         class FailingHandler(BaseBackgroundTaskHandler[MockBackgroundTaskArgs]):
             async def execute(
                 self, reporter: ProgressReporter, args: MockBackgroundTaskArgs
@@ -387,4 +416,5 @@ class TestBackgroundTaskManager:
         event = await background_task_manager._observe_retriable_bgtask(handler, args, metadata)
 
         assert isinstance(event, BgtaskFailedEvent)
+        assert event.message is not None
         assert "ValueError" in event.message

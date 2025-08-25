@@ -13,19 +13,19 @@ from ai.backend.common.events.types import EventCacheDomain
 
 
 @pytest.fixture
-def mock_event_producer():
+def mock_event_producer() -> AsyncMock:
     producer = AsyncMock(spec=EventProducer)
     producer.broadcast_event_with_cache = AsyncMock()
     return producer
 
 
 @pytest.fixture
-def task_id():
+def task_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
 @pytest.fixture
-def progress_reporter(mock_event_producer, task_id):
+def progress_reporter(mock_event_producer: AsyncMock, task_id: uuid.UUID) -> ProgressReporter:
     return ProgressReporter(
         event_producer=mock_event_producer,
         task_id=task_id,
@@ -35,14 +35,14 @@ def progress_reporter(mock_event_producer, task_id):
 
 
 class TestProgressReporter:
-    def test_init(self, mock_event_producer, task_id):
+    def test_init(self, mock_event_producer: AsyncMock, task_id: uuid.UUID) -> None:
         reporter = ProgressReporter(mock_event_producer, task_id)
         assert reporter._event_producer == mock_event_producer
         assert reporter._task_id == task_id
         assert reporter.current_progress == 0
         assert reporter.total_progress == 0
 
-    def test_init_with_progress(self, mock_event_producer, task_id):
+    def test_init_with_progress(self, mock_event_producer: AsyncMock, task_id: uuid.UUID) -> None:
         reporter = ProgressReporter(
             mock_event_producer,
             task_id,
@@ -53,7 +53,12 @@ class TestProgressReporter:
         assert reporter.total_progress == 100
 
     @pytest.mark.asyncio
-    async def test_update_without_message(self, progress_reporter, mock_event_producer, task_id):
+    async def test_update_without_message(
+        self,
+        progress_reporter: ProgressReporter,
+        mock_event_producer: AsyncMock,
+        task_id: uuid.UUID,
+    ) -> None:
         await progress_reporter.update(increment=10)
 
         assert progress_reporter.current_progress == 10
@@ -70,7 +75,12 @@ class TestProgressReporter:
         assert event.total_progress == 100
 
     @pytest.mark.asyncio
-    async def test_update_with_message(self, progress_reporter, mock_event_producer, task_id):
+    async def test_update_with_message(
+        self,
+        progress_reporter: ProgressReporter,
+        mock_event_producer: AsyncMock,
+        task_id: uuid.UUID,
+    ) -> None:
         await progress_reporter.update(increment=25, message="Processing batch 1")
 
         assert progress_reporter.current_progress == 25
@@ -84,7 +94,9 @@ class TestProgressReporter:
         assert event.total_progress == 100
 
     @pytest.mark.asyncio
-    async def test_multiple_updates(self, progress_reporter, mock_event_producer):
+    async def test_multiple_updates(
+        self, progress_reporter: ProgressReporter, mock_event_producer: AsyncMock
+    ) -> None:
         await progress_reporter.update(increment=10, message="Step 1")
         await progress_reporter.update(increment=20, message="Step 2")
         await progress_reporter.update(increment=30, message="Step 3")
@@ -98,7 +110,9 @@ class TestProgressReporter:
         assert event.message == "Step 3"
 
     @pytest.mark.asyncio
-    async def test_update_with_float_increment(self, progress_reporter, mock_event_producer):
+    async def test_update_with_float_increment(
+        self, progress_reporter: ProgressReporter, mock_event_producer: AsyncMock
+    ) -> None:
         await progress_reporter.update(increment=10.5)
         assert progress_reporter.current_progress == 10.5
 
@@ -106,7 +120,9 @@ class TestProgressReporter:
         assert progress_reporter.current_progress == 30.8
 
     @pytest.mark.asyncio
-    async def test_update_with_zero_increment(self, progress_reporter, mock_event_producer):
+    async def test_update_with_zero_increment(
+        self, progress_reporter: ProgressReporter, mock_event_producer: AsyncMock
+    ) -> None:
         await progress_reporter.update(increment=0, message="Status update")
 
         assert progress_reporter.current_progress == 0
@@ -118,14 +134,16 @@ class TestProgressReporter:
         assert event.message == "Status update"
 
     @pytest.mark.asyncio
-    async def test_update_with_negative_increment(self, progress_reporter):
+    async def test_update_with_negative_increment(
+        self, progress_reporter: ProgressReporter
+    ) -> None:
         progress_reporter.current_progress = 50
         await progress_reporter.update(increment=-10)
 
         assert progress_reporter.current_progress == 40
 
     @pytest.mark.asyncio
-    async def test_concurrent_updates(self, progress_reporter):
+    async def test_concurrent_updates(self, progress_reporter: ProgressReporter) -> None:
         async def update_task(increment: int, message: str):
             await progress_reporter.update(increment=increment, message=message)
 
@@ -138,7 +156,7 @@ class TestProgressReporter:
         await asyncio.gather(*tasks)
         assert progress_reporter.current_progress == 60
 
-    def test_progress_state_persistence(self, progress_reporter):
+    def test_progress_state_persistence(self, progress_reporter: ProgressReporter) -> None:
         progress_reporter.current_progress = 50
         progress_reporter.total_progress = 200
 
@@ -146,7 +164,7 @@ class TestProgressReporter:
         assert progress_reporter.total_progress == 200
 
     @pytest.mark.asyncio
-    async def test_cache_id_usage(self, mock_event_producer, task_id):
+    async def test_cache_id_usage(self, mock_event_producer: AsyncMock, task_id: uuid.UUID) -> None:
         reporter = ProgressReporter(mock_event_producer, task_id)
         await reporter.update(increment=1)
 

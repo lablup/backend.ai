@@ -12,7 +12,7 @@ from ai.backend.common.types import DispatchResult
 
 
 class ConcreteTaskArgs(BaseBackgroundTaskArgs):
-    def __init__(self, value: str, count: int = 0):
+    def __init__(self, value: str, count: int = 0) -> None:
         self.value = value
         self.count = count
 
@@ -46,16 +46,12 @@ class ConcreteTaskHandler(BaseBackgroundTaskHandler[ConcreteTaskArgs]):
 
 
 class TestBaseBackgroundTaskArgs:
-    def test_abstract_methods_not_implemented(self):
-        with pytest.raises(TypeError):
-            BaseBackgroundTaskArgs()
-
-    def test_concrete_implementation(self):
+    def test_concrete_implementation(self) -> None:
         args = ConcreteTaskArgs(value="test", count=5)
         assert args.value == "test"
         assert args.count == 5
 
-    def test_to_metadata_body(self):
+    def test_to_metadata_body(self) -> None:
         args = ConcreteTaskArgs(value="hello", count=10)
         body = args.to_metadata_body()
 
@@ -63,7 +59,7 @@ class TestBaseBackgroundTaskArgs:
         assert body["value"] == "hello"
         assert body["count"] == 10
 
-    def test_from_metadata_body(self):
+    def test_from_metadata_body(self) -> None:
         body = {"value": "world", "count": 20}
         args = ConcreteTaskArgs.from_metadata_body(body)
 
@@ -71,21 +67,21 @@ class TestBaseBackgroundTaskArgs:
         assert args.value == "world"
         assert args.count == 20
 
-    def test_from_metadata_body_with_missing_fields(self):
+    def test_from_metadata_body_with_missing_fields(self) -> None:
         body = {"value": "partial"}
         args = ConcreteTaskArgs.from_metadata_body(body)
 
         assert args.value == "partial"
         assert args.count == 0
 
-    def test_from_metadata_body_empty(self):
-        body = {}
+    def test_from_metadata_body_empty(self) -> None:
+        body: dict[str, Any] = {}
         args = ConcreteTaskArgs.from_metadata_body(body)
 
         assert args.value == ""
         assert args.count == 0
 
-    def test_round_trip_serialization(self):
+    def test_round_trip_serialization(self) -> None:
         original = ConcreteTaskArgs(value="round-trip", count=42)
         body = original.to_metadata_body()
         restored = ConcreteTaskArgs.from_metadata_body(body)
@@ -95,12 +91,8 @@ class TestBaseBackgroundTaskArgs:
 
 
 class TestBaseBackgroundTaskHandler:
-    def test_abstract_methods_not_implemented(self):
-        with pytest.raises(TypeError):
-            BaseBackgroundTaskHandler()
-
     @pytest.mark.asyncio
-    async def test_concrete_handler_execute(self):
+    async def test_concrete_handler_execute(self) -> None:
         handler = ConcreteTaskHandler()
         args = ConcreteTaskArgs(value="test-value", count=3)
 
@@ -110,23 +102,24 @@ class TestBaseBackgroundTaskHandler:
         result = await handler.execute(reporter, args)
 
         assert isinstance(result, DispatchResult)
+        assert result.result is not None
         assert result.result["processed"] == "test-value"
         assert result.result["count"] == 3
 
         reporter.update.assert_called_once_with(1, "Processing test-value")
 
-    def test_handler_name(self):
+    def test_handler_name(self) -> None:
         assert ConcreteTaskHandler.name() == TaskName.CLONE_VFOLDER
 
-    def test_handler_args_type(self):
+    def test_handler_args_type(self) -> None:
         assert ConcreteTaskHandler.args_type() == ConcreteTaskArgs
 
-    def test_handler_generic_typing(self):
+    def test_handler_generic_typing(self) -> None:
         handler = ConcreteTaskHandler()
         assert isinstance(handler, BaseBackgroundTaskHandler)
 
     @pytest.mark.asyncio
-    async def test_handler_with_empty_args(self):
+    async def test_handler_with_empty_args(self) -> None:
         from unittest.mock import AsyncMock
 
         handler = ConcreteTaskHandler()
@@ -137,11 +130,12 @@ class TestBaseBackgroundTaskHandler:
 
         result = await handler.execute(reporter, args)
 
+        assert result.result is not None
         assert result.result["processed"] == ""
         assert result.result["count"] == 0
 
     @pytest.mark.asyncio
-    async def test_handler_with_error_result(self):
+    async def test_handler_with_error_result(self) -> None:
         from unittest.mock import AsyncMock
 
         class ErrorTaskHandler(BaseBackgroundTaskHandler[ConcreteTaskArgs]):

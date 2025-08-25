@@ -12,7 +12,7 @@ from ai.backend.common.bgtask.types import (
 
 
 class TestBgtaskStatus:
-    def test_status_values(self):
+    def test_status_values(self) -> None:
         assert BgtaskStatus.STARTED == "bgtask_started"
         assert BgtaskStatus.UPDATED == "bgtask_updated"
         assert BgtaskStatus.DONE == "bgtask_done"
@@ -20,7 +20,7 @@ class TestBgtaskStatus:
         assert BgtaskStatus.FAILED == "bgtask_failed"
         assert BgtaskStatus.PARTIAL_SUCCESS == "bgtask_partial_success"
 
-    def test_finished(self):
+    def test_finished(self) -> None:
         assert BgtaskStatus.DONE.finished() is True
         assert BgtaskStatus.CANCELLED.finished() is True
         assert BgtaskStatus.FAILED.finished() is True
@@ -29,35 +29,35 @@ class TestBgtaskStatus:
         assert BgtaskStatus.STARTED.finished() is False
         assert BgtaskStatus.UPDATED.finished() is False
 
-    def test_string_conversion(self):
+    def test_string_conversion(self) -> None:
         assert str(BgtaskStatus.STARTED) == "bgtask_started"
         assert str(BgtaskStatus.DONE) == "bgtask_done"
 
 
 class TestTaskName:
-    def test_task_names(self):
+    def test_task_names(self) -> None:
         assert TaskName.CLONE_VFOLDER == "clone_vfolder"
         assert TaskName.PUSH_IMAGE == "push_image"
 
-    def test_string_conversion(self):
+    def test_string_conversion(self) -> None:
         assert str(TaskName.CLONE_VFOLDER) == "clone_vfolder"
         assert str(TaskName.PUSH_IMAGE) == "push_image"
 
 
 class TestTaskID:
-    def test_task_id_creation(self):
+    def test_task_id_creation(self) -> None:
         uuid_value = uuid.uuid4()
         task_id = TaskID(uuid_value)
         assert task_id == uuid_value
         assert isinstance(task_id, uuid.UUID)
 
-    def test_task_id_equality(self):
+    def test_task_id_equality(self) -> None:
         uuid_value = uuid.uuid4()
         task_id1 = TaskID(uuid_value)
         task_id2 = TaskID(uuid_value)
         assert task_id1 == task_id2
 
-    def test_task_id_hash(self):
+    def test_task_id_hash(self) -> None:
         uuid_value = uuid.uuid4()
         task_id = TaskID(uuid_value)
         assert hash(task_id) == hash(uuid_value)
@@ -67,7 +67,7 @@ class TestTaskID:
 
 
 class TestBackgroundTaskMetadata:
-    def test_create(self):
+    def test_create(self) -> None:
         task_id = TaskID(uuid.uuid4())
         metadata = BackgroundTaskMetadata.create(
             task_id=task_id,
@@ -82,7 +82,7 @@ class TestBackgroundTaskMetadata:
         assert metadata.server_id == "server-1"
         assert metadata.tags == set()
 
-    def test_create_with_tags(self):
+    def test_create_with_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
         tags = ["tag1", "tag2", "tag3"]
         metadata = BackgroundTaskMetadata.create(
@@ -95,7 +95,7 @@ class TestBackgroundTaskMetadata:
 
         assert metadata.tags == {"tag1", "tag2", "tag3"}
 
-    def test_create_with_none_tags(self):
+    def test_create_with_none_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
         metadata = BackgroundTaskMetadata.create(
             task_id=task_id,
@@ -107,7 +107,7 @@ class TestBackgroundTaskMetadata:
 
         assert metadata.tags == set()
 
-    def test_json_serialization_deserialization(self):
+    def test_json_serialization_deserialization(self) -> None:
         # Test to_json and from_json together since they are a pair for DB storage
         task_id = TaskID(uuid.uuid4())
         original_metadata = BackgroundTaskMetadata.create(
@@ -140,7 +140,7 @@ class TestBackgroundTaskMetadata:
         assert restored_metadata.server_id == original_metadata.server_id
         assert restored_metadata.tags == original_metadata.tags
 
-    def test_json_serialization_with_bytes_input(self):
+    def test_json_serialization_with_bytes_input(self) -> None:
         # Test that from_json can handle bytes input (common in DB operations)
         task_id = TaskID(uuid.uuid4())
         json_data = json.dumps({
@@ -159,7 +159,7 @@ class TestBackgroundTaskMetadata:
         assert metadata.server_id == "server-3"
         assert metadata.tags == set()
 
-    def test_json_serialization_with_complex_data(self):
+    def test_json_serialization_with_complex_data(self) -> None:
         # Test serialization/deserialization with more complex nested structures
         task_id = TaskID(uuid.uuid4())
         complex_body = {
