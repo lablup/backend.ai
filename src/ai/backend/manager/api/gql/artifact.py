@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Optional, Self, Sequence
 
 import strawberry
 from aiotools import apartial
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactOrderField,
@@ -40,6 +41,7 @@ from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
@@ -55,6 +57,7 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
+from ai.backend.manager.types import TriState
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -167,10 +170,10 @@ class ImportArtifactsInput:
     bucket_name: str
 
 
-# TODO: Remove this?
 @strawberry.input(description="Added in 25.13.0")
 class UpdateArtifactInput:
     artifact_id: ID
+    readonly: Optional[bool] = UNSET
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -767,8 +770,29 @@ async def import_artifacts(
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-def update_artifact(input: UpdateArtifactInput) -> UpdateArtifactPayload:
-    raise NotImplementedError("Update artifact functionality is not implemented yet.")
+async def update_artifact(
+    input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
+) -> UpdateArtifactPayload:
+    action_result = await info.context.processors.artifact.update.wait_for_complete(
+        UpdateArtifactAction(
+            artifact_id=uuid.UUID(input.artifact_id),
+            modifier=ArtifactModifier(readonly=TriState.from_graphql(input.readonly)),
+        )
+    )
+
+    artifact = action_result.result
+    registry_loader = DataLoader(
+        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    )
+
+    registry_data = await registry_loader.load(artifact.registry_id)
+    source_registry_data = await registry_loader.load(artifact.source_registry_id)
+
+    return UpdateArtifactPayload(
+        artifact=Artifact.from_dataclass(
+            artifact, registry_url=registry_data.url, source_url=source_registry_data.url
+        )
+    )
 
 
 @strawberry.mutation(description="Added in 25.13.0")

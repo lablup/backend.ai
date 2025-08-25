@@ -16,6 +16,7 @@ from ai.backend.common.exception import (
     ObjectStorageNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -237,6 +238,28 @@ class ArtifactRepository:
             row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError()
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def update_artifact(
+        self, artifact_id: uuid.UUID, modifier: ArtifactModifier
+    ) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            data = modifier.fields_to_update()
+            if not data:
+                raise ValueError("No valid fields to update")
+
+            await db_sess.execute(
+                sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(**data)
+            )
+            await db_sess.commit()
+
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError()
             return row.to_dataclass()
 
     @repository_decorator()

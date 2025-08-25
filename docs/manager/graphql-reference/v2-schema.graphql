@@ -866,6 +866,7 @@ scalar UUID
 """Added in 25.13.0"""
 input UpdateArtifactInput {
   artifactId: ID!
+  readonly: Boolean
 }
 
 """Added in 25.13.0"""
