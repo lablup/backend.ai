@@ -7,7 +7,7 @@ from uuid import UUID
 import yarl
 
 from ai.backend.common.types import RuntimeVariant, VFolderMount
-from ai.backend.manager.models.endpoint import EndpointLifecycle
+from ai.backend.manager.models.endpoint_enums import EndpointLifecycle
 
 
 @dataclass
@@ -31,7 +31,8 @@ class DeploymentState:
 @dataclass
 class MountMetadata:
     model_vfolder_id: UUID
-    model_definition_path: str = "/models"
+    model_definition_path: Optional[str] = None
+    model_mount_destination: str = "/models"
     extra_mounts: list[VFolderMount] = field(default_factory=list)
 
 
@@ -60,7 +61,8 @@ class ExecutionSpec:
 
 @dataclass
 class ModelRevisionSpec:
-    image: UUID
+    image: str
+    architecture: str
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec

@@ -13,12 +13,14 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.model_serving.types import RouteStatus, RoutingData
 
 from ..errors.service import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
+from .endpoint_enums import RouteStatus
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.model_serving.types import RoutingData
+
     from .endpoint import EndpointRow
     from .gql import GraphQueryContext
 
@@ -194,7 +196,9 @@ class RoutingRow(Base):
     def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
         self.session_owner = user_uuid
 
-    def to_data(self) -> RoutingData:
+    def to_data(self) -> "RoutingData":
+        from ai.backend.manager.data.model_serving.types import RoutingData
+
         return RoutingData(
             id=self.id,
             endpoint=self.endpoint,

@@ -16,5 +16,5 @@ class DeploymentRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         """Create deployment repositories."""
-        repository = DeploymentRepository(args.db)
+        repository = DeploymentRepository(args.db, args.storage_manager)
         return cls(repository=repository)

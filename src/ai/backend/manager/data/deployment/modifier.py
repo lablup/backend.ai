@@ -50,10 +50,32 @@ class DeploymentNetworkSpecModifier(PartialModifier):
 
 
 @dataclass
+class ModelRevisionModifier(PartialModifier):
+    """Modifier for model revision - currently focused on model_id updates."""
+
+    model_vfolder_id: OptionalState[UUID] = field(default_factory=OptionalState[UUID].nop)
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.model_vfolder_id.update_dict(to_update, "model_vfolder_id")
+        return to_update
+
+
+@dataclass
 class DeploymentModifier(PartialModifier):
     metadata: Optional[DeploymentMetadataModifier] = None
     replica_spec: Optional[ReplicaSpecModifier] = None
     network: Optional[DeploymentNetworkSpecModifier] = None
+    model_revision: Optional[ModelRevisionModifier] = None
+
+    # Accessor property for backward compatibility
+    @property
+    def model_id(self) -> OptionalState[UUID] | None:
+        """Get the model_vfolder_id from model revision modifier."""
+        if self.model_revision is None:
+            return None
+        return self.model_revision.model_vfolder_id
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -64,4 +86,6 @@ class DeploymentModifier(PartialModifier):
             to_update.update(self.replica_spec.fields_to_update())
         if self.network:
             to_update.update(self.network.fields_to_update())
+        if self.model_revision:
+            to_update.update(self.model_revision.fields_to_update())
         return to_update

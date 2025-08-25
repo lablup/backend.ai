@@ -2,12 +2,17 @@
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.metrics.scheduler import SchedulerPhaseMetricObserver
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -19,6 +24,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.deployment.validators import (
+    DeploymentValidator,
+    ModelVFolderValidationRule,
+)
 
 from .calculators.resource_calculator import ResourceCalculator
 from .preparers import (
@@ -45,6 +54,7 @@ class SchedulingControllerArgs:
     """Arguments for initializing SchedulingController."""
 
     repository: SchedulerRepository
+    deployment_repository: "DeploymentRepository"
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     event_producer: EventProducer
@@ -56,6 +66,7 @@ class SchedulingController:
     """Controller for session lifecycle and scheduling operations management."""
 
     _repository: SchedulerRepository
+    _deployment_repository: "DeploymentRepository"
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
@@ -68,10 +79,12 @@ class SchedulingController:
     _preparer: SessionPreparer
     _resource_calculator: ResourceCalculator
     _metric_observer: SchedulerPhaseMetricObserver
+    _deployment_validator: DeploymentValidator
 
     def __init__(self, args: SchedulingControllerArgs) -> None:
         """Initialize the scheduling controller with required services."""
         self._repository = args.repository
+        self._deployment_repository = args.deployment_repository
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
@@ -104,6 +117,12 @@ class SchedulingController:
 
         # Initialize resource calculator (still needed for resource calculations)
         self._resource_calculator = ResourceCalculator(args.config_provider)
+
+        # Initialize deployment validator with rules
+        deployment_validator_rules = [
+            ModelVFolderValidationRule(),
+        ]
+        self._deployment_validator = DeploymentValidator(deployment_validator_rules)
 
     async def _resolve_scaling_group(
         self,
@@ -271,3 +290,44 @@ class SchedulingController:
             await self.request_scheduling(ScheduleType.TERMINATE)
 
         return result
+
+    async def dry_run_deployment(
+        self,
+        deployment_spec: DeploymentCreator,
+    ) -> None:
+        """
+        Perform a dry-run validation of a deployment without actually creating it.
+
+        This method validates all aspects of a deployment:
+        1. Fetches deployment preparation data (vfolder info, group validation, endpoint name check)
+        2. Reads service definition from model vfolder if available
+        3. Validates the deployment specification
+
+        Args:
+            deployment_spec: Deployment creation specification
+
+        Raises:
+            ModelVFolderNotFound: If model vfolder doesn't exist
+            InvalidVFolderOwnership: If vfolder has project ownership
+            GroupNotFound: If group doesn't exist
+            DuplicateEndpointName: If endpoint name already exists
+        """
+        # Fetch deployment preparation data (will raise exceptions if validation fails)
+        prep_data = await self._deployment_repository.fetch_deployment_preparation_data(
+            vfolder_id=deployment_spec.model_id,
+            domain_name=deployment_spec.domain,
+            group_name=deployment_spec.project,
+            endpoint_name=deployment_spec.name,
+        )
+
+        # Fetch service definition from storage if available
+        service_definition = await self._deployment_repository.fetch_service_definition(
+            deployment_spec.model_id
+        )
+
+        # Run validation rules
+        await self._deployment_validator.validate(
+            deployment_spec,
+            prep_data,
+            service_definition,
+        )

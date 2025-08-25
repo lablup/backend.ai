@@ -931,6 +931,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.scheduling_controller = SchedulingController(
         SchedulingControllerArgs(
             repository=root_ctx.repositories.scheduler.repository,
+            deployment_repository=root_ctx.repositories.deployment.repository,
             config_provider=root_ctx.config_provider,
             storage_manager=root_ctx.storage_manager,
             event_producer=root_ctx.event_producer,
@@ -941,8 +942,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Create deployment controller if Sokovan is enabled
     if root_ctx.config_provider.config.manager.use_sokovan:
-        from ai.backend.manager.sokovan.deployment import DeploymentController
         from ai.backend.manager.sokovan.deployment.deployment_controller import (
+            DeploymentController,
             DeploymentControllerArgs,
         )
 

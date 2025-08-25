@@ -3,7 +3,10 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.deployment import DeploymentRepository
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
@@ -17,11 +20,10 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
-from ai.backend.manager.data.deployment.types import DeploymentInfo
-from ai.backend.manager.models.endpoint import EndpointLifecycle
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
+from ai.backend.manager.models.endpoint_enums import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,
 )
@@ -32,10 +34,17 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
 from ai.backend.manager.services.model_serving.types import (
     ServiceInfo,
 )
-from ai.backend.manager.sokovan.deployment.validators.validator import DeploymentValidator
+from ai.backend.manager.sokovan.deployment.validators import (
+    DeploymentValidateRule,
+    DeploymentValidator,
+    ModelVFolderValidationRule,
+)
 
 from ..scheduling_controller import SchedulingController
-from .exceptions import EndpointNotFound, ServiceInfoRetrievalFailed
+from .exceptions import (
+    EndpointNotFound,
+    ServiceInfoRetrievalFailed,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -45,8 +54,7 @@ class DeploymentControllerArgs:
     """Arguments for initializing DeploymentController."""
 
     scheduling_controller: SchedulingController
-    deployment_validator: DeploymentValidator
-    deployment_repository: DeploymentRepository
+    deployment_repository: "DeploymentRepository"
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     event_producer: EventProducer
@@ -57,7 +65,7 @@ class DeploymentController:
 
     _scheduling_controller: SchedulingController
     _deployment_validator: DeploymentValidator
-    _deployment_repository: DeploymentRepository
+    _deployment_repository: "DeploymentRepository"
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
@@ -65,11 +73,16 @@ class DeploymentController:
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
         self._scheduling_controller = args.scheduling_controller
-        self._deployment_validator = args.deployment_validator
         self._deployment_repository = args.deployment_repository
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
+
+        # Initialize deployment validator with rules
+        deployment_validator_rules: list[DeploymentValidateRule] = [
+            ModelVFolderValidationRule(),
+        ]
+        self._deployment_validator = DeploymentValidator(deployment_validator_rules)
 
     async def create_deployment(
         self,
@@ -80,10 +93,36 @@ class DeploymentController:
 
         Returns:
             DeploymentInfo: Information about the created deployment
-        """
-        await self._deployment_validator.validate(spec)
 
-        return await self._deployment_repository.create_endpoint(spec)
+        Raises:
+            ModelVFolderNotFound: If model vfolder doesn't exist
+            InvalidVFolderOwnership: If vfolder has project ownership
+            GroupNotFound: If group doesn't exist
+            DuplicateEndpointName: If endpoint name already exists
+        """
+        # 1. Fetch preparation data (validates vfolder, group, endpoint name)
+        prep_data = await self._deployment_repository.fetch_deployment_preparation_data(
+            vfolder_id=spec.model_id,
+            domain_name=spec.domain,
+            group_name=str(spec.project),
+            endpoint_name=spec.name,
+        )
+
+        # 2. Read service definition if available
+        service_definition = await self._deployment_repository.fetch_service_definition(
+            spec.model_id
+        )
+
+        # 3. Validate spec with the fetched data
+        await self._deployment_validator.validate(spec, prep_data, service_definition)
+
+        # 4. Create deployment in repository
+        deployment_info = await self._deployment_repository.create_endpoint(spec)
+
+        # 5. Create initial routes and sessions based on replica count
+        # (This would be handled by the scheduling controller separately)
+
+        return deployment_info
 
     async def update_deployment(
         self,
@@ -99,7 +138,75 @@ class DeploymentController:
 
         Returns:
             DeploymentInfo: Updated deployment information
+
+        Raises:
+            EndpointNotFound: If the deployment doesn't exist
+            ModelVFolderNotFound: If updating model and vfolder doesn't exist
+            InvalidVFolderOwnership: If updating model and vfolder has project ownership
         """
+        # Get current deployment info for validation
+        current_deployment = await self._deployment_repository.get_endpoint_info(deployment_id)
+
+        # If updating model_id, validate the new model vfolder
+        if modifier.model_id is not None and modifier.model_id.optional_value() is not None:
+            # Fetch preparation data for the new model
+            prep_data = await self._deployment_repository.fetch_deployment_preparation_data(
+                vfolder_id=modifier.model_id.value(),
+                domain_name=current_deployment.metadata.domain,
+                group_name=str(current_deployment.metadata.project),
+                endpoint_name=current_deployment.metadata.name,
+            )
+
+            # Read service definition for the new model if available
+            service_definition = await self._deployment_repository.fetch_service_definition(
+                modifier.model_id.value()
+            )
+
+            # Create a temporary DeploymentCreator for validation purposes
+            # We need to handle the case where model_revisions might be empty
+            if current_deployment.model_revisions:
+                model_revision = current_deployment.model_revisions[0]
+            else:
+                # Create a minimal ModelRevisionSpec for validation purposes
+                # This should not happen in normal cases, but we handle it for type safety
+                from ai.backend.manager.data.deployment.types import (
+                    ExecutionSpec, MountMetadata, ResourceSpec
+                )
+                model_revision = ModelRevisionSpec(
+                    image="",
+                    architecture="x86_64",
+                    resource_spec=ResourceSpec(
+                        replicas=1,
+                        resource_slots={},
+                        cluster_size=1,
+                        cluster_mode="single-node"
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=modifier.model_id.value(),
+                        model_definition_path="/models"
+                    ),
+                    execution=ExecutionSpec()
+                )
+
+
+
+
+
+
+
+
+
+
+            temp_spec = DeploymentCreator(
+                metadata=current_deployment.metadata,
+                replica_spec=current_deployment.replica_spec,
+                network=current_deployment.network,
+                model_revision=model_revision,
+            )
+
+            # Validate with the new model
+            await self._deployment_validator.validate(temp_spec, prep_data, service_definition)
+
         # Pass the modifier to repository which will handle the updates and return updated info
         deployment_info = await self._deployment_repository.update_endpoint_with_modifier(
             deployment_id, modifier
@@ -324,12 +431,16 @@ class DeploymentController:
         # Get the first model revision (assuming single revision for now)
         model_revision = endpoint_info.model_revisions[0] if endpoint_info.model_revisions else None
         environ = model_revision.execution.environ or {} if model_revision else {}
+        
+        # Ensure model definition path is a string
+        model_path = "/models"
+        if model_revision and model_revision.mounts.model_definition_path:
+            model_path = model_revision.mounts.model_definition_path
+            
         environ.update({
             "BACKEND_ENDPOINT_ID": str(endpoint_id),
             "BACKEND_ROUTE_ID": str(route_id),
-            "BACKEND_MODEL_PATH": model_revision.mounts.model_definition_path
-            if model_revision
-            else "/models",
+            "BACKEND_MODEL_PATH": model_path,
             "BACKEND_SERVICE_NAME": endpoint_info.metadata.name,
             "BACKEND_REPLICA_INDEX": str(replica_idx),
         })
@@ -470,7 +581,7 @@ class DeploymentController:
                     sync_stats["failed"] += 1
                     await self._deployment_repository.update_endpoint_lifecycle(
                         endpoint.id,
-                        EndpointLifecycle.DESTROYING,  # Mark for cleanup if all routes failed
+                        EndpointLifecycle.DESTROYED,  # Mark as DESTROYED if all routes failed
                     )
 
                 # Handle failed routes - mark for recovery in next cycle

@@ -16,7 +16,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
+    EndpointAutoScalingConfigRow,
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
@@ -258,7 +258,7 @@ class AdminModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             try:
-                row = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
+                row = await EndpointAutoScalingConfigRow.get(session, rule_id, load_endpoint=True)
             except ObjectNotFound:
                 return None
             return row.to_data()
@@ -309,7 +309,7 @@ class AdminModelServingRepository:
         """
         async with self._db.begin_session() as session:
             try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
+                rule = await EndpointAutoScalingConfigRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
                     return None
 
@@ -330,7 +330,7 @@ class AdminModelServingRepository:
         """
         async with self._db.begin_session() as session:
             try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
+                rule = await EndpointAutoScalingConfigRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
                     return False
 

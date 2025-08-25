@@ -77,7 +77,7 @@ from ..base import (
     generate_sql_info_for_gql_connection,
 )
 from ..endpoint import (
-    EndpointAutoScalingRuleRow,
+    EndpointAutoScalingConfigRow,
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
@@ -175,7 +175,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         )
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow) -> Self:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingConfigRow) -> Self:
         return cls(
             id=row.id,
             row_id=row.id,
@@ -205,7 +205,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            rule_row = await EndpointAutoScalingRuleRow.get(
+            rule_row = await EndpointAutoScalingConfigRow.get(
                 db_session, _rule_id, load_endpoint=True
             )
             match graph_ctx.user["role"]:
@@ -254,8 +254,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            EndpointAutoScalingRuleRow,
-            EndpointAutoScalingRuleRow.id,
+            EndpointAutoScalingConfigRow,
+            EndpointAutoScalingConfigRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -288,7 +288,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                     if row.created_user != graph_ctx.user["uuid"]:
                         raise GenericForbidden
 
-            query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
+            query = query.filter(EndpointAutoScalingConfigRow.endpoint == _endpoint_id)
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)

@@ -17,13 +17,19 @@ from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
 from ai.backend.manager.errors.service import EndpointNotFound, NoUpdatesToApply
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
+    EndpointAutoScalingConfigRow,
     EndpointRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 
+from ..preparation_types import (
+    DeploymentPreparationData,
+    VFolderInfo,
+)
 from ..types import (
     AutoScalingRuleData,
     EndpointData,
@@ -110,12 +116,48 @@ class DeploymentDBSource:
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo."""
         async with self._begin_session_read_committed() as db_sess:
-            endpoint = EndpointRow.from_deployment_creator(creator)
+            endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
             db_sess.add(endpoint)
             await db_sess.flush()
+
+            # Load image_row relationship for to_deployment_info
+            await db_sess.refresh(endpoint, ["image_row"])
             deployment_info = endpoint.to_deployment_info()
 
         return deployment_info
+
+    async def resolve_image(
+        self,
+        image_name: str,
+        architecture: str,
+    ) -> tuple[uuid.UUID, str, str]:
+        """
+        Resolve image by name and architecture.
+
+        Args:
+            image_name: Image name or alias
+            architecture: Target architecture
+
+        Returns:
+            Tuple of (image_id, canonical_name, architecture)
+
+        Raises:
+            Exception: If image cannot be resolved
+        """
+        from ai.backend.common.types import ImageAlias
+        from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+
+        # Build identifiers to try
+        identifiers: list[ImageAlias | ImageIdentifier] = [
+            ImageIdentifier(
+                canonical=image_name,
+                architecture=architecture,
+            ),
+            ImageAlias(image_name),
+        ]
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            image_row = await ImageRow.resolve(db_sess, identifiers)
+            return (image_row.id, image_row.image, image_row.architecture)
 
     async def get_endpoint(
         self,
@@ -127,7 +169,13 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+            from sqlalchemy.orm import selectinload
+
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(selectinload(EndpointRow.image_row))
+            )
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
 
@@ -145,14 +193,20 @@ class DeploymentDBSource:
 
     async def _fetch_active_endpoints(
         self,
-        db_sess,
+        db_sess: SASession,
     ) -> list[EndpointRow]:
         """Fetch all active endpoints from database."""
-        query = sa.select(EndpointRow).where(
-            EndpointRow.lifecycle_stage.in_([
-                EndpointLifecycle.CREATED,
-                EndpointLifecycle.DESTROYING,
-            ])
+        from sqlalchemy.orm import selectinload
+
+        query = (
+            sa.select(EndpointRow)
+            .where(
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
+            )
+            .options(selectinload(EndpointRow.image_row))
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
@@ -164,10 +218,16 @@ class DeploymentDBSource:
     ) -> list[DeploymentInfo]:
         """List endpoints owned by a specific user with optional name filter."""
         async with self._begin_readonly_session_read_committed() as db_sess:
+            from sqlalchemy.orm import selectinload
+
             # Build query with base conditions
-            query = sa.select(EndpointRow).where(
-                EndpointRow.session_owner == session_owner_id,
-                EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
+            query = (
+                sa.select(EndpointRow)
+                .where(
+                    EndpointRow.session_owner == session_owner_id,
+                    EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
+                )
+                .options(selectinload(EndpointRow.image_row))
             )
 
             # Add name filter if provided
@@ -212,7 +272,7 @@ class DeploymentDBSource:
 
     async def _update_endpoint_replicas(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
         target_replicas: int,
     ) -> bool:
@@ -227,7 +287,7 @@ class DeploymentDBSource:
 
     async def _rebalance_traffic_ratios(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
         target_replicas: int,
     ) -> None:
@@ -407,7 +467,7 @@ class DeploymentDBSource:
 
     async def _delete_routes_and_endpoint(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> bool:
         """Private method to delete routes and endpoint in a single transaction."""
@@ -441,7 +501,7 @@ class DeploymentDBSource:
 
     async def _fetch_endpoint_and_routes(
         self,
-        db_sess,
+        db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> Optional[EndpointWithRoutesRawData]:
         """Fetch endpoint and routes from database."""
@@ -523,7 +583,7 @@ class DeploymentDBSource:
         rule_id = uuid.uuid4()
 
         async with self._begin_session_read_committed() as db_sess:
-            rule = EndpointAutoScalingRuleRow(
+            rule = EndpointAutoScalingConfigRow(
                 id=rule_id,
                 endpoint_id=endpoint_id,
                 metric_source=metric_source,
@@ -545,8 +605,8 @@ class DeploymentDBSource:
     ) -> Optional[AutoScalingRuleData]:
         """Get auto-scaling rule by ID."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointAutoScalingRuleRow).where(
-                EndpointAutoScalingRuleRow.id == rule_id
+            query = sa.select(EndpointAutoScalingConfigRow).where(
+                EndpointAutoScalingConfigRow.id == rule_id
             )
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
@@ -577,8 +637,8 @@ class DeploymentDBSource:
         """Update auto-scaling rule."""
         async with self._begin_session_read_committed() as db_sess:
             query = (
-                sa.update(EndpointAutoScalingRuleRow)
-                .where(EndpointAutoScalingRuleRow.id == rule_id)
+                sa.update(EndpointAutoScalingConfigRow)
+                .where(EndpointAutoScalingConfigRow.id == rule_id)
                 .values(**updates)
             )
             result = await db_sess.execute(query)
@@ -590,8 +650,117 @@ class DeploymentDBSource:
     ) -> bool:
         """Delete an auto-scaling rule."""
         async with self._begin_session_read_committed() as db_sess:
-            query = sa.delete(EndpointAutoScalingRuleRow).where(
-                EndpointAutoScalingRuleRow.id == rule_id
+            query = sa.delete(EndpointAutoScalingConfigRow).where(
+                EndpointAutoScalingConfigRow.id == rule_id
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
+
+    # Deployment data fetching methods
+
+    async def fetch_deployment_preparation_data(
+        self,
+        vfolder_id: uuid.UUID,
+        domain_name: str,
+        group_name: str,
+        endpoint_name: str,
+    ) -> DeploymentPreparationData:
+        """
+        Fetch all deployment preparation data in a single DB session.
+
+        Returns:
+            DeploymentPreparationData with all necessary information
+
+        Raises:
+            VFolderNotFound: If vfolder is not found
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            vfolder_info = await self._get_vfolder_info(db_sess, vfolder_id)
+            if vfolder_info is None:
+                raise VFolderNotFound(f"VFolder {vfolder_id} not found")
+
+            group_id = await self._resolve_group_id(db_sess, domain_name, group_name)
+            is_name_unique = await self._check_endpoint_name_uniqueness(db_sess, endpoint_name)
+
+            return DeploymentPreparationData(
+                vfolder_info=vfolder_info,
+                group_id=group_id,
+                is_endpoint_name_unique=is_name_unique,
+            )
+
+    async def _get_vfolder_info(
+        self,
+        db_sess: SASession,
+        vfolder_id: uuid.UUID,
+    ) -> Optional[VFolderInfo]:
+        """Private method to get vfolder information."""
+        from ai.backend.manager.models.vfolder import VFolderRow
+
+        query = sa.select(
+            VFolderRow.id,
+            VFolderRow.vfid,
+            VFolderRow.host,
+            VFolderRow.ownership_type,
+        ).where(VFolderRow.id == vfolder_id)
+
+        result = await db_sess.execute(query)
+        row = result.one_or_none()
+
+        if row:
+            return VFolderInfo(
+                vfolder_id=row.id,
+                vfid=row.vfid,
+                host=row.host,
+                ownership_type=row.ownership_type,
+            )
+        return None
+
+    async def _resolve_group_id(
+        self,
+        db_sess: SASession,
+        domain_name: str,
+        group_name: str,
+    ) -> Optional[uuid.UUID]:
+        """Private method to resolve group ID."""
+        from ai.backend.manager.models.group import GroupRow
+
+        query = sa.select(GroupRow.id).where(
+            sa.and_(
+                GroupRow.domain_name == domain_name,
+                GroupRow.name == group_name,
+            )
+        )
+        result = await db_sess.execute(query)
+        return result.scalar_one_or_none()
+
+    async def _check_endpoint_name_uniqueness(
+        self,
+        db_sess: SASession,
+        endpoint_name: str,
+    ) -> bool:
+        """Private method to check endpoint name uniqueness."""
+        query = (
+            sa.select(sa.func.count())
+            .select_from(EndpointRow)
+            .where(EndpointRow.name == endpoint_name)
+        )
+        result = await db_sess.execute(query)
+        count = result.scalar()
+        return count == 0
+
+    async def get_vfolder_by_id(
+        self,
+        vfolder_id: uuid.UUID,
+    ) -> Optional[VFolderRow]:
+        """Get vfolder row by ID.
+
+        Args:
+            vfolder_id: ID of the vfolder
+
+        Returns:
+            VFolderRow if found, None otherwise
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
+            result = await db_sess.execute(query)
+            return result.scalar_one_or_none()

@@ -210,6 +210,9 @@ class ErrorDetail(enum.StrEnum):
     # Invalid parameters means the received parameters are invalid.
     # This is different from BAD_REQUEST, which means the request is malformed.
     INVALID_PARAMETERS = "invalid-parameters"
+    # Invalid argument means the argument provided is invalid.
+    # This is used for validation errors on specific arguments.
+    INVALID_ARGUMENT = "invalid-argument"
     # DATA_EXPIRED means the data is expired and cannot be used anymore.
     # This is different from NOT_FOUND, which means the resource does not exist.
     # For example, the password is expired or the auth token is expired.

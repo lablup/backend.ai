@@ -12,11 +12,20 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
-from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.model_serving.types import RouteInfo, ServiceInfo
+from ai.backend.manager.services.model_serving.types import (
+    ModelServiceDefinition,
+    RouteInfo,
+    ServiceInfo,
+)
+from ai.backend.manager.sokovan.deployment.exceptions import (
+    EndpointNotFound,
+)
 
 from .db_source import DeploymentDBSource
+from .preparation_types import DeploymentPreparationData
+from .storage_source import DeploymentStorageSource
 from .types import RouteData
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -26,9 +35,15 @@ class DeploymentRepository:
     """Repository for deployment-related operations."""
 
     _db_source: DeploymentDBSource
+    _storage_source: DeploymentStorageSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        storage_manager: StorageSessionManager,
+    ) -> None:
         self._db_source = DeploymentDBSource(db)
+        self._storage_source = DeploymentStorageSource(storage_manager)
 
     # Endpoint operations
 
@@ -160,6 +175,75 @@ class DeploymentRepository:
     ) -> bool:
         """Delete a route."""
         return await self._db_source.delete_route(route_id)
+
+    # Data fetching operations
+
+    async def fetch_deployment_preparation_data(
+        self,
+        vfolder_id: uuid.UUID,
+        domain_name: str,
+        group_name: str,
+        endpoint_name: str,
+    ) -> DeploymentPreparationData:
+        """Fetch all preparation data needed for deployment validation.
+
+        Raises:
+            ModelVFolderNotFound: If vfolder doesn't exist
+            InvalidVFolderOwnership: If vfolder has project ownership
+            GroupNotFound: If group doesn't exist
+            DuplicateEndpointName: If endpoint name already exists
+        """
+        return await self._db_source.fetch_deployment_preparation_data(
+            vfolder_id=vfolder_id,
+            domain_name=domain_name,
+            group_name=group_name,
+            endpoint_name=endpoint_name,
+        )
+
+    async def fetch_service_definition(
+        self,
+        vfolder_id: uuid.UUID,
+    ) -> Optional[ModelServiceDefinition]:
+        """Fetch service definition from model vfolder.
+
+        Args:
+            vfolder_id: ID of the model vfolder
+
+        Returns:
+            Parsed service definition or None if not found
+        """
+        # Get vfolder info from DB
+        vfolder_row = await self._db_source.get_vfolder_by_id(vfolder_id)
+        if not vfolder_row:
+            return None
+
+        # Read service definition from storage
+        return await self._storage_source.fetch_service_config(vfolder_row)
+
+    async def check_model_definition_exists(
+        self,
+        vfolder_id: uuid.UUID,
+        model_definition_path: str,
+    ) -> bool:
+        """Check if model definition file exists in vfolder.
+
+        Args:
+            vfolder_id: ID of the model vfolder
+            model_definition_path: Path to model definition file
+
+        Returns:
+            True if file exists, False otherwise
+        """
+        # Get vfolder info from DB
+        vfolder_row = await self._db_source.get_vfolder_by_id(vfolder_id)
+        if not vfolder_row:
+            return False
+
+        # Check file existence in storage
+        return await self._storage_source.check_model_definition_exists(
+            vfolder_row,
+            model_definition_path,
+        )
 
     # Additional operations for model serving
 

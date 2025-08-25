@@ -59,7 +59,7 @@ from ai.backend.manager.models import (
     recalc_agent_resource_occupancy,
 )
 from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
+    EndpointAutoScalingConfigRow,
     EndpointLifecycle,
     EndpointStatistics,
 )
@@ -1314,7 +1314,7 @@ class ScheduleRepository:
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
         current_datetime = datetime.now(timezone.utc)
-        rules = await EndpointAutoScalingRuleRow.list(session)
+        rules = await EndpointAutoScalingConfigRow.list(session)
 
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
         # To fetch aggregated kernel metrics among every kernels managed by a single endpoint
