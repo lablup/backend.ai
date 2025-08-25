@@ -10,7 +10,6 @@ import resource
 import signal
 import sys
 import time
-import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -45,7 +44,7 @@ from .intrinsic import (
     prepare_ttyd_service,
 )
 from .jupyter_client import aexecute_interactive
-from .logging import BraceStyleAdapter, setup_logger
+from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
@@ -166,6 +165,7 @@ class BaseRunner(metaclass=ABCMeta):
     _health_check_task: Optional[asyncio.Task]
 
     def __init__(self, runtime_path: Path) -> None:
+        setup_logger_basic(self.log_prefix, False)
         self.subproc = None
         self.runtime_path = runtime_path
         self.child_env = {**os.environ, **self.default_child_env}
@@ -184,19 +184,14 @@ class BaseRunner(metaclass=ABCMeta):
         except FileNotFoundError:
             pass
         except Exception:
-            print(
-                f"{self.log_prefix}: [ERROR] Reading /home/config/environ.txt failed!",
-                file=sys.stderr,
-            )
-            traceback.print_exc(file=sys.stderr)
+            log.exception("Reading /home/config/environ.txt failed!")
 
         work_dir = Path("/home/work")
         work_dir_owner = work_dir.stat().st_uid
         process_owner = os.getuid()
         if work_dir_owner != process_owner:
-            print(
-                f"{self.log_prefix}: [WARNING] {work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
-                file=sys.stderr,
+            log.warning(
+                f"{work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
             )
 
         path_env = self.child_env["PATH"]
@@ -228,6 +223,7 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
+        setup_logger_basic(self.log_prefix, cmdargs.debug)
         loop = current_loop()
         self._service_lock = asyncio.Lock()
 
@@ -251,10 +247,10 @@ class BaseRunner(metaclass=ABCMeta):
         outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
         self.insock.bind(f"tcp://*:{insock_port}")
-        print(f"binding to tcp://*:{insock_port}")
+        log.debug(f"binding the kernel-runner inbound socket to tcp://*:{insock_port}")
         self.outsock = self.zctx.socket(zmq.PUSH)
         self.outsock.bind(f"tcp://*:{outsock_port}")
-        print(f"binding to tcp://*:{outsock_port}")
+        log.debug(f"binding the kernel-runner outbound socket to tcp://*:{outsock_port}")
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -278,7 +274,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def _shutdown(self) -> None:
         try:
             self.insock.close()
-            log.debug("shutting down...")
+            log.info("shutting down...")
             self._run_task.cancel()
             self._main_task.cancel()
             await self._run_task
@@ -286,7 +282,7 @@ class BaseRunner(metaclass=ABCMeta):
             if health_check_task := self._health_check_task:
                 health_check_task.cancel()
                 await health_check_task
-            log.debug("terminating service processes...")
+            log.info("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
                 await asyncio.gather(
@@ -294,7 +290,7 @@ class BaseRunner(metaclass=ABCMeta):
                     return_exceptions=True,
                 )
                 await asyncio.sleep(0.01)
-            log.debug("terminated.")
+            log.info("terminated.")
         finally:
             # allow remaining logs to be flushed.
             await asyncio.sleep(0.1)
@@ -348,8 +344,10 @@ class BaseRunner(metaclass=ABCMeta):
                 log.warning("jupyter query mode is not available: no jupyter kernelspec found")
         except OSError:
             log.exception(
-                "Failed to create the ipython kernel configuration to handle code execution requests. "
-                "This feature is now disabled and all code execution requests will return immediately with an empty output."
+                "Failed to create the ipython kernel configuration to handle code execution requests."
+            )
+            log.warning(
+                "All query-mode code execution requests will get the exit code 127 immediately."
             )
 
     async def _shutdown_jupyter_kernel(self):
