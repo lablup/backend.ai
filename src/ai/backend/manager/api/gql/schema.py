@@ -24,6 +24,12 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .model_deployment.access_token import create_access_token
+from .model_deployment.auto_scaling_rule import (
+    create_auto_scaling_rule,
+    delete_auto_scaling_rule,
+    update_auto_scaling_rule,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
@@ -35,7 +41,10 @@ from .model_deployment.model_deployment import (
     update_model_deployment,
 )
 from .model_deployment.model_revision import (
+    add_model_revision,
     create_model_revision,
+    inference_runtime_config,
+    inference_runtime_configs,
     revision,
     revisions,
 )
@@ -65,6 +74,8 @@ class Query:
     object_storages = object_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
+    inference_runtime_configs = inference_runtime_configs
+    inference_runtime_config = inference_runtime_config
 
 
 @strawberry.type
@@ -77,9 +88,13 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    add_model_revision = add_model_revision
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
+    create_auto_scaling_rule = create_auto_scaling_rule
+    update_auto_scaling_rule = update_auto_scaling_rule
+    delete_auto_scaling_rule = delete_auto_scaling_rule
     delete_object_storage = delete_object_storage
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
@@ -88,6 +103,7 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
+    create_access_token = create_access_token
 
 
 @strawberry.type
