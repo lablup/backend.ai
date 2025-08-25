@@ -85,8 +85,8 @@ type ArtifactRevision implements Node {
   status: ArtifactStatus!
   createdAt: DateTime!
   updatedAt: DateTime!
-  readme: String!
   version: String!
+  readme: String
   size: ByteSize
 }
 

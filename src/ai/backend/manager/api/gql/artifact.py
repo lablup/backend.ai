@@ -265,8 +265,8 @@ class ArtifactRevision(Node):
     status: ArtifactStatus
     created_at: datetime
     updated_at: datetime
-    readme: str
     version: str
+    readme: Optional[str]
     size: Optional[ByteSize]
 
     @classmethod

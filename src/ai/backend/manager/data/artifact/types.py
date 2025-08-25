@@ -48,7 +48,7 @@ class ArtifactRevisionData:
     id: uuid.UUID
     artifact_id: uuid.UUID
     version: str
-    readme: str
+    readme: Optional[str]
     size: Optional[int]
     status: ArtifactStatus
     created_at: datetime
