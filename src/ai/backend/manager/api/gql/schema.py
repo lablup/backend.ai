@@ -25,6 +25,11 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .model_deployment.access_token import create_access_token
+from .model_deployment.auto_scaling_rule import (
+    create_auto_scaling_rule,
+    delete_auto_scaling_rule,
+    update_auto_scaling_rule,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
@@ -87,6 +92,9 @@ class Mutation:
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
+    create_auto_scaling_rule = create_auto_scaling_rule
+    update_auto_scaling_rule = update_auto_scaling_rule
+    delete_auto_scaling_rule = delete_auto_scaling_rule
     delete_object_storage = delete_object_storage
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry

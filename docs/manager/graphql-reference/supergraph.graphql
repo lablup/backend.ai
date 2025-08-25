@@ -1122,6 +1122,26 @@ type CreateAccessTokenPayload
   accessToken: AccessToken!
 }
 
+input CreateAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  modelDeploymentId: ID!
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int!
+  timeWindow: Int!
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type CreateAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  autoScalingRule: AutoScalingRule!
+}
+
 """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -1516,6 +1536,18 @@ type DeleteArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
+}
+
+input DeleteAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+type DeleteAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
 }
 
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
@@ -3950,6 +3982,15 @@ type Mutation
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
+  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
@@ -5190,6 +5231,26 @@ type UpdateArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
   artifact: Artifact!
+}
+
+input UpdateAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  metricSource: AutoScalingMetricSource
+  metricName: String
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int
+  timeWindow: Int
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type UpdateAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  autoScalingRule: AutoScalingRule!
 }
 
 """Added in 25.3.0."""

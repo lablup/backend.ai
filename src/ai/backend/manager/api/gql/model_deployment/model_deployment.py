@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from decimal import Decimal
 from enum import StrEnum
 from typing import AsyncGenerator, Optional, cast
 from uuid import UUID, uuid4
@@ -20,8 +19,9 @@ from ai.backend.manager.api.gql.model_deployment.access_token import (
     mock_access_token_5,
 )
 from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
-    AutoScalingMetricSource,
     AutoScalingRule,
+    mock_scaling_rule_1,
+    mock_scaling_rule_2,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import (
     RoutingNode,
@@ -202,25 +202,6 @@ class DeploymentOrderBy:
     direction: OrderDirection = OrderDirection.DESC
 
 
-@strawberry.type(description="Added in 25.13.0")
-class CreateScalingRuleInput:
-    deployment_id: ID
-    auto_scaling_rule: AutoScalingRule
-
-
-@strawberry.type(description="Added in 25.13.0")
-class UpdateScalingRuleInput:
-    deployment_id: ID
-    auto_scaling_rule_id: ID
-    auto_scaling_rule: AutoScalingRule
-
-
-@strawberry.type(description="Added in 25.13.0")
-class DeleteScalingRuleInput:
-    deployment_id: ID
-    auto_scaling_rule_id: ID
-
-
 # Payload Types
 @strawberry.type(description="Added in 25.13.0")
 class CreateModelDeploymentPayload:
@@ -235,21 +216,6 @@ class UpdateModelDeploymentPayload:
 @strawberry.type(description="Added in 25.13.0")
 class DeleteModelDeploymentPayload:
     deployment: Optional[ModelDeployment] = None
-
-
-@strawberry.type(description="Added in 25.13.0")
-class CreateScalingRulePayload:
-    auto_scaling_rule: AutoScalingRule
-
-
-@strawberry.type(description="Added in 25.13.0")
-class UpdateScalingRulePayload:
-    auto_scaling_rule: Optional[AutoScalingRule] = None
-
-
-@strawberry.type(description="Added in 25.13.0")
-class DeleteScalingRulePayload:
-    auto_scaling_rule: Optional[AutoScalingRule] = None
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -376,8 +342,6 @@ ModelReplicaEdge = Edge[ModelReplica]
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Deployments
 mock_model_deployment_id_1 = "8c3105c3-3a02-42e3-aa00-6923cdcd114c"
-mock_scaling_rule_id_1 = "7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb"
-mock_scaling_rule_id_2 = "483e2158-e089-482b-8cef-260805649cf1"
 mock_created_user_id_1 = "9a41b189-72fa-4265-afe8-04172ec5d26b"
 mock_model_deployment_1 = ModelDeployment(
     id=UUID(mock_model_deployment_id_1),
@@ -421,36 +385,7 @@ mock_model_deployment_1 = ModelDeployment(
             end_cursor="rev-cursor-2",
         ),
     ),
-    scaling_rule=ScalingRule(
-        auto_scaling_rules=[
-            AutoScalingRule(
-                id=UUID(mock_scaling_rule_id_1),
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name="cpu_usage",
-                min_threshold=None,
-                max_threshold=Decimal("80"),
-                step_size=1,
-                time_window=300,
-                min_replicas=1,
-                max_replicas=5,
-                created_at=datetime.now() - timedelta(days=10),
-                last_triggered_at=datetime.now() - timedelta(hours=2),
-            ),
-            AutoScalingRule(
-                id=UUID(mock_scaling_rule_id_2),
-                metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
-                metric_name="requests_per_second",
-                min_threshold=None,
-                max_threshold=Decimal("1000"),
-                step_size=2,
-                time_window=600,
-                min_replicas=2,
-                max_replicas=10,
-                created_at=datetime.now() - timedelta(days=5),
-                last_triggered_at=datetime.now() - timedelta(hours=12),
-            ),
-        ]
-    ),
+    scaling_rule=ScalingRule(auto_scaling_rules=[mock_scaling_rule_1, mock_scaling_rule_2]),
     replica_state=ReplicaState(
         desired_replica_count=3,
         replicas=ModelReplicaConnection(
@@ -651,21 +586,6 @@ mock_model_deployment_3 = ModelDeployment(
     ),
 )
 
-mock_auto_scaling_rule_id_0 = "77117a41-87f3-43b7-ba24-40dd5e978720"
-mock_auto_scaling_rule = AutoScalingRule(
-    id=UUID(mock_auto_scaling_rule_id_0),
-    metric_source=AutoScalingMetricSource.KERNEL,
-    metric_name="memory_usage",
-    min_threshold=None,
-    max_threshold=Decimal("90"),
-    step_size=1,
-    time_window=120,
-    min_replicas=1,
-    max_replicas=3,
-    created_at=datetime.now() - timedelta(days=15),
-    last_triggered_at=datetime.now() - timedelta(hours=6),
-)
-
 
 ModelDeploymentEdge = Edge[ModelDeployment]
 
@@ -771,33 +691,6 @@ async def delete_model_deployment(
 ) -> DeleteModelDeploymentPayload:
     """Delete a model deployment."""
     return DeleteModelDeploymentPayload(deployment=None)
-
-
-@strawberry.mutation(description="Added in 25.13.0")
-async def create_scaling_rule(
-    input: CreateScalingRuleInput,
-) -> CreateScalingRulePayload:
-    """Create a new auto-scaling rule for a deployment."""
-    # This is a placeholder implementation
-    return CreateScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
-
-
-@strawberry.mutation(description="Added in 25.13.0")
-async def update_scaling_rule(
-    input: UpdateScalingRuleInput,
-) -> UpdateScalingRulePayload:
-    """Update an existing auto-scaling rule for a deployment."""
-    # This is a placeholder implementation
-    return UpdateScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
-
-
-@strawberry.mutation(description="Added in 25.13.0")
-async def delete_scaling_rule(
-    input: DeleteScalingRuleInput,
-) -> DeleteScalingRulePayload:
-    """Delete an auto-scaling rule from a deployment."""
-    # This is a placeholder implementation
-    return DeleteScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
 
 
 @strawberry.subscription(description="Added in 25.13.0")
