@@ -1,7 +1,37 @@
-schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
+}
+
+type AccessToken implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.13.0: The access token."""
+  token: String!
+
+  """Added in 25.13.0: The creation timestamp of the access token."""
+  createdAt: DateTime!
+
+  """Added in 25.13.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
+}
+
+"""Added in 25.13.0"""
+input AddModelRevisionInput {
+  name: String = null
+  deploymentId: ID!
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+}
+
+"""Added in 25.13.0"""
+type AddModelRevisionPayload {
+  revision: ModelRevision!
 }
 
 """Added in 25.13.0"""
@@ -167,6 +197,44 @@ enum ArtifactType {
   IMAGE
 }
 
+"""Added in 25.1.0"""
+enum AutoScalingMetricSource {
+  KERNEL
+  INFERENCE_FRAMEWORK
+}
+
+type AutoScalingRule implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.13.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+
+  """Added in 25.13.0: The minimum threshold for scaling (e.g. 0.5)"""
+  minThreshold: Decimal
+
+  """Added in 25.13.0: The maximum threshold for scaling (e.g. 21.0)"""
+  maxThreshold: Decimal
+
+  """Added in 25.13.0: The step size for scaling (e.g. 1)."""
+  stepSize: Int!
+
+  """Added in 25.13.0: The time window (seconds) for scaling (e.g. 60)."""
+  timeWindow: Int!
+
+  """Added in 25.13.0: The minimum number of replicas (e.g. 1)."""
+  minReplicas: Int
+
+  """Added in 25.13.0: The maximum number of replicas (e.g. 10)."""
+  maxReplicas: Int
+  createdAt: DateTime!
+  lastTriggeredAt: DateTime!
+}
+
+"""BigInt field"""
+scalar BigInt
+
 scalar ByteSize
 
 """Added in 25.13.0"""
@@ -178,16 +246,19 @@ type CancelImportArtifactPayload {
   artifactRevisionId: ID!
 }
 
+"""Added in 25.13.0"""
 type ClusterConfig {
   mode: ClusterMode!
   size: Int!
 }
 
+"""Added in 25.13.0"""
 input ClusterConfigInput {
   mode: ClusterMode!
   size: Int!
 }
 
+"""Added in 25.13.0"""
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
@@ -205,27 +276,32 @@ type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""Added in 25.13.0"""
 input CreateModelDeploymentInput {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
-  clusterConfig: ClusterConfigInput!
-  resourceConfig: ResourceConfigInput!
   deploymentStrategy: DeploymentStrategyInput!
+  desiredReplicaCount: Int!
   initialRevision: CreateModelRevisionInput!
 }
 
+"""Added in 25.13.0"""
 type CreateModelDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
 input CreateModelRevisionInput {
-  deploymentId: ID!
-  name: String!
+  name: String = null
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
 }
 
+"""Added in 25.13.0"""
 type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
@@ -247,6 +323,9 @@ type CreateObjectStoragePayload {
 
 """Date with time (isoformat)"""
 scalar DateTime
+
+"""Decimal (fixed-point)"""
+scalar Decimal
 
 """Added in 25.13.0"""
 input DeleteArtifactRevisionTarget {
@@ -274,10 +353,12 @@ type DeleteHuggingFaceRegistryPayload {
   id: ID!
 }
 
+"""Added in 25.13.0"""
 input DeleteModelDeploymentInput {
   id: ID!
 }
 
+"""Added in 25.13.0"""
 type DeleteModelDeploymentPayload {
   deployment: ModelDeployment
 }
@@ -292,56 +373,69 @@ type DeleteObjectStoragePayload {
   id: ID!
 }
 
+"""Added in 25.13.0"""
 input DeploymentFilter {
-  status: DeploymentStatus = null
+  name: StringFilter = null
+  status: DeploymentStatusFilter = null
   openToPublic: Boolean = null
-  tags: [StringFilter!] = null
-  AND: DeploymentFilter = null
-  OR: DeploymentFilter = null
-  NOT: DeploymentFilter = null
+  tags: StringFilter = null
+  AND: [DeploymentFilter!] = null
+  OR: [DeploymentFilter!] = null
+  NOT: [DeploymentFilter!] = null
   DISTINCT: Boolean = null
 }
 
+"""Added in 25.13.0"""
 input DeploymentOrderBy {
   field: DeploymentOrderField!
   direction: OrderDirection! = DESC
 }
 
+"""Added in 25.13.0"""
 enum DeploymentOrderField {
   CREATED_AT
   UPDATED_AT
   NAME
 }
 
+"""Added in 25.13.0"""
 enum DeploymentStatus {
   ACTIVE
   INACTIVE
 }
 
+"""Added in 25.13.0"""
 type DeploymentStatusChangedPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
+input DeploymentStatusFilter {
+  in: [DeploymentStatus!] = null
+  eq: [DeploymentStatus!] = null
+}
+
+"""Added in 25.13.0"""
 type DeploymentStrategy {
   type: DeploymentStrategyType!
 }
 
+"""Added in 25.13.0"""
 input DeploymentStrategyInput {
   type: DeploymentStrategyType!
 }
 
+"""Added in 25.13.0"""
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
   CANARY
 }
 
-extend type EndpointAutoScalingRuleNode @key(fields: "id") {
-  id: ID! @external
-}
-
-extend type EndpointToken @key(fields: "token") {
-  token: String! @external
+"""Added in 25.13.0"""
+input ExtraVFolderMountInput {
+  vfolderId: ID!
+  mountDestination: String
 }
 
 """Added in 25.13.0"""
@@ -401,13 +495,48 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
+type ImageDetail implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  rowId: UUID!
+  name: String!
+  namespace: String!
+  baseImageName: String!
+  project: String!
+  humanizedName: String!
+  tag: String!
+  tags: [KVPair!]!
+  version: String!
+  registry: String!
+  architecture: String!
+  isLocal: Boolean!
+  digest: String!
+  labels: [KVPair!]!
+  sizeBytes: BigInt!
+  status: String!
+  resourceLimits: [ResourceLimit!]!
+  supportedAccelerators: [String!]!
+  aliases: [String!]!
+  permissions: [ImagePermissionValueField!]!
+  installed: Boolean!
+  type: ImageType!
+}
+
+"""Added in 25.13.0"""
 input ImageInput {
   name: String!
   architecture: String!
 }
 
-extend type ImageNode @key(fields: "id") {
-  id: ID! @external
+"""
+Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+"""
+scalar ImagePermissionValueField
+
+enum ImageType {
+  COMPUTE
+  SYSTEM
+  SERVICE
 }
 
 """Added in 25.13.0"""
@@ -422,9 +551,20 @@ type ImportArtifactsPayload {
   taskIds: [UUID!]!
 }
 
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
 """A custom scalar for JSON strings using orjson"""
 scalar JSONString
 
+type KVPair @shareable {
+  key: String!
+  value: String!
+}
+
+"""Added in 25.13.0"""
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -435,11 +575,10 @@ type ModelDeployment implements Node {
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
   deploymentStrategy: DeploymentStrategy!
-  clusterConfig: ClusterConfig!
-  resourceConfig: ResourceConfig!
-  createdUser: UserNode!
+  createdUser: UserDetail!
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -458,6 +597,7 @@ type ModelDeploymentEdge {
   node: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
@@ -466,35 +606,41 @@ type ModelDeploymentMetadata {
   updatedAt: DateTime!
 }
 
+"""Added in 25.13.0"""
 input ModelDeploymentMetadataInput {
   name: String!
   tags: [String!] = null
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens: [EndpointToken!]!
+  accessTokens: [AccessToken!]!
 }
 
+"""Added in 25.13.0"""
 input ModelDeploymentNetworkAccessInput {
   preferredDomainName: String = null
   openToPublic: Boolean! = false
 }
 
+"""Added in 25.13.0"""
 type ModelMountConfig {
-  vfolder: VirtualFolderNode!
+  vfolder: VFolder!
   mountDestination: String!
   definitionPath: String!
 }
 
+"""Added in 25.13.0"""
 input ModelMountConfigInput {
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String!
 }
 
+"""Added in 25.13.0"""
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -504,6 +650,7 @@ type ModelReplica implements Node {
   routings: [RoutingNode!]!
 }
 
+"""Added in 25.13.0"""
 type ModelReplicaConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -522,16 +669,21 @@ type ModelReplicaEdge {
   node: ModelReplica!
 }
 
+"""Added in 25.13.0"""
 type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
   modelMountConfig: ModelMountConfig!
-  image: ImageNode!
+  extraMounts: [VFolder!]!
+  image: ImageDetail!
   createdAt: DateTime!
 }
 
+"""Added in 25.13.0"""
 type ModelRevisionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -550,34 +702,47 @@ type ModelRevisionEdge {
   node: ModelRevision!
 }
 
+"""Added in 25.13.0"""
 input ModelRevisionFilter {
   name: StringFilter = null
   deploymentId: ID = null
-  AND: ModelRevisionFilter = null
-  OR: ModelRevisionFilter = null
-  NOT: ModelRevisionFilter = null
+  AND: [ModelRevisionFilter!] = null
+  OR: [ModelRevisionFilter!] = null
+  NOT: [ModelRevisionFilter!] = null
   DISTINCT: Boolean = null
 }
 
+"""Added in 25.13.0"""
 input ModelRevisionOrder {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
 }
 
+"""Added in 25.13.0"""
 enum ModelRevisionOrderField {
   CREATED_AT
   NAME
 }
 
+"""Added in 25.13.0"""
 type ModelRuntimeConfig {
   runtimeVariant: String!
-  serviceConfig: ServiceConfig
+  inferenceRuntimeConfig: JSON
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  """
   environ: JSONString
 }
 
+"""Added in 25.13.0"""
 input ModelRuntimeConfigInput {
   runtimeVariant: String!
-  serviceConfig: JSONString = null
+  inferenceRuntimeConfig: JSON = null
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  """
   environ: JSONString = null
 }
 
@@ -596,9 +761,20 @@ type Mutation {
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
+
+  """Added in 25.13.0"""
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
+
+  """Added in 25.13.0"""
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
+
+  """Added in 25.13.0"""
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
+
+  """Added in 25.13.0"""
+  addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload!
+
+  """Added in 25.13.0"""
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
 
   """Added in 25.13.0"""
@@ -705,7 +881,6 @@ type PageInfo @shareable {
 }
 
 type Query {
-  _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 
   """Added in 25.13.0"""
@@ -719,6 +894,8 @@ type Query {
 
   """Added in 25.13.0"""
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+
+  """Added in 25.13.0"""
   deployments(
     filter: DeploymentFilter = null
     orderBy: DeploymentOrderBy = null
@@ -735,7 +912,11 @@ type Query {
     """Returns the items in the list that come after the specified cursor."""
     last: Int = null
   ): ModelDeploymentConnection!
+
+  """Added in 25.13.0"""
   deployment(id: ID!): ModelDeployment
+
+  """Added in 25.13.0"""
   revisions(
     filter: ModelRevisionFilter = null
     order: ModelRevisionOrder = null
@@ -752,7 +933,11 @@ type Query {
     """Returns the items in the list that come after the specified cursor."""
     last: Int = null
   ): ModelRevisionConnection!
+
+  """Added in 25.13.0"""
   revision(id: ID!): ModelRevision
+
+  """Added in 25.13.0"""
   replica(id: ID!): ModelReplica
 
   """Added in 25.13.0"""
@@ -766,11 +951,14 @@ type Query {
 
   """Added in 25.13.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
-}
 
-type RawServiceConfig {
-  config: JSONString!
-  extraCliParameters: String
+  """
+  Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
+  """
+  inferenceRuntimeConfigs: JSON!
+
+  """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
+  inferenceRuntimeConfig(name: String!): JSON!
 }
 
 """Added in 25.13.0"""
@@ -794,54 +982,101 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 25.13.0"""
 type ReplicaState {
   desiredReplicaCount: Int!
   replicas: ModelReplicaConnection!
 }
 
+"""Added in 25.13.0"""
 enum ReplicaStatus {
   HEALTHY
   UNHEALTHY
 }
 
+"""Added in 25.13.0"""
 type ReplicaStatusChangedPayload {
   replica: ModelReplica!
 }
 
+"""Added in 25.13.0"""
 type ResourceConfig {
-  resourceGroup: ScalingGroupNode!
+  resourceGroup: ResourceGroup!
+
+  """
+  Resource Slots are a JSON string that describes the resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  """
   resourceSlots: JSONString!
+
+  """
+  Resource Options are a JSON string that describes additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  """
   resourceOpts: JSONString
 }
 
+"""Added in 25.13.0"""
 input ResourceConfigInput {
   resourceGroup: ResourceGroupInput!
+
+  """
+  Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  """
   resourceSlots: JSONString!
+
+  """
+  Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  """
   resourceOpts: JSONString = null
 }
 
+type ResourceGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String!
+  isActive: Boolean!
+  isPublic: Boolean!
+  createdAt: DateTime!
+  wsproxyAddr: String!
+  wsproxyApiToken: String!
+  driver: String!
+  driverOpts: JSONString!
+  scheduler: String!
+  schedulerOpts: JSONString!
+  useHostNetwork: Boolean!
+}
+
+"""Added in 25.13.0"""
 input ResourceGroupInput {
   name: String!
 }
 
+type ResourceLimit @shareable {
+  key: String!
+  min: String!
+  max: String!
+}
+
+"""Added in 25.13.0"""
 type RoutingNode implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   routingId: UUID!
-  endpoint: String!
-  session: UUID!
+  endpointUrl: String!
+  sessionId: UUID!
   status: String!
   trafficRatio: Float!
   createdAt: DateTime!
+
+  """
+  live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
+  """
   liveStat: JSONString!
 }
 
-extend type ScalingGroupNode @key(fields: "id") {
-  id: ID! @external
-}
-
+"""Added in 25.13.0"""
 type ScalingRule {
-  autoScalingRules: [EndpointAutoScalingRuleNode!]!
+  autoScalingRules: [AutoScalingRule!]!
 }
 
 """Added in 25.13.0"""
@@ -856,9 +1091,6 @@ input ScanArtifactsInput {
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
-
-"""Different service configurations for model runtime"""
-union ServiceConfig = RawServiceConfig
 
 """Added in 25.13.0"""
 type SourceInfo {
@@ -885,7 +1117,11 @@ type Subscription {
 
   """Added in 25.13.0"""
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
+
+  """Added in 25.13.0"""
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
+
+  """Added in 25.13.0"""
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
 }
 
@@ -926,6 +1162,7 @@ type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""Added in 25.13.0"""
 input UpdateModelDeploymentInput {
   id: ID!
   openToPublic: Boolean = null
@@ -934,6 +1171,7 @@ input UpdateModelDeploymentInput {
   activeRevisionId: ID = null
 }
 
+"""Added in 25.13.0"""
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment
 }
@@ -954,17 +1192,87 @@ type UpdateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
 
-extend type UserNode @key(fields: "id") {
-  id: ID! @external
+type UserDetail implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Unique username of the user."""
+  username: String!
+
+  """Unique email of the user."""
+  email: String!
+  needPasswordChange: Boolean!
+  fullName: String!
+  description: String!
+
+  """
+  The status is one of `active`, `inactive`, `deleted` or `before-verification`.
+  """
+  status: String!
+
+  """Additional information of user status."""
+  statusInfo: String!
+  createdAt: DateTime!
+  modifiedAt: DateTime!
+  domainName: String!
+
+  """The role is one of `user`, `admin`, `superadmin` or `monitor`."""
+  role: String!
+  resourcePolicy: String!
+  allowedClientIp: [String!]!
+  totpActivated: Boolean!
+  totpActivatedAt: DateTime!
+  sudoSessionEnabled: Boolean!
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  containerUid: Int!
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  containerMainGid: Int!
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  containerGids: [Int!]!
 }
 
-extend type VirtualFolderNode @key(fields: "id") {
-  id: ID! @external
+type VFolder implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  rowId: UUID!
+  host: String!
+  quotaScopeId: String!
+  name: String!
+  user: UUID!
+  userEmail: String!
+  group: UUID!
+  groupName: String!
+  creator: String!
+  unmanagedPath: String!
+  usageMode: String!
+  permission: String!
+  ownershipType: String!
+  maxFiles: Int!
+  maxSize: BigInt!
+  createdAt: DateTime!
+  lastUsed: DateTime!
+  numFiles: Int!
+  curSize: BigInt!
+  cloneable: Boolean!
+  status: String!
+  permissions: [VFolderPermissionValueField!]!
 }
+
+"""
+Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+"""
+scalar VFolderPermissionValueField
 
 scalar _Any
-
-union _Entity = EndpointAutoScalingRuleNode | EndpointToken | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
 
 type _Service {
   sdl: String!

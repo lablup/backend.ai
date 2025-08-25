@@ -35,7 +35,10 @@ from .model_deployment.model_deployment import (
     update_model_deployment,
 )
 from .model_deployment.model_revision import (
+    add_model_revision,
     create_model_revision,
+    inference_runtime_config,
+    inference_runtime_configs,
     revision,
     revisions,
 )
@@ -67,6 +70,8 @@ class Query:
     object_storages = object_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
+    inference_runtime_configs = inference_runtime_configs
+    inference_runtime_config = inference_runtime_config
 
 
 @strawberry.type
@@ -79,6 +84,7 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    add_model_revision = add_model_revision
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage

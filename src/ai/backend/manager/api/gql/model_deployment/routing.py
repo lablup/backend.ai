@@ -10,19 +10,21 @@ from strawberry.types import Info
 from ai.backend.manager.api.gql.base import JSONString
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class RoutingNode(Node):
     id: NodeID
     routing_id: UUID
-    endpoint: str
-    session: UUID
+    endpoint_url: str
+    session_id: UUID
     status: str
     traffic_ratio: float
     created_at: datetime
-    live_stat: JSONString
+    live_stat: JSONString = strawberry.field(
+        description='live statistics of the routing node. e.g. "live_stat": "{\\"cpu_util\\": {\\"current\\": \\"7.472\\", \\"capacity\\": \\"1000\\", \\"pct\\": \\"0.75\\", \\"unit_hint\\": \\"percent\\"}}"'
+    )
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class RoutingNodeConnection(Connection[RoutingNode]):
     @classmethod
     def resolve_connection(

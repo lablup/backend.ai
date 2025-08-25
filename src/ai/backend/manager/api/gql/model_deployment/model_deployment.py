@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 from typing import AsyncGenerator, Optional, cast
 from uuid import uuid4
@@ -10,15 +11,15 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.federated_types import (
-    AccessToken,
+from ai.backend.manager.api.gql.model_deployment.access_token import AccessToken
+from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
+    AutoScalingMetricSource,
     AutoScalingRule,
-    ResourceGroup,
-    User,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import (
     RoutingNode,
 )
+from ai.backend.manager.api.gql.user import User
 
 from .model_revision import (
     CreateModelRevisionInput,
@@ -31,44 +32,43 @@ from .model_revision import (
 )
 
 
-@strawberry.enum
-class ClusterMode(StrEnum):
-    SINGLE_NODE = "SINGLE_NODE"
-    MULTI_NODE = "MULTI_NODE"
-
-
-@strawberry.enum
+@strawberry.enum(description="Added in 25.13.0")
 class DeploymentStatus(StrEnum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+    CREATED = "CREATED"
+    DEPLOYING = "DEPLOYING"
+    READY = "READY"
+    STOPPING = "STOPPING"
+    STOPPED = "STOPPED"
 
 
-@strawberry.enum
+@strawberry.enum(description="Added in 25.13.0")
 class ReplicaStatus(StrEnum):
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
 
 
-@strawberry.enum
+@strawberry.enum(description="Added in 25.13.0")
 class DeploymentStrategyType(StrEnum):
     ROLLING = "ROLLING"
     BLUE_GREEN = "BLUE_GREEN"
     CANARY = "CANARY"
 
 
-@strawberry.enum
+@strawberry.enum(description="Added in 25.13.0")
 class DeploymentOrderField(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
     NAME = "NAME"
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class DeploymentStrategy:
     type: DeploymentStrategyType
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelReplica(Node):
     id: NodeID
     name: str
@@ -77,7 +77,7 @@ class ModelReplica(Node):
     routings: list[RoutingNode]
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelReplicaConnection(Connection[ModelReplica]):
     @strawberry.field
     def count(self) -> int:
@@ -107,24 +107,18 @@ class ModelReplicaConnection(Connection[ModelReplica]):
         )
 
 
-@strawberry.type
-class ClusterConfig:
-    mode: ClusterMode
-    size: int
-
-
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ReplicaState:
     desired_replica_count: int
     replicas: ModelReplicaConnection
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ScalingRule:
     auto_scaling_rules: list[AutoScalingRule]
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelDeploymentMetadata:
     name: str
     status: DeploymentStatus
@@ -133,7 +127,7 @@ class ModelDeploymentMetadata:
     updated_at: datetime
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelDeploymentNetworkAccess:
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
@@ -141,15 +135,8 @@ class ModelDeploymentNetworkAccess:
     access_tokens: list[AccessToken]
 
 
-@strawberry.type
-class ResourceConfig:
-    resource_group: ResourceGroup
-    resource_slots: JSONString
-    resource_opts: Optional[JSONString] = None
-
-
 # Main ModelDeployment Type
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelDeployment(Node):
     id: NodeID
     metadata: ModelDeploymentMetadata
@@ -163,103 +150,139 @@ class ModelDeployment(Node):
 
     deployment_strategy: DeploymentStrategy
 
-    cluster_config: ClusterConfig
-    resource_config: ResourceConfig
     created_user: User
 
 
 # Filter Types
-@strawberry.input
-class DeploymentFilter:
-    status: Optional[DeploymentStatus] = None
-    open_to_public: Optional[bool] = None
-    tags: Optional[list[StringFilter]] = None
+@strawberry.input(description="Added in 25.13.0")
+class DeploymentStatusFilter:
+    in_: Optional[list[DeploymentStatus]] = strawberry.field(name="in", default=None)
+    eq: Optional[list[DeploymentStatus]] = None
 
-    AND: Optional["DeploymentFilter"] = None
-    OR: Optional["DeploymentFilter"] = None
-    NOT: Optional["DeploymentFilter"] = None
+
+@strawberry.input(description="Added in 25.13.0")
+class DeploymentFilter:
+    name: Optional[StringFilter] = None
+    status: Optional[DeploymentStatusFilter] = None
+    open_to_public: Optional[bool] = None
+    tags: Optional[StringFilter] = None
+
+    AND: Optional[list["DeploymentFilter"]] = None
+    OR: Optional[list["DeploymentFilter"]] = None
+    NOT: Optional[list["DeploymentFilter"]] = None
     DISTINCT: Optional[bool] = None
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
+class ReplicaStatusFilter:
+    in_: Optional[list[ReplicaStatus]] = strawberry.field(name="in", default=None)
+    eq: Optional[list[ReplicaStatus]] = None
+
+
+@strawberry.input(description="Added in 25.13.0")
+class ReplicaFilter:
+    status: Optional[ReplicaStatusFilter] = None
+
+    AND: Optional[list["ReplicaFilter"]] = None
+    OR: Optional[list["ReplicaFilter"]] = None
+    NOT: Optional[list["ReplicaFilter"]] = None
+    DISTINCT: Optional[bool] = None
+
+
+@strawberry.input(description="Added in 25.13.0")
 class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
 
 
+@strawberry.type(description="Added in 25.13.0")
+class CreateScalingRuleInput:
+    deployment_id: ID
+    auto_scaling_rule: AutoScalingRule
+
+
+@strawberry.type(description="Added in 25.13.0")
+class UpdateScalingRuleInput:
+    deployment_id: ID
+    auto_scaling_rule_id: ID
+    auto_scaling_rule: AutoScalingRule
+
+
+@strawberry.type(description="Added in 25.13.0")
+class DeleteScalingRuleInput:
+    deployment_id: ID
+    auto_scaling_rule_id: ID
+
+
 # Payload Types
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class CreateModelDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class UpdateModelDeploymentPayload:
     deployment: Optional[ModelDeployment] = None
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class DeleteModelDeploymentPayload:
     deployment: Optional[ModelDeployment] = None
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
+class CreateScalingRulePayload:
+    auto_scaling_rule: AutoScalingRule
+
+
+@strawberry.type(description="Added in 25.13.0")
+class UpdateScalingRulePayload:
+    auto_scaling_rule: Optional[AutoScalingRule] = None
+
+
+@strawberry.type(description="Added in 25.13.0")
+class DeleteScalingRulePayload:
+    auto_scaling_rule: Optional[AutoScalingRule] = None
+
+
+@strawberry.type(description="Added in 25.13.0")
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ReplicaStatusChangedPayload:
     replica: ModelReplica
 
 
 # Input Types
-@strawberry.input
-class ClusterConfigInput:
-    mode: ClusterMode
-    size: int
-
-
-@strawberry.input
-class ResourceGroupInput:
-    name: str
-
-
-@strawberry.input
-class ResourceConfigInput:
-    resource_group: ResourceGroupInput
-    resource_slots: JSONString
-    resource_opts: Optional[JSONString] = None
-
-
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class ModelDeploymentMetadataInput:
     name: str
     tags: Optional[list[str]] = None
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class DeploymentStrategyInput:
     type: DeploymentStrategyType
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class CreateModelDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
-    cluster_config: ClusterConfigInput
-    resource_config: ResourceConfigInput
     deployment_strategy: DeploymentStrategyInput
+    desired_replica_count: int
     initial_revision: CreateModelRevisionInput
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class UpdateModelDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
@@ -268,7 +291,7 @@ class UpdateModelDeploymentInput:
     active_revision_id: Optional[ID] = None
 
 
-@strawberry.input
+@strawberry.input(description="Added in 25.13.0")
 class DeleteModelDeploymentInput:
     id: ID
 
@@ -287,8 +310,8 @@ mock_model_replica_1 = ModelReplica(
         RoutingNode(
             id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
-            endpoint="https://api.backend.ai/models/dep-001/routing/01",
-            session=uuid4(),
+            endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
+            session_id=uuid4(),
             status="ACTIVE",
             traffic_ratio=0.33,
             created_at=datetime.now() - timedelta(days=5),
@@ -308,8 +331,8 @@ mock_model_replica_2 = ModelReplica(
         RoutingNode(
             id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
-            endpoint="https://api.backend.ai/models/dep-001/routing/02",
-            session=uuid4(),
+            endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
+            session_id=uuid4(),
             status="ACTIVE",
             traffic_ratio=0.33,
             created_at=datetime.now() - timedelta(days=5),
@@ -329,8 +352,8 @@ mock_model_replica_3 = ModelReplica(
         RoutingNode(
             id=ID(_generate_mock_global_id()),
             routing_id=uuid4(),
-            endpoint="https://api.backend.ai/models/dep-001/routing/03",
-            session=uuid4(),
+            endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
+            session_id=uuid4(),
             status="INACTIVE",
             traffic_ratio=0.0,
             created_at=datetime.now() - timedelta(days=2),
@@ -358,18 +381,6 @@ mock_model_deployment_1 = ModelDeployment(
         open_to_public=True,
         access_tokens=[],
     ),
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-        ),
-    ),
     revision=mock_model_revision_1,
     revision_history=ModelRevisionConnection(
         edges=[
@@ -385,8 +396,32 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     scaling_rule=ScalingRule(
         auto_scaling_rules=[
-            AutoScalingRule(id=ID(_generate_mock_global_id())),
-            AutoScalingRule(id=ID(_generate_mock_global_id())),
+            AutoScalingRule(
+                id=ID(_generate_mock_global_id()),
+                metric_source=AutoScalingMetricSource.KERNEL,
+                metric_name="cpu_usage",
+                min_threshold=None,
+                max_threshold=Decimal("80"),
+                step_size=1,
+                time_window=300,
+                min_replicas=1,
+                max_replicas=5,
+                created_at=datetime.now() - timedelta(days=10),
+                last_triggered_at=datetime.now() - timedelta(hours=2),
+            ),
+            AutoScalingRule(
+                id=ID(_generate_mock_global_id()),
+                metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
+                metric_name="requests_per_second",
+                min_threshold=None,
+                max_threshold=Decimal("1000"),
+                step_size=2,
+                time_window=600,
+                min_replicas=2,
+                max_replicas=10,
+                created_at=datetime.now() - timedelta(days=5),
+                last_triggered_at=datetime.now() - timedelta(hours=12),
+            ),
         ]
     ),
     replica_state=ReplicaState(
@@ -406,7 +441,28 @@ mock_model_deployment_1 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
-    created_user=User(id=ID(_generate_mock_global_id())),
+    created_user=User(
+        id=ID(_generate_mock_global_id()),
+        username="admin",
+        email="admin@backend.ai",
+        need_password_change=False,
+        full_name="System Administrator",
+        description="Primary deployment administrator",
+        status="active",
+        status_info="Normal operation",
+        created_at=datetime.now() - timedelta(days=365),
+        modified_at=datetime.now() - timedelta(days=7),
+        domain_name="default",
+        role="superadmin",
+        resource_policy="default",
+        allowed_client_ip=[],
+        totp_activated=False,
+        totp_activated_at=datetime.now() - timedelta(days=365),
+        sudo_session_enabled=True,
+        container_uid=1000,
+        container_main_gid=1000,
+        container_gids=[1000],
+    ),
 )
 
 mock_model_deployment_2 = ModelDeployment(
@@ -423,18 +479,6 @@ mock_model_deployment_2 = ModelDeployment(
         preferred_domain_name="mistral-7b.models.backend.ai",
         open_to_public=False,
         access_tokens=[],
-    ),
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-        ),
     ),
     revision=mock_model_revision_3,
     revision_history=ModelRevisionConnection(
@@ -465,7 +509,28 @@ mock_model_deployment_2 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
-    created_user=User(id=ID(_generate_mock_global_id())),
+    created_user=User(
+        id=ID(_generate_mock_global_id()),
+        username="mlops_user",
+        email="mlops@backend.ai",
+        need_password_change=False,
+        full_name="MLOps Team",
+        description="MLOps team deployment account",
+        status="active",
+        status_info="Normal operation",
+        created_at=datetime.now() - timedelta(days=180),
+        modified_at=datetime.now() - timedelta(days=2),
+        domain_name="default",
+        role="admin",
+        resource_policy="default",
+        allowed_client_ip=[],
+        totp_activated=False,
+        totp_activated_at=datetime.now() - timedelta(days=180),
+        sudo_session_enabled=False,
+        container_uid=1001,
+        container_main_gid=1001,
+        container_gids=[1001],
+    ),
 )
 
 mock_model_deployment_3 = ModelDeployment(
@@ -482,18 +547,6 @@ mock_model_deployment_3 = ModelDeployment(
         preferred_domain_name=None,
         open_to_public=False,
         access_tokens=[],
-    ),
-    cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-    resource_config=ResourceConfig(
-        resource_group=ResourceGroup(id=ID(_generate_mock_global_id())),
-        resource_slots=cast(
-            JSONString,
-            '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-        ),
-        resource_opts=cast(
-            JSONString,
-            '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-        ),
     ),
     revision=None,
     revision_history=ModelRevisionConnection(
@@ -519,7 +572,42 @@ mock_model_deployment_3 = ModelDeployment(
         ),
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
-    created_user=User(id=ID(_generate_mock_global_id())),
+    created_user=User(
+        id=ID(_generate_mock_global_id()),
+        username="dev_user",
+        email="developer@backend.ai",
+        need_password_change=False,
+        full_name="Development Team",
+        description="Development team deployment account",
+        status="active",
+        status_info="Normal operation",
+        created_at=datetime.now() - timedelta(days=90),
+        modified_at=datetime.now() - timedelta(days=14),
+        domain_name="default",
+        role="user",
+        resource_policy="default",
+        allowed_client_ip=[],
+        totp_activated=False,
+        totp_activated_at=datetime.now() - timedelta(days=90),
+        sudo_session_enabled=False,
+        container_uid=1002,
+        container_main_gid=1002,
+        container_gids=[1002],
+    ),
+)
+
+mock_auto_scaling_rule = AutoScalingRule(
+    id=ID(_generate_mock_global_id()),
+    metric_source=AutoScalingMetricSource.KERNEL,
+    metric_name="memory_usage",
+    min_threshold=None,
+    max_threshold=Decimal("90"),
+    step_size=1,
+    time_window=120,
+    min_replicas=1,
+    max_replicas=3,
+    created_at=datetime.now() - timedelta(days=15),
+    last_triggered_at=datetime.now() - timedelta(hours=6),
 )
 
 
@@ -527,7 +615,7 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type
+@strawberry.type(description="Added in 25.13.0")
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     @strawberry.field
     def count(self) -> int:
@@ -566,7 +654,7 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 
 
 # Resolvers
-@strawberry.relay.connection(ModelDeploymentConnection)
+@strawberry.relay.connection(ModelDeploymentConnection, description="Added in 25.13.0")
 async def deployments(
     filter: Optional[DeploymentFilter] = None,
     order_by: Optional[DeploymentOrderBy] = None,
@@ -584,13 +672,13 @@ async def deployments(
     return deployments
 
 
-@strawberry.field
+@strawberry.field(description="Added in 25.13.0")
 async def deployment(id: ID) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
-    return None
+    return mock_model_deployment_1
 
 
-@strawberry.field
+@strawberry.field(description="Added in 25.13.0")
 async def replica(id: ID) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
 
@@ -603,7 +691,7 @@ async def replica(id: ID) -> Optional[ModelReplica]:
     )
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def create_model_deployment(
     input: CreateModelDeploymentInput,
 ) -> CreateModelDeploymentPayload:
@@ -612,7 +700,7 @@ async def create_model_deployment(
     return CreateModelDeploymentPayload(deployment=mock_model_deployment_1)
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def update_model_deployment(
     input: UpdateModelDeploymentInput,
 ) -> UpdateModelDeploymentPayload:
@@ -621,7 +709,7 @@ async def update_model_deployment(
     return UpdateModelDeploymentPayload(deployment=mock_model_deployment_1)
 
 
-@strawberry.mutation
+@strawberry.mutation(description="Added in 25.13.0")
 async def delete_model_deployment(
     input: DeleteModelDeploymentInput,
 ) -> DeleteModelDeploymentPayload:
@@ -629,7 +717,34 @@ async def delete_model_deployment(
     return DeleteModelDeploymentPayload(deployment=None)
 
 
-@strawberry.subscription
+@strawberry.mutation(description="Added in 25.13.0")
+async def create_scaling_rule(
+    input: CreateScalingRuleInput,
+) -> CreateScalingRulePayload:
+    """Create a new auto-scaling rule for a deployment."""
+    # This is a placeholder implementation
+    return CreateScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def update_scaling_rule(
+    input: UpdateScalingRuleInput,
+) -> UpdateScalingRulePayload:
+    """Update an existing auto-scaling rule for a deployment."""
+    # This is a placeholder implementation
+    return UpdateScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def delete_scaling_rule(
+    input: DeleteScalingRuleInput,
+) -> DeleteScalingRulePayload:
+    """Delete an auto-scaling rule from a deployment."""
+    # This is a placeholder implementation
+    return DeleteScalingRulePayload(auto_scaling_rule=mock_auto_scaling_rule)
+
+
+@strawberry.subscription(description="Added in 25.13.0")
 async def deployment_status_changed(
     deployment_id: ID,
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
@@ -640,7 +755,7 @@ async def deployment_status_changed(
         yield DeploymentStatusChangedPayload(deployment=dep)
 
 
-@strawberry.subscription
+@strawberry.subscription(description="Added in 25.13.0")
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
