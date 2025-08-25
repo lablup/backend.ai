@@ -4679,7 +4679,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "//gql/graphene": {
+    "//gql": {
       "post": {
         "operationId": "root.handle_gql_graphene",
         "tags": [
