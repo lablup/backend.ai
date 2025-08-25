@@ -681,28 +681,26 @@ async def artifacts(
         huggingface_registries = action_result.data
 
         for registry in huggingface_registries:
-            action_scan_action_result = (
-                await info.context.processors.artifact.scan.wait_for_complete(
-                    ScanArtifactsAction(
-                        registry_id=registry.id,
-                        storage_id=storage_data.id,
-                        limit=limit or 10,
-                        search=search_from_remote,
-                        order=ModelSortKey.DOWNLOADS,
-                    )
+            scan_action_result = await info.context.processors.artifact.scan.wait_for_complete(
+                ScanArtifactsAction(
+                    registry_id=registry.id,
+                    storage_id=storage_data.id,
+                    limit=limit or 10,
+                    search=search_from_remote,
+                    order=ModelSortKey.DOWNLOADS,
                 )
             )
-            action_scan_action_result.result
+
             # Convert scan results to ArtifactConnection
             registry_loader = DataLoader(
                 apartial(HuggingFaceRegistry.load_by_id, info.context),
             )
 
-            scan_artifacts = []
-            for item in action_scan_action_result.result:
+            scanned_artifacts = []
+            for item in scan_action_result.result:
                 registry_data = await registry_loader.load(item.artifact.registry_id)
                 source_registry_data = await registry_loader.load(item.artifact.source_registry_id)
-                scan_artifacts.append(
+                scanned_artifacts.append(
                     Artifact.from_dataclass(
                         item.artifact, registry_data.url, source_registry_data.url
                     )
@@ -710,7 +708,8 @@ async def artifacts(
 
             # Create ArtifactConnection for scan results
             edges = [
-                ArtifactEdge(node=artifact, cursor=str(artifact.id)) for artifact in scan_artifacts
+                ArtifactEdge(node=artifact, cursor=str(artifact.id))
+                for artifact in scanned_artifacts
             ]
 
             page_info = strawberry.relay.PageInfo(
@@ -721,7 +720,7 @@ async def artifacts(
             )
 
             return ArtifactConnection(
-                count=len(scan_artifacts),
+                count=len(scanned_artifacts),
                 edges=edges,
                 page_info=page_info,
             )
