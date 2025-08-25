@@ -10,6 +10,7 @@ import resource
 import signal
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -183,7 +184,20 @@ class BaseRunner(metaclass=ABCMeta):
         except FileNotFoundError:
             pass
         except Exception:
-            log.exception("Reading /home/config/environ.txt failed!")
+            print(
+                f"{self.log_prefix}: [ERROR] Reading /home/config/environ.txt failed!",
+                file=sys.stderr,
+            )
+            traceback.print_exc(file=sys.stderr)
+
+        work_dir = Path("/home/work")
+        work_dir_owner = work_dir.stat().st_uid
+        process_owner = os.getuid()
+        if work_dir_owner != process_owner:
+            print(
+                f"{self.log_prefix}: [WARNING] {work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
+                file=sys.stderr,
+            )
 
         path_env = self.child_env["PATH"]
         if Path("/usr/local/cuda/bin").is_dir():
@@ -299,36 +313,44 @@ class BaseRunner(metaclass=ABCMeta):
         initialize jupyter kernel.
         """
         # Make inline backend defaults in Matplotlib.
-        kconfigdir = Path("/home/work/.ipython/profile_default/")
-        kconfigdir.mkdir(parents=True, exist_ok=True)
-        kconfig_file = kconfigdir / "ipython_kernel_config.py"
-        kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
+        self.kernel_mgr = None
+        try:
+            kconfigdir = Path("/home/work/.ipython/profile_default/")
+            kconfigdir.mkdir(parents=True, exist_ok=True)
+            kconfig_file = kconfigdir / "ipython_kernel_config.py"
+            kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
 
-        kernelspec_mgr = KernelSpecManager()
-        kernelspec_mgr.ensure_native_kernel = False
-        kspecs = kernelspec_mgr.get_all_specs()
-        for kname in kspecs:
-            if self.jupyter_kspec_name in kname:
-                log.debug("starting " + kname + " kernel...")
-                self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
-                await self.kernel_mgr.start_kernel()
-                if not await self.kernel_mgr.is_alive():
-                    log.error("jupyter query mode is disabled: failed to start jupyter kernel")
-                else:
-                    self.kernel_client = self.kernel_mgr.client()  # type: ignore
-                    assert self.kernel_client is not None
-                    self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
-                    try:
-                        await self.kernel_client.wait_for_ready(timeout=10)
-                        # self.init_jupyter_kernel()
-                    except RuntimeError:
-                        # Clean up for client and kernel will be done in `shutdown`.
-                        log.error("jupyter channel is not active!")
-                        self.kernel_mgr = None
-                break
-        else:
-            log.debug("jupyter query mode is not available: no jupyter kernelspec found")
-            self.kernel_mgr = None
+            kernelspec_mgr = KernelSpecManager()
+            kernelspec_mgr.ensure_native_kernel = False
+            kspecs = kernelspec_mgr.get_all_specs()
+            for kname in kspecs:
+                if self.jupyter_kspec_name in kname:
+                    log.debug("starting " + kname + " kernel...")
+                    self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                    await self.kernel_mgr.start_kernel()
+                    if not await self.kernel_mgr.is_alive():
+                        log.error("jupyter query mode is disabled: failed to start jupyter kernel")
+                    else:
+                        self.kernel_client = self.kernel_mgr.client()  # type: ignore
+                        assert self.kernel_client is not None
+                        self.kernel_client.start_channels(
+                            shell=True, iopub=True, stdin=True, hb=True
+                        )
+                        try:
+                            await self.kernel_client.wait_for_ready(timeout=10)
+                            # self.init_jupyter_kernel()
+                        except RuntimeError:
+                            # Clean up for client and kernel will be done in `shutdown`.
+                            log.error("jupyter channel is not active!")
+                            self.kernel_mgr = None
+                    break
+            else:
+                log.warning("jupyter query mode is not available: no jupyter kernelspec found")
+        except OSError:
+            log.exception(
+                "Failed to create the ipython kernel configuration to handle code execution requests. "
+                "This feature is now disabled and all code execution requests will return immediately with an empty output."
+            )
 
     async def _shutdown_jupyter_kernel(self):
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
@@ -723,7 +745,9 @@ class BaseRunner(metaclass=ABCMeta):
                 "options": {},
             }
             result = await self._start_service(
-                service_info, cwd=model_info["model_path"], do_not_wait=True
+                service_info,
+                cwd=model_info["model_path"],
+                launch_timeout=None,  # model service launches may take a long time
             )
             started = result["status"] == "running" or result["status"] == "started"
         finally:
@@ -813,7 +837,7 @@ class BaseRunner(metaclass=ABCMeta):
         service_info,
         *,
         cwd: Optional[str] = None,
-        do_not_wait: bool = False,
+        launch_timeout: Optional[float] = 30.0,
     ):
         error_reason = None
         try:
@@ -884,8 +908,8 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                        if not do_not_wait:
-                            async with asyncio.timeout(30.0):
+                        if launch_timeout is not None:
+                            async with asyncio.timeout(launch_timeout):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",
@@ -937,9 +961,7 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warning(
-                    "failed to start model service {}: {}", service_info["name"], error_reason
-                )
+                log.warning("failed to start service {}: {}", service_info["name"], error_reason)
 
     async def _wait_service_proc(
         self,
@@ -1112,6 +1134,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
+                launch_timeout=10.0,
             )
         )
         intrinsic_spawn_coros.append(
@@ -1121,6 +1144,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
+                launch_timeout=10.0,
             )
         )
         results = await asyncio.gather(*intrinsic_spawn_coros, return_exceptions=True)
