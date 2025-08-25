@@ -26,26 +26,43 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 * Maintain high code quality throughout development
 * Eliminate duplication ruthlessly
-* Express intent clearly through naming and structure
-* Make dependencies explicit
 * Keep methods small and focused on a single responsibility
 * Minimize state and side effects
 * Use the simplest solution that could possibly work
+* Make dependencies explicit
+  - Use relative imports when referring to modules in a subtree under `src` sharing a single BUILD file
+  - Use absolute imports when referring to modules in other subtrees under `src`, 3rd-party packages, and Python intrinsic packages
+* Express intent clearly through naming and structure
+* Name things with meaningful, predictable, and explicit but concise tones
+  - When reading codes, variable names should align with what intermediate-level developers could expect from them.
+  - The words in names should follow adjectives/descriptives and nouns in a meaningful order.
+    - Example: `container_user_info` vs. `user_container_info` means completely different things.
+      The former represents container-specific "user" information,
+      while the latter represents user-specific "container" information.
+  - Legacy stuffs should be distinguishable names
+  - Be cautious when naming similar but different stuffs to avoid reader's confusion
+* Avoid replicating legacy patterns when writing new codes
+  - Stick to the user prompts about the new code patterns
 
 ### Working with Long Contexts
 
-* Keep the intention and direction in SPEC.md if exists
+* Store and consult the user request, your analysis and plans in `.claude/tasks/{job-slug}.md`
+  when the user request is expected to require a long context
+  - Example: `./claude/tasks/refactor-sokovan-scheduler.md`
 * Split large work into step by step sprints
-* Update the current design and next plans in SPEC.md when completing a sprint
+* Update the current design and next plans in `{job-slug}.md` when completing a sprint
 * Do not make changes beyond those originally asked for but explicitly proceed with user confirmation
 
 ### Python Specifics
 
-- **Async-first**: All I/O operations use async/await
-- **Type Hints**: Comprehensive type annotations required
-- **Structured Logging**: Use BraceStyleAdapter for consistent logging
-- **Configuration**: Pydantic models for validation
-- **Error Handling**: Comprehensive exception handling with proper logging
+* **Latest Syntax and Patterns**: No need to add branches or fallbacks for Python 3.11 or older
+* **Async-first**: All I/O operations use async/await
+* **Type Hints**: Comprehensive type annotations required
+  - Use `typing.cast()` sparingly but explicitly specify the types in the LHS of assignments when the RHS expression is `Any` or has unknown types
+  - DO NOT forget adding return type annotations of all functions and methods
+* **Structured Logging**: Use `ai.backend.logging.BraceStyleAdapter` for consistent logging
+* **Configuration**: Use Pydantic models for validation and serilization for configurations and DTOs
+* **Error Handling**: Comprehensive exception handling with proper logging
 
 ### Directory Conventions
 
@@ -61,15 +78,32 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 - Integration tests in `src/ai/backend/test`
 - Reusable helper utilities for testing in `src/ai/backend/testutils`
 
+### Python Module Conventions
+
+- `types.py`: Reusable type definitions such as pydantic models, dataclasses, enums, and constants annotated with `typing.Final`.
+- `abc.py`: Abstract base classes (ABCs) providing pure interfaces
+- `base.py`: Base classes providing shared, partial, reusable implementation for subclasses
+- `utils.py`: Reusable helper functions that are out of scope of the core logic or minor details
+- If the types or utilities could be shared with other `ai.backend` namespace packages, put them in the `ai.backend.common` package.
+
 ### Writing Tests
 
 * Write the simplest failing test first
-* Implement the minimum code needed to make tests pass
+  - Let tests verify the intention rather than direct inputs and outputs
+  - Avoid duplicating the original logic in tests
+* Implement the minimum code needed to make tests pass while preserving the design intention
+  - Avoid making simple branches just to satisfy test input combinations, but think about the fundamental fix
 * Refactor only after tests are passing
-* Use pytest to write tests with following markers:
+* Use the tester subagent to run and write tests considering the general guides in this document
   - `integration`: for tests requiring externally provisioned resources
   - `asyncio`: for tests using async/await codes
-
+* Always add type annotations to test codes
+  - Add argument type annotations to the fixture references in test functions
+  - Add return type annotations to the fixture functions
+  - Add return type annotation (`-> None`) to the test functions
+* Utilize `typing.Protocol` and `typing.TypedDict` when typing mocked objects and functions if applicable
+* Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
+* Prefer pytest-style module-level test functions rather than unittest-style test classes
 
 ## Build System & Development Commands
 
@@ -86,6 +120,17 @@ Use them proactively as their description specifies.
 Most pants command accepts a special target argument which can indicate a set of files or the files
 changed for a specific revision range with optional transitive dependent files of the changed files.
 
+**Basic structure of pants commands:**
+```bash
+pants {global-options} {subcommand} {subcommand-options} {targets}
+pants {global-options} {subcommand} {subcommand-options} {targets} -- {arguments-and-options-passed-to-spawned-processes}
+```
+
+**Global options:**
+- `--no-colors`: Recommended to ensure non-colored output for reading console output via pipes
+- `--no-dynamic-ui`: Recommended to remove progress outputs for reading console output via pipes
+
+**Targets:**
 - All files: `::`
 - All files under specific directory of the dependency tree: `path/to/subpkg::`
 - Files changed after the last commit: `--changed-since=HEAD~1` (here, the revision range syntax is that used by Git)
@@ -179,27 +224,3 @@ When you observe migration failures due to multiple heads, do the followings:
   rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
   base branch like main and top_head is the topmost revision ID of the migrations added in the current working
   branch.
-
-### Verifying Code Changes
-
-We use the follwoing linting and typecheck tools:
-
-- **Ruff**: Primary linter with line length 100, preview features and formatter enabled
-- **MyPy**: Type checking with strict settings
-- Git pre-commit (lint only) and pre-push (lint and typecheck) hooks
-
-Once you finish or want to validate a job requested by the user after changing multiple files,
-use the following commands to automatically format, lint, and do type checks:
-
-```bash
-pants fmt --changed-since=HEAD~1   # Auto-format changed files
-pants fix --changed-since=HEAD~1   # Auto-fix lint issues changed files
-pants lint --changed-since=HEAD~1 --changed-dependents=transitive  # Run full linting on changed and their dependent files
-pants check --changed-since=HEAD~1 --changed-dependents=transitive  # Run typecheck on changed and their dependent files
-```
-
-and fix any Ruff and Mypy errors displayed after running them.
-
-### Pre-commit Hooks
-
-The project uses pre-commit hooks that automatically run `pants lint --changed-since="HEAD~1"` on changed files.
