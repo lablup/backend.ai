@@ -2,6 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 
 class ArtifactType(enum.StrEnum):
@@ -48,7 +49,7 @@ class ArtifactRevisionData:
     artifact_id: uuid.UUID
     version: str
     readme: str
-    size: int
+    size: Optional[int]
     status: ArtifactStatus
     created_at: datetime
     updated_at: datetime

@@ -261,7 +261,7 @@ class ArtifactRevision(Node):
     updated_at: datetime
     readme: str
     version: str
-    size: ByteSize
+    size: Optional[ByteSize]
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
@@ -272,7 +272,7 @@ class ArtifactRevision(Node):
             updated_at=data.updated_at,
             readme=data.readme,
             version=data.version,
-            size=ByteSize(data.size),
+            size=ByteSize(data.size) if data.size is not None else None,
         )
 
     @classmethod
