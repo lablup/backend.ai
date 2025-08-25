@@ -8,6 +8,11 @@ import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import unbase64
 
+from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.types import (
         PaginationOptions,
@@ -124,6 +129,35 @@ def parse_json(value: str | bytes) -> Any:
     parse_literal=lambda v: parse_json(v.value) if hasattr(v, "value") else v,
 )
 class JSONString:
+    pass
+
+
+@strawberry.scalar(
+    name="BigInt",
+    serialize=lambda v: int(v),
+    parse_value=lambda v: str(v),
+    description="BigInt field",
+)
+class BigInt:
+    pass
+
+
+@strawberry.scalar(
+    serialize=lambda val: val.value,
+    parse_value=lambda value: ImagePermission(value),
+    description=f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}.",
+)
+class ImagePermissionValueField:
+    pass
+
+
+@strawberry.scalar(
+    serialize=lambda val: val.value,
+    parse_value=lambda value: VFolderRBACPermission(value),
+    parse_literal=lambda value: VFolderRBACPermission(value) if isinstance(value, str) else None,
+    description=f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}.",
+)
+class VFolderPermissionValueField:
     pass
 
 
