@@ -297,6 +297,22 @@ type CreateAccessTokenPayload {
   accessToken: AccessToken!
 }
 
+input CreateAutoScalingRuleInput {
+  modelDeploymentId: ID!
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int!
+  timeWindow: Int!
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type CreateAutoScalingRulePayload {
+  autoScalingRule: AutoScalingRule!
+}
+
 """Added in 25.13.0"""
 input CreateHuggingFaceRegistryInput {
   url: String!
@@ -374,6 +390,14 @@ input DeleteArtifactRevisionsInput {
 """Added in 25.13.0"""
 type DeleteArtifactRevisionsPayload {
   artifactRevisionIds: [ID!]!
+}
+
+input DeleteAutoScalingRuleInput {
+  id: ID!
+}
+
+type DeleteAutoScalingRulePayload {
+  id: ID!
 }
 
 """Added in 25.13.0"""
@@ -848,6 +872,15 @@ type Mutation {
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
 
   """Added in 25.13.0"""
+  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload!
+
+  """Added in 25.13.0"""
+  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload!
+
+  """Added in 25.13.0"""
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
+
+  """Added in 25.13.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
   """Added in 25.13.0"""
@@ -1214,6 +1247,22 @@ input UpdateArtifactInput {
 """Added in 25.13.0"""
 type UpdateArtifactPayload {
   artifact: Artifact!
+}
+
+input UpdateAutoScalingRuleInput {
+  id: ID!
+  metricSource: AutoScalingMetricSource
+  metricName: String
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int
+  timeWindow: Int
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type UpdateAutoScalingRulePayload {
+  autoScalingRule: AutoScalingRule!
 }
 
 """Added in 25.13.0"""
