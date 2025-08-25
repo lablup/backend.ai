@@ -1,9 +1,8 @@
-import base64
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum, StrEnum
 from typing import Any, Optional, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info, relay
@@ -112,8 +111,6 @@ class ModelRevisionOrder:
 
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Revisions
-def _generate_mock_global_id() -> str:
-    return base64.b64encode(f"default:{uuid4()}".encode("utf-8")).decode()
 
 
 def _generate_random_name() -> str:
@@ -136,13 +133,17 @@ mock_inference_runtime_config = (
     },
 )
 
+mock_revision_id_1 = "d19f8f78-f308-45a9-ab7b-1c63346024fd"
+mock_resource_group_id_1 = "1bd4a689-8dab-4355-aadd-9957932d896a"
+mock_vfolder_id_1 = "79b7e9e2-37d0-4238-936d-8078f417f383"
+mock_image_id_1 = "7609ac08-d5e0-410a-a045-10c42119ed21"
 mock_model_revision_1 = ModelRevision(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_revision_id_1),
     name="llama-3-8b-instruct-v1.0",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
         resource_group=ResourceGroup(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_resource_group_id_1),
             name="gpu-cluster-01",
             description="Primary GPU cluster for inference",
             is_active=True,
@@ -172,7 +173,7 @@ mock_model_revision_1 = ModelRevision(
     ),
     model_mount_config=ModelMountConfig(
         vfolder=VFolder(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_vfolder_id_1),
             row_id=uuid4(),
             name="llama-3-8b-model",
             host="storage-01",
@@ -201,7 +202,7 @@ mock_model_revision_1 = ModelRevision(
     ),
     extra_mounts=[],
     image=Image(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_image_id_1),
         row_id=uuid4(),
         name="cr.backend.ai/pytorch:2.0-cuda12.1",
         namespace="cr.backend.ai",
@@ -228,13 +229,17 @@ mock_model_revision_1 = ModelRevision(
     created_at=datetime.now() - timedelta(days=10),
 )
 
+mock_revision_id_2 = "3c81bc63-24c1-4a8f-9ad2-8a19899690c3"
+mock_resource_id_2 = "0cc27c4c-7fa1-49ae-aa53-9c485205c78b"
+mock_vfolder_id_2 = "870b9bac-a9b5-4b5b-a8f2-e78ef727f2c3"
+mock_image_id_2 = "18c39ba3-e9c4-4353-9892-115e557b60a7"
 mock_model_revision_2 = ModelRevision(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_revision_id_2),
     name="llama-3-8b-instruct-v1.1",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
         resource_group=ResourceGroup(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_resource_id_2),
             name="gpu-cluster-02",
             description="Secondary GPU cluster for inference",
             is_active=True,
@@ -264,7 +269,7 @@ mock_model_revision_2 = ModelRevision(
     ),
     model_mount_config=ModelMountConfig(
         vfolder=VFolder(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_vfolder_id_2),
             row_id=uuid4(),
             name="llama-3-8b-model-v1.1",
             host="storage-02",
@@ -293,7 +298,7 @@ mock_model_revision_2 = ModelRevision(
     ),
     extra_mounts=[],
     image=Image(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_image_id_2),
         row_id=uuid4(),
         name="cr.backend.ai/vllm:0.5.0-cuda12.1",
         namespace="cr.backend.ai",
@@ -320,13 +325,18 @@ mock_model_revision_2 = ModelRevision(
     created_at=datetime.now() - timedelta(days=5),
 )
 
+
+mock_revision_id_3 = "86d1a714-b177-4851-897f-da36f306fe30"
+mock_resource_id_3 = "135f7fd4-60fc-4b0d-9913-f3497d730b31"
+mock_vfolder_id_3 = "039022f8-c0ed-47e6-9223-cbb1bddd4bd3"
+mock_image_id_3 = "7b6ffbda-a0f4-48da-b589-b9889d33e5e9"
 mock_model_revision_3 = ModelRevision(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_revision_id_3),
     name="mistral-7b-v0.3-initial",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
         resource_group=ResourceGroup(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_resource_id_3),
             name="cpu-cluster-01",
             description="CPU cluster for development",
             is_active=True,
@@ -356,7 +366,7 @@ mock_model_revision_3 = ModelRevision(
     ),
     model_mount_config=ModelMountConfig(
         vfolder=VFolder(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_vfolder_id_3),
             row_id=uuid4(),
             name="mistral-7b-model",
             host="storage-03",
@@ -385,7 +395,7 @@ mock_model_revision_3 = ModelRevision(
     ),
     extra_mounts=[],
     image=Image(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_image_id_3),
         row_id=uuid4(),
         name="cr.backend.ai/vllm:0.5.0-cuda12.1",
         namespace="cr.backend.ai",
@@ -588,7 +598,7 @@ async def revision(id: ID) -> Optional[ModelRevision]:
 async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelRevisionPayload:
     """Create a new model revision."""
     revision = ModelRevision(
-        id=_generate_mock_global_id(),
+        id=UUID("4cc91efb-7297-47ec-80c4-6e9c4378ae8b"),
         name=_generate_random_name(),
         cluster_config=ClusterConfig(
             mode=ClusterMode.SINGLE_NODE,
@@ -596,7 +606,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
         ),
         resource_config=ResourceConfig(
             resource_group=ResourceGroup(
-                id=ID(_generate_mock_global_id()),
+                id=UUID("f4ea16a1-d6cf-41b2-ad0a-d2093658ec59"),
                 name="default-cluster",
                 description="Default resource group",
                 is_active=True,
@@ -626,7 +636,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
         ),
         model_mount_config=ModelMountConfig(
             vfolder=VFolder(
-                id=ID(_generate_mock_global_id()),
+                id=UUID("544bd43d-0e3d-4656-a14e-42c185708d8f"),
                 row_id=uuid4(),
                 name="model-vfolder",
                 host="storage-default",
@@ -655,7 +665,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
         ),
         extra_mounts=[],
         image=Image(
-            id=ID(_generate_mock_global_id()),
+            id=UUID("3e52a88d-5ad1-4f72-83d0-d372a23b2a76"),
             row_id=uuid4(),
             name="cr.backend.ai/inference:latest",
             namespace="cr.backend.ai",
@@ -688,7 +698,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
 async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPayload:
     """Add a model revision to a deployment."""
     revision = ModelRevision(
-        id=_generate_mock_global_id(),
+        id=UUID("dda405f0-6463-45c4-a5ca-3721cc8d730c"),
         name=_generate_random_name(),
         cluster_config=ClusterConfig(
             mode=ClusterMode.SINGLE_NODE,
@@ -696,7 +706,7 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
         ),
         resource_config=ResourceConfig(
             resource_group=ResourceGroup(
-                id=ID(_generate_mock_global_id()),
+                id=UUID("b2a2c037-f45f-4945-91fb-1b4ff90b0939"),
                 name="default-cluster",
                 description="Default resource group",
                 is_active=True,
@@ -726,7 +736,7 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
         ),
         model_mount_config=ModelMountConfig(
             vfolder=VFolder(
-                id=ID(_generate_mock_global_id()),
+                id=UUID("53d0182b-74fe-41b3-9c1d-c1674ad53653"),
                 row_id=uuid4(),
                 name="model-vfolder",
                 host="storage-default",
@@ -755,7 +765,7 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
         ),
         extra_mounts=[],
         image=Image(
-            id=ID(_generate_mock_global_id()),
+            id=UUID("7be39d9a-a7a6-4101-a0fa-5689ce41f5de"),
             row_id=uuid4(),
             name="cr.backend.ai/inference:latest",
             namespace="cr.backend.ai",

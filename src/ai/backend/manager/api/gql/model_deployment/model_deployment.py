@@ -1,9 +1,8 @@
-import base64
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import AsyncGenerator, Optional, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info, relay
@@ -296,19 +295,17 @@ class DeleteModelDeploymentInput:
     id: ID
 
 
-def _generate_mock_global_id() -> str:
-    return base64.b64encode(f"default:{uuid4()}".encode("utf-8")).decode()
-
-
 # Mock Model Replicas
+mock_replica_id_1 = "b62f9890-228a-40c9-a614-63387805b9a7"
+mock_routing_id_1 = "60bf21b8-21a9-4655-aaeb-479a4ef02358"
 mock_model_replica_1 = ModelReplica(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_replica_id_1),
     name="llama-3-8b-instruct-replica-01",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_routing_id_1),
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
             session_id=uuid4(),
@@ -322,14 +319,16 @@ mock_model_replica_1 = ModelReplica(
     ],
 )
 
+mock_replica_id_2 = "7562e9d4-a368-4e28-9092-65eb91534bac"
+mock_routing_id_2 = "21ede864-725d-4933-96f6-6df727f92217"
 mock_model_replica_2 = ModelReplica(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_replica_id_2),
     name="llama-3-8b-instruct-replica-02",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_routing_id_2),
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
             session_id=uuid4(),
@@ -343,14 +342,16 @@ mock_model_replica_2 = ModelReplica(
     ],
 )
 
+mock_replica_id_3 = "2a2388ea-a312-422a-b77e-0e0b61c48145"
+mock_routing_id_3 = "9613c8d1-53f1-4b8a-9cc4-6333d00afef0"
 mock_model_replica_3 = ModelReplica(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_replica_id_3),
     name="llama-3-8b-instruct-replica-03",
     status=ReplicaStatus.UNHEALTHY,
     revision=mock_model_revision_1,
     routings=[
         RoutingNode(
-            id=ID(_generate_mock_global_id()),
+            id=UUID(mock_routing_id_3),
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
             session_id=uuid4(),
@@ -366,8 +367,12 @@ ModelReplicaEdge = Edge[ModelReplica]
 
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Deployments
+mock_model_deployment_id_1 = "8c3105c3-3a02-42e3-aa00-6923cdcd114c"
+mock_scaling_rule_id_1 = "7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb"
+mock_scaling_rule_id_2 = "483e2158-e089-482b-8cef-260805649cf1"
+mock_created_user_id_1 = "9a41b189-72fa-4265-afe8-04172ec5d26b"
 mock_model_deployment_1 = ModelDeployment(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_model_deployment_id_1),
     metadata=ModelDeploymentMetadata(
         name="Llama 3.8B Instruct",
         status=DeploymentStatus.ACTIVE,
@@ -397,7 +402,7 @@ mock_model_deployment_1 = ModelDeployment(
     scaling_rule=ScalingRule(
         auto_scaling_rules=[
             AutoScalingRule(
-                id=ID(_generate_mock_global_id()),
+                id=UUID(mock_scaling_rule_id_1),
                 metric_source=AutoScalingMetricSource.KERNEL,
                 metric_name="cpu_usage",
                 min_threshold=None,
@@ -410,7 +415,7 @@ mock_model_deployment_1 = ModelDeployment(
                 last_triggered_at=datetime.now() - timedelta(hours=2),
             ),
             AutoScalingRule(
-                id=ID(_generate_mock_global_id()),
+                id=UUID(mock_scaling_rule_id_2),
                 metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
                 metric_name="requests_per_second",
                 min_threshold=None,
@@ -442,7 +447,7 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.ROLLING),
     created_user=User(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_created_user_id_1),
         username="admin",
         email="admin@backend.ai",
         need_password_change=False,
@@ -465,8 +470,10 @@ mock_model_deployment_1 = ModelDeployment(
     ),
 )
 
+mock_model_deployment_id_2 = "5f839a95-17bd-43b0-a029-a132aa60ae71"
+mock_created_user_id_2 = "75994553-fa63-4464-9398-67b6b96c8d11"
 mock_model_deployment_2 = ModelDeployment(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_model_deployment_id_2),
     metadata=ModelDeploymentMetadata(
         name="Mistral 7B v0.3",
         status=DeploymentStatus.ACTIVE,
@@ -510,7 +517,7 @@ mock_model_deployment_2 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
     created_user=User(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_created_user_id_2),
         username="mlops_user",
         email="mlops@backend.ai",
         need_password_change=False,
@@ -533,8 +540,10 @@ mock_model_deployment_2 = ModelDeployment(
     ),
 )
 
+mock_model_deployment_id_3 = "d040c413-a5df-4292-a5f4-0e0d85f7a1d4"
+mock_created_user_id_3 = "640b0af8-8140-4e58-8ca4-96daba325be8"
 mock_model_deployment_3 = ModelDeployment(
-    id=_generate_mock_global_id(),
+    id=UUID(mock_model_deployment_id_3),
     metadata=ModelDeploymentMetadata(
         name="Gemma 2.9B",
         status=DeploymentStatus.INACTIVE,
@@ -573,7 +582,7 @@ mock_model_deployment_3 = ModelDeployment(
     ),
     deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
     created_user=User(
-        id=ID(_generate_mock_global_id()),
+        id=UUID(mock_created_user_id_3),
         username="dev_user",
         email="developer@backend.ai",
         need_password_change=False,
@@ -596,8 +605,9 @@ mock_model_deployment_3 = ModelDeployment(
     ),
 )
 
+mock_auto_scaling_rule_id_0 = "77117a41-87f3-43b7-ba24-40dd5e978720"
 mock_auto_scaling_rule = AutoScalingRule(
-    id=ID(_generate_mock_global_id()),
+    id=UUID(mock_auto_scaling_rule_id_0),
     metric_source=AutoScalingMetricSource.KERNEL,
     metric_name="memory_usage",
     min_threshold=None,
