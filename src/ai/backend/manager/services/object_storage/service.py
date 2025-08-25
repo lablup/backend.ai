@@ -23,6 +23,10 @@ from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.get_buckets import (
+    GetObjectStorageBucketsAction,
+    GetObjectStorageBucketsActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
     GetDownloadPresignedURLActionResult,
@@ -34,6 +38,14 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.register_bucket import (
+    RegisterBucketAction,
+    RegisterBucketActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
+    UnregisterBucketAction,
+    UnregisterBucketActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
@@ -96,7 +108,7 @@ class ObjectStorageService:
         List all object storages.
         """
         log.info("Listing object storages")
-        storage_data_list = await self._object_storage_repository.list()
+        storage_data_list = await self._object_storage_repository.list_()
         return ListObjectStorageActionResult(data=storage_data_list)
 
     async def get_presigned_download_url(
@@ -177,3 +189,24 @@ class ObjectStorageService:
         return GetUploadPresignedURLActionResult(
             storage_id=storage_data.id, presigned_url=result.url, fields=result.fields
         )
+
+    async def register_bucket(self, action: RegisterBucketAction) -> RegisterBucketActionResult:
+        log.info("Registering object storage bucket")
+        storage_metadata = await self._object_storage_repository.register_bucket(action.creator)
+        return RegisterBucketActionResult(storage_id=storage_metadata.id, result=storage_metadata)
+
+    async def unregister_bucket(
+        self, action: UnregisterBucketAction
+    ) -> UnregisterBucketActionResult:
+        log.info("Unregistering object storage bucket")
+        storage_id = await self._object_storage_repository.unregister_bucket(
+            action.storage_id, action.bucket_name
+        )
+        return UnregisterBucketActionResult(storage_id=storage_id)
+
+    async def get_buckets(
+        self, action: GetObjectStorageBucketsAction
+    ) -> GetObjectStorageBucketsActionResult:
+        log.info("Getting object storage buckets for storage: {}", action.storage_id)
+        buckets = await self._object_storage_repository.get_buckets(action.storage_id)
+        return GetObjectStorageBucketsActionResult(result=buckets)

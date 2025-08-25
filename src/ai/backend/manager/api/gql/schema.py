@@ -46,6 +46,8 @@ from .object_storage import (
     get_presigned_upload_url,
     object_storage,
     object_storages,
+    register_object_storage_bucket,
+    unregister_object_storage_bucket,
     update_object_storage,
 )
 
@@ -81,6 +83,8 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
+    register_object_storage_bucket = register_object_storage_bucket
+    unregister_object_storage_bucket = unregister_object_storage_bucket
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry

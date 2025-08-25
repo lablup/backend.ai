@@ -609,6 +609,12 @@ type Mutation {
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
   """Added in 25.13.0"""
+  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload!
+
+  """Added in 25.13.0"""
+  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload!
+
+  """Added in 25.13.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
 
   """Added in 25.13.0"""
@@ -646,6 +652,7 @@ type ObjectStorage implements Node {
   secretKey: String!
   endpoint: String!
   region: String!
+  meta: [ObjectStorageMeta!]!
 }
 
 """Added in 25.13.0"""
@@ -665,6 +672,14 @@ type ObjectStorageEdge {
 
   """The item at the end of the edge"""
   node: ObjectStorage!
+}
+
+"""Added in 25.13.0"""
+type ObjectStorageMeta implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  bucket: String!
 }
 
 enum OrderDirection {
@@ -754,6 +769,17 @@ type Query {
 type RawServiceConfig {
   config: JSONString!
   extraCliParameters: String
+}
+
+"""Added in 25.13.0"""
+input RegisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type RegisterObjectStorageBucketPayload {
+  id: UUID!
 }
 
 """Added in 25.13.0"""
@@ -862,6 +888,17 @@ type Subscription {
 }
 
 scalar UUID
+
+"""Added in 25.13.0"""
+input UnregisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type UnregisterObjectStorageBucketPayload {
+  id: UUID!
+}
 
 """Added in 25.13.0"""
 input UpdateArtifactInput {
