@@ -280,7 +280,7 @@ type CreateHuggingFaceRegistryPayload {
 input CreateModelDeploymentInput {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
-  deploymentStrategy: DeploymentStrategyInput!
+  defaultDeploymentStrategy: DeploymentStrategyInput!
   desiredReplicaCount: Int!
   initialRevision: CreateModelRevisionInput!
 }
@@ -402,6 +402,11 @@ enum DeploymentOrderField {
 enum DeploymentStatus {
   ACTIVE
   INACTIVE
+  CREATED
+  DEPLOYING
+  READY
+  STOPPING
+  STOPPED
 }
 
 """Added in 25.13.0"""
@@ -574,7 +579,7 @@ type ModelDeployment implements Node {
   revisionHistory: ModelRevisionConnection!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
-  deploymentStrategy: DeploymentStrategy!
+  defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserDetail!
 }
 
@@ -1167,7 +1172,7 @@ input UpdateModelDeploymentInput {
   id: ID!
   openToPublic: Boolean = null
   tags: [String!] = null
-  deploymentStrategy: DeploymentStrategyInput = null
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
 }
 
