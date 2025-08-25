@@ -663,7 +663,7 @@ async def artifacts(
     )
 
     # Fetch from the remote registries
-    if len(artifacts.edges) == 0 and search_from_remote:
+    if search_from_remote is not None and len(artifacts.edges) == 0:
         storage_list_action_result = (
             await info.context.processors.object_storage.list_.wait_for_complete(
                 ListObjectStorageAction()
