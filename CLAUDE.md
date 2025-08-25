@@ -56,10 +56,12 @@ Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 ### Python Specifics
 
 * **Latest Syntax and Patterns**: No need to add branches or fallbacks for Python 3.11 or older
+  - Use the pattern matching syntax when there are self-repeating if-elif statements
 * **Async-first**: All I/O operations use async/await
 * **Type Hints**: Comprehensive type annotations required
   - Use `typing.cast()` sparingly but explicitly specify the types in the LHS of assignments when the RHS expression is `Any` or has unknown types
   - DO NOT forget adding return type annotations of all functions and methods
+  - Use `collections.abc` when referring to generic collection/container types such as `Mapping`, `Sequence`, `Iterable`, `Awaitable`, etc.
 * **Structured Logging**: Use `ai.backend.logging.BraceStyleAdapter` for consistent logging
 * **Configuration**: Use Pydantic models for validation and serilization for configurations and DTOs
 * **Error Handling**: Comprehensive exception handling with proper logging
