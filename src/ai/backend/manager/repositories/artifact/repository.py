@@ -326,10 +326,8 @@ class ArtifactRepository:
                 if existing_revision is not None:
                     # Update existing revision
                     # TODO: Reset to SCANNED?
-                    if model.readme:
-                        existing_revision.readme = model.readme
-                    if model.modified_at:
-                        existing_revision.updated_at = model.modified_at
+                    existing_revision.readme = model.readme
+                    existing_revision.updated_at = model.modified_at
 
                     # Create revision row if it doesn't exist
                     if existing_revision is None:

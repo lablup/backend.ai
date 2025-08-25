@@ -251,34 +251,37 @@ class Artifact(Node):
         )
 
     @strawberry.field
-    async def updated_at(self, info: Info[StrawberryGQLContext]) -> datetime:
+    async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
         action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
             GetArtifactRevisionsAction(uuid.UUID(self.id))
         )
 
-        return max(action_result.revisions, key=lambda r: r.updated_at).updated_at
+        updated_at_list = (
+            r.updated_at for r in action_result.revisions if r.updated_at is not None
+        )
+        return max(updated_at_list) if updated_at_list else None
 
 
 @strawberry.type(description="Added in 25.13.0")
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
-    created_at: datetime
-    updated_at: datetime
     version: str
     readme: Optional[str]
     size: Optional[ByteSize]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
         return cls(
             id=ID(str(data.id)),
             status=ArtifactStatus(data.status),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
             readme=data.readme,
             version=data.version,
             size=ByteSize(data.size) if data.size is not None else None,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
         )
 
     @classmethod

@@ -51,8 +51,8 @@ class ArtifactRevisionData:
     readme: Optional[str]
     size: Optional[int]
     status: ArtifactStatus
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
 
 # TODO: Should we keep this for REST API?

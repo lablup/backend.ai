@@ -54,16 +54,15 @@ class ArtifactRevisionRow(Base):
     created_at = sa.Column(
         "created_at",
         sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
+        nullable=True,
+        server_default=None,
         index=True,
     )
     updated_at = sa.Column(
         "updated_at",
         sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
+        nullable=True,
+        server_default=None,
         index=True,
     )
 

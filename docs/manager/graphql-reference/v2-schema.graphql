@@ -25,7 +25,7 @@ type Artifact implements Node {
   source: SourceInfo!
   readonly: Boolean!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
-  updatedAt: DateTime!
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
@@ -83,11 +83,11 @@ type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
-  createdAt: DateTime!
-  updatedAt: DateTime!
   version: String!
   readme: String
   size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
