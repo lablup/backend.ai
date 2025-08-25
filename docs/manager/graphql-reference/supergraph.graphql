@@ -51,6 +51,7 @@ input AddModelRevisionInput
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
 }
 
 """Added in 25.13.0"""
@@ -2031,6 +2032,39 @@ input ExtraMountInput
   permission: String
 }
 
+type ExtraVFolderMount implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  mountDestination: String!
+  vfolder: VFolder!
+}
+
+"""Added in 25.13.0"""
+type ExtraVFolderMountConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ExtraVFolderMountEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ExtraVFolderMountEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ExtraVFolderMount!
+}
+
 """Added in 25.13.0"""
 input ExtraVFolderMountInput
   @join__type(graph: STRAWBERRY)
@@ -2955,7 +2989,7 @@ type ModelRevision implements Node
   resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
   modelMountConfig: ModelMountConfig!
-  extraMounts: [VFolder!]!
+  extraMounts: ExtraVFolderMountConnection!
   image: ImageDetail!
   createdAt: DateTime!
 }
