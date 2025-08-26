@@ -9,7 +9,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.model_deployment.routing import (
     RoutingEdge,
     RoutingNode,
@@ -37,6 +37,7 @@ class ReplicaStatusFilter:
 
 @strawberry.input(description="Added in 25.13.0")
 class ReplicaFilter:
+    name: Optional[StringFilter] = None
     status: Optional[ReplicaStatusFilter] = None
 
     AND: Optional[list["ReplicaFilter"]] = None

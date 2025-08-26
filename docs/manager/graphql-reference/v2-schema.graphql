@@ -1080,6 +1080,7 @@ type RejectArtifactPayload {
 
 """Added in 25.13.0"""
 input ReplicaFilter {
+  name: StringFilter = null
   status: ReplicaStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null

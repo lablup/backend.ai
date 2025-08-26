@@ -4790,6 +4790,7 @@ type RejectArtifactPayload
 input ReplicaFilter
   @join__type(graph: STRAWBERRY)
 {
+  name: StringFilter = null
   status: ReplicaStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
