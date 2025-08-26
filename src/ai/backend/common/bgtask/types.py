@@ -4,6 +4,9 @@ from collections.abc import Iterable, Mapping
 from typing import Any, NewType, Optional, Self
 
 from pydantic import BaseModel, Field
+from pydantic_core import ValidationError
+
+from .exception import InvalidTaskMetadataError
 
 
 class BgtaskStatus(enum.StrEnum):
@@ -58,4 +61,7 @@ class BackgroundTaskMetadata(BaseModel):
     @classmethod
     def from_json(cls, data: str | bytes) -> Self:
         """Create from Redis hash data"""
-        return cls.model_validate_json(data)
+        try:
+            return cls.model_validate_json(data)
+        except ValidationError as e:
+            raise InvalidTaskMetadataError from e

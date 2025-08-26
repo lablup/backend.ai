@@ -332,9 +332,8 @@ class BackgroundTaskManager:
             server_id=self._server_id,
             tags=tags,
         )
-        await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
-        self._ongoing_tasks[TaskID(task_id)] = task
+        self._ongoing_tasks[task_id] = task
         return task_id
 
     async def _process_retriable_task(
@@ -343,6 +342,7 @@ class BackgroundTaskManager:
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
+        await self._valkey_client.register_task(metadata)
         try:
             await self._wrapper_broadcast_result(
                 func,
