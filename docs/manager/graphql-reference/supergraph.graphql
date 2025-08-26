@@ -1824,12 +1824,12 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.13.0"""
+"""
+Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.
+"""
 enum DeploymentStatus
   @join__type(graph: STRAWBERRY)
 {
-  ACTIVE @join__enumValue(graph: STRAWBERRY)
-  INACTIVE @join__enumValue(graph: STRAWBERRY)
   CREATED @join__enumValue(graph: STRAWBERRY)
   DEPLOYING @join__enumValue(graph: STRAWBERRY)
   READY @join__enumValue(graph: STRAWBERRY)
@@ -1866,13 +1866,14 @@ input DeploymentStrategyInput
   type: DeploymentStrategyType!
 }
 
-"""Added in 25.13.0"""
+"""
+Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+"""
 enum DeploymentStrategyType
   @join__type(graph: STRAWBERRY)
 {
   ROLLING @join__enumValue(graph: STRAWBERRY)
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
-  CANARY @join__enumValue(graph: STRAWBERRY)
 }
 
 type DisassociateAllScalingGroupsWithDomain
@@ -2956,6 +2957,17 @@ enum link__Purpose {
   EXECUTION
 }
 
+"""
+Added in 25.13.0. This enum represents the liveness status of a routing node, indicating whether the deployment is currently running and able to serve requests.
+"""
+enum LivenessStatus
+  @join__type(graph: STRAWBERRY)
+{
+  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.6.0. A pair of timestamp and value."""
 type MetricResultValue
   @join__type(graph: GRAPHENE)
@@ -3138,7 +3150,7 @@ type ModelReplica implements Node
   name: String!
   status: ReplicaStatus!
   revision: ModelRevision!
-  routings: [RoutingNode!]!
+  routings: RoutingNodeConnection!
 }
 
 """Added in 25.13.0"""
@@ -4872,6 +4884,9 @@ type Query
   revision(id: ID!): ModelRevision @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   replica(id: ID!): ModelReplica @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
@@ -4920,6 +4935,17 @@ input QuotaScopeInput
   @join__type(graph: GRAPHENE)
 {
   hard_limit_bytes: BigInt
+}
+
+"""
+Added in 25.13.0. This enum represents the readiness status of a routing node, indicating whether the deployment has been checked and its health state.
+"""
+enum ReadinessStatus
+  @join__type(graph: STRAWBERRY)
+{
+  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.13.0"""
@@ -4979,7 +5005,37 @@ type RejectArtifactPayload
 <<<<<<< HEAD
 =======
 """Added in 25.13.0"""
+<<<<<<< HEAD
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+input ReplicaFilter
+  @join__type(graph: STRAWBERRY)
+{
+  status: ReplicaStatusFilter = null
+  AND: [ReplicaFilter!] = null
+  OR: [ReplicaFilter!] = null
+  NOT: [ReplicaFilter!] = null
+  DISTINCT: Boolean = null
+}
+
+"""Added in 25.13.0"""
+input ReplicaOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ReplicaOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 25.13.0"""
+enum ReplicaOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.13.0"""
+>>>>>>> 0af295f24 (refactor: Seperate model replica field from deployment file)
 type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
@@ -5000,6 +5056,14 @@ type ReplicaStatusChangedPayload
   @join__type(graph: STRAWBERRY)
 {
   replica: ModelReplica!
+}
+
+"""Added in 25.13.0"""
+input ReplicaStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [ReplicaStatus!] = null
+  equals: ReplicaStatus = null
 }
 
 """Added in 25.4.0."""
@@ -5145,14 +5209,51 @@ type RoutingNode implements Node
   routingId: UUID!
   endpointUrl: String!
   sessionId: UUID!
-  status: String!
-  trafficRatio: Float!
+
+  """
+  Added in 25.13.0. This enum represents the readiness status of a routing node, indicating whether the deployment has been checked and its health state.
+  """
+  readinessStatus: ReadinessStatus!
+
+  """
+  Added in 25.13.0. This enum represents the liveness status of a routing node, indicating whether the deployment is currently running and able to serve requests.
+  """
+  livenessStatus: LivenessStatus!
+  weight: Int!
+
+  """
+  Detailed information about the routing node. It can include both error messages and success messages.
+  """
+  detail: JSON!
   createdAt: DateTime!
 
   """
   live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
   """
   liveStat: JSONString!
+}
+
+"""Added in 25.13.0"""
+type RoutingNodeConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoutingNodeEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoutingNodeEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoutingNode!
 }
 
 """Added in 24.03.5."""

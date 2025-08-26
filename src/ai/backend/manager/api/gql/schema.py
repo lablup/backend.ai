@@ -36,10 +36,9 @@ from .model_deployment.model_deployment import (
     deployment,
     deployment_status_changed,
     deployments,
-    replica,
-    replica_status_changed,
     update_model_deployment,
 )
+from .model_deployment.model_replica import replica, replica_status_changed, replicas
 from .model_deployment.model_revision import (
     add_model_revision,
     create_model_revision,
@@ -71,6 +70,7 @@ class Query:
     deployment = deployment
     revisions = revisions
     revision = revision
+    replicas = replicas
     replica = replica
     object_storage = object_storage
     object_storages = object_storages
