@@ -132,6 +132,7 @@ class ErrorDomain(enum.StrEnum):
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
     ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact-registry"
     ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
@@ -164,7 +165,6 @@ class ErrorDomain(enum.StrEnum):
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
-    RESERVOIR = "reservoir"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -743,7 +743,7 @@ class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.RESERVOIR,
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
