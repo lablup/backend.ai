@@ -332,7 +332,6 @@ class BackgroundTaskManager:
             server_id=self._server_id,
             tags=tags,
         )
-        await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
         self._ongoing_tasks[task_id] = task
         return task_id
@@ -343,21 +342,16 @@ class BackgroundTaskManager:
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
+        await self._valkey_client.register_task(metadata)
         try:
             await self._wrapper_broadcast_result(
                 func,
                 args,
                 metadata,
             )
-        except asyncio.CancelledError:
-            # Keep the task registered for retry when the server shuts down
-            pass
-        except Exception:
-            await self._valkey_client.unregister_task(metadata)
-        else:
-            await self._valkey_client.unregister_task(metadata)
         finally:
             self._ongoing_tasks.pop(metadata.task_id, None)
+            await self._valkey_client.unregister_task(metadata)
 
     async def _wrapper_broadcast_result(
         self,
