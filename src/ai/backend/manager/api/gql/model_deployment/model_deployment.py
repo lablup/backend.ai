@@ -164,7 +164,7 @@ class ModelDeployment(Node):
 @strawberry.input(description="Added in 25.13.0")
 class DeploymentStatusFilter:
     in_: Optional[list[DeploymentStatus]] = strawberry.field(name="in", default=None)
-    eq: Optional[list[DeploymentStatus]] = None
+    equals: Optional[list[DeploymentStatus]] = None
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -183,7 +183,7 @@ class DeploymentFilter:
 @strawberry.input(description="Added in 25.13.0")
 class ReplicaStatusFilter:
     in_: Optional[list[ReplicaStatus]] = strawberry.field(name="in", default=None)
-    eq: Optional[list[ReplicaStatus]] = None
+    equals: Optional[list[ReplicaStatus]] = None
 
 
 @strawberry.input(description="Added in 25.13.0")

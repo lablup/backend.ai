@@ -270,10 +270,14 @@ type Artifact implements Node
   readonly: Boolean!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
 <<<<<<< HEAD
+<<<<<<< HEAD
   updatedAt: DateTime
 =======
   updatedAt: DateTime!
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+  updatedAt: DateTime
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 }
 
 """Added in 25.13.0"""
@@ -347,6 +351,7 @@ type ArtifactRevision implements Node
   id: ID!
   status: ArtifactStatus!
 <<<<<<< HEAD
+<<<<<<< HEAD
   version: String!
   readme: String
   size: ByteSize
@@ -359,6 +364,13 @@ type ArtifactRevision implements Node
   version: String!
   size: ByteSize!
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+  version: String!
+  readme: String
+  size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 }
 
 """Added in 25.13.0"""
@@ -413,9 +425,13 @@ enum ArtifactRevisionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 <<<<<<< HEAD
+<<<<<<< HEAD
   STATUS @join__enumValue(graph: STRAWBERRY)
 =======
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+  STATUS @join__enumValue(graph: STRAWBERRY)
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 }
 
 """Added in 25.13.0"""
@@ -423,12 +439,17 @@ input ArtifactRevisionStatusFilter
   @join__type(graph: STRAWBERRY)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
   in: [ArtifactStatus!] = null
   equals: ArtifactStatus = null
 =======
   in: [ArtifactStatus!]
   equals: [ArtifactStatus!] = null
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+  in: [ArtifactStatus!] = null
+  equals: ArtifactStatus = null
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 }
 
 enum ArtifactStatus
@@ -1570,7 +1591,21 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """Added in 25.13.0"""
-input DeleteArtifactInput
+input DeleteArtifactRevisionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  targets: [DeleteArtifactRevisionTarget!]!
+}
+
+"""Added in 25.13.0"""
+type DeleteArtifactRevisionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.13.0"""
+input DeleteArtifactRevisionTarget
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
@@ -1578,6 +1613,7 @@ input DeleteArtifactInput
   bucketName: String!
 }
 
+<<<<<<< HEAD
 """Added in 25.13.0"""
 type DeleteArtifactPayload
   @join__type(graph: STRAWBERRY)
@@ -1586,6 +1622,8 @@ type DeleteArtifactPayload
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
 }
 
+=======
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 input DeleteAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -1811,7 +1849,7 @@ input DeploymentStatusFilter
   @join__type(graph: STRAWBERRY)
 {
   in: [DeploymentStatus!] = null
-  eq: [DeploymentStatus!] = null
+  equals: [DeploymentStatus!] = null
 }
 
 """Added in 25.13.0"""
@@ -4033,12 +4071,16 @@ type Mutation
 
   """Added in 25.13.0"""
 <<<<<<< HEAD
+<<<<<<< HEAD
   deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
 =======
   deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload! @join__field(graph: STRAWBERRY)
+=======
+  deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
@@ -4079,14 +4121,20 @@ type Mutation
 
   """Added in 25.13.0"""
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
   registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
   unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
+<<<<<<< HEAD
 =======
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
@@ -4180,9 +4228,13 @@ type ObjectStorage implements Node
   endpoint: String!
   region: String!
 <<<<<<< HEAD
+<<<<<<< HEAD
   namespaces: [ObjectStorageNamespace!]!
 =======
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+  meta: [ObjectStorageMeta!]!
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 }
 
 """Added in 25.13.0"""
@@ -4209,8 +4261,13 @@ type ObjectStorageEdge
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 """Added in 25.13.0"""
 type ObjectStorageNamespace implements Node
+=======
+"""Added in 25.13.0"""
+type ObjectStorageMeta implements Node
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
@@ -4220,8 +4277,11 @@ type ObjectStorageNamespace implements Node
   bucket: String!
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
+=======
+>>>>>>> 1f7581dc0 (fix: Rename eq filter to equals)
 enum OrderDirection
   @join__type(graph: STRAWBERRY)
 {
@@ -4871,6 +4931,21 @@ input QuotaScopeInput
   @join__type(graph: GRAPHENE)
 {
   hard_limit_bytes: BigInt
+}
+
+"""Added in 25.13.0"""
+input RegisterObjectStorageBucketInput
+  @join__type(graph: STRAWBERRY)
+{
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type RegisterObjectStorageBucketPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
 }
 
 """Added in 25.13.0"""
