@@ -1202,7 +1202,7 @@ type RoutingNode implements Node {
   """
   Detailed information about the routing node. It can include both error messages and success messages.
   """
-  detail: JSON!
+  detail: JSONString!
   createdAt: DateTime!
 
   """

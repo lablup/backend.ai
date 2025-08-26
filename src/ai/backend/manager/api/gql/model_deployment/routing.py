@@ -3,7 +3,6 @@ from uuid import UUID
 
 import strawberry
 from strawberry.relay import Connection, Edge, Node, NodeID
-from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
@@ -35,7 +34,7 @@ class RoutingNode(Node):
         description="Added in 25.13.0. This enum represents the liveness status of a routing node, indicating whether the deployment is currently running and able to serve requests.",
     )
     weight: int
-    detail: JSON = strawberry.field(
+    detail: JSONString = strawberry.field(
         description="Detailed information about the routing node. It can include both error messages and success messages."
     )
     created_at: datetime
