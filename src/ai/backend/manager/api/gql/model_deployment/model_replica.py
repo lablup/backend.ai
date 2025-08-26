@@ -96,7 +96,7 @@ mock_model_replica_1 = ModelReplica(
                     readiness_status=CommonReadinessStatus.HEALTHY,
                     liveness_status=CommonLivenessStatus.HEALTHY,
                     weight=1,
-                    detail={},
+                    detail=cast(JSONString, "{}"),
                     created_at=datetime.now() - timedelta(days=5),
                     live_stat=cast(
                         JSONString,
@@ -133,7 +133,7 @@ mock_model_replica_2 = ModelReplica(
                     readiness_status=CommonReadinessStatus.HEALTHY,
                     liveness_status=CommonLivenessStatus.HEALTHY,
                     weight=2,
-                    detail={},
+                    detail=cast(JSONString, "{}"),
                     created_at=datetime.now() - timedelta(days=5),
                     live_stat=cast(
                         JSONString,
@@ -169,7 +169,7 @@ mock_model_replica_3 = ModelReplica(
                     readiness_status=CommonReadinessStatus.NOT_CHECKED,
                     liveness_status=CommonLivenessStatus.HEALTHY,
                     weight=1,
-                    detail={},
+                    detail=cast(JSONString, "{}"),
                     created_at=datetime.now() - timedelta(days=2),
                     live_stat=cast(
                         JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
@@ -214,7 +214,7 @@ async def replica(id: ID) -> Optional[ModelReplica]:
                         readiness_status=CommonReadinessStatus.NOT_CHECKED,
                         liveness_status=CommonLivenessStatus.HEALTHY,
                         weight=1,
-                        detail={},
+                        detail=cast(JSONString, "{}"),
                         created_at=datetime.now() - timedelta(days=2),
                         live_stat=cast(
                             JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
