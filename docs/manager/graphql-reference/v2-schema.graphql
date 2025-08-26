@@ -1000,22 +1000,7 @@ type Query {
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
 
   """Added in 25.13.0"""
-  deployments(
-    filter: DeploymentFilter = null
-    orderBy: DeploymentOrderBy = null
-
-    """Returns the first n items from the list."""
-    first: Int = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    after: String = null
-
-    """Returns the items in the list that come before the specified cursor."""
-    before: String = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    last: Int = null
-  ): ModelDeploymentConnection!
+  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection!
 
   """Added in 25.13.0"""
   deployment(id: ID!): ModelDeployment
@@ -1274,6 +1259,9 @@ input UpdateModelDeploymentInput {
   tags: [String!] = null
   defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
+  desiredReplicaCount: Int = null
+  name: String = null
+  preferredDomainName: String = null
 }
 
 """Added in 25.13.0"""

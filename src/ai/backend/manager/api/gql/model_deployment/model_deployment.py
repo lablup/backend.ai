@@ -263,6 +263,9 @@ class UpdateModelDeploymentInput:
     tags: Optional[list[str]] = None
     default_deployment_strategy: Optional[DeploymentStrategyInput] = None
     active_revision_id: Optional[ID] = None
+    desired_replica_count: Optional[int] = None
+    name: Optional[str] = None
+    preferred_domain_name: Optional[str] = None
 
 
 @strawberry.input(description="Added in 25.13.0")
