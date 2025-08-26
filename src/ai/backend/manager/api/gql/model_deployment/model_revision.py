@@ -7,12 +7,12 @@ from uuid import UUID, uuid4
 import strawberry
 from strawberry import ID, Info, relay
 from strawberry.relay import Connection, Edge, PageInfo
-from strawberry.relay.types import NodeIterableType
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.image import Image, ResourceLimit
 from ai.backend.manager.api.gql.resource_group import ResourceGroup
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import (
     ExtraVFolderMountConnection,
     ExtraVFolderMountEdge,
@@ -114,7 +114,7 @@ class ModelRevisionOrderField(Enum):
 
 
 @strawberry.input(description="Added in 25.13.0")
-class ModelRevisionOrder:
+class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
 
@@ -469,34 +469,11 @@ ModelRevisionEdge = Edge[ModelRevision]
 
 @strawberry.type(description="Added in 25.13.0")
 class ModelRevisionConnection(Connection[ModelRevision]):
-    """Connection type for ModelRevision, used for Relay pagination."""
+    count: int
 
-    @strawberry.field
-    def count(self) -> int:
-        return 0
-
-    @classmethod
-    def resolve_connection(
-        cls,
-        nodes: NodeIterableType[ModelRevision],
-        *,
-        info: Optional[Info] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        max_results: Optional[int] = None,
-        **kwargs: Any,
-    ):
-        """Resolve the connection for Relay pagination."""
-        revisions = [mock_model_revision_1, mock_model_revision_2, mock_model_revision_3]
-        edges = [ModelRevisionEdge(node=rev, cursor=str(i)) for i, rev in enumerate(revisions)]
-        return cls(
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
-            ),
-        )
+    def __init__(self, *args, count: int, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 @strawberry.field(
@@ -532,15 +509,55 @@ async def inference_runtime_configs() -> JSON:
     return all_configs
 
 
-@strawberry.relay.connection(ModelRevisionConnection, description="Added in 25.13.0")
-async def revisions(
+async def resolve_revisions(
+    info: Info[StrawberryGQLContext],
     filter: Optional[ModelRevisionFilter] = None,
-    order: Optional[ModelRevisionOrder] = None,
-    first: Optional[int] = None,
+    order_by: Optional[list[ModelRevisionOrderBy]] = None,
+    before: Optional[str] = None,
     after: Optional[str] = None,
-) -> list[ModelRevision]:
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ModelRevisionConnection:
+    # Implement the logic to resolve the revisions based on the provided filters and pagination
+    return ModelRevisionConnection(
+        count=3,
+        edges=[
+            ModelRevisionEdge(node=mock_model_revision_1, cursor="revision-cursor-1"),
+            ModelRevisionEdge(node=mock_model_revision_2, cursor="revision-cursor-2"),
+            ModelRevisionEdge(node=mock_model_revision_3, cursor="revision-cursor-3"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
+        ),
+    )
+
+
+@strawberry.field(description="Added in 25.13.0")
+async def revisions(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ModelRevisionFilter] = None,
+    order_by: Optional[list[ModelRevisionOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ModelRevisionConnection:
     """List revisions with optional filtering and pagination."""
-    return [mock_model_revision_1, mock_model_revision_2, mock_model_revision_3]
+    return await resolve_revisions(
+        info=info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @strawberry.field(description="Added in 25.13.0")

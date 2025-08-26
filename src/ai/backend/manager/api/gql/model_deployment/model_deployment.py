@@ -374,6 +374,7 @@ mock_model_deployment_1 = ModelDeployment(
     ),
     revision=mock_model_revision_1,
     revision_history=ModelRevisionConnection(
+        count=2,
         edges=[
             ModelRevisionEdge(node=mock_model_revision_1, cursor="rev-cursor-1"),
             ModelRevisionEdge(node=mock_model_revision_2, cursor="rev-cursor-2"),
@@ -457,6 +458,7 @@ mock_model_deployment_2 = ModelDeployment(
     ),
     revision=mock_model_revision_3,
     revision_history=ModelRevisionConnection(
+        count=1,
         edges=[
             ModelRevisionEdge(node=mock_model_revision_3, cursor="rev-cursor-3"),
         ],
@@ -540,6 +542,7 @@ mock_model_deployment_3 = ModelDeployment(
     ),
     revision=None,
     revision_history=ModelRevisionConnection(
+        count=0,
         edges=[],
         page_info=PageInfo(
             has_next_page=False,
