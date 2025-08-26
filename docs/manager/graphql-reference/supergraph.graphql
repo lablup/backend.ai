@@ -269,7 +269,7 @@ type Artifact implements Node
   source: SourceInfo!
   readonly: Boolean!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
-  updatedAt: DateTime!
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
@@ -342,11 +342,11 @@ type ArtifactRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-  readme: String!
   version: String!
-  size: ByteSize!
+  readme: String
+  size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
@@ -400,14 +400,15 @@ enum ArtifactRevisionOrderField
   SIZE @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.13.0"""
 input ArtifactRevisionStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  in: [ArtifactStatus!]
-  equals: [ArtifactStatus!] = null
+  in: [ArtifactStatus!] = null
+  equals: ArtifactStatus = null
 }
 
 enum ArtifactStatus
@@ -1524,19 +1525,26 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """Added in 25.13.0"""
-input DeleteArtifactInput
+input DeleteArtifactRevisionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  targets: [DeleteArtifactRevisionTarget!]!
+}
+
+"""Added in 25.13.0"""
+type DeleteArtifactRevisionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.13.0"""
+input DeleteArtifactRevisionTarget
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
   storageId: ID!
   bucketName: String!
-}
-
-"""Added in 25.13.0"""
-type DeleteArtifactPayload
-  @join__type(graph: STRAWBERRY)
-{
-  artifactRevisionId: ID!
 }
 
 input DeleteAutoScalingRuleInput
@@ -1764,7 +1772,7 @@ input DeploymentStatusFilter
   @join__type(graph: STRAWBERRY)
 {
   in: [DeploymentStatus!] = null
-  eq: [DeploymentStatus!] = null
+  equals: [DeploymentStatus!] = null
 }
 
 """Added in 25.13.0"""
@@ -3956,7 +3964,7 @@ type Mutation
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
-  deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload! @join__field(graph: STRAWBERRY)
+  deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
@@ -3993,6 +4001,12 @@ type Mutation
 
   """Added in 25.13.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
@@ -4087,6 +4101,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
+  meta: [ObjectStorageMeta!]!
 }
 
 """Added in 25.13.0"""
@@ -4110,6 +4125,17 @@ type ObjectStorageEdge
 
   """The item at the end of the edge"""
   node: ObjectStorage!
+}
+
+"""Added in 25.13.0"""
+type ObjectStorageMeta implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  bucket: String!
 }
 
 enum OrderDirection
@@ -4736,6 +4762,21 @@ input QuotaScopeInput
 }
 
 """Added in 25.13.0"""
+input RegisterObjectStorageBucketInput
+  @join__type(graph: STRAWBERRY)
+{
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type RegisterObjectStorageBucketPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+}
+
+"""Added in 25.13.0"""
 input RejectArtifactInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5201,6 +5242,21 @@ type UnloadImage
   task_id: String
 }
 
+"""Added in 25.13.0"""
+input UnregisterObjectStorageBucketInput
+  @join__type(graph: STRAWBERRY)
+{
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type UnregisterObjectStorageBucketPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+}
+
 type UnsetQuotaScope
   @join__type(graph: GRAPHENE)
 {
@@ -5225,6 +5281,7 @@ input UpdateArtifactInput
   @join__type(graph: STRAWBERRY)
 {
   artifactId: ID!
+  readonly: Boolean
 }
 
 """Added in 25.13.0"""
