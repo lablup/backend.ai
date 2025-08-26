@@ -1132,6 +1132,11 @@ type ContainerUtilizationMetricMetadata
 input CreateAccessTokenInput
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 25.13.0: The ID of the model deployment for which the access token is created.
+  """
+  modelDeploymentId: ID!
+
   """Added in 25.13.0: The expiration timestamp of the access token."""
   validUntil: DateTime!
 }
