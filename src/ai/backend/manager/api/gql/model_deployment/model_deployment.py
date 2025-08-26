@@ -26,6 +26,7 @@ from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
 from ai.backend.manager.api.gql.model_deployment.routing import (
     RoutingNode,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
 
 from .model_revision import (
@@ -596,59 +597,66 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 # Connection types for Relay support
 @strawberry.type(description="Added in 25.13.0")
 class ModelDeploymentConnection(Connection[ModelDeployment]):
-    @strawberry.field
-    def count(self) -> int:
-        return 0
+    count: int
 
-    @classmethod
-    def resolve_connection(
-        cls,
-        nodes: NodeIterableType[ModelDeployment],
-        *,
-        info: Info,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        max_results: Optional[int] = None,
-        **kwargs,
-    ) -> "ModelDeploymentConnection":
-        mock_deployments = [
-            mock_model_deployment_1,
-            mock_model_deployment_2,
-            mock_model_deployment_3,
-        ]
-        return cls(
-            edges=[
-                Edge(node=deployment, cursor=str(i))
-                for i, deployment in enumerate(mock_deployments)
-            ],
-            page_info=relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        )
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+async def resolve_deployments(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[DeploymentFilter] = None,
+    order_by: Optional[list[DeploymentOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ModelDeploymentConnection:
+    return ModelDeploymentConnection(
+        count=3,
+        edges=[
+            ModelDeploymentEdge(node=mock_model_deployment_1, cursor="deployment-cursor-1"),
+            ModelDeploymentEdge(node=mock_model_deployment_2, cursor="deployment-cursor-2"),
+            ModelDeploymentEdge(node=mock_model_deployment_3, cursor="deployment-cursor-3"),
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="deployment-cursor-1",
+            end_cursor="deployment-cursor-3",
+        ),
+    )
 
 
 # Resolvers
-@strawberry.relay.connection(ModelDeploymentConnection, description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.13.0")
 async def deployments(
+    info: Info[StrawberryGQLContext],
     filter: Optional[DeploymentFilter] = None,
-    order_by: Optional[DeploymentOrderBy] = None,
-    first: Optional[int] = None,
+    order_by: Optional[list[DeploymentOrderBy]] = None,
+    before: Optional[str] = None,
     after: Optional[str] = None,
-) -> list[ModelDeployment]:
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ModelDeploymentConnection:
     """List deployments with optional filtering and pagination."""
-    # Return a list of mock deployments with more details
-    deployments = [
-        mock_model_deployment_1,
-        mock_model_deployment_2,
-        mock_model_deployment_3,
-    ]
 
-    return deployments
+    return await resolve_deployments(
+        info=info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @strawberry.field(description="Added in 25.13.0")
