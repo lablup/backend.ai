@@ -257,6 +257,17 @@ class TerminateSessionsHandler(ScheduleHandler):
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
 
+        # Broadcast batch event for sessions that transitioned to TERMINATED
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.TERMINATED),
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
+
 
 class SweepSessionsHandler(ScheduleHandler):
     """Handler for sweeping stale sessions (maintenance operation)."""
