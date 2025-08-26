@@ -40,7 +40,6 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("readonly", sa.Boolean(), default=False, nullable=False),
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
     )
     op.create_index(
@@ -76,6 +75,7 @@ def upgrade() -> None:
         sa.Column("registry_type", sa.String(), nullable=False),
         sa.Column("source_registry_type", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
+        sa.Column("readonly", sa.Boolean(), default=False, nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifacts")),
     )
     op.create_index(op.f("ix_artifacts_name"), "artifacts", ["name"], unique=False)
