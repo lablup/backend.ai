@@ -3,7 +3,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 
@@ -89,6 +89,9 @@ mock_access_token_5 = AccessToken(
 
 @strawberry.input
 class CreateAccessTokenInput:
+    model_deployment_id: ID = strawberry.field(
+        description="Added in 25.13.0: The ID of the model deployment for which the access token is created."
+    )
     valid_until: datetime = strawberry.field(
         description="Added in 25.13.0: The expiration timestamp of the access token."
     )
