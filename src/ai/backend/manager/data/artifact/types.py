@@ -13,6 +13,7 @@ class ArtifactType(enum.StrEnum):
 
 class ArtifactRegistryType(enum.StrEnum):
     HUGGINGFACE = "huggingface"
+    RESERVOIR = "reservoir"
 
 
 class ArtifactStatus(enum.StrEnum):

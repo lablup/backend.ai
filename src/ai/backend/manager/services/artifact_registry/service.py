@@ -66,7 +66,9 @@ class ArtifactRegistryService:
         Create a new huggingface registry.
         """
         log.info("Creating huggingface registry with data: {}", action.creator.fields_to_store())
-        registry_data = await self._huggingface_registry_repository.create(action.creator)
+        registry_data = await self._huggingface_registry_repository.create(
+            action.creator, action.meta
+        )
         return CreateHuggingFaceRegistryActionResult(result=registry_data)
 
     async def update_huggingface_registry(
@@ -77,7 +79,7 @@ class ArtifactRegistryService:
         """
         log.info("Updating huggingface registry with data: {}", action.modifier.fields_to_update())
         registry_data = await self._huggingface_registry_repository.update(
-            action.id, action.modifier
+            action.id, action.modifier, action.meta
         )
         return UpdateHuggingFaceRegistryActionResult(result=registry_data)
 
@@ -120,7 +122,7 @@ class ArtifactRegistryService:
         Create a new reservoir.
         """
         log.info("Creating reservoir with data: {}", action.creator.fields_to_store())
-        reservoir_data = await self._reservoir_repository.create(action.creator)
+        reservoir_data = await self._reservoir_repository.create(action.creator, action.meta)
         return CreateReservoirActionResult(result=reservoir_data)
 
     async def update_reservoir_registry(
@@ -130,7 +132,9 @@ class ArtifactRegistryService:
         Update an existing reservoir.
         """
         log.info("Updating reservoir with data: {}", action.modifier.fields_to_update())
-        reservoir_data = await self._reservoir_repository.update(action.id, action.modifier)
+        reservoir_data = await self._reservoir_repository.update(
+            action.id, action.modifier, action.meta
+        )
         return UpdateReservoirRegistryActionResult(result=reservoir_data)
 
     async def delete_reservoir_registry(

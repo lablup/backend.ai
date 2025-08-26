@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
 from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
@@ -10,6 +11,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 @dataclass
 class CreateReservoirRegistryAction(ArtifactRegistryAction):
     creator: ReservoirRegistryCreator
+    meta: ArtifactRegistryCreatorMeta
 
     @override
     def entity_id(self) -> Optional[str]:

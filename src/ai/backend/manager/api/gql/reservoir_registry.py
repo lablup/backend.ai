@@ -6,6 +6,10 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.data.artifact_registries.types import (
+    ArtifactRegistryCreatorMeta,
+    ArtifactRegistryModifierMeta,
+)
 from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
@@ -134,6 +138,9 @@ class CreateReservoirRegistryInput:
             api_version=self.api_version,
         )
 
+    def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
+        return ArtifactRegistryCreatorMeta(name=self.name)
+
 
 @strawberry.input(description="Added in 25.13.0")
 class UpdateReservoirRegistryInput:
@@ -151,6 +158,11 @@ class UpdateReservoirRegistryInput:
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),
             api_version=OptionalState[str].from_graphql(self.api_version),
+        )
+
+    def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
+        return ArtifactRegistryModifierMeta(
+            name=OptionalState[str].from_graphql(self.name),
         )
 
 
@@ -181,7 +193,10 @@ async def create_reservoir_registry(
     processors = info.context.processors
 
     action_result = await processors.artifact_registry.create_reservoir_registry.wait_for_complete(
-        CreateReservoirRegistryAction(input.to_creator())
+        CreateReservoirRegistryAction(
+            input.to_creator(),
+            input.to_creator_meta(),
+        )
     )
 
     return CreateReservoirRegistryPayload(
@@ -196,7 +211,9 @@ async def update_reservoir_registry(
     processors = info.context.processors
 
     action_result = await processors.artifact_registry.update_reservoir_registry.wait_for_complete(
-        UpdateReservoirRegistryAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
+        UpdateReservoirRegistryAction(
+            id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
+        )
     )
 
     return UpdateReservoirRegistryPayload(

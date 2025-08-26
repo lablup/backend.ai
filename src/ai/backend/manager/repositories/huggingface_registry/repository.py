@@ -5,6 +5,11 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import ArtifactRegistryNotFoundError
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.data.artifact_registries.types import (
+    ArtifactRegistryCreatorMeta,
+    ArtifactRegistryModifierMeta,
+)
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -12,6 +17,7 @@ from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -67,62 +73,102 @@ class HuggingFaceRepository:
             return row.huggingface_registry.to_dataclass()
 
     @repository_decorator()
-    async def create(self, creator: HuggingFaceRegistryCreator) -> HuggingFaceRegistryData:
+    async def create(
+        self, creator: HuggingFaceRegistryCreator, meta: ArtifactRegistryCreatorMeta
+    ) -> HuggingFaceRegistryData:
         """
         Create a new Hugging Face registry entry.
         """
-        async with self._db.begin_session() as db_session:
-            huggingface_registry_data = creator.fields_to_store()
-            huggingface_registry_row = HuggingFaceRegistryRow(**huggingface_registry_data)
-            db_session.add(huggingface_registry_row)
-            await db_session.flush()
-            await db_session.refresh(huggingface_registry_row)
+        async with self._db.begin_session() as db:
+            hf_insert = (
+                sa.insert(HuggingFaceRegistryRow)
+                .values(**creator.fields_to_store())
+                .returning(HuggingFaceRegistryRow.id)
+            )
+            hf_id = (await db.execute(hf_insert)).scalar_one()
 
-            result = await db_session.execute(
+            reg_insert = sa.insert(ArtifactRegistryRow).values(
+                name=meta.name,
+                registry_id=hf_id,
+                type=ArtifactRegistryType.HUGGINGFACE,
+            )
+            await db.execute(reg_insert)
+
+            stmt = (
                 sa.select(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == huggingface_registry_row.id)
+                .where(HuggingFaceRegistryRow.id == hf_id)
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            row: HuggingFaceRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(
-                    f"Registry with ID {huggingface_registry_row.id} not found"
-                )
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {hf_id} not found")
 
-            return huggingface_registry_row.to_dataclass()
+            return row.to_dataclass()
 
     @repository_decorator()
     async def update(
-        self, registry_id: uuid.UUID, modifier: HuggingFaceRegistryModifier
+        self,
+        registry_id: uuid.UUID,
+        modifier: HuggingFaceRegistryModifier,
+        meta: ArtifactRegistryModifierMeta,
     ) -> HuggingFaceRegistryData:
         """
         Update an existing Hugging Face registry entry in the database.
         """
         async with self._db.begin_session() as db_session:
             data = modifier.fields_to_update()
+
             update_stmt = (
                 sa.update(HuggingFaceRegistryRow)
                 .where(HuggingFaceRegistryRow.id == registry_id)
                 .values(**data)
                 .returning(*sa.select(HuggingFaceRegistryRow).selected_columns)
             )
-            stmt = sa.select(HuggingFaceRegistryRow).from_statement(update_stmt)
-            row: HuggingFaceRegistryRow = (await db_session.execute(stmt)).scalars().one()
+            row: HuggingFaceRegistryRow = (
+                (
+                    await db_session.execute(
+                        sa.select(HuggingFaceRegistryRow).from_statement(update_stmt)
+                    )
+                )
+                .scalars()
+                .one()
+            )
+
+            if (name := meta.name.optional_value()) is not None:
+                await db_session.execute(
+                    sa.update(ArtifactRegistryRow)
+                    .where(ArtifactRegistryRow.registry_id == row.id)
+                    .values(name=name)
+                )
+
+            row = (
+                await db_session.execute(
+                    sa.select(HuggingFaceRegistryRow)
+                    .where(HuggingFaceRegistryRow.id == row.id)
+                    .options(selectinload(HuggingFaceRegistryRow.meta))
+                )
+            ).scalar_one()
+
             return row.to_dataclass()
 
     @repository_decorator()
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
+    async def delete(self, registry_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing Hugging Face registry entry from the database.
         """
         async with self._db.begin_session() as db_session:
             delete_query = (
                 sa.delete(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == storage_id)
+                .where(HuggingFaceRegistryRow.id == registry_id)
                 .returning(HuggingFaceRegistryRow.id)
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+
+            delete_meta_query = sa.delete(ArtifactRegistryRow).where(
+                ArtifactRegistryRow.id == registry_id
+            )
+            await db_session.execute(delete_meta_query)
             return deleted_id
 
     @repository_decorator()
@@ -147,7 +193,9 @@ class HuggingFaceRepository:
         List all Hugging Face registry entries from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(HuggingFaceRegistryRow)
+            query = sa.select(HuggingFaceRegistryRow).options(
+                selectinload(HuggingFaceRegistryRow.meta)
+            )
             result = await db_session.execute(query)
             rows: list[HuggingFaceRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
