@@ -3,15 +3,15 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.reservoir.modifier import ReservoirModifier
-from ai.backend.manager.data.reservoir.types import ReservoirData
+from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
 @dataclass
 class UpdateReservoirRegistryAction(ArtifactRegistryAction):
     id: uuid.UUID
-    modifier: ReservoirModifier
+    modifier: ReservoirRegistryModifier
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -25,7 +25,7 @@ class UpdateReservoirRegistryAction(ArtifactRegistryAction):
 
 @dataclass
 class UpdateReservoirRegistryActionResult(BaseActionResult):
-    result: ReservoirData
+    result: ReservoirRegistryData
 
     @override
     def entity_id(self) -> Optional[str]:

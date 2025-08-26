@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.reservoir.types import ReservoirData
+from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
@@ -20,7 +20,7 @@ class ListReservoirRegistriesAction(ArtifactRegistryAction):
 
 @dataclass
 class ListReservoirRegistriesActionResult(BaseActionResult):
-    data: list[ReservoirData]
+    data: list[ReservoirRegistryData]
 
     @override
     def entity_id(self) -> Optional[str]:

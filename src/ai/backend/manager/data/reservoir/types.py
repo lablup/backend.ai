@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ReservoirData:
+class ReservoirRegistryData:
     id: uuid.UUID
     name: str
     endpoint: str

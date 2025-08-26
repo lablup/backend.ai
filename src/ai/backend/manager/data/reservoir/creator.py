@@ -5,7 +5,7 @@ from ai.backend.manager.types import Creator
 
 
 @dataclass
-class ReservoirCreator(Creator):
+class ReservoirRegistryCreator(Creator):
     name: str
     endpoint: str
 

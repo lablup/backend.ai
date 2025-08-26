@@ -50,7 +50,7 @@ from .object_storage import (
     unregister_object_storage_bucket,
     update_object_storage,
 )
-from .reservoir import (
+from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
     reservoir_registries,

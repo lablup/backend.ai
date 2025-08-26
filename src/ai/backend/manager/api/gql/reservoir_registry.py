@@ -6,9 +6,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.data.reservoir.creator import ReservoirCreator
-from ai.backend.manager.data.reservoir.modifier import ReservoirModifier
-from ai.backend.manager.data.reservoir.types import ReservoirData
+from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
+from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirRegistryAction,
 )
@@ -36,7 +36,7 @@ class ReservoirRegistry(Node):
     endpoint: str
 
     @classmethod
-    def from_dataclass(cls, data: ReservoirData) -> Self:
+    def from_dataclass(cls, data: ReservoirRegistryData) -> Self:
         return cls(
             id=ID(str(data.id)),
             name=data.name,
@@ -116,8 +116,8 @@ class CreateReservoirRegistryInput:
     name: str
     endpoint: str
 
-    def to_creator(self) -> ReservoirCreator:
-        return ReservoirCreator(name=self.name, endpoint=self.endpoint)
+    def to_creator(self) -> ReservoirRegistryCreator:
+        return ReservoirRegistryCreator(name=self.name, endpoint=self.endpoint)
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -126,8 +126,8 @@ class UpdateReservoirRegistryInput:
     name: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
 
-    def to_modifier(self) -> ReservoirModifier:
-        return ReservoirModifier(
+    def to_modifier(self) -> ReservoirRegistryModifier:
+        return ReservoirRegistryModifier(
             name=OptionalState[str].from_graphql(self.name),
             endpoint=OptionalState[str].from_graphql(self.endpoint),
         )

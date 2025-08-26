@@ -5,7 +5,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 @dataclass
-class ReservoirModifier(PartialModifier):
+class ReservoirRegistryModifier(PartialModifier):
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
     endpoint: OptionalState[str] = field(default_factory=OptionalState.nop)
 
