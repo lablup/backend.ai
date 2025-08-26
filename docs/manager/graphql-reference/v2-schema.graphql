@@ -805,7 +805,7 @@ input ModelRevisionFilter {
 }
 
 """Added in 25.13.0"""
-input ModelRevisionOrder {
+input ModelRevisionOrderBy {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
 }
@@ -1021,22 +1021,7 @@ type Query {
   deployment(id: ID!): ModelDeployment
 
   """Added in 25.13.0"""
-  revisions(
-    filter: ModelRevisionFilter = null
-    order: ModelRevisionOrder = null
-
-    """Returns the first n items from the list."""
-    first: Int = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    after: String = null
-
-    """Returns the items in the list that come before the specified cursor."""
-    before: String = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    last: Int = null
-  ): ModelRevisionConnection!
+  revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
   """Added in 25.13.0"""
   revision(id: ID!): ModelRevision
