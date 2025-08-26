@@ -269,12 +269,12 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, _propagate_events)
 
     # NOTE: SchedulingBroadcastEvent will replace most other session-related events
-    # since the Sokovan scheduler has been introduced.
-    # NOTE: Currently its propagation to the Event Hub is already handled in the
-    # scheduler.dispatcher module.
-    # FYI: We don't have to subscribe the events manually as the event dispatching
-    # mechanism will be centralized and migrated into the Event Hub's
-    # implementation detail in the future.
+    #       since the Sokovan scheduler has been introduced.
+    #       Currently its propagation to the Event Hub is already handled in the
+    #       scheduler.dispatcher module.
+    # FYI: In the future, we don't have to subscribe the events manually as the
+    #      event dispatching mechanism will be centralized and migrated into the
+    #      Event Hub's implementation detail.
     yield
 
 

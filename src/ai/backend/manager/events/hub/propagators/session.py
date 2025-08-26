@@ -192,8 +192,7 @@ class SessionEventPropagator(EventPropagator):
                 data = dict(row._mapping)
                 data["kernel_id"] = data["id"]
                 data["reason"] = getattr(event, "reason", "")
-                if hasattr(event, "exit_code"):
-                    data["exit_code"] = event.exit_code
+                data["exit_Code"] = getattr(event, "exit_code", None)
                 return event.event_name(), data
         except Exception as e:
             log.warning("Failed to fetch kernel data for event {}: {}", event.kernel_id, e)
@@ -245,8 +244,7 @@ class SessionEventPropagator(EventPropagator):
                         event.status_transition, event.status_transition.lower()
                     )
                 data["reason"] = getattr(event, "reason", "")
-                if hasattr(event, "exit_code"):
-                    data["exit_code"] = event.exit_code
+                data["exit_Code"] = getattr(event, "exit_code", None)
                 return event_name, data
         except Exception as e:
             log.warning("Failed to fetch session data for event {}: {}", event.session_id, e)
