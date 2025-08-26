@@ -55,7 +55,9 @@ jobs:
     - name: Pants export
       run: pants export --resolve=python-default
     - name: Install Rover CLI for generating supergraph
-      run: curl -sSL https://rover.apollo.dev/nix/latest | sh
+      run: |
+        curl -sSL https://rover.apollo.dev/nix/latest | sh
+        echo "$HOME/.rover/bin" >> $GITHUB_PATH
     - name: Create api schema dump
       run: |
         ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
