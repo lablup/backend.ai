@@ -29,7 +29,6 @@ from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode
 
-from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
 from ...output.fields import network_fields, session_fields
@@ -1074,7 +1073,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                 completion_msg_func()
                 sys.exit()
 
-    asyncio_run(export_tracker(result["task_id"]))
+    asyncio.run(export_tracker(result["task_id"]))
 
 
 @session.command()
@@ -1262,9 +1261,8 @@ def _events_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
         default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
     @click.option(
         "-q",
@@ -1323,7 +1321,7 @@ def _events_cmd(docs: Optional[str] = None):
                                 sys.exit(0)
 
         try:
-            asyncio_run(_run_events())
+            asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
 
@@ -1389,9 +1387,8 @@ def _watch_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
-        default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        default="session,kernel",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
     @click.option(
         "--max-wait",
@@ -1507,9 +1504,9 @@ def _watch_cmd(docs: Optional[str] = None):
 
         try:
             if max_wait > 0:
-                asyncio_run(_run_events_with_timeout(max_wait))
+                asyncio.run(_run_events_with_timeout(max_wait))
             else:
-                asyncio_run(_run_events())
+                asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

@@ -83,7 +83,7 @@ SessionEventInfo = Tuple[str, dict, str, Optional[int]]
         t.Key("sessionId", default=None) >> "session_id": t.Null | tx.UUID,
         # NOTE: if set, sessionId overrides sessionName and ownerAccessKey parameters.
         tx.AliasedKey(["group", "groupName"], default="*") >> "group_name": t.String,
-        t.Key("scope", default="*"): t.Enum("*", "session", "kernel"),
+        t.Key("scope", default="*"): t.String,
     })
 )
 async def push_session_events(
@@ -113,7 +113,8 @@ async def push_session_events(
     )
 
     if scope == "*":
-        raise InvalidArgument("Wildcard event subscription is not yet supported in the Event Hub.")
+        # Coalesce the legacy default value.
+        scope = "session,kernel"
 
     # Resolve session name to session ID
     if session_name == "*":
@@ -154,15 +155,15 @@ async def push_session_events(
     aliases = []
 
     async with sse_response(request) as resp:
-        match scope:
-            case "session":
-                propagator = SessionEventPropagator(resp, root_ctx.db, filters)
-                aliases.append((EventDomain.SESSION, str(session_id)))
-            case "kernel":
-                propagator = SessionEventPropagator(resp, root_ctx.db, filters)
-                aliases.append((EventDomain.KERNEL, str(session_id)))
-            case _:
-                raise InvalidArgument(f"Invalid scope: {scope}")
+        propagator = SessionEventPropagator(resp, root_ctx.db, filters)
+        for item in scope.split(","):
+            match item:
+                case "session":
+                    aliases.append((EventDomain.SESSION, str(session_id)))
+                case "kernel":
+                    aliases.append((EventDomain.KERNEL, str(session_id)))
+                case _:
+                    raise InvalidArgument(f"Invalid scope: {scope}")
         root_ctx.event_hub.register_event_propagator(propagator, aliases)
         try:
             # Keep the connection alive until closed
