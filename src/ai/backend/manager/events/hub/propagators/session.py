@@ -92,13 +92,6 @@ class SessionEventPropagator(EventPropagator):
         if self._closed:
             return
 
-        # Filter events by type first
-        scope = self._filters.get("scope", "*")
-        if scope == "session" and not event.event_name().startswith("session_"):
-            return
-        if scope == "kernel" and not event.event_name().startswith("kernel_"):
-            return
-
         # Get event data based on event type
         event_data = await self._get_event_data(event)
         if event_data is None:

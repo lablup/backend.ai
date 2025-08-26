@@ -150,7 +150,6 @@ async def push_session_events(
         "session_name": session_name,
         "session_id": session_id,
         "access_key": access_key,
-        "scope": scope,
     }
     aliases = []
     for item in scope.split(","):
