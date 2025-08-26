@@ -8,7 +8,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 
 @dataclass
-class GetReservoirAction(ArtifactRegistryAction):
+class GetReservoirRegistryAction(ArtifactRegistryAction):
     reservoir_id: uuid.UUID
 
     @override
@@ -22,7 +22,7 @@ class GetReservoirAction(ArtifactRegistryAction):
 
 
 @dataclass
-class GetReservoirActionResult(BaseActionResult):
+class GetReservoirRegistryActionResult(BaseActionResult):
     result: ReservoirData
 
     @override

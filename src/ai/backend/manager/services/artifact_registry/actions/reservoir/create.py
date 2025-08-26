@@ -8,7 +8,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 
 @dataclass
-class CreateReservoirAction(ArtifactRegistryAction):
+class CreateReservoirRegistryAction(ArtifactRegistryAction):
     creator: ReservoirCreator
 
     @override

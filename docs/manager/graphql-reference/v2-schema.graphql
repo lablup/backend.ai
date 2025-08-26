@@ -246,14 +246,14 @@ type CreateObjectStoragePayload {
 }
 
 """Added in 25.13.0"""
-input CreateReservoirInput {
+input CreateReservoirRegistryInput {
   name: String!
   endpoint: String!
 }
 
 """Added in 25.13.0"""
-type CreateReservoirPayload {
-  reservoir: Reservoir!
+type CreateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
 }
 
 """Date with time (isoformat)"""
@@ -304,12 +304,12 @@ type DeleteObjectStoragePayload {
 }
 
 """Added in 25.13.0"""
-input DeleteReservoirInput {
+input DeleteReservoirRegistryInput {
   id: ID!
 }
 
 """Added in 25.13.0"""
-type DeleteReservoirPayload {
+type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
@@ -647,13 +647,13 @@ type Mutation {
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
 
   """Added in 25.13.0"""
-  createReservoir(input: CreateReservoirInput!): CreateReservoirPayload!
+  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload!
 
   """Added in 25.13.0"""
-  updateReservoir(input: UpdateReservoirInput!): UpdateReservoirPayload!
+  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload!
 
   """Added in 25.13.0"""
-  deleteReservoir(input: DeleteReservoirInput!): DeleteReservoirPayload!
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload!
 
   """Added in 25.13.0"""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
@@ -798,10 +798,10 @@ type Query {
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
 
   """Added in 25.13.0"""
-  reservoir(id: ID!): Reservoir
+  reservoirRegistry(id: ID!): ReservoirRegistry
 
   """Added in 25.13.0"""
-  reservoirs(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirConnection!
+  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 }
 
 type RawServiceConfig {
@@ -845,7 +845,7 @@ type ReplicaStatusChangedPayload {
 }
 
 """Added in 25.13.0"""
-type Reservoir implements Node {
+type ReservoirRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
@@ -853,22 +853,22 @@ type Reservoir implements Node {
 }
 
 """Added in 25.13.0"""
-type ReservoirConnection {
+type ReservoirRegistryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [ReservoirEdge!]!
+  edges: [ReservoirRegistryEdge!]!
   count: Int!
 }
 
 """An edge in a connection."""
-type ReservoirEdge {
+type ReservoirRegistryEdge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: Reservoir!
+  node: ReservoirRegistry!
 }
 
 type ResourceConfig {
@@ -1018,15 +1018,15 @@ type UpdateObjectStoragePayload {
 }
 
 """Added in 25.13.0"""
-input UpdateReservoirInput {
+input UpdateReservoirRegistryInput {
   id: ID!
   name: String
   endpoint: String
 }
 
 """Added in 25.13.0"""
-type UpdateReservoirPayload {
-  reservoir: Reservoir!
+type UpdateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
 }
 
 extend type UserNode @key(fields: "id") {

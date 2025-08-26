@@ -7,7 +7,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 
 @dataclass
-class ListReservoirAction(ArtifactRegistryAction):
+class ListReservoirRegistriesAction(ArtifactRegistryAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -19,7 +19,7 @@ class ListReservoirAction(ArtifactRegistryAction):
 
 
 @dataclass
-class ListReservoirActionResult(BaseActionResult):
+class ListReservoirRegistriesActionResult(BaseActionResult):
     data: list[ReservoirData]
 
     @override

@@ -7,7 +7,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 
 @dataclass
-class DeleteReservoirAction(ArtifactRegistryAction):
+class DeleteReservoirRegistryAction(ArtifactRegistryAction):
     reservoir_id: uuid.UUID
 
     @override

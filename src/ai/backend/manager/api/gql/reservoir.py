@@ -10,19 +10,19 @@ from ai.backend.manager.data.reservoir.creator import ReservoirCreator
 from ai.backend.manager.data.reservoir.modifier import ReservoirModifier
 from ai.backend.manager.data.reservoir.types import ReservoirData
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
-    CreateReservoirAction,
+    CreateReservoirRegistryAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
-    DeleteReservoirAction,
+    DeleteReservoirRegistryAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
-    GetReservoirAction,
+    GetReservoirRegistryAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
-    ListReservoirAction,
+    ListReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
-    UpdateReservoirAction,
+    UpdateReservoirRegistryAction,
 )
 
 from ...types import OptionalState
@@ -30,7 +30,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.13.0")
-class Reservoir(Node):
+class ReservoirRegistry(Node):
     id: NodeID[str]
     name: str
     endpoint: str
@@ -46,37 +46,41 @@ class Reservoir(Node):
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[uuid.UUID]
-    ) -> list["Reservoir"]:
+    ) -> list["ReservoirRegistry"]:
         reservoirs = []
         for reservoir_id in reservoir_ids:
-            action_result = await ctx.processors.artifact_registry.get_reservoir.wait_for_complete(
-                GetReservoirAction(reservoir_id=reservoir_id)
+            action_result = (
+                await ctx.processors.artifact_registry.get_reservoir_registry.wait_for_complete(
+                    GetReservoirRegistryAction(reservoir_id=reservoir_id)
+                )
             )
-            reservoirs.append(Reservoir.from_dataclass(action_result.result))
+            reservoirs.append(ReservoirRegistry.from_dataclass(action_result.result))
         return reservoirs
 
 
-ReservoirEdge = Edge[Reservoir]
+ReservoirRegistryEdge = Edge[ReservoirRegistry]
 
 
 @strawberry.type(description="Added in 25.13.0")
-class ReservoirConnection(Connection[Reservoir]):
+class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
 
 
 @strawberry.field(description="Added in 25.13.0")
-async def reservoir(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Reservoir]:
+async def reservoir_registry(
+    id: ID, info: Info[StrawberryGQLContext]
+) -> Optional[ReservoirRegistry]:
     processors = info.context.processors
-    action_result = await processors.artifact_registry.get_reservoir.wait_for_complete(
-        GetReservoirAction(reservoir_id=uuid.UUID(id))
+    action_result = await processors.artifact_registry.get_reservoir_registry.wait_for_complete(
+        GetReservoirRegistryAction(reservoir_id=uuid.UUID(id))
     )
-    return Reservoir.from_dataclass(action_result.result)
+    return ReservoirRegistry.from_dataclass(action_result.result)
 
 
 @strawberry.field(description="Added in 25.13.0")
-async def reservoirs(
+async def reservoir_registries(
     info: Info[StrawberryGQLContext],
     before: Optional[str] = None,
     after: Optional[str] = None,
@@ -84,19 +88,19 @@ async def reservoirs(
     last: Optional[int] = None,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
-) -> ReservoirConnection:
+) -> ReservoirRegistryConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
 
-    action_result = await processors.artifact_registry.list_reservoirs.wait_for_complete(
-        ListReservoirAction()
+    action_result = await processors.artifact_registry.list_reservoir_registries.wait_for_complete(
+        ListReservoirRegistriesAction()
     )
 
-    nodes = [Reservoir.from_dataclass(data) for data in action_result.data]
-    edges = [ReservoirEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
+    nodes = [ReservoirRegistry.from_dataclass(data) for data in action_result.data]
+    edges = [ReservoirRegistryEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
 
-    return ReservoirConnection(
+    return ReservoirRegistryConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,
@@ -108,7 +112,7 @@ async def reservoirs(
 
 
 @strawberry.input(description="Added in 25.13.0")
-class CreateReservoirInput:
+class CreateReservoirRegistryInput:
     name: str
     endpoint: str
 
@@ -117,7 +121,7 @@ class CreateReservoirInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class UpdateReservoirInput:
+class UpdateReservoirRegistryInput:
     id: ID
     name: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
@@ -130,59 +134,63 @@ class UpdateReservoirInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DeleteReservoirInput:
+class DeleteReservoirRegistryInput:
     id: ID
 
 
 @strawberry.type(description="Added in 25.13.0")
-class CreateReservoirPayload:
-    reservoir: Reservoir
+class CreateReservoirRegistryPayload:
+    reservoir: ReservoirRegistry
 
 
 @strawberry.type(description="Added in 25.13.0")
-class UpdateReservoirPayload:
-    reservoir: Reservoir
+class UpdateReservoirRegistryPayload:
+    reservoir: ReservoirRegistry
 
 
 @strawberry.type(description="Added in 25.13.0")
-class DeleteReservoirPayload:
+class DeleteReservoirRegistryPayload:
     id: ID
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def create_reservoir(
-    input: CreateReservoirInput, info: Info[StrawberryGQLContext]
-) -> CreateReservoirPayload:
+async def create_reservoir_registry(
+    input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> CreateReservoirRegistryPayload:
     processors = info.context.processors
 
-    action_result = await processors.artifact_registry.create_reservoir.wait_for_complete(
-        CreateReservoirAction(input.to_creator())
+    action_result = await processors.artifact_registry.create_reservoir_registry.wait_for_complete(
+        CreateReservoirRegistryAction(input.to_creator())
     )
 
-    return CreateReservoirPayload(reservoir=Reservoir.from_dataclass(action_result.result))
+    return CreateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+    )
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def update_reservoir(
-    input: UpdateReservoirInput, info: Info[StrawberryGQLContext]
-) -> UpdateReservoirPayload:
+async def update_reservoir_registry(
+    input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> UpdateReservoirRegistryPayload:
     processors = info.context.processors
 
-    action_result = await processors.artifact_registry.update_reservoir.wait_for_complete(
-        UpdateReservoirAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
+    action_result = await processors.artifact_registry.update_reservoir_registry.wait_for_complete(
+        UpdateReservoirRegistryAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
     )
 
-    return UpdateReservoirPayload(reservoir=Reservoir.from_dataclass(action_result.result))
+    return UpdateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+    )
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def delete_reservoir(
-    input: DeleteReservoirInput, info: Info[StrawberryGQLContext]
-) -> DeleteReservoirPayload:
+async def delete_reservoir_registry(
+    input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> DeleteReservoirRegistryPayload:
     processors = info.context.processors
 
-    await processors.artifact_registry.delete_reservoir.wait_for_complete(
-        DeleteReservoirAction(reservoir_id=uuid.UUID(input.id))
+    await processors.artifact_registry.delete_reservoir_registry.wait_for_complete(
+        DeleteReservoirRegistryAction(reservoir_id=uuid.UUID(input.id))
     )
 
-    return DeleteReservoirPayload(id=input.id)
+    return DeleteReservoirRegistryPayload(id=input.id)

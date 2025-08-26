@@ -51,11 +51,11 @@ from .object_storage import (
     update_object_storage,
 )
 from .reservoir import (
-    create_reservoir,
-    delete_reservoir,
-    reservoir,
-    reservoirs,
-    update_reservoir,
+    create_reservoir_registry,
+    delete_reservoir_registry,
+    reservoir_registries,
+    reservoir_registry,
+    update_reservoir_registry,
 )
 
 
@@ -74,8 +74,8 @@ class Query:
     object_storages = object_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
-    reservoir = reservoir
-    reservoirs = reservoirs
+    reservoir_registry = reservoir_registry
+    reservoir_registries = reservoir_registries
 
 
 @strawberry.type
@@ -97,9 +97,9 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
-    create_reservoir = create_reservoir
-    update_reservoir = update_reservoir
-    delete_reservoir = delete_reservoir
+    create_reservoir_registry = create_reservoir_registry
+    update_reservoir_registry = update_reservoir_registry
+    delete_reservoir_registry = delete_reservoir_registry
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
