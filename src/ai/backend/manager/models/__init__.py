@@ -21,6 +21,7 @@ from . import network as _network
 from . import object_storage as _object_storage
 from . import rbac as _rbac
 from . import rbac_models as _rbac_models
+from . import reservoir as _reservoir
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import resource_usage as _rusage
@@ -73,6 +74,7 @@ __all__ = (
     *_eventlog.__all__,
     *_relay_agent.__all__,
     *_relay_kernel.__all__,
+    *_reservoir.__all__,
     *_relay_session.__all__,
 )
 
@@ -111,3 +113,4 @@ from .rbac_models import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa
+from .reservoir import *  # noqa
