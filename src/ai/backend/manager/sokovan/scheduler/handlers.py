@@ -128,6 +128,7 @@ class ScheduleSessionsHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.SCHEDULED),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]
@@ -173,6 +174,7 @@ class CheckPreconditionHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.PREPARING),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]
@@ -214,6 +216,7 @@ class StartSessionsHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.CREATING),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]
@@ -256,6 +259,18 @@ class TerminateSessionsHandler(ScheduleHandler):
             event_data.access_key for event_data in result.scheduled_sessions
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+
+        # Broadcast batch event for sessions that transitioned to TERMINATED
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.TERMINATED),
+                reason=event_data.reason,
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -331,6 +346,7 @@ class CheckPullingProgressHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.PREPARED),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]
@@ -375,6 +391,7 @@ class CheckCreatingProgressHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.RUNNING),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]
@@ -428,6 +445,7 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
                 session_id=event_data.session_id,
                 creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.TERMINATED),
+                reason=event_data.reason,
             )
             for event_data in result.scheduled_sessions
         ]

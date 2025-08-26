@@ -396,7 +396,7 @@ class Dispatchers:
             self._schedule_event_handler.handle_do_sokovan_process_schedule,
             name="sokovan.process_schedule",
         )
-        # Subscribe to BatchSchedulingBroadcastEvent to propagate individual events
+        # Subscribe to SchedulingBroadcastEvent to propagate individual events
         event_dispatcher.subscribe(
             SchedulingBroadcastEvent,
             None,

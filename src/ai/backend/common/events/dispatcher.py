@@ -767,7 +767,7 @@ class EventProducer:
 
     async def broadcast_events_batch(
         self,
-        events: list[AbstractBroadcastEvent],
+        events: Sequence[AbstractBroadcastEvent],
     ) -> None:
         """
         Broadcast multiple events in a batch with optional caching.
