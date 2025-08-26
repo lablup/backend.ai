@@ -358,6 +358,7 @@ mock_model_deployment_1 = ModelDeployment(
         preferred_domain_name="llama-3-8b.models.backend.ai",
         open_to_public=True,
         access_tokens=AccessTokenConnection(
+            count=5,
             edges=[
                 AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
                 AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
@@ -445,6 +446,7 @@ mock_model_deployment_2 = ModelDeployment(
         preferred_domain_name="mistral-7b.models.backend.ai",
         open_to_public=False,
         access_tokens=AccessTokenConnection(
+            count=2,
             edges=[
                 AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
                 AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
@@ -527,6 +529,7 @@ mock_model_deployment_3 = ModelDeployment(
         preferred_domain_name=None,
         open_to_public=False,
         access_tokens=AccessTokenConnection(
+            count=4,
             edges=[
                 AccessTokenEdge(node=mock_access_token_1, cursor="token-cursor-1"),
                 AccessTokenEdge(node=mock_access_token_2, cursor="token-cursor-2"),
@@ -537,7 +540,7 @@ mock_model_deployment_3 = ModelDeployment(
                 has_next_page=False,
                 has_previous_page=False,
                 start_cursor="token-cursor-1",
-                end_cursor="token-cursor-5",
+                end_cursor="token-cursor-4",
             ),
         ),
     ),
