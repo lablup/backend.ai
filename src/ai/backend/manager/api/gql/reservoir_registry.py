@@ -34,6 +34,9 @@ class ReservoirRegistry(Node):
     id: NodeID[str]
     name: str
     endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
 
     @classmethod
     def from_dataclass(cls, data: ReservoirRegistryData) -> Self:
@@ -41,6 +44,9 @@ class ReservoirRegistry(Node):
             id=ID(str(data.id)),
             name=data.name,
             endpoint=data.endpoint,
+            access_key=data.access_key,
+            secret_key=data.secret_key,
+            api_version=data.api_version,
         )
 
     @classmethod

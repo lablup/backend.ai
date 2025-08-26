@@ -25,6 +25,9 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("endpoint", sa.String(), nullable=False),
+        sa.Column("access_key", sa.String(), nullable=False),
+        sa.Column("secret_key", sa.String(), nullable=False),
+        sa.Column("api_version", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_reservoir_registries")),
     )
     op.create_index(

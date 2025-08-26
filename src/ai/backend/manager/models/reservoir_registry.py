@@ -23,9 +23,12 @@ class ReservoirRegistryRow(Base):
     id = IDColumn("id")
     name = sa.Column("name", sa.String, index=True, unique=True, nullable=False)
     endpoint = sa.Column("endpoint", sa.String, nullable=False)
+    access_key = sa.Column("access_key", sa.String, nullable=False)
+    secret_key = sa.Column("secret_key", sa.String, nullable=False)
+    api_version = sa.Column("api_version", sa.String, nullable=False)
 
     def __str__(self) -> str:
-        return f"ReservoirRegistryRow(id={self.id}, name={self.name}, endpoint={self.endpoint})"
+        return f"ReservoirRegistryRow(id={self.id}, name={self.name}, endpoint={self.endpoint}, api_version={self.api_version})"
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -35,4 +38,7 @@ class ReservoirRegistryRow(Base):
             id=self.id,
             name=self.name,
             endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
         )
