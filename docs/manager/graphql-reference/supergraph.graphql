@@ -4840,6 +4840,7 @@ type Query
 =======
 
   """Added in 25.13.0"""
+<<<<<<< HEAD
 >>>>>>> 27f96d571 (feat: Modify GQL Schema for model deployment)
   deployments(
     filter: DeploymentFilter = null
@@ -4857,6 +4858,9 @@ type Query
     """Returns the items in the list that come after the specified cursor."""
     last: Int = null
   ): ModelDeploymentConnection! @join__field(graph: STRAWBERRY)
+=======
+  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection! @join__field(graph: STRAWBERRY)
+>>>>>>> 8fa348940 (feat: Add fields for update deployment mutation)
 
   """Added in 25.13.0"""
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
@@ -5580,6 +5584,9 @@ input UpdateModelDeploymentInput
   tags: [String!] = null
   defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
+  desiredReplicaCount: Int = null
+  name: String = null
+  preferredDomainName: String = null
 }
 
 """Added in 25.13.0"""
