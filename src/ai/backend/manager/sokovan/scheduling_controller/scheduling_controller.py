@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
+from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -12,6 +14,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
@@ -272,6 +275,18 @@ class SchedulingController:
                 len(result.cancelled_sessions),
                 len(result.terminating_sessions),
             )
+
+            cancelled_events: list[AbstractBroadcastEvent] = [
+                SchedulingBroadcastEvent(
+                    session_id=session_id,
+                    creation_id="",
+                    status_transition=str(SessionStatus.CANCELLED),
+                    reason=reason,
+                )
+                for session_id in result.cancelled_sessions
+            ]
+            if cancelled_events:
+                await self._event_producer.broadcast_events_batch(cancelled_events)
             # Record metric for termination attempts
             self._operation_metrics.observe_success(
                 operation="mark_sessions_terminating",
