@@ -2,6 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 
 class ArtifactType(enum.StrEnum):
@@ -47,11 +48,11 @@ class ArtifactRevisionData:
     id: uuid.UUID
     artifact_id: uuid.UUID
     version: str
-    readme: str
-    size: int
+    readme: Optional[str]
+    size: Optional[int]
     status: ArtifactStatus
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
 
 # TODO: Should we keep this for REST API?
@@ -72,3 +73,4 @@ class ArtifactRevisionOrderField(enum.StrEnum):
     SIZE = "SIZE"
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
+    STATUS = "STATUS"

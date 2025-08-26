@@ -109,7 +109,7 @@ class HuggingFaceRepository:
             return deleted_id
 
     @repository_decorator()
-    async def list(self) -> list[HuggingFaceRegistryData]:
+    async def list_registries(self) -> list[HuggingFaceRegistryData]:
         """
         List all Hugging Face registry entries from the database.
         """

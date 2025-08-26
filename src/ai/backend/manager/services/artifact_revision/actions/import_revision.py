@@ -4,11 +4,11 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.services.artifact.actions.base import ArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
 @dataclass
-class ImportArtifactAction(ArtifactAction):
+class ImportArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
     storage_id: uuid.UUID
     bucket_name: str
@@ -24,7 +24,7 @@ class ImportArtifactAction(ArtifactAction):
 
 
 @dataclass
-class ImportArtifactActionResult(BaseActionResult):
+class ImportArtifactRevisionActionResult(BaseActionResult):
     result: ArtifactRevisionData
     task_id: uuid.UUID
 

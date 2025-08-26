@@ -21,6 +21,10 @@ from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.update import (
+    UpdateArtifactAction,
+    UpdateArtifactActionResult,
+)
 
 
 class ArtifactService:
@@ -83,3 +87,9 @@ class ArtifactService:
     ) -> GetArtifactRevisionsActionResult:
         revisions = await self._artifact_repository.list_artifact_revisions(action.artifact_id)
         return GetArtifactRevisionsActionResult(revisions=revisions)
+
+    async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
+        updated_artifact = await self._artifact_repository.update_artifact(
+            action.artifact_id, action.modifier
+        )
+        return UpdateArtifactActionResult(result=updated_artifact)

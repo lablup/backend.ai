@@ -15,6 +15,10 @@ from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.get_buckets import (
+    GetObjectStorageBucketsAction,
+    GetObjectStorageBucketsActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
     GetDownloadPresignedURLActionResult,
@@ -26,6 +30,14 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.register_bucket import (
+    RegisterBucketAction,
+    RegisterBucketActionResult,
+)
+from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
+    UnregisterBucketAction,
+    UnregisterBucketActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
@@ -46,6 +58,9 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
     get_presigned_upload_url: ActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
     ]
+    register_bucket: ActionProcessor[RegisterBucketAction, RegisterBucketActionResult]
+    unregister_bucket: ActionProcessor[UnregisterBucketAction, UnregisterBucketActionResult]
+    get_buckets: ActionProcessor[GetObjectStorageBucketsAction, GetObjectStorageBucketsActionResult]
 
     def __init__(self, service: ObjectStorageService, action_monitors: list[ActionMonitor]) -> None:
         self.create = ActionProcessor(service.create, action_monitors)
@@ -59,6 +74,9 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
         self.get_presigned_upload_url = ActionProcessor(
             service.get_presigned_upload_url, action_monitors
         )
+        self.register_bucket = ActionProcessor(service.register_bucket, action_monitors)
+        self.unregister_bucket = ActionProcessor(service.unregister_bucket, action_monitors)
+        self.get_buckets = ActionProcessor(service.get_buckets, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -70,4 +88,7 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
             ListObjectStorageAction.spec(),
             GetDownloadPresignedURLAction.spec(),
             GetUploadPresignedURLAction.spec(),
+            RegisterBucketAction.spec(),
+            UnregisterBucketAction.spec(),
+            GetObjectStorageBucketsAction.spec(),
         ]
