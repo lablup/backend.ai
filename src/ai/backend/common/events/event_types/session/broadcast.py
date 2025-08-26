@@ -225,6 +225,7 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
     session_id: SessionId
     creation_id: str
     status_transition: str  # "SCHEDULED", "PREPARING", "CREATING", etc.
+    reason: str  # "self-terminated", "user-requested", etc.
 
     @classmethod
     @override
@@ -241,6 +242,7 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
             str(self.session_id),
             self.creation_id,
             self.status_transition,
+            self.reason,
         )
 
     @classmethod
@@ -250,6 +252,7 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
             session_id=SessionId(uuid.UUID(value[0])),
             creation_id=value[1],
             status_transition=value[2],
+            reason=value[3],
         )
 
     @classmethod

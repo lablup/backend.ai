@@ -619,6 +619,7 @@ class Scheduler:
                 session_id=result.session_id,
                 creation_id=result.creation_id,
                 access_key=result.access_key,
+                reason=result.reason,
             )
             for result in session_results
             if result.should_terminate_session
@@ -705,6 +706,7 @@ class Scheduler:
                     session_id=session.session_id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    reason="sweeped-as-stale",
                 )
                 for session in timed_out_sessions
             ]
@@ -738,6 +740,7 @@ class Scheduler:
                     session_id=session.session_id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    reason="triggered-by-scheduler",
                 )
                 for session in sessions_data
             ]
@@ -788,6 +791,7 @@ class Scheduler:
                     session_id=session.session_id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    reason="triggered-by-scheduler",
                 )
                 for session in sessions_data
                 if session.session_id in sessions_to_update
@@ -839,6 +843,7 @@ class Scheduler:
                     session_id=session.session_id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    reason=session.status_info or "unknown",
                 )
                 for session in sessions_data
                 if session.session_id in sessions_to_update
@@ -877,6 +882,7 @@ class Scheduler:
                 session_id=session.session_id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
+                reason="passed-preconditions",
             )
             for session in scheduled_sessions
         ]
@@ -953,6 +959,7 @@ class Scheduler:
                 session_id=session.session_id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
+                reason="triggered-by-scheduler",
             )
             for session in prepared_sessions
         ]
@@ -1519,6 +1526,7 @@ class Scheduler:
                 session_id=session.session_id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
+                reason="triggered-by-scheduler",
             )
             for session in truly_stuck_sessions
         ]
@@ -1638,6 +1646,7 @@ class Scheduler:
                 session_id=session.session_id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
+                reason="triggered-by-scheduler",
             )
             for session in truly_stuck_sessions
         ]

@@ -10,6 +10,7 @@ from sqlalchemy.orm import load_only
 
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.kernel.broadcast import (
+    BaseKernelEvent,
     KernelCancelledBroadcastEvent,
     KernelCreatingBroadcastEvent,
     KernelPreparingBroadcastEvent,
@@ -19,6 +20,8 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
+    BaseSessionEvent,
+    SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionFailureBroadcastEvent,
@@ -93,9 +96,11 @@ class SessionEventPropagator(EventPropagator):
             return
 
         # Get event data based on event type
-        event_data = await self._get_event_data(event)
-        if event_data is None:
+        data = await self._get_event_data(event)
+        if data is None:
+            log.warning("Could not fetch the domain object for {!r}", event)
             return
+        event_name, event_data = data
 
         # Apply permission and session filters
         if not await self._should_send_event(event_data):
@@ -119,50 +124,51 @@ class SessionEventPropagator(EventPropagator):
             response_data["clusterIdx"] = cluster_idx
 
         try:
-            await self._response.send(dump_json_str(response_data), event=event.event_name())
+            await self._response.send(dump_json_str(response_data), event=event_name)
         except Exception as e:
             log.warning("Failed to send SSE event: {}", e)
             await self.close()
 
-    async def _get_event_data(self, event: AbstractEvent) -> Optional[Mapping[str, Any]]:
+    async def _get_event_data(
+        self, event: AbstractEvent
+    ) -> Optional[tuple[str, Mapping[str, Any]]]:
         """Get event data from database based on event type."""
-        if isinstance(
-            event,
-            (
-                KernelPreparingBroadcastEvent,
-                KernelPullingBroadcastEvent,
-                KernelCreatingBroadcastEvent,
-                KernelStartedBroadcastEvent,
-                KernelCancelledBroadcastEvent,
-                KernelTerminatingBroadcastEvent,
-                KernelTerminatedBroadcastEvent,
-            ),
-        ):
-            return await self._fetch_kernel_data(event)
-        elif isinstance(
-            event,
-            (
-                SessionEnqueuedBroadcastEvent,
-                SessionScheduledBroadcastEvent,
-                SessionStartedBroadcastEvent,
-                SessionCancelledBroadcastEvent,
-                SessionTerminatingBroadcastEvent,
-                SessionTerminatedBroadcastEvent,
-                SessionSuccessBroadcastEvent,
-                SessionFailureBroadcastEvent,
-            ),
-        ):
-            return await self._fetch_session_data(event)
-        else:
-            log.debug("Unknown event type: {}", type(event))
-            return None
+        match event:
+            case SchedulingBroadcastEvent():
+                return await self._fetch_session_data(event)
+            case (
+                KernelPreparingBroadcastEvent()
+                | KernelPullingBroadcastEvent()
+                | KernelCreatingBroadcastEvent()
+                | KernelStartedBroadcastEvent()
+                | KernelCancelledBroadcastEvent()
+                | KernelTerminatingBroadcastEvent()
+                | KernelTerminatedBroadcastEvent()
+            ):
+                return await self._fetch_kernel_data(event)
+            case (
+                SessionEnqueuedBroadcastEvent()
+                | SessionScheduledBroadcastEvent()
+                | SessionStartedBroadcastEvent()
+                | SessionCancelledBroadcastEvent()
+                | SessionTerminatingBroadcastEvent()
+                | SessionTerminatedBroadcastEvent()
+                | SessionSuccessBroadcastEvent()
+                | SessionFailureBroadcastEvent()
+            ):
+                return await self._fetch_session_data(event)
+            case _:
+                log.debug("Unknown event type: {}", type(event))
+                return None
 
-    async def _fetch_kernel_data(self, event) -> Optional[Mapping[str, Any]]:
+    async def _fetch_kernel_data(
+        self, event: BaseKernelEvent
+    ) -> Optional[tuple[str, Mapping[str, Any]]]:
         """Fetch kernel data from database."""
         try:
             from ai.backend.manager.models import kernels
 
-            async with self._db.begin_readonly() as conn:
+            async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 query = (
                     sa.select([
                         kernels.c.id,
@@ -185,20 +191,25 @@ class SessionEventPropagator(EventPropagator):
 
                 data = dict(row._mapping)
                 data["kernel_id"] = data["id"]
-                data["reason"] = event.reason.value if hasattr(event, "reason") else ""
+                data["reason"] = getattr(event, "reason", "")
                 if hasattr(event, "exit_code"):
                     data["exit_code"] = event.exit_code
-                return data
+                return event.event_name(), data
         except Exception as e:
             log.warning("Failed to fetch kernel data for event {}: {}", event.kernel_id, e)
             return None
 
-    async def _fetch_session_data(self, event) -> Optional[Mapping[str, Any]]:
+    async def _fetch_session_data(
+        self, event: BaseSessionEvent | SchedulingBroadcastEvent
+    ) -> Optional[tuple[str, Mapping[str, Any]]]:
         """Fetch session data from database."""
+        event_name = event.event_name()
         try:
             from ai.backend.manager.models.session import SessionRow
 
-            async with self._db.begin_readonly_session() as db_session:
+            async with self._db.begin_readonly_session(
+                isolation_level="READ COMMITTED"
+            ) as db_session:
                 query = (
                     sa.select(SessionRow)
                     .where(SessionRow.id == event.session_id)
@@ -224,11 +235,19 @@ class SessionEventPropagator(EventPropagator):
                     "domain_name": row.domain_name,
                     "group_id": row.group_id,
                     "user_uuid": row.user_uuid,
-                    "reason": event.reason.value if hasattr(event, "reason") else "",
                 }
+                if isinstance(event, SchedulingBroadcastEvent):
+                    data["status"] = event.status_transition
+                    status_to_evname = {
+                        "RUNNING": "started",
+                    }
+                    event_name = "session_" + status_to_evname.get(
+                        event.status_transition, event.status_transition.lower()
+                    )
+                data["reason"] = getattr(event, "reason", "")
                 if hasattr(event, "exit_code"):
                     data["exit_code"] = event.exit_code
-                return data
+                return event_name, data
         except Exception as e:
             log.warning("Failed to fetch session data for event {}: {}", event.session_id, e)
             return None

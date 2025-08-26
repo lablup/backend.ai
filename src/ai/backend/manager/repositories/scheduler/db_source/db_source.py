@@ -1424,6 +1424,7 @@ class ScheduleDBSource:
                                 session_id=allocation.session_id,
                                 creation_id=creation_id,
                                 access_key=access_key,
+                                reason="triggered-by-scheduler",
                             )
                         )
 
@@ -2295,6 +2296,7 @@ class ScheduleDBSource:
                         cluster_role=kernel.cluster_role,
                         container_id=kernel.container_id,
                         startup_command=kernel.startup_command,
+                        status_info=kernel.status_info,
                     )
                     for kernel in session.kernels
                 ]
@@ -2309,6 +2311,7 @@ class ScheduleDBSource:
                     cluster_mode=session.cluster_mode,
                     kernels=kernel_data,
                     batch_timeout=session.batch_timeout,
+                    status_info=session.status_info,
                 )
 
                 ready_sessions.append(session_data)
@@ -2546,6 +2549,7 @@ class ScheduleDBSource:
                 session_id=session.id,
                 creation_id=session.creation_id,
                 access_key=session.access_key,
+                reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
 
@@ -2590,6 +2594,7 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id,
                     access_key=session.access_key,
+                    reason="triggered-by-scheduler",
                 )
             )
 

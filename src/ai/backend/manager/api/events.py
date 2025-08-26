@@ -37,6 +37,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
 )
 from ai.backend.common.events.event_types.session.broadcast import (
     BaseSessionEvent,
+    SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionFailureBroadcastEvent,
@@ -52,7 +53,8 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.common import GenericForbidden, ObjectNotFound
+from ..errors.common import GenericForbidden
+from ..errors.kernel import SessionNotFound
 from ..errors.resource import GroupNotFound
 from ..events.hub.propagators.session import SessionEventPropagator
 from ..exceptions import InvalidArgument
@@ -103,18 +105,18 @@ async def push_session_events(
         if access_key != request["keypair"]["access_key"]:
             raise GenericForbidden
     group_name = params["group_name"]
+    if scope == "*":
+        # Coalesce the legacy default value.
+        scope = "session,kernel"
 
     log.info(
-        "PUSH_SESSION_EVENTS (ak:{}, s:{} / s:{}, g:{})",
+        "PUSH_SESSION_EVENTS (ak:{}, s:{} / s:{}, g:{}, scope:{})",
         access_key,
         session_name,
         session_id,
         group_name,
+        scope,
     )
-
-    if scope == "*":
-        # Coalesce the legacy default value.
-        scope = "session,kernel"
 
     # Resolve session name to session ID
     if session_name == "*":
@@ -125,7 +127,7 @@ async def push_session_events(
                 db_sess, session_name, access_key, allow_prefix=False
             )
             if not rows:
-                raise ObjectNotFound(object_name="session")
+                raise SessionNotFound
             session_id = rows[0].id
     if session_id is None:
         raise InvalidArgument("Either session_name or session_id must be given.")
@@ -224,12 +226,13 @@ async def push_background_task_events(
 async def _propagate_events(
     app: web.Application,
     agent_id: AgentId,
-    event: BaseSessionEvent | BaseKernelEvent,
+    event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
 ) -> None:
     """
     A private connector from EventDispatcher subscription to EventHub.
     """
     root_ctx: RootContext = app["_root.context"]
+    log.trace("api.events._propagate_event({!r})", event)
     await root_ctx.event_hub.propagate_event(event)
 
 
@@ -264,6 +267,9 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, _propagate_events)
+    # NOTE: SchedulingBroadcastEvent will replace most other session-related events
+    # since the Sokovan scheduler has been introduced.
+    event_dispatcher.subscribe(SchedulingBroadcastEvent, app, _propagate_events)
     yield
 
 
