@@ -1849,7 +1849,7 @@ input DeploymentStatusFilter
   @join__type(graph: STRAWBERRY)
 {
   in: [DeploymentStatus!] = null
-  equals: [DeploymentStatus!] = null
+  equals: DeploymentStatus = null
 }
 
 """Added in 25.13.0"""

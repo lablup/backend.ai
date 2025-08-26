@@ -475,7 +475,7 @@ type DeploymentStatusChangedPayload {
 """Added in 25.13.0"""
 input DeploymentStatusFilter {
   in: [DeploymentStatus!] = null
-  equals: [DeploymentStatus!] = null
+  equals: DeploymentStatus = null
 }
 
 """Added in 25.13.0"""
