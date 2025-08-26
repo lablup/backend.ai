@@ -56,6 +56,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
+    DoRecalculateUsageEvent,
     DoUpdateSessionStatusEvent,
     SessionCancelledAnycastEvent,
     SessionCheckingPrecondAnycastEvent,
@@ -275,6 +276,8 @@ class SchedulerDispatcher(aobject):
     scale_timer: GlobalTimer
     update_session_status_timer: GlobalTimer
 
+    _recalc_usage_timer: GlobalTimer
+
     redis_live: RedisConnectionInfo
     redis_stat: RedisConnectionInfo
 
@@ -346,11 +349,20 @@ class SchedulerDispatcher(aobject):
             initial_delay=3.0,
             task_name="update_session_status_timer",
         )
+        self._recalc_usage_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_RECALC_USAGE_TIMER, 10.0),
+            self.event_producer,
+            lambda: DoRecalculateUsageEvent(),
+            interval=60.0,
+            initial_delay=3.0,
+            task_name="recalc_usage_timer",
+        )
         await self.schedule_timer.join()
         await self.check_precond_timer.join()
         await self.session_start_timer.join()
         await self.scale_timer.join()
         await self.update_session_status_timer.join()
+        await self._recalc_usage_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
@@ -360,6 +372,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.session_start_timer.leave())
             tg.create_task(self.schedule_timer.leave())
             tg.create_task(self.update_session_status_timer.leave())
+            tg.create_task(self._recalc_usage_timer.leave())
         await self.redis_live.close()
         log.info("Session scheduler stopped")
 

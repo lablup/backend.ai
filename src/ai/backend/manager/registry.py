@@ -299,8 +299,6 @@ class AgentRegistry:
             self,
         )
 
-        self._recalc_resource_loop = asyncio.create_task(self._recalc_resource_usage_periodically())
-
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
         self.session_creation_tracker = {}
@@ -309,7 +307,6 @@ class AgentRegistry:
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def shutdown(self) -> None:
-        self._recalc_resource_loop.cancel()
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
@@ -2200,15 +2197,6 @@ class AgentRegistry:
             if cursor == 0:
                 break
         return result
-
-    async def _recalc_resource_usage_periodically(self) -> None:
-        while True:
-            try:
-                await self.recalc_resource_usage(do_fullscan=True)
-                log.debug("Recalculated resource usage periodically")
-            except Exception:
-                log.exception("Failed to recalculate resource usage periodically")
-            await asyncio.sleep(60)
 
     async def destroy_session_lowlevel(
         self,

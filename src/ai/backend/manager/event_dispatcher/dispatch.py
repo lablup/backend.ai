@@ -49,6 +49,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
+    DoRecalculateUsageEvent,
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
     ExecutionCancelledAnycastEvent,
@@ -145,6 +146,7 @@ class Dispatchers:
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_schedule_events(event_dispatcher)
+        self._dispatch_usage_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
@@ -334,6 +336,14 @@ class Dispatchers:
             DoUpdateSessionStatusEvent,
             None,
             self._schedule_event_handler.handle_do_update_session_status,
+        )
+
+    def _dispatch_usage_events(self, event_dispatcher: EventDispatcher) -> None:
+        event_dispatcher.consume(
+            DoRecalculateUsageEvent,
+            None,
+            self._schedule_event_handler.handle_do_recalculate_usage,
+            name="recalc.usage",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

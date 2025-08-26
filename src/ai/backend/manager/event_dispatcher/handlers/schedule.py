@@ -8,6 +8,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
+    DoRecalculateUsageEvent,
     DoUpdateSessionStatusEvent,
     SessionEnqueuedAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -59,3 +60,8 @@ class ScheduleEventHandler:
         self, context: None, agent_id: str, ev: DoUpdateSessionStatusEvent
     ) -> None:
         await self._scheduler_dispatcher.update_session_status()
+
+    async def handle_do_recalculate_usage(
+        self, context: None, agent_id: str, ev: DoRecalculateUsageEvent
+    ) -> None:
+        await self._scheduler_dispatcher.registry.recalc_resource_usage(do_fullscan=True)
