@@ -736,9 +736,9 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/reservoir-not-found"
-    error_title = "Reservoir Not Found"
+class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-registry-not-found"
+    error_title = "Artifact Registry Not Found"
 
     @classmethod
     def error_code(cls) -> ErrorCode:

@@ -29,7 +29,6 @@ class ReservoirRegistryRow(Base):
     __tablename__ = "reservoir_registries"
 
     id = IDColumn("id")
-    name = sa.Column("name", sa.String, index=True, unique=True, nullable=False)
     endpoint = sa.Column("endpoint", sa.String, nullable=False)
     access_key = sa.Column("access_key", sa.String, nullable=False)
     secret_key = sa.Column("secret_key", sa.String, nullable=False)

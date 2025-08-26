@@ -153,7 +153,6 @@ class UpdateReservoirRegistryInput:
 
     def to_modifier(self) -> ReservoirRegistryModifier:
         return ReservoirRegistryModifier(
-            name=OptionalState[str].from_graphql(self.name),
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),
