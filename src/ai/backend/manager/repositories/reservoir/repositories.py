@@ -6,7 +6,7 @@ from ai.backend.manager.repositories.reservoir.repository import ReservoirRegist
 
 
 @dataclass
-class ReservoirRepositories:
+class ReservoirRegistryRepositories:
     repository: ReservoirRegistryRepository
 
     @classmethod
