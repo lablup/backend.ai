@@ -53,6 +53,8 @@ from .object_storage import (
 from .reservoir import (
     create_reservoir,
     delete_reservoir,
+    reservoir,
+    reservoirs,
     update_reservoir,
 )
 
@@ -72,6 +74,8 @@ class Query:
     object_storages = object_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
+    reservoir = reservoir
+    reservoirs = reservoirs
 
 
 @strawberry.type

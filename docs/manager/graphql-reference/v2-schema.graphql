@@ -796,6 +796,12 @@ type Query {
 
   """Added in 25.13.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
+
+  """Added in 25.13.0"""
+  reservoir(id: ID!): Reservoir
+
+  """Added in 25.13.0"""
+  reservoirs(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirConnection!
 }
 
 type RawServiceConfig {
@@ -844,6 +850,25 @@ type Reservoir implements Node {
   id: ID!
   name: String!
   endpoint: String!
+}
+
+"""Added in 25.13.0"""
+type ReservoirConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReservoirEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReservoirEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Reservoir!
 }
 
 type ResourceConfig {
