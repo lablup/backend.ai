@@ -243,26 +243,22 @@ class ValkeyBgtaskClient:
             match result_type:
                 case _ScriptResult.TTL_SUFFICIENT:
                     log.debug(
-                        "Task TTL sufficient, skipping (id: {}, key: {}, info: {})",
+                        "Task TTL sufficient, skipping (id: {})",
                         task_id,
-                        key,
-                        result_type,
                     )
                     continue
                 case _ScriptResult.KEY_NOT_EXIST | _ScriptResult.NO_EXPIRY:
                     log.warning(
-                        "Task key not exist or no expiry, skipping (id: {}, key: {}, info: {})",
+                        "Task key not exist or no expiry, skipping (id: {}, result: {})",
                         task_id,
-                        key,
                         result_type,
                     )
                     continue
                 case _ScriptResult.TTL_INSUFFICIENT:
                     log.info(
-                        "Task TTL insufficient, fetching metadata (id: {}, key: {}, info: {})",
+                        "Task TTL insufficient, fetching metadata (id: {}, metadata: {})",
                         task_id,
-                        key,
-                        result_type,
+                        metadata,
                     )
                     if metadata is None:
                         continue
@@ -275,15 +271,13 @@ class ValkeyBgtaskClient:
         self, raw_result: list[bytes]
     ) -> tuple[_ScriptResult, Optional[BackgroundTaskMetadata]]:
         result_type = _ScriptResult.from_bytes(raw_result[0])
-        if len(raw_result) == 1:
-            metadata = None
-        else:
+        metadata: Optional[BackgroundTaskMetadata] = None
+        if len(raw_result) == 2:
             raw_metadata = raw_result[1]
             try:
                 metadata = BackgroundTaskMetadata.from_json(raw_metadata)
             except InvalidTaskMetadataError:
                 log.exception("Invalid bgtask metadata (data: {})", raw_metadata)
-                metadata = None
         return result_type, metadata
 
     @valkey_decorator()
