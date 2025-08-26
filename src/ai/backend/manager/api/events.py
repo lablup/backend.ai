@@ -120,7 +120,7 @@ async def push_session_events(
     if session_name == "*":
         raise InvalidArgument("Wildcard session ID is not yet supported in the Event Hub.")
     else:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
             rows = await SessionRow.match_sessions(
                 db_sess, session_name, access_key, allow_prefix=False
             )
@@ -134,7 +134,7 @@ async def push_session_events(
     if group_name == "*":
         group_id = "*"
     else:
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
             query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
