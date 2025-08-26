@@ -241,7 +241,10 @@ class Services:
             object_storage_repository=repositories.object_storage.repository,
             storage_manager=args.storage_manager,
         )
-        artifact_registry = ArtifactRegistryService(repositories.huggingface_registry.repository)
+        artifact_registry = ArtifactRegistryService(
+            repositories.huggingface_registry.repository,
+            repositories.reservoir.repository,
+        )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
             storage_manager=args.storage_manager,

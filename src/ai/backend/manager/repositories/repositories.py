@@ -23,6 +23,7 @@ from ai.backend.manager.repositories.object_storage.repositories import ObjectSt
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
+from ai.backend.manager.repositories.reservoir.repositories import ReservoirRepositories
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
@@ -48,6 +49,7 @@ class Repositories:
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
+    reservoir: ReservoirRepositories
     resource_preset: ResourcePresetRepositories
     schedule: ScheduleRepositories
     scheduler: SchedulerRepositories
@@ -72,6 +74,7 @@ class Repositories:
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
+        reservoir_repositories = ReservoirRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
@@ -95,6 +98,7 @@ class Repositories:
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             project_resource_policy=project_resource_policy_repositories,
+            reservoir=reservoir_repositories,
             resource_preset=resource_preset_repositories,
             schedule=schedule_repositories,
             scheduler=scheduler_repositories,

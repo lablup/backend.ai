@@ -23,6 +23,26 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.update im
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
+    CreateReservoirAction,
+    CreateReservoirActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
+    DeleteReservoirAction,
+    DeleteReservoirActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
+    GetReservoirAction,
+    GetReservoirActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
+    ListReservoirAction,
+    ListReservoirActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
+    UpdateReservoirAction,
+    UpdateReservoirActionResult,
+)
 
 from .service import ArtifactRegistryService
 
@@ -43,6 +63,11 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_huggingface_registries: ActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
+    create_reservoir: ActionProcessor[CreateReservoirAction, CreateReservoirActionResult]
+    update_reservoir: ActionProcessor[UpdateReservoirAction, UpdateReservoirActionResult]
+    delete_reservoir: ActionProcessor[DeleteReservoirAction, DeleteReservoirActionResult]
+    get_reservoir: ActionProcessor[GetReservoirAction, GetReservoirActionResult]
+    list_reservoirs: ActionProcessor[ListReservoirAction, ListReservoirActionResult]
 
     def __init__(
         self, service: ArtifactRegistryService, action_monitors: list[ActionMonitor]
@@ -62,6 +87,11 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_huggingface_registries = ActionProcessor(
             service.list_huggingface_registry, action_monitors
         )
+        self.create_reservoir = ActionProcessor(service.create_reservoir, action_monitors)
+        self.update_reservoir = ActionProcessor(service.update_reservoir, action_monitors)
+        self.delete_reservoir = ActionProcessor(service.delete_reservoir, action_monitors)
+        self.get_reservoir = ActionProcessor(service.get_reservoir, action_monitors)
+        self.list_reservoirs = ActionProcessor(service.list_reservoirs, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -71,4 +101,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             DeleteHuggingFaceRegistryAction.spec(),
             GetHuggingFaceRegistryAction.spec(),
             ListHuggingFaceRegistryAction.spec(),
+            CreateReservoirAction.spec(),
+            UpdateReservoirAction.spec(),
+            DeleteReservoirAction.spec(),
+            GetReservoirAction.spec(),
+            ListReservoirAction.spec(),
         ]
