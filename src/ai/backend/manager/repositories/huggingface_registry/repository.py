@@ -122,29 +122,24 @@ class HuggingFaceRepository:
                 sa.update(HuggingFaceRegistryRow)
                 .where(HuggingFaceRegistryRow.id == registry_id)
                 .values(**data)
-                .returning(*sa.select(HuggingFaceRegistryRow).selected_columns)
+                .returning(HuggingFaceRegistryRow.id)
             )
-            row: HuggingFaceRegistryRow = (
-                (
-                    await db_session.execute(
-                        sa.select(HuggingFaceRegistryRow).from_statement(update_stmt)
-                    )
-                )
-                .scalars()
-                .one()
-            )
+
+            result = await db_session.execute(update_stmt)
+            inserted_row_id = result.scalar()
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
                     sa.update(ArtifactRegistryRow)
-                    .where(ArtifactRegistryRow.registry_id == row.id)
+                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
                     .values(name=name)
                 )
 
+            # Reselect for the `selectinload`
             row = (
                 await db_session.execute(
                     sa.select(HuggingFaceRegistryRow)
-                    .where(HuggingFaceRegistryRow.id == row.id)
+                    .where(HuggingFaceRegistryRow.id == inserted_row_id)
                     .options(selectinload(HuggingFaceRegistryRow.meta))
                 )
             ).scalar_one()

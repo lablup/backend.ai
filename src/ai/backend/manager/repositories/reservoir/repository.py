@@ -104,29 +104,23 @@ class ReservoirRegistryRepository:
                 sa.update(ReservoirRegistryRow)
                 .where(ReservoirRegistryRow.id == reservoir_id)
                 .values(**data)
-                .returning(*sa.select(ReservoirRegistryRow).selected_columns)
+                .returning(ReservoirRegistryRow.id)
             )
-            row: ReservoirRegistryRow = (
-                (
-                    await db_session.execute(
-                        sa.select(ReservoirRegistryRow).from_statement(update_stmt)
-                    )
-                )
-                .scalars()
-                .one()
-            )
+            result = await db_session.execute(update_stmt)
+            inserted_row_id = result.scalar()
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
                     sa.update(ArtifactRegistryRow)
-                    .where(ArtifactRegistryRow.registry_id == reservoir_id)
+                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
                     .values(name=name)
                 )
 
+            # Reselect for the `selectinload`
             row = (
                 await db_session.execute(
                     sa.select(ReservoirRegistryRow)
-                    .where(ReservoirRegistryRow.id == row.id)
+                    .where(ReservoirRegistryRow.id == inserted_row_id)
                     .options(selectinload(ReservoirRegistryRow.meta))
                 )
             ).scalar_one()
