@@ -63,5 +63,5 @@ class BackgroundTaskMetadata(BaseModel):
         """Create from Redis hash data"""
         try:
             return cls.model_validate_json(data)
-        except ValidationError:
-            raise InvalidTaskMetadataError
+        except ValidationError as e:
+            raise InvalidTaskMetadataError from e
