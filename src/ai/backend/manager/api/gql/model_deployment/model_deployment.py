@@ -1,22 +1,19 @@
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import AsyncGenerator, Optional, cast
-from uuid import UUID, uuid4
+from typing import AsyncGenerator, Optional
+from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info, relay
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
-from strawberry.relay.types import NodeIterableType
 
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy as CommonDeploymentStrategy,
 )
-from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
-from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessTokenConnection,
     AccessTokenEdge,
@@ -31,10 +28,12 @@ from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     mock_scaling_rule_1,
     mock_scaling_rule_2,
 )
-from ai.backend.manager.api.gql.model_deployment.routing import (
-    RoutingEdge,
-    RoutingNode,
-    RoutingNodeConnection,
+from ai.backend.manager.api.gql.model_deployment.model_replica import (
+    ModelReplicaConnection,
+    ModelReplicaEdge,
+    mock_model_replica_1,
+    mock_model_replica_2,
+    mock_model_replica_3,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
@@ -63,12 +62,6 @@ DeploymentStrategyType = strawberry.enum(
 
 
 @strawberry.enum(description="Added in 25.13.0")
-class ReplicaStatus(StrEnum):
-    HEALTHY = "HEALTHY"
-    UNHEALTHY = "UNHEALTHY"
-
-
-@strawberry.enum(description="Added in 25.13.0")
 class DeploymentOrderField(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
@@ -78,45 +71,6 @@ class DeploymentOrderField(StrEnum):
 @strawberry.type(description="Added in 25.13.0")
 class DeploymentStrategy:
     type: DeploymentStrategyType
-
-
-@strawberry.type(description="Added in 25.13.0")
-class ModelReplica(Node):
-    id: NodeID
-    name: str
-    status: ReplicaStatus
-    revision: ModelRevision
-    routings: RoutingNodeConnection
-
-
-@strawberry.type(description="Added in 25.13.0")
-class ModelReplicaConnection(Connection[ModelReplica]):
-    @strawberry.field
-    def count(self) -> int:
-        return 0
-
-    @classmethod
-    def resolve_connection(
-        cls,
-        nodes: NodeIterableType[ModelReplica],
-        *,
-        info: Info,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        max_results: Optional[int] = None,
-        **kwargs,
-    ) -> "ModelReplicaConnection":
-        return cls(
-            edges=[],
-            page_info=relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        )
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -186,22 +140,6 @@ class DeploymentFilter:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class ReplicaStatusFilter:
-    in_: Optional[list[ReplicaStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[ReplicaStatus] = None
-
-
-@strawberry.input(description="Added in 25.13.0")
-class ReplicaFilter:
-    status: Optional[ReplicaStatusFilter] = None
-
-    AND: Optional[list["ReplicaFilter"]] = None
-    OR: Optional[list["ReplicaFilter"]] = None
-    NOT: Optional[list["ReplicaFilter"]] = None
-    DISTINCT: Optional[bool] = None
-
-
-@strawberry.input(description="Added in 25.13.0")
 class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -226,11 +164,6 @@ class DeleteModelDeploymentPayload:
 @strawberry.type(description="Added in 25.13.0")
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
-
-
-@strawberry.type(description="Added in 25.13.0")
-class ReplicaStatusChangedPayload:
-    replica: ModelReplica
 
 
 # Input Types
@@ -276,122 +209,6 @@ class UpdateModelDeploymentInput:
 class DeleteModelDeploymentInput:
     id: ID
 
-
-# Mock Model Replicas
-mock_replica_id_1 = "b62f9890-228a-40c9-a614-63387805b9a7"
-mock_routing_id_1 = "60bf21b8-21a9-4655-aaeb-479a4ef02358"
-mock_model_replica_1 = ModelReplica(
-    id=UUID(mock_replica_id_1),
-    name="llama-3-8b-instruct-replica-01",
-    status=ReplicaStatus.HEALTHY,
-    revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID(mock_routing_id_1),
-                    routing_id=uuid4(),
-                    endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.HEALTHY,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=1,
-                    detail={},
-                    created_at=datetime.now() - timedelta(days=5),
-                    live_stat=cast(
-                        JSONString,
-                        '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}',
-                    ),
-                ),
-                cursor="routing-cursor-1",
-            )
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-1",
-            end_cursor="routing-cursor-5",
-        ),
-    ),
-)
-
-mock_replica_id_2 = "7562e9d4-a368-4e28-9092-65eb91534bac"
-mock_routing_id_2 = "21ede864-725d-4933-96f6-6df727f92217"
-mock_model_replica_2 = ModelReplica(
-    id=UUID(mock_replica_id_2),
-    name="llama-3-8b-instruct-replica-02",
-    status=ReplicaStatus.HEALTHY,
-    revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID(mock_routing_id_2),
-                    routing_id=uuid4(),
-                    endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.HEALTHY,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=2,
-                    detail={},
-                    created_at=datetime.now() - timedelta(days=5),
-                    live_stat=cast(
-                        JSONString,
-                        '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}',
-                    ),
-                ),
-                cursor="token-cursor-2",
-            )
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-2",
-            end_cursor="routing-cursor-2",
-        ),
-    ),
-)
-
-mock_replica_id_3 = "2a2388ea-a312-422a-b77e-0e0b61c48145"
-mock_routing_id_3 = "9613c8d1-53f1-4b8a-9cc4-6333d00afef0"
-mock_model_replica_3 = ModelReplica(
-    id=UUID(mock_replica_id_3),
-    name="llama-3-8b-instruct-replica-03",
-    status=ReplicaStatus.UNHEALTHY,
-    revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID(mock_routing_id_3),
-                    routing_id=uuid4(),
-                    endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.NOT_CHECKED,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=1,
-                    detail={},
-                    created_at=datetime.now() - timedelta(days=2),
-                    live_stat=cast(
-                        JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
-                    ),
-                ),
-                cursor="routing-cursor-3",
-            ),
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-3",
-            end_cursor="routing-cursor-3",
-        ),
-    ),
-)
-
-ModelReplicaEdge = Edge[ModelReplica]
 
 # TODO: After implementing the actual logic, remove these mock objects
 # Mock Model Deployments
@@ -445,6 +262,7 @@ mock_model_deployment_1 = ModelDeployment(
     replica_state=ReplicaState(
         desired_replica_count=3,
         replicas=ModelReplicaConnection(
+            count=3,
             edges=[
                 ModelReplicaEdge(node=mock_model_replica_1, cursor="replica-cursor-1"),
                 ModelReplicaEdge(node=mock_model_replica_2, cursor="replica-cursor-2"),
@@ -529,6 +347,7 @@ mock_model_deployment_2 = ModelDeployment(
     replica_state=ReplicaState(
         desired_replica_count=1,
         replicas=ModelReplicaConnection(
+            count=2,
             edges=[
                 ModelReplicaEdge(node=mock_model_replica_1, cursor="replica-cursor-1"),
                 ModelReplicaEdge(node=mock_model_replica_2, cursor="replica-cursor-2"),
@@ -612,6 +431,7 @@ mock_model_deployment_3 = ModelDeployment(
     replica_state=ReplicaState(
         desired_replica_count=0,
         replicas=ModelReplicaConnection(
+            count=0,
             edges=[],
             page_info=PageInfo(
                 has_next_page=False,
@@ -721,46 +541,6 @@ async def deployment(id: ID) -> Optional[ModelDeployment]:
     return mock_model_deployment_1
 
 
-@strawberry.field(description="Added in 25.13.0")
-async def replica(id: ID) -> Optional[ModelReplica]:
-    """Get a specific replica by ID."""
-
-    return ModelReplica(
-        id=id,
-        name="llama-3-8b-instruct-replica-01",
-        status=ReplicaStatus.HEALTHY,
-        revision=mock_model_revision_1,
-        routings=RoutingNodeConnection(
-            count=1,
-            edges=[
-                RoutingEdge(
-                    node=RoutingNode(
-                        id=UUID(mock_routing_id_1),
-                        routing_id=uuid4(),
-                        endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
-                        session_id=uuid4(),
-                        readiness_status=CommonReadinessStatus.NOT_CHECKED,
-                        liveness_status=CommonLivenessStatus.HEALTHY,
-                        weight=1,
-                        detail={},
-                        created_at=datetime.now() - timedelta(days=2),
-                        live_stat=cast(
-                            JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
-                        ),
-                    ),
-                    cursor="routing-cursor-1",
-                ),
-            ],
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor="routing-cursor-1",
-                end_cursor="routing-cursor-1",
-            ),
-        ),
-    )
-
-
 @strawberry.mutation(description="Added in 25.13.0")
 async def create_model_deployment(
     input: CreateModelDeploymentInput,
@@ -796,14 +576,3 @@ async def deployment_status_changed(
 
     for dep in deployment:
         yield DeploymentStatusChangedPayload(deployment=dep)
-
-
-@strawberry.subscription(description="Added in 25.13.0")
-async def replica_status_changed(
-    revision_id: ID,
-) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
-    """Subscribe to replica status changes."""
-    replicas = [mock_model_replica_1, mock_model_replica_2, mock_model_replica_3]
-
-    for replica in replicas:
-        yield ReplicaStatusChangedPayload(replica=replica)
