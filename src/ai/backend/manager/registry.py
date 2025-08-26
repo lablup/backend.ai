@@ -2147,34 +2147,26 @@ class AgentRegistry:
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
+            keys = await self._scan_keys(r, f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
+                ak = stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
                 concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
                     len(concurrent_sessions.compute_session_ids)
                     if concurrent_sessions is not None
                     else 0
                 )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
+                updates[stat_key] = usage
+            keys = await self._scan_keys(r, f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
+                ak = stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
                 concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
                     len(concurrent_sessions.system_concurrency_used_key)
                     if concurrent_sessions is not None
                     else 0
                 )
-                updates[_stat_key] = usage
+                updates[stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2191,6 +2183,20 @@ class AgentRegistry:
                 self.redis_stat,
                 _update,
             )
+
+    async def _scan_keys(self, redis: Redis, pattern: str) -> list[str]:
+        cursor = 0
+        result: list[str] = []
+        while True:
+            cursor, keys = await redis.scan(cursor=cursor, match=pattern, count=100)
+            for key in keys:
+                if isinstance(key, bytes):
+                    result.append(key.decode("utf-8"))
+                else:
+                    result.append(cast(str, key))
+            if cursor == 0:
+                break
+        return result
 
     async def destroy_session_lowlevel(
         self,

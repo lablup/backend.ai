@@ -49,6 +49,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
+    DoRecalculateUsageEvent,
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
     ExecutionCancelledAnycastEvent,
@@ -74,6 +75,7 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
+from ai.backend.manager.event_dispatcher.handlers.usage import UsageEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
@@ -107,6 +109,7 @@ class Dispatchers:
     _image_event_handler: ImageEventHandler
     _kernel_event_handler: KernelEventHandler
     _schedule_event_handler: ScheduleEventHandler
+    _usage_event_handler: UsageEventHandler
     _model_serving_event_handler: ModelServingEventHandler
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
@@ -126,6 +129,7 @@ class Dispatchers:
             args.valkey_stream, args.agent_registry, args.db
         )
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
+        self._usage_event_handler = UsageEventHandler(args.agent_registry)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,
@@ -145,6 +149,7 @@ class Dispatchers:
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_schedule_events(event_dispatcher)
+        self._dispatch_usage_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
@@ -334,6 +339,14 @@ class Dispatchers:
             DoUpdateSessionStatusEvent,
             None,
             self._schedule_event_handler.handle_do_update_session_status,
+        )
+
+    def _dispatch_usage_events(self, event_dispatcher: EventDispatcher) -> None:
+        event_dispatcher.consume(
+            DoRecalculateUsageEvent,
+            None,
+            self._usage_event_handler.handle_do_recalculate_usage,
+            name="recalc.usage",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

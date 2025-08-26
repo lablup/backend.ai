@@ -42,6 +42,14 @@ class DoUpdateSessionStatusEvent(SessionLifecycleEvent):
 
 
 @dataclass
+class DoRecalculateUsageEvent(SessionLifecycleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_recalculate_usage"
+
+
+@dataclass
 class BaseSessionEvent(AbstractAnycastEvent):
     session_id: SessionId
 
