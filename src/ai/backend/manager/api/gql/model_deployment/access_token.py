@@ -1,16 +1,14 @@
 from datetime import datetime, timedelta
-from typing import Any, Optional
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
-from strawberry.relay.types import NodeIterableType
+from strawberry import ID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 
 @strawberry.type
 class AccessToken(Node):
-    id: NodeID  # Inherits from Node, no need for strawberry.field()
+    id: NodeID
     token: str = strawberry.field(description="Added in 25.13.0: The access token.")
     created_at: datetime = strawberry.field(
         description="Added in 25.13.0: The creation timestamp of the access token."
@@ -25,30 +23,11 @@ AccessTokenEdge = Edge[AccessToken]
 
 @strawberry.type(description="Added in 25.13.0")
 class AccessTokenConnection(Connection[AccessToken]):
-    @strawberry.field
-    def count(self) -> int:
-        return 0
+    count: int
 
-    @classmethod
-    def resolve_connection(
-        cls,
-        nodes: NodeIterableType[AccessToken],
-        *,
-        info: Optional[Info] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        max_results: Optional[int] = None,
-        **kwargs: Any,
-    ):
-        """Resolve the connection for Relay pagination."""
-        return cls(
-            edges=[],
-            page_info=PageInfo(
-                has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
-            ),
-        )
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 mock_access_token_1 = AccessToken(
