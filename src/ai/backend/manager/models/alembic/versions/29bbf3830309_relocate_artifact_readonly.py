@@ -1,4 +1,4 @@
-"""empty message
+"""Relocate artifact revision's readonly column
 
 Revision ID: 29bbf3830309
 Revises: 902837cf18b4
