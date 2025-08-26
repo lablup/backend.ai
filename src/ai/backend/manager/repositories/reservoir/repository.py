@@ -1,6 +1,7 @@
 import uuid
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import ReservoirNotFoundError
 from ai.backend.common.metrics.metric import LayerType
@@ -74,7 +75,12 @@ class ReservoirRegistryRepository:
             )
             await db.execute(reg_insert)
 
-            stmt = sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.id == reservoir_id)
+            stmt = (
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id == reservoir_id)
+                .options(selectinload(ReservoirRegistryRow.meta))
+            )
+
             row: ReservoirRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {reservoir_id} not found")
@@ -117,6 +123,14 @@ class ReservoirRegistryRepository:
                     .values(name=name)
                 )
 
+            row = (
+                await db_session.execute(
+                    sa.select(ReservoirRegistryRow)
+                    .where(ReservoirRegistryRow.id == row.id)
+                    .options(selectinload(ReservoirRegistryRow.meta))
+                )
+            ).scalar_one()
+
             return row.to_dataclass()
 
     @repository_decorator()
@@ -145,7 +159,7 @@ class ReservoirRegistryRepository:
         List all Reservoir entries from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ReservoirRegistryRow)
+            query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
             result = await db_session.execute(query)
             rows: list[ReservoirRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
