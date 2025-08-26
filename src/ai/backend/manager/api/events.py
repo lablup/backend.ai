@@ -153,24 +153,21 @@ async def push_session_events(
         "scope": scope,
     }
     aliases = []
+    for item in scope.split(","):
+        match item:
+            case "session":
+                aliases.append((EventDomain.SESSION, str(session_id)))
+            case "kernel":
+                aliases.append((EventDomain.KERNEL, str(session_id)))
+            case _:
+                raise InvalidArgument(f"Invalid scope: {scope}")
 
     async with sse_response(request) as resp:
+        while not resp.prepared:
+            await asyncio.sleep(0.1)
         propagator = SessionEventPropagator(resp, root_ctx.db, filters)
-        for item in scope.split(","):
-            match item:
-                case "session":
-                    aliases.append((EventDomain.SESSION, str(session_id)))
-                case "kernel":
-                    aliases.append((EventDomain.KERNEL, str(session_id)))
-                case _:
-                    raise InvalidArgument(f"Invalid scope: {scope}")
         root_ctx.event_hub.register_event_propagator(propagator, aliases)
         try:
-            # Keep the connection alive until closed
-            while not resp.prepared:
-                await asyncio.sleep(0.1)
-
-            # Wait for the response to be closed
             await resp.wait()
         finally:
             root_ctx.event_hub.unregister_event_propagator(propagator.id())
