@@ -1002,6 +1002,8 @@ configure_backendai() {
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
