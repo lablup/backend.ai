@@ -83,5 +83,5 @@ class ArtifactRegistryService:
         List all huggingface registries.
         """
         log.info("Listing huggingface registries")
-        registry_data_list = await self._huggingface_registry_repository.list_repositories()
+        registry_data_list = await self._huggingface_registry_repository.list_registries()
         return ListHuggingFaceRegistryActionResult(data=registry_data_list)
