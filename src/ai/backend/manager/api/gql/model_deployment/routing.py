@@ -1,12 +1,9 @@
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 import strawberry
-from strawberry.relay import Connection, Node, NodeID, PageInfo
-from strawberry.relay.types import NodeIterableType
+from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
-from strawberry.types import Info
 
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
@@ -47,27 +44,13 @@ class RoutingNode(Node):
     )
 
 
+RoutingEdge = Edge[RoutingNode]
+
+
 @strawberry.type(description="Added in 25.13.0")
 class RoutingNodeConnection(Connection[RoutingNode]):
-    @classmethod
-    def resolve_connection(
-        cls,
-        nodes: NodeIterableType[RoutingNode],
-        *,
-        info: Info,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        max_results: Optional[int] = None,
-        **kwargs,
-    ) -> "RoutingNodeConnection":
-        return cls(
-            edges=[],
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=None,
-                end_cursor=None,
-            ),
-        )
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
