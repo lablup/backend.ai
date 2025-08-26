@@ -10,7 +10,7 @@ from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.models.reservoir import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for reservoir repository
