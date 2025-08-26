@@ -57,8 +57,7 @@ class _ScriptResult(enum.StrEnum):
 
 class ValkeyBgtaskClient:
     """
-    Client for background task management operations using Valkey/Glide.
-    Provides task-specific methods instead of generic Redis operations.
+    Client for background task management using Valkey/Glide.
     """
 
     _client: AbstractValkeyClient
@@ -81,10 +80,6 @@ class ValkeyBgtaskClient:
     ) -> Self:
         """
         Create a ValkeyBgtaskClient instance.
-
-        :param valkey_target: The target Valkey server to connect to.
-        :param db_id: The database index to use.
-        :param human_readable_name: The human-readable name for the client.
         """
         client = create_valkey_client(
             valkey_target,
@@ -101,28 +96,19 @@ class ValkeyBgtaskClient:
             self._closed = True
 
     def _get_tag_key(self, tag: str) -> str:
-        """Get key for tag"""
         return f"{_TAG_KEY_PREFIX}:{tag}"
 
     def _get_server_key(self, server_id: str) -> str:
-        """Get key for server-specific task set"""
         return f"{_SERVER_KEY_PREFIX}:{server_id}"
 
     def _get_task_key(self, task_id: TaskID) -> str:
-        """Get key for individual task metadata"""
         return f"{_TASK_KEY_PREFIX}:{task_id}"
 
     # Task metadata operations
     @valkey_decorator()
     async def register_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Register a background task with automatic expiration.
-
-        Stores task metadata with 24-hour TTL and indexes it by server type
-        and server ID for efficient lookup.
-
-        Args:
-            metadata: Task metadata with ID, server info, and configuration
+        Register a background task with 24-hour TTL and index it by tags and server ID.
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -140,13 +126,7 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def unregister_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Remove task and all its index references.
-
-        Atomically deletes task metadata and removes from all server indexes.
-        Safe to call even if already deleted (idempotent).
-
-        Args:
-            metadata: Task metadata with ID and server associations
+        Remove task and all its index references. Idempotent operation.
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -181,13 +161,7 @@ class ValkeyBgtaskClient:
         self, tags: Collection[str]
     ) -> list[BackgroundTaskMetadata]:
         """
-        List timeout task metadata by tags.
-
-        Args:
-            tags: Collection of tags to filter tasks
-
-        Returns:
-            List of timeout task metadata associated with the tags.
+        List tasks with insufficient TTL filtered by tags.
         """
         if not tags:
             return []
@@ -199,13 +173,7 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def list_timeout_tasks_by_server_id(self, server_id: str) -> list[BackgroundTaskMetadata]:
         """
-        List timeout task metada owned by a specific server.
-
-        Args:
-            server_id: Server instance identifier
-
-        Returns:
-            List of timeout task metadata for the server.
+        List tasks with insufficient TTL owned by a specific server.
         """
         key = self._get_server_key(server_id)
         task_ids = await self._get_registered_task_ids([key])
@@ -215,15 +183,6 @@ class ValkeyBgtaskClient:
     async def _list_timeout_tasks(
         self, task_ids: Collection[TaskID]
     ) -> list[BackgroundTaskMetadata]:
-        """
-        List timeout task metadata for a given key.
-
-        Args:
-            key: Key to retrieve tasks from
-
-        Returns:
-            List of timeout task metadata.
-        """
         if not task_ids:
             return []
         script = self._task_getter_script()
@@ -283,13 +242,7 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def heartbeat(self, task_ids: Collection[TaskID]) -> None:
         """
-        Extend TTL for active tasks (heartbeat).
-
-        Resets TTL to 24 hours. Non-existent tasks ignored.
-        Call periodically for long-running tasks.
-
-        Args:
-            task_ids: Task IDs to refresh
+        Extend TTL to 24 hours for active tasks. Non-existent tasks are ignored.
         """
         if not task_ids:
             return
@@ -300,19 +253,9 @@ class ValkeyBgtaskClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
-        """
-        Create a batch object for batch operations.
-
-        :param is_atomic: Whether the batch should be atomic (transaction-like).
-        :return: A Batch object.
-        """
         return Batch(is_atomic=is_atomic)
 
     def _task_getter_script(self) -> Script:
-        """
-        Create a script to get task metadata with TTL check.
-        """
-
         code = textwrap.dedent(f"""
         -- KEYS[1]: Key
         -- ARGV[1]: TTL threshold (in seconds)
