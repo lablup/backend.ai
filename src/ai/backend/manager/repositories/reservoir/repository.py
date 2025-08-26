@@ -17,14 +17,16 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT_REGISTRY)
 
 
-class ReservoirRepository:
+class ReservoirRegistryRepository:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     @repository_decorator()
-    async def get_reservoir_data_by_id(self, reservoir_id: uuid.UUID) -> ReservoirRegistryData:
+    async def get_reservoir_registry_data_by_id(
+        self, reservoir_id: uuid.UUID
+    ) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.id == reservoir_id)
@@ -35,7 +37,7 @@ class ReservoirRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def get_reservoir_data_by_name(self, name: str) -> ReservoirRegistryData:
+    async def get_reservoir_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.name == name)
@@ -93,7 +95,7 @@ class ReservoirRepository:
             return deleted_id
 
     @repository_decorator()
-    async def list_reservoirs(self) -> list[ReservoirRegistryData]:
+    async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
         """
         List all Reservoir entries from the database.
         """

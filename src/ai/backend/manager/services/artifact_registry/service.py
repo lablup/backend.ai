@@ -2,7 +2,7 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRepository
+from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -49,12 +49,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 class ArtifactRegistryService:
     _huggingface_registry_repository: HuggingFaceRepository
-    _reservoir_repository: ReservoirRepository
+    _reservoir_repository: ReservoirRegistryRepository
 
     def __init__(
         self,
         huggingface_registry_repository: HuggingFaceRepository,
-        reservoir_repository: ReservoirRepository,
+        reservoir_repository: ReservoirRegistryRepository,
     ) -> None:
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_repository = reservoir_repository
@@ -150,7 +150,7 @@ class ArtifactRegistryService:
         Get an existing reservoir by ID.
         """
         log.info("Getting reservoir with id: {}", action.reservoir_id)
-        reservoir_data = await self._reservoir_repository.get_reservoir_data_by_id(
+        reservoir_data = await self._reservoir_repository.get_reservoir_registry_data_by_id(
             action.reservoir_id
         )
         return GetReservoirRegistryActionResult(result=reservoir_data)
@@ -162,5 +162,5 @@ class ArtifactRegistryService:
         List all reservoirs.
         """
         log.info("Listing reservoirs")
-        reservoir_data_list = await self._reservoir_repository.list_reservoirs()
+        reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
