@@ -1,6 +1,7 @@
 from . import acl as _acl
 from . import agent as _agent
 from . import artifact as _artifact
+from . import artifact_registries as _artifact_registries
 from . import artifact_revision as _artifact_revision
 from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
@@ -40,6 +41,7 @@ from .gql_models import session as _relay_session
 __all__ = (
     "metadata",
     *_acl.__all__,
+    *_artifact_registries.__all__,
     *_auditlog.__all__,
     *_agent.__all__,
     *_artifact.__all__,
@@ -79,6 +81,7 @@ __all__ = (
 )
 
 from .acl import *  # noqa
+from .artifact_registries import *  # noqa
 from .audit_log import *  # noqa
 from .artifact import *  # noqa
 from .artifact_revision import *  # noqa

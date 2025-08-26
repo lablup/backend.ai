@@ -747,3 +747,16 @@ class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/relation-not-loaded"
+    error_title = "Relation Not Loaded"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

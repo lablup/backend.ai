@@ -3,6 +3,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.exception import ArtifactRegistryNotFoundError
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
@@ -28,22 +29,26 @@ class HuggingFaceRepository:
     async def get_registry_data_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.id == registry_id)
+                sa.select(HuggingFaceRegistryRow)
+                .where(HuggingFaceRegistryRow.id == registry_id)
+                .options(selectinload(HuggingFaceRegistryRow.meta))
             )
             row: HuggingFaceRegistryRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Registry with ID {registry_id} not found")
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(HuggingFaceRegistryRow).where(HuggingFaceRegistryRow.name == name)
+                sa.select(HuggingFaceRegistryRow)
+                .where(HuggingFaceRegistryRow.name == name)
+                .options(selectinload(HuggingFaceRegistryRow.meta))
             )
             row: HuggingFaceRegistryRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Registry with name {name} not found")
+                raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -72,6 +77,18 @@ class HuggingFaceRepository:
             db_session.add(huggingface_registry_row)
             await db_session.flush()
             await db_session.refresh(huggingface_registry_row)
+
+            result = await db_session.execute(
+                sa.select(HuggingFaceRegistryRow)
+                .where(HuggingFaceRegistryRow.id == huggingface_registry_row.id)
+                .options(selectinload(HuggingFaceRegistryRow.meta))
+            )
+            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Registry with ID {huggingface_registry_row.id} not found"
+                )
+
             return huggingface_registry_row.to_dataclass()
 
     @repository_decorator()
@@ -107,6 +124,22 @@ class HuggingFaceRepository:
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
             return deleted_id
+
+    @repository_decorator()
+    async def get_registries_by_ids(
+        self, registry_ids: list[uuid.UUID]
+    ) -> list[HuggingFaceRegistryData]:
+        """
+        Get multiple Hugging Face registry entries by their IDs in a single query.
+        """
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.select(HuggingFaceRegistryRow)
+                .where(HuggingFaceRegistryRow.id.in_(registry_ids))
+                .options(selectinload(HuggingFaceRegistryRow.meta))
+            )
+            rows: list[HuggingFaceRegistryRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
 
     @repository_decorator()
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
