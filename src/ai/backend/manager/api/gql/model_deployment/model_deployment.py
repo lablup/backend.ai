@@ -8,6 +8,14 @@ from strawberry import ID, Info, relay
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.relay.types import NodeIterableType
 
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentStrategy as CommonDeploymentStrategy,
+)
+from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
+from ai.backend.common.data.model_deployment.types import (
+    ModelDeploymentStatus as CommonDeploymentStatus,
+)
+from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessTokenConnection,
@@ -39,29 +47,23 @@ from .model_revision import (
     mock_model_revision_3,
 )
 
+DeploymentStatus = strawberry.enum(
+    CommonDeploymentStatus,
+    name="DeploymentStatus",
+    description="Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.",
+)
 
-@strawberry.enum(description="Added in 25.13.0")
-class DeploymentStatus(StrEnum):
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    CREATED = "CREATED"
-    DEPLOYING = "DEPLOYING"
-    READY = "READY"
-    STOPPING = "STOPPING"
-    STOPPED = "STOPPED"
+DeploymentStrategyType = strawberry.enum(
+    CommonDeploymentStrategy,
+    name="DeploymentStrategyType",
+    description="Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+)
 
 
 @strawberry.enum(description="Added in 25.13.0")
 class ReplicaStatus(StrEnum):
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
-
-
-@strawberry.enum(description="Added in 25.13.0")
-class DeploymentStrategyType(StrEnum):
-    ROLLING = "ROLLING"
-    BLUE_GREEN = "BLUE_GREEN"
-    CANARY = "CANARY"
 
 
 @strawberry.enum(description="Added in 25.13.0")
@@ -287,8 +289,10 @@ mock_model_replica_1 = ModelReplica(
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
             session_id=uuid4(),
-            status="ACTIVE",
-            traffic_ratio=0.33,
+            readiness_status=CommonReadinessStatus.HEALTHY,
+            liveness_status=CommonLivenessStatus.HEALTHY,
+            weight=1,
+            detail={},
             created_at=datetime.now() - timedelta(days=5),
             live_stat=cast(
                 JSONString, '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}'
@@ -310,8 +314,10 @@ mock_model_replica_2 = ModelReplica(
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
             session_id=uuid4(),
-            status="ACTIVE",
-            traffic_ratio=0.33,
+            readiness_status=CommonReadinessStatus.HEALTHY,
+            liveness_status=CommonLivenessStatus.HEALTHY,
+            weight=2,
+            detail={},
             created_at=datetime.now() - timedelta(days=5),
             live_stat=cast(
                 JSONString, '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}'
@@ -333,8 +339,10 @@ mock_model_replica_3 = ModelReplica(
             routing_id=uuid4(),
             endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
             session_id=uuid4(),
-            status="INACTIVE",
-            traffic_ratio=0.0,
+            readiness_status=CommonReadinessStatus.NOT_CHECKED,
+            liveness_status=CommonLivenessStatus.HEALTHY,
+            weight=1,
+            detail={},
             created_at=datetime.now() - timedelta(days=2),
             live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
         )
@@ -351,7 +359,7 @@ mock_model_deployment_1 = ModelDeployment(
     id=UUID(mock_model_deployment_id_1),
     metadata=ModelDeploymentMetadata(
         name="Llama 3.8B Instruct",
-        status=DeploymentStatus.ACTIVE,
+        status=DeploymentStatus.CREATED,
         tags=["production", "llm", "chat", "instruct"],
         created_at=datetime.now() - timedelta(days=30),
         updated_at=datetime.now() - timedelta(hours=2),
@@ -439,7 +447,7 @@ mock_model_deployment_2 = ModelDeployment(
     id=UUID(mock_model_deployment_id_2),
     metadata=ModelDeploymentMetadata(
         name="Mistral 7B v0.3",
-        status=DeploymentStatus.ACTIVE,
+        status=DeploymentStatus.READY,
         tags=["staging", "llm", "experimental"],
         created_at=datetime.now() - timedelta(days=20),
         updated_at=datetime.now() - timedelta(days=1),
@@ -522,7 +530,7 @@ mock_model_deployment_3 = ModelDeployment(
     id=UUID(mock_model_deployment_id_3),
     metadata=ModelDeploymentMetadata(
         name="Gemma 2.9B",
-        status=DeploymentStatus.INACTIVE,
+        status=DeploymentStatus.STOPPED,
         tags=["development", "llm", "testing"],
         created_at=datetime.now() - timedelta(days=15),
         updated_at=datetime.now() - timedelta(days=7),
@@ -571,7 +579,7 @@ mock_model_deployment_3 = ModelDeployment(
             ),
         ),
     ),
-    default_deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.CANARY),
+    default_deployment_strategy=DeploymentStrategy(type=DeploymentStrategyType.BLUE_GREEN),
     created_user=User(
         id=UUID(mock_created_user_id_3),
         username="dev_user",
