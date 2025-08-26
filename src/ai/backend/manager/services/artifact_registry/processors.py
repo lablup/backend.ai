@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.artifact_registry.actions.common.get import (
+    GetArtifactRegistryAction,
+    GetArtifactRegistryActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -78,6 +82,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_reservoir_registries: ActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
+    get_artifact_registry: ActionProcessor[
+        GetArtifactRegistryAction, GetArtifactRegistryActionResult
+    ]
 
     def __init__(
         self, service: ArtifactRegistryService, action_monitors: list[ActionMonitor]
@@ -112,6 +119,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_reservoir_registries = ActionProcessor(
             service.list_reservoir_registries, action_monitors
         )
+        self.get_artifact_registry = ActionProcessor(service.get_artifact_registry, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

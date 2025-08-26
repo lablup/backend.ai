@@ -749,6 +749,19 @@ class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class InvalidArtifactRegistryTypeError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-artifact-registry-type"
+    error_title = "Invalid Artifact Registry Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/relation-not-loaded"
     error_title = "Relation Not Loaded"

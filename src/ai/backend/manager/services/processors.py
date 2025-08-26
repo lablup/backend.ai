@@ -244,6 +244,7 @@ class Services:
         artifact_registry = ArtifactRegistryService(
             repositories.huggingface_registry.repository,
             repositories.reservoir_registry.repository,
+            repositories.artifact_registry.repository,
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
