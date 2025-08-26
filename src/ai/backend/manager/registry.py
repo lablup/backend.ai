@@ -299,6 +299,8 @@ class AgentRegistry:
             self,
         )
 
+        self._recalc_resource_loop = asyncio.create_task(self._recalc_resource_usage_periodically())
+
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
         self.session_creation_tracker = {}
@@ -307,6 +309,7 @@ class AgentRegistry:
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def shutdown(self) -> None:
+        self._recalc_resource_loop.cancel()
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
@@ -2147,7 +2150,7 @@ class AgentRegistry:
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
+            keys = await self._scan_keys(r, f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
@@ -2161,7 +2164,7 @@ class AgentRegistry:
                     else 0
                 )
                 updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
+            keys = await self._scan_keys(r, f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
@@ -2191,6 +2194,28 @@ class AgentRegistry:
                 self.redis_stat,
                 _update,
             )
+
+    async def _scan_keys(self, redis: Redis, pattern: str) -> list[str]:
+        cursor = 0
+        result: list[str] = []
+        while True:
+            cursor, keys = await redis.scan(cursor=cursor, match=pattern, count=100)
+            for key in keys:
+                if isinstance(key, bytes):
+                    result.append(key.decode("utf-8"))
+                else:
+                    result.append(cast(str, key))
+            if cursor == 0:
+                break
+        return result
+
+    async def _recalc_resource_usage_periodically(self) -> None:
+        while True:
+            try:
+                await self.recalc_resource_usage(do_fullscan=True)
+            except Exception:
+                log.exception("Failed to recalculate resource usage periodically")
+            await asyncio.sleep(60)
 
     async def destroy_session_lowlevel(
         self,
