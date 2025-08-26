@@ -48,11 +48,15 @@ class ArtifactRegistryRow(Base):
         "HuggingFaceRegistryRow",
         back_populates="meta",
         primaryjoin=_get_huggingface_registry_join_condition,
+        uselist=False,
+        viewonly=True,
     )
     reservoir_registries = relationship(
         "ReservoirRegistryRow",
         back_populates="meta",
         primaryjoin=_get_reservoir_registry_join_condition,
+        uselist=False,
+        viewonly=True,
     )
 
     def __str__(self) -> str:

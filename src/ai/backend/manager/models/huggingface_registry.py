@@ -47,6 +47,8 @@ class HuggingFaceRegistryRow(Base):
         "ArtifactRegistryRow",
         back_populates="huggingface_registries",
         primaryjoin=_get_registry_meta_join_condition,
+        uselist=False,
+        viewonly=True,
     )
 
     def __str__(self) -> str:
