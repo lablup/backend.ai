@@ -32,7 +32,9 @@ from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     mock_scaling_rule_2,
 )
 from ai.backend.manager.api.gql.model_deployment.routing import (
+    RoutingEdge,
     RoutingNode,
+    RoutingNodeConnection,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
@@ -84,7 +86,7 @@ class ModelReplica(Node):
     name: str
     status: ReplicaStatus
     revision: ModelRevision
-    routings: list[RoutingNode]
+    routings: RoutingNodeConnection
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -283,22 +285,35 @@ mock_model_replica_1 = ModelReplica(
     name="llama-3-8b-instruct-replica-01",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
-    routings=[
-        RoutingNode(
-            id=UUID(mock_routing_id_1),
-            routing_id=uuid4(),
-            endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
-            session_id=uuid4(),
-            readiness_status=CommonReadinessStatus.HEALTHY,
-            liveness_status=CommonLivenessStatus.HEALTHY,
-            weight=1,
-            detail={},
-            created_at=datetime.now() - timedelta(days=5),
-            live_stat=cast(
-                JSONString, '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}'
-            ),
-        )
-    ],
+    routings=RoutingNodeConnection(
+        count=1,
+        edges=[
+            RoutingEdge(
+                node=RoutingNode(
+                    id=UUID(mock_routing_id_1),
+                    routing_id=uuid4(),
+                    endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
+                    session_id=uuid4(),
+                    readiness_status=CommonReadinessStatus.HEALTHY,
+                    liveness_status=CommonLivenessStatus.HEALTHY,
+                    weight=1,
+                    detail={},
+                    created_at=datetime.now() - timedelta(days=5),
+                    live_stat=cast(
+                        JSONString,
+                        '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}',
+                    ),
+                ),
+                cursor="routing-cursor-1",
+            )
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="routing-cursor-1",
+            end_cursor="routing-cursor-5",
+        ),
+    ),
 )
 
 mock_replica_id_2 = "7562e9d4-a368-4e28-9092-65eb91534bac"
@@ -308,22 +323,35 @@ mock_model_replica_2 = ModelReplica(
     name="llama-3-8b-instruct-replica-02",
     status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
-    routings=[
-        RoutingNode(
-            id=UUID(mock_routing_id_2),
-            routing_id=uuid4(),
-            endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
-            session_id=uuid4(),
-            readiness_status=CommonReadinessStatus.HEALTHY,
-            liveness_status=CommonLivenessStatus.HEALTHY,
-            weight=2,
-            detail={},
-            created_at=datetime.now() - timedelta(days=5),
-            live_stat=cast(
-                JSONString, '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}'
-            ),
-        )
-    ],
+    routings=RoutingNodeConnection(
+        count=1,
+        edges=[
+            RoutingEdge(
+                node=RoutingNode(
+                    id=UUID(mock_routing_id_2),
+                    routing_id=uuid4(),
+                    endpoint_url="https://api.backend.ai/models/dep-001/routing/02",
+                    session_id=uuid4(),
+                    readiness_status=CommonReadinessStatus.HEALTHY,
+                    liveness_status=CommonLivenessStatus.HEALTHY,
+                    weight=2,
+                    detail={},
+                    created_at=datetime.now() - timedelta(days=5),
+                    live_stat=cast(
+                        JSONString,
+                        '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}',
+                    ),
+                ),
+                cursor="token-cursor-2",
+            )
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="routing-cursor-2",
+            end_cursor="routing-cursor-2",
+        ),
+    ),
 )
 
 mock_replica_id_3 = "2a2388ea-a312-422a-b77e-0e0b61c48145"
@@ -333,20 +361,34 @@ mock_model_replica_3 = ModelReplica(
     name="llama-3-8b-instruct-replica-03",
     status=ReplicaStatus.UNHEALTHY,
     revision=mock_model_revision_1,
-    routings=[
-        RoutingNode(
-            id=UUID(mock_routing_id_3),
-            routing_id=uuid4(),
-            endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
-            session_id=uuid4(),
-            readiness_status=CommonReadinessStatus.NOT_CHECKED,
-            liveness_status=CommonLivenessStatus.HEALTHY,
-            weight=1,
-            detail={},
-            created_at=datetime.now() - timedelta(days=2),
-            live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
-        )
-    ],
+    routings=RoutingNodeConnection(
+        count=1,
+        edges=[
+            RoutingEdge(
+                node=RoutingNode(
+                    id=UUID(mock_routing_id_3),
+                    routing_id=uuid4(),
+                    endpoint_url="https://api.backend.ai/models/dep-001/routing/03",
+                    session_id=uuid4(),
+                    readiness_status=CommonReadinessStatus.NOT_CHECKED,
+                    liveness_status=CommonLivenessStatus.HEALTHY,
+                    weight=1,
+                    detail={},
+                    created_at=datetime.now() - timedelta(days=2),
+                    live_stat=cast(
+                        JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
+                    ),
+                ),
+                cursor="routing-cursor-3",
+            ),
+        ],
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor="routing-cursor-3",
+            end_cursor="routing-cursor-3",
+        ),
+    ),
 )
 
 ModelReplicaEdge = Edge[ModelReplica]
@@ -688,7 +730,34 @@ async def replica(id: ID) -> Optional[ModelReplica]:
         name="llama-3-8b-instruct-replica-01",
         status=ReplicaStatus.HEALTHY,
         revision=mock_model_revision_1,
-        routings=[],
+        routings=RoutingNodeConnection(
+            count=1,
+            edges=[
+                RoutingEdge(
+                    node=RoutingNode(
+                        id=UUID(mock_routing_id_1),
+                        routing_id=uuid4(),
+                        endpoint_url="https://api.backend.ai/models/dep-001/routing/01",
+                        session_id=uuid4(),
+                        readiness_status=CommonReadinessStatus.NOT_CHECKED,
+                        liveness_status=CommonLivenessStatus.HEALTHY,
+                        weight=1,
+                        detail={},
+                        created_at=datetime.now() - timedelta(days=2),
+                        live_stat=cast(
+                            JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
+                        ),
+                    ),
+                    cursor="routing-cursor-1",
+                ),
+            ],
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor="routing-cursor-1",
+                end_cursor="routing-cursor-1",
+            ),
+        ),
     )
 
 
