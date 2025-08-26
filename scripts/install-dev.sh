@@ -282,9 +282,11 @@ fi
 show_info "Checking the uv installation..."
 if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  uv_init_script="export PATH=\"\$HOME/.local/bin:\$PATH\""
-  append_to_profiles "$uv_init_script"
-  eval "$uv_init_script"
+  if [ $SHELL = "/bin/fish" ]; then
+    source $HOME/.local/bin/env.fish
+  else
+    source $HOME/.local/bin/env
+  fi
   show_info "uv is installed."
 else
   show_info "uv is already installed."
