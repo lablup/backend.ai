@@ -18,7 +18,6 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import (
@@ -240,6 +239,7 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
+DEFAULT_WAIT_TIMEOUT_SECONDS = 60
 
 
 class AgentRegistry:
@@ -399,6 +399,41 @@ class AgentRegistry:
         agent = await self.get_instance(instance_id, agents.c.addr)
         agent_client = self._get_agent_client(agent["id"])
         return await agent_client.scan_gpu_alloc_map()
+
+    async def _wait_for_session_running(
+        self,
+        session_id: SessionId,
+        propagator: WithCachePropagator,
+        max_wait: int,
+    ) -> None:
+        cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+        while True:
+            try:
+                with _timeout(DEFAULT_WAIT_TIMEOUT_SECONDS):
+                    async for event in propagator.receive(cache_id):
+                        if isinstance(event, SchedulingBroadcastEvent):
+                            if event.status_transition == str(SessionStatus.RUNNING):
+                                return
+                            if event.status_transition in (
+                                str(SessionStatus.TERMINATED),
+                                str(SessionStatus.CANCELLED),
+                            ):
+                                raise SessionNotFound("Session terminated during scheduling")
+            except asyncio.TimeoutError as e:
+                if max_wait > 0:
+                    raise e
+                async with self.db.begin_readonly_session() as db_session:
+                    query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
+                    result = await db_session.execute(query)
+                    row = result.first()
+
+                    if row is None:
+                        raise SessionNotFound(f"Session {session_id} not found")
+
+                    if row.status == SessionStatus.RUNNING:
+                        return
+                    elif row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
+                        raise SessionNotFound("Session terminated during scheduling")
 
     async def create_session(
         self,
@@ -650,17 +685,7 @@ class AgentRegistry:
                     propagator, [(EventDomain.SESSION, str(session_id))]
                 )
                 try:
-                    # Wait for SchedulingBroadcastEvent with RUNNING status
-                    cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
-                    with ExitStack() as stack:
-                        if max_wait > 0:
-                            stack.enter_context(_timeout(max_wait))
-                        async for event in propagator.receive(cache_id):
-                            if isinstance(event, SchedulingBroadcastEvent):
-                                if event.status_transition == str(SessionStatus.RUNNING):
-                                    break
-                                if event.status_transition == str(SessionStatus.TERMINATED):
-                                    raise SessionNotFound("Session terminated during scheduling")
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -891,17 +916,7 @@ class AgentRegistry:
                     propagator, [(EventDomain.SESSION, str(session_id))]
                 )
                 try:
-                    # Wait for SchedulingBroadcastEvent with RUNNING status
-                    cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
-                    with ExitStack() as stack:
-                        if max_wait > 0:
-                            stack.enter_context(_timeout(max_wait))
-                        async for event in propagator.receive(cache_id):
-                            if isinstance(event, SchedulingBroadcastEvent):
-                                if event.status_transition == str(SessionStatus.RUNNING):
-                                    break
-                                if event.status_transition == str(SessionStatus.TERMINATED):
-                                    raise SessionNotFound("Session terminated during scheduling")
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
