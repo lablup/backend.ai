@@ -10,8 +10,22 @@ from strawberry.relay import Connection, Edge, PageInfo
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.image import Image, ResourceLimit
-from ai.backend.manager.api.gql.resource_group import ResourceGroup
+from ai.backend.manager.api.gql.image import (
+    Image,
+    mock_image_1,
+    mock_image_2,
+    mock_image_3,
+    mock_image_4,
+    mock_image_5,
+)
+from ai.backend.manager.api.gql.resource_group import (
+    ResourceGroup,
+    mock_resource_group_1,
+    mock_resource_group_2,
+    mock_resource_group_3,
+    mock_resource_group_4,
+    mock_resource_group_5,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import (
     ExtraVFolderMountConnection,
@@ -25,15 +39,11 @@ from ai.backend.manager.api.gql.vfolder import (
     mock_model_vfolder_4,
     mock_model_vfolder_5,
 )
-from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_deployment.inference_runtime_config import (
     MOJORuntimeConfig,
     NVDIANIMRuntimeConfig,
     SGLangRuntimeConfig,
     VLLMRuntimeConfig,
-)
-from ai.backend.manager.models.rbac.permission_defs import (
-    ImagePermission,
 )
 
 
@@ -142,28 +152,12 @@ mock_inference_runtime_config = {
 }
 
 mock_revision_id_1 = "d19f8f78-f308-45a9-ab7b-1c63346024fd"
-mock_resource_group_id_1 = "1bd4a689-8dab-4355-aadd-9957932d896a"
-mock_image_id_1 = "7609ac08-d5e0-410a-a045-10c42119ed21"
 mock_model_revision_1 = ModelRevision(
     id=UUID(mock_revision_id_1),
     name="llama-3-8b-instruct-v1.0",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(
-            id=UUID(mock_resource_group_id_1),
-            name="gpu-cluster-01",
-            description="Primary GPU cluster for inference",
-            is_active=True,
-            is_public=True,
-            created_at=datetime.now() - timedelta(days=100),
-            wsproxy_addr="http://proxy-01.backend.ai:5050",
-            wsproxy_api_token="mock-token-01",
-            driver="cuda",
-            driver_opts=cast(JSONString, "{}"),
-            scheduler="fifo",
-            scheduler_opts=cast(JSONString, "{}"),
-            use_host_network=False,
-        ),
+        resource_group=mock_resource_group_1,
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -192,57 +186,17 @@ mock_model_revision_1 = ModelRevision(
             has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
         ),
     ),
-    image=Image(
-        id=UUID(mock_image_id_1),
-        row_id=uuid4(),
-        name="cr.backend.ai/pytorch:2.0-cuda12.1",
-        namespace="cr.backend.ai",
-        base_image_name="pytorch",
-        project="inference",
-        humanized_name="PyTorch 2.0 Inference",
-        tag="2.0-cuda12.1",
-        tags=[],
-        version="2.0",
-        registry="cr.backend.ai",
-        architecture="x86_64",
-        is_local=False,
-        digest="sha256:abcd1234",
-        labels=[],
-        size_bytes=5000000000,  # type: ignore
-        status="available",
-        aliases=[],
-        permissions=[ImagePermission.READ_ATTRIBUTE],  # type: ignore
-        installed=True,
-        type=ImageType.COMPUTE,
-        resource_limits=[ResourceLimit(key="cuda.device", min="1", max="8")],
-        supported_accelerators=["cuda"],
-    ),
+    image=mock_image_1,
     created_at=datetime.now() - timedelta(days=10),
 )
 
 mock_revision_id_2 = "3c81bc63-24c1-4a8f-9ad2-8a19899690c3"
-mock_resource_id_2 = "0cc27c4c-7fa1-49ae-aa53-9c485205c78b"
-mock_image_id_2 = "18c39ba3-e9c4-4353-9892-115e557b60a7"
 mock_model_revision_2 = ModelRevision(
     id=UUID(mock_revision_id_2),
     name="llama-3-8b-instruct-v1.1",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(
-            id=UUID(mock_resource_id_2),
-            name="gpu-cluster-02",
-            description="Secondary GPU cluster for inference",
-            is_active=True,
-            is_public=False,
-            created_at=datetime.now() - timedelta(days=80),
-            wsproxy_addr="http://proxy-02.backend.ai:5050",
-            wsproxy_api_token="mock-token-02",
-            driver="cuda",
-            driver_opts=cast(JSONString, "{}"),
-            scheduler="lifo",
-            scheduler_opts=cast(JSONString, "{}"),
-            use_host_network=False,
-        ),
+        resource_group=mock_resource_group_2,
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -271,58 +225,18 @@ mock_model_revision_2 = ModelRevision(
             has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
         ),
     ),
-    image=Image(
-        id=UUID(mock_image_id_2),
-        row_id=uuid4(),
-        name="cr.backend.ai/vllm:0.5.0-cuda12.1",
-        namespace="cr.backend.ai",
-        base_image_name="vllm",
-        project="inference",
-        humanized_name="vLLM Inference Engine",
-        tag="0.5.0-cuda12.1",
-        tags=[],
-        version="0.5.0",
-        registry="cr.backend.ai",
-        architecture="x86_64",
-        is_local=False,
-        digest="sha256:efgh5678",
-        labels=[],
-        size_bytes=6000000000,  # type: ignore
-        status="available",
-        aliases=[],
-        permissions=[ImagePermission.READ_ATTRIBUTE],  # type: ignore
-        installed=True,
-        type=ImageType.COMPUTE,
-        resource_limits=[ResourceLimit(key="cuda.device", min="1", max="16")],
-        supported_accelerators=["cuda", "rocm"],
-    ),
+    image=mock_image_2,
     created_at=datetime.now() - timedelta(days=5),
 )
 
 
 mock_revision_id_3 = "86d1a714-b177-4851-897f-da36f306fe30"
-mock_resource_id_3 = "135f7fd4-60fc-4b0d-9913-f3497d730b31"
-mock_image_id_3 = "7b6ffbda-a0f4-48da-b589-b9889d33e5e9"
 mock_model_revision_3 = ModelRevision(
     id=UUID(mock_revision_id_3),
     name="mistral-7b-v0.3-initial",
     cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
     resource_config=ResourceConfig(
-        resource_group=ResourceGroup(
-            id=UUID(mock_resource_id_3),
-            name="cpu-cluster-01",
-            description="CPU cluster for development",
-            is_active=True,
-            is_public=True,
-            created_at=datetime.now() - timedelta(days=60),
-            wsproxy_addr="http://proxy-03.backend.ai:5050",
-            wsproxy_api_token="mock-token-03",
-            driver="cpu",
-            driver_opts=cast(JSONString, "{}"),
-            scheduler="drf",
-            scheduler_opts=cast(JSONString, "{}"),
-            use_host_network=False,
-        ),
+        resource_group=mock_resource_group_3,
         resource_slots=cast(
             JSONString,
             '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -348,31 +262,7 @@ mock_model_revision_3 = ModelRevision(
             has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
         ),
     ),
-    image=Image(
-        id=UUID(mock_image_id_3),
-        row_id=uuid4(),
-        name="cr.backend.ai/vllm:0.5.0-cuda12.1",
-        namespace="cr.backend.ai",
-        base_image_name="vllm",
-        project="inference",
-        humanized_name="vLLM Inference Runtime",
-        tag="0.5.0-cuda12.1",
-        tags=[],
-        version="0.5.0",
-        registry="cr.backend.ai",
-        architecture="x86_64",
-        is_local=True,
-        digest="sha256:ijkl9012",
-        labels=[],
-        size_bytes=4500000000,  # type: ignore
-        status="available",
-        aliases=[],
-        permissions=[ImagePermission.READ_ATTRIBUTE],  # type: ignore
-        installed=True,
-        type=ImageType.COMPUTE,
-        resource_limits=[ResourceLimit(key="cpu", min="4", max="64")],
-        supported_accelerators=["cuda"],
-    ),
+    image=mock_image_3,
     created_at=datetime.now() - timedelta(days=20),
 )
 
@@ -577,21 +467,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
             size=1,
         ),
         resource_config=ResourceConfig(
-            resource_group=ResourceGroup(
-                id=UUID("f4ea16a1-d6cf-41b2-ad0a-d2093658ec59"),
-                name="default-cluster",
-                description="Default resource group",
-                is_active=True,
-                is_public=True,
-                created_at=datetime.now(),
-                wsproxy_addr="http://proxy.backend.ai:5050",
-                wsproxy_api_token="default-token",
-                driver="auto",
-                driver_opts=cast(JSONString, "{}"),
-                scheduler="fifo",
-                scheduler_opts=cast(JSONString, "{}"),
-                use_host_network=False,
-            ),
+            resource_group=mock_resource_group_4,
             resource_slots=cast(
                 JSONString,
                 '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -617,31 +493,7 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
                 has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
             ),
         ),
-        image=Image(
-            id=UUID("3e52a88d-5ad1-4f72-83d0-d372a23b2a76"),
-            row_id=uuid4(),
-            name="cr.backend.ai/inference:latest",
-            namespace="cr.backend.ai",
-            base_image_name="inference",
-            project="default",
-            humanized_name="Default Inference Image",
-            tag="latest",
-            tags=[],
-            version="1.0.0",
-            registry="cr.backend.ai",
-            architecture="x86_64",
-            is_local=False,
-            digest="sha256:abcdef123456",
-            labels=[],
-            size_bytes=1000000000,  # type: ignore
-            status="available",
-            aliases=[],
-            permissions=[ImagePermission.READ_ATTRIBUTE],  # type: ignore
-            installed=True,
-            type=ImageType.COMPUTE,
-            resource_limits=[],
-            supported_accelerators=[],
-        ),
+        image=mock_image_4,
         created_at=datetime.now(),
     )
     return CreateModelRevisionPayload(revision=revision)
@@ -658,21 +510,7 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
             size=1,
         ),
         resource_config=ResourceConfig(
-            resource_group=ResourceGroup(
-                id=UUID("b2a2c037-f45f-4945-91fb-1b4ff90b0939"),
-                name="default-cluster",
-                description="Default resource group",
-                is_active=True,
-                is_public=True,
-                created_at=datetime.now(),
-                wsproxy_addr="http://proxy.backend.ai:5050",
-                wsproxy_api_token="default-token",
-                driver="auto",
-                driver_opts=cast(JSONString, "{}"),
-                scheduler="fifo",
-                scheduler_opts=cast(JSONString, "{}"),
-                use_host_network=False,
-            ),
+            resource_group=mock_resource_group_5,
             resource_slots=cast(
                 JSONString,
                 '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
@@ -698,31 +536,7 @@ async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPa
                 has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
             ),
         ),
-        image=Image(
-            id=UUID("7be39d9a-a7a6-4101-a0fa-5689ce41f5de"),
-            row_id=uuid4(),
-            name="cr.backend.ai/inference:latest",
-            namespace="cr.backend.ai",
-            base_image_name="inference",
-            project="default",
-            humanized_name="Default Inference Image",
-            tag="latest",
-            tags=[],
-            version="1.0.0",
-            registry="cr.backend.ai",
-            architecture="x86_64",
-            is_local=False,
-            digest="sha256:abcdef123456",
-            labels=[],
-            size_bytes=1000000000,  # type: ignore
-            status="available",
-            aliases=[],
-            permissions=[ImagePermission.READ_ATTRIBUTE],  # type: ignore
-            installed=True,
-            type=ImageType.COMPUTE,
-            resource_limits=[],
-            supported_accelerators=[],
-        ),
+        image=mock_image_5,
         created_at=datetime.now(),
     )
     return AddModelRevisionPayload(revision=revision)
