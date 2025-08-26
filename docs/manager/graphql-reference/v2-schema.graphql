@@ -245,6 +245,17 @@ type CreateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
 
+"""Added in 25.13.0"""
+input CreateReservoirInput {
+  name: String!
+  endpoint: String!
+}
+
+"""Added in 25.13.0"""
+type CreateReservoirPayload {
+  reservoir: Reservoir!
+}
+
 """Date with time (isoformat)"""
 scalar DateTime
 
@@ -289,6 +300,16 @@ input DeleteObjectStorageInput {
 
 """Added in 25.13.0"""
 type DeleteObjectStoragePayload {
+  id: ID!
+}
+
+"""Added in 25.13.0"""
+input DeleteReservoirInput {
+  id: ID!
+}
+
+"""Added in 25.13.0"""
+type DeleteReservoirPayload {
   id: ID!
 }
 
@@ -626,6 +647,15 @@ type Mutation {
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
 
   """Added in 25.13.0"""
+  createReservoir(input: CreateReservoirInput!): CreateReservoirPayload!
+
+  """Added in 25.13.0"""
+  updateReservoir(input: UpdateReservoirInput!): UpdateReservoirPayload!
+
+  """Added in 25.13.0"""
+  deleteReservoir(input: DeleteReservoirInput!): DeleteReservoirPayload!
+
+  """Added in 25.13.0"""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
 
   """Added in 25.13.0"""
@@ -808,6 +838,14 @@ type ReplicaStatusChangedPayload {
   replica: ModelReplica!
 }
 
+"""Added in 25.13.0"""
+type Reservoir implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  endpoint: String!
+}
+
 type ResourceConfig {
   resourceGroup: ScalingGroupNode!
   resourceSlots: JSONString!
@@ -952,6 +990,18 @@ input UpdateObjectStorageInput {
 """Added in 25.13.0"""
 type UpdateObjectStoragePayload {
   objectStorage: ObjectStorage!
+}
+
+"""Added in 25.13.0"""
+input UpdateReservoirInput {
+  id: ID!
+  name: String
+  endpoint: String
+}
+
+"""Added in 25.13.0"""
+type UpdateReservoirPayload {
+  reservoir: Reservoir!
 }
 
 extend type UserNode @key(fields: "id") {

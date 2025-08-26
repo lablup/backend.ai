@@ -2,6 +2,7 @@ import uuid
 
 import sqlalchemy as sa
 
+from ai.backend.common.exception import ReservoirNotFoundError
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.reservoir.creator import ReservoirCreator
 from ai.backend.manager.data.reservoir.modifier import ReservoirModifier
@@ -30,7 +31,7 @@ class ReservoirRepository:
             )
             row: ReservoirRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Reservoir with ID {reservoir_id} not found")
+                raise ReservoirNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -39,7 +40,7 @@ class ReservoirRepository:
             result = await db_sess.execute(sa.select(ReservoirRow).where(ReservoirRow.name == name))
             row: ReservoirRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Reservoir with name {name} not found")
+                raise ReservoirNotFoundError(f"Reservoir with name {name} not found")
             return row.to_dataclass()
 
     @repository_decorator()

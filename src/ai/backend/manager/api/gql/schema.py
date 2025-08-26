@@ -50,6 +50,11 @@ from .object_storage import (
     unregister_object_storage_bucket,
     update_object_storage,
 )
+from .reservoir import (
+    create_reservoir,
+    delete_reservoir,
+    update_reservoir,
+)
 
 
 @strawberry.type
@@ -88,6 +93,9 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    create_reservoir = create_reservoir
+    update_reservoir = update_reservoir
+    delete_reservoir = delete_reservoir
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision

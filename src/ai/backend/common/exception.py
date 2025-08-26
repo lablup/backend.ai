@@ -164,6 +164,7 @@ class ErrorDomain(enum.StrEnum):
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
+    RESERVOIR = "reservoir"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -730,6 +731,19 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/reservoir-not-found"
+    error_title = "Reservoir Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESERVOIR,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
