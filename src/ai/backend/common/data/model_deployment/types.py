@@ -15,7 +15,8 @@ class LivenessStatus(StrEnum):
 
 
 class ModelDeploymentStatus(StrEnum):
-    CREATED = "CREATED"
+    PENDING = "PENDING"
+    SCALING = "SCALING"
     DEPLOYING = "DEPLOYING"
     READY = "READY"
     STOPPING = "STOPPING"
