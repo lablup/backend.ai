@@ -1981,11 +1981,6 @@
             "name": "scope",
             "schema": {
               "type": "string",
-              "enum": [
-                "*",
-                "session",
-                "kernel"
-              ],
               "default": "*"
             },
             "required": true,
