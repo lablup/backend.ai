@@ -256,6 +256,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".group",
     ".groupconfig",
     ".logs",
+    ".object_storage",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
