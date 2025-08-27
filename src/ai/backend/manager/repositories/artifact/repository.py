@@ -297,6 +297,102 @@ class ArtifactRepository:
             return [row.to_dataclass() for row in rows]
 
     @repository_decorator()
+    async def upsert_artifacts(
+        self,
+        artifacts: list[ArtifactData],
+    ) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            result_artifacts: list[ArtifactData] = []
+
+            for artifact_data in artifacts:
+                # Check if artifact exists
+                artifact_query_result = await db_sess.execute(
+                    sa.select(ArtifactRow).where(
+                        sa.and_(
+                            ArtifactRow.name == artifact_data.name,
+                            ArtifactRow.registry_id == artifact_data.registry_id,
+                        )
+                    )
+                )
+                existing_artifact: ArtifactRow = artifact_query_result.scalar_one_or_none()
+
+                if existing_artifact is None:
+                    # Create new artifact
+                    new_artifact = ArtifactRow(
+                        id=artifact_data.id,
+                        name=artifact_data.name,
+                        type=artifact_data.type,
+                        description=artifact_data.description,
+                        registry_id=artifact_data.registry_id,
+                        source_registry_id=artifact_data.source_registry_id,
+                        registry_type=artifact_data.registry_type,
+                        source_registry_type=artifact_data.source_registry_type,
+                        readonly=artifact_data.readonly,
+                    )
+                    db_sess.add(new_artifact)
+                    await db_sess.flush()
+                    await db_sess.refresh(new_artifact)
+                    result_artifacts.append(new_artifact.to_dataclass())
+                else:
+                    # Update existing artifact
+                    existing_artifact.description = artifact_data.description
+                    existing_artifact.readonly = artifact_data.readonly
+                    await db_sess.flush()
+                    await db_sess.refresh(existing_artifact)
+                    result_artifacts.append(existing_artifact.to_dataclass())
+
+            return result_artifacts
+
+    @repository_decorator()
+    async def upsert_artifact_revisions(
+        self,
+        revisions: list[ArtifactRevisionData],
+    ) -> list[ArtifactRevisionData]:
+        async with self._db.begin_session() as db_sess:
+            result_revisions: list[ArtifactRevisionData] = []
+
+            for revision_data in revisions:
+                # Check if revision exists
+                revision_query_result = await db_sess.execute(
+                    sa.select(ArtifactRevisionRow).where(
+                        sa.and_(
+                            ArtifactRevisionRow.artifact_id == revision_data.artifact_id,
+                            ArtifactRevisionRow.version == revision_data.version,
+                        )
+                    )
+                )
+                existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
+
+                if existing_revision is None:
+                    # Create new revision
+                    new_revision = ArtifactRevisionRow(
+                        id=revision_data.id,
+                        artifact_id=revision_data.artifact_id,
+                        version=revision_data.version,
+                        readme=revision_data.readme,
+                        size=revision_data.size,
+                        status=revision_data.status,
+                    )
+                    db_sess.add(new_revision)
+                    await db_sess.flush()
+                    await db_sess.refresh(
+                        new_revision, attribute_names=["created_at", "updated_at"]
+                    )
+                    result_revisions.append(new_revision.to_dataclass())
+                else:
+                    # Update existing revision
+                    existing_revision.readme = revision_data.readme
+                    existing_revision.size = revision_data.size
+                    existing_revision.status = revision_data.status
+                    await db_sess.flush()
+                    await db_sess.refresh(
+                        existing_revision, attribute_names=["created_at", "updated_at"]
+                    )
+                    result_revisions.append(existing_revision.to_dataclass())
+
+            return result_revisions
+
+    @repository_decorator()
     async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],

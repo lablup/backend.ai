@@ -74,6 +74,7 @@ class APIHandler:
             )
         )
         registry_type = registry_action_result.common.type
+        print("registry_type!", registry_type)
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -92,6 +93,13 @@ class APIHandler:
                 client_resp = await remote_reservoir_client.request(
                     "POST", "/artifact-registries/search", json=payload
                 )
+
+                registry_action_result = (
+                    await processors.artifact_registry.get_artifact_registry.wait_for_complete(
+                        GetArtifactRegistryAction(registry_id=registry_id)
+                    )
+                )
+
                 print("client_resp_body!", client_resp)
 
         resp = ArtifactRegistriesScanResponse()
@@ -106,14 +114,12 @@ class APIHandler:
     ) -> APIResponse:
         processors = processors_ctx.processors
         pagination = body.parsed.pagination
-        ordering = body.parsed.ordering
-        filters = body.parsed.filters
 
         action_result = await processors.artifact.list_artifacts_with_revisions.wait_for_complete(
             ListArtifactsWithRevisionsAction(
                 pagination=pagination,
-                ordering=ordering,
-                filters=filters,
+                ordering=None,
+                filters=None,
             )
         )
 

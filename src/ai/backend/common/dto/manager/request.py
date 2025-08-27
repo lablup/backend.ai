@@ -3,10 +3,6 @@ from typing import Any, Optional
 
 from pydantic import AliasChoices, Field
 
-from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
-)
 from ai.backend.manager.repositories.types import PaginationOptions
 
 from ...api_handlers import BaseRequestModel
@@ -132,5 +128,6 @@ class ArtifactRegistriesScanReq(BaseRequestModel):
 
 class ArtifactRegistriesSearchReq(BaseRequestModel):
     pagination: PaginationOptions
-    ordering: Optional[ArtifactOrderingOptions] = None
-    filters: Optional[ArtifactFilterOptions] = None
+    # TODO: Support this. (we need to make strawberry independent types)
+    # ordering: Optional[ArtifactOrderingOptions] = None
+    # filters: Optional[ArtifactFilterOptions] = None

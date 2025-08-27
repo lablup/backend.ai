@@ -11,6 +11,10 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.insert_multi import (
+    InsertArtifactsAction,
+    InsertArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
     ListArtifactsActionResult,
@@ -40,6 +44,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
+    insert: ActionProcessor[InsertArtifactsAction, InsertArtifactsActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.scan = ActionProcessor(service.scan, action_monitors)
@@ -50,6 +55,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
+        self.insert = ActionProcessor(service.insert, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -60,4 +66,5 @@ class ArtifactProcessors(AbstractProcessorPackage):
             ListArtifactsWithRevisionsAction.spec(),
             GetArtifactRevisionsAction.spec(),
             UpdateArtifactAction.spec(),
+            InsertArtifactsAction.spec(),
         ]

@@ -3,6 +3,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -13,6 +14,10 @@ from ai.backend.manager.services.artifact.actions.get import (
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.insert_multi import (
+    InsertArtifactsAction,
+    InsertArtifactsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
@@ -115,3 +120,25 @@ class ArtifactService:
             action.artifact_id, action.modifier
         )
         return UpdateArtifactActionResult(result=updated_artifact)
+
+    async def insert(self, action: InsertArtifactsAction) -> InsertArtifactsActionResult:
+        result_data: list[ArtifactDataWithRevisions] = []
+
+        for artifact_with_revisions in action.data:
+            # Upsert artifact first
+            upserted_artifacts = await self._artifact_repository.upsert_artifacts([
+                artifact_with_revisions.artifact
+            ])
+            upserted_artifact = upserted_artifacts[0]
+
+            # Upsert revisions for this artifact
+            upserted_revisions = await self._artifact_repository.upsert_artifact_revisions(
+                artifact_with_revisions.revisions
+            )
+
+            # Combine into ArtifactDataWithRevisions
+            result_data.append(
+                ArtifactDataWithRevisions(artifact=upserted_artifact, revisions=upserted_revisions)
+            )
+
+        return InsertArtifactsActionResult(result=result_data)
