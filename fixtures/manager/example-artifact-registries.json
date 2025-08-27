@@ -1,9 +1,16 @@
 {
+    "artifact_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce04",
+            "registry_id": "fe878f09-06cc-4b91-9242-4c71015cce05",
+            "name": "huggingface-hub",
+            "type": "huggingface"
+        }
+    ],
     "huggingface_registries": [
         {
             "id": "fe878f09-06cc-4b91-9242-4c71015cce05",
-            "url": "https://huggingface.co",
-            "name": "huggingface-hub"
+            "url": "https://huggingface.co"
         }
     ],
     "object_storages": [
