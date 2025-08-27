@@ -1282,6 +1282,24 @@ input CreateProjectResourcePolicyInput
   max_network_count: Int
 }
 
+"""Added in 25.13.0"""
+input CreateReservoirRegistryInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+}
+
+"""Added in 25.13.0"""
+type CreateReservoirRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  reservoir: ReservoirRegistry!
+}
+
 type CreateResourcePreset
   @join__type(graph: GRAPHENE)
 {
@@ -1524,6 +1542,20 @@ type DeleteProjectResourcePolicy
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.13.0"""
+input DeleteReservoirRegistryInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+"""Added in 25.13.0"""
+type DeleteReservoirRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
 }
 
 type DeleteResourcePreset
@@ -3712,6 +3744,15 @@ type Mutation
   deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
+  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
@@ -4430,6 +4471,12 @@ type Query
 
   """Added in 25.13.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  reservoirRegistry(id: ID!): ReservoirRegistry @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
@@ -4525,6 +4572,43 @@ type RescanImages
   ok: Boolean
   msg: String
   task_id: UUID
+}
+
+"""Added in 25.13.0"""
+type ReservoirRegistry implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+}
+
+"""Added in 25.13.0"""
+type ReservoirRegistryConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReservoirRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReservoirRegistryEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ReservoirRegistry!
 }
 
 type ResourceConfig
@@ -5033,6 +5117,25 @@ type UpdateObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   objectStorage: ObjectStorage!
+}
+
+"""Added in 25.13.0"""
+input UpdateReservoirRegistryInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  name: String
+  endpoint: String
+  accessKey: String
+  secretKey: String
+  apiVersion: String
+}
+
+"""Added in 25.13.0"""
+type UpdateReservoirRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  reservoir: ReservoirRegistry!
 }
 
 type User implements Item

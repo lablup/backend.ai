@@ -8,10 +8,16 @@ from ai.backend.manager.types import Creator
 class ReservoirRegistryCreator(Creator):
     name: str
     endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
 
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "endpoint": self.endpoint,
+            "access_key": self.access_key,
+            "secret_key": self.secret_key,
+            "api_version": self.api_version,
         }

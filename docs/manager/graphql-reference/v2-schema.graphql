@@ -249,6 +249,9 @@ type CreateObjectStoragePayload {
 input CreateReservoirRegistryInput {
   name: String!
   endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
 }
 
 """Added in 25.13.0"""
@@ -850,6 +853,9 @@ type ReservoirRegistry implements Node {
   id: ID!
   name: String!
   endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
 }
 
 """Added in 25.13.0"""
@@ -1022,6 +1028,9 @@ input UpdateReservoirRegistryInput {
   id: ID!
   name: String
   endpoint: String
+  accessKey: String
+  secretKey: String
+  apiVersion: String
 }
 
 """Added in 25.13.0"""

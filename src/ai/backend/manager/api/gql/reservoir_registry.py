@@ -121,9 +121,18 @@ async def reservoir_registries(
 class CreateReservoirRegistryInput:
     name: str
     endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
 
     def to_creator(self) -> ReservoirRegistryCreator:
-        return ReservoirRegistryCreator(name=self.name, endpoint=self.endpoint)
+        return ReservoirRegistryCreator(
+            name=self.name,
+            endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
+        )
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -131,11 +140,17 @@ class UpdateReservoirRegistryInput:
     id: ID
     name: Optional[str] = UNSET
     endpoint: Optional[str] = UNSET
+    access_key: Optional[str] = UNSET
+    secret_key: Optional[str] = UNSET
+    api_version: Optional[str] = UNSET
 
     def to_modifier(self) -> ReservoirRegistryModifier:
         return ReservoirRegistryModifier(
             name=OptionalState[str].from_graphql(self.name),
             endpoint=OptionalState[str].from_graphql(self.endpoint),
+            access_key=OptionalState[str].from_graphql(self.access_key),
+            secret_key=OptionalState[str].from_graphql(self.secret_key),
+            api_version=OptionalState[str].from_graphql(self.api_version),
         )
 
 
