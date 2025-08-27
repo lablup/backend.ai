@@ -55,7 +55,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
-        self.upsert = ActionProcessor(service.insert, action_monitors)
+        self.upsert = ActionProcessor(service.upsert, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

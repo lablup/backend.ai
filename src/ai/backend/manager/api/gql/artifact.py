@@ -36,7 +36,6 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
-from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
@@ -57,7 +56,7 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import PaginationOptions, TriState
 
 
 @strawberry.input(description="Added in 25.13.0")

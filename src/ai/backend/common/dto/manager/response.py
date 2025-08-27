@@ -1,10 +1,9 @@
+import uuid
 from typing import Any, Optional
 
 from graphql import GraphQLFormattedError
 from graphql.language.location import FormattedSourceLocation
 from pydantic import Field
-
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 
 from ...api_handlers import BaseResponseModel
 from .field import VFolderItemField
@@ -84,6 +83,29 @@ class DeleteObjectStorageResponse(BaseResponseModel):
     pass
 
 
+# Object Storage Presigned URL Response Models
+class GetPresignedDownloadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned download URL")
+
+
+class GetPresignedUploadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned upload URL")
+    fields: str = Field(description="JSON string containing the form fields")
+
+
+# Object Storage Bucket Response Models
+class RegisterObjectStorageBucketResponse(BaseResponseModel):
+    id: uuid.UUID = Field(description="The ID of the registered bucket")
+
+
+class UnregisterObjectStorageBucketResponse(BaseResponseModel):
+    id: uuid.UUID = Field(description="The ID of the unregistered bucket")
+
+
+class ObjectStorageBucketListResponse(BaseResponseModel):
+    buckets: list[str] = Field(default_factory=list, description="List of bucket names")
+
+
 # Association Artifact-Storage API Response Models
 class AssociationArtifactStorageResponse(BaseResponseModel):
     id: str = Field(description="ID of the association")
@@ -99,11 +121,3 @@ class AssociateArtifactWithStorageResponse(BaseResponseModel):
 class DisassociateArtifactWithStorageResponse(BaseResponseModel):
     association: AssociationArtifactStorageResponse = Field(description="Removed association")
     message: str = Field(description="Success message")
-
-
-class ArtifactRegistriesScanResponse(BaseResponseModel):
-    pass
-
-
-class ArtifactRegistriesSearchResponse(BaseResponseModel):
-    artifacts: list[ArtifactDataWithRevisions]

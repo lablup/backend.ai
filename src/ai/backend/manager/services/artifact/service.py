@@ -121,7 +121,7 @@ class ArtifactService:
         )
         return UpdateArtifactActionResult(result=updated_artifact)
 
-    async def insert(self, action: UpsertArtifactsAction) -> UpsertArtifactsActionResult:
+    async def upsert(self, action: UpsertArtifactsAction) -> UpsertArtifactsActionResult:
         result_data: list[ArtifactDataWithRevisions] = []
 
         for artifact_with_revisions in action.data:

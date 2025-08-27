@@ -3,12 +3,13 @@ import pytest
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
 )
-from ai.backend.manager.repositories.types import OffsetBasedPaginationOptions, PaginationOptions
+from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
     ListArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.types import OffsetBasedPaginationOptions
 
 from ...fixtures import (
     ARTIFACT_FIXTURE_DICT,

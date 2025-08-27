@@ -9,7 +9,7 @@ from graphql import StringValueNode
 from graphql_relay.utils import unbase64
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.types import (
+    from ai.backend.manager.types import (
         PaginationOptions,
     )
 
@@ -141,7 +141,7 @@ def build_pagination_options(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> PaginationOptions:
-    from ai.backend.manager.repositories.types import (
+    from ai.backend.manager.types import (
         BackwardPaginationOptions,
         ForwardPaginationOptions,
         OffsetBasedPaginationOptions,

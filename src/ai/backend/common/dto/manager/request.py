@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 from pydantic import AliasChoices, Field
 
-from ai.backend.manager.repositories.types import PaginationOptions
-
 from ...api_handlers import BaseRequestModel
 from ...typed_validators import VFolderName
 from ...types import VFolderUsageMode
@@ -115,19 +113,39 @@ class DeleteHuggingFaceRegistryReq(BaseRequestModel):
     id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")
 
 
-class ArtifactRegistriesScanReq(BaseRequestModel):
-    storage_id: uuid.UUID = Field(description="The unique identifier of the storage to scan.")
-    registry_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact registry to scan."
+# Object Storage Presigned URL Request Models
+class GetPresignedDownloadURLReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact revision"
     )
-    limit: int
-    search: Optional[str] = None
-    # 레저버 쪽의 스캔 요청은 limit과 search를 무시하고 모두 보내준다거나,
-    # limit만 고려한다거나 해도 될 듯?
+    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
+    bucket_name: str = Field(description="Name of the bucket")
+    key: str = Field(description="Object key")
 
 
-class ArtifactRegistriesSearchReq(BaseRequestModel):
-    pagination: PaginationOptions
-    # TODO: Support this. (we need to make strawberry independent types)
-    # ordering: Optional[ArtifactOrderingOptions] = None
-    # filters: Optional[ArtifactFilterOptions] = None
+class GetPresignedUploadURLReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact revision"
+    )
+    bucket_name: str = Field(description="Name of the bucket")
+    key: str = Field(description="Object key")
+    content_type: Optional[str] = Field(default=None, description="Content type of the object")
+    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
+    min_size: Optional[int] = Field(default=None, description="Minimum file size")
+    max_size: Optional[int] = Field(default=None, description="Maximum file size")
+
+
+# Object Storage Bucket Request Models
+class RegisterObjectStorageBucketReq(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
+    bucket_name: str = Field(description="Name of the bucket to register")
+
+
+class UnregisterObjectStorageBucketReq(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
+    bucket_name: str = Field(description="Name of the bucket to unregister")
+
+
+class ObjectStorageBucketPathParam(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
+    bucket_name: str = Field(description="Name of the bucket")

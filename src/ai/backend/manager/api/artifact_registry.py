@@ -1,29 +1,30 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
 from pydantic import TypeAdapter
 
-from ai.backend.client.manager_client import ManagerFacingClient
 from ai.backend.common.api_handlers import APIResponse, BodyParam, api_handler
-from ai.backend.common.dto.manager.request import (
-    ArtifactRegistriesScanReq,
-    ArtifactRegistriesSearchReq,
-)
-from ai.backend.common.dto.manager.response import (
-    ArtifactRegistriesScanResponse,
-    ArtifactRegistriesSearchResponse,
-)
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.client.manager_client import ManagerFacingClient
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRegistryType,
 )
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
-from ai.backend.manager.dto.context import ProcessorsCtx, StorageSessionManagerCtx
+from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.request import (
+    ArtifactRegistriesScanReq,
+    ArtifactRegistriesSearchReq,
+)
+from ai.backend.manager.dto.response import (
+    ArtifactRegistriesScanResponse,
+    ArtifactRegistriesSearchResponse,
+)
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
 )
@@ -46,47 +47,22 @@ class APIHandler:
         self,
         body: BodyParam[ArtifactRegistriesScanReq],
         processors_ctx: ProcessorsCtx,
-        storage_session_manager_ctx: StorageSessionManagerCtx,
     ) -> APIResponse:
-        # # 스토리지 프록시 매니저 facing client 부터 얻어온 후 그 쪽으로 요청.
-        # storage_id = body.parsed.storage_id
-        # processors = processors_ctx.processors
-        # storage_manager = storage_session_manager_ctx.storage_session_manager
-
-        # storage_action_result = await processors.object_storage.get.wait_for_complete(
-        #     GetObjectStorageAction(storage_id=storage_id)
-        # )
-        # storage_data = storage_action_result.result
-
-        # storage_client = storage_manager.get_manager_facing_client(storage_data.host)
-
-        # # 우선 remote 레저버로부터 presigned url을 구해와야 함.
-
-        # resp = ArtifactRegistriesScanResponse()
-
-        # # 어떤 스토리지에 싱크할 건지를 같이 보내야 하니...
-
-        # # 그 이후 다른 매니저한테 이 요청을 같은 엔드포인트 sync에 그대로 쏜다.
-        # return APIResponse.build(status_code=200, response_model=resp)
         registry_id = body.parsed.registry_id
-        storage_id = body.parsed.storage_id
         processors = processors_ctx.processors
-        storage_manager = storage_session_manager_ctx.storage_session_manager
 
-        registry_action_result = (
+        get_registry_action_result = (
             await processors.artifact_registry.get_artifact_registry.wait_for_complete(
                 GetArtifactRegistryAction(registry_id=registry_id)
             )
         )
-        registry_type = registry_action_result.common.type
+        registry_type = get_registry_action_result.common.type
+        registry_data = get_registry_action_result.result
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                # TODO: 허깅페이스 스캔 (scan_artifacts)
-                ...
+                raise NotImplementedError("HuggingFace registry scanning is not implemented yet.")
             case ArtifactRegistryType.RESERVOIR:
-                # TODO:
-                registry_data = registry_action_result.result
                 assert isinstance(registry_data, ReservoirRegistryData)
                 remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
 
@@ -121,7 +97,7 @@ class APIHandler:
                         artifact_data.artifact.registry_id = registry_id
                         artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
 
-                    registry_action_result = await processors.artifact.upsert.wait_for_complete(
+                    await processors.artifact.upsert.wait_for_complete(
                         UpsertArtifactsAction(data=all_artifacts)
                     )
 
@@ -146,11 +122,10 @@ class APIHandler:
             )
         )
 
-        artifacts = action_result.data
         resp = ArtifactRegistriesSearchResponse(
-            artifacts=artifacts,
+            artifacts=action_result.data,
         )
-        return APIResponse.build(status_code=200, response_model=resp)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
 
 def create_app(
