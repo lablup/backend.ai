@@ -11,6 +11,7 @@ class LivenessStatus(StrEnum):
     NOT_CHECKED = "NOT_CHECKED"
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
+    DEGRADED = "DEGRADED"
 
 
 class ModelDeploymentStatus(StrEnum):
