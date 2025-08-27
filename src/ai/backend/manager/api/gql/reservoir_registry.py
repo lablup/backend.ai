@@ -131,7 +131,6 @@ class CreateReservoirRegistryInput:
 
     def to_creator(self) -> ReservoirRegistryCreator:
         return ReservoirRegistryCreator(
-            name=self.name,
             endpoint=self.endpoint,
             access_key=self.access_key,
             secret_key=self.secret_key,
