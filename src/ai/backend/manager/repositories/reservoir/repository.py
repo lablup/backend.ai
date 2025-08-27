@@ -36,22 +36,13 @@ class ReservoirRegistryRepository:
     ) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.id == reservoir_id)
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id == reservoir_id)
+                .options(selectinload(ReservoirRegistryRow.meta))
             )
             row: ReservoirRegistryRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
-            return row.to_dataclass()
-
-    @repository_decorator()
-    async def get_reservoir_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.name == name)
-            )
-            row: ReservoirRegistryRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactRegistryNotFoundError(f"Reservoir with name {name} not found")
             return row.to_dataclass()
 
     @repository_decorator()
