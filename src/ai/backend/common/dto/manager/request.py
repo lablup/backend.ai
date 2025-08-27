@@ -3,6 +3,12 @@ from typing import Any, Optional
 
 from pydantic import AliasChoices, Field
 
+from ai.backend.manager.repositories.artifact.types import (
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
+)
+from ai.backend.manager.repositories.types import PaginationOptions
+
 from ...api_handlers import BaseRequestModel
 from ...typed_validators import VFolderName
 from ...types import VFolderUsageMode
@@ -125,9 +131,6 @@ class ArtifactRegistriesScanReq(BaseRequestModel):
 
 
 class ArtifactRegistriesSearchReq(BaseRequestModel):
-    # storage_id: uuid.UUID = Field(description="The unique identifier of the storage to scan.")
-    # registry_id: uuid.UUID = Field(
-    #     description="The unique identifier of the artifact registry to scan."
-    # )
-    # search 쪽은 필요 X, 스토리지 프록시 거치지도 않고 DB에서만 검색.
-    pass
+    pagination: PaginationOptions
+    ordering: Optional[ArtifactOrderingOptions] = None
+    filters: Optional[ArtifactFilterOptions] = None

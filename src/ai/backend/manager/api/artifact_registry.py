@@ -13,12 +13,16 @@ from ai.backend.common.dto.manager.request import (
     ArtifactRegistriesSearchReq,
 )
 from ai.backend.common.dto.manager.response import (
+    ArtifactRegistriesScanResponse,
     ArtifactRegistriesSearchResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.dto.context import ProcessorsCtx, StorageSessionManagerCtx
+from ai.backend.manager.services.artifact.actions.list_with_revisions import (
+    ListArtifactsWithRevisionsAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.common.get import (
     GetArtifactRegistryAction,
 )
@@ -69,8 +73,9 @@ class APIHandler:
                 GetArtifactRegistryAction(registry_id=registry_id)
             )
         )
+        registry_type = registry_action_result.common.type
 
-        match registry_action_result.common.type:
+        match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
                 # TODO: 허깅페이스 스캔 (scan_artifacts)
                 ...
@@ -79,44 +84,43 @@ class APIHandler:
                 registry_data = registry_action_result.result
                 assert isinstance(registry_data, ReservoirRegistryData)
                 remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
+                payload = {
+                    "pagination": {
+                        "offset": {"offset": 0, "limit": 10},
+                    },
+                }
                 client_resp = await remote_reservoir_client.request(
-                    "GET", "/artifact-registries/search"
+                    "POST", "/artifact-registries/search", json=payload
                 )
                 print("client_resp_body!", client_resp)
 
-        resp = ArtifactRegistriesSearchResponse()
+        resp = ArtifactRegistriesScanResponse()
         return APIResponse.build(status_code=200, response_model=resp)
 
-    # 지금 필요한 건 scan이 아니라 search만 하면 됨.
-    # DB에서 데이터 가져온 후 presigned url 생성해 import에 넘기면 끝.
     @auth_required_for_method
     @api_handler
     async def search_artifacts(
         self,
         body: BodyParam[ArtifactRegistriesSearchReq],
         processors_ctx: ProcessorsCtx,
-        storage_session_manager_ctx: StorageSessionManagerCtx,
     ) -> APIResponse:
-        # registry_id = body.parsed.registry_id
-        # storage_id = body.parsed.storage_id
         processors = processors_ctx.processors
-        storage_manager = storage_session_manager_ctx.storage_session_manager
+        pagination = body.parsed.pagination
+        ordering = body.parsed.ordering
+        filters = body.parsed.filters
 
-        # registry_action_result = (
-        #     await processors.artifact_registry.get_artifact_registry.wait_for_complete(
-        #         GetArtifactRegistryAction(registry_id=registry_id)
-        #     )
-        # )
+        action_result = await processors.artifact.list_artifacts_with_revisions.wait_for_complete(
+            ListArtifactsWithRevisionsAction(
+                pagination=pagination,
+                ordering=ordering,
+                filters=filters,
+            )
+        )
 
-        # match registry_action_result.common.type:
-        #     case ArtifactRegistryType.HUGGINGFACE:
-        #         # TODO: DB에서 허깅페이스 레코드만 검색.
-        #         ...
-        #     case ArtifactRegistryType.RESERVOIR:
-        #         # TODO: DB에서 레저버 레코드만 검색.
-        #         ...
-
-        resp = ArtifactRegistriesSearchResponse()
+        artifacts = action_result.data
+        resp = ArtifactRegistriesSearchResponse(
+            artifacts=artifacts,
+        )
         return APIResponse.build(status_code=200, response_model=resp)
 
 
@@ -129,5 +133,5 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
-    cors.add(app.router.add_route("GET", "/search", api_handler.search_artifacts))
+    cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
     return app, []

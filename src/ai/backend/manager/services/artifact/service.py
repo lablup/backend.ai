@@ -18,6 +18,10 @@ from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
     ListArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.list_with_revisions import (
+    ListArtifactsWithRevisionsAction,
+    ListArtifactsWithRevisionsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
@@ -86,6 +90,19 @@ class ArtifactService:
             filters=action.filters,
         )
         return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
+
+    async def list_with_revisions(
+        self, action: ListArtifactsWithRevisionsAction
+    ) -> ListArtifactsWithRevisionsActionResult:
+        (
+            artifacts_data,
+            total_count,
+        ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
+            pagination=action.pagination,
+            ordering=action.ordering,
+            filters=action.filters,
+        )
+        return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
 
     async def get_revisions(
         self, action: GetArtifactRevisionsAction

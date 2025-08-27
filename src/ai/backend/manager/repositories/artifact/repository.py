@@ -627,6 +627,69 @@ class ArtifactRepository:
             return data_objects, total_count
 
     @repository_decorator()
+    async def list_artifacts_with_revisions_paginated(
+        self,
+        *,
+        pagination: Optional[PaginationOptions] = None,
+        ordering: Optional[ArtifactOrderingOptions] = None,
+        filters: Optional[ArtifactFilterOptions] = None,
+    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+        """List artifacts with their revisions using pagination and filtering.
+
+        Args:
+            pagination: Pagination options for the query
+            ordering: Ordering options for the query
+            filters: Filtering options for artifacts
+
+        Returns:
+            Tuple of (artifacts with revisions list, total count)
+        """
+        # Set defaults
+        if ordering is None:
+            ordering = ArtifactOrderingOptions()
+        if filters is None:
+            filters = ArtifactFilterOptions()
+
+        # Initialize the generic paginator with artifact-specific components
+        artifact_paginator = GenericQueryBuilder[
+            ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
+        ](
+            model_class=ArtifactRow,
+            filter_applier=ArtifactFilterApplier(),
+            ordering_applier=ArtifactOrderingApplier(),
+            model_converter=ArtifactModelConverter(),
+            cursor_type_name="Artifact",
+        )
+
+        # Build query using the generic paginator with eager loading of revisions
+        querybuild_result = artifact_paginator.build_pagination_queries(
+            pagination=pagination or PaginationOptions(),
+            ordering=ordering,
+            filters=filters,
+            select_options=[selectinload(ArtifactRow.revision_rows)],
+        )
+
+        async with self._db.begin_session() as db_sess:
+            # Execute data query
+            result = await db_sess.execute(querybuild_result.data_query)
+            rows = result.scalars().all()
+
+            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            count_result = await db_sess.execute(count_stmt)
+            total_count = count_result.scalar()
+
+            # Convert to ArtifactDataWithRevisions objects
+            data_objects: list[ArtifactDataWithRevisions] = []
+            for row in rows:
+                artifact_data = row.to_dataclass()
+                revisions_data = [revision.to_dataclass() for revision in row.revision_rows]
+                data_objects.append(
+                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revisions_data)
+                )
+
+            return data_objects, total_count
+
+    @repository_decorator()
     async def list_artifact_revisions_paginated(
         self,
         *,

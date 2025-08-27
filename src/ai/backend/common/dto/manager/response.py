@@ -4,6 +4,8 @@ from graphql import GraphQLFormattedError
 from graphql.language.location import FormattedSourceLocation
 from pydantic import Field
 
+from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
+
 from ...api_handlers import BaseResponseModel
 from .field import VFolderItemField
 
@@ -97,3 +99,11 @@ class AssociateArtifactWithStorageResponse(BaseResponseModel):
 class DisassociateArtifactWithStorageResponse(BaseResponseModel):
     association: AssociationArtifactStorageResponse = Field(description="Removed association")
     message: str = Field(description="Success message")
+
+
+class ArtifactRegistriesScanResponse(BaseResponseModel):
+    pass
+
+
+class ArtifactRegistriesSearchResponse(BaseResponseModel):
+    artifacts: list[ArtifactDataWithRevisions]
