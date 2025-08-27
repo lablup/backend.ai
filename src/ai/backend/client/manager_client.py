@@ -37,8 +37,10 @@ class ManagerFacingClient:
 
     async def request(self, method: str, rel_url: str) -> aiohttp.ClientResponse:
         header = self._build_header(method=method, rel_url=rel_url)
-        url = yarl.URL(self._registry_data.endpoint) / rel_url
-
+        print("url!1", self._registry_data.endpoint)
+        print("url!2", rel_url)
+        url = yarl.URL(self._registry_data.endpoint) / rel_url.lstrip("/")
+        print("url!", url)
         async with aiohttp.ClientSession() as session:
             async with session.request(
                 method,

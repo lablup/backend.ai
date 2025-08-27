@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Iterable, Tuple
+from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -22,9 +22,6 @@ from ai.backend.manager.dto.context import ProcessorsCtx, StorageSessionManagerC
 from ai.backend.manager.services.artifact_registry.actions.common.get import (
     GetArtifactRegistryAction,
 )
-
-if TYPE_CHECKING:
-    pass
 
 from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
