@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import uuid
 from typing import Optional, Self
@@ -72,19 +74,50 @@ class ObjectStorage(Node):
         )
 
     @strawberry.field
-    async def namespaces(self, info: Info[StrawberryGQLContext]) -> list[ObjectStorageNamespace]:
+    async def namespaces(
+        self,
+        info: Info[StrawberryGQLContext],
+        before: Optional[str],
+        after: Optional[str],
+        first: Optional[int],
+        last: Optional[int],
+        limit: Optional[int],
+        offset: Optional[int],
+    ) -> ObjectStorageNamespaceConnection:
+        # TODO: Support pagination
         action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
             GetObjectStorageBucketsAction(uuid.UUID(self.id))
         )
 
-        return [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
+        nodes = [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
+        edges = [
+            ObjectStorageNamespaceEdge(node=node, cursor=node.id) for _, node in enumerate(nodes)
+        ]
+
+        return ObjectStorageNamespaceConnection(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
 
 
 ObjectStorageEdge = Edge[ObjectStorage]
+ObjectStorageNamespaceEdge = Edge[ObjectStorageNamespace]
 
 
 @strawberry.type(description="Added in 25.13.0")
 class ObjectStorageConnection(Connection[ObjectStorage]):
+    @strawberry.field
+    def count(self) -> int:
+        return len(self.edges)
+
+
+@strawberry.type(description="Added in 25.13.0")
+class ObjectStorageNamespaceConnection(Connection[ObjectStorageNamespace]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
