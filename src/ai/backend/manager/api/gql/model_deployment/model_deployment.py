@@ -218,7 +218,7 @@ mock_model_deployment_1 = ModelDeployment(
     id=UUID(mock_model_deployment_id_1),
     metadata=ModelDeploymentMetadata(
         name="Llama 3.8B Instruct",
-        status=DeploymentStatus.CREATED,
+        status=DeploymentStatus.READY,
         tags=["production", "llm", "chat", "instruct"],
         created_at=datetime.now() - timedelta(days=30),
         updated_at=datetime.now() - timedelta(hours=2),
