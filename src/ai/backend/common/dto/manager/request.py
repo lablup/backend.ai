@@ -111,3 +111,22 @@ class CreateHuggingFaceRegistryReq(BaseRequestModel):
 
 class DeleteHuggingFaceRegistryReq(BaseRequestModel):
     id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")
+
+
+class ArtifactRegistriesScanReq(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the storage to scan.")
+    registry_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact registry to scan."
+    )
+    limit: int
+    search: Optional[str] = None
+    # 레저버 쪽의 스캔 요청은 limit과 search를 무시하고 모두 보내준다거나,
+    # limit만 고려한다거나 해도 될 듯?
+
+
+class ArtifactRegistriesSearchReq(BaseRequestModel):
+    storage_id: uuid.UUID = Field(description="The unique identifier of the storage to scan.")
+    registry_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact registry to scan."
+    )
+    # search 쪽은 필요 X, 스토리지 프록시 거치지도 않고 DB에서만 검색.

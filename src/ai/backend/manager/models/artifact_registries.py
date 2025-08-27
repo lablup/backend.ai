@@ -60,7 +60,7 @@ class ArtifactRegistryRow(Base):
     )
 
     def __str__(self) -> str:
-        return f"ArtifactRegistryRow(id={self.id}, type={self.type}, name={self.name})"
+        return f"ArtifactRegistryRow(id={self.id}, registry_id={self.registry_id}, type={self.type}, name={self.name})"
 
     def to_dataclass(self) -> ArtifactRegistryData:
         return ArtifactRegistryData(
