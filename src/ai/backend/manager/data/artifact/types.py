@@ -36,7 +36,7 @@ class ArtifactData:
     id: uuid.UUID
     name: str
     type: ArtifactType
-    description: str
+    description: Optional[str]
     registry_id: uuid.UUID
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType

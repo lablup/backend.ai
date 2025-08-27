@@ -15,10 +15,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.insert_multi import (
-    InsertArtifactsAction,
-    InsertArtifactsActionResult,
-)
 from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
     ListArtifactsActionResult,
@@ -34,6 +30,10 @@ from ai.backend.manager.services.artifact.actions.scan import (
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
     UpdateArtifactActionResult,
+)
+from ai.backend.manager.services.artifact.actions.upsert_multi import (
+    UpsertArtifactsAction,
+    UpsertArtifactsActionResult,
 )
 
 
@@ -121,7 +121,7 @@ class ArtifactService:
         )
         return UpdateArtifactActionResult(result=updated_artifact)
 
-    async def insert(self, action: InsertArtifactsAction) -> InsertArtifactsActionResult:
+    async def insert(self, action: UpsertArtifactsAction) -> UpsertArtifactsActionResult:
         result_data: list[ArtifactDataWithRevisions] = []
 
         for artifact_with_revisions in action.data:
@@ -141,4 +141,4 @@ class ArtifactService:
                 ArtifactDataWithRevisions(artifact=upserted_artifact, revisions=upserted_revisions)
             )
 
-        return InsertArtifactsActionResult(result=result_data)
+        return UpsertArtifactsActionResult(result=result_data)

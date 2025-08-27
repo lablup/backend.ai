@@ -7,7 +7,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class InsertArtifactsAction(ArtifactAction):
+class UpsertArtifactsAction(ArtifactAction):
     data: list[ArtifactDataWithRevisions]
 
     @override
@@ -17,11 +17,11 @@ class InsertArtifactsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "insert_multi"
+        return "upsert_multi"
 
 
 @dataclass
-class InsertArtifactsActionResult(BaseActionResult):
+class UpsertArtifactsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
 
     @override

@@ -5,6 +5,7 @@ from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
+from pydantic import TypeAdapter
 
 from ai.backend.client.manager_client import ManagerFacingClient
 from ai.backend.common.api_handlers import APIResponse, BodyParam, api_handler
@@ -23,6 +24,7 @@ from ai.backend.manager.dto.context import ProcessorsCtx, StorageSessionManagerC
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
 )
+from ai.backend.manager.services.artifact.actions.upsert_multi import UpsertArtifactsAction
 from ai.backend.manager.services.artifact_registry.actions.common.get import (
     GetArtifactRegistryAction,
 )
@@ -74,7 +76,6 @@ class APIHandler:
             )
         )
         registry_type = registry_action_result.common.type
-        print("registry_type!", registry_type)
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -93,14 +94,12 @@ class APIHandler:
                 client_resp = await remote_reservoir_client.request(
                     "POST", "/artifact-registries/search", json=payload
                 )
+                RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
+                parsed = RespTypeAdapter.validate_python(client_resp)
 
-                registry_action_result = (
-                    await processors.artifact_registry.get_artifact_registry.wait_for_complete(
-                        GetArtifactRegistryAction(registry_id=registry_id)
-                    )
+                registry_action_result = await processors.artifact.upsert.wait_for_complete(
+                    UpsertArtifactsAction(data=parsed.artifacts)
                 )
-
-                print("client_resp_body!", client_resp)
 
         resp = ArtifactRegistriesScanResponse()
         return APIResponse.build(status_code=200, response_model=resp)
