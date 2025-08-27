@@ -18,7 +18,10 @@ from ai.backend.common.dto.manager.response import (
     ArtifactRegistriesSearchResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactDataWithRevisions,
+    ArtifactRegistryType,
+)
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.dto.context import ProcessorsCtx, StorageSessionManagerCtx
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
@@ -86,20 +89,41 @@ class APIHandler:
                 registry_data = registry_action_result.result
                 assert isinstance(registry_data, ReservoirRegistryData)
                 remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
-                payload = {
-                    "pagination": {
-                        "offset": {"offset": 0, "limit": 10},
-                    },
-                }
-                client_resp = await remote_reservoir_client.request(
-                    "POST", "/artifact-registries/search", json=payload
-                )
-                RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
-                parsed = RespTypeAdapter.validate_python(client_resp)
 
-                registry_action_result = await processors.artifact.upsert.wait_for_complete(
-                    UpsertArtifactsAction(data=parsed.artifacts)
-                )
+                offset = 0
+                limit = 10
+                all_artifacts: list[ArtifactDataWithRevisions] = []
+
+                while True:
+                    payload = {
+                        "pagination": {
+                            "offset": {"offset": offset, "limit": limit},
+                        },
+                    }
+                    client_resp = await remote_reservoir_client.request(
+                        "POST", "/artifact-registries/search", json=payload
+                    )
+                    RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
+                    parsed = RespTypeAdapter.validate_python(client_resp)
+
+                    if not parsed.artifacts:
+                        break
+
+                    all_artifacts.extend(parsed.artifacts)
+
+                    if len(parsed.artifacts) < limit:
+                        break
+
+                    offset += limit
+
+                if all_artifacts:
+                    for artifact_data in all_artifacts:
+                        artifact_data.artifact.registry_id = registry_id
+                        artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
+
+                    registry_action_result = await processors.artifact.upsert.wait_for_complete(
+                        UpsertArtifactsAction(data=all_artifacts)
+                    )
 
         resp = ArtifactRegistriesScanResponse()
         return APIResponse.build(status_code=200, response_model=resp)
