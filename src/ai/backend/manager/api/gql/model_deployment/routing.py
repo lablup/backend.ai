@@ -25,7 +25,6 @@ LivenessStatus = strawberry.enum(
 class RoutingNode(Node):
     id: NodeID
     routing_id: UUID
-    endpoint_url: str
     session_id: UUID
     readiness_status: ReadinessStatus = strawberry.field(
         description="Added in 25.13.0. This enum represents the readiness status of a routing node, indicating whether the deployment has been checked and its health state.",
