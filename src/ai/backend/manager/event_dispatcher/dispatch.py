@@ -19,6 +19,9 @@ from ai.backend.common.events.event_types.agent.anycast import (
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanArtifactRegistryEvent,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -89,6 +92,9 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
+from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
+    ArtifactRegistryEventHandler,
+)
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
@@ -144,6 +150,7 @@ class Dispatchers:
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
     _artifact_event_handler: ArtifactEventHandler
+    _artifact_registry_event_handler: ArtifactRegistryEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -192,6 +199,10 @@ class Dispatchers:
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
         )
+        self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
+            args.repositories.artifact.repository,
+            args.repositories.huggingface_registry.repository,
+        )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -207,6 +218,7 @@ class Dispatchers:
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
+        self._dispatch_artifact_registry_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -547,6 +559,14 @@ class Dispatchers:
             ModelImportDoneEvent,
             None,
             self._artifact_event_handler.handle_artifact_import_done,
+        )
+
+    def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            DoScanArtifactRegistryEvent,
+            None,
+            self._artifact_registry_event_handler.handle_artifact_registry_scan,
         )
 
     def _dispatch_idle_check_events(

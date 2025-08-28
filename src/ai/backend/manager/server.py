@@ -68,10 +68,14 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanArtifactRegistryEvent,
+)
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -1047,6 +1051,15 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Get task specifications from sokovan and register them
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
+    task_specs.append(
+        EventTaskSpec(
+            name="artifact_registry_process_scan",
+            event_factory=lambda: DoScanArtifactRegistryEvent(),
+            # TODO: Update this.
+            interval=5,
+            initial_delay=0,
+        )
+    )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [
