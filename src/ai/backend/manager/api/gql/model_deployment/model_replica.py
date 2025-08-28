@@ -135,10 +135,13 @@ mock_model_replica_3 = ModelReplica(
     id=UUID("2a2388ea-a312-422a-b77e-0e0b61c48145"),
     revision=mock_model_revision_1,
     session_id=ID(str(uuid4())),
-    readiness_status=CommonReadinessStatus.NOT_CHECKED,
+    readiness_status=CommonReadinessStatus.UNHEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     weight=1,
-    detail=cast(JSONString, "{}"),
+    detail=cast(
+        JSONString,
+        '{"type": "creation_failed", "errors": [{"src": "", "name": "InvalidAPIParameters", "repr": "<InvalidAPIParameters(400): Missing or invalid API parameters. (`mount-in-session` Not allowed in vfolder host(`seoul-h100:flash02`))>"}]}',
+    ),
     created_at=datetime.now() - timedelta(days=2),
     live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
 )
