@@ -40,6 +40,7 @@ from ai.backend.manager.api.gql.user import User
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
+from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 
 from .model_revision import (
     CreateModelRevisionInput,
@@ -602,4 +603,9 @@ class SyncReplicaPayload:
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
 ) -> SyncReplicaPayload:
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    await deployment_processor.sync_replicas.wait_for_complete(
+        SyncReplicaAction(deployment_id=UUID(input.model_deployment_id))
+    )
     return SyncReplicaPayload(success=True)

@@ -17,6 +17,10 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.sync_replicas import (
+    SyncReplicaAction,
+    SyncReplicaActionResult,
+)
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 
 
@@ -49,3 +53,6 @@ class DeploymentService:
 
     async def destroy(self, action: DestroyDeploymentAction) -> DestroyDeploymentActionResult:
         return DestroyDeploymentActionResult(success=True)
+
+    async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
+        return SyncReplicaActionResult(success=True)
