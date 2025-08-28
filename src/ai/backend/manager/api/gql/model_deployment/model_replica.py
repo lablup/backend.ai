@@ -107,7 +107,10 @@ mock_model_replica_1 = ModelReplica(
     readiness_status=CommonReadinessStatus.HEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     weight=1,
-    detail=cast(JSONString, "{}"),
+    detail=cast(
+        JSONString,
+        '{"type": "creation_success", "message": "Model replica created successfully", "status": "operational"}',
+    ),
     created_at=datetime.now() - timedelta(days=5),
     live_stat=cast(
         JSONString,
@@ -123,7 +126,10 @@ mock_model_replica_2 = ModelReplica(
     readiness_status=CommonReadinessStatus.HEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     weight=2,
-    detail=cast(JSONString, "{}"),
+    detail=cast(
+        JSONString,
+        '{"type": "creation_success", "message": "Model replica created successfully", "status": "operational"}',
+    ),
     created_at=datetime.now() - timedelta(days=5),
     live_stat=cast(
         JSONString,
