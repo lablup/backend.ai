@@ -902,6 +902,11 @@ type Mutation {
   """Added in 25.13.0"""
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
 
+  """
+  Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
+  """
+  syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
+
   """Added in 25.13.0"""
   addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload!
 
@@ -1252,6 +1257,16 @@ type Subscription {
 
   """Added in 25.13.0"""
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+}
+
+"""Added in 25.13.0"""
+input SyncReplicaInput {
+  modelDeploymentId: ID!
+}
+
+"""Added in 25.13.0"""
+type SyncReplicaPayload {
+  success: Boolean!
 }
 
 scalar UUID

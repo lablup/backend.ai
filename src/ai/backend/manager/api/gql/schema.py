@@ -36,6 +36,7 @@ from .model_deployment.model_deployment import (
     deployment,
     deployment_status_changed,
     deployments,
+    sync_replicas,
     update_model_deployment,
 )
 from .model_deployment.model_replica import replica, replica_status_changed, replicas
@@ -90,6 +91,7 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage

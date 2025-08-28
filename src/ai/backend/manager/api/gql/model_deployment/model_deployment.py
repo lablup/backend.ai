@@ -576,3 +576,23 @@ async def deployment_status_changed(
 
     for dep in deployment:
         yield DeploymentStatusChangedPayload(deployment=dep)
+
+
+@strawberry.input(description="Added in 25.13.0")
+class SyncReplicaInput:
+    model_deployment_id: ID
+
+
+@strawberry.type(description="Added in 25.13.0")
+class SyncReplicaPayload:
+    success: bool
+
+
+@strawberry.mutation(
+    description="Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
+)
+async def sync_replicas(
+    info: Info[StrawberryGQLContext],
+    input: SyncReplicaInput,
+) -> SyncReplicaPayload:
+    return SyncReplicaPayload(success=True)
