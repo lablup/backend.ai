@@ -1,6 +1,5 @@
 import logging
 from decimal import Decimal
-from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -11,6 +10,7 @@ from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConf
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
+    ResourceSlotState,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -51,12 +51,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.engine import Row
-
-
-# TODO: Replace with `ai.backend.common.data.session.types.ResourceSlotState`
-class ResourceSlotState(StrEnum):
-    OCCUPIED = "using"
-    AVAILABLE = "remaining"
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

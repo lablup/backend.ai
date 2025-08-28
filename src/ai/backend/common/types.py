@@ -1021,6 +1021,11 @@ class ResourceSlot(UserDict):
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
 
 
+class ResourceSlotState(enum.StrEnum):
+    OCCUPIED = "using"
+    AVAILABLE = "remaining"
+
+
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
