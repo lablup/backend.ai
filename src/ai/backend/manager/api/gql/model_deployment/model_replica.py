@@ -150,7 +150,7 @@ class ReplicaStatusChangedPayload:
 
 
 @strawberry.field(description="Added in 25.13.0")
-async def replica(id: ID) -> Optional[ModelReplica]:
+async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
 
     return ModelReplica(

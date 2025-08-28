@@ -543,7 +543,7 @@ async def deployment(id: ID) -> Optional[ModelDeployment]:
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def create_model_deployment(
-    input: CreateModelDeploymentInput,
+    input: CreateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> CreateModelDeploymentPayload:
     """Create a new model deployment."""
     # Create a dummy deployment for placeholder
@@ -552,7 +552,7 @@ async def create_model_deployment(
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def update_model_deployment(
-    input: UpdateModelDeploymentInput,
+    input: UpdateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateModelDeploymentPayload:
     """Update an existing model deployment."""
     # Create a dummy deployment for placeholder
@@ -561,7 +561,7 @@ async def update_model_deployment(
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def delete_model_deployment(
-    input: DeleteModelDeploymentInput,
+    input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteModelDeploymentPayload:
     """Delete a model deployment."""
     return DeleteModelDeploymentPayload(deployment=None)
@@ -569,7 +569,7 @@ async def delete_model_deployment(
 
 @strawberry.subscription(description="Added in 25.13.0")
 async def deployment_status_changed(
-    deployment_id: ID,
+    deployment_id: ID, info: Info[StrawberryGQLContext]
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
     deployment = [mock_model_deployment_1, mock_model_deployment_2, mock_model_deployment_3]
@@ -592,7 +592,6 @@ class SyncReplicaPayload:
     description="Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
 )
 async def sync_replicas(
-    info: Info[StrawberryGQLContext],
-    input: SyncReplicaInput,
+    input: SyncReplicaInput, info: Info[StrawberryGQLContext]
 ) -> SyncReplicaPayload:
     return SyncReplicaPayload(success=True)
