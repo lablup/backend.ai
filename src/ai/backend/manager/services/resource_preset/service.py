@@ -1,6 +1,7 @@
 import logging
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 import trafaret as t
@@ -45,6 +46,11 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
     ModifyResourcePresetAction,
     ModifyResourcePresetActionResult,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from sqlalchemy.engine import Row
 
 
 # TODO: Replace with `ai.backend.common.data.session.types.ResourceSlotState`
@@ -219,7 +225,9 @@ class ResourcePresetService:
                 )
 
             # Prepare per scaling group resource.
-            sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
+            sgroups: Sequence[Row] = await query_allowed_sgroups(
+                conn, domain_name, group_id, access_key
+            )
             sgroup_names = [sg.name for sg in sgroups]
             if action.scaling_group is not None:
                 if action.scaling_group not in sgroup_names:
