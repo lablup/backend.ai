@@ -763,6 +763,25 @@ append_to_profiles() {
   done
 }
 
+install_rover_cli() {
+  curl -sSL https://rover.apollo.dev/nix/latest | sh
+  SHELL_RC=""
+  if [ -n "$ZSH_VERSION" ]; then
+    SHELL_RC="$HOME/.zshrc"
+  elif [ -n "$BASH_VERSION" ]; then
+    SHELL_RC="$HOME/.bashrc"
+  fi
+
+  if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
+    echo '# Apollo Rover Settings' >> "$SHELL_RC"
+    echo 'export PATH="$HOME/.rover/bin:$PATH"' >> "$SHELL_RC"
+    echo 'export APOLLO_ELV2_LICENSE=accept' >> "$SHELL_RC"
+  fi
+
+  export PATH="$HOME/.rover/bin:$PATH"
+  export APOLLO_ELV2_LICENSE=accept
+}
+
 setup_environment() {
   wait_for_docker
   # Install pyenv
@@ -792,6 +811,9 @@ setup_environment() {
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks
+
+  show_info "Installing Rover CLI..."
+  install_rover_cli
 
   show_info "Installing Python..."
   install_python
@@ -898,25 +920,6 @@ setup_environment() {
   else
     $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
   fi
-}
-
-install_rover_cli() {
-  curl -sSL https://rover.apollo.dev/nix/latest | sh
-  SHELL_RC=""
-  if [ -n "$ZSH_VERSION" ]; then
-    SHELL_RC="$HOME/.zshrc"
-  elif [ -n "$BASH_VERSION" ]; then
-    SHELL_RC="$HOME/.bashrc"
-  fi
-
-  if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
-    echo '# Apollo Rover Settings' >> "$SHELL_RC"
-    echo 'export PATH="$HOME/.rover/bin:$PATH"' >> "$SHELL_RC"
-    echo 'export APOLLO_ELV2_LICENSE=accept' >> "$SHELL_RC"
-  fi
-
-  export PATH="$HOME/.rover/bin:$PATH"
-  export APOLLO_ELV2_LICENSE=accept
 }
 
 configure_backendai() {
