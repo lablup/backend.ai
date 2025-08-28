@@ -917,12 +917,6 @@ install_rover_cli() {
 
   export PATH="$HOME/.rover/bin:$PATH"
   export APOLLO_ELV2_LICENSE=accept
-
-  echo "Verifying Rover installation:"
-  echo "  PATH includes Rover: $(echo $PATH | grep -q ".rover/bin" && echo "✓ Yes" || echo "✗ No")"
-  echo "  License accepted: $APOLLO_ELV2_LICENSE"
-  echo "  Rover version: $(rover --version 2>/dev/null || echo "✗ Command not found")"
-  echo "  Rover binary location: $(which rover 2>/dev/null || echo "✗ Not in PATH")"
 }
 
 configure_backendai() {
