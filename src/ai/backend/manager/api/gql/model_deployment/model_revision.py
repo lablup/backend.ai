@@ -39,7 +39,7 @@ from ai.backend.manager.api.gql.vfolder import (
     mock_model_vfolder_4,
     mock_model_vfolder_5,
 )
-from ai.backend.manager.data.model_deployment.inference_runtime_config import (
+from ai.backend.manager.data.deployment.inference_runtime_config import (
     MOJORuntimeConfig,
     NVDIANIMRuntimeConfig,
     SGLangRuntimeConfig,
