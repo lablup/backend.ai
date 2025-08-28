@@ -91,6 +91,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
 from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
     ArtifactRegistryEventHandler,
@@ -137,6 +138,7 @@ class DispatcherArgs:
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
     processors: Processors
+    storage_manager: StorageSessionManager
     use_sokovan: bool = True
 
 
@@ -207,6 +209,7 @@ class Dispatchers:
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.repositories.object_storage.repository,
+            args.storage_manager,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:

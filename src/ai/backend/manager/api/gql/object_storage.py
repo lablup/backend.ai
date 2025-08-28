@@ -11,7 +11,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetObjectStorageBucketsAction,
+    GetBucketsAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -86,7 +86,7 @@ class ObjectStorage(Node):
     ) -> ObjectStorageNamespaceConnection:
         # TODO: Support pagination
         action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
-            GetObjectStorageBucketsAction(uuid.UUID(self.id))
+            GetBucketsAction(uuid.UUID(self.id))
         )
 
         nodes = [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]

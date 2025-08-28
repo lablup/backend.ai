@@ -22,8 +22,10 @@ from ai.backend.common.dto.storage.request import (
     ObjectStorageAPIPathParams,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
+    PullObjectReq,
     UploadObjectReq,
 )
+from ai.backend.common.dto.storage.response import PullObjectResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
@@ -116,6 +118,29 @@ class StorageAPIHandler:
                 "Content-Type": "application/octet-stream",
             },
         )
+
+    @api_handler
+    async def pull_file(
+        self,
+        path: PathParam[ObjectStorageAPIPathParams],
+        body: BodyParam[PullObjectReq],
+    ) -> APIResponse:
+        """
+        Pull a file from URL and store it in the specified S3 bucket.
+        Downloads file content from URL and uploads it to storage using streaming.
+        """
+        req = body.parsed
+        url = req.url
+        filepath = req.key
+        storage_name = path.parsed.storage_name
+        bucket_name = path.parsed.bucket_name
+
+        await log_client_api_entry(log, "pull_file", req)
+
+        storage_service = StorageService(self._storage_configs)
+        response = await storage_service.stream_from_url(storage_name, bucket_name, filepath, url)
+
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=PullObjectResponse())
 
     @api_handler
     async def presigned_upload_url(
@@ -239,9 +264,17 @@ def create_app(ctx: RootContext) -> web.Application:
         "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/download", api_handler.download_file
     )
     app.router.add_route(
+        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/pull", api_handler.pull_file
+    )
+    app.router.add_route(
         "POST",
         "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
         api_handler.presigned_upload_url,
+    )
+    app.router.add_route(
+        "POST",
+        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/pull",
+        api_handler.pull_file,
     )
     app.router.add_route(
         "GET",

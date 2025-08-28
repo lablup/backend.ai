@@ -1,6 +1,8 @@
 import logging
 from typing import AsyncIterable, AsyncIterator, Optional
 
+import aiohttp
+
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     DeleteObjectResponse,
@@ -104,6 +106,59 @@ class StorageService:
         except Exception as e:
             log.error(f"Stream download failed: {e}")
             raise FileStreamDownloadError("Download failed") from e
+
+    async def stream_from_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        filepath: str,
+        url: str,
+        content_type: Optional[str] = None,
+    ) -> UploadObjectResponse:
+        """
+        Download a file from URL and upload it to S3 using streaming.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path where to store the file in the bucket
+            url: URL to download the file from
+            content_type: Content type of the file
+
+        Returns:
+            UploadObjectResponse
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            part_size = self._storage_configs[storage_name].upload_chunk_size
+
+            async def url_stream() -> AsyncIterator[bytes]:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        response.raise_for_status()
+
+                        # Auto-detect content type if not provided
+                        detected_content_type = content_type
+                        if not detected_content_type:
+                            detected_content_type = response.headers.get(
+                                "content-type", "application/octet-stream"
+                            )
+
+                        async for chunk in response.content.iter_chunked(part_size):
+                            yield chunk
+
+            await s3_client.upload_stream(
+                url_stream(),
+                filepath,
+                content_type=content_type,
+                part_size=part_size,
+            )
+
+            return UploadObjectResponse()
+
+        except Exception as e:
+            log.error(f"Stream from URL failed: {e}")
+            raise FileStreamUploadError("URL streaming failed") from e
 
     # TODO: Replace `request` with proper options
     async def generate_presigned_upload_url(

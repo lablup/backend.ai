@@ -224,3 +224,26 @@ class ObjectStorageRepository:
             result = await db_session.execute(query)
             rows: list[ObjectStorageNamespaceRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
+    async def get_all_buckets_by_storage(self) -> dict[uuid.UUID, list[str]]:
+        """
+        Get all buckets grouped by storage ID.
+
+        Returns:
+            Dictionary mapping storage_id to list of bucket names
+        """
+        async with self._db.begin_session() as db_session:
+            query = sa.select(ObjectStorageMetaRow.storage_id, ObjectStorageMetaRow.bucket)
+            result = await db_session.execute(query)
+            rows = result.all()
+
+            buckets_by_storage: dict[uuid.UUID, list[str]] = {}
+            for row in rows:
+                storage_id = row.storage_id
+                bucket_name = row.bucket
+                if storage_id not in buckets_by_storage:
+                    buckets_by_storage[storage_id] = []
+                buckets_by_storage[storage_id].append(bucket_name)
+
+            return buckets_by_storage

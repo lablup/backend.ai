@@ -13,6 +13,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
+    PullObjectReq,
 )
 from ai.backend.common.dto.storage.response import (
     DeleteObjectResponse,
@@ -21,6 +22,7 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
+    PullObjectResponse,
     VFolderCloneResponse,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -695,6 +697,23 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return DownloadObjectResponse.model_validate(resp)
+
+    @client_decorator()
+    async def pull_s3_file(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PullObjectReq,
+    ) -> PullObjectResponse:
+        """
+        Pull a file from url to S3 storage.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/pull",
+            body=req.model_dump(by_alias=True),
+        )
+        return PullObjectResponse.model_validate(resp)
 
     @client_decorator()
     async def get_s3_presigned_download_url(

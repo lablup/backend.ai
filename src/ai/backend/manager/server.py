@@ -239,6 +239,8 @@ public_interface_objs: MutableMapping[str, Any] = {}
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
     ".container_registry",
+    ".artifact",
+    ".artifact_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -793,6 +795,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.event_dispatcher_plugin_ctx,
             root_ctx.repositories,
             root_ctx.processors,
+            root_ctx.storage_manager,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )

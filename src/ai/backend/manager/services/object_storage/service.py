@@ -24,9 +24,13 @@ from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.get_all_buckets import (
+    GetAllBucketsAction,
+    GetAllBucketsActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetObjectStorageBucketsAction,
-    GetObjectStorageBucketsActionResult,
+    GetBucketsAction,
+    GetBucketsActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -225,9 +229,12 @@ class ObjectStorageService:
         )
         return UnregisterBucketActionResult(storage_id=storage_id)
 
-    async def get_buckets(
-        self, action: GetObjectStorageBucketsAction
-    ) -> GetObjectStorageBucketsActionResult:
+    async def get_buckets(self, action: GetBucketsAction) -> GetBucketsActionResult:
         log.info("Getting object storage buckets for storage: {}", action.storage_id)
         buckets = await self._object_storage_repository.get_buckets(action.storage_id)
-        return GetObjectStorageBucketsActionResult(result=buckets)
+        return GetBucketsActionResult(result=buckets)
+
+    async def get_all_buckets(self, action: GetAllBucketsAction) -> GetAllBucketsActionResult:
+        log.info("Getting all buckets grouped by storage")
+        buckets_by_storage = await self._object_storage_repository.get_all_buckets_by_storage()
+        return GetAllBucketsActionResult(result=buckets_by_storage)

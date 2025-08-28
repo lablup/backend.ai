@@ -98,6 +98,23 @@ class RegisterObjectStorageBucketResponse(BaseResponseModel):
     id: uuid.UUID = Field(description="The ID of the registered bucket")
 
 
+class ObjectStorageBucketsResponse(BaseResponseModel):
+    buckets: list[str] = Field(description="List of bucket names for a specific storage")
+
+
+class ObjectStorageAllBucketsResponse(BaseResponseModel):
+    buckets_by_storage: dict[str, list[str]] = Field(
+        description="Mapping of storage IDs to bucket lists"
+    )
+
+
+# Artifact Installed Storages Response Models
+class ArtifactInstalledStoragesResponse(BaseResponseModel):
+    installed_storages: dict[str, str] = Field(
+        description="Mapping of artifact revision IDs to storage IDs"
+    )
+
+
 class UnregisterObjectStorageBucketResponse(BaseResponseModel):
     id: uuid.UUID = Field(description="The ID of the unregistered bucket")
 

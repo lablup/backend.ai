@@ -57,6 +57,10 @@ class DownloadObjectResponse(BaseResponseModel):
     pass
 
 
+class PullObjectResponse(BaseResponseModel):
+    pass
+
+
 class ObjectMetaResponse(BaseResponseModel):
     content_length: Optional[int]
     content_type: Optional[str]

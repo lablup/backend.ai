@@ -7,6 +7,10 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.get_installed_storages import (
+    GetInstalledStoragesAction,
+    GetInstalledStoragesActionResult,
+)
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
@@ -43,6 +47,9 @@ class ArtifactProcessors(AbstractProcessorPackage):
         ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
+    get_installed_storages: ActionProcessor[
+        GetInstalledStoragesAction, GetInstalledStoragesActionResult
+    ]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
     upsert: ActionProcessor[UpsertArtifactsAction, UpsertArtifactsActionResult]
 
@@ -54,6 +61,9 @@ class ArtifactProcessors(AbstractProcessorPackage):
             service.list_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
+        self.get_installed_storages = ActionProcessor(
+            service.get_installed_storages, action_monitors
+        )
         self.update = ActionProcessor(service.update, action_monitors)
         self.upsert = ActionProcessor(service.upsert, action_monitors)
 
@@ -65,6 +75,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
             ListArtifactsAction.spec(),
             ListArtifactsWithRevisionsAction.spec(),
             GetArtifactRevisionsAction.spec(),
+            GetInstalledStoragesAction.spec(),
             UpdateArtifactAction.spec(),
             UpsertArtifactsAction.spec(),
         ]

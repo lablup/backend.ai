@@ -1,6 +1,9 @@
 import logging
 
+from pydantic import TypeAdapter
+
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.dto.manager.response import GetPresignedDownloadURLResponse
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanArtifactRegistryEvent,
 )
@@ -9,6 +12,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.client.manager_client import ManagerFacingClient
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -26,6 +30,7 @@ class ArtifactRegistryEventHandler:
     _artifact_registry_repository: ArtifactRegistryRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _object_storage_repository: ObjectStorageRepository
+    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
@@ -34,12 +39,14 @@ class ArtifactRegistryEventHandler:
         artifact_registry_repository: ArtifactRegistryRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
+        storage_manager: StorageSessionManager,
     ) -> None:
         self._processors = processors
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._object_storage_repository = object_storage_repository
+        self._storage_manager = storage_manager
 
     async def handle_artifact_registry_scan(
         self, context: None, source: AgentId, event: DoScanArtifactRegistryEvent
@@ -50,6 +57,7 @@ class ArtifactRegistryEventHandler:
 
         # For now, we just pick first storage
         storage = object_storages[0]
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
         for registry in registries:
             if registry.type != ArtifactRegistryType.RESERVOIR:
@@ -69,17 +77,30 @@ class ArtifactRegistryEventHandler:
             )
 
             artifacts = scan_result.result
-            registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(registry.registry_id)
+            registry_data = (
+                await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                    registry.registry_id
+                )
+            )
 
             remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
 
             for artifact in artifacts:
                 for revision in artifact.revisions:
+                    # 매니저를 통해 download url을 얻고..
                     client_resp = await remote_reservoir_client.request(
-                        "GET", "/object-storages/presigned/download", json={
+                        "GET",
+                        "/object-storages/presigned/download",
+                        json={
                             "artifact_revision_id": revision.id,
                             "storage_id": storage.id,
-                            "bucket_name": storage.bucket_name,
-                            "key": "."
-                        }
+                            # "bucket_name": storage.bucket_name,
+                            "key": ".",
+                        },
                     )
+
+                    RespTypeAdapter = TypeAdapter(GetPresignedDownloadURLResponse)
+                    parsed = RespTypeAdapter.validate_python(client_resp)
+                    presigned_url = parsed.presigned_url
+
+                    storage_proxy_client.upload_file()

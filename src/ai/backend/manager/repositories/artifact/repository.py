@@ -862,3 +862,22 @@ class ArtifactRepository:
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
+
+    @repository_decorator()
+    async def get_installed_storages_for_artifact_revisions(
+        self,
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """Get mapping of artifact revision IDs to storage IDs where they are installed.
+
+        Returns:
+            Dictionary mapping artifact_revision_id to storage_id
+        """
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(
+                    AssociationArtifactsStorageRow.artifact_revision_id,
+                    AssociationArtifactsStorageRow.storage_id,
+                )
+            )
+            rows: list[AssociationArtifactsStorageRow] = result.all()
+            return {row.artifact_revision_id: row.storage_id for row in rows}

@@ -17,6 +17,10 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.get_installed_storages import (
+    GetInstalledStoragesAction,
+    GetInstalledStoragesActionResult,
+)
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
@@ -206,3 +210,11 @@ class ArtifactService:
             )
 
         return UpsertArtifactsActionResult(result=result_data)
+
+    async def get_installed_storages(
+        self, action: GetInstalledStoragesAction
+    ) -> GetInstalledStoragesActionResult:
+        installed_storages = (
+            await self._artifact_repository.get_installed_storages_for_artifact_revisions()
+        )
+        return GetInstalledStoragesActionResult(result=installed_storages)
