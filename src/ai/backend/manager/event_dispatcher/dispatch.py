@@ -104,6 +104,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -135,6 +136,7 @@ class DispatcherArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
+    processors: Processors
     use_sokovan: bool = True
 
 
@@ -200,8 +202,11 @@ class Dispatchers:
             args.repositories.huggingface_registry.repository,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
+            args.processors,
             args.repositories.artifact.repository,
-            args.repositories.huggingface_registry.repository,
+            args.repositories.artifact_registry.repository,
+            args.repositories.reservoir_registry.repository,
+            args.repositories.object_storage.repository,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
