@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import logging
 import textwrap
 import uuid
@@ -13,6 +14,7 @@ from glide import (
     Script,
 )
 
+from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
 from ai.backend.common.bgtask.types import (
     BackgroundTaskMetadata,
     TaskID,
@@ -42,10 +44,20 @@ _TAG_KEY_PREFIX = f"{_KEY_PREFIX}:tag"  # bgtask:tag:{tag}
 _SERVER_KEY_PREFIX = f"{_KEY_PREFIX}:server"  # bgtask:server:{server_id}
 
 
+class _ScriptResult(enum.StrEnum):
+    KEY_NOT_EXIST = "key_not_exist"
+    NO_EXPIRY = "no_expiry"
+    TTL_SUFFICIENT = "ttl_sufficient"
+    TTL_INSUFFICIENT = "ttl_insufficient"
+
+    @classmethod
+    def from_bytes(cls, value: bytes) -> _ScriptResult:
+        return cls(value.decode())
+
+
 class ValkeyBgtaskClient:
     """
-    Client for background task management operations using Valkey/Glide.
-    Provides task-specific methods instead of generic Redis operations.
+    Client for background task management using Valkey/Glide.
     """
 
     _client: AbstractValkeyClient
@@ -68,10 +80,6 @@ class ValkeyBgtaskClient:
     ) -> Self:
         """
         Create a ValkeyBgtaskClient instance.
-
-        :param valkey_target: The target Valkey server to connect to.
-        :param db_id: The database index to use.
-        :param human_readable_name: The human-readable name for the client.
         """
         client = create_valkey_client(
             valkey_target,
@@ -88,28 +96,19 @@ class ValkeyBgtaskClient:
             self._closed = True
 
     def _get_tag_key(self, tag: str) -> str:
-        """Get key for tag"""
         return f"{_TAG_KEY_PREFIX}:{tag}"
 
     def _get_server_key(self, server_id: str) -> str:
-        """Get key for server-specific task set"""
         return f"{_SERVER_KEY_PREFIX}:{server_id}"
 
     def _get_task_key(self, task_id: TaskID) -> str:
-        """Get key for individual task metadata"""
         return f"{_TASK_KEY_PREFIX}:{task_id}"
 
     # Task metadata operations
     @valkey_decorator()
     async def register_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Register a background task with automatic expiration.
-
-        Stores task metadata with 24-hour TTL and indexes it by server type
-        and server ID for efficient lookup.
-
-        Args:
-            metadata: Task metadata with ID, server info, and configuration
+        Register a background task with 24-hour TTL and index it by tags and server ID.
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -127,13 +126,7 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def unregister_task(self, metadata: BackgroundTaskMetadata) -> None:
         """
-        Remove task and all its index references.
-
-        Atomically deletes task metadata and removes from all server indexes.
-        Safe to call even if already deleted (idempotent).
-
-        Args:
-            metadata: Task metadata with ID and server associations
+        Remove task and all its index references. Idempotent operation.
         """
         batch = self._create_batch()
         key = self._get_task_key(metadata.task_id)
@@ -147,7 +140,7 @@ class ValkeyBgtaskClient:
         batch.srem(server_key, [metadata.task_id.hex])
         await self._client.client.exec(batch, raise_on_error=True)
 
-    async def _get_task_ids(self, keys: Collection[str]) -> set[TaskID]:
+    async def _get_registered_task_ids(self, keys: Collection[str]) -> set[TaskID]:
         if not keys:
             return set()
         batch = self._create_batch()
@@ -168,49 +161,28 @@ class ValkeyBgtaskClient:
         self, tags: Collection[str]
     ) -> list[BackgroundTaskMetadata]:
         """
-        List timeout task metadata by tags.
-
-        Args:
-            tags: Collection of tags to filter tasks
-
-        Returns:
-            List of timeout task metadata associated with the tags.
+        List tasks with insufficient TTL filtered by tags.
         """
         if not tags:
             return []
         keys = [self._get_tag_key(tag) for tag in tags]
-        task_ids = await self._get_task_ids(keys)
+        task_ids = await self._get_registered_task_ids(keys)
         results = await self._list_timeout_tasks(task_ids)
         return results
 
     @valkey_decorator()
     async def list_timeout_tasks_by_server_id(self, server_id: str) -> list[BackgroundTaskMetadata]:
         """
-        List timeout task metada owned by a specific server.
-
-        Args:
-            server_id: Server instance identifier
-
-        Returns:
-            List of timeout task metadata for the server.
+        List tasks with insufficient TTL owned by a specific server.
         """
         key = self._get_server_key(server_id)
-        task_ids = await self._get_task_ids([key])
+        task_ids = await self._get_registered_task_ids([key])
         results = await self._list_timeout_tasks(task_ids)
         return results
 
     async def _list_timeout_tasks(
         self, task_ids: Collection[TaskID]
     ) -> list[BackgroundTaskMetadata]:
-        """
-        List timeout task metadata for a given key.
-
-        Args:
-            key: Key to retrieve tasks from
-
-        Returns:
-            List of timeout task metadata.
-        """
         if not task_ids:
             return []
         script = self._task_getter_script()
@@ -225,28 +197,52 @@ class ValkeyBgtaskClient:
                     str(TASK_METADATA_TTL),
                 ],
             )
-            result = cast(Optional[tuple[bool, Optional[bytes]]], raw_result)
-            if result is None:
-                log.warning("Task {} not found or expired", task_id)
-                continue
-            do_retry, raw_metadata = result
-            if not do_retry or raw_metadata is None:
-                continue
-            metadata = BackgroundTaskMetadata.from_json(raw_metadata)
+            result = cast(list[bytes], raw_result)
+            result_type, metadata = self._resolve_script_result(result)
+            match result_type:
+                case _ScriptResult.TTL_SUFFICIENT:
+                    log.debug(
+                        "Task TTL sufficient, skipping (id: {})",
+                        task_id,
+                    )
+                    continue
+                case _ScriptResult.KEY_NOT_EXIST | _ScriptResult.NO_EXPIRY:
+                    log.warning(
+                        "Task key not exist or no expiry, skipping (id: {}, result: {})",
+                        task_id,
+                        result_type,
+                    )
+                    continue
+                case _ScriptResult.TTL_INSUFFICIENT:
+                    log.info(
+                        "Task TTL insufficient, fetching metadata (id: {}, metadata: {})",
+                        task_id,
+                        metadata,
+                    )
+                    if metadata is None:
+                        continue
+
             results.append(metadata)
 
         return results
 
+    def _resolve_script_result(
+        self, raw_result: list[bytes]
+    ) -> tuple[_ScriptResult, Optional[BackgroundTaskMetadata]]:
+        result_type = _ScriptResult.from_bytes(raw_result[0])
+        metadata: Optional[BackgroundTaskMetadata] = None
+        if len(raw_result) == 2:
+            raw_metadata = raw_result[1]
+            try:
+                metadata = BackgroundTaskMetadata.from_json(raw_metadata)
+            except InvalidTaskMetadataError:
+                log.exception("Invalid bgtask metadata (data: {})", raw_metadata)
+        return result_type, metadata
+
     @valkey_decorator()
     async def heartbeat(self, task_ids: Collection[TaskID]) -> None:
         """
-        Extend TTL for active tasks (heartbeat).
-
-        Resets TTL to 24 hours. Non-existent tasks ignored.
-        Call periodically for long-running tasks.
-
-        Args:
-            task_ids: Task IDs to refresh
+        Extend TTL to 24 hours for active tasks. Non-existent tasks are ignored.
         """
         if not task_ids:
             return
@@ -257,20 +253,10 @@ class ValkeyBgtaskClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
-        """
-        Create a batch object for batch operations.
-
-        :param is_atomic: Whether the batch should be atomic (transaction-like).
-        :return: A Batch object.
-        """
         return Batch(is_atomic=is_atomic)
 
     def _task_getter_script(self) -> Script:
-        """
-        Create a script to get task metadata with TTL check.
-        """
-
-        code = textwrap.dedent("""
+        code = textwrap.dedent(f"""
         -- KEYS[1]: Key
         -- ARGV[1]: TTL threshold (in seconds)
         -- ARGV[2]: New TTL value to set (in seconds)
@@ -285,7 +271,7 @@ class ValkeyBgtaskClient:
         -- Handle non-existent key (-2)
         if current_ttl == -2 then
             -- Key doesn't exist
-            return nil
+            return {{'{_ScriptResult.KEY_NOT_EXIST}'}}
         end
 
         -- Key exists, set new TTL
@@ -294,17 +280,17 @@ class ValkeyBgtaskClient:
         -- Handle key without expiration (-1) - treat as infinite TTL
         if current_ttl == -1 then
             -- Key exists but has no expiration, TTL is sufficient
-            return {false, nil}
+            return {{'{_ScriptResult.NO_EXPIRY}'}}
         end
 
         -- Key exists and has TTL, check threshold
         if current_ttl < ttl_threshold then
             -- TTL is below threshold, return true with value
             local value = redis.call('GET', target_key)
-            return {true, value}
+            return {{'{_ScriptResult.TTL_INSUFFICIENT}', value}}
         else
             -- TTL is sufficient, return false with nil
-            return {false, nil}
+            return {{'{_ScriptResult.TTL_SUFFICIENT}'}}
         end
         """)
         return Script(code)

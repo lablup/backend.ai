@@ -14,7 +14,6 @@ from collections.abc import (
 from pathlib import Path
 from typing import (
     Any,
-    Literal,
     Optional,
     Self,
     Union,
@@ -1215,7 +1214,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     # only supported in AsyncAPISession
-    def listen_events(self, scope: Literal["*", "session", "kernel"] = "*") -> SSEContextManager:
+    def listen_events(self, scope: str = "*") -> SSEContextManager:
         """
         Opens the stream of the kernel lifecycle events.
         Only the master kernel of each session is monitored.

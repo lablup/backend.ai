@@ -4,6 +4,7 @@ import pytest
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    ContainerUserInfo,
     SessionCreationContext,
     SessionCreationSpec,
 )
@@ -29,7 +30,7 @@ class TestMountNameValidationRule:
             image_infos={},
             vfolder_mounts=[],
             dotfile_data={},
-            user_container_info=None,
+            container_user_info=ContainerUserInfo(),
         )
 
     def test_valid_mount_names(self, mount_rule, basic_context):

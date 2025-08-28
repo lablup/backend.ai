@@ -17,6 +17,14 @@ type MessageId = bytes
 
 
 @dataclass
+class BroadcastPayload:
+    """Payload data for broadcasting with optional cache."""
+
+    payload: Mapping[str, str]
+    cache_id: Optional[str] = None
+
+
+@dataclass
 class BroadcastMessage:
     payload: Mapping[str, str]
 

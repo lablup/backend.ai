@@ -74,7 +74,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
-    BatchSchedulingBroadcastEvent,
+    SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
@@ -396,11 +396,11 @@ class Dispatchers:
             self._schedule_event_handler.handle_do_sokovan_process_schedule,
             name="sokovan.process_schedule",
         )
-        # Subscribe to BatchSchedulingBroadcastEvent to propagate individual events
+        # Subscribe to SchedulingBroadcastEvent to propagate individual events
         event_dispatcher.subscribe(
-            BatchSchedulingBroadcastEvent,
+            SchedulingBroadcastEvent,
             None,
-            self._schedule_event_handler.handle_batch_scheduling_broadcast,
+            self._schedule_event_handler.handle_scheduling_broadcast,
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

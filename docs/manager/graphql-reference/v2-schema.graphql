@@ -25,7 +25,7 @@ type Artifact implements Node {
   source: SourceInfo!
   readonly: Boolean!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
-  updatedAt: DateTime!
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
@@ -83,11 +83,11 @@ type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-  readme: String!
   version: String!
-  size: ByteSize!
+  readme: String
+  size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
 }
 
 """Added in 25.13.0"""
@@ -131,12 +131,13 @@ enum ArtifactRevisionOrderField {
   SIZE
   CREATED_AT
   UPDATED_AT
+  STATUS
 }
 
 """Added in 25.13.0"""
 input ArtifactRevisionStatusFilter {
-  in: [ArtifactStatus!]
-  equals: [ArtifactStatus!] = null
+  in: [ArtifactStatus!] = null
+  equals: ArtifactStatus = null
 }
 
 enum ArtifactStatus {
@@ -248,15 +249,20 @@ type CreateObjectStoragePayload {
 scalar DateTime
 
 """Added in 25.13.0"""
-input DeleteArtifactInput {
+input DeleteArtifactRevisionTarget {
   artifactRevisionId: ID!
   storageId: ID!
   bucketName: String!
 }
 
 """Added in 25.13.0"""
-type DeleteArtifactPayload {
-  artifactRevisionId: ID!
+input DeleteArtifactRevisionsInput {
+  targets: [DeleteArtifactRevisionTarget!]!
+}
+
+"""Added in 25.13.0"""
+type DeleteArtifactRevisionsPayload {
+  artifactRevisionIds: [ID!]!
 }
 
 """Added in 25.13.0"""
@@ -589,7 +595,7 @@ type Mutation {
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
   """Added in 25.13.0"""
-  deleteArtifact(input: DeleteArtifactInput!): DeleteArtifactPayload!
+  deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload!
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
@@ -606,6 +612,12 @@ type Mutation {
 
   """Added in 25.13.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+
+  """Added in 25.13.0"""
+  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload!
+
+  """Added in 25.13.0"""
+  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload!
 
   """Added in 25.13.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
@@ -645,6 +657,7 @@ type ObjectStorage implements Node {
   secretKey: String!
   endpoint: String!
   region: String!
+  meta: [ObjectStorageMeta!]!
 }
 
 """Added in 25.13.0"""
@@ -664,6 +677,14 @@ type ObjectStorageEdge {
 
   """The item at the end of the edge"""
   node: ObjectStorage!
+}
+
+"""Added in 25.13.0"""
+type ObjectStorageMeta implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  bucket: String!
 }
 
 enum OrderDirection {
@@ -753,6 +774,17 @@ type Query {
 type RawServiceConfig {
   config: JSONString!
   extraCliParameters: String
+}
+
+"""Added in 25.13.0"""
+input RegisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type RegisterObjectStorageBucketPayload {
+  id: UUID!
 }
 
 """Added in 25.13.0"""
@@ -863,8 +895,20 @@ type Subscription {
 scalar UUID
 
 """Added in 25.13.0"""
+input UnregisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.13.0"""
+type UnregisterObjectStorageBucketPayload {
+  id: UUID!
+}
+
+"""Added in 25.13.0"""
 input UpdateArtifactInput {
   artifactId: ID!
+  readonly: Boolean
 }
 
 """Added in 25.13.0"""

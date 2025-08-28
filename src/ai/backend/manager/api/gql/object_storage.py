@@ -6,11 +6,20 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageMetaCreator
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
+from ai.backend.manager.services.object_storage.actions.get_buckets import (
+    GetObjectStorageBucketsAction,
+)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.register_bucket import RegisterBucketAction
+from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
+    UnregisterBucketAction,
 )
 
 from ...data.object_storage.creator import ObjectStorageCreator
@@ -23,6 +32,21 @@ from ...services.object_storage.actions.list import ListObjectStorageAction
 from ...services.object_storage.actions.update import UpdateObjectStorageAction
 from ...types import OptionalState
 from .types import StrawberryGQLContext
+
+
+@strawberry.type(description="Added in 25.13.0")
+class ObjectStorageMeta(Node):
+    id: NodeID[str]
+    storage_id: ID
+    bucket: str
+
+    @classmethod
+    def from_dataclass(cls, data: ObjectStorageMetaData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            storage_id=ID(str(data.storage_id)),
+            bucket=data.bucket,
+        )
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -46,6 +70,14 @@ class ObjectStorage(Node):
             endpoint=data.endpoint,
             region=data.region,
         )
+
+    @strawberry.field
+    async def meta(self, info: Info[StrawberryGQLContext]) -> list[ObjectStorageMeta]:
+        action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
+            GetObjectStorageBucketsAction(uuid.UUID(self.id))
+        )
+
+        return [ObjectStorageMeta.from_dataclass(bucket) for bucket in action_result.result]
 
 
 ObjectStorageEdge = Edge[ObjectStorage]
@@ -279,3 +311,62 @@ async def get_presigned_upload_url(
     return GetPresignedUploadURLPayload(
         presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
     )
+
+
+@strawberry.input(description="Added in 25.13.0")
+class RegisterObjectStorageBucketInput:
+    storage_id: uuid.UUID
+    bucket_name: str
+
+    def to_creator(self) -> ObjectStorageMetaCreator:
+        return ObjectStorageMetaCreator(
+            storage_id=self.storage_id,
+            bucket=self.bucket_name,
+        )
+
+
+@strawberry.input(description="Added in 25.13.0")
+class UnregisterObjectStorageBucketInput:
+    storage_id: uuid.UUID
+    bucket_name: str
+
+
+@strawberry.type(description="Added in 25.13.0")
+class RegisterObjectStorageBucketPayload:
+    id: uuid.UUID
+
+
+@strawberry.type(description="Added in 25.13.0")
+class UnregisterObjectStorageBucketPayload:
+    id: uuid.UUID
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def register_object_storage_bucket(
+    input: RegisterObjectStorageBucketInput, info: Info[StrawberryGQLContext]
+) -> RegisterObjectStorageBucketPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.register_bucket.wait_for_complete(
+        RegisterBucketAction(
+            creator=input.to_creator(),
+        )
+    )
+
+    return RegisterObjectStorageBucketPayload(id=action_result.storage_id)
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def unregister_object_storage_bucket(
+    input: UnregisterObjectStorageBucketInput, info: Info[StrawberryGQLContext]
+) -> UnregisterObjectStorageBucketPayload:
+    processors = info.context.processors
+
+    action_result = await processors.object_storage.unregister_bucket.wait_for_complete(
+        UnregisterBucketAction(
+            storage_id=input.storage_id,
+            bucket_name=input.bucket_name,
+        )
+    )
+
+    return UnregisterObjectStorageBucketPayload(id=action_result.storage_id)

@@ -114,9 +114,10 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
-from ai.backend.common.events.types import EventDomain
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
+from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -238,6 +239,7 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
+DEFAULT_WAIT_TIMEOUT_SECONDS = 60
 
 
 class AgentRegistry:
@@ -397,6 +399,41 @@ class AgentRegistry:
         agent = await self.get_instance(instance_id, agents.c.addr)
         agent_client = self._get_agent_client(agent["id"])
         return await agent_client.scan_gpu_alloc_map()
+
+    async def _wait_for_session_running(
+        self,
+        session_id: SessionId,
+        propagator: WithCachePropagator,
+        max_wait: int,
+    ) -> None:
+        cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+        while True:
+            try:
+                with _timeout(DEFAULT_WAIT_TIMEOUT_SECONDS):
+                    async for event in propagator.receive(cache_id):
+                        if isinstance(event, SchedulingBroadcastEvent):
+                            if event.status_transition == str(SessionStatus.RUNNING):
+                                return
+                            if event.status_transition in (
+                                str(SessionStatus.TERMINATED),
+                                str(SessionStatus.CANCELLED),
+                            ):
+                                raise SessionNotFound("Session terminated during scheduling")
+            except asyncio.TimeoutError as e:
+                if max_wait > 0:
+                    raise e
+                async with self.db.begin_readonly_session() as db_session:
+                    query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
+                    result = await db_session.execute(query)
+                    row = result.first()
+
+                    if row is None:
+                        raise SessionNotFound(f"Session {session_id} not found")
+
+                    if row.status == SessionStatus.RUNNING:
+                        return
+                    elif row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
+                        raise SessionNotFound("Session terminated during scheduling")
 
     async def create_session(
         self,
@@ -637,7 +674,9 @@ class AgentRegistry:
 
             if not enqueue_only:
                 # Create and register propagator for event hub
-                propagator = AsyncBypassPropagator()
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
 
@@ -646,18 +685,7 @@ class AgentRegistry:
                     propagator, [(EventDomain.SESSION, str(session_id))]
                 )
                 try:
-                    # Wait for SchedulingBroadcastEvent with RUNNING status
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            async for event in propagator.receive():
-                                if isinstance(event, SchedulingBroadcastEvent):
-                                    if event.status_transition == str(SessionStatus.RUNNING):
-                                        break
-                    else:
-                        async for event in propagator.receive():
-                            if isinstance(event, SchedulingBroadcastEvent):
-                                if event.status_transition == str(SessionStatus.RUNNING):
-                                    break
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -877,7 +905,9 @@ class AgentRegistry:
 
             if not enqueue_only:
                 # Create and register propagator for event hub
-                propagator = AsyncBypassPropagator()
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
 
@@ -886,18 +916,7 @@ class AgentRegistry:
                     propagator, [(EventDomain.SESSION, str(session_id))]
                 )
                 try:
-                    # Wait for SchedulingBroadcastEvent with RUNNING status
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            async for event in propagator.receive():
-                                if isinstance(event, SchedulingBroadcastEvent):
-                                    if event.status_transition == str(SessionStatus.RUNNING):
-                                        break
-                    else:
-                        async for event in propagator.receive():
-                            if isinstance(event, SchedulingBroadcastEvent):
-                                if event.status_transition == str(SessionStatus.RUNNING):
-                                    break
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:

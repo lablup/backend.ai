@@ -14,6 +14,7 @@ class ScheduledSessionData:
     session_id: SessionId
     creation_id: str
     access_key: AccessKey
+    reason: str
 
 
 @dataclass

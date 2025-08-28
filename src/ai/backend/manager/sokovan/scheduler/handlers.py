@@ -8,9 +8,9 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import (
-    BatchSchedulingBroadcastEvent,
-    SessionSchedulingEventData,
+    SchedulingBroadcastEvent,
 )
+from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import LockID
@@ -123,17 +123,16 @@ class ScheduleSessionsHandler(ScheduleHandler):
         log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for scheduled sessions
-        event = BatchSchedulingBroadcastEvent(
-            session_events=[
-                SessionSchedulingEventData(
-                    session_id=event_data.session_id,
-                    creation_id=event_data.creation_id,
-                )
-                for event_data in result.scheduled_sessions
-            ],
-            status_transition=str(SessionStatus.SCHEDULED),
-        )
-        await self._event_producer.broadcast_event(event)
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.SCHEDULED),
+                reason=event_data.reason,
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class CheckPreconditionHandler(ScheduleHandler):
@@ -170,17 +169,16 @@ class CheckPreconditionHandler(ScheduleHandler):
         await self._scheduling_controller.request_scheduling(ScheduleType.START)
 
         # Broadcast batch event for sessions that passed precondition check
-        event = BatchSchedulingBroadcastEvent(
-            session_events=[
-                SessionSchedulingEventData(
-                    session_id=event_data.session_id,
-                    creation_id=event_data.creation_id,
-                )
-                for event_data in result.scheduled_sessions
-            ],
-            status_transition=str(SessionStatus.PREPARING),  # Sessions transition to PREPARING
-        )
-        await self._event_producer.broadcast_event(event)
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.PREPARING),
+                reason=event_data.reason,
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class StartSessionsHandler(ScheduleHandler):
@@ -213,17 +211,16 @@ class StartSessionsHandler(ScheduleHandler):
         log.info("Started {} sessions", len(result.scheduled_sessions))
 
         # Broadcast batch event for started sessions
-        event = BatchSchedulingBroadcastEvent(
-            session_events=[
-                SessionSchedulingEventData(
-                    session_id=event_data.session_id,
-                    creation_id=event_data.creation_id,
-                )
-                for event_data in result.scheduled_sessions
-            ],
-            status_transition=str(SessionStatus.CREATING),
-        )
-        await self._event_producer.broadcast_event(event)
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.CREATING),
+                reason=event_data.reason,
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class TerminateSessionsHandler(ScheduleHandler):
@@ -262,6 +259,18 @@ class TerminateSessionsHandler(ScheduleHandler):
             event_data.access_key for event_data in result.scheduled_sessions
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+
+        # Broadcast batch event for sessions that transitioned to TERMINATED
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
+                status_transition=str(SessionStatus.TERMINATED),
+                reason=event_data.reason,
+            )
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class SweepSessionsHandler(ScheduleHandler):
@@ -332,18 +341,16 @@ class CheckPullingProgressHandler(ScheduleHandler):
         log.info("{} sessions transitioned to PREPARED state", len(result.scheduled_sessions))
 
         # Broadcast batch event for sessions that transitioned to PREPARED
-        if result.scheduled_sessions:
-            event = BatchSchedulingBroadcastEvent(
-                session_events=[
-                    SessionSchedulingEventData(
-                        session_id=event_data.session_id,
-                        creation_id=event_data.creation_id,
-                    )
-                    for event_data in result.scheduled_sessions
-                ],
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.PREPARED),
+                reason=event_data.reason,
             )
-            await self._event_producer.broadcast_event(event)
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class CheckCreatingProgressHandler(ScheduleHandler):
@@ -379,18 +386,16 @@ class CheckCreatingProgressHandler(ScheduleHandler):
         log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_sessions))
 
         # Broadcast batch event for sessions that transitioned to RUNNING
-        if result.scheduled_sessions:
-            event = BatchSchedulingBroadcastEvent(
-                session_events=[
-                    SessionSchedulingEventData(
-                        session_id=event_data.session_id,
-                        creation_id=event_data.creation_id,
-                    )
-                    for event_data in result.scheduled_sessions
-                ],
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.RUNNING),
+                reason=event_data.reason,
             )
-            await self._event_producer.broadcast_event(event)
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 class CheckTerminatingProgressHandler(ScheduleHandler):
@@ -435,18 +440,16 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
         log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for sessions that transitioned to TERMINATED
-        if result.scheduled_sessions:
-            event = BatchSchedulingBroadcastEvent(
-                session_events=[
-                    SessionSchedulingEventData(
-                        session_id=event_data.session_id,
-                        creation_id=event_data.creation_id,
-                    )
-                    for event_data in result.scheduled_sessions
-                ],
+        events: list[AbstractBroadcastEvent] = [
+            SchedulingBroadcastEvent(
+                session_id=event_data.session_id,
+                creation_id=event_data.creation_id,
                 status_transition=str(SessionStatus.TERMINATED),
+                reason=event_data.reason,
             )
-            await self._event_producer.broadcast_event(event)
+            for event_data in result.scheduled_sessions
+        ]
+        await self._event_producer.broadcast_events_batch(events)
 
 
 # Time thresholds for health checks

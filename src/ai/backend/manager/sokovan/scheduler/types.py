@@ -776,6 +776,7 @@ class KernelTransitionData:
     cluster_role: str  # DEFAULT_ROLE for main kernel
     container_id: Optional[str]
     startup_command: Optional[str]
+    status_info: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -790,6 +791,7 @@ class SessionTransitionData:
     session_name: str
     session_type: SessionTypes
     access_key: AccessKey
+    status_info: Optional[str]
     cluster_mode: Optional[ClusterMode]
     kernels: list[KernelTransitionData]
     batch_timeout: Optional[int]  # For batch sessions

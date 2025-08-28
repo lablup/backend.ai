@@ -1,11 +1,16 @@
-from typing import Final
+import enum
 
-KERNEL_CANCELLED: Final[str] = "kernel_cancelled"
-KERNEL_CREATING: Final[str] = "kernel_creating"
-KERNEL_STARTED: Final[str] = "kernel_started"
-KERNEL_TERMINATED: Final[str] = "kernel_terminated"
-KERNEL_TERMINATING: Final[str] = "kernel_terminating"
-SESSION_FAILURE: Final[str] = "session_failure"
-SESSION_STARTED: Final[str] = "session_started"
-SESSION_SUCCESS: Final[str] = "session_success"
-SESSION_TERMINATED: Final[str] = "session_terminated"
+
+class SubscribableEvents(enum.StrEnum):
+    KERNEL_CANCELLED = "kernel_cancelled"
+    KERNEL_CREATING = "kernel_creating"
+    KERNEL_STARTED = "kernel_started"
+    KERNEL_TERMINATED = "kernel_terminated"
+    KERNEL_TERMINATING = "kernel_terminating"
+    SESSION_FAILURE = "session_failure"
+    SESSION_STARTED = "session_started"
+    SESSION_SUCCESS = "session_success"
+    SESSION_TERMINATED = "session_terminated"
+
+    # Virtual event representing either success or failure for batch sessions
+    BATCH_SESSION_RESULT = "batch_session_result"

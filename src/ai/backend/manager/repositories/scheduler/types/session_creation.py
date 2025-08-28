@@ -104,8 +104,8 @@ class KernelEnqueueData:
     stdout_port: int = 0
 
     # Container user info
-    uid: int = field(default=1000)
-    main_gid: int = field(default=1000)
+    uid: Optional[int] = field(default=None)
+    main_gid: Optional[int] = field(default=None)
     gids: list[int] = field(default_factory=list)
 
 
@@ -185,12 +185,12 @@ class AllowedScalingGroup:
 
 
 @dataclass
-class UserContainerInfo:
+class ContainerUserInfo:
     """User container UID/GID information."""
 
-    uid: int
-    main_gid: int
-    supplementary_gids: list[int]
+    uid: Optional[int] = None
+    main_gid: Optional[int] = None
+    supplementary_gids: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -212,5 +212,5 @@ class SessionCreationContext:
     # Dotfile data
     dotfile_data: dict[str, Any]
 
-    # User container info
-    user_container_info: Optional[UserContainerInfo] = None
+    # User (UID/GID) inside container
+    container_user_info: ContainerUserInfo

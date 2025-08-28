@@ -29,13 +29,12 @@ from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode
 
-from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
 from ...output.fields import network_fields, session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
-from .. import events
+from ..events import SubscribableEvents
 from ..pretty import (
     ProgressViewer,
     print_done,
@@ -1074,7 +1073,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                 completion_msg_func()
                 sys.exit()
 
-    asyncio_run(export_tracker(result["task_id"]))
+    asyncio.run(export_tracker(result["task_id"]))
 
 
 @session.command()
@@ -1262,16 +1261,45 @@ def _events_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
         default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
-    def events(session_id_or_name, owner_access_key, scope):
+    @click.option(
+        "-q",
+        "--quiet",
+        is_flag=True,
+        help="Run silently without logging events.",
+    )
+    @click.option(
+        "--wait",
+        metavar="EVENT_NAME",
+        help="Wait until the specified event is received and exit (supports 'batch_session_result' for success/failure).",
+    )
+    def events(
+        session_id_or_name: str,
+        owner_access_key: str,
+        scope: str,
+        quiet: bool,
+        wait: Optional[str] = None,
+    ) -> None:
         """
         Monitor the lifecycle events of a compute session.
 
         SESSID: session ID or its alias given when creating the session.
+
+        \b
+        The --wait option allows you to wait for specific events:
+        - Use 'batch_session_result' to wait for either success or failure of batch sessions
+        - Exit code will be 0 for success, 1 for failure
+        - Any other event name waits for that specific event (exit code 0)
         """
+
+        def print_event(ev):
+            click.echo(
+                click.style(ev.event, fg="cyan", bold=True)
+                + " "
+                + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+            )
 
         async def _run_events():
             async with AsyncSession() as session:
@@ -1279,14 +1307,21 @@ def _events_cmd(docs: Optional[str] = None):
 
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        click.echo(
-                            click.style(ev.event, fg="cyan", bold=True)
-                            + " "
-                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
-                        )
+                        if not quiet:
+                            print_event(ev)
+                        match wait:
+                            case SubscribableEvents.BATCH_SESSION_RESULT:
+                                # Stop at batch session completion
+                                if ev.event == SubscribableEvents.SESSION_SUCCESS:
+                                    sys.exit(0)
+                                elif ev.event == SubscribableEvents.SESSION_FAILURE:
+                                    sys.exit(1)
+                            case ev.event:
+                                # Stop at specific event
+                                sys.exit(0)
 
         try:
-            asyncio_run(_run_events())
+            asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
 
@@ -1352,9 +1387,8 @@ def _watch_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
-        default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        default="session,kernel",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
     @click.option(
         "--max-wait",
@@ -1413,17 +1447,17 @@ def _watch_cmd(docs: Optional[str] = None):
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     match ev.event:
-                        case events.SESSION_SUCCESS:
-                            print_done(events.SESSION_SUCCESS)
+                        case SubscribableEvents.SESSION_SUCCESS:
+                            print_done(SubscribableEvents.SESSION_SUCCESS)
                             sys.exit(json.loads(ev.data).get("exitCode", 0))
-                        case events.SESSION_FAILURE:
-                            print_fail(events.SESSION_FAILURE)
+                        case SubscribableEvents.SESSION_FAILURE:
+                            print_fail(SubscribableEvents.SESSION_FAILURE)
                             sys.exit(json.loads(ev.data).get("exitCode", 1))
-                        case events.KERNEL_CANCELLED:
-                            print_fail(events.KERNEL_CANCELLED)
+                        case SubscribableEvents.KERNEL_CANCELLED:
+                            print_fail(SubscribableEvents.KERNEL_CANCELLED)
                             break
-                        case events.SESSION_TERMINATED:
-                            print_done(events.SESSION_TERMINATED)
+                        case SubscribableEvents.SESSION_TERMINATED:
+                            print_done(SubscribableEvents.SESSION_TERMINATED)
                             break
                         case _:
                             print_done(ev.event)
@@ -1438,11 +1472,14 @@ def _watch_cmd(docs: Optional[str] = None):
                     click.echo(event)
 
                     match ev.event:
-                        case events.SESSION_SUCCESS:
+                        case SubscribableEvents.SESSION_SUCCESS:
                             sys.exit(event.get("exitCode", 0))
-                        case events.SESSION_FAILURE:
+                        case SubscribableEvents.SESSION_FAILURE:
                             sys.exit(event.get("exitCode", 1))
-                        case events.SESSION_TERMINATED | events.KERNEL_CANCELLED:
+                        case (
+                            SubscribableEvents.SESSION_TERMINATED
+                            | SubscribableEvents.KERNEL_CANCELLED
+                        ):
                             break
 
         async def _run_events():
@@ -1467,9 +1504,9 @@ def _watch_cmd(docs: Optional[str] = None):
 
         try:
             if max_wait > 0:
-                asyncio_run(_run_events_with_timeout(max_wait))
+                asyncio.run(_run_events_with_timeout(max_wait))
             else:
-                asyncio_run(_run_events())
+                asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

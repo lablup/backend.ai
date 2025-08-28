@@ -176,7 +176,7 @@ class BackgroundTaskManager:
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
         await self._event_producer.broadcast_event_with_cache(
-            EventCacheDomain.BGTASK.cache_id(task_id),
+            EventCacheDomain.BGTASK.cache_id(str(task_id)),
             BgtaskUpdatedEvent(
                 task_id=task_id,
                 message="Task started",
@@ -297,7 +297,7 @@ class BackgroundTaskManager:
     ) -> None:
         try:
             bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-            cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
+            cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
             log.info(
                 "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
@@ -316,7 +316,7 @@ class BackgroundTaskManager:
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
         await self._event_producer.broadcast_event_with_cache(
-            EventCacheDomain.BGTASK.cache_id(task_id),
+            EventCacheDomain.BGTASK.cache_id(str(task_id)),
             BgtaskUpdatedEvent(
                 task_id=task_id,
                 message="Task started",
@@ -332,9 +332,8 @@ class BackgroundTaskManager:
             server_id=self._server_id,
             tags=tags,
         )
-        await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
-        self._ongoing_tasks[TaskID(task_id)] = task
+        self._ongoing_tasks[task_id] = task
         return task_id
 
     async def _process_retriable_task(
@@ -343,6 +342,7 @@ class BackgroundTaskManager:
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
+        await self._valkey_client.register_task(metadata)
         try:
             await self._wrapper_broadcast_result(
                 func,
@@ -364,7 +364,7 @@ class BackgroundTaskManager:
             args,
             metadata,
         )
-        cache_id = EventCacheDomain.BGTASK.cache_id(metadata.task_id)
+        cache_id = EventCacheDomain.BGTASK.cache_id(str(metadata.task_id))
         await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
         log.info(
             "Task {} ({}): {}",

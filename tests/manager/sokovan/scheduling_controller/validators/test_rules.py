@@ -9,6 +9,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
+    ContainerUserInfo,
     ImageInfo,
     SessionCreationContext,
     SessionCreationSpec,
@@ -45,7 +46,7 @@ def basic_context():
         },
         vfolder_mounts=[],
         dotfile_data={},
-        user_container_info=None,
+        container_user_info=ContainerUserInfo(),
     )
 
 

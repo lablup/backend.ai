@@ -12,16 +12,16 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
     CancelImportActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactAction,
-    DeleteArtifactActionResult,
+    DeleteArtifactRevisionAction,
+    DeleteArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_ import (
-    ImportArtifactAction,
-    ImportArtifactActionResult,
+from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+    ImportArtifactRevisionAction,
+    ImportArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
@@ -39,18 +39,18 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     list_: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
     approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
     reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
-    import_: ActionProcessor[ImportArtifactAction, ImportArtifactActionResult]
+    import_: ActionProcessor[ImportArtifactRevisionAction, ImportArtifactRevisionActionResult]
     cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
-    delete: ActionProcessor[DeleteArtifactAction, DeleteArtifactActionResult]
+    delete: ActionProcessor[DeleteArtifactRevisionAction, DeleteArtifactRevisionActionResult]
 
     def __init__(
         self, service: ArtifactRevisionService, action_monitors: list[ActionMonitor]
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
-        self.list_ = ActionProcessor(service.list_, action_monitors)
+        self.list_ = ActionProcessor(service.list_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
-        self.import_ = ActionProcessor(service.import_, action_monitors)
+        self.import_ = ActionProcessor(service.import_revision, action_monitors)
         self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
 
@@ -61,7 +61,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             ListArtifactRevisionsAction.spec(),
             ApproveArtifactRevisionAction.spec(),
             RejectArtifactRevisionAction.spec(),
-            ImportArtifactAction.spec(),
+            ImportArtifactRevisionAction.spec(),
             CancelImportAction.spec(),
-            DeleteArtifactAction.spec(),
+            DeleteArtifactRevisionAction.spec(),
         ]

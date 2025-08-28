@@ -279,6 +279,19 @@ else
   exit 1
 fi
 
+show_info "Checking the uv installation..."
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  if [ $SHELL = "/bin/fish" ]; then
+    source $HOME/.local/bin/env.fish
+  else
+    source $HOME/.local/bin/env
+  fi
+  show_info "uv is installed."
+else
+  show_info "uv is already installed."
+fi
+
 show_info "Checking the bootstrapper Python version..."
 scripts/python.sh -c 'import sys; print(sys.version_info)'
 

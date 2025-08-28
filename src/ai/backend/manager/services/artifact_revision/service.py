@@ -19,8 +19,8 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
     CancelImportActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactAction,
-    DeleteArtifactActionResult,
+    DeleteArtifactRevisionAction,
+    DeleteArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
@@ -30,9 +30,9 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_ import (
-    ImportArtifactAction,
-    ImportArtifactActionResult,
+from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+    ImportArtifactRevisionAction,
+    ImportArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
@@ -66,7 +66,9 @@ class ArtifactRevisionService:
         revision = await self._artifact_repository.get_artifact_revision_by_id(action.revision_id)
         return GetArtifactRevisionActionResult(revision=revision)
 
-    async def list_(self, action: ListArtifactRevisionsAction) -> ListArtifactRevisionsActionResult:
+    async def list_revision(
+        self, action: ListArtifactRevisionsAction
+    ) -> ListArtifactRevisionsActionResult:
         (
             artifacts_data,
             total_count,
@@ -112,7 +114,9 @@ class ArtifactRevisionService:
         await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
         return CancelImportActionResult(artifact_revision_id=revision_data.id)
 
-    async def import_(self, action: ImportArtifactAction) -> ImportArtifactActionResult:
+    async def import_revision(
+        self, action: ImportArtifactRevisionAction
+    ) -> ImportArtifactRevisionActionResult:
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
@@ -139,9 +143,11 @@ class ArtifactRevisionService:
 
         await self.associate_with_storage(AssociateWithStorageAction(revision_data.id, storage.id))
         # TODO: Improve event-based state structure with heartbeat-based structure
-        return ImportArtifactActionResult(result=revision_data, task_id=result.task_id)
+        return ImportArtifactRevisionActionResult(result=revision_data, task_id=result.task_id)
 
-    async def delete(self, action: DeleteArtifactAction) -> DeleteArtifactActionResult:
+    async def delete(
+        self, action: DeleteArtifactRevisionAction
+    ) -> DeleteArtifactRevisionActionResult:
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
@@ -179,4 +185,4 @@ class ArtifactRevisionService:
             )
         )
 
-        return DeleteArtifactActionResult(artifact_revision_id=result)
+        return DeleteArtifactRevisionActionResult(artifact_revision_id=result)

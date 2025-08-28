@@ -424,7 +424,7 @@ class SessionService:
                 propagator, [(EventDomain.BGTASK, str(bgtask_id))]
             )
             try:
-                cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
                 async for event in propagator.receive(cache_id):
                     if not isinstance(event, BaseBgtaskEvent):
                         log.warning("unexpected event: {}", event)
@@ -466,7 +466,7 @@ class SessionService:
                     propagator, [(EventDomain.BGTASK, str(bgtask_id))]
                 )
                 try:
-                    cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                    cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
                     async for event in propagator.receive(cache_id):
                         if not isinstance(event, BaseBgtaskEvent):
                             log.warning("unexpected event: {}", event)

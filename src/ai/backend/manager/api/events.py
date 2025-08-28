@@ -11,7 +11,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Set,
     Tuple,
 )
 
@@ -21,14 +20,13 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from aiohttp_sse import sse_response
-from aiotools import adefer
-from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.events.event_types.kernel.broadcast import (
+    BaseKernelEvent,
     KernelCancelledBroadcastEvent,
     KernelCreatingBroadcastEvent,
     KernelPreparingBroadcastEvent,
@@ -38,11 +36,11 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
+    BaseSessionEvent,
+    SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionFailureBroadcastEvent,
-    SessionScheduledBroadcastEvent,
-    SessionStartedBroadcastEvent,
     SessionSuccessBroadcastEvent,
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
@@ -54,10 +52,12 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.common import GenericForbidden
+from ..errors.kernel import SessionNotFound
 from ..errors.resource import GroupNotFound
-from ..models import UserRole, groups, kernels
+from ..events.hub.propagators.session import SessionEventPropagator
+from ..exceptions import InvalidArgument
+from ..models import UserRole, groups
 from ..models.session import SessionRow
-from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -83,17 +83,14 @@ SessionEventInfo = Tuple[str, dict, str, Optional[int]]
         t.Key("sessionId", default=None) >> "session_id": t.Null | tx.UUID,
         # NOTE: if set, sessionId overrides sessionName and ownerAccessKey parameters.
         tx.AliasedKey(["group", "groupName"], default="*") >> "group_name": t.String,
-        t.Key("scope", default="*"): t.Enum("*", "session", "kernel"),
+        t.Key("scope", default="*"): t.String,
     })
 )
-@adefer
 async def push_session_events(
-    defer,
     request: web.Request,
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["events.context"]
     session_name = params["session_name"]
     session_id = params["session_id"]
     scope = params["scope"]
@@ -106,66 +103,74 @@ async def push_session_events(
         if access_key != request["keypair"]["access_key"]:
             raise GenericForbidden
     group_name = params["group_name"]
-    my_queue: asyncio.Queue[Sentinel | SessionEventInfo] = asyncio.Queue()
-    log.info("PUSH_SESSION_EVENTS (ak:{}, s:{}, g:{})", access_key, session_name, group_name)
+    if scope == "*":
+        # Coalesce the legacy default value.
+        scope = "session,kernel"
+
+    log.info(
+        "PUSH_SESSION_EVENTS (ak:{}, s:{} / s:{}, g:{}, scope:{})",
+        access_key,
+        session_name,
+        session_id,
+        group_name,
+        scope,
+    )
+
+    # Resolve session name to session ID
+    if session_name == "*":
+        raise InvalidArgument("Wildcard session ID is not yet supported in the Event Hub.")
+    else:
+        async with root_ctx.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
+            rows = await SessionRow.match_sessions(
+                db_sess, session_name, access_key, allow_prefix=False
+            )
+            if not rows:
+                raise SessionNotFound
+            session_id = rows[0].id
+    if session_id is None:
+        raise InvalidArgument("Either session_name or session_id must be given.")
+
+    # Resolve group name to group ID
     if group_name == "*":
         group_id = "*"
     else:
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
             query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
             if row is None:
                 raise GroupNotFound
             group_id = row["id"]
-    app_ctx.session_event_queues.add(my_queue)
-    defer(lambda: app_ctx.session_event_queues.remove(my_queue))
+
+    filters = {
+        "user_role": user_role,
+        "user_uuid": user_uuid,
+        "domain_name": request["user"]["domain_name"],
+        "group_id": group_id,
+        "session_name": session_name,
+        "session_id": session_id,
+        "access_key": access_key,
+    }
+    aliases = []
+    for item in scope.split(","):
+        match item:
+            case "session":
+                aliases.append((EventDomain.SESSION, str(session_id)))
+            case "kernel":
+                aliases.append((EventDomain.KERNEL, str(session_id)))
+            case _:
+                raise InvalidArgument(f"Invalid scope: {scope}")
+
     async with sse_response(request) as resp:
+        while not resp.prepared:
+            await asyncio.sleep(0.1)
+        propagator = SessionEventPropagator(resp, root_ctx.db, filters)
+        root_ctx.event_hub.register_event_propagator(propagator, aliases)
         try:
-            while True:
-                evdata = await my_queue.get()
-                try:
-                    if evdata is sentinel:
-                        break
-                    event_name, row, reason, exit_code = evdata
-                    if user_role in (UserRole.USER, UserRole.ADMIN):
-                        if row["domain_name"] != request["user"]["domain_name"]:
-                            continue
-                    if user_role == UserRole.USER:
-                        if row["user_uuid"] != user_uuid:
-                            continue
-                    if group_id != "*" and row["group_id"] != group_id:
-                        continue
-                    if scope == "session" and not event_name.startswith("session_"):
-                        continue
-                    if scope == "kernel" and not event_name.startswith("kernel_"):
-                        continue
-                    if session_id is not None:
-                        if row["session_id"] != session_id:
-                            continue
-                    else:
-                        if session_name != "*" and not (
-                            (row["session_name"] == session_name)
-                            and (row["access_key"] == access_key)
-                        ):
-                            continue
-                    response_data = {
-                        "reason": reason,
-                        "sessionName": row["session_name"],
-                        "ownerAccessKey": row["access_key"],
-                        "sessionId": str(row["session_id"]),
-                        "exitCode": exit_code,
-                    }
-                    if kernel_id := row.get("id"):
-                        response_data["kernelId"] = str(kernel_id)
-                    if cluster_role := row.get("cluster_role"):
-                        response_data["clusterRole"] = cluster_role
-                    if cluster_idx := row.get("cluster_idx"):
-                        response_data["clusterIdx"] = cluster_idx
-                    await resp.send(dump_json_str(response_data), event=event_name)
-                finally:
-                    my_queue.task_done()
+            await resp.wait()
         finally:
+            root_ctx.event_hub.unregister_event_propagator(propagator.id())
+            await propagator.close()
             return resp
 
 
@@ -190,7 +195,7 @@ async def push_background_task_events(
             propagator, [(EventDomain.BGTASK, str(task_id))]
         )
         try:
-            cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
+            cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             async for event in propagator.receive(cache_id):
                 user_event = event.user_event()
                 if user_event is None:
@@ -216,281 +221,70 @@ async def push_background_task_events(
     return resp
 
 
-async def enqueue_kernel_creation_status_update(
-    app: web.Application,
-    source: AgentId,
-    event: KernelPreparingBroadcastEvent
-    | KernelPullingBroadcastEvent
-    | KernelCreatingBroadcastEvent
-    | KernelStartedBroadcastEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.cluster_role,
-                    kernels.c.cluster_idx,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.kernel_id),
-                )
-            )
-            result = await conn.execute(query)
-            return result.first()
-
-    row = await execute_with_retry(_fetch)
-    if row is None:
-        return
-    for q in app_ctx.session_event_queues:
-        q.put_nowait((event.event_name(), row._mapping, event.reason, None))
-
-
-async def enqueue_kernel_termination_status_update(
+async def _propagate_events(
     app: web.Application,
     agent_id: AgentId,
-    event: KernelCancelledBroadcastEvent
-    | KernelTerminatingBroadcastEvent
-    | KernelTerminatedBroadcastEvent,
+    event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
 ) -> None:
+    """
+    A private connector from EventDispatcher subscription to EventHub.
+    """
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.cluster_role,
-                    kernels.c.cluster_idx,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.kernel_id),
-                )
-            )
-            result = await conn.execute(query)
-            return result.first()
-
-    row = await execute_with_retry(_fetch)
-    if row is None:
-        return
-    for q in app_ctx.session_event_queues:
-        exit_code = (
-            event.exit_code
-            if isinstance(event, (KernelTerminatingBroadcastEvent, KernelTerminatedBroadcastEvent))
-            else None
-        )
-        q.put_nowait((event.event_name(), row._mapping, event.reason, exit_code))
-
-
-async def enqueue_session_creation_status_update(
-    app: web.Application,
-    source: AgentId,
-    event: (
-        SessionEnqueuedBroadcastEvent
-        | SessionScheduledBroadcastEvent
-        | SessionStartedBroadcastEvent
-        | SessionCancelledBroadcastEvent
-    ),
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-
-    async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == event.session_id)
-                .options(
-                    load_only(
-                        SessionRow.id,
-                        SessionRow.name,
-                        SessionRow.access_key,
-                        SessionRow.domain_name,
-                        SessionRow.group_id,
-                        SessionRow.user_uuid,
-                    )
-                )
-            )
-            return await db_session.scalar(query)
-
-    row = await execute_with_retry(_fetch)
-    if row is None:
-        return
-    row_map = {
-        "session_id": row.id,
-        "session_name": row.name,
-        "domain_name": row.domain_name,
-        "user_uuid": row.user_uuid,
-        "group_id": row.group_id,
-        "access_key": row.access_key,
-    }
-    for q in app_ctx.session_event_queues:
-        q.put_nowait((event.event_name(), row_map, event.reason, None))
-
-
-async def enqueue_session_termination_status_update(
-    app: web.Application,
-    agent_id: AgentId,
-    event: SessionTerminatingBroadcastEvent | SessionTerminatedBroadcastEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-
-    async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == event.session_id)
-                .options(
-                    load_only(
-                        SessionRow.id,
-                        SessionRow.name,
-                        SessionRow.access_key,
-                        SessionRow.domain_name,
-                        SessionRow.group_id,
-                        SessionRow.user_uuid,
-                    )
-                )
-            )
-            return await db_session.scalar(query)
-
-    row = await execute_with_retry(_fetch)
-    if row is None:
-        return
-    row_map = {
-        "session_id": row.id,
-        "session_name": row.name,
-        "domain_name": row.domain_name,
-        "user_uuid": row.user_uuid,
-        "group_id": row.group_id,
-        "access_key": row.access_key,
-    }
-    for q in app_ctx.session_event_queues:
-        q.put_nowait((event.event_name(), row_map, event.reason, None))
-
-
-async def enqueue_batch_task_result_update(
-    app: web.Application,
-    agent_id: AgentId,
-    event: SessionSuccessBroadcastEvent | SessionFailureBroadcastEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-
-    async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == event.session_id)
-                .options(
-                    load_only(
-                        SessionRow.id,
-                        SessionRow.name,
-                        SessionRow.access_key,
-                        SessionRow.domain_name,
-                        SessionRow.group_id,
-                        SessionRow.user_uuid,
-                    )
-                )
-            )
-            return await db_session.scalar(query)
-
-    row = await execute_with_retry(_fetch)
-    if row is None:
-        return
-    row_map = {
-        "session_id": row.id,
-        "session_name": row.name,
-        "domain_name": row.domain_name,
-        "user_uuid": row.user_uuid,
-        "group_id": row.group_id,
-        "access_key": row.access_key,
-    }
-    for q in app_ctx.session_event_queues:
-        q.put_nowait((event.event_name(), row_map, event.reason, event.exit_code))
+    log.trace("api.events._propagate_event({!r})", event)
+    await root_ctx.event_hub.propagate_event(event)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    session_event_queues: Set[asyncio.Queue[Sentinel | SessionEventInfo]]
+    pass
 
 
 async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
+    """
+    Initialize events application context.
+    Note: Event subscriptions are now handled by the event hub architecture,
+    but we keep the legacy handlers for backward compatibility during transition.
+    """
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
-    app_ctx.session_event_queues = set()
     event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    event_dispatcher.subscribe(
-        SessionEnqueuedBroadcastEvent, app, enqueue_session_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        SessionScheduledBroadcastEvent, app, enqueue_session_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelPreparingBroadcastEvent, app, enqueue_kernel_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelPullingBroadcastEvent, app, enqueue_kernel_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelCreatingBroadcastEvent, app, enqueue_kernel_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelStartedBroadcastEvent, app, enqueue_kernel_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        SessionStartedBroadcastEvent, app, enqueue_session_creation_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelTerminatingBroadcastEvent, app, enqueue_kernel_termination_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelTerminatedBroadcastEvent, app, enqueue_kernel_termination_status_update
-    )
-    event_dispatcher.subscribe(
-        KernelCancelledBroadcastEvent, app, enqueue_kernel_termination_status_update
-    )
-    event_dispatcher.subscribe(
-        SessionTerminatingBroadcastEvent, app, enqueue_session_termination_status_update
-    )
-    event_dispatcher.subscribe(
-        SessionTerminatedBroadcastEvent, app, enqueue_session_termination_status_update
-    )
-    event_dispatcher.subscribe(
-        SessionCancelledBroadcastEvent, app, enqueue_session_creation_status_update
-    )
-    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, enqueue_batch_task_result_update)
-    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, enqueue_batch_task_result_update)
+
+    # Keep legacy event dispatcher subscriptions for backward compatibility
+    # These now delegate to the event hub
+    event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, _propagate_events)
+    # event_dispatcher.subscribe(SessionScheduledBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
+    event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, _propagate_events)
+    # event_dispatcher.subscribe(SessionPreparingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
+    # event_dispatcher.subscribe(SessionCreatingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
+    # event_dispatcher.subscribe(SessionStartedBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
+    event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, _propagate_events)
+    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, _propagate_events)
+
+    # NOTE: SchedulingBroadcastEvent will replace most other session-related events
+    #       since the Sokovan scheduler has been introduced.
+    #       Currently its propagation to the Event Hub is already handled in the
+    #       scheduler.dispatcher module.
+    # FYI: In the future, we don't have to subscribe the events manually as the
+    #      event dispatching mechanism will be centralized and migrated into the
+    #      Event Hub's implementation detail.
     yield
 
 
 async def events_shutdown(app: web.Application) -> None:
-    # shutdown handler is called before waiting for closing active connections.
-    # We need to put sentinels here to ensure delivery of them to active SSE connections.
-    app_ctx: PrivateContext = app["events.context"]
-    join_tasks = []
-    for sq in app_ctx.session_event_queues:
-        sq.put_nowait(sentinel)
-        join_tasks.append(sq.join())
-    await asyncio.gather(*join_tasks)
+    """
+    Shutdown handler for events app.
+    Note: No longer needs to handle session event queues as they are managed by event hub.
+    """
+    # No cleanup needed - event hub handles propagator cleanup automatically
+    pass
 
 
 def create_app(

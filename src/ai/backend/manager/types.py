@@ -133,7 +133,7 @@ class TriState(Generic[TVal]):
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
-        if isinstance(value, UndefinedType):
+        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
             return cls.nop()
         return cls.update(value)
 
