@@ -1801,6 +1801,7 @@ input DeploymentFilter
   status: DeploymentStatusFilter = null
   openToPublic: Boolean = null
   tags: StringFilter = null
+  endpointUrl: StringFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
