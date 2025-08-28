@@ -119,10 +119,15 @@ class ObjectStorageService:
         """
         log.info(
             "Getting presigned download URL for object storage, storage: {}, artifact_revision: {}",
-            action.storage_id,
+            action.storage_namespace_id,
             action.artifact_revision_id,
         )
-        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+        storage_data = await self._object_storage_repository.get_by_namespace_id(
+            action.storage_namespace_id
+        )
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            action.storage_namespace_id
+        )
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
@@ -139,7 +144,9 @@ class ObjectStorageService:
         object_path = Path(artifact_data.name) / revision_data.version / action.key
 
         result = await storage_proxy_client.get_s3_presigned_download_url(
-            storage_data.name, action.bucket_name, PresignedDownloadObjectReq(key=str(object_path))
+            storage_data.name,
+            storage_namespace.bucket,
+            PresignedDownloadObjectReq(key=str(object_path)),
         )
 
         return GetDownloadPresignedURLActionResult(
@@ -169,6 +176,9 @@ class ObjectStorageService:
         storage_data = await self._artifact_repository.get_artifact_installed_storage(
             action.artifact_revision_id
         )
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            action.storage_namespace_id
+        )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
         # Build S3 key
@@ -176,7 +186,7 @@ class ObjectStorageService:
 
         result = await storage_proxy_client.get_s3_presigned_upload_url(
             storage_data.name,
-            action.bucket_name,
+            storage_namespace.bucket,
             PresignedUploadObjectReq(
                 key=str(object_path),
                 content_type=action.content_type,
@@ -192,8 +202,8 @@ class ObjectStorageService:
 
     async def register_bucket(self, action: RegisterBucketAction) -> RegisterBucketActionResult:
         log.info("Registering object storage bucket")
-        storage_metadata = await self._object_storage_repository.register_bucket(action.creator)
-        return RegisterBucketActionResult(storage_id=storage_metadata.id, result=storage_metadata)
+        storage_namespace = await self._object_storage_repository.register_bucket(action.creator)
+        return RegisterBucketActionResult(storage_id=storage_namespace.id, result=storage_namespace)
 
     async def unregister_bucket(
         self, action: UnregisterBucketAction

@@ -3,14 +3,14 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageMetaCreator
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
+from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
 @dataclass
 class RegisterBucketAction(ObjectStorageAction):
-    creator: ObjectStorageMetaCreator
+    creator: ObjectStorageNamespaceCreator
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -25,7 +25,7 @@ class RegisterBucketAction(ObjectStorageAction):
 @dataclass
 class RegisterBucketActionResult(BaseActionResult):
     storage_id: uuid.UUID
-    result: ObjectStorageMetaData
+    result: ObjectStorageNamespaceData
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -24,12 +24,12 @@ def _get_association_artifact_join_cond():
 def _get_association_object_storage_join_cond():
     from .object_storage import ObjectStorageRow
 
-    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)
+    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
 class AssociationArtifactsStorageRow(Base):
     """
-    Association table for linking artifacts to object storages.
+    Association table for linking artifacts to storage namespace.
     """
 
     __tablename__ = "association_artifacts_storages"
@@ -44,17 +44,20 @@ class AssociationArtifactsStorageRow(Base):
         GUID,
         nullable=False,
     )
-    storage_id = sa.Column(
-        "storage_id",
+    storage_namespace_id = sa.Column(
+        "storage_namespace_id",
         GUID,
         nullable=False,
     )
+    storage_type = sa.Column("storage_type", sa.String, nullable=False)
 
     artifact_revision_row = relationship(
         "ArtifactRevisionRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin=_get_association_artifact_join_cond,
     )
+
+    # only valid when storage_type is "object_storage"
     object_storage_row = relationship(
         "ObjectStorageRow",
         back_populates="association_artifacts_storages_rows",
