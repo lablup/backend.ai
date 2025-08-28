@@ -388,7 +388,7 @@ async def inference_runtime_config(name: str) -> JSON:
 @strawberry.field(
     description="Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes"
 )
-async def inference_runtime_configs() -> JSON:
+async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     all_configs = {
         "vllm": VLLMRuntimeConfig.to_json_schema(),
         "sglang": SGLangRuntimeConfig.to_json_schema(),
@@ -451,13 +451,15 @@ async def revisions(
 
 
 @strawberry.field(description="Added in 25.13.0")
-async def revision(id: ID) -> Optional[ModelRevision]:
+async def revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelRevision]:
     """Get a specific revision by ID."""
     return mock_model_revision_1
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelRevisionPayload:
+async def create_model_revision(
+    input: CreateModelRevisionInput, info: Info[StrawberryGQLContext]
+) -> CreateModelRevisionPayload:
     """Create a new model revision."""
     revision = ModelRevision(
         id=UUID("4cc91efb-7297-47ec-80c4-6e9c4378ae8b"),
@@ -500,7 +502,9 @@ async def create_model_revision(input: CreateModelRevisionInput) -> CreateModelR
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def add_model_revision(input: AddModelRevisionInput) -> AddModelRevisionPayload:
+async def add_model_revision(
+    input: AddModelRevisionInput, info: Info[StrawberryGQLContext]
+) -> AddModelRevisionPayload:
     """Add a model revision to a deployment."""
     revision = ModelRevision(
         id=UUID("dda405f0-6463-45c4-a5ca-3721cc8d730c"),

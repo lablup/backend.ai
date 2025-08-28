@@ -2,8 +2,10 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.type
@@ -83,6 +85,6 @@ class CreateAccessTokenPayload:
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def create_access_token(
-    input: CreateAccessTokenInput,
+    input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:
     return CreateAccessTokenPayload(access_token=mock_access_token_1)

@@ -5,8 +5,10 @@ from typing import Optional
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Node, NodeID
+
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.enum(description="Added in 25.1.0")
@@ -142,14 +144,14 @@ mock_scaling_rule_2 = AutoScalingRule(
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def create_auto_scaling_rule(
-    input: CreateAutoScalingRuleInput,
+    input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
     return CreateAutoScalingRulePayload(auto_scaling_rule=mock_scaling_rule_0)
 
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def update_auto_scaling_rule(
-    input: UpdateAutoScalingRuleInput,
+    input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateAutoScalingRulePayload:
     return UpdateAutoScalingRulePayload(
         auto_scaling_rule=AutoScalingRule(
@@ -180,6 +182,6 @@ async def update_auto_scaling_rule(
 
 @strawberry.mutation(description="Added in 25.13.0")
 async def delete_auto_scaling_rule(
-    input: DeleteAutoScalingRuleInput,
+    input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:
     return DeleteAutoScalingRulePayload(id=input.id)
