@@ -28,7 +28,19 @@ def upgrade() -> None:
 
     columns = [col["name"] for col in inspector.get_columns("artifacts")]
     if "readonly" not in columns:
-        op.add_column("artifacts", sa.Column("readonly", sa.Boolean(), nullable=False))
+        op.add_column(
+            "artifacts",
+            sa.Column("readonly", sa.Boolean(), server_default=sa.false(), nullable=False),
+        )
+
+        op.alter_column(
+            "artifacts",
+            "readonly",
+            default=False,
+            server_default=None,
+            nullable=False,
+        )
+
     # ### end Alembic commands ###
 
 
@@ -39,7 +51,18 @@ def downgrade() -> None:
 
     columns = [col["name"] for col in inspector.get_columns("artifact_revisions")]
     if "readonly" not in columns:
-        op.add_column("artifact_revisions", sa.Column("readonly", sa.Boolean(), nullable=False))
+        op.add_column(
+            "artifact_revisions",
+            sa.Column("readonly", sa.Boolean(), server_default=sa.false(), nullable=True),
+        )
+
+        op.alter_column(
+            "artifact_revisions",
+            "readonly",
+            default=False,
+            server_default=None,
+            nullable=False,
+        )
 
     columns = [col["name"] for col in inspector.get_columns("artifacts")]
     if "readonly" in columns:
