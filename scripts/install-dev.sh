@@ -900,11 +900,39 @@ setup_environment() {
   fi
 }
 
+install_rover_cli() {
+  curl -sSL https://rover.apollo.dev/nix/latest | sh
+  SHELL_RC=""
+  if [ -n "$ZSH_VERSION" ]; then
+    SHELL_RC="$HOME/.zshrc"
+  elif [ -n "$BASH_VERSION" ]; then
+    SHELL_RC="$HOME/.bashrc"
+  fi
+
+  if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
+    echo '# Apollo Rover Settings' >> "$SHELL_RC"
+    echo 'export PATH="$HOME/.rover/bin:$PATH"' >> "$SHELL_RC"
+    echo 'export APOLLO_ELV2_LICENSE=accept' >> "$SHELL_RC"
+  fi
+
+  export PATH="$HOME/.rover/bin:$PATH"
+  export APOLLO_ELV2_LICENSE=accept
+
+  echo "Verifying Rover installation:"
+  echo "  PATH includes Rover: $(echo $PATH | grep -q ".rover/bin" && echo "✓ Yes" || echo "✗ No")"
+  echo "  License accepted: $APOLLO_ELV2_LICENSE"
+  echo "  Rover version: $(rover --version 2>/dev/null || echo "✗ Command not found")"
+  echo "  Rover binary location: $(which rover 2>/dev/null || echo "✗ Not in PATH")"
+}
+
 configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Install rover cli for Supergraph generation
+  install_rover_cli
 
   # Configure MinIO using separate configuration script
   source "$(dirname "$0")/configure-minio.sh"
