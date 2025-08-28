@@ -770,19 +770,13 @@ install_rover_cli() {
   fi
 
   curl -sSL https://rover.apollo.dev/nix/latest | sh
-  SHELL_RC=""
-  if [ -n "$ZSH_VERSION" ]; then
-    SHELL_RC="$HOME/.zshrc"
-  elif [ -n "$BASH_VERSION" ]; then
-    SHELL_RC="$HOME/.bashrc"
-  fi
-
-  if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
-    echo '# Apollo Rover Settings' >> "$SHELL_RC"
-    echo 'export PATH="$HOME/.rover/bin:$PATH"' >> "$SHELL_RC"
-    echo 'export APOLLO_ELV2_LICENSE=accept' >> "$SHELL_RC"
-  fi
-
+  
+  rover_settings='# Apollo Rover Settings
+export PATH="$HOME/.rover/bin:$PATH"
+export APOLLO_ELV2_LICENSE=accept'
+  
+  append_to_profiles "$rover_settings"
+  
   export PATH="$HOME/.rover/bin:$PATH"
   export APOLLO_ELV2_LICENSE=accept
 }
