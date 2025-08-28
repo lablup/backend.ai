@@ -44,6 +44,7 @@ from typing import (
     override,
 )
 from uuid import UUID
+from warnings import deprecated
 
 import attrs
 import redis.asyncio.sentinel
@@ -1022,6 +1023,12 @@ class ResourceSlot(UserDict):
 
 
 class ResourceSlotState(enum.StrEnum):
+    OCCUPIED = "occupied"
+    AVAILABLE = "available"
+
+
+@deprecated("Use `ResourceSlotState` instead.")
+class LegacyResourceSlotState(enum.StrEnum):
     OCCUPIED = "using"
     AVAILABLE = "remaining"
 

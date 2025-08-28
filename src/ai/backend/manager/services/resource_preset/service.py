@@ -7,11 +7,8 @@ import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
-from ai.backend.common.types import (
-    DefaultForUnspecified,
-    ResourceSlot,
-    ResourceSlotState,
-)
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.agent import AgentStatus, agents
