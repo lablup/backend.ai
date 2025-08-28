@@ -6,8 +6,8 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageMetaCreator
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
+from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
     GetObjectStorageBucketsAction,
 )
@@ -35,13 +35,13 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.13.0")
-class ObjectStorageMeta(Node):
+class ObjectStorageNamespace(Node):
     id: NodeID[str]
     storage_id: ID
     bucket: str
 
     @classmethod
-    def from_dataclass(cls, data: ObjectStorageMetaData) -> Self:
+    def from_dataclass(cls, data: ObjectStorageNamespaceData) -> Self:
         return cls(
             id=ID(str(data.id)),
             storage_id=ID(str(data.storage_id)),
@@ -72,12 +72,12 @@ class ObjectStorage(Node):
         )
 
     @strawberry.field
-    async def meta(self, info: Info[StrawberryGQLContext]) -> list[ObjectStorageMeta]:
+    async def namespaces(self, info: Info[StrawberryGQLContext]) -> list[ObjectStorageNamespace]:
         action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
             GetObjectStorageBucketsAction(uuid.UUID(self.id))
         )
 
-        return [ObjectStorageMeta.from_dataclass(bucket) for bucket in action_result.result]
+        return [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
 
 
 ObjectStorageEdge = Edge[ObjectStorage]
@@ -318,8 +318,8 @@ class RegisterObjectStorageBucketInput:
     storage_id: uuid.UUID
     bucket_name: str
 
-    def to_creator(self) -> ObjectStorageMetaCreator:
-        return ObjectStorageMetaCreator(
+    def to_creator(self) -> ObjectStorageNamespaceCreator:
+        return ObjectStorageNamespaceCreator(
             storage_id=self.storage_id,
             bucket=self.bucket_name,
         )

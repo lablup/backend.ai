@@ -7,7 +7,7 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
@@ -25,12 +25,12 @@ def _get_object_storage_association_artifact_join_cond():
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)
 
 
-def _get_object_storage_meta_join_cond():
-    return foreign(ObjectStorageMetaRow.storage_id) == ObjectStorageRow.id
+def _get_object_storage_namespace_join_cond():
+    return foreign(ObjectStorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-class ObjectStorageMetaRow(Base):
-    __tablename__ = "object_storage_meta"
+class ObjectStorageNamespaceRow(Base):
+    __tablename__ = "object_storage_namespace"
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("storage_id", "bucket", name="uq_storage_id_bucket"),
@@ -46,12 +46,12 @@ class ObjectStorageMetaRow(Base):
 
     object_storage_row = relationship(
         "ObjectStorageRow",
-        back_populates="meta_rows",
-        primaryjoin=_get_object_storage_meta_join_cond,
+        back_populates="namespace_rows",
+        primaryjoin=_get_object_storage_namespace_join_cond,
     )
 
-    def to_dataclass(self) -> ObjectStorageMetaData:
-        return ObjectStorageMetaData(
+    def to_dataclass(self) -> ObjectStorageNamespaceData:
+        return ObjectStorageNamespaceData(
             id=self.id,
             storage_id=self.storage_id,
             bucket=self.bucket,
@@ -96,10 +96,10 @@ class ObjectStorageRow(Base):
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_association_artifact_join_cond,
     )
-    meta_rows = relationship(
-        "ObjectStorageMetaRow",
+    namespace_rows = relationship(
+        "ObjectStorageNamespaceRow",
         back_populates="object_storage_row",
-        primaryjoin=_get_object_storage_meta_join_cond,
+        primaryjoin=_get_object_storage_namespace_join_cond,
     )
 
     def __str__(self) -> str:

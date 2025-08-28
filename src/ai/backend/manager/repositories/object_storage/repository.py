@@ -7,12 +7,12 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageMetaCreator
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageMetaData
+from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.models.object_storage import ObjectStorageMetaRow, ObjectStorageRow
+from ai.backend.manager.models.object_storage import ObjectStorageNamespaceRow, ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for user repository
@@ -111,17 +111,21 @@ class ObjectStorageRepository:
             return [row.to_dataclass() for row in rows]
 
     @repository_decorator()
-    async def register_bucket(self, creator: ObjectStorageMetaCreator) -> ObjectStorageMetaData:
+    async def register_bucket(
+        self, creator: ObjectStorageNamespaceCreator
+    ) -> ObjectStorageNamespaceData:
         """
         Register a new bucket for the specified object storage.
         """
         async with self._db.begin_session() as db_session:
-            object_storage_metadata = creator.fields_to_store()
-            object_storage_meta_row = ObjectStorageMetaRow(**object_storage_metadata)
-            db_session.add(object_storage_meta_row)
+            object_storage_namespace_data = creator.fields_to_store()
+            object_storage_namespace_row = ObjectStorageNamespaceRow(
+                **object_storage_namespace_data
+            )
+            db_session.add(object_storage_namespace_row)
             await db_session.flush()
-            await db_session.refresh(object_storage_meta_row)
-            return object_storage_meta_row.to_dataclass()
+            await db_session.refresh(object_storage_namespace_row)
+            return object_storage_namespace_row.to_dataclass()
 
     @repository_decorator()
     async def unregister_bucket(self, storage_id: uuid.UUID, bucket_name: str) -> uuid.UUID:
@@ -130,12 +134,12 @@ class ObjectStorageRepository:
         """
         async with self._db.begin_session() as db_session:
             delete_query = (
-                sa.delete(ObjectStorageMetaRow)
+                sa.delete(ObjectStorageNamespaceRow)
                 .where(
-                    ObjectStorageMetaRow.storage_id == storage_id,
-                    ObjectStorageMetaRow.bucket == bucket_name,
+                    ObjectStorageNamespaceRow.storage_id == storage_id,
+                    ObjectStorageNamespaceRow.bucket == bucket_name,
                 )
-                .returning(ObjectStorageMetaRow.storage_id)
+                .returning(ObjectStorageNamespaceRow.storage_id)
             )
             result = await db_session.execute(delete_query)
             deleted_storage_id = result.scalar()
@@ -144,14 +148,14 @@ class ObjectStorageRepository:
             return deleted_storage_id
 
     @repository_decorator()
-    async def get_buckets(self, storage_id: uuid.UUID) -> list[ObjectStorageMetaData]:
+    async def get_buckets(self, storage_id: uuid.UUID) -> list[ObjectStorageNamespaceData]:
         """
         Get all buckets for the specified object storage.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageMetaRow).where(
-                ObjectStorageMetaRow.storage_id == storage_id
+            query = sa.select(ObjectStorageNamespaceRow).where(
+                ObjectStorageNamespaceRow.storage_id == storage_id
             )
             result = await db_session.execute(query)
-            rows: list[ObjectStorageMetaRow] = result.scalars().all()
+            rows: list[ObjectStorageNamespaceRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]

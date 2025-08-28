@@ -3792,7 +3792,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  meta: [ObjectStorageMeta!]!
+  namespaces: [ObjectStorageNamespace!]!
 }
 
 """Added in 25.13.0"""
@@ -3819,7 +3819,7 @@ type ObjectStorageEdge
 }
 
 """Added in 25.13.0"""
-type ObjectStorageMeta implements Node
+type ObjectStorageNamespace implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {

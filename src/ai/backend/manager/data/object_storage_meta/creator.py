@@ -6,7 +6,7 @@ from ai.backend.manager.types import Creator
 
 
 @dataclass
-class ObjectStorageMetaCreator(Creator):
+class ObjectStorageNamespaceCreator(Creator):
     storage_id: uuid.UUID
     bucket: str
 

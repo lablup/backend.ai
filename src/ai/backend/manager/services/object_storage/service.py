@@ -192,8 +192,8 @@ class ObjectStorageService:
 
     async def register_bucket(self, action: RegisterBucketAction) -> RegisterBucketActionResult:
         log.info("Registering object storage bucket")
-        storage_metadata = await self._object_storage_repository.register_bucket(action.creator)
-        return RegisterBucketActionResult(storage_id=storage_metadata.id, result=storage_metadata)
+        storage_namespace = await self._object_storage_repository.register_bucket(action.creator)
+        return RegisterBucketActionResult(storage_id=storage_namespace.id, result=storage_namespace)
 
     async def unregister_bucket(
         self, action: UnregisterBucketAction

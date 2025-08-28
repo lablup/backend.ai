@@ -657,7 +657,7 @@ type ObjectStorage implements Node {
   secretKey: String!
   endpoint: String!
   region: String!
-  meta: [ObjectStorageMeta!]!
+  namespaces: [ObjectStorageNamespace!]!
 }
 
 """Added in 25.13.0"""
@@ -680,7 +680,7 @@ type ObjectStorageEdge {
 }
 
 """Added in 25.13.0"""
-type ObjectStorageMeta implements Node {
+type ObjectStorageNamespace implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   storageId: ID!
