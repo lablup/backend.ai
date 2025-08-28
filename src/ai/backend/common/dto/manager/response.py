@@ -97,4 +97,3 @@ class AssociateArtifactWithStorageResponse(BaseResponseModel):
 class DisassociateArtifactWithStorageResponse(BaseResponseModel):
     association: AssociationArtifactStorageResponse = Field(description="Removed association")
     message: str = Field(description="Success message")
-
