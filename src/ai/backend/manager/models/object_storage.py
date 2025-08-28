@@ -22,7 +22,7 @@ __all__ = ("ObjectStorageRow",)
 
 
 def _get_object_storage_association_artifact_join_cond():
-    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_id)
+    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
 def _get_object_storage_namespace_join_cond():

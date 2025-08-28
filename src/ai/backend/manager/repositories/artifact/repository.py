@@ -279,7 +279,7 @@ class ArtifactRepository:
                 raise ArtifactAssociationNotFoundError()
 
             result = await db_sess.execute(
-                sa.select(ObjectStorageRow).where(ObjectStorageRow.id == row.storage_id)
+                sa.select(ObjectStorageRow).where(ObjectStorageRow.id == row.storage_namespace_id)
             )
             storage_row: ObjectStorageRow = result.scalar_one_or_none()
             if storage_row is None:
@@ -391,24 +391,26 @@ class ArtifactRepository:
     async def associate_artifact_with_storage(
         self,
         artifact_revision_id: uuid.UUID,
-        storage_id: uuid.UUID,
+        storage_namespace_id: uuid.UUID,
     ) -> AssociationArtifactsStoragesData:
         async with self._db.begin_session() as db_sess:
             select_stmt = sa.select(AssociationArtifactsStorageRow.id).where(
                 sa.and_(
                     AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
-                    AssociationArtifactsStorageRow.storage_id == storage_id,
+                    AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
                 )
             )
             existing = (await db_sess.execute(select_stmt)).scalar_one_or_none()
             if existing is not None:
                 return AssociationArtifactsStoragesData(
-                    id=existing, artifact_revision_id=artifact_revision_id, storage_id=storage_id
+                    id=existing,
+                    artifact_revision_id=artifact_revision_id,
+                    storage_namespace_id=storage_namespace_id,
                 )
 
             insert_stmt = (
                 sa.insert(AssociationArtifactsStorageRow)
-                .values(artifact_revision_id=artifact_revision_id, storage_id=storage_id)
+                .values(artifact_revision_id=artifact_revision_id, storage_id=storage_namespace_id)
                 .returning(AssociationArtifactsStorageRow.id)
             )
 
@@ -418,19 +420,19 @@ class ArtifactRepository:
             return AssociationArtifactsStoragesData(
                 id=existing,
                 artifact_revision_id=artifact_revision_id,
-                storage_id=storage_id,
+                storage_namespace_id=storage_namespace_id,
             )
 
     @repository_decorator()
     async def disassociate_artifact_with_storage(
-        self, artifact_revision_id: uuid.UUID, storage_id: uuid.UUID
+        self, artifact_revision_id: uuid.UUID, storage_namespace_id: uuid.UUID
     ) -> AssociationArtifactsStoragesData:
         async with self._db.begin_session() as db_sess:
             select_result = await db_sess.execute(
                 sa.select(AssociationArtifactsStorageRow).where(
                     sa.and_(
                         AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
-                        AssociationArtifactsStorageRow.storage_id == storage_id,
+                        AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
                     )
                 )
             )
@@ -438,14 +440,14 @@ class ArtifactRepository:
             if existing_row is None:
                 # TODO: Make exception
                 raise ArtifactAssociationNotFoundError(
-                    f"Association between artifact {artifact_revision_id} and storage {storage_id} does not exist"
+                    f"Association between artifact {artifact_revision_id} and storage {storage_namespace_id} does not exist"
                 )
 
             # Store the data before deletion
             association_data = AssociationArtifactsStoragesData(
                 id=existing_row.id,
                 artifact_revision_id=existing_row.artifact_revision_id,
-                storage_id=existing_row.storage_id,
+                storage_namespace_id=existing_row.storage_namespace_id,
             )
 
             # Delete the association
@@ -453,7 +455,7 @@ class ArtifactRepository:
                 sa.delete(AssociationArtifactsStorageRow).where(
                     sa.and_(
                         AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
-                        AssociationArtifactsStorageRow.storage_id == storage_id,
+                        AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
                     )
                 )
             )

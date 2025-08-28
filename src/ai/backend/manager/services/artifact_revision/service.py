@@ -95,7 +95,7 @@ class ArtifactRevisionService:
         self, action: AssociateWithStorageAction
     ) -> AssociateWithStorageActionResult:
         result = await self._artifact_repository.associate_artifact_with_storage(
-            action.artifact_revision_id, action.storage_id
+            action.artifact_revision_id, action.storage_namespace_id
         )
         return AssociateWithStorageActionResult(result=result)
 
@@ -103,7 +103,7 @@ class ArtifactRevisionService:
         self, action: DisassociateWithStorageAction
     ) -> DisassociateWithStorageActionResult:
         result = await self._artifact_repository.disassociate_artifact_with_storage(
-            action.artifact_revision_id, action.storage_id
+            action.artifact_revision_id, action.storage_namespace_id
         )
         return DisassociateWithStorageActionResult(result=result)
 
@@ -181,7 +181,7 @@ class ArtifactRevisionService:
         await self.disassociate_with_storage(
             DisassociateWithStorageAction(
                 artifact_revision_id=revision_data.id,
-                storage_id=storage_data.id,
+                storage_namespace_id=storage_data.id,
             )
         )
 
