@@ -5,6 +5,10 @@ from typing import Protocol, override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
+    CreateAutoScalingRuleAction,
+    CreateAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -50,6 +54,10 @@ class DeploymentServiceProtocol(Protocol):
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult: ...
 
+    async def create_auto_scaling_rule(
+        self, action: CreateAutoScalingRuleAction
+    ) -> CreateAutoScalingRuleActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -60,10 +68,16 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_deployment: ActionProcessor[CreateDeploymentAction, CreateDeploymentActionResult]
     destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
+    create_auto_scaling_rule: ActionProcessor[
+        CreateAutoScalingRuleAction, CreateAutoScalingRuleActionResult
+    ]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
     ) -> None:
+        self.create_auto_scaling_rule = ActionProcessor(
+            service.create_auto_scaling_rule, action_monitors
+        )
         self.list_deployments = ActionProcessor(service.list_deployments, action_monitors)
         self.list_model_revisions = ActionProcessor(service.list_model_revisions, action_monitors)
         self.list_model_replicas = ActionProcessor(service.list_model_replicas, action_monitors)
@@ -77,4 +91,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             CreateDeploymentAction.spec(),
             DestroyDeploymentAction.spec(),
             SyncReplicaAction.spec(),
+            CreateAutoScalingRuleAction.spec(),
         ]

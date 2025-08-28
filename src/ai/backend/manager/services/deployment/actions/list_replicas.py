@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.types import ModelReplicaData
+from ai.backend.manager.data.deployment.types_ import ModelReplicaData
 from ai.backend.manager.repositories.deployment.filtering import (
     ModelReplicaFilterOptions,
 )

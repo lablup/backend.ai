@@ -8,7 +8,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     ReplicaSpec,
 )
+from ai.backend.manager.data.deployment.types_ import ModelDeploymentAutoScalingRuleData
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
+    CreateAutoScalingRuleAction,
+    CreateAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -81,3 +86,23 @@ class DeploymentService:
         self, action: ListModelReplicasAction
     ) -> ListModelReplicasActionResult:
         return ListModelReplicasActionResult(data=[], total_count=0)
+
+    async def create_auto_scaling_rule(
+        self, action: CreateAutoScalingRuleAction
+    ) -> CreateAutoScalingRuleActionResult:
+        return CreateAutoScalingRuleActionResult(
+            data=ModelDeploymentAutoScalingRuleData(
+                id=uuid4(),
+                model_deployment_id=action.creator.model_deployment_id,
+                metric_source=action.creator.metric_source,
+                metric_name=action.creator.metric_name,
+                min_threshold=action.creator.min_threshold,
+                max_threshold=action.creator.max_threshold,
+                step_size=action.creator.step_size,
+                time_window=action.creator.time_window,
+                min_replicas=action.creator.min_replicas,
+                max_replicas=action.creator.max_replicas,
+                created_at=datetime.now(),
+                last_triggered_at=datetime.now(),
+            )
+        )

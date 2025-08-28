@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.types_ import ModelDeploymentData
 from ai.backend.manager.repositories.deployment.filtering import DeploymentFilterOptions
 from ai.backend.manager.repositories.deployment.ordering import DeploymentOrderingOptions
 from ai.backend.manager.repositories.types import PaginationOptions

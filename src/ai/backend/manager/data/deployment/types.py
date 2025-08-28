@@ -6,12 +6,10 @@ from uuid import UUID
 
 import yarl
 
-from ai.backend.common.data.model_deployment.types import (
-    LivenessStatus,
-    ModelDeploymentStatus,
-    ReadinessStatus,
+from ai.backend.common.types import (
+    RuntimeVariant,
+    VFolderMount,
 )
-from ai.backend.common.types import ClusterMode, RuntimeVariant, VFolderMount
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 
@@ -111,79 +109,3 @@ class DeploymentInfo:
 class DefinitionFiles:
     service_definition: Optional[dict[str, Any]]
     model_definition: dict[str, Any]
-
-
-@dataclass
-class ModelDeploymentMetatda:
-    name: str
-    status: ModelDeploymentStatus
-    tags: list[str]
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-
-@dataclass
-class AccessToken:
-    id: UUID
-    token: str
-    valid_until: datetime
-    created_at: Optional[datetime] = None
-
-
-@dataclass
-class ModelDeploymentNetworkAccess:
-    endpoint_url: str
-    preferred_domain_name: Optional[str] = None
-    open_to_public: bool = False
-    access_tokens: list[AccessToken] = field(default_factory=list)
-
-
-@dataclass
-class ClusterConfig:
-    mode: ClusterMode
-    size: int
-
-
-@dataclass
-class ResourceConfig:
-    resource_slots: Mapping[str, Any]
-    resource_opts: Optional[Mapping[str, Any]] = None
-
-
-@dataclass
-class ModelRuntimeConfig:
-    runtime_variant: RuntimeVariant
-    inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[dict[str, str]] = None
-
-
-@dataclass
-class ModelRevisionData:
-    id: UUID
-    name: str
-    cluster_config: ClusterConfig
-    resource_config: ResourceConfig
-    runtime_config: ModelRuntimeConfig
-
-
-@dataclass
-class ModelReplicaData:
-    id: UUID
-    revision: ModelRevisionSpec
-    session_id: Optional[UUID]
-    readiness_status: ReadinessStatus
-    liveness_status: LivenessStatus
-    weight: int
-    detail: str
-    created_at: datetime
-    live_stat: str
-
-
-@dataclass
-class ModelDeploymentData:
-    id: UUID
-    metadata: DeploymentMetadata
-    state: DeploymentState
-    replica_spec: ReplicaSpec
-    network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec]

@@ -1,14 +1,20 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Self
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Node, NodeID
 
+from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.deployment.creator import ModelDeploymentAutoScalingRuleCreator
+from ai.backend.manager.data.deployment.types_ import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
+    CreateAutoScalingRuleAction,
+)
 
 
 @strawberry.enum(description="Added in 25.1.0")
@@ -19,7 +25,7 @@ class AutoScalingMetricSource(StrEnum):
 
 @strawberry.type
 class AutoScalingRule(Node):
-    id: NodeID
+    id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = strawberry.field(
         description="Added in 25.13.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
@@ -50,6 +56,22 @@ class AutoScalingRule(Node):
     created_at: datetime
     last_triggered_at: datetime
 
+    @classmethod
+    def from_dataclass(cls, data: ModelDeploymentAutoScalingRuleData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            metric_source=AutoScalingMetricSource(data.metric_source.name),
+            metric_name=data.metric_name,
+            min_threshold=data.min_threshold,
+            max_threshold=data.max_threshold,
+            step_size=data.step_size,
+            time_window=data.time_window,
+            min_replicas=data.min_replicas,
+            max_replicas=data.max_replicas,
+            created_at=data.created_at,
+            last_triggered_at=data.last_triggered_at,
+        )
+
 
 # Input Types
 @strawberry.input
@@ -63,6 +85,19 @@ class CreateAutoScalingRuleInput:
     time_window: int
     min_replicas: Optional[int]
     max_replicas: Optional[int]
+
+    def to_creator(self) -> ModelDeploymentAutoScalingRuleCreator:
+        return ModelDeploymentAutoScalingRuleCreator(
+            model_deployment_id=UUID(self.model_deployment_id),
+            metric_source=CommonAutoScalingMetricSource(self.metric_source.lower()),
+            metric_name=self.metric_name,
+            min_threshold=self.min_threshold,
+            max_threshold=self.max_threshold,
+            step_size=self.step_size,
+            time_window=self.time_window,
+            min_replicas=self.min_replicas,
+            max_replicas=self.max_replicas,
+        )
 
 
 @strawberry.input
@@ -100,7 +135,7 @@ class DeleteAutoScalingRulePayload:
 
 
 mock_scaling_rule_0: AutoScalingRule = AutoScalingRule(
-    id=UUID("77117a41-87f3-43b7-ba24-40dd5e978720"),
+    id="77117a41-87f3-43b7-ba24-40dd5e978720",
     metric_source=AutoScalingMetricSource.KERNEL,
     metric_name="memory_usage",
     min_threshold=None,
@@ -114,7 +149,7 @@ mock_scaling_rule_0: AutoScalingRule = AutoScalingRule(
 )
 
 mock_scaling_rule_1: AutoScalingRule = AutoScalingRule(
-    id=UUID("7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb"),
+    id="7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb",
     metric_source=AutoScalingMetricSource.KERNEL,
     metric_name="cpu_usage",
     min_threshold=None,
@@ -128,7 +163,7 @@ mock_scaling_rule_1: AutoScalingRule = AutoScalingRule(
 )
 
 mock_scaling_rule_2: AutoScalingRule = AutoScalingRule(
-    id=UUID("483e2158-e089-482b-8cef-260805649cf1"),
+    id="483e2158-e089-482b-8cef-260805649cf1",
     metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
     metric_name="requests_per_second",
     min_threshold=None,
@@ -146,7 +181,14 @@ mock_scaling_rule_2: AutoScalingRule = AutoScalingRule(
 async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
-    return CreateAutoScalingRulePayload(auto_scaling_rule=mock_scaling_rule_0)
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    result = await deployment_processor.create_auto_scaling_rule.wait_for_complete(
+        action=CreateAutoScalingRuleAction(input.to_creator())
+    )
+    return CreateAutoScalingRulePayload(
+        auto_scaling_rule=AutoScalingRule.from_dataclass(result.data)
+    )
 
 
 @strawberry.mutation(description="Added in 25.13.0")
