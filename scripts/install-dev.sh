@@ -764,6 +764,11 @@ append_to_profiles() {
 }
 
 install_rover_cli() {
+  if command -v rover >/dev/null 2>&1; then
+    echo "✓ Rover CLI is already installed: $(rover --version)"
+    return 0
+  fi
+
   curl -sSL https://rover.apollo.dev/nix/latest | sh
   SHELL_RC=""
   if [ -n "$ZSH_VERSION" ]; then
