@@ -48,14 +48,18 @@ class HuggingFaceRepository:
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.name == name)
-                .options(selectinload(HuggingFaceRegistryRow.meta))
+                sa.select(ArtifactRegistryRow)
+                .where(ArtifactRegistryRow.name == name)
+                .options(
+                    selectinload(ArtifactRegistryRow.huggingface_registries).selectinload(
+                        HuggingFaceRegistryRow.meta
+                    )
+                )
             )
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            row: ArtifactRegistryRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
-            return row.to_dataclass()
+            return row.huggingface_registries.to_dataclass()
 
     @repository_decorator()
     async def get_registry_data_by_artifact_id(

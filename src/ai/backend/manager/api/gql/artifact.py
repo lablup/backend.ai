@@ -158,7 +158,7 @@ class ArtifactRevisionOrderBy:
 @strawberry.input(description="Added in 25.13.0")
 class ScanArtifactsInput:
     registry_id: ID
-    storage_namespace_id: ID
+    storage_id: ID
     limit: int
     search: Optional[str] = None
 
@@ -721,7 +721,7 @@ async def scan_artifacts(
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             registry_id=uuid.UUID(input.registry_id),
-            storage_namespace_id=uuid.UUID(input.storage_namespace_id),
+            storage_id=uuid.UUID(input.storage_id),
             limit=input.limit,
             # TODO: Move this huggingface_registries config if needed
             order=ModelSortKey.DOWNLOADS,

@@ -935,7 +935,7 @@ type ScalingRule {
 """Added in 25.13.0"""
 input ScanArtifactsInput {
   registryId: ID!
-  storageNamespaceId: ID!
+  storageId: ID!
   limit: Int!
   search: String = null
 }
