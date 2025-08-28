@@ -461,7 +461,8 @@ enum DeploymentOrderField {
 Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
 enum DeploymentStatus {
-  CREATED
+  PENDING
+  SCALING
   DEPLOYING
   READY
   STOPPING
@@ -658,12 +659,19 @@ type KVPair @shareable {
 }
 
 """
-Added in 25.13.0. This enum represents the liveness status of a routing node, indicating whether the deployment is currently running and able to serve requests.
+Added in 25.13.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
 enum LivenessStatus {
   NOT_CHECKED
   HEALTHY
   UNHEALTHY
+  DEGRADED
+}
+
+"""Added in 25.13.0"""
+input LivenessStatusFilter {
+  in: [LivenessStatus!] = null
+  equals: LivenessStatus = null
 }
 
 """Added in 25.13.0"""
@@ -746,10 +754,34 @@ input ModelMountConfigInput {
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String!
-  status: ReplicaStatus!
   revision: ModelRevision!
-  routings: RoutingNodeConnection!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  sessionId: ID
+
+  """
+  This represents whether the deployment has been checked and its health state.
+  """
+  readinessStatus: ReadinessStatus!
+
+  """
+  This represents whether the deployment is currently running and able to serve requests.
+  """
+  livenessStatus: LivenessStatus!
+  weight: Int!
+
+  """
+  Detailed information about the routing node. It can include both error messages and success messages.
+  """
+  detail: JSONString!
+  createdAt: DateTime!
+
+  """
+  live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
+  """
+  liveStat: JSONString!
 }
 
 """Added in 25.13.0"""
@@ -1049,12 +1081,18 @@ type Query {
 }
 
 """
-Added in 25.13.0. This enum represents the readiness status of a routing node, indicating whether the deployment has been checked and its health state.
+Added in 25.13.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
 """
 enum ReadinessStatus {
   NOT_CHECKED
   HEALTHY
   UNHEALTHY
+}
+
+"""Added in 25.13.0"""
+input ReadinessStatusFilter {
+  in: [ReadinessStatus!] = null
+  equals: ReadinessStatus = null
 }
 
 """Added in 25.13.0"""
@@ -1080,8 +1118,8 @@ type RejectArtifactPayload {
 
 """Added in 25.13.0"""
 input ReplicaFilter {
-  name: StringFilter = null
-  status: ReplicaStatusFilter = null
+  readinessStatus: ReadinessStatusFilter = null
+  livenessStatus: LivenessStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
@@ -1097,7 +1135,6 @@ input ReplicaOrderBy {
 """Added in 25.13.0"""
 enum ReplicaOrderField {
   CREATED_AT
-  NAME
 }
 
 """Added in 25.13.0"""
@@ -1107,20 +1144,8 @@ type ReplicaState {
 }
 
 """Added in 25.13.0"""
-enum ReplicaStatus {
-  HEALTHY
-  UNHEALTHY
-}
-
-"""Added in 25.13.0"""
 type ReplicaStatusChangedPayload {
   replica: ModelReplica!
-}
-
-"""Added in 25.13.0"""
-input ReplicaStatusFilter {
-  in: [ReplicaStatus!] = null
-  equals: ReplicaStatus = null
 }
 
 """Added in 25.13.0"""
@@ -1179,56 +1204,6 @@ type ResourceLimit @shareable {
   key: String!
   min: String!
   max: String!
-}
-
-"""Added in 25.13.0"""
-type RoutingNode implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  routingId: UUID!
-  endpointUrl: String!
-  sessionId: UUID!
-
-  """
-  Added in 25.13.0. This enum represents the readiness status of a routing node, indicating whether the deployment has been checked and its health state.
-  """
-  readinessStatus: ReadinessStatus!
-
-  """
-  Added in 25.13.0. This enum represents the liveness status of a routing node, indicating whether the deployment is currently running and able to serve requests.
-  """
-  livenessStatus: LivenessStatus!
-  weight: Int!
-
-  """
-  Detailed information about the routing node. It can include both error messages and success messages.
-  """
-  detail: JSONString!
-  createdAt: DateTime!
-
-  """
-  live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
-  """
-  liveStat: JSONString!
-}
-
-"""Added in 25.13.0"""
-type RoutingNodeConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [RoutingNodeEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type RoutingNodeEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: RoutingNode!
 }
 
 """Added in 25.13.0"""
