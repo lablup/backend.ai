@@ -251,8 +251,7 @@ scalar DateTime
 """Added in 25.13.0"""
 input DeleteArtifactRevisionTarget {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -348,8 +347,7 @@ extend type EndpointToken @key(fields: "token") {
 """Added in 25.13.0"""
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
 }
 
@@ -361,7 +359,7 @@ type GetPresignedDownloadURLPayload {
 """Added in 25.13.0"""
 input GetPresignedUploadURLInput {
   artifactRevisionId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
   contentType: String = null
   expiration: Int = null
@@ -415,8 +413,7 @@ extend type ImageNode @key(fields: "id") {
 """Added in 25.13.0"""
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -850,7 +847,7 @@ type ScalingRule {
 """Added in 25.13.0"""
 input ScanArtifactsInput {
   registryId: ID!
-  storageId: ID!
+  storageNamespaceId: ID!
   limit: Int!
   search: String = null
 }

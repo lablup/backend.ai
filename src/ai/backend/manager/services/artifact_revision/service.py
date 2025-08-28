@@ -1,4 +1,5 @@
 from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import DeleteObjectReq, HuggingFaceImportModelsReq
 from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -63,7 +64,9 @@ class ArtifactRevisionService:
         self._storage_manager = storage_manager
 
     async def get(self, action: GetArtifactRevisionAction) -> GetArtifactRevisionActionResult:
-        revision = await self._artifact_repository.get_artifact_revision_by_id(action.revision_id)
+        revision = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
+        )
         return GetArtifactRevisionActionResult(revision=revision)
 
     async def list_revision(
@@ -95,7 +98,7 @@ class ArtifactRevisionService:
         self, action: AssociateWithStorageAction
     ) -> AssociateWithStorageActionResult:
         result = await self._artifact_repository.associate_artifact_with_storage(
-            action.artifact_revision_id, action.storage_namespace_id
+            action.artifact_revision_id, action.storage_namespace_id, action.storage_type
         )
         return AssociateWithStorageActionResult(result=result)
 
@@ -124,7 +127,13 @@ class ArtifactRevisionService:
         await self._artifact_repository.update_artifact_revision_status(
             artifact.id, ArtifactStatus.PULLING
         )
-        storage = await self._object_storage_repository.get_by_id(action.storage_id)
+        storage = await self._object_storage_repository.get_by_namespace_id(
+            action.storage_namespace_id
+        )
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            action.storage_namespace_id
+        )
+
         registry_data = (
             await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
                 artifact.id
@@ -137,11 +146,16 @@ class ArtifactRevisionService:
                 models=[ModelTarget(model_id=artifact.name, revision=revision_data.version)],
                 registry_name=registry_data.name,
                 storage_name=storage.name,
-                bucket_name=action.bucket_name,
+                bucket_name=storage_namespace.bucket,
             )
         )
 
-        await self.associate_with_storage(AssociateWithStorageAction(revision_data.id, storage.id))
+        await self.associate_with_storage(
+            AssociateWithStorageAction(
+                revision_data.id, storage_namespace.id, ArtifactStorageType.OBJECT_STORAGE
+            )
+        )
+
         # TODO: Improve event-based state structure with heartbeat-based structure
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=result.task_id)
 
@@ -162,7 +176,12 @@ class ArtifactRevisionService:
         )
 
         result = await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
-        storage_data = await self._object_storage_repository.get_by_id(action.storage_id)
+        storage_data = await self._object_storage_repository.get_by_namespace_id(
+            action.storage_namespace_id
+        )
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            action.storage_namespace_id
+        )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
         key = f"{artifact_data.name}/{revision_data.version}"
@@ -170,7 +189,7 @@ class ArtifactRevisionService:
         try:
             await storage_proxy_client.delete_s3_file(
                 storage_name=storage_data.name,
-                bucket_name=action.bucket_name,
+                bucket_name=storage_namespace.bucket,
                 req=DeleteObjectReq(
                     key=key,
                 ),
@@ -181,7 +200,7 @@ class ArtifactRevisionService:
         await self.disassociate_with_storage(
             DisassociateWithStorageAction(
                 artifact_revision_id=revision_data.id,
-                storage_namespace_id=storage_data.id,
+                storage_namespace_id=storage_namespace.id,
             )
         )
 

@@ -46,7 +46,9 @@ class ArtifactService:
         self._storage_manager = storage_manager
 
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
-        storage = await self._object_storage_repository.get_by_id(action.storage_id)
+        storage = await self._object_storage_repository.get_by_namespace_id(
+            action.storage_namespace_id
+        )
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             action.registry_id
         )

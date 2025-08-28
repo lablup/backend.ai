@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.storage.registries.types import ModelData
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -392,6 +393,7 @@ class ArtifactRepository:
         self,
         artifact_revision_id: uuid.UUID,
         storage_namespace_id: uuid.UUID,
+        storage_type: ArtifactStorageType,
     ) -> AssociationArtifactsStoragesData:
         async with self._db.begin_session() as db_sess:
             select_stmt = sa.select(AssociationArtifactsStorageRow.id).where(
@@ -410,7 +412,11 @@ class ArtifactRepository:
 
             insert_stmt = (
                 sa.insert(AssociationArtifactsStorageRow)
-                .values(artifact_revision_id=artifact_revision_id, storage_id=storage_namespace_id)
+                .values(
+                    artifact_revision_id=artifact_revision_id,
+                    storage_namespace_id=storage_namespace_id,
+                    storage_type=storage_type.value,
+                )
                 .returning(AssociationArtifactsStorageRow.id)
             )
 

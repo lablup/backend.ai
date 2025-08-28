@@ -24,3 +24,9 @@ class ObjectStorageData:
             endpoint=self.endpoint,
             region=self.region,
         )
+
+
+@dataclass
+class ObjectStorageNamespaceData:
+    id: uuid.UUID
+    bucket: str
