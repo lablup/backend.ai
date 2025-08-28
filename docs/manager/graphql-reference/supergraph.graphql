@@ -3833,7 +3833,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  namespaces: [ObjectStorageNamespace!]!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): ObjectStorageNamespaceConnection!
 }
 
 """Added in 25.13.0"""
@@ -3868,6 +3868,29 @@ type ObjectStorageNamespace implements Node
   id: ID!
   storageId: ID!
   bucket: String!
+}
+
+"""Added in 25.13.0"""
+type ObjectStorageNamespaceConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageNamespaceEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorageNamespace!
 }
 
 enum OrderDirection
