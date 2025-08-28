@@ -9,12 +9,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.model_deployment.routing import (
-    RoutingEdge,
-    RoutingNode,
-    RoutingNodeConnection,
-)
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .model_revision import (
@@ -22,23 +17,35 @@ from .model_revision import (
     mock_model_revision_1,
 )
 
+ReadinessStatus = strawberry.enum(
+    CommonReadinessStatus,
+    name="ReadinessStatus",
+    description="Added in 25.13.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.",
+)
 
-@strawberry.enum(description="Added in 25.13.0")
-class ReplicaStatus(StrEnum):
-    HEALTHY = "HEALTHY"
-    UNHEALTHY = "UNHEALTHY"
+LivenessStatus = strawberry.enum(
+    CommonLivenessStatus,
+    name="LivenessStatus",
+    description="Added in 25.13.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.",
+)
 
 
 @strawberry.input(description="Added in 25.13.0")
-class ReplicaStatusFilter:
-    in_: Optional[list[ReplicaStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[ReplicaStatus] = None
+class ReadinessStatusFilter:
+    in_: Optional[list[ReadinessStatus]] = strawberry.field(name="in", default=None)
+    equals: Optional[ReadinessStatus] = None
+
+
+@strawberry.input(description="Added in 25.13.0")
+class LivenessStatusFilter:
+    in_: Optional[list[LivenessStatus]] = strawberry.field(name="in", default=None)
+    equals: Optional[LivenessStatus] = None
 
 
 @strawberry.input(description="Added in 25.13.0")
 class ReplicaFilter:
-    name: Optional[StringFilter] = None
-    status: Optional[ReplicaStatusFilter] = None
+    readiness_status: Optional[ReadinessStatusFilter] = None
+    liveness_status: Optional[LivenessStatusFilter] = None
 
     AND: Optional[list["ReplicaFilter"]] = None
     OR: Optional[list["ReplicaFilter"]] = None
@@ -49,7 +56,6 @@ class ReplicaFilter:
 @strawberry.enum(description="Added in 25.13.0")
 class ReplicaOrderField(StrEnum):
     CREATED_AT = "CREATED_AT"
-    NAME = "NAME"
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -61,10 +67,24 @@ class ReplicaOrderBy:
 @strawberry.type(description="Added in 25.13.0")
 class ModelReplica(Node):
     id: NodeID
-    name: str
-    status: ReplicaStatus
     revision: ModelRevision
-    routings: RoutingNodeConnection
+    session_id: Optional[ID] = strawberry.field(
+        description="The session ID associated with the replica. This can be null right after replica creation."
+    )
+    readiness_status: ReadinessStatus = strawberry.field(
+        description="This represents whether the deployment has been checked and its health state.",
+    )
+    liveness_status: LivenessStatus = strawberry.field(
+        description="This represents whether the deployment is currently running and able to serve requests.",
+    )
+    weight: int
+    detail: JSONString = strawberry.field(
+        description="Detailed information about the routing node. It can include both error messages and success messages."
+    )
+    created_at: datetime
+    live_stat: JSONString = strawberry.field(
+        description='live statistics of the routing node. e.g. "live_stat": "{\\"cpu_util\\": {\\"current\\": \\"7.472\\", \\"capacity\\": \\"1000\\", \\"pct\\": \\"0.75\\", \\"unit_hint\\": \\"percent\\"}}"'
+    )
 
 
 ModelReplicaEdge = Edge[ModelReplica]
@@ -82,107 +102,45 @@ class ModelReplicaConnection(Connection[ModelReplica]):
 # Mock Model Replicas
 mock_model_replica_1 = ModelReplica(
     id=UUID("b62f9890-228a-40c9-a614-63387805b9a7"),
-    name="llama-3-8b-instruct-replica-01",
-    status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID("60bf21b8-21a9-4655-aaeb-479a4ef02358"),
-                    routing_id=uuid4(),
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.HEALTHY,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=1,
-                    detail=cast(JSONString, "{}"),
-                    created_at=datetime.now() - timedelta(days=5),
-                    live_stat=cast(
-                        JSONString,
-                        '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}',
-                    ),
-                ),
-                cursor="routing-cursor-1",
-            )
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-1",
-            end_cursor="routing-cursor-5",
-        ),
+    session_id=ID(str(uuid4())),
+    readiness_status=CommonReadinessStatus.HEALTHY,
+    liveness_status=CommonLivenessStatus.HEALTHY,
+    weight=1,
+    detail=cast(JSONString, "{}"),
+    created_at=datetime.now() - timedelta(days=5),
+    live_stat=cast(
+        JSONString,
+        '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}',
     ),
 )
 
 
 mock_model_replica_2 = ModelReplica(
     id=UUID("7562e9d4-a368-4e28-9092-65eb91534bac"),
-    name="llama-3-8b-instruct-replica-02",
-    status=ReplicaStatus.HEALTHY,
     revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID("21ede864-725d-4933-96f6-6df727f92217"),
-                    routing_id=uuid4(),
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.HEALTHY,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=2,
-                    detail=cast(JSONString, "{}"),
-                    created_at=datetime.now() - timedelta(days=5),
-                    live_stat=cast(
-                        JSONString,
-                        '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}',
-                    ),
-                ),
-                cursor="token-cursor-2",
-            )
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-2",
-            end_cursor="routing-cursor-2",
-        ),
+    session_id=ID(str(uuid4())),
+    readiness_status=CommonReadinessStatus.HEALTHY,
+    liveness_status=CommonLivenessStatus.HEALTHY,
+    weight=2,
+    detail=cast(JSONString, "{}"),
+    created_at=datetime.now() - timedelta(days=5),
+    live_stat=cast(
+        JSONString,
+        '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}',
     ),
 )
 
 mock_model_replica_3 = ModelReplica(
     id=UUID("2a2388ea-a312-422a-b77e-0e0b61c48145"),
-    name="llama-3-8b-instruct-replica-03",
-    status=ReplicaStatus.UNHEALTHY,
     revision=mock_model_revision_1,
-    routings=RoutingNodeConnection(
-        count=1,
-        edges=[
-            RoutingEdge(
-                node=RoutingNode(
-                    id=UUID("9613c8d1-53f1-4b8a-9cc4-6333d00afef0"),
-                    routing_id=uuid4(),
-                    session_id=uuid4(),
-                    readiness_status=CommonReadinessStatus.NOT_CHECKED,
-                    liveness_status=CommonLivenessStatus.HEALTHY,
-                    weight=1,
-                    detail=cast(JSONString, "{}"),
-                    created_at=datetime.now() - timedelta(days=2),
-                    live_stat=cast(
-                        JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
-                    ),
-                ),
-                cursor="routing-cursor-3",
-            ),
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="routing-cursor-3",
-            end_cursor="routing-cursor-3",
-        ),
-    ),
+    session_id=ID(str(uuid4())),
+    readiness_status=CommonReadinessStatus.NOT_CHECKED,
+    liveness_status=CommonLivenessStatus.HEALTHY,
+    weight=1,
+    detail=cast(JSONString, "{}"),
+    created_at=datetime.now() - timedelta(days=2),
+    live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
 )
 
 
@@ -197,36 +155,14 @@ async def replica(id: ID) -> Optional[ModelReplica]:
 
     return ModelReplica(
         id=id,
-        name="llama-3-8b-instruct-replica-01",
-        status=ReplicaStatus.HEALTHY,
         revision=mock_model_revision_1,
-        routings=RoutingNodeConnection(
-            count=1,
-            edges=[
-                RoutingEdge(
-                    node=RoutingNode(
-                        id=UUID("60bf21b8-21a9-4655-aaeb-479a4ef02358"),
-                        routing_id=UUID("60bf21b8-21a9-4655-aaeb-479a4ef02358"),
-                        session_id=uuid4(),
-                        readiness_status=CommonReadinessStatus.NOT_CHECKED,
-                        liveness_status=CommonLivenessStatus.HEALTHY,
-                        weight=1,
-                        detail=cast(JSONString, "{}"),
-                        created_at=datetime.now() - timedelta(days=2),
-                        live_stat=cast(
-                            JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'
-                        ),
-                    ),
-                    cursor="routing-cursor-1",
-                ),
-            ],
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor="routing-cursor-1",
-                end_cursor="routing-cursor-1",
-            ),
-        ),
+        session_id=ID(str(uuid4())),
+        readiness_status=CommonReadinessStatus.NOT_CHECKED,
+        liveness_status=CommonLivenessStatus.HEALTHY,
+        weight=1,
+        detail=cast(JSONString, "{}"),
+        created_at=datetime.now() - timedelta(days=2),
+        live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
     )
 
 
