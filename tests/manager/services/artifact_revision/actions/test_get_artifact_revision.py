@@ -21,7 +21,7 @@ from ...utils import ScenarioBase
         ScenarioBase.success(
             "Success Case",
             GetArtifactRevisionAction(
-                revision_id=ARTIFACT_REVISION_ROW_FIXTURE.id,
+                artifact_revision_id=ARTIFACT_REVISION_ROW_FIXTURE.id,
             ),
             GetArtifactRevisionActionResult(
                 revision=ARTIFACT_REVISION_FIXTURE_DATA,

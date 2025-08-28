@@ -135,6 +135,7 @@ class ErrorDomain(enum.StrEnum):
     ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
+    STORAGE_NAMESPACE = "storage-namespace"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
     LEADER_ELECTION = "leader-election"
@@ -520,7 +521,20 @@ class ObjectStorageNotFoundError(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-not-found"
+    error_title = "Artifact Storage Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_NAMESPACE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
