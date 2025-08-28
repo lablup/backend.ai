@@ -65,7 +65,11 @@ class HuggingFaceRepository:
             result = await db_sess.execute(
                 sa.select(ArtifactRow)
                 .where(ArtifactRow.id == artifact_id)
-                .options(selectinload(ArtifactRow.huggingface_registry))
+                .options(
+                    selectinload(ArtifactRow.huggingface_registry).selectinload(
+                        HuggingFaceRegistryRow.meta
+                    ),
+                )
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
