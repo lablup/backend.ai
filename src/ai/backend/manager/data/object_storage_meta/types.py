@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ObjectStorageMetaData:
+class ObjectStorageNamespaceData:
     id: uuid.UUID
     storage_id: uuid.UUID
     bucket: str

@@ -1398,8 +1398,7 @@ input DeleteArtifactRevisionTarget
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
@@ -1967,8 +1966,7 @@ input GetPresignedDownloadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
 }
 
@@ -1984,7 +1982,7 @@ input GetPresignedUploadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
   contentType: String = null
   expiration: Int = null
@@ -2306,8 +2304,7 @@ input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -3792,7 +3789,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  meta: [ObjectStorageMeta!]!
+  namespaces: [ObjectStorageNamespace!]!
 }
 
 """Added in 25.13.0"""
@@ -3819,7 +3816,7 @@ type ObjectStorageEdge
 }
 
 """Added in 25.13.0"""
-type ObjectStorageMeta implements Node
+type ObjectStorageNamespace implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
@@ -4712,7 +4709,7 @@ input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   registryId: ID!
-  storageId: ID!
+  storageNamespaceId: ID!
   limit: Int!
   search: String = null
 }
