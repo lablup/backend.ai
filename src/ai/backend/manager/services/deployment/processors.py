@@ -13,6 +13,18 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.list_deployments import (
+    ListDeploymentsAction,
+    ListDeploymentsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.list_model_revisions import (
+    ListModelRevisionsAction,
+    ListModelRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.list_replicas import (
+    ListModelReplicasAction,
+    ListModelReplicasActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -20,6 +32,18 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import (
 
 
 class DeploymentServiceProtocol(Protocol):
+    async def list_model_replicas(
+        self, action: ListModelReplicasAction
+    ) -> ListModelReplicasActionResult: ...
+
+    async def list_model_revisions(
+        self, action: ListModelRevisionsAction
+    ) -> ListModelRevisionsActionResult: ...
+
+    async def list_deployments(
+        self, action: ListDeploymentsAction
+    ) -> ListDeploymentsActionResult: ...
+
     async def create(self, action: CreateDeploymentAction) -> CreateDeploymentActionResult: ...
 
     async def destroy(self, action: DestroyDeploymentAction) -> DestroyDeploymentActionResult: ...
@@ -30,6 +54,9 @@ class DeploymentServiceProtocol(Protocol):
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
 
+    list_deployments: ActionProcessor[ListDeploymentsAction, ListDeploymentsActionResult]
+    list_model_revisions: ActionProcessor[ListModelRevisionsAction, ListModelRevisionsActionResult]
+    list_model_replicas: ActionProcessor[ListModelReplicasAction, ListModelReplicasActionResult]
     create_deployment: ActionProcessor[CreateDeploymentAction, CreateDeploymentActionResult]
     destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
@@ -37,6 +64,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
     ) -> None:
+        self.list_deployments = ActionProcessor(service.list_deployments, action_monitors)
+        self.list_model_revisions = ActionProcessor(service.list_model_revisions, action_monitors)
+        self.list_model_replicas = ActionProcessor(service.list_model_replicas, action_monitors)
         self.create_deployment = ActionProcessor(service.create, action_monitors)
         self.destroy_deployment = ActionProcessor(service.destroy, action_monitors)
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)

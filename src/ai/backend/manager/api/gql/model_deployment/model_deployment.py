@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import AsyncGenerator, Optional
@@ -13,7 +15,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, build_pagination_options
 from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessTokenConnection,
     AccessTokenEdge,
@@ -37,9 +39,16 @@ from ai.backend.manager.api.gql.model_deployment.model_replica import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
+from ai.backend.manager.repositories.deployment.filtering import (
+    DeploymentFilterOptions,
+    DeploymentStatusFilterOptions,
+    DeploymentStatusFilterType,
+)
+from ai.backend.manager.repositories.deployment.ordering import DeploymentOrderingOptions
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
+from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 
 from .model_revision import (
@@ -52,13 +61,13 @@ from .model_revision import (
     mock_model_revision_3,
 )
 
-DeploymentStatus = strawberry.enum(
+DeploymentStatus: type[CommonDeploymentStatus] = strawberry.enum(
     CommonDeploymentStatus,
     name="DeploymentStatus",
     description="Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
-DeploymentStrategyType = strawberry.enum(
+DeploymentStrategyType: type[CommonDeploymentStrategy] = strawberry.enum(
     CommonDeploymentStrategy,
     name="DeploymentStrategyType",
     description="Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
@@ -141,6 +150,37 @@ class DeploymentFilter:
     OR: Optional[list["DeploymentFilter"]] = None
     NOT: Optional[list["DeploymentFilter"]] = None
     DISTINCT: Optional[bool] = None
+
+    def to_repo_filter(self) -> DeploymentFilterOptions:
+        repo_filter = DeploymentFilterOptions()
+
+        repo_filter.name = self.name
+        repo_filter.tags = self.tags
+
+        if self.status:
+            if self.status.in_:
+                repo_filter.status = DeploymentStatusFilterOptions(
+                    type=DeploymentStatusFilterType.IN,
+                    values=self.status.in_,
+                )
+            elif self.status.equals:
+                repo_filter.status = DeploymentStatusFilterOptions(
+                    type=DeploymentStatusFilterType.EQUALS,
+                    values=[self.status.equals],
+                )
+
+        repo_filter.open_to_public = self.open_to_public
+
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+        if self.DISTINCT:
+            repo_filter.DISTINCT = self.DISTINCT
+
+        return repo_filter
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -495,6 +535,24 @@ async def resolve_deployments(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelDeploymentConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_deployment_ordering_to_repo_ordering(order_by)
+
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    await deployment_processor.list_deployments.wait_for_complete(
+        action=ListDeploymentsAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
+    )
+
     return ModelDeploymentConnection(
         count=3,
         edges=[
@@ -509,6 +567,21 @@ async def resolve_deployments(
             end_cursor="deployment-cursor-3",
         ),
     )
+
+
+def _convert_gql_deployment_ordering_to_repo_ordering(
+    order_by: Optional[list[DeploymentOrderBy]],
+) -> DeploymentOrderingOptions:
+    """Convert GraphQL deployment ordering to repository ordering."""
+    if not order_by:
+        return DeploymentOrderingOptions()  # Default ordering
+
+    repo_order_by = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_order_by.append((order.field, desc))
+
+    return DeploymentOrderingOptions(order_by=repo_order_by)
 
 
 # Resolvers

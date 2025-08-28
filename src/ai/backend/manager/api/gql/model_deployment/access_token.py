@@ -32,35 +32,35 @@ class AccessTokenConnection(Connection[AccessToken]):
         self.count = count
 
 
-mock_access_token_1 = AccessToken(
+mock_access_token_1: AccessToken = AccessToken(
     id=UUID("13cd8325-9307-49e4-94eb-ded2581363f8"),
     token="mock-token-1",
     created_at=datetime.now(),
     valid_until=datetime.now() + timedelta(hours=12),
 )
 
-mock_access_token_2 = AccessToken(
+mock_access_token_2: AccessToken = AccessToken(
     id=UUID("dc1a223a-7437-4e6f-aedf-23417d0486dd"),
     token="mock-token-2",
     created_at=datetime.now(),
     valid_until=datetime.now() + timedelta(hours=1),
 )
 
-mock_access_token_3 = AccessToken(
+mock_access_token_3: AccessToken = AccessToken(
     id=UUID("39f8b49e-0ddf-4dfb-92d6-003c771684b7"),
     token="mock-token-3",
     created_at=datetime.now(),
     valid_until=datetime.now() + timedelta(hours=100),
 )
 
-mock_access_token_4 = AccessToken(
+mock_access_token_4: AccessToken = AccessToken(
     id=UUID("85a6ed1e-133b-4f58-9c06-f667337c6111"),
     token="mock-token-4",
     created_at=datetime.now(),
     valid_until=datetime.now() + timedelta(hours=10),
 )
 
-mock_access_token_5 = AccessToken(
+mock_access_token_5: AccessToken = AccessToken(
     id=UUID("c42f8578-b31d-4203-b858-93f93b4b9549"),
     token="mock-token-5",
     created_at=datetime.now(),

@@ -99,7 +99,7 @@ class DeleteAutoScalingRulePayload:
     id: ID
 
 
-mock_scaling_rule_0 = AutoScalingRule(
+mock_scaling_rule_0: AutoScalingRule = AutoScalingRule(
     id=UUID("77117a41-87f3-43b7-ba24-40dd5e978720"),
     metric_source=AutoScalingMetricSource.KERNEL,
     metric_name="memory_usage",
@@ -113,7 +113,7 @@ mock_scaling_rule_0 = AutoScalingRule(
     last_triggered_at=datetime.now() - timedelta(hours=6),
 )
 
-mock_scaling_rule_1 = AutoScalingRule(
+mock_scaling_rule_1: AutoScalingRule = AutoScalingRule(
     id=UUID("7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb"),
     metric_source=AutoScalingMetricSource.KERNEL,
     metric_name="cpu_usage",
@@ -127,7 +127,7 @@ mock_scaling_rule_1 = AutoScalingRule(
     last_triggered_at=datetime.now() - timedelta(hours=2),
 )
 
-mock_scaling_rule_2 = AutoScalingRule(
+mock_scaling_rule_2: AutoScalingRule = AutoScalingRule(
     id=UUID("483e2158-e089-482b-8cef-260805649cf1"),
     metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
     metric_name="requests_per_second",

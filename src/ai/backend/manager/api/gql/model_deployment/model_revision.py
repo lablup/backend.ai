@@ -9,7 +9,12 @@ from strawberry import ID, Info, relay
 from strawberry.relay import Connection, Edge, PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    JSONString,
+    OrderDirection,
+    StringFilter,
+    build_pagination_options,
+)
 from ai.backend.manager.api.gql.image import (
     Image,
     mock_image_1,
@@ -44,6 +49,11 @@ from ai.backend.manager.data.deployment.inference_runtime_config import (
     NVDIANIMRuntimeConfig,
     SGLangRuntimeConfig,
     VLLMRuntimeConfig,
+)
+from ai.backend.manager.repositories.deployment.filtering import ModelRevisionFilterOptions
+from ai.backend.manager.repositories.deployment.ordering import ModelRevisionOrderingOptions
+from ai.backend.manager.services.deployment.actions.list_model_revisions import (
+    ListModelRevisionsAction,
 )
 
 
@@ -116,6 +126,25 @@ class ModelRevisionFilter:
     NOT: Optional[list["ModelRevisionFilter"]] = None
     DISTINCT: Optional[bool] = None
 
+    def to_repo_filter(self) -> ModelRevisionFilterOptions:
+        repo_filter = ModelRevisionFilterOptions()
+
+        repo_filter.name = self.name
+
+        repo_filter.deployment_id = UUID(self.deployment_id) if self.deployment_id else None
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+        if self.DISTINCT:
+            repo_filter.DISTINCT = self.DISTINCT
+
+        return repo_filter
+
 
 @strawberry.enum(description="Added in 25.13.0")
 class ModelRevisionOrderField(Enum):
@@ -127,6 +156,21 @@ class ModelRevisionOrderField(Enum):
 class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+
+def _convert_gql_model_revision_ordering_to_repo_order_by(
+    order_by: Optional[list[ModelRevisionOrderBy]],
+) -> ModelRevisionOrderingOptions:
+    """Convert GraphQL model revision ordering to repository ordering."""
+    if not order_by:
+        return ModelRevisionOrderingOptions()  # Default ordering
+
+    repo_order_by = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_order_by.append((order.field, desc))
+
+    return ModelRevisionOrderingOptions(order_by=repo_order_by)
 
 
 # TODO: After implementing the actual logic, remove these mock objects
@@ -411,6 +455,24 @@ async def resolve_revisions(
     offset: Optional[int] = None,
 ) -> ModelRevisionConnection:
     # Implement the logic to resolve the revisions based on the provided filters and pagination
+
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_model_revision_ordering_to_repo_order_by(order_by)
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    await deployment_processor.list_model_revisions.wait_for_complete(
+        action=ListModelRevisionsAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
+    )
+
     return ModelRevisionConnection(
         count=3,
         edges=[

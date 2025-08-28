@@ -17,6 +17,18 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.list_deployments import (
+    ListDeploymentsAction,
+    ListDeploymentsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.list_model_revisions import (
+    ListModelRevisionsAction,
+    ListModelRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.list_replicas import (
+    ListModelReplicasAction,
+    ListModelReplicasActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -56,3 +68,16 @@ class DeploymentService:
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
         return SyncReplicaActionResult(success=True)
+
+    async def list_deployments(self, action: ListDeploymentsAction) -> ListDeploymentsActionResult:
+        return ListDeploymentsActionResult(data=[], total_count=0)
+
+    async def list_model_revisions(
+        self, action: ListModelRevisionsAction
+    ) -> ListModelRevisionsActionResult:
+        return ListModelRevisionsActionResult(data=[], total_count=0)
+
+    async def list_model_replicas(
+        self, action: ListModelReplicasAction
+    ) -> ListModelReplicasActionResult:
+        return ListModelReplicasActionResult(data=[], total_count=0)
