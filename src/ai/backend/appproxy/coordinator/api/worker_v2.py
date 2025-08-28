@@ -238,6 +238,7 @@ async def update_worker(
             )
             sess.add(worker)
             await sess.flush()
+            await sess.refresh(worker)
 
         for filter in params.app_filters:
             try:
