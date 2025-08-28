@@ -37,6 +37,9 @@ from ai.backend.manager.api.gql.model_deployment.model_replica import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
+from ai.backend.manager.services.deployment.actions.destroy_deployment import (
+    DestroyDeploymentAction,
+)
 
 from .model_revision import (
     CreateModelRevisionInput,
@@ -564,6 +567,11 @@ async def delete_model_deployment(
     input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteModelDeploymentPayload:
     """Delete a model deployment."""
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    await deployment_processor.destroy_deployment.wait_for_complete(
+        DestroyDeploymentAction(deployment_id=UUID(input.id))
+    )
     return DeleteModelDeploymentPayload(deployment=None)
 
 
