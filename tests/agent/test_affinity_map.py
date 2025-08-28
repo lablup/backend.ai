@@ -159,7 +159,6 @@ def test_affinity_map_prefer_larger_chunks(allocation_strategy: AllocationStrate
         "hw_location": "",
         "memory_size": 0,
         "processing_units": 1,
-        "hw_location": "",
         "device_name": "x",
     }
     devices = [
