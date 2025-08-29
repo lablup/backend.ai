@@ -1,9 +1,12 @@
-.TH ALL-SMI 1 "August 2025" "all-smi 0.8.0" "User Commands"
+.TH ALL-SMI 1 "August 2025" "all-smi 0.9.0" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
 .B all-smi
-[\fBview\fR] [\fIOPTIONS\fR]
+[\fBlocal\fR] [\fIOPTIONS\fR]
+.br
+.B all-smi
+\fBview\fR --hosts \fIURL\fR... | --hostfile \fIFILE\fR [\fIOPTIONS\fR]
 .br
 .B all-smi
 \fBapi\fR [\fIOPTIONS\fR]
@@ -16,18 +19,25 @@ is a comprehensive hardware monitoring tool that provides real-time information 
 memory usage, temperature, power consumption, and other metrics. It supports various hardware platforms 
 including NVIDIA GPUs, Apple Silicon, NVIDIA Jetson, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
 
-The tool can run in two primary modes:
+The tool can run in three primary modes:
+.TP
+.B local mode
+An interactive TUI for monitoring local GPUs/NPUs (default when no command specified)
 .TP
 .B view mode
-An interactive terminal user interface (TUI) for real-time monitoring
+An interactive TUI for monitoring remote nodes via API endpoints
 .TP
 .B api mode
 A Prometheus-compatible metrics endpoint for integration with monitoring systems
 .SH COMMANDS
 .TP
-.B view
-Run in view mode, displaying an interactive TUI. This is the default mode if no command is specified.
+.B local
+Run in local mode, monitoring local GPUs/NPUs with an interactive TUI. This is the default mode if no command is specified.
 Requires sudo permissions on macOS for Apple Silicon metrics.
+.TP
+.B view
+Run in remote view mode, monitoring remote nodes via API endpoints. Requires either --hosts or --hostfile option.
+Does not require sudo permissions.
 .TP
 .B api
 Run in API mode, exposing metrics in Prometheus format via HTTP endpoint.
@@ -43,22 +53,25 @@ Display help information
 .TP
 .B \-V, \-\-version
 Display version information
-.SS View Mode Options
+.SS Local Mode Options
+.TP
+.B \-i, \-\-interval \fISECONDS\fR
+The interval in seconds at which to update the hardware information.
+Default: 1 second (Apple Silicon) or 2 seconds (others)
+.SS View Mode Options (Remote Monitoring)
 .TP
 .B \-\-hosts \fIURL\fR...
-A list of host addresses to connect to for remote monitoring. Multiple hosts can be specified.
+(Required) A list of host addresses to connect to for remote monitoring. Multiple hosts can be specified.
 Format: http://hostname:port or https://hostname:port
 .TP
 .B \-\-hostfile \fIFILE\fR
-A CSV file containing a list of host addresses to connect to for remote monitoring.
-The file should contain one URL per line.
+(Required) A CSV file containing a list of host addresses to connect to for remote monitoring.
+The file should contain one URL per line. Either this or --hosts must be specified.
 .TP
 .B \-i, \-\-interval \fISECONDS\fR
 The interval in seconds at which to update the hardware information. 
 If not specified, uses adaptive interval based on node count:
 .RS
-.IP \(bu 3
-Local monitoring: 1 second (Apple Silicon) or 2 seconds (others)
 .IP \(bu 3
 1-10 remote nodes: 3 seconds
 .IP \(bu 3
@@ -78,7 +91,7 @@ The interval in seconds at which to update the hardware information (default: 3)
 .TP
 .B \-\-processes
 Include the process list in the API output
-.SH INTERACTIVE CONTROLS (VIEW MODE)
+.SH INTERACTIVE CONTROLS (LOCAL/VIEW MODE)
 .TP
 .B Tab / Shift+Tab
 Navigate between different tabs (GPU, CPU, Memory, Network, Disk)
@@ -134,12 +147,12 @@ Prometheus-compatible metrics endpoint with hardware statistics
 Health check endpoint returning "OK"
 .SH EXAMPLES
 .TP
-View local hardware in interactive TUI:
+Monitor local hardware in interactive TUI:
 .B all-smi
 .br
 or
 .br
-.B all-smi view
+.B all-smi local
 .TP
 Start API server on default port 9090:
 .B all-smi api
@@ -147,7 +160,10 @@ Start API server on default port 9090:
 Start API server on custom port with 5-second interval:
 .B all-smi api --port 8080 --interval 5
 .TP
-Monitor remote hosts:
+Monitor local hardware with custom interval:
+.B all-smi local --interval 5
+.TP
+Monitor remote hosts (requires API endpoints):
 .B all-smi view --hosts http://node1:9090 http://node2:9090
 .TP
 Monitor hosts from file:
