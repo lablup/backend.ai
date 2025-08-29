@@ -1,0 +1,111 @@
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Optional
+from uuid import UUID
+
+import yarl
+
+from ai.backend.common.types import (
+    RuntimeVariant,
+    VFolderMount,
+)
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+
+
+@dataclass
+class DeploymentMetadata:
+    name: str
+    domain: str
+    project: UUID
+    resource_group: str
+    created_user: UUID
+    session_owner: UUID
+    created_at: Optional[datetime]
+    tag: Optional[str] = None
+
+
+@dataclass
+class DeploymentState:
+    lifecycle: EndpointLifecycle
+    retry_count: int
+
+
+@dataclass
+class MountSpec:
+    mounts: list[UUID]
+    mount_map: Mapping[UUID, str]
+    mount_options: Mapping[UUID, dict[str, Any]]
+
+
+@dataclass
+class MountMetadata:
+    model_vfolder_id: UUID
+    model_definition_path: Optional[str] = None
+    model_mount_destination: str = "/models"
+    extra_mounts: list[VFolderMount] = field(default_factory=list)
+
+    def to_mount_spec(self) -> MountSpec:
+        mounts = [
+            self.model_vfolder_id,
+            *[m.vfid.folder_id for m in self.extra_mounts],
+        ]
+        mount_map = {
+            self.model_vfolder_id: self.model_mount_destination,
+            **{m.vfid.folder_id: m.kernel_path.as_posix() for m in self.extra_mounts},
+        }
+        mount_options = {m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts}
+        return MountSpec(mounts=mounts, mount_map=mount_map, mount_options=mount_options)
+
+
+@dataclass
+class ReplicaSpec:
+    replica_count: int
+
+
+@dataclass
+class ResourceSpec:
+    cluster_mode: str
+    cluster_size: int
+    resource_slots: Mapping[str, Any]
+    resource_opts: Optional[Mapping[str, Any]] = None
+
+
+@dataclass
+class ExecutionSpec:
+    startup_command: Optional[str] = None
+    bootstrap_script: Optional[str] = None
+    environ: Optional[dict[str, str]] = None
+    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    callback_url: Optional[yarl.URL] = None
+
+
+@dataclass
+class ModelRevisionSpec:
+    image_identifier: ImageIdentifier
+    resource_spec: ResourceSpec
+    mounts: MountMetadata
+    execution: ExecutionSpec
+
+
+@dataclass
+class DeploymentNetworkSpec:
+    open_to_public: bool
+    url: Optional[str] = None
+
+
+@dataclass
+class DeploymentInfo:
+    id: UUID
+    metadata: DeploymentMetadata
+    state: DeploymentState
+    replica_spec: ReplicaSpec
+    network: DeploymentNetworkSpec
+    model_revisions: list[ModelRevisionSpec]
+
+
+@dataclass
+class DefinitionFiles:
+    service_definition: Optional[dict[str, Any]]
+    model_definition: dict[str, Any]

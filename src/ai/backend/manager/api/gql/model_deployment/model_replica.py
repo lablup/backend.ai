@@ -9,8 +9,17 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection, build_pagination_options
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.repositories.deployment.filtering import (
+    LivenessStatusFilterOptions,
+    LivenessStatusFilterType,
+    ModelReplicaFilterOptions,
+    ReadinessStatusFilterOptions,
+    ReadinessStatusFilterType,
+)
+from ai.backend.manager.repositories.deployment.ordering import ModelReplicaOrderingOptions
+from ai.backend.manager.services.deployment.actions.list_replicas import ListModelReplicasAction
 
 from .model_revision import (
     ModelRevision,
@@ -52,6 +61,42 @@ class ReplicaFilter:
     NOT: Optional[list["ReplicaFilter"]] = None
     DISTINCT: Optional[bool] = None
 
+    def to_repo_filter(self) -> ModelReplicaFilterOptions:
+        repo_filter = ModelReplicaFilterOptions()
+        if self.readiness_status:
+            if self.readiness_status.in_:
+                repo_filter.readiness_status = ReadinessStatusFilterOptions(
+                    type=ReadinessStatusFilterType.IN,
+                    values=self.readiness_status.in_,
+                )
+            elif self.readiness_status.equals:
+                repo_filter.readiness_status = ReadinessStatusFilterOptions(
+                    type=ReadinessStatusFilterType.EQUALS,
+                    values=[self.readiness_status.equals],
+                )
+
+        if self.liveness_status:
+            if self.liveness_status.in_:
+                repo_filter.liveness_status = LivenessStatusFilterOptions(
+                    type=LivenessStatusFilterType.IN,
+                    values=self.liveness_status.in_,
+                )
+            elif self.liveness_status.equals:
+                repo_filter.liveness_status = LivenessStatusFilterOptions(
+                    type=LivenessStatusFilterType.EQUALS,
+                    values=[self.liveness_status.equals],
+                )
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+        if self.DISTINCT:
+            repo_filter.DISTINCT = self.DISTINCT
+
+        return repo_filter
+
 
 @strawberry.enum(description="Added in 25.13.0")
 class ReplicaOrderField(StrEnum):
@@ -62,6 +107,21 @@ class ReplicaOrderField(StrEnum):
 class ReplicaOrderBy:
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+
+def _convert_gql_replica_ordering_to_repo_order_by(
+    order_by: Optional[list[ReplicaOrderBy]],
+) -> ModelReplicaOrderingOptions:
+    """Convert GraphQL replica ordering to repository ordering."""
+    if not order_by:
+        return ModelReplicaOrderingOptions()  # Default ordering
+
+    repo_order_by = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_order_by.append((order.field, desc))
+
+    return ModelReplicaOrderingOptions(order_by=repo_order_by)
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -186,6 +246,23 @@ async def resolve_replicas(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelReplicaConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_replica_ordering_to_repo_order_by(order_by)
+    pagination_options = build_pagination_options(
+        before=before, after=after, first=first, last=last, limit=limit, offset=offset
+    )
+
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    await deployment_processor.list_model_replicas.wait_for_complete(
+        action=ListModelReplicasAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
+    )
+
     return ModelReplicaConnection(
         count=3,
         edges=[
