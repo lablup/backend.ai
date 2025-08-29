@@ -2068,6 +2068,7 @@ class ScheduleRepository:
                 (SessionRow.scaling_group_name == scaling_group)
                 & (SessionRow.status == SessionStatus.PENDING)
             )
+            .order_by(SessionRow.created_at.asc())
         )
         result = await db_sess.execute(query)
 
@@ -2590,7 +2591,7 @@ class ScheduleRepository:
 
         from dateutil.tz import tzutc
 
-        from ai.backend.manager.models.session import SessionStatus
+        from ai.backend.manager.data.session.types import SessionStatus
 
         timed_out_sessions: list["SweptSessionInfo"] = []
         now = datetime.now(tzutc())

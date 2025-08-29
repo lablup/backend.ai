@@ -13,6 +13,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -108,6 +109,8 @@ class SchedulerArgs:
     agent_pool: AgentPool
     network_plugin_ctx: NetworkPluginContext
 
+    valkey_schedule: ValkeyScheduleClient
+
 
 class Scheduler:
     _validator: SchedulingValidator
@@ -123,6 +126,8 @@ class Scheduler:
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
     _phase_metrics: SchedulerPhaseMetricObserver
     _hook_registry: HookRegistry
+
+    _valkey_schedule: ValkeyScheduleClient  # TODO: Remove this client and use only via repository
 
     def __init__(self, args: SchedulerArgs) -> None:
         self._validator = args.validator
@@ -140,6 +145,7 @@ class Scheduler:
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
         self._hook_registry = HookRegistry(args.deployment_repository, args.agent_pool)
+        self._valkey_schedule = args.valkey_schedule
 
     @classmethod
     def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
@@ -363,6 +369,9 @@ class Scheduler:
         )
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
             scheduled_sessions = await self._allocator.allocate(batch)
+
+        failure_ids = [f.session_id for f in scheduling_failures]
+        await self._valkey_schedule.set_pending_queue(scaling_group, failure_ids)
         return ScheduleResult(
             scheduled_sessions=scheduled_sessions,
         )

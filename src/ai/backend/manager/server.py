@@ -1083,6 +1083,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.distributed_lock_factory,
         agent_pool,
         root_ctx.network_plugin_ctx,
+        root_ctx.valkey_schedule,
     )
 
     # Create HTTP client pool for deployment operations

@@ -91,6 +91,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         valkey_stat=root_ctx.valkey_stat,
         valkey_image=root_ctx.valkey_image,
         valkey_live=root_ctx.valkey_live,
+        valkey_schedule=root_ctx.valkey_schedule,
         network_plugin_ctx=root_ctx.network_plugin_ctx,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
