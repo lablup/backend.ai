@@ -13,10 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
-from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointRow,
-)
+from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -126,6 +123,7 @@ class DeploymentDBSource:
                 project=args.group_id,
                 domain=args.domain_name,
                 resource_group=resource_group,  # Required field
+                image=args.image,  # Set the resolved image ID
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 open_to_public=args.is_public,
                 runtime_variant=args.runtime_variant,

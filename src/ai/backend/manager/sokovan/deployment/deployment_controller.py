@@ -12,6 +12,7 @@ from ai.backend.common.types import KernelEnqueueingConfig, SessionId, SessionTy
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import EndpointLifecycle
+from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -89,9 +90,21 @@ class DeploymentController:
             spec.replicas,
         )
 
+        # Resolve image to get the database ID
+        async with self._deployment_repository._db_source._db.begin_readonly_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(spec.image, spec.architecture),
+                    ImageAlias(spec.image),
+                ],
+            )
+
+        log.info("Resolved image '{}' to database ID: {}", spec.image, image_row.id)
+
         # Prepare resource_opts to store for future scaling operations
         endpoint_resource_opts = {
-            "image_ref": spec.image,
+            "image_ref": spec.image,  # Keep as string for JSON serialization
             "architecture": spec.architecture,
             "access_key": spec.model_service_prepare_ctx.owner_access_key,
             "scaling_group": spec.config.scaling_group,
@@ -128,6 +141,7 @@ class DeploymentController:
             is_public=spec.open_to_public,
             runtime_variant=spec.runtime_variant,
             desired_session_count=spec.replicas,
+            image=image_row.id,  # Add the resolved image ID
             resource_opts=endpoint_resource_opts,
             scaling_group=spec.config.scaling_group,
         )
@@ -516,6 +530,17 @@ class DeploymentController:
         Returns:
             SessionCreationSpec: Session specification ready for enqueuing
         """
+        # Resolve image string to ImageRef object (same pattern as regular session creation)
+        async with self._deployment_repository._db_source._db.begin_readonly_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(model_spec.image, model_spec.architecture),
+                    ImageAlias(model_spec.image),
+                ],
+            )
+        resolved_image_ref = image_row.image_ref
+
         # Convert ModelServiceCreator to SessionCreationSpec
 
         # Convert extra mounts to VFolderMount list
@@ -552,7 +577,7 @@ class DeploymentController:
 
         # Create kernel specifications based on the model spec
         kernel_config = KernelEnqueueingConfig(
-            image_ref=model_spec.image,  # type: ignore[typeddict-item]
+            image_ref=resolved_image_ref,
             cluster_role="main",
             cluster_idx=0,
             local_rank=0,
