@@ -84,7 +84,7 @@ class ValkeyLiveClient:
         Close the ValkeyLiveClient connection.
         """
         if self._closed:
-            log.warning("ValkeyLiveClient is already closed.")
+            log.debug("ValkeyLiveClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

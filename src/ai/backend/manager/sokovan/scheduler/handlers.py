@@ -3,7 +3,6 @@ Schedule operation handlers that bundle the operation with its post-processing l
 """
 
 import logging
-from abc import ABC, abstractmethod
 from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
@@ -13,10 +12,11 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.handlers import ScheduleHandler
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -25,7 +25,6 @@ from .results import ScheduleResult
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 __all__ = [
-    "ScheduleHandler",
     "ScheduleSessionsHandler",
     "CheckPreconditionHandler",
     "StartSessionsHandler",
@@ -37,44 +36,6 @@ __all__ = [
     "RetryPreparingHandler",
     "RetryCreatingHandler",
 ]
-
-
-class ScheduleHandler(ABC):
-    """Base class for schedule operation handlers."""
-
-    @classmethod
-    @abstractmethod
-    def name(cls) -> str:
-        """Get the name of the handler."""
-        raise NotImplementedError("Subclasses must implement name()")
-
-    @property
-    @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
-        """Get the lock ID for this handler.
-
-        Returns:
-            LockID to acquire before execution, or None if no lock needed
-        """
-        raise NotImplementedError("Subclasses must implement lock_id")
-
-    @abstractmethod
-    async def execute(self) -> ScheduleResult:
-        """Execute the scheduling operation.
-
-        Returns:
-            Result of the scheduling operation
-        """
-        raise NotImplementedError("Subclasses must implement execute()")
-
-    @abstractmethod
-    async def post_process(self, result: ScheduleResult) -> None:
-        """Handle post-processing after the operation.
-
-        Args:
-            result: The result from execute()
-        """
-        raise NotImplementedError("Subclasses must implement post_process()")
 
 
 class ScheduleSessionsHandler(ScheduleHandler):
@@ -110,7 +71,7 @@ class ScheduleSessionsHandler(ScheduleHandler):
     async def post_process(self, result: ScheduleResult) -> None:
         """Request precondition check if sessions were scheduled and invalidate cache."""
         # Request next phase first
-        await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
+        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.CHECK_PRECONDITION)
         log.info(
             "Scheduled {} sessions, requesting precondition check", len(result.scheduled_sessions)
         )
@@ -166,7 +127,7 @@ class CheckPreconditionHandler(ScheduleHandler):
         """Request session start if preconditions are met."""
         # Request next phase first
         log.info("Checked preconditions for {} sessions", len(result.scheduled_sessions))
-        await self._scheduling_controller.request_scheduling(ScheduleType.START)
+        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
 
         # Broadcast batch event for sessions that passed precondition check
         events: list[AbstractBroadcastEvent] = [
@@ -382,7 +343,7 @@ class CheckCreatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to RUNNING."""
-        await self._scheduling_controller.request_scheduling(ScheduleType.START)
+        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
         log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_sessions))
 
         # Broadcast batch event for sessions that transitioned to RUNNING
@@ -429,7 +390,7 @@ class CheckTerminatingProgressHandler(ScheduleHandler):
 
     async def post_process(self, result: ScheduleResult) -> None:
         """Log the number of sessions that transitioned to TERMINATED and invalidate cache."""
-        await self._scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
+        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
         log.info("{} sessions transitioned to TERMINATED state", len(result.scheduled_sessions))
 
         # Invalidate cache for affected access keys

@@ -97,7 +97,7 @@ class ValkeyStatClient:
         Close the ValkeyStatClient connection.
         """
         if self._closed:
-            log.warning("ValkeyStatClient is already closed.")
+            log.debug("ValkeyStatClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

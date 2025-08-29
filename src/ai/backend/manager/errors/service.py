@@ -17,8 +17,61 @@ from ai.backend.common.exception import (
 from .common import ObjectNotFound
 
 
+class NoUpdatesToApply(BackendAIError):
+    """Raised when there are no updates to apply to an endpoint."""
+
+    def __init__(self, message: str = "No updates to apply") -> None:
+        super().__init__(message)
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDefinitionNotFound(ObjectNotFound):
+    object_name = "model_definition"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingImpossible(BackendAIError, web.HTTPBadRequest):
+    error_title = (
+        "Scaling operation cannot be performed due to insufficient resources or constraints."
+    )
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class AutoScalingRuleNotFound(ObjectNotFound):
+    object_name = "auto_scaling_rule"
 
     @classmethod
     def error_code(cls) -> ErrorCode:

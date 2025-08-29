@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,

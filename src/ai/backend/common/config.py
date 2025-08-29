@@ -319,6 +319,13 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
+    def health_check_config(self) -> Optional[ModelHealthCheck]:
+        for model in self.models:
+            if model.service and model.service.health_check:
+                if model.service.health_check is not None:
+                    return model.service.health_check
+        return None
+
 
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)

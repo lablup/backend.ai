@@ -15,9 +15,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.kernel import KernelStatus
-from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
@@ -269,6 +270,15 @@ class SchedulerRepository:
             vfolder_mounts,
         )
 
+    async def check_available_image(
+        self, image_identifier: ImageIdentifier, domain: str, user_uuid: UUID
+    ) -> None:
+        """
+        Check if the specified image is available.
+        Raises ImageNotFound if the image does not exist.
+        """
+        await self._db_source.check_available_image(image_identifier, domain, user_uuid)
+
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
@@ -285,16 +295,16 @@ class SchedulerRepository:
     async def get_sessions_for_transition(
         self,
         session_statuses: list[SessionStatus],
-        kernel_status: KernelStatus,
+        kernel_statuses: list[KernelStatus],
     ) -> list[SessionTransitionData]:
         """
         Get sessions ready for state transition based on current session and kernel status.
 
         :param session_statuses: List of current session statuses to filter by
-        :param kernel_status: Required kernel status for transition
+        :param kernel_statuses: List of current kernel statuses to filter by
         :return: List of sessions ready for transition with detailed information
         """
-        return await self._db_source.get_sessions_for_transition(session_statuses, kernel_status)
+        return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
 
     async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
         """
@@ -411,28 +421,32 @@ class SchedulerRepository:
     async def get_sessions_for_pull(
         self,
         statuses: list[SessionStatus],
+        kernel_statuses: list[KernelStatus],
     ) -> SessionsForPullWithImages:
         """
         Get sessions for image pulling with specified statuses.
         Returns SessionsForPullWithImages dataclass.
 
         :param statuses: Session statuses to filter by (typically SCHEDULED, PREPARING, PULLING)
+        :param kernel_statuses: Kernel statuses to filter by (typically PREPARED, PULLING)
         :return: SessionsForPullWithImages object
         """
-        return await self._db_source.get_sessions_for_pull(statuses)
+        return await self._db_source.get_sessions_for_pull(statuses, kernel_statuses)
 
     async def get_sessions_for_start(
         self,
-        statuses: list[SessionStatus],
+        session_statuses: list[SessionStatus],
+        kernel_statuses: list[KernelStatus],
     ) -> SessionsForStartWithImages:
         """
         Get sessions for starting with specified statuses.
         Returns SessionsForStartWithImages dataclass.
 
         :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
+        :param kernel_statuses: Kernel statuses to filter by (typically PREPARED)
         :return: SessionsForStartWithImages object
         """
-        return await self._db_source.get_sessions_for_start(statuses)
+        return await self._db_source.get_sessions_for_start(session_statuses, kernel_statuses)
 
     async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
         """
@@ -461,6 +475,31 @@ class SchedulerRepository:
         Get container IDs for kernels in a session.
         """
         return await self._db_source.get_container_info_for_kernels(session_id)
+
+    async def batch_update_stuck_session_retries(
+        self, session_ids: list[SessionId], max_retries: int = 5
+    ) -> list[SessionId]:
+        """
+        Batch update retry counts for stuck sessions.
+        Sessions that exceed max_retries are moved to PENDING status.
+
+        :param session_ids: List of session IDs to update
+        :param max_retries: Maximum retries before moving to PENDING (default: 5)
+        :return: List of session IDs that should continue retrying (not moved to PENDING)
+        """
+        return await self._db_source.batch_update_stuck_session_retries(session_ids, max_retries)
+
+    async def update_session_error_info(
+        self, session_id: SessionId, error_info: ErrorStatusInfo
+    ) -> None:
+        """
+        Update session's status_data with error information without changing status.
+        This is used when a session fails but should be retried later.
+
+        :param session_id: The session ID to update
+        :param error_info: Error information to store in status_data
+        """
+        await self._db_source.update_session_error_info(session_id, error_info)
 
     async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
         """

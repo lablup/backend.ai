@@ -23,9 +23,10 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionRow, SessionStatus
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.scheduler.agent_selector import (

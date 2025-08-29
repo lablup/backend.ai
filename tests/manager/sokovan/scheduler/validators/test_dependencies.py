@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,

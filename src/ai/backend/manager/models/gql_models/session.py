@@ -32,7 +32,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
-from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
@@ -78,7 +78,6 @@ from ..session import (
     SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     SessionTypes,
     by_domain_name,
     by_raw_filter,

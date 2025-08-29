@@ -12,7 +12,6 @@ from typing import (
     Any,
     Callable,
     List,
-    NamedTuple,
     Optional,
     Self,
     Tuple,
@@ -46,6 +45,7 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
+    ImageIdentifier,
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
@@ -94,15 +94,6 @@ __all__ = (
     "ImageIdentifier",
     "PublicImageLoadFilter",
 )
-
-
-class ImageIdentifier(NamedTuple):
-    """
-    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
-    """
-
-    canonical: str
-    architecture: str
 
 
 class PublicImageLoadFilter(enum.StrEnum):
@@ -631,6 +622,32 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
+
+    @classmethod
+    async def lookup(
+        cls,
+        session: AsyncSession,
+        image_identifier: ImageIdentifier,
+    ) -> Self:
+        """
+        Lookup ImageRow by ImageIdentifier, also trying canonical as alias.
+
+        Args:
+            session: Database session
+            image_identifier: ImageIdentifier containing canonical name and architecture
+
+        Returns:
+            ImageRow instance
+
+        Raises:
+            ImageNotFound: If no matching image is found
+        """
+        identifiers: list[ImageAlias | ImageRef | ImageIdentifier] = [
+            image_identifier,
+            ImageAlias(image_identifier.canonical),
+        ]
+
+        return await cls.resolve(session, identifiers)
 
     @classmethod
     async def get(

@@ -57,11 +57,3 @@ class RouteData:
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_data: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class EndpointWithRoutesData:
-    """Data structure containing endpoint with its routes."""
-
-    endpoint: EndpointData
-    routes: list[RouteData]

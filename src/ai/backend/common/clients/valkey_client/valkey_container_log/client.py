@@ -73,7 +73,7 @@ class ValkeyContainerLogClient:
         Close the ValkeyContainerLogClient connection.
         """
         if self._closed:
-            log.warning("ValkeyContainerLogClient is already closed.")
+            log.debug("ValkeyContainerLogClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

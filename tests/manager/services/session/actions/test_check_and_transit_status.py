@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
@@ -15,6 +15,7 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
@@ -77,6 +78,7 @@ CHECK_AND_TRANSIT_STATUS_MOCK = {cast(SessionId, SESSION_FIXTURE_DATA.id): "RUNN
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }

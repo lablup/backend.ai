@@ -235,9 +235,9 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoCompatibleAgentError
+        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoAvailableAgentError
 
-        with pytest.raises(NoCompatibleAgentError) as exc_info:
+        with pytest.raises(NoAvailableAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 agents,
                 criteria,
@@ -246,7 +246,8 @@ class TestAgentSelectionWithResources:
             )
 
         # Should raise error because designated agent lacks resources
-        assert "No agents meet the resource requirements" in str(exc_info.value)
+        assert "Designated agent 'designated' is not compatible" in str(exc_info.value)
+        assert "insufficient resources" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_container_limit_with_resource_requirements(self) -> None:

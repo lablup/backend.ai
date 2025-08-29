@@ -26,6 +26,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.models import (
     AgentRow,
@@ -33,7 +35,6 @@ from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
     KernelRow,
-    KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     ProjectResourcePolicyRow,
@@ -41,7 +42,6 @@ from ai.backend.manager.models import (
     ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     UserResourcePolicyRow,
     UserRow,
 )
