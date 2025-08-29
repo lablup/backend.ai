@@ -17,6 +17,10 @@ from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.delete_auto_scaling_rule import (
+    DeleteAutoScalingRuleAction,
+    DeleteAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
@@ -74,6 +78,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: UpdateAutoScalingRuleAction
     ) -> UpdateAutoScalingRuleActionResult: ...
 
+    async def delete_auto_scaling_rule(
+        self, action: DeleteAutoScalingRuleAction
+    ) -> DeleteAutoScalingRuleActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -90,6 +98,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     update_auto_scaling_rule: ActionProcessor[
         UpdateAutoScalingRuleAction, UpdateAutoScalingRuleActionResult
     ]
+    delete_auto_scaling_rule: ActionProcessor[
+        DeleteAutoScalingRuleAction, DeleteAutoScalingRuleActionResult
+    ]
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
 
     def __init__(
@@ -100,6 +111,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         )
         self.update_auto_scaling_rule = ActionProcessor(
             service.update_auto_scaling_rule, action_monitors
+        )
+        self.delete_auto_scaling_rule = ActionProcessor(
+            service.delete_auto_scaling_rule, action_monitors
         )
         self.list_deployments = ActionProcessor(service.list_deployments, action_monitors)
         self.list_model_revisions = ActionProcessor(service.list_model_revisions, action_monitors)

@@ -27,6 +27,10 @@ from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.delete_auto_scaling_rule import (
+    DeleteAutoScalingRuleAction,
+    DeleteAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
@@ -151,3 +155,8 @@ class DeploymentService:
                 last_triggered_at=datetime.now(),
             )
         )
+
+    async def delete_auto_scaling_rule(
+        self, action: DeleteAutoScalingRuleAction
+    ) -> DeleteAutoScalingRuleActionResult:
+        return DeleteAutoScalingRuleActionResult(id=action.auto_scaling_rule_id)

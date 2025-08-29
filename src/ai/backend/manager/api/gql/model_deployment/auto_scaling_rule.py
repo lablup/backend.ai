@@ -16,6 +16,9 @@ from ai.backend.manager.data.deployment.types_ import ModelDeploymentAutoScaling
 from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.delete_auto_scaling_rule import (
+    DeleteAutoScalingRuleAction,
+)
 from ai.backend.manager.services.deployment.actions.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
 )
@@ -234,4 +237,9 @@ async def update_auto_scaling_rule(
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:
-    return DeleteAutoScalingRulePayload(id=input.id)
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    action_result = await deployment_processor.delete_auto_scaling_rule.wait_for_complete(
+        DeleteAutoScalingRuleAction(auto_scaling_rule_id=UUID(input.id))
+    )
+    return DeleteAutoScalingRulePayload(id=ID(str(action_result.id)))
