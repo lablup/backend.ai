@@ -1,4 +1,5 @@
 import logging
+from typing import Callable
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
@@ -21,7 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryEventHandler:
-    _processors: Processors
+    _processors_factory: Callable[[], Processors]
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
@@ -30,14 +31,14 @@ class ArtifactRegistryEventHandler:
 
     def __init__(
         self,
-        processors: Processors,
+        processors_factory: Callable[[], Processors],
         artifact_repository: ArtifactRepository,
         artifact_registry_repository: ArtifactRegistryRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
         storage_manager: StorageSessionManager,
     ) -> None:
-        self._processors = processors
+        self._processors_factory = processors_factory
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
@@ -48,6 +49,7 @@ class ArtifactRegistryEventHandler:
         self, context: None, source: AgentId, event: DoScanArtifactRegistryEvent
     ) -> None:
         print("Handling artifact registry scan event")
+        processors = self._processors_factory()
         registries = await self._artifact_registry_repository.list_artifact_registry_data()
 
         for registry in registries:
@@ -56,7 +58,7 @@ class ArtifactRegistryEventHandler:
 
             self._artifact_registry_repository.get_artifact_registry_data
 
-            await self._processors.artifact.scan.wait_for_complete(
+            await processors.artifact.scan.wait_for_complete(
                 ScanArtifactsAction(
                     registry_id=registry.registry_id,
                     order=ModelSortKey.DOWNLOADS,

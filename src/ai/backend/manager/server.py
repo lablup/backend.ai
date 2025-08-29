@@ -793,7 +793,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
             root_ctx.repositories,
-            root_ctx.processors,
+            lambda: root_ctx.processors,
             root_ctx.storage_manager,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable
 
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -137,7 +138,7 @@ class DispatcherArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
-    processors: Processors
+    processors_factory: Callable[[], Processors]
     storage_manager: StorageSessionManager
     use_sokovan: bool = True
 
@@ -204,7 +205,7 @@ class Dispatchers:
             args.repositories.huggingface_registry.repository,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
-            args.processors,
+            args.processors_factory,
             args.repositories.artifact.repository,
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
