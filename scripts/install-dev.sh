@@ -82,6 +82,16 @@ usage() {
   echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
+  echo "  ${LWHITE}--enable-cuda-mig-mock${NC}"
+  echo "    Install CUDA accelerator mock plugin and pull a"
+  echo "    TensorFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-rocm-mock${NC}"
+  echo "    Install ROCm accelerator mock plugin and pull a"
+  echo "    TensorFlow ROCm kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
   echo "    If you are on the main branch, this will be automatically enabled."
@@ -313,6 +323,8 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+ENABLE_CUDA_MIG_MOCK=0
+ENABLE_ROCM_MOCK=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -356,6 +368,8 @@ while [ $# -gt 0 ]; do
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
+    --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
+    --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -713,9 +727,10 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   fi
 fi
 
-if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  show_error "You can't use both CUDA and CUDA mock plugins at once!"
-  show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
+count=$(( ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK ))
+if [ $count -gt 1 ]; then
+  show_error "You can't use multiple CUDA/ROCm plugins at once!"
+  show_error "Please remove --enable-cuda, --enable-cuda-mock, --enable-cuda-mig-mock, --enable-rocm-mock flag to continue."
   exit 1
 fi
 
@@ -914,6 +929,14 @@ configure_backendai() {
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
   fi
 
+  if [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    cp "configs/accelerator/cuda-mock-mig.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    cp "configs/accelerator/rocm-mock.toml" mock-accelerator.toml
+  fi
+
   # configure manager
   show_info "Copy default configuration files to manager / agent root..."
   cp configs/manager/halfstack.toml ./manager.toml
@@ -995,6 +1018,10 @@ configure_backendai() {
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_ROCM_MOCK -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
