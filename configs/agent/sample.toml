@@ -69,13 +69,13 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "rocm", "cuda",]
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
   # Blocked compute plugins
-  ## block-compute-plugins = [ "cpu",]
+  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
-  ## allow-network-plugins = [ "overlay",]
+  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Blocked network plugins
-  ## block-network-plugins = [ "host",]
+  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Path for image commit
   image-commit-path = "tmp/backend.ai/commit"
   # Path for abuse reports
@@ -155,10 +155,10 @@
   version = 1
   # The main log level to filter messages from all loggers.
   level = "INFO"
-  # Array of log drivers to print.
-  drivers = [ "console",]
   # Disable the existing loggers when applying the config.
   disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"
