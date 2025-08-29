@@ -24,7 +24,7 @@ registries = []
   node-id = "storage-proxy-1"
   # Number of worker processes to spawn.
   # Defaults to the number of CPU cores available.
-  num-proc = 14
+  num-proc = 12
   # Path to the file where the process ID will be written.
   # Set to /dev/null to disable this feature.
   pid-file = "/dev/null"
@@ -49,7 +49,7 @@ registries = []
   ## user = "501"
   # Group ID to run the storage-proxy process as.
   # Defaults to the GID of the current file's owner.
-  ## group = "501"
+  ## group = "20"
   # Port for the aiomonitor terminal UI.
   # Allows connecting to a debugging console.
   aiomonitor-termui-port = 38300
@@ -92,10 +92,10 @@ registries = []
   version = 1
   # The main log level to filter messages from all loggers.
   level = "INFO"
-  # Array of log drivers to print.
-  drivers = [ "console",]
   # Disable the existing loggers when applying the config.
   disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"

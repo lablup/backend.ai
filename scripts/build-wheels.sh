@@ -1,6 +1,8 @@
 #! /bin/bash
 set -e
 
+pants export --resolve=python-default
+
 # Normalize the package version
 PKGVER=$(./py -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
 # Build non-platform-specific wheels

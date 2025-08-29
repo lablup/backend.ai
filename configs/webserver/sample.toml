@@ -270,10 +270,10 @@
   version = 1
   # The main log level to filter messages from all loggers.
   level = "INFO"
-  # Array of log drivers to print.
-  drivers = [ "console",]
   # Disable the existing loggers when applying the config.
   disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"

@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Nie można usunąć folderu zamontowanego w co najmniej jednej sesji. Najpierw zakończ sesję.",
       "CannotDeletePipelineFolder": "Nie możesz usunąć folderów rurociągów.",
       "CannotRestorePipelineFolder": "Nie możesz przywrócić folderów rurociągów.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Modelowe foldery projektu można tworzyć tylko w projektach ekskluzywnych w magazynie modeli. \nZmień bieżący projekt lub typ użytkownika.",
       "CloneAFolder": "Sklonuj folder",
       "CloneFolder": "Klonowanie folderu",
       "Cloneable": "Możliwość klonowania",
       "Control": "Kontrola",
+      "CreateModelFolderOnlyInExclusiveProject": "Modelowe foldery projektu można tworzyć tylko w projektach ekskluzywnych w magazynie modeli.",
       "CreatedAt": "Utworzony w",
       "Delete": "Kasować",
       "DeleteAFolder": "Usuń folder",
@@ -398,6 +400,7 @@
       "Path": "Ścieżka przechowywania",
       "Permission": "Pozwolenie",
       "ProjectFolderAlertDesc": "Ten folder jest udostępniany wszystkim członkom projektu",
+      "ProjectFolderCreationHelp": "Folder dostępny przez użytkowników projektu „{{projectName}}”.",
       "Rename": "Przemianować",
       "Restore": "Przywrócić",
       "RestoreDescription": "Czy chcesz przywrócić folder \"{{ folderName }}\"?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "Żądanie zasobów jest mniejsze niż minimum wymagane przez obraz. Spróbuj użyć więcej zasobów.",
     "TooManyLoginFailures": "Wystąpiło zbyt wiele błędów logowania w krótkim czasie. Logowanie jest przez pewien czas zablokowane.",
     "UnauthorizedToken": "Nieautoryzowany token. Sprawdź swój token.",
+    "UnexpectedError": "Wystąpił nieoczekiwany błąd. \nSpróbuj ponownie później lub skontaktuj się z wsparciem, jeśli problem będzie się utrzymywał.",
     "UnknownError": "Wystąpił nieznany błąd. Spróbuj ponownie.",
     "UpdateError": "Błąd aktualizacji",
     "UserHasNoGroup": "Użytkownik nie ma grupy. Skontaktuj się z administratorem, aby to naprawić.",
@@ -634,6 +638,7 @@
     "Title": "Wystąpił błąd."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder nie został znaleziony ani nie ma dostępu",
     "InputTooShort": "Wejście zbyt krótkie",
     "NoExplorerSupportForUnmanagedFolder": "Foldery niezarządzane nie obsługują eksploratora plików.",
     "ValueRequired": "Wymagana wartość"
@@ -770,6 +775,9 @@
   "kernel": {
     "AgentId": "Identyfikator agenta",
     "ContainerId": "Identyfikator kontenera",
+    "ContainerLogs": "Dzienniki kontenera",
+    "Hostname": "Nazwa hosta",
+    "Kernel": "Jądro",
     "KernelId": "ID jądra",
     "Kernels": "Jądra",
     "Role": "Rola",
@@ -911,6 +919,7 @@
     "EndpointName": "Nazwa punktu końcowego",
     "Error": "Błąd",
     "ExpiredDate": "Data wygaśnięcia",
+    "ExtraMountsWarning": "Podczas edytowania usługi nazwa (alias) dodatkowych zamontowanych folderów nie może zostać zachowana. \nPrzed zapisaniem prosimy o podwójne sprawdzenie nazw folderów.",
     "FailedToStartService": "Nie udało się utworzyć usługi.",
     "FailedToTerminateService": "Żądanie zakończenia usługi nie powiodło się.",
     "FailedToUpdateService": "Nie udało się zaktualizować usługi.",
@@ -1025,10 +1034,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} z {{total}}"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Wyszukiwanie",
-    "ResetFilter": "Zresetuj filtry"
   },
   "registry": {
     "AddRegistry": "Dodaj rejestr",
@@ -1197,6 +1202,9 @@
     "SharedMemory": "Udostępniona pamięć",
     "Updated": "Zaktualizowano wstępne ustawienia zasobów"
   },
+  "scheduler": {
+    "PendingSessions": "Oczekujące sesje"
+  },
   "session": {
     "Agent": "Agent",
     "AgentId": "Identyfikator agenta",
@@ -1277,12 +1285,15 @@
     "OpenToPublic": "Otwórz aplikację publicznie",
     "OpenToPublicDesc": "Włączenie tej opcji umożliwia dostęp do aplikacji dla wszystkich użytkowników w sieci.<br /><br /> \nW celu zarządzania dostępem wprowadź określone adresy IP w polu „dozwolone IP”.<br /><br /> \nOpuszczenie tego pola pustego pozwoli na dostęp ze wszystkich adresów IP.<br /><br /> \nW razie potrzeby rozważ ustawienie ograniczeń IP do zarządzania bezpieczeństwem.",
     "Others": "Inne",
+    "PanelSettings": "Ustawienia panelowe",
+    "PendingPosition": "Pozycja kolejki",
     "PredicateChecks": "Kontrole predykatu",
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
     "ReadLess": "Czytaj mniej",
     "ReadMore": "Czytaj więcej...",
     "RecentlyCreatedSessions": "Niedawno utworzone sesje",
+    "RecentlyCreatedSessionsTooltip": "Pokazuje {{count}} najnowszych uruchomionych sesji w bieżącym projekcie",
     "RequestContainerCommit": "Request Container Commit",
     "Reservation": "Rezerwacja",
     "ResourceGroup": "Grupa zasobów",
@@ -1538,6 +1549,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Wsparcie Atom Max",
     "ATOMPlusSupport": "Wsparcie ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Zezwalaj na rejestrację po stronie agenta",
@@ -1545,6 +1557,7 @@
     "Config": "Konfiguracja",
     "ConfigPerJobSchduler": "Ustawienia harmonogramu",
     "ConfigPerJobSchdulerDescription": "Wartości w ustawieniu harmonogramu są wartościami domyślnymi, które mają być używane, gdy nie ma ustawienia harmonogramu w każdej grupie zasobów. Jeśli istnieje ustawienie specyficzne dla grupy zasobów, ta wartość zostanie zignorowana.",
+    "DescATOMMaxSupport": "Użyj Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Użyj akceleratora Rebellions ATOM+.",
     "DescATOMSupport": "Użyj akceleratora Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Pozwól agentowi zarejestrować się na menedżera. Użyj tylko wtedy, gdy klaster backend.ai jest zarządzany w bezpiecznej lokalizacji.",
@@ -1588,6 +1601,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Obsługa ROCm GPU",
     "RegisterNewImagesFromRepo": "Zarejestruj nowe obrazy z repozytorium",
+    "RequireATOMMaxPlugin": "Wymaga wtyczki Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Wymaga wtyczki Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Wymaga wtyczki Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Wymaga wtyczki Backend.AI Virtual CUDA API Layer.",
@@ -1752,6 +1766,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Enabled",
+    "ATOMMaxEnabled": "Atom Max NPU włączony",
     "ATOMPlusEnabled": "Włączono NPU ATOM+",
     "Accept": "Zaakceptować",
     "AcceptSharedVFolder": "Możesz teraz uzyskać dostęp do folderu:",
@@ -1971,6 +1986,7 @@
       "MyResources": "Moje zasoby",
       "MyResourcesDescription": "<p> Ten panel pokazuje całkowite wykorzystanie zasobów i pozostałe we wszystkich projektach i grupach zasobów. </p> <p> Gdy istnieje wiele limitów (takich jak domena, projekt lub klawiatura), najbardziej restrykcyjny limit jest stosowany, aby pokazać twoje użycie i pozostałą pojemność. </p>",
       "MyResourcesIn": "Moje zasoby",
+      "MyResourcesInResourceGroup": "Moje zasoby w grupie zasobów",
       "MyResourcesInResourceGroupDescription": "Ten panel pokazuje bieżące wykorzystanie zasobów i dostępną pojemność w wybranej grupie zasobów.",
       "NewPassword": "Nowe hasło",
       "NewPasswordAgain": "Powtórz nowe hasło)",
@@ -1990,6 +2006,7 @@
       "Remaining": "Pozostały",
       "ResourcePolicy": "Polityka zasobów",
       "Resources": "Zasoby",
+      "Scheduler": "Harmonogram",
       "Serving": "Obsługa",
       "Sessions": "Sesje",
       "Settings": "Ustawienia",
@@ -2001,6 +2018,7 @@
       "Tasks": "Zadania",
       "TermsOfService": "Warunki usługi",
       "TotalResourcesIn": "Całkowite zasoby w",
+      "TotalResourcesInResourceGroup": "Całkowite zasoby w grupie zasobów",
       "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowite wykorzystane i pozostałe zasoby. \nWartości są obliczane przez dodanie użycia i pozostałych ilości wszystkich agentów za pomocą wybranej grupy zasobów.",
       "TotpActivated": "Włączone 2FA",
       "Update": "Aktualizacja",
