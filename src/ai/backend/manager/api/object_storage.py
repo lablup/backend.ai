@@ -58,7 +58,6 @@ class APIHandler:
             await processors.object_storage.get_presigned_download_url.wait_for_complete(
                 GetDownloadPresignedURLAction(
                     artifact_revision_id=body.parsed.artifact_revision_id,
-                    storage_namespace_id=body.parsed.storage_namespace_id,
                     key=body.parsed.key,
                 )
             )
@@ -79,7 +78,6 @@ class APIHandler:
         action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
             GetUploadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
-                storage_namespace_id=body.parsed.storage_namespace_id,
                 key=body.parsed.key,
                 content_type=body.parsed.content_type,
                 expiration=body.parsed.expiration,
@@ -105,10 +103,7 @@ class APIHandler:
             GetAllBucketsAction()
         )
 
-        # Convert UUID keys to strings for JSON serialization
-        result = {str(k): v for k, v in action_result.result.items()}
-
-        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=result)
+        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=action_result.result)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method

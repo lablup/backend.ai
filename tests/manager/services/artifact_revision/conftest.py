@@ -7,6 +7,7 @@ from ai.backend.manager.repositories.huggingface_registry.repository import Hugg
 from ai.backend.manager.repositories.object_storage.repository import (
     ObjectStorageRepository,  # pants: no-infer-dep
 )
+from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 
@@ -17,6 +18,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
     # Mock other dependencies for artifact revision service
     object_storage_repository = MagicMock(spec=ObjectStorageRepository)
     huggingface_registry_repository = MagicMock(spec=HuggingFaceRepository)
+    reservoir_registry_repository = MagicMock(spec=ReservoirRegistryRepository)
     storage_manager = MagicMock()
     config_provider = MagicMock()
 
@@ -24,6 +26,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
         artifact_repository=artifact_repository,
         object_storage_repository=object_storage_repository,
         huggingface_registry_repository=huggingface_registry_repository,
+        reservoir_registry_repository=reservoir_registry_repository,
         storage_manager=storage_manager,
         config_provider=config_provider,
     )

@@ -118,18 +118,12 @@ class GetPresignedDownloadURLReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The unique identifier of the artifact revision"
     )
-    storage_namespace_id: uuid.UUID = Field(
-        description="The unique identifier of the object storage"
-    )
     key: str = Field(description="Object key")
 
 
 class GetPresignedUploadURLReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The unique identifier of the artifact revision"
-    )
-    storage_namespace_id: uuid.UUID = Field(
-        description="The unique identifier of the object storage"
     )
     key: str = Field(description="Object key")
     content_type: Optional[str] = Field(default=None, description="Content type of the object")
