@@ -50,6 +50,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
+        valkey_schedule=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=root_context.background_task_manager,  # type: ignore

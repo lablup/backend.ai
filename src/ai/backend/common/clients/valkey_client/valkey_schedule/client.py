@@ -1,14 +1,20 @@
-from typing import Self
+from collections.abc import Sequence
+from typing import Optional, Self
+from uuid import UUID
 
-from glide import Batch
+from glide import Batch, ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import SessionId, ValkeyTarget
+
+PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
+
 
 # Layer-specific decorator for valkey_schedule client
 valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_SCHEDULE)
@@ -109,6 +115,71 @@ class ValkeyScheduleClient:
         if results and len(results) > 0:
             return results[0] is not None
         return False
+
+    def _pending_queue_key(self, resource_group_id: str) -> str:
+        return f"pending_queue:{resource_group_id}"
+
+    def _queue_position_key(self, session_id: SessionId) -> str:
+        return f"queue_position:{session_id}"
+
+    @valkey_decorator()
+    async def set_pending_queue(
+        self, resource_group_id: str, session_ids: Sequence[SessionId]
+    ) -> None:
+        """
+        Set up the pending queue for a specific resource group and store the position of sessions in the pending queue.
+        """
+        if not session_ids:
+            return
+        batch = Batch(is_atomic=False)
+        key = self._pending_queue_key(resource_group_id)
+        value = dump_json_str([str(sid) for sid in session_ids])
+        batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, PENDING_QUEUE_EXPIRY_SEC))
+
+        for position, session_id in enumerate(session_ids):
+            pos_key = self._queue_position_key(session_id)
+            batch.set(
+                pos_key, str(position), expiry=ExpirySet(ExpiryType.SEC, PENDING_QUEUE_EXPIRY_SEC)
+            )
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def get_pending_queue(self, resource_group_id: str) -> list[SessionId]:
+        """
+        Get the pending queue for a specific resource group.
+        """
+        key = self._pending_queue_key(resource_group_id)
+        result = await self._client.client.get(key)
+        if result is None:
+            return []
+        raw_session_ids = load_json(result)
+        return [SessionId(UUID(sid)) for sid in raw_session_ids]
+
+    @valkey_decorator()
+    async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[Optional[int]]:
+        """
+        Get the positions of multiple sessions in their pending queue.
+        """
+        if not session_ids:
+            return []
+        batch = Batch(is_atomic=False)
+        for session_id in session_ids:
+            key = self._queue_position_key(session_id)
+            batch.get(key)
+        batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        if batch_result is None:
+            return [None for _ in session_ids]
+
+        result: list[Optional[int]] = []
+        for pos in batch_result:
+            if pos is None:
+                result.append(None)
+            else:
+                try:
+                    result.append(int(pos))  # type: ignore[arg-type]
+                except ValueError:
+                    result.append(None)
+        return result
 
     @valkey_decorator()
     async def mark_deployment_needed(self, lifecycle_type: str) -> None:

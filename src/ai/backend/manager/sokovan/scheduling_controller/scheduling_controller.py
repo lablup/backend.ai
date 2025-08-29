@@ -18,6 +18,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (

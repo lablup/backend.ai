@@ -2068,6 +2068,7 @@ class ScheduleRepository:
                 (SessionRow.scaling_group_name == scaling_group)
                 & (SessionRow.status == SessionStatus.PENDING)
             )
+            .order_by(SessionRow.created_at.asc())
         )
         result = await db_sess.execute(query)
 
