@@ -202,7 +202,8 @@ class DeploymentExecutor:
             auto_scaling_rule = auto_scaling_rules.get(deployment.id, [])
             if not auto_scaling_rule:
                 routes = metrics_data.routes_by_endpoint.get(deployment.id, [])
-                if deployment.replica_spec.target_replica_count != len(routes):
+                if deployment.replica_spec.replica_count != len(routes):
+                    desired_replicas_map[deployment.id] = deployment.replica_spec.replica_count
                     successes.append(deployment)
                 else:
                     skipped.append(deployment)
