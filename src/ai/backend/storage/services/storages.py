@@ -236,6 +236,29 @@ class StorageService:
             log.error(f"Delete object failed: {e}")
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
 
+    async def delete_folder(
+        self, storage_name: str, bucket_name: str, prefix: str
+    ) -> DeleteObjectResponse:
+        """
+        Delete folder and all its contents.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path of the file to delete
+
+        Returns:
+            DeleteResponse with success status
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            await s3_client.delete_folder(prefix)
+            return DeleteObjectResponse()
+
+        except Exception as e:
+            log.error(f"Delete folder failed: {e}")
+            raise StorageBucketNotFoundError(f"Delete folder failed: {str(e)}") from e
+
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
         storage_config = self._storage_configs.get(storage_name)
         if not storage_config:

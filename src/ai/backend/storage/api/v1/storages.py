@@ -194,23 +194,24 @@ class StorageAPIHandler:
         )
 
     @api_handler
-    async def delete_file(
+    async def delete_folder(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[DeleteObjectReq],
     ) -> APIResponse:
         """
-        Delete a file from the specified S3 bucket.
+        Delete a folder and its contents from the specified S3 bucket.
         Permanently removes the object from storage.
         """
         req = body.parsed
-        filepath = req.key
+        prefix = req.key
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
-        await log_client_api_entry(log, "delete_file", req)
+        await log_client_api_entry(log, "delete_folder", req)
         storage_service = StorageService(self._storage_configs)
-        response = await storage_service.delete_file(storage_name, bucket_name, filepath)
+
+        response = await storage_service.delete_folder(storage_name, bucket_name, prefix)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -229,7 +230,7 @@ def create_app(ctx: RootContext) -> web.Application:
         "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/meta", api_handler.get_file_meta
     )
     app.router.add_route(
-        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/file", api_handler.delete_file
+        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/file", api_handler.delete_folder
     )
     app.router.add_route(
         "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/upload", api_handler.upload_file
