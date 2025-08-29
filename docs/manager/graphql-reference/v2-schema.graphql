@@ -365,7 +365,6 @@ extend type EndpointToken @key(fields: "token") {
 """Added in 25.13.0"""
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
-  storageNamespaceId: ID!
   key: String!
 }
 
@@ -377,7 +376,6 @@ type GetPresignedDownloadURLPayload {
 """Added in 25.13.0"""
 input GetPresignedUploadURLInput {
   artifactRevisionId: ID!
-  storageNamespaceId: ID!
   key: String!
   contentType: String = null
   expiration: Int = null

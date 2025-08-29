@@ -136,12 +136,10 @@ class ArtifactRevisionService:
         reservoir_storage_name = reservoir_config.storage_name
         # TODO: Abstract this.
         bucket_name = reservoir_config.config.bucket_name
-
         storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace_by_bucket(
-            bucket_name
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            storage_data.id, bucket_name
         )
-
         registry_data = (
             await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
                 artifact.id
@@ -190,8 +188,8 @@ class ArtifactRevisionService:
 
         result = await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
         storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace_by_bucket(
-            bucket_name
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            storage_data.id, bucket_name
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 

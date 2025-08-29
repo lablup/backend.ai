@@ -1993,7 +1993,6 @@ input GetPresignedDownloadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageNamespaceId: ID!
   key: String!
 }
 
@@ -2009,7 +2008,6 @@ input GetPresignedUploadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageNamespaceId: ID!
   key: String!
   contentType: String = null
   expiration: Int = null

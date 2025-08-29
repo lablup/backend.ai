@@ -8,6 +8,7 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.common.exception import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -59,16 +60,19 @@ class ObjectStorageService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
     _storage_manager: StorageSessionManager
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
         object_storage_repository: ObjectStorageRepository,
         storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
         self._storage_manager = storage_manager
+        self._config_provider = config_provider
 
     async def create(self, action: CreateObjectStorageAction) -> CreateObjectStorageActionResult:
         """
@@ -118,15 +122,16 @@ class ObjectStorageService:
         Get a presigned download URL for an existing object storage.
         """
         log.info(
-            "Getting presigned download URL for object storage, storage: {}, artifact_revision: {}",
-            action.storage_namespace_id,
+            "Getting presigned download URL for object storage, artifact_revision: {}",
             action.artifact_revision_id,
         )
-        storage_data = await self._object_storage_repository.get_by_namespace_id(
-            action.storage_namespace_id
-        )
+
+        reservoir_config = self._config_provider.config.reservoir
+        storage_name = reservoir_config.storage_name
+        bucket_name = reservoir_config.config.bucket_name
+        storage_data = await self._object_storage_repository.get_by_name(storage_name)
         storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            action.storage_namespace_id
+            storage_data.id, bucket_name
         )
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
@@ -163,6 +168,15 @@ class ObjectStorageService:
             "Getting presigned upload URL for object storage with artifact id: {}",
             action.artifact_revision_id,
         )
+
+        reservoir_config = self._config_provider.config.reservoir
+        storage_name = reservoir_config.storage_name
+        bucket_name = reservoir_config.config.bucket_name
+        storage_data = await self._object_storage_repository.get_by_name(storage_name)
+        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+            storage_data.id, bucket_name
+        )
+
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
@@ -175,9 +189,6 @@ class ObjectStorageService:
 
         storage_data = await self._artifact_repository.get_artifact_installed_storage(
             action.artifact_revision_id
-        )
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            action.storage_namespace_id
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 

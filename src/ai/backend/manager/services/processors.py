@@ -240,6 +240,7 @@ class Services:
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
             storage_manager=args.storage_manager,
+            config_provider=args.config_provider,
         )
         artifact_registry = ArtifactRegistryService(
             repositories.huggingface_registry.repository,

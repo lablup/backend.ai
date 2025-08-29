@@ -79,6 +79,26 @@ class ObjectStorageRepository:
 
     @repository_decorator()
     async def get_storage_namespace(
+        self, storage_id: uuid.UUID, bucket_name: str
+    ) -> ObjectStorageNamespaceData:
+        """
+        Get an existing object storage configuration from the database by ID.
+        """
+        async with self._db.begin_session() as db_session:
+            query = sa.select(ObjectStorageNamespaceRow).where(
+                ObjectStorageNamespaceRow.storage_id == storage_id,
+                ObjectStorageNamespaceRow.bucket == bucket_name,
+            )
+            result = await db_session.execute(query)
+            row: ObjectStorageNamespaceRow = result.scalar_one_or_none()
+            if row is None:
+                raise StorageNamespaceNotFoundError(
+                    f"Object storage namespace with bucket_name {bucket_name} not found."
+                )
+            return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_storage_namespace_by_id(
         self, storage_namespace_id: uuid.UUID
     ) -> ObjectStorageNamespaceData:
         """
@@ -93,24 +113,6 @@ class ObjectStorageRepository:
             if row is None:
                 raise StorageNamespaceNotFoundError(
                     f"Object storage namespace ID {storage_namespace_id} not found."
-                )
-            return row.to_dataclass()
-
-    # NOTE: This method assumes 1:1 mapping between storage and bucket
-    @repository_decorator()
-    async def get_storage_namespace_by_bucket(self, bucket_name: str) -> ObjectStorageNamespaceData:
-        """
-        Get an existing object storage configuration from the database by ID.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageNamespaceRow).where(
-                ObjectStorageNamespaceRow.bucket == bucket_name
-            )
-            result = await db_session.execute(query)
-            row: ObjectStorageNamespaceRow = result.scalar_one_or_none()
-            if row is None:
-                raise StorageNamespaceNotFoundError(
-                    f"Object storage namespace with bucket_name {bucket_name} not found."
                 )
             return row.to_dataclass()
 
