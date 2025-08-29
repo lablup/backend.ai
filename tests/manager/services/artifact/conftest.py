@@ -18,11 +18,13 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
     object_storage_repository = MagicMock(spec=ObjectStorageRepository)
     huggingface_registry_repository = MagicMock(spec=HuggingFaceRepository)
     storage_manager = MagicMock()
+    config_provider = MagicMock()
 
     artifact_service = ArtifactService(
         artifact_repository=artifact_repository,
         object_storage_repository=object_storage_repository,
         huggingface_registry_repository=huggingface_registry_repository,
         storage_manager=storage_manager,
+        config_provider=config_provider,
     )
     return ArtifactProcessors(artifact_service, [])

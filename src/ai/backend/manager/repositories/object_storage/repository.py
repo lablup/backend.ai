@@ -82,7 +82,7 @@ class ObjectStorageRepository:
         self, storage_id: uuid.UUID, bucket_name: str
     ) -> ObjectStorageNamespaceData:
         """
-        Get an existing object storage configuration from the database by ID.
+        Get an existing object storage namespace from the database.
         """
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageNamespaceRow).where(
@@ -102,7 +102,7 @@ class ObjectStorageRepository:
         self, storage_namespace_id: uuid.UUID
     ) -> ObjectStorageNamespaceData:
         """
-        Get an existing object storage configuration from the database by ID.
+        Get an existing object storage namespace from the database by ID.
         """
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageNamespaceRow).where(
