@@ -5,6 +5,10 @@ from typing import Protocol, override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.deployment.actions.create_access_token import (
+    CreateAccessTokenAction,
+    CreateAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
     CreateAutoScalingRuleActionResult,
@@ -58,6 +62,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: CreateAutoScalingRuleAction
     ) -> CreateAutoScalingRuleActionResult: ...
 
+    async def create_access_token(
+        self, action: CreateAccessTokenAction
+    ) -> CreateAccessTokenActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -71,6 +79,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_auto_scaling_rule: ActionProcessor[
         CreateAutoScalingRuleAction, CreateAutoScalingRuleActionResult
     ]
+    create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -84,6 +93,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.create_deployment = ActionProcessor(service.create, action_monitors)
         self.destroy_deployment = ActionProcessor(service.destroy, action_monitors)
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
+        self.create_access_token = ActionProcessor(service.create_access_token, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

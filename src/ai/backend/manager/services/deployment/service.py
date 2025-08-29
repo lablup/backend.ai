@@ -8,8 +8,15 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     ReplicaSpec,
 )
-from ai.backend.manager.data.deployment.types_ import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.data.deployment.types_ import (
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.services.deployment.actions.create_access_token import (
+    CreateAccessTokenAction,
+    CreateAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
     CreateAutoScalingRuleActionResult,
@@ -45,6 +52,18 @@ class DeploymentService:
     def __init__(self, deployment_controller: DeploymentController) -> None:
         """Initialize deployment service with controller."""
         self._deployment_controller = deployment_controller
+
+    async def create_access_token(
+        self, action: CreateAccessTokenAction
+    ) -> CreateAccessTokenActionResult:
+        return CreateAccessTokenActionResult(
+            data=ModelDeploymentAccessTokenData(
+                id=uuid4(),
+                token="test-token",
+                valid_until=datetime.now(),
+                created_at=datetime.now(),
+            )
+        )
 
     async def create(self, action: CreateDeploymentAction) -> CreateDeploymentActionResult:
         return CreateDeploymentActionResult(

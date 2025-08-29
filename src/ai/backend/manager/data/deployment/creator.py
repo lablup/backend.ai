@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -53,3 +54,9 @@ class ModelDeploymentAutoScalingRuleCreator:
     time_window: int
     min_replicas: Optional[int]
     max_replicas: Optional[int]
+
+
+@dataclass
+class ModelDeploymentAccessTokenCreator:
+    model_deployment_id: UUID
+    valid_until: datetime
