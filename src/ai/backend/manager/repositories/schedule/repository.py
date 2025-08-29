@@ -2591,7 +2591,7 @@ class ScheduleRepository:
 
         from dateutil.tz import tzutc
 
-        from ai.backend.manager.models.session import SessionStatus
+        from ai.backend.manager.data.session.types import SessionStatus
 
         timed_out_sessions: list["SweptSessionInfo"] = []
         now = datetime.now(tzutc())
