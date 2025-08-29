@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.context import ProcessorsCtx, ValkeyImageCtx
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -172,6 +172,7 @@ class GQLAPIHandler:
         body: BodyParam[GraphQLReq],
         config_ctx: GQLInspectionConfigCtx,
         processors_ctx: ProcessorsCtx,
+        valkey_image_ctx: ValkeyImageCtx,
     ) -> APIResponse:
         rules = []
 
@@ -199,6 +200,7 @@ class GQLAPIHandler:
 
         strawberry_ctx = StrawberryGQLContext(
             processors=processors_ctx.processors,
+            valkey_image=valkey_image_ctx.valkey_image,
         )
 
         query, variables, operation_name = (
