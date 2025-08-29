@@ -342,10 +342,12 @@
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
       "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
       "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model project folders can only be created in model store–exclusive projects. Change the current project or user type.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
       "Control": "Controls",
+      "CreateModelFolderOnlyInExclusiveProject": "Model project folders can only be created in model store–exclusive projects.",
       "CreatedAt": "Created At",
       "Delete": "Delete",
       "DeleteAFolder": "Delete folder",
@@ -400,6 +402,7 @@
       "Path": "Path",
       "Permission": "Permission",
       "ProjectFolderAlertDesc": "This folder is shared with all members of the project",
+      "ProjectFolderCreationHelp": "A folder accessible by \"{{projectName}}\" project users will be created.",
       "Rename": "Rename",
       "Restore": "Restore",
       "RestoreDescription": "Do you want to restore \"{{ folderName }}\" folder?",
@@ -622,6 +625,7 @@
     "SmallerResourceThenImageRequires": "Your resource request is smaller than the minimum required by the image. Try more resources.",
     "TooManyLoginFailures": "There have been too many login failures in a short time. Login is blocked for a while.",
     "UnauthorizedToken": "Unauthorized token. Please check your token.",
+    "UnexpectedError": "An unexpected error occurred. Please try again later or contact support if the problem persists.",
     "UnknownError": "An unknown error occurred. Please try again.",
     "UpdateError": "Update error",
     "UserHasNoGroup": "User has no group. Please contact administrator to fix it.",
@@ -638,8 +642,10 @@
     "Title": "An error has occurred."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder not found or access denied",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Unmanaged folders do not support the file explorer.",
+    "NoPermissions": "No permissions to access this folder",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -774,6 +780,9 @@
   "kernel": {
     "AgentId": "Agent ID",
     "ContainerId": "Container ID",
+    "ContainerLogs": "Container Logs",
+    "Hostname": "Hostname",
+    "Kernel": "Kernel",
     "KernelId": "Kernel ID",
     "Kernels": "Kernels",
     "Role": "Role",
@@ -915,6 +924,7 @@
     "EndpointName": "Endpoint Name",
     "Error": "Error",
     "ExpiredDate": "Expired Date",
+    "ExtraMountsWarning": "When editing the service, the name (alias) of additional mounted folders may not be retained. Please double-check folder names before saving.",
     "FailedToStartService": "Failed to create service.",
     "FailedToTerminateService": "The request to terminate the service failed.",
     "FailedToUpdateService": "Failed to update service.",
@@ -1030,10 +1040,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} of {{total}} items"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Search",
-    "ResetFilter": "Reset filters"
   },
   "registry": {
     "AddRegistry": "Add Registry",
@@ -1202,6 +1208,9 @@
     "SharedMemory": "Shared memory",
     "Updated": "Resource preset updated"
   },
+  "scheduler": {
+    "PendingSessions": "Pending Sessions"
+  },
   "session": {
     "Agent": "Agent",
     "AgentId": "Agent ID",
@@ -1282,12 +1291,15 @@
     "OpenToPublic": "Open app to public",
     "OpenToPublicDesc": "Enabling this option allows application access for all users within the network.<br /><br />   For access management, enter specific IP addresses in the 'Allowed IP' field. <br /><br />  Leaving this field empty will permit access from all IP addresses.<br /> <br /> Consider setting IP restrictions when necessary for security management.",
     "Others": "Others",
+    "PanelSettings": "Panel Settings",
+    "PendingPosition": "Queue Position",
     "PredicateChecks": "Predicate Checks",
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
     "ReadLess": "Read less",
     "ReadMore": "Read More...",
     "RecentlyCreatedSessions": "Recently Created Sessions",
+    "RecentlyCreatedSessionsTooltip": "Shows the {{count}} most recently created running sessions in the current project",
     "RequestContainerCommit": "Request Container Commit",
     "Reservation": "Reservation",
     "ResourceGroup": "Resource Group",
@@ -1544,6 +1556,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "ATOM Max Support",
     "ATOMPlusSupport": "ATOM+ Support",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Allow agent-side registration",
@@ -1551,6 +1564,7 @@
     "Config": "Config",
     "ConfigPerJobSchduler": "Scheduler settings",
     "ConfigPerJobSchdulerDescription": "The values in the scheduler setting is the defaults to use when there is no scheduler setting in each resource group. If there is a resource group-specific setting, this value will be ignored.",
+    "DescATOMMaxSupport": "Use Rebellions ATOM Max accelerator.",
     "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator.",
     "DescATOMSupport": "Use Rebellions ATOM accelerator",
     "DescAllowAgentSideRegistration": "Allow agent to register itself to manager. Use only if Backend.AI cluster is managed on secure location.",
@@ -1594,6 +1608,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU support",
     "RegisterNewImagesFromRepo": "Register new images from repository",
+    "RequireATOMMaxPlugin": "Requires Backend.AI ATOM Max Plugin.",
     "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
     "RequireFGPUPlugin": "Requires Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1758,6 +1773,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Enabled",
+    "ATOMMaxEnabled": "ATOM Max NPU Enabled",
     "ATOMPlusEnabled": "ATOM+ NPU Enabled",
     "Accept": "Accept",
     "AcceptSharedVFolder": "You can now access folder: ",
@@ -1979,6 +1995,7 @@
       "MyResources": "My Resources",
       "MyResourcesDescription": "<p>This panel shows your total resource usage and remaining across all projects and resource groups.</p><p>When there are multiple limits (such as domain, project, or keypair), the most restrictive limit is applied to show your usage and remaining capacity.</p>\n",
       "MyResourcesIn": "My Resources in",
+      "MyResourcesInResourceGroup": "My Resources in Resource Group",
       "MyResourcesInResourceGroupDescription": "This panel shows your current resource usage and available capacity in the selected resource group.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
@@ -1997,6 +2014,7 @@
       "Remaining": "Remaining",
       "ResourcePolicy": "Resource Policy",
       "Resources": "Resources",
+      "Scheduler": "Scheduler",
       "Serving": "Serving",
       "Sessions": "Sessions",
       "Settings": "Settings",
@@ -2008,6 +2026,7 @@
       "Tasks": "Tasks",
       "TermsOfService": "Terms of Service",
       "TotalResourcesIn": "Total Resources in",
+      "TotalResourcesInResourceGroup": "Total Resources in Resource Group",
       "TotalResourcesInResourceGroupDescription": "This panel shows the total used and remaining resources. The values are calculated by adding up the usage and remaining amounts of all agents using the selected resource group.",
       "TotpActivated": "2FA Enabled",
       "Update": "Update",

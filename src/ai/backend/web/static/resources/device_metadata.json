@@ -89,7 +89,7 @@
       },
       "display_icon": "rebel"
     },
-    "atom-plus.device" : {
+    "atom-plus.device": {
       "slot_name": "atom-plus.device",
       "description": "ATOM+",
       "human_readable_name": "ATOM+ Device",
@@ -100,7 +100,18 @@
       },
       "display_icon": "rebel"
     },
-    "gaudi2.device" : {
+    "atom-max.device": {
+      "slot_name": "atom-max.device",
+      "description": "ATOM Max",
+      "human_readable_name": "ATOM Max Device",
+      "display_unit": "ATOM Max",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
+    "gaudi2.device": {
       "slot_name": "gaudi2.device",
       "description": "Gaudi 2",
       "human_readable_name": "Gaudi 2 Device",
