@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.13.1 (2025-08-29)
+
+### Fixes
+* Fix session ordering in session_pending_queue query resolver ([#5682](https://github.com/lablup/backend.ai/issues/5682))
+* fix: Ensure redis address is nullable ([#5683](https://github.com/lablup/backend.ai/issues/5683))
+
+
 ## 25.13.0 (2025-08-29)
 
 ### Features
