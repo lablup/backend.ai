@@ -65,7 +65,7 @@ from .selectors.selector import (
 from .sequencers.drf import DRFSequencer
 from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
-from .sequencers.sequencer import WorkloadSequencer
+from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
 from .types import (
     AllocationBatch,
     ImageConfigData,
@@ -170,6 +170,10 @@ class Scheduler:
         )
         return pool
 
+    def _get_sequencer(self, name: str) -> SchedulingSequencer:
+        sequncer = self._sequencer_pool[name]
+        return SchedulingSequencer(sequncer)
+
     async def schedule_all_scaling_groups(self) -> ScheduleResult:
         """
         Schedule sessions for all scaling groups.
@@ -269,7 +273,7 @@ class Scheduler:
         with self._phase_metrics.measure_phase(
             "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
         ):
-            sequencer = self._sequencer_pool[sg_info.scheduler]
+            sequencer = self._get_sequencer(sg_info.scheduler)
             sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
         # Build mutable agents with occupancy data from snapshot
