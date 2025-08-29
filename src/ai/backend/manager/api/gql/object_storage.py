@@ -8,8 +8,8 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageNamespaceCreator
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
+from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
     GetObjectStorageBucketsAction,
 )

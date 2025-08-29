@@ -3,6 +3,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import DeleteObjectReq, HuggingFaceImportModelsReq
 from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -50,6 +51,7 @@ class ArtifactRevisionService:
     _object_storage_repository: ObjectStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _storage_manager: StorageSessionManager
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
@@ -57,11 +59,13 @@ class ArtifactRevisionService:
         object_storage_repository: ObjectStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._storage_manager = storage_manager
+        self._config_provider = config_provider
 
     async def get(self, action: GetArtifactRevisionAction) -> GetArtifactRevisionActionResult:
         revision = await self._artifact_repository.get_artifact_revision_by_id(
@@ -127,11 +131,15 @@ class ArtifactRevisionService:
         await self._artifact_repository.update_artifact_revision_status(
             artifact.id, ArtifactStatus.PULLING
         )
-        storage = await self._object_storage_repository.get_by_namespace_id(
-            action.storage_namespace_id
-        )
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            action.storage_namespace_id
+
+        reservoir_config = self._config_provider.config.reservoir
+        reservoir_storage_name = reservoir_config.storage_name
+        # TODO: Abstract this.
+        bucket_name = reservoir_config.config.bucket_name
+
+        storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+        storage_namespace = await self._object_storage_repository.get_storage_namespace_by_bucket(
+            bucket_name
         )
 
         registry_data = (
@@ -140,12 +148,12 @@ class ArtifactRevisionService:
             )
         )
 
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
         result = await storage_proxy_client.import_huggingface_models(
             HuggingFaceImportModelsReq(
                 models=[ModelTarget(model_id=artifact.name, revision=revision_data.version)],
                 registry_name=registry_data.name,
-                storage_name=storage.name,
+                storage_name=storage_data.name,
                 bucket_name=storage_namespace.bucket,
             )
         )
@@ -175,12 +183,15 @@ class ArtifactRevisionService:
             revision_data.artifact_id
         )
 
+        reservoir_config = self._config_provider.config.reservoir
+        reservoir_storage_name = reservoir_config.storage_name
+        # TODO: Abstract this.
+        bucket_name = reservoir_config.config.bucket_name
+
         result = await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
-        storage_data = await self._object_storage_repository.get_by_namespace_id(
-            action.storage_namespace_id
-        )
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            action.storage_namespace_id
+        storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+        storage_namespace = await self._object_storage_repository.get_storage_namespace_by_bucket(
+            bucket_name
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 

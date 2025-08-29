@@ -10,7 +10,6 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 @dataclass
 class ImportArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
-    storage_namespace_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:

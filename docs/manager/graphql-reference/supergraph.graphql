@@ -1404,7 +1404,7 @@ type DealiasImage
 input DeleteArtifactRevisionsInput
   @join__type(graph: STRAWBERRY)
 {
-  targets: [DeleteArtifactRevisionTarget!]!
+  artifactRevisionIds: [ID!]!
 }
 
 """Added in 25.13.0"""
@@ -1412,14 +1412,6 @@ type DeleteArtifactRevisionsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
-}
-
-"""Added in 25.13.0"""
-input DeleteArtifactRevisionTarget
-  @join__type(graph: STRAWBERRY)
-{
-  artifactRevisionId: ID!
-  storageNamespaceId: ID!
 }
 
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
@@ -2339,7 +2331,6 @@ input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
-  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -4841,7 +4832,6 @@ input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   registryId: ID!
-  storageNamespaceId: ID!
   limit: Int!
   search: String = null
 }

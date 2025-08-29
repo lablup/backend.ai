@@ -11,7 +11,6 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 @dataclass
 class ScanArtifactsAction(ArtifactAction):
     registry_id: uuid.UUID
-    storage_id: uuid.UUID
     limit: int
     order: ModelSortKey
     search: Optional[str]

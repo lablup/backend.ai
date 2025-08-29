@@ -251,12 +251,14 @@ class Services:
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            config_provider=args.config_provider,
         )
         artifact_revision_service = ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            config_provider=args.config_provider,
         )
 
         # Initialize deployment service if controller is available

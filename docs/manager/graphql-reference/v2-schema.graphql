@@ -263,14 +263,8 @@ type CreateReservoirRegistryPayload {
 scalar DateTime
 
 """Added in 25.13.0"""
-input DeleteArtifactRevisionTarget {
-  artifactRevisionId: ID!
-  storageNamespaceId: ID!
-}
-
-"""Added in 25.13.0"""
 input DeleteArtifactRevisionsInput {
-  targets: [DeleteArtifactRevisionTarget!]!
+  artifactRevisionIds: [ID!]!
 }
 
 """Added in 25.13.0"""
@@ -437,7 +431,6 @@ extend type ImageNode @key(fields: "id") {
 """Added in 25.13.0"""
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
-  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -935,7 +928,6 @@ type ScalingRule {
 """Added in 25.13.0"""
 input ScanArtifactsInput {
   registryId: ID!
-  storageId: ID!
   limit: Int!
   search: String = null
 }

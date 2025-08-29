@@ -67,4 +67,4 @@ async def test_list_artifact_revisions(
     processors: ArtifactRevisionProcessors,
     test_scenario: ScenarioBase[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult],
 ):
-    await test_scenario.test(processors.list_.wait_for_complete)
+    await test_scenario.test(processors.list_revision.wait_for_complete)

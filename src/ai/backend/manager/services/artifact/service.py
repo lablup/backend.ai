@@ -2,6 +2,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -32,6 +33,7 @@ class ArtifactService:
     _object_storage_repository: ObjectStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _storage_manager: StorageSessionManager
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
@@ -39,14 +41,17 @@ class ArtifactService:
         object_storage_repository: ObjectStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._storage_manager = storage_manager
+        self._config_provider = config_provider
 
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
-        storage = await self._object_storage_repository.get_by_id(action.storage_id)
+        reservoir_config = self._config_provider.config.reservoir
+        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             action.registry_id
         )
