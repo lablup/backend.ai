@@ -201,8 +201,11 @@ class DeploymentExecutor:
         for deployment in deployments:
             auto_scaling_rule = auto_scaling_rules.get(deployment.id, [])
             if not auto_scaling_rule:
-                log.debug("No auto scaling rule for deployment {}, skipping", deployment.id)
-                successes.append(deployment)
+                routes = metrics_data.routes_by_endpoint.get(deployment.id, [])
+                if deployment.replica_spec.target_replica_count != len(routes):
+                    successes.append(deployment)
+                else:
+                    skipped.append(deployment)
                 continue
             try:
                 # Calculate desired replicas

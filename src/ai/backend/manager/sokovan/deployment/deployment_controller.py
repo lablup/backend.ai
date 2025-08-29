@@ -109,9 +109,12 @@ class DeploymentController:
         target_revision = modified_endpoint.target_revision()
         if target_revision:
             await self._validate_model_revision(target_revision)
-        return await self._deployment_repository.update_endpoint_with_modifier(
-            endpoint_id, modifier
-        )
+        res = await self._deployment_repository.update_endpoint_with_modifier(endpoint_id, modifier)
+        try:
+            await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
+        except Exception as e:
+            log.error("Failed to mark deployment lifecycle needed: {}", e)
+        return res
 
     async def destroy_deployment(
         self,

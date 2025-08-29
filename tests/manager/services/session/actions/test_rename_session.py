@@ -13,6 +13,7 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     KERNEL_FIXTURE_DICT,
     PENDING_SESSION_FIXTURE_DATA,
     PENDING_SESSION_FIXTURE_DICT,
@@ -48,6 +49,7 @@ from ..fixtures import (
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT, PENDING_SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }

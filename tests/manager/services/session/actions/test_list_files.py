@@ -11,7 +11,12 @@ from ai.backend.manager.services.session.actions.list_files import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...utils import ScenarioBase
-from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
+from ..fixtures import (
+    AGENT_FIXTURE_DICT,
+    KERNEL_FIXTURE_DICT,
+    SESSION_FIXTURE_DATA,
+    SESSION_FIXTURE_DICT,
+)
 
 
 @pytest.fixture
@@ -63,6 +68,7 @@ AGENT_LIST_FILES_RPC_RESP = {
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }

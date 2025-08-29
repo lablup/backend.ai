@@ -116,12 +116,14 @@ class ScheduleEventHandler:
             await self._scheduler_dispatcher.check_precond(ev.event_name())
 
     async def handle_do_scale(self, context: None, agent_id: str, ev: DoScaleEvent) -> None:
-        await self._scheduler_dispatcher.scale_services(ev.event_name())
+        if not self._use_sokovan:
+            await self._scheduler_dispatcher.scale_services(ev.event_name())
 
     async def handle_do_update_session_status(
         self, context: None, agent_id: str, ev: DoUpdateSessionStatusEvent
     ) -> None:
-        await self._scheduler_dispatcher.update_session_status()
+        if not self._use_sokovan:
+            await self._scheduler_dispatcher.update_session_status()
 
     async def handle_do_sokovan_process_if_needed(
         self, context: None, agent_id: str, ev: DoSokovanProcessIfNeededEvent

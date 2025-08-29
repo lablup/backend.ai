@@ -11,7 +11,12 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.types import OptionalState
 
 from ...utils import ScenarioBase
-from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
+from ..fixtures import (
+    AGENT_FIXTURE_DICT,
+    KERNEL_FIXTURE_DICT,
+    SESSION_FIXTURE_DATA,
+    SESSION_FIXTURE_DICT,
+)
 
 
 @pytest.mark.parametrize(
@@ -36,6 +41,7 @@ from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTUR
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }

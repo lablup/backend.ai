@@ -11,7 +11,12 @@ from ai.backend.manager.services.session.actions.download_file import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...utils import ScenarioBase
-from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTURE_DICT
+from ..fixtures import (
+    AGENT_FIXTURE_DICT,
+    KERNEL_FIXTURE_DICT,
+    SESSION_FIXTURE_DATA,
+    SESSION_FIXTURE_DICT,
+)
 
 
 @pytest.fixture
@@ -52,6 +57,7 @@ AGENT_DOWNLOAD_FILE_RPC_RESP = b"file content"
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }

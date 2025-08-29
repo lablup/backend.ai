@@ -13,6 +13,7 @@ from ai.backend.manager.services.session.types import CommitStatusInfo
 
 from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     KERNEL_FIXTURE_DATA,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
@@ -61,6 +62,7 @@ AGENT_COMMIT_STATUS_RPC_RESP = {
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }
