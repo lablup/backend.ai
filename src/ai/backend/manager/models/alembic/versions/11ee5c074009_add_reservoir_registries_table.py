@@ -1,7 +1,7 @@
 """Add reservoir_registries table
 
 Revision ID: 11ee5c074009
-Revises: 43c7e60c56af
+Revises: fb01c44db0d6
 Create Date: 2025-08-26 03:31:43.771428
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "11ee5c074009"
-down_revision = "43c7e60c56af"
+down_revision = "fb01c44db0d6"
 branch_labels = None
 depends_on = None
 
