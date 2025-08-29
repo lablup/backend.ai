@@ -57,11 +57,13 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             description = "Success"
             return result
         except BackendAIError as e:
+            log.exception("Action processing error: {}", e)
             status = OperationStatus.ERROR
             description = str(e)
             error_code = e.error_code()
             raise
         except BaseException as e:
+            log.exception("Unexpected error during action processing: {}", e)
             status = OperationStatus.ERROR
             description = str(e)
             error_code = ErrorCode.default()

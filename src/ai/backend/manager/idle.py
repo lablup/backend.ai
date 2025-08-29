@@ -72,12 +72,12 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
-from .models.session import SessionStatus
 from .models.user import users
 from .types import DistributedLockFactory
 

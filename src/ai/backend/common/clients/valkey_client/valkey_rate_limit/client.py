@@ -82,7 +82,7 @@ class ValkeyRateLimitClient:
         Close the ValkeyRateLimitClient connection.
         """
         if self._closed:
-            log.warning("ValkeyRateLimitClient is already closed.")
+            log.debug("ValkeyRateLimitClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

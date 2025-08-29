@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
@@ -87,7 +89,8 @@ class RootContext(BaseContext):
     scheduler_dispatcher: SchedulerDispatcher
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
-    deployment_controller: DeploymentController | None
+    deployment_controller: DeploymentController
+    route_controller: RouteController
     leader_election: ValkeyLeaderElection
 
     error_monitor: ErrorPluginContext

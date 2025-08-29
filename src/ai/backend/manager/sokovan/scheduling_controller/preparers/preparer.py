@@ -16,8 +16,9 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     KernelEnqueueData,
@@ -125,7 +126,7 @@ class SessionPreparer:
             domain_name=spec.user_scope.domain_name,
             scaling_group_name=validated_scaling_group,
             session_type=spec.session_type,
-            cluster_mode=spec.cluster_mode.value,
+            cluster_mode=spec.cluster_mode,
             cluster_size=spec.cluster_size,
             priority=spec.priority,
             status=SessionStatus.PENDING.name,
@@ -226,7 +227,7 @@ class SessionPreparer:
                 session_creation_id=spec.session_creation_id,
                 session_name=spec.session_name,
                 session_type=spec.session_type,
-                cluster_mode=spec.cluster_mode.value,
+                cluster_mode=spec.cluster_mode,
                 cluster_size=spec.cluster_size,
                 cluster_role=kernel_config.get("cluster_role", DEFAULT_ROLE),
                 cluster_idx=kernel_config.get("cluster_idx", idx),

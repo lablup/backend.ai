@@ -175,3 +175,15 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ScalingGroupProxyTargetNotFound(ObjectNotFound):
+    object_name = "scaling group proxy target"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

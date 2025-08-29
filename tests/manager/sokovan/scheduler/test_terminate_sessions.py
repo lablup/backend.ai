@@ -19,8 +19,8 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.clients.agent import AgentClient, AgentPool
-from ai.backend.manager.models.kernel import KernelStatus
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
@@ -68,6 +68,7 @@ def scheduler(mock_repository, mock_agent_pool):
         agent_selector=MagicMock(),
         allocator=MagicMock(),
         repository=mock_repository,
+        deployment_repository=MagicMock(),
         config_provider=MagicMock(),
         lock_factory=MagicMock(),
         agent_pool=mock_agent_pool,

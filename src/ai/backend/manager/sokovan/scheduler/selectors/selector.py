@@ -6,6 +6,7 @@ the row-based implementation details of the legacy selectors.
 """
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Sequence
 from uuid import UUID
@@ -13,6 +14,8 @@ from uuid import UUID
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
 
 from .exceptions import (
+    ContainerLimitExceededError,
+    InsufficientResourcesError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
@@ -325,30 +328,51 @@ class AgentSelector:
         config: AgentSelectionConfig,
         designated_agent: Optional[AgentId] = None,
     ) -> AgentStateTracker:
-        # Filter compatible trackers
-        compatible_trackers = [
-            tracker
-            for tracker in state_trackers
-            if self._is_tracker_compatible(
-                tracker,
-                resource_req,
-                config,
+        # First pass: filter by architecture (binary compatibility check)
+        arch_compatible_trackers = []
+        for tracker in state_trackers:
+            agent = tracker.original_agent
+            if agent.architecture == resource_req.required_architecture:
+                arch_compatible_trackers.append(tracker)
+
+        if not arch_compatible_trackers:
+            # No agents with matching architecture
+            available_archs = {t.original_agent.architecture for t in state_trackers}
+            raise NoCompatibleAgentError(
+                f"No agents with required architecture '{resource_req.required_architecture}'. "
+                f"Available architectures: {', '.join(sorted(available_archs))}"
             )
-        ]
+
+        # Second pass: filter by resource availability (quantitative check)
+        compatible_trackers = []
+        error_messages: defaultdict[str, int] = defaultdict(int)
+        agent_errors: dict[AgentId, str] = {}
+        for tracker in arch_compatible_trackers:
+            try:
+                self._check_tracker_compatibility(
+                    tracker,
+                    resource_req,
+                    config,
+                )
+                compatible_trackers.append(tracker)
+            except Exception as e:
+                error_messages[str(e)] += 1
+                agent_errors[tracker.original_agent.agent_id] = str(e)
 
         if not compatible_trackers:
-            raise NoCompatibleAgentError(
-                f"No agents compatible with resource requirements: "
-                f"requested {resource_req.requested_slots} on {resource_req.required_architecture} architecture"
+            error_messages_summary = "; ".join(
+                f"{count}x {msg}" for msg, count in error_messages.items()
             )
+            raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
         # Handle designated agent if specified
         if designated_agent:
             for tracker in compatible_trackers:
                 if tracker.original_agent.agent_id == designated_agent:
                     return tracker
-            raise NoCompatibleAgentError(
-                f"Designated agent '{designated_agent}' not found in compatible agents"
+            error_message = agent_errors.get(designated_agent, "Designated agent not found")
+            raise NoAvailableAgentError(
+                f"Designated agent '{designated_agent}' is not compatible. Details: {error_message}"
             )
 
         # Use strategy to select from compatible trackers
@@ -356,18 +380,21 @@ class AgentSelector:
             compatible_trackers, resource_req, criteria, config
         )
 
-    def _is_tracker_compatible(
+    def _check_tracker_compatibility(
         self,
         tracker: AgentStateTracker,
         resource_req: ResourceRequirements,
         config: AgentSelectionConfig,
-    ) -> bool:
-        """Check if an agent tracker is compatible with the resource requirements."""
-        agent = tracker.original_agent
+    ) -> None:
+        """Check if an agent tracker is compatible with the resource requirements.
 
-        # Check architecture compatibility
-        if agent.architecture != resource_req.required_architecture:
-            return False
+        Note: Architecture compatibility is checked separately before this method.
+
+        Raises:
+            InsufficientResourcesError: If agent doesn't have enough resources
+            ContainerLimitExceededError: If agent has reached container limit
+        """
+        agent = tracker.original_agent
 
         # Get current state with tracked changes
         occupied_slots = tracker.get_current_occupied_slots()
@@ -376,11 +403,48 @@ class AgentSelector:
         # Check resource availability
         available_slots = agent.available_slots - occupied_slots
         if not (available_slots >= resource_req.requested_slots):
-            return False
+            # Build detailed message showing which resources are insufficient
+            insufficient = []
+            for k in resource_req.requested_slots.keys():
+                requested_val = resource_req.requested_slots.get(k, 0)
+                available_val = available_slots.get(k, 0)
+                if requested_val > available_val:
+                    insufficient.append(k)
+
+            # Format values similar to group_resource_limit.py
+            insufficient_details = {}
+            for resource_name in insufficient:
+                requested = resource_req.requested_slots.get(resource_name, 0)
+                available = available_slots.get(resource_name, 0)
+
+                # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
+                if resource_name == "mem":
+                    from ai.backend.common.types import BinarySize
+
+                    insufficient_details[resource_name] = (
+                        str(BinarySize(requested)),
+                        str(BinarySize(available)),
+                    )
+                else:
+                    # Store raw values for other resources
+                    insufficient_details[resource_name] = (
+                        str(requested),
+                        str(available),
+                    )
+
+            raise InsufficientResourcesError(
+                agent_id=agent.agent_id,
+                requested_slots=resource_req.requested_slots,
+                available_slots=available_slots,
+                occupied_slots=occupied_slots,
+                insufficient_resources=insufficient_details,
+            )
 
         # Check container limit if specified
         if config.max_container_count is not None:
             if container_count >= config.max_container_count:
-                return False
-
-        return True
+                raise ContainerLimitExceededError(
+                    agent_id=agent.agent_id,
+                    current_count=container_count,
+                    max_count=config.max_container_count,
+                )

@@ -60,6 +60,24 @@ class ValkeyScheduleClient:
         """
         return f"schedule:{schedule_type}"
 
+    def _get_deployment_key(self, lifecycle_type: str) -> str:
+        """
+        Generate the Redis key for the given deployment lifecycle type.
+
+        :param lifecycle_type: The type of deployment lifecycle
+        :return: The formatted key string
+        """
+        return f"deployment:{lifecycle_type}"
+
+    def _get_route_key(self, lifecycle_type: str) -> str:
+        """
+        Generate the Redis key for the given route lifecycle type.
+
+        :param lifecycle_type: The type of route lifecycle
+        :return: The formatted key string
+        """
+        return f"route:{lifecycle_type}"
+
     @valkey_decorator()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
         """
@@ -81,6 +99,70 @@ class ValkeyScheduleClient:
         :return: True if a mark existed (and was deleted), False otherwise
         """
         key = self._get_schedule_key(schedule_type)
+        # Use Batch for atomic GET and DELETE
+        batch = Batch(is_atomic=True)
+        batch.get(key)
+        batch.delete([key])
+        results = await self._client.client.exec(batch, raise_on_error=True)
+
+        # Check if results exist and the first element (GET result) is not None
+        if results and len(results) > 0:
+            return results[0] is not None
+        return False
+
+    @valkey_decorator()
+    async def mark_deployment_needed(self, lifecycle_type: str) -> None:
+        """
+        Mark that a deployment lifecycle operation is needed.
+        Simply sets a flag that will be checked in the next scheduling loop.
+
+        :param lifecycle_type: The type of deployment lifecycle to mark
+        """
+        key = self._get_deployment_key(lifecycle_type)
+        await self._client.client.set(key, b"1")
+
+    @valkey_decorator()
+    async def load_and_delete_deployment_mark(self, lifecycle_type: str) -> bool:
+        """
+        Check if a deployment lifecycle mark exists and atomically delete it.
+        This ensures that only one scheduler processes the mark.
+
+        :param lifecycle_type: The type of deployment lifecycle to check
+        :return: True if a mark existed (and was deleted), False otherwise
+        """
+        key = self._get_deployment_key(lifecycle_type)
+        # Use Batch for atomic GET and DELETE
+        batch = Batch(is_atomic=True)
+        batch.get(key)
+        batch.delete([key])
+        results = await self._client.client.exec(batch, raise_on_error=True)
+
+        # Check if results exist and the first element (GET result) is not None
+        if results and len(results) > 0:
+            return results[0] is not None
+        return False
+
+    @valkey_decorator()
+    async def mark_route_needed(self, lifecycle_type: str) -> None:
+        """
+        Mark that a route lifecycle operation is needed.
+        Simply sets a flag that will be checked in the next scheduling loop.
+
+        :param lifecycle_type: The type of route lifecycle to mark
+        """
+        key = self._get_route_key(lifecycle_type)
+        await self._client.client.set(key, b"1")
+
+    @valkey_decorator()
+    async def load_and_delete_route_mark(self, lifecycle_type: str) -> bool:
+        """
+        Check if a route lifecycle mark exists and atomically delete it.
+        This ensures that only one scheduler processes the mark.
+
+        :param lifecycle_type: The type of route lifecycle to check
+        :return: True if a mark existed (and was deleted), False otherwise
+        """
+        key = self._get_route_key(lifecycle_type)
         # Use Batch for atomic GET and DELETE
         batch = Batch(is_atomic=True)
         batch.get(key)

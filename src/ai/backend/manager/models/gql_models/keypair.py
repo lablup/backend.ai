@@ -13,6 +13,7 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.models.gql_models.session import ComputeSession
 from ai.backend.manager.models.keypair import (
@@ -183,7 +184,6 @@ class KeyPair(graphene.ObjectType):
         self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
     ):
         ctx: GraphQueryContext = info.context
-        from .. import KernelStatus
 
         if raw_status is not None:
             status = KernelStatus[raw_status]

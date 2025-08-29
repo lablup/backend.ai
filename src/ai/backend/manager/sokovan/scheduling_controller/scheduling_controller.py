@@ -4,17 +4,20 @@ import logging
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import SessionId
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
@@ -25,6 +28,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 
 from .calculators.resource_calculator import ResourceCalculator
 from .preparers import (
@@ -225,7 +229,7 @@ class SchedulingController:
             session_id,
         )
         try:
-            await self.request_scheduling(ScheduleType.SCHEDULE)
+            await self.mark_scheduling_needed(ScheduleType.SCHEDULE)
         except Exception as e:
             log.warning(
                 "Failed to request scheduling for session {}: {}",
@@ -234,7 +238,7 @@ class SchedulingController:
             )
         return session_id
 
-    async def request_scheduling(self, schedule_type: ScheduleType) -> None:
+    async def mark_scheduling_needed(self, schedule_type: ScheduleType) -> None:
         """
         Request a scheduling operation for the next cycle.
 
@@ -293,6 +297,51 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
-            await self.request_scheduling(ScheduleType.TERMINATE)
+            await self.mark_scheduling_needed(ScheduleType.TERMINATE)
 
         return result
+
+    async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
+        # TODO: Refactor to use ValidationRule
+        alias_folders = spec.mount_spec.mount_map.values()
+        if len(alias_folders) != len(set(alias_folders)):
+            raise InvalidAPIParameters("Duplicate alias folder name exists.")
+        original_folders = spec.mount_spec.mount_map.keys()
+        alias_name: str
+        for alias_name in alias_folders:
+            if alias_name.startswith("/home/work/"):
+                alias_name = alias_name.replace("/home/work/", "")
+            if alias_name == "":
+                raise InvalidAPIParameters("Alias name cannot be empty.")
+            if not _verify_vfolder_name(alias_name):
+                raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
+            if alias_name in original_folders:
+                raise InvalidAPIParameters(
+                    "Alias name cannot be set to an existing folder name: " + str(alias_name)
+                )
+        # Validate resource slots
+        available_resource_slots = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+        try:
+            ResourceSlot.from_user_input(
+                spec.resource_spec.resource_slots, available_resource_slots
+            )
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
+        # Validate Image
+        user = current_user()
+        if user is None:
+            raise InvalidAPIParameters("User context is required for image validation.")
+        await self._repository.check_available_image(
+            spec.image_identifier, user.domain_name, user.user_id
+        )
+
+
+def _verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True

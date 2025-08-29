@@ -269,10 +269,10 @@ class TestAsyncDestroy:
                 skipped_sessions=[],
             )
         )
-        mock_schedule_coordinator.request_scheduling = AsyncMock()
+        mock_schedule_coordinator.mark_schedule_needed = AsyncMock()
 
         # In the real implementation, mark_sessions_for_termination in ScheduleCoordinator
-        # should call request_scheduling if any sessions were processed
+        # should call mark_schedule_needed if any sessions were processed
         # For this test, we're verifying the flow would work correctly
 
         result = await mock_schedule_coordinator.mark_sessions_for_termination(
