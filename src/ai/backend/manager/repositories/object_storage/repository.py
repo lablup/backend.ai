@@ -234,7 +234,9 @@ class ObjectStorageRepository:
             Dictionary mapping storage_id to list of bucket names
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageMetaRow.storage_id, ObjectStorageMetaRow.bucket)
+            query = sa.select(
+                ObjectStorageNamespaceRow.storage_id, ObjectStorageNamespaceRow.bucket
+            )
             result = await db_session.execute(query)
             rows = result.all()
 

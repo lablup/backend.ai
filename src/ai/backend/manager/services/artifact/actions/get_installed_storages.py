@@ -7,7 +7,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class GetInstalledStoragesAction(ArtifactAction):
+class GetInstalledStorageNamespacesAction(ArtifactAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -19,7 +19,7 @@ class GetInstalledStoragesAction(ArtifactAction):
 
 
 @dataclass
-class GetInstalledStoragesActionResult(BaseActionResult):
+class GetInstalledStorageNamspacesActionResult(BaseActionResult):
     result: dict[uuid.UUID, uuid.UUID]
 
     @override

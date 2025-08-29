@@ -58,8 +58,7 @@ class APIHandler:
             await processors.object_storage.get_presigned_download_url.wait_for_complete(
                 GetDownloadPresignedURLAction(
                     artifact_revision_id=body.parsed.artifact_revision_id,
-                    storage_id=body.parsed.storage_id,
-                    bucket_name=body.parsed.bucket_name,
+                    storage_namespace_id=body.parsed.storage_namespace_id,
                     key=body.parsed.key,
                 )
             )
@@ -80,7 +79,7 @@ class APIHandler:
         action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
             GetUploadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
-                bucket_name=body.parsed.bucket_name,
+                storage_namespace_id=body.parsed.storage_namespace_id,
                 key=body.parsed.key,
                 content_type=body.parsed.content_type,
                 expiration=body.parsed.expiration,

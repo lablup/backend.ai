@@ -118,8 +118,9 @@ class GetPresignedDownloadURLReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The unique identifier of the artifact revision"
     )
-    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
-    bucket_name: str = Field(description="Name of the bucket")
+    storage_namespace_id: uuid.UUID = Field(
+        description="The unique identifier of the object storage"
+    )
     key: str = Field(description="Object key")
 
 
@@ -127,7 +128,9 @@ class GetPresignedUploadURLReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The unique identifier of the artifact revision"
     )
-    bucket_name: str = Field(description="Name of the bucket")
+    storage_namespace_id: uuid.UUID = Field(
+        description="The unique identifier of the object storage"
+    )
     key: str = Field(description="Object key")
     content_type: Optional[str] = Field(default=None, description="Content type of the object")
     expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")

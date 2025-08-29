@@ -773,3 +773,16 @@ class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ReservoirFileSyncError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/reservoir-file-sync-error"
+    error_title = "Reservoir File Sync Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

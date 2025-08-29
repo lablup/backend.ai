@@ -239,7 +239,6 @@ public_interface_objs: MutableMapping[str, Any] = {}
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
     ".container_registry",
-    ".artifact",
     ".artifact_registry",
     ".etcd",
     ".events",

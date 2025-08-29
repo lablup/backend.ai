@@ -103,14 +103,14 @@ class ObjectStorageBucketsResponse(BaseResponseModel):
 
 
 class ObjectStorageAllBucketsResponse(BaseResponseModel):
-    buckets_by_storage: dict[str, list[str]] = Field(
+    buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
         description="Mapping of storage IDs to bucket lists"
     )
 
 
 # Artifact Installed Storages Response Models
 class ArtifactInstalledStoragesResponse(BaseResponseModel):
-    installed_storages: dict[str, str] = Field(
+    installed_storages: dict[uuid.UUID, uuid.UUID] = Field(
         description="Mapping of artifact revision IDs to storage IDs"
     )
 

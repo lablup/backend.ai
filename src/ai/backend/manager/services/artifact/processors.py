@@ -8,8 +8,8 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactActionResult,
 )
 from ai.backend.manager.services.artifact.actions.get_installed_storages import (
-    GetInstalledStoragesAction,
-    GetInstalledStoragesActionResult,
+    GetInstalledStorageNamespacesAction,
+    GetInstalledStorageNamspacesActionResult,
 )
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
@@ -47,8 +47,8 @@ class ArtifactProcessors(AbstractProcessorPackage):
         ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
-    get_installed_storages: ActionProcessor[
-        GetInstalledStoragesAction, GetInstalledStoragesActionResult
+    get_installed_storage_namespaces: ActionProcessor[
+        GetInstalledStorageNamespacesAction, GetInstalledStorageNamspacesActionResult
     ]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
     upsert: ActionProcessor[UpsertArtifactsAction, UpsertArtifactsActionResult]
@@ -61,8 +61,8 @@ class ArtifactProcessors(AbstractProcessorPackage):
             service.list_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
-        self.get_installed_storages = ActionProcessor(
-            service.get_installed_storages, action_monitors
+        self.get_installed_storage_namespaces = ActionProcessor(
+            service.get_installed_storage_namespaces, action_monitors
         )
         self.update = ActionProcessor(service.update, action_monitors)
         self.upsert = ActionProcessor(service.upsert, action_monitors)
@@ -75,7 +75,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
             ListArtifactsAction.spec(),
             ListArtifactsWithRevisionsAction.spec(),
             GetArtifactRevisionsAction.spec(),
-            GetInstalledStoragesAction.spec(),
             UpdateArtifactAction.spec(),
             UpsertArtifactsAction.spec(),
+            GetInstalledStorageNamespacesAction.spec(),
         ]

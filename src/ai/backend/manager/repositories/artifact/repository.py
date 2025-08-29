@@ -870,14 +870,14 @@ class ArtifactRepository:
         """Get mapping of artifact revision IDs to storage IDs where they are installed.
 
         Returns:
-            Dictionary mapping artifact_revision_id to storage_id
+            Dictionary mapping artifact_revision_id to storage_namespace_id
         """
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(
                     AssociationArtifactsStorageRow.artifact_revision_id,
-                    AssociationArtifactsStorageRow.storage_id,
+                    AssociationArtifactsStorageRow.storage_namespace_id,
                 )
             )
             rows: list[AssociationArtifactsStorageRow] = result.all()
-            return {row.artifact_revision_id: row.storage_id for row in rows}
+            return {row.artifact_revision_id: row.storage_namespace_id for row in rows}

@@ -42,7 +42,7 @@ class APIHandler:
         await processors.artifact.scan.wait_for_complete(
             ScanArtifactsAction(
                 registry_id=body.parsed.registry_id,
-                storage_id=body.parsed.storage_id,
+                storage_namespace_id=body.parsed.storage_namespace_id,
                 limit=body.parsed.limit,
                 order=ModelSortKey.DOWNLOADS,
                 search=body.parsed.search,
