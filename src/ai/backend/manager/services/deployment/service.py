@@ -1,6 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import uuid4
 
+from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
@@ -44,6 +46,10 @@ from ai.backend.manager.services.deployment.actions.list_replicas import (
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
+)
+from ai.backend.manager.services.deployment.actions.update_auto_scaling_rule import (
+    UpdateAutoScalingRuleAction,
+    UpdateAutoScalingRuleActionResult,
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 
@@ -121,6 +127,26 @@ class DeploymentService:
                 time_window=action.creator.time_window,
                 min_replicas=action.creator.min_replicas,
                 max_replicas=action.creator.max_replicas,
+                created_at=datetime.now(),
+                last_triggered_at=datetime.now(),
+            )
+        )
+
+    async def update_auto_scaling_rule(
+        self, action: UpdateAutoScalingRuleAction
+    ) -> UpdateAutoScalingRuleActionResult:
+        return UpdateAutoScalingRuleActionResult(
+            data=ModelDeploymentAutoScalingRuleData(
+                id=uuid4(),
+                model_deployment_id=uuid4(),
+                metric_source=AutoScalingMetricSource.KERNEL,
+                metric_name="test-metric",
+                min_threshold=Decimal("0.5"),
+                max_threshold=Decimal("21.0"),
+                step_size=1,
+                time_window=60,
+                min_replicas=1,
+                max_replicas=10,
                 created_at=datetime.now(),
                 last_triggered_at=datetime.now(),
             )

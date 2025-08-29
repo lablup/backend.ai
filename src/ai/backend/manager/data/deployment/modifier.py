@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Optional, override
 from uuid import UUID
 
+from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -88,4 +90,31 @@ class DeploymentModifier(PartialModifier):
             to_update.update(self.network.fields_to_update())
         if self.model_revision:
             to_update.update(self.model_revision.fields_to_update())
+        return to_update
+
+
+@dataclass
+class ModelDeploymentAutoScalingRuleModifier(PartialModifier):
+    metric_source: OptionalState[AutoScalingMetricSource] = field(
+        default_factory=OptionalState[AutoScalingMetricSource].nop
+    )
+    metric_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    min_threshold: TriState[Decimal] = field(default_factory=TriState[Decimal].nop)
+    max_threshold: TriState[Decimal] = field(default_factory=TriState[Decimal].nop)
+    step_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    time_window: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    min_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    max_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.metric_source.update_dict(to_update, "metric_source")
+        self.metric_name.update_dict(to_update, "metric_name")
+        self.min_threshold.update_dict(to_update, "min_threshold")
+        self.max_threshold.update_dict(to_update, "max_threshold")
+        self.step_size.update_dict(to_update, "step_size")
+        self.time_window.update_dict(to_update, "time_window")
+        self.min_replicas.update_dict(to_update, "min_replicas")
+        self.max_replicas.update_dict(to_update, "max_replicas")
         return to_update
