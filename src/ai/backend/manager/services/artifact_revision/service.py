@@ -174,7 +174,7 @@ class ArtifactRevisionService:
                 )
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (
-                    await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                    await self._reservoir_registry_repository.get_registry_data_by_artifact_id(
                         artifact.id
                     )
                 )
@@ -184,7 +184,7 @@ class ArtifactRevisionService:
                     "GET",
                     "/object-storages/presigned/download",
                     json={
-                        "artifact_revision_id": registry_data.id,
+                        "artifact_revision_id": str(registry_data.id),
                         "key": ".",
                     },
                 )

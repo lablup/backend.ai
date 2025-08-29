@@ -12,6 +12,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
 from .base import (
     GUID,
@@ -53,6 +54,14 @@ class ArtifactRow(Base):
         "HuggingFaceRegistryRow",
         back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
+        overlaps="reservoir_registry,artifacts",
+    )
+
+    reservoir_registry = relationship(
+        "ReservoirRegistryRow",
+        back_populates="artifacts",
+        primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
+        overlaps="huggingface_registry,artifacts",
     )
 
     revision_rows = relationship(

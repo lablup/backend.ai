@@ -16,6 +16,7 @@ from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,6 +45,25 @@ class ReservoirRegistryRepository:
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_registry_data_by_artifact_id(
+        self, artifact_id: uuid.UUID
+    ) -> ReservoirRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow)
+                .where(ArtifactRow.id == artifact_id)
+                .options(
+                    selectinload(ArtifactRow.reservoir_registry).selectinload(
+                        ReservoirRegistryRow.meta
+                    ),
+                )
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ValueError(f"Artifact with ID {artifact_id} not found")
+            return row.reservoir_registry.to_dataclass()
 
     @repository_decorator()
     async def create(

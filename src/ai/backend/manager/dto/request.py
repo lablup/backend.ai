@@ -8,9 +8,6 @@ from ai.backend.manager.types import PaginationOptions
 
 
 class ArtifactRegistriesScanReq(BaseRequestModel):
-    storage_namespace_id: uuid.UUID = Field(
-        description="The unique identifier of the storage namespace to scan."
-    )
     registry_id: uuid.UUID = Field(
         description="The unique identifier of the artifact registry to scan."
     )
