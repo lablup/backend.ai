@@ -1058,8 +1058,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         EventTaskSpec(
             name="artifact_registry_process_scan",
             event_factory=lambda: DoScanArtifactRegistryEvent(),
-            # TODO: Update this.
-            interval=5,
+            interval=3600,  # 1 hour
             initial_delay=0,
         )
     )
