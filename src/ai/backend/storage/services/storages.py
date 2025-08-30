@@ -33,8 +33,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
 
-CHUNK_SIZE = 1024 * 1024
-
 
 def _is_dir_marker(key: str) -> bool:
     # Return True if the given object key represents a "directory marker".
