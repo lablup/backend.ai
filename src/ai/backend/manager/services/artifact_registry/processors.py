@@ -23,6 +23,26 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.update im
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
+    CreateReservoirActionResult,
+    CreateReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
+    DeleteReservoirActionResult,
+    DeleteReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
+    GetReservoirRegistryAction,
+    GetReservoirRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
+    ListReservoirRegistriesAction,
+    ListReservoirRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
+    UpdateReservoirRegistryAction,
+    UpdateReservoirRegistryActionResult,
+)
 
 from .service import ArtifactRegistryService
 
@@ -43,6 +63,21 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_huggingface_registries: ActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
+    create_reservoir_registry: ActionProcessor[
+        CreateReservoirRegistryAction, CreateReservoirActionResult
+    ]
+    update_reservoir_registry: ActionProcessor[
+        UpdateReservoirRegistryAction, UpdateReservoirRegistryActionResult
+    ]
+    delete_reservoir_registry: ActionProcessor[
+        DeleteReservoirRegistryAction, DeleteReservoirActionResult
+    ]
+    get_reservoir_registry: ActionProcessor[
+        GetReservoirRegistryAction, GetReservoirRegistryActionResult
+    ]
+    list_reservoir_registries: ActionProcessor[
+        ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
+    ]
 
     def __init__(
         self, service: ArtifactRegistryService, action_monitors: list[ActionMonitor]
@@ -62,6 +97,21 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_huggingface_registries = ActionProcessor(
             service.list_huggingface_registry, action_monitors
         )
+        self.create_reservoir_registry = ActionProcessor(
+            service.create_reservoir_registry, action_monitors
+        )
+        self.update_reservoir_registry = ActionProcessor(
+            service.update_reservoir_registry, action_monitors
+        )
+        self.delete_reservoir_registry = ActionProcessor(
+            service.delete_reservoir_registry, action_monitors
+        )
+        self.get_reservoir_registry = ActionProcessor(
+            service.get_reservoir_registry, action_monitors
+        )
+        self.list_reservoir_registries = ActionProcessor(
+            service.list_reservoir_registries, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -71,4 +121,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             DeleteHuggingFaceRegistryAction.spec(),
             GetHuggingFaceRegistryAction.spec(),
             ListHuggingFaceRegistryAction.spec(),
+            CreateReservoirRegistryAction.spec(),
+            UpdateReservoirRegistryAction.spec(),
+            DeleteReservoirRegistryAction.spec(),
+            GetReservoirRegistryAction.spec(),
+            ListReservoirRegistriesAction.spec(),
         ]

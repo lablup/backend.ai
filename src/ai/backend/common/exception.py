@@ -132,6 +132,7 @@ class ErrorDomain(enum.StrEnum):
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
     ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact-registry"
     ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
@@ -730,6 +731,19 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/reservoir-not-found"
+    error_title = "Reservoir Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

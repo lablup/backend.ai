@@ -1,0 +1,217 @@
+import uuid
+from collections.abc import Sequence
+from typing import Optional, Self
+
+import strawberry
+from strawberry import ID, UNSET, Info
+from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
+from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
+from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
+    CreateReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
+    DeleteReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
+    GetReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
+    ListReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
+    UpdateReservoirRegistryAction,
+)
+
+from ...types import OptionalState
+from .types import StrawberryGQLContext
+
+
+@strawberry.type(description="Added in 25.13.0")
+class ReservoirRegistry(Node):
+    id: NodeID[str]
+    name: str
+    endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
+
+    @classmethod
+    def from_dataclass(cls, data: ReservoirRegistryData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            name=data.name,
+            endpoint=data.endpoint,
+            access_key=data.access_key,
+            secret_key=data.secret_key,
+            api_version=data.api_version,
+        )
+
+    @classmethod
+    async def load_by_id(
+        cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[uuid.UUID]
+    ) -> list["ReservoirRegistry"]:
+        reservoirs = []
+        for reservoir_id in reservoir_ids:
+            action_result = (
+                await ctx.processors.artifact_registry.get_reservoir_registry.wait_for_complete(
+                    GetReservoirRegistryAction(reservoir_id=reservoir_id)
+                )
+            )
+            reservoirs.append(ReservoirRegistry.from_dataclass(action_result.result))
+        return reservoirs
+
+
+ReservoirRegistryEdge = Edge[ReservoirRegistry]
+
+
+@strawberry.type(description="Added in 25.13.0")
+class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
+    @strawberry.field
+    def count(self) -> int:
+        return len(self.edges)
+
+
+@strawberry.field(description="Added in 25.13.0")
+async def reservoir_registry(
+    id: ID, info: Info[StrawberryGQLContext]
+) -> Optional[ReservoirRegistry]:
+    processors = info.context.processors
+    action_result = await processors.artifact_registry.get_reservoir_registry.wait_for_complete(
+        GetReservoirRegistryAction(reservoir_id=uuid.UUID(id))
+    )
+    return ReservoirRegistry.from_dataclass(action_result.result)
+
+
+@strawberry.field(description="Added in 25.13.0")
+async def reservoir_registries(
+    info: Info[StrawberryGQLContext],
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> ReservoirRegistryConnection:
+    # TODO: Support pagination with before, after, first, last
+    # TODO: Does we need to support filtering, ordering here?
+    processors = info.context.processors
+
+    action_result = await processors.artifact_registry.list_reservoir_registries.wait_for_complete(
+        ListReservoirRegistriesAction()
+    )
+
+    nodes = [ReservoirRegistry.from_dataclass(data) for data in action_result.data]
+    edges = [ReservoirRegistryEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
+
+    return ReservoirRegistryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+
+@strawberry.input(description="Added in 25.13.0")
+class CreateReservoirRegistryInput:
+    name: str
+    endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
+
+    def to_creator(self) -> ReservoirRegistryCreator:
+        return ReservoirRegistryCreator(
+            name=self.name,
+            endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
+        )
+
+
+@strawberry.input(description="Added in 25.13.0")
+class UpdateReservoirRegistryInput:
+    id: ID
+    name: Optional[str] = UNSET
+    endpoint: Optional[str] = UNSET
+    access_key: Optional[str] = UNSET
+    secret_key: Optional[str] = UNSET
+    api_version: Optional[str] = UNSET
+
+    def to_modifier(self) -> ReservoirRegistryModifier:
+        return ReservoirRegistryModifier(
+            name=OptionalState[str].from_graphql(self.name),
+            endpoint=OptionalState[str].from_graphql(self.endpoint),
+            access_key=OptionalState[str].from_graphql(self.access_key),
+            secret_key=OptionalState[str].from_graphql(self.secret_key),
+            api_version=OptionalState[str].from_graphql(self.api_version),
+        )
+
+
+@strawberry.input(description="Added in 25.13.0")
+class DeleteReservoirRegistryInput:
+    id: ID
+
+
+@strawberry.type(description="Added in 25.13.0")
+class CreateReservoirRegistryPayload:
+    reservoir: ReservoirRegistry
+
+
+@strawberry.type(description="Added in 25.13.0")
+class UpdateReservoirRegistryPayload:
+    reservoir: ReservoirRegistry
+
+
+@strawberry.type(description="Added in 25.13.0")
+class DeleteReservoirRegistryPayload:
+    id: ID
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def create_reservoir_registry(
+    input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> CreateReservoirRegistryPayload:
+    processors = info.context.processors
+
+    action_result = await processors.artifact_registry.create_reservoir_registry.wait_for_complete(
+        CreateReservoirRegistryAction(input.to_creator())
+    )
+
+    return CreateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+    )
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def update_reservoir_registry(
+    input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> UpdateReservoirRegistryPayload:
+    processors = info.context.processors
+
+    action_result = await processors.artifact_registry.update_reservoir_registry.wait_for_complete(
+        UpdateReservoirRegistryAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
+    )
+
+    return UpdateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+    )
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def delete_reservoir_registry(
+    input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
+) -> DeleteReservoirRegistryPayload:
+    processors = info.context.processors
+
+    await processors.artifact_registry.delete_reservoir_registry.wait_for_complete(
+        DeleteReservoirRegistryAction(reservoir_id=uuid.UUID(input.id))
+    )
+
+    return DeleteReservoirRegistryPayload(id=input.id)

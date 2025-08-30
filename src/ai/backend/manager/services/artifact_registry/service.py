@@ -2,6 +2,7 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
+from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -22,15 +23,41 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.update im
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
+    CreateReservoirActionResult,
+    CreateReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
+    DeleteReservoirActionResult,
+    DeleteReservoirRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
+    GetReservoirRegistryAction,
+    GetReservoirRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
+    ListReservoirRegistriesAction,
+    ListReservoirRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
+    UpdateReservoirRegistryAction,
+    UpdateReservoirRegistryActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class ArtifactRegistryService:
     _huggingface_registry_repository: HuggingFaceRepository
+    _reservoir_repository: ReservoirRegistryRepository
 
-    def __init__(self, huggingface_registry_repository: HuggingFaceRepository) -> None:
+    def __init__(
+        self,
+        huggingface_registry_repository: HuggingFaceRepository,
+        reservoir_repository: ReservoirRegistryRepository,
+    ) -> None:
         self._huggingface_registry_repository = huggingface_registry_repository
+        self._reservoir_repository = reservoir_repository
 
     async def create_huggingface_registry(
         self, action: CreateHuggingFaceRegistryAction
@@ -85,3 +112,55 @@ class ArtifactRegistryService:
         log.info("Listing huggingface registries")
         registry_data_list = await self._huggingface_registry_repository.list_registries()
         return ListHuggingFaceRegistryActionResult(data=registry_data_list)
+
+    async def create_reservoir_registry(
+        self, action: CreateReservoirRegistryAction
+    ) -> CreateReservoirActionResult:
+        """
+        Create a new reservoir.
+        """
+        log.info("Creating reservoir with data: {}", action.creator.fields_to_store())
+        reservoir_data = await self._reservoir_repository.create(action.creator)
+        return CreateReservoirActionResult(result=reservoir_data)
+
+    async def update_reservoir_registry(
+        self, action: UpdateReservoirRegistryAction
+    ) -> UpdateReservoirRegistryActionResult:
+        """
+        Update an existing reservoir.
+        """
+        log.info("Updating reservoir with data: {}", action.modifier.fields_to_update())
+        reservoir_data = await self._reservoir_repository.update(action.id, action.modifier)
+        return UpdateReservoirRegistryActionResult(result=reservoir_data)
+
+    async def delete_reservoir_registry(
+        self, action: DeleteReservoirRegistryAction
+    ) -> DeleteReservoirActionResult:
+        """
+        Delete an existing reservoir.
+        """
+        log.info("Deleting reservoir with id: {}", action.reservoir_id)
+        reservoir_data = await self._reservoir_repository.delete(action.reservoir_id)
+        return DeleteReservoirActionResult(deleted_reservoir_id=reservoir_data)
+
+    async def get_reservoir_registry(
+        self, action: GetReservoirRegistryAction
+    ) -> GetReservoirRegistryActionResult:
+        """
+        Get an existing reservoir by ID.
+        """
+        log.info("Getting reservoir with id: {}", action.reservoir_id)
+        reservoir_data = await self._reservoir_repository.get_reservoir_registry_data_by_id(
+            action.reservoir_id
+        )
+        return GetReservoirRegistryActionResult(result=reservoir_data)
+
+    async def list_reservoir_registries(
+        self, action: ListReservoirRegistriesAction
+    ) -> ListReservoirRegistriesActionResult:
+        """
+        List all reservoirs.
+        """
+        log.info("Listing reservoirs")
+        reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
+        return ListReservoirRegistriesActionResult(data=reservoir_data_list)
