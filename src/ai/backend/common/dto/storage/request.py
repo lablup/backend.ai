@@ -59,10 +59,7 @@ class PullObjectReq(BaseRequestModel):
     Data model for file pull requests from object storage.
     """
 
-    url: str = Field(description="The URL of the file to pull.")
-    key: str = Field(
-        description="The object key (path) within the bucket to store the pulled file."
-    )
+    pass
 
 
 class PresignedUploadObjectReq(BaseRequestModel):

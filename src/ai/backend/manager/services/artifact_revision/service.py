@@ -1,15 +1,11 @@
-from pydantic import TypeAdapter
-
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.dto.manager.response import GetPresignedDownloadURLResponse
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceImportModelsReq,
     PullObjectReq,
 )
 from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
-from ai.backend.manager.client.manager_client import ManagerFacingClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType, ArtifactStatus
@@ -179,24 +175,15 @@ class ArtifactRevisionService:
                     )
                 )
 
-                remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
-                client_resp = await remote_reservoir_client.request(
-                    "GET",
-                    "/object-storages/presigned/download",
-                    json={
-                        "artifact_revision_id": str(registry_data.id),
-                        "key": ".",
-                    },
-                )
-
-                RespTypeAdapter = TypeAdapter(GetPresignedDownloadURLResponse)
-                parsed = RespTypeAdapter.validate_python(client_resp)
-                presigned_url = parsed.presigned_url
-
-                await storage_proxy_client.pull_s3_file(
+                result = await storage_proxy_client.pull_s3_file(
                     storage_data.name,
                     storage_namespace.bucket,
-                    PullObjectReq(url=presigned_url, key="."),
+                    PullObjectReq(),
+                )
+            case _:
+                # TODO: Add exception
+                raise NotImplementedError(
+                    f"Unsupported artifact registry type: {artifact.registry_type}"
                 )
 
         await self.associate_with_storage(

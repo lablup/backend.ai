@@ -665,7 +665,48 @@ class HuggingfaceConfig(BaseModel):
     )
 
 
-RegistrySpecificConfig = Union[HuggingfaceConfig]
+class ReservoirConfig(BaseModel):
+    registry_type: Literal["reservoir"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    endpoint: str = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for the reservoir registry API.
+        """,
+        examples=["https://huggingface.co"],
+    )
+    object_storage_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir registry API.
+        """,
+        validation_alias=AliasChoices("object-storage-access-key", "object_storage_access_key"),
+        serialization_alias="object-storage-access-key",
+    )
+    object_storage_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir registry API.
+        """,
+        validation_alias=AliasChoices("object-storage-secret-key", "object_storage_secret_key"),
+        serialization_alias="object-storage-secret-key",
+    )
+    object_storage_region: Optional[str] = Field(
+        default=None,
+        description="""
+        Region for the object storage service.
+        """,
+        validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
+        serialization_alias="object-storage-region",
+    )
+
+
+RegistrySpecificConfig = Union[HuggingfaceConfig, ReservoirConfig]
 
 
 class ArtifactRegistryConfig(BaseModel):
@@ -674,7 +715,7 @@ class ArtifactRegistryConfig(BaseModel):
         Name of the artifact registry configuration.
         Used to identify this registry in the system.
         """,
-        examples=["huggingface"],
+        examples=["huggingface", "reservoir"],
     )
     config: RegistrySpecificConfig = Field(
         discriminator="registry_type",
