@@ -6,6 +6,10 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.data.artifact_registries.types import (
+    ArtifactRegistryCreatorMeta,
+    ArtifactRegistryModifierMeta,
+)
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -122,7 +126,10 @@ class CreateHuggingFaceRegistryInput:
     token: Optional[str] = None
 
     def to_creator(self) -> HuggingFaceRegistryCreator:
-        return HuggingFaceRegistryCreator(url=self.url, name=self.name, token=self.token)
+        return HuggingFaceRegistryCreator(url=self.url, token=self.token)
+
+    def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
+        return ArtifactRegistryCreatorMeta(name=self.name)
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -134,9 +141,13 @@ class UpdateHuggingFaceRegistryInput:
 
     def to_modifier(self) -> HuggingFaceRegistryModifier:
         return HuggingFaceRegistryModifier(
-            name=OptionalState[str].from_graphql(self.name),
             url=OptionalState[str].from_graphql(self.url),
             token=OptionalState[str].from_graphql(self.token),
+        )
+
+    def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
+        return ArtifactRegistryModifierMeta(
+            name=OptionalState[str].from_graphql(self.name),
         )
 
 
@@ -168,7 +179,10 @@ async def create_huggingface_registry(
 
     action_result = (
         await processors.artifact_registry.create_huggingface_registry.wait_for_complete(
-            CreateHuggingFaceRegistryAction(input.to_creator())
+            CreateHuggingFaceRegistryAction(
+                input.to_creator(),
+                input.to_creator_meta(),
+            )
         )
     )
 
@@ -185,7 +199,9 @@ async def update_huggingface_registry(
 
     action_result = (
         await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
-            UpdateHuggingFaceRegistryAction(id=uuid.UUID(input.id), modifier=input.to_modifier())
+            UpdateHuggingFaceRegistryAction(
+                id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
+            )
         )
     )
 

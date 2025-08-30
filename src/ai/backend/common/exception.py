@@ -736,9 +736,9 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/reservoir-not-found"
-    error_title = "Reservoir Not Found"
+class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-registry-not-found"
+    error_title = "Artifact Registry Not Found"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -746,4 +746,30 @@ class ReservoirNotFoundError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidArtifactRegistryTypeError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-artifact-registry-type"
+    error_title = "Invalid Artifact Registry Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/relation-not-loaded"
+    error_title = "Relation Not Loaded"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

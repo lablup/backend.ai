@@ -1,15 +1,22 @@
 import uuid
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import ReservoirNotFoundError
+from ai.backend.common.exception import ArtifactRegistryNotFoundError
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.data.artifact_registries.types import (
+    ArtifactRegistryCreatorMeta,
+    ArtifactRegistryModifierMeta,
+)
 from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -29,54 +36,87 @@ class ReservoirRegistryRepository:
     ) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.id == reservoir_id)
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id == reservoir_id)
+                .options(selectinload(ReservoirRegistryRow.meta))
             )
             row: ReservoirRegistryRow = result.scalar_one_or_none()
             if row is None:
-                raise ReservoirNotFoundError(f"Reservoir with ID {reservoir_id} not found")
+                raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
-    async def get_reservoir_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ReservoirRegistryRow).where(ReservoirRegistryRow.name == name)
-            )
-            row: ReservoirRegistryRow = result.scalar_one_or_none()
-            if row is None:
-                raise ReservoirNotFoundError(f"Reservoir with name {name} not found")
-            return row.to_dataclass()
-
-    @repository_decorator()
-    async def create(self, creator: ReservoirRegistryCreator) -> ReservoirRegistryData:
+    async def create(
+        self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
+    ) -> ReservoirRegistryData:
         """
         Create a new Reservoir entry.
         """
-        async with self._db.begin_session() as db_session:
-            reservoir_data = creator.fields_to_store()
-            reservoir_row = ReservoirRegistryRow(**reservoir_data)
-            db_session.add(reservoir_row)
-            await db_session.flush()
-            await db_session.refresh(reservoir_row)
-            return reservoir_row.to_dataclass()
+        async with self._db.begin_session() as db:
+            reservoir_insert = (
+                sa.insert(ReservoirRegistryRow)
+                .values(**creator.fields_to_store())
+                .returning(ReservoirRegistryRow.id)
+            )
+            reservoir_id = (await db.execute(reservoir_insert)).scalar_one()
+
+            reg_insert = sa.insert(ArtifactRegistryRow).values(
+                name=meta.name,
+                registry_id=reservoir_id,
+                type=ArtifactRegistryType.RESERVOIR,
+            )
+            await db.execute(reg_insert)
+
+            stmt = (
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id == reservoir_id)
+                .options(selectinload(ReservoirRegistryRow.meta))
+            )
+
+            row: ReservoirRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {reservoir_id} not found")
+
+            return row.to_dataclass()
 
     @repository_decorator()
     async def update(
-        self, reservoir_id: uuid.UUID, modifier: ReservoirRegistryModifier
+        self,
+        reservoir_id: uuid.UUID,
+        modifier: ReservoirRegistryModifier,
+        meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
         """
         Update an existing Reservoir entry in the database.
         """
         async with self._db.begin_session() as db_session:
             data = modifier.fields_to_update()
+
             update_stmt = (
                 sa.update(ReservoirRegistryRow)
                 .where(ReservoirRegistryRow.id == reservoir_id)
                 .values(**data)
-                .returning(*sa.select(ReservoirRegistryRow).selected_columns)
+                .returning(ReservoirRegistryRow.id)
             )
-            stmt = sa.select(ReservoirRegistryRow).from_statement(update_stmt)
-            row: ReservoirRegistryRow = (await db_session.execute(stmt)).scalars().one()
+            result = await db_session.execute(update_stmt)
+            inserted_row_id = result.scalar()
+
+            if (name := meta.name.optional_value()) is not None:
+                await db_session.execute(
+                    sa.update(ArtifactRegistryRow)
+                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
+                    .values(name=name)
+                )
+
+            # Reselect for the `selectinload`
+            row = (
+                await db_session.execute(
+                    sa.select(ReservoirRegistryRow)
+                    .where(ReservoirRegistryRow.id == inserted_row_id)
+                    .options(selectinload(ReservoirRegistryRow.meta))
+                )
+            ).scalar_one()
+
             return row.to_dataclass()
 
     @repository_decorator()
@@ -92,6 +132,11 @@ class ReservoirRegistryRepository:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+
+            delete_meta_query = sa.delete(ArtifactRegistryRow).where(
+                ArtifactRegistryRow.registry_id == reservoir_id
+            )
+            await db_session.execute(delete_meta_query)
             return deleted_id
 
     @repository_decorator()
@@ -100,7 +145,7 @@ class ReservoirRegistryRepository:
         List all Reservoir entries from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ReservoirRegistryRow)
+            query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
             result = await db_session.execute(query)
             rows: list[ReservoirRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]

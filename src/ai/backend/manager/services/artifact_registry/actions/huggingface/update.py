@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
@@ -12,6 +13,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 class UpdateHuggingFaceRegistryAction(ArtifactRegistryAction):
     id: uuid.UUID
     modifier: HuggingFaceRegistryModifier
+    meta: ArtifactRegistryModifierMeta
 
     @override
     def entity_id(self) -> Optional[str]:
