@@ -75,7 +75,10 @@ class GPFSQuotaModel(BaseQuotaModel):
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
-        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id.pathname)
+        quotas = await self.api_client.list_fileset_quotas(
+            self.fs,
+            self._get_fileset_name(quota_scope_id),
+        )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
             return QuotaUsage(-1, -1)
