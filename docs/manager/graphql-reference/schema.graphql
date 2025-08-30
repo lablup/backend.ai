@@ -630,7 +630,7 @@ type ImageNode implements Node @key(fields: "id") {
   type: ImageType
 }
 
-type KVPair {
+type KVPair @shareable {
   key: String
   value: String
 }
@@ -641,7 +641,7 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
 
-type ResourceLimit {
+type ResourceLimit @shareable {
   key: String
   min: String
   max: String
