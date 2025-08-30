@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.13.0",
+    "version": "25.13.1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -4674,7 +4674,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "//gql/graphene": {
+    "//gql": {
       "post": {
         "operationId": "root.handle_gql_graphene",
         "tags": [
