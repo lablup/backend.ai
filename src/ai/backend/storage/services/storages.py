@@ -4,7 +4,6 @@ import mimetypes
 from typing import AsyncIterable, AsyncIterator, Optional
 
 import aioboto3
-import aiohttp
 
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
@@ -15,7 +14,8 @@ from ai.backend.common.dto.storage.response import (
     UploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.config.unified import ObjectStorageConfig
+from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
+from ai.backend.storage.types import BucketCopyOptions
 
 from ..client.s3 import S3Client
 from ..exception import (
@@ -37,14 +37,10 @@ CHUNK_SIZE = 1024 * 1024
 
 
 def _is_dir_marker(key: str) -> bool:
-    # 일부 도구가 "prefix/" 형태의 빈 오브젝트(디렉터리 마커)를 만들기도 함
+    # Return True if the given object key represents a "directory marker".
+    # In S3/MinIO, folders do not really exist; some tools create zero-byte
+    # objects whose keys end with "/" to simulate directories.
     return key.endswith("/")
-
-
-def _norm_prefix(prefix: Optional[str]) -> str:
-    if not prefix:
-        return ""
-    return prefix if prefix.endswith("/") else f"{prefix}/"
 
 
 class StorageService:
@@ -123,167 +119,140 @@ class StorageService:
             log.error(f"Stream download failed: {e}")
             raise FileStreamDownloadError("Download failed") from e
 
-    async def stream_bucket_to_bucket(
+    async def _list_all_keys_and_sizes(
         self,
         *,
-        # ---- Source (MinIO/S3) connection params ----
-        src_endpoint_url: str,
-        src_access_key: str,
-        src_secret_key: str,
-        src_region: Optional[str],
-        src_bucket_name: str,
-        src_prefix: Optional[str] = None,  # 소스 프리픽스 (없으면 전체)
-        # ---- Destination (existing wrapper) ----
-        dst_storage_name: str,
-        dst_bucket_name: str,
-        dst_prefix: Optional[str] = None,  # 대상에 붙일 접두사
-        # ---- Options ----
-        concurrency: int = 16,
-        part_size: Optional[int] = None,  # dst 멀티파트 사이즈(없으면 스토리지 설정)
-        override_content_type: Optional[str] = None,
-        read_chunk_size: int = CHUNK_SIZE,
+        endpoint_url: str,
+        access_key: Optional[str],
+        secret_key: Optional[str],
+        region: Optional[str],
+        bucket: str,
+    ) -> tuple[list[str], dict[str, int], int]:
+        """List all non-marker object keys in the bucket and return (keys, size_map, total_bytes)."""
+        session = aioboto3.Session()
+        keys: list[str] = []
+        size_map: dict[str, int] = {}
+        total = 0
+
+        log.trace("[list] start bucket={} endpoint={}", bucket, endpoint_url)
+        async with session.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            region_name=region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        ) as s3:
+            paginator = s3.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=bucket):
+                for obj in page.get("Contents", []) or []:
+                    key = obj["Key"]
+                    if _is_dir_marker(key):
+                        continue
+                    size = int(obj.get("Size", 0))
+                    keys.append(key)
+                    size_map[key] = size
+                    total += size
+
+        log.trace("[list] done keys={} total_bytes={}", len(keys), total)
+        return keys, size_map, total
+
+    async def stream_bucket_to_bucket(
+        self,
+        src: ReservoirConfig,
+        storage_name: str,
+        bucket_name: str,
+        options: BucketCopyOptions,
     ) -> int:
         """
-        소스 MinIO/S3(프리픽스 선택 가능) → 대상 버킷으로 스트리밍 복사.
+        Stream-copy ALL objects from the source bucket (no prefix) to the destination bucket.
 
-        Args:
-            src_endpoint_url: 소스 S3/MinIO 엔드포인트 (예: "http://127.0.0.1:9000")
-            src_access_key: 소스 액세스 키
-            src_secret_key: 소스 시크릿 키
-            src_region: 소스 리전 (None 가능; MinIO는 보통 None/빈 문자열 가능)
-            src_bucket_name: 소스 버킷 이름
-            src_prefix: 복사할 프리픽스 (없으면 버킷 전체)
-            dst_storage_name: 대상 스토리지 이름(내부 래퍼 조회용)
-            dst_bucket_name: 대상 버킷 이름
-            dst_prefix: 대상 접두사(없으면 소스 상대 경로 그대로)
-            concurrency: 동시에 복사할 개수
-            part_size: 대상 업로드 멀티파트 파트 크기
-            override_content_type: 콘텐츠 타입 강제 설정
-            read_chunk_size: 소스에서 읽을 스트림 청크 크기
-
-        Returns:
-            복사된 오브젝트(파일) 개수
+        - Source S3/MinIO endpoint is taken from `src.endpoint` (assumed S3-compatible).
+        - Credentials/region come from `src.object_storage_access_key`, `src.object_storage_secret_key`, `src.object_storage_region`.
+        - Destination is looked up via your wrapper: `_get_s3_client(storage_name, bucket_name)`.
+        - Returns the number of copied objects.
         """
-        # 대상 업로드 클라이언트/설정
-        dst = self._get_s3_client(dst_storage_name, dst_bucket_name)
-        if part_size is None:
-            part_size = self._storage_configs[dst_storage_name].upload_chunk_size
+        # Destination upload client & part size
+        dst_client = self._get_s3_client(storage_name, bucket_name)
+        part_size = options.part_size or self._storage_configs[storage_name].upload_chunk_size
 
-        src_norm = _norm_prefix(src_prefix)
-        dst_norm = _norm_prefix(dst_prefix)
+        # List all objects up front
+        keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
+            endpoint_url=src.endpoint,
+            access_key=src.object_storage_access_key,
+            secret_key=src.object_storage_secret_key,
+            region=src.object_storage_region,
+            bucket=bucket_name,
+        )
+
+        if not keys:
+            log.trace("[copy] no objects to copy; nothing to do")
+            return 0
+
+        log.trace(
+            "[copy] start src_endpoint={} src_bucket={} dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
+            src.endpoint,
+            bucket_name,
+            storage_name,
+            bucket_name,
+            len(keys),
+            total_bytes,
+            options.concurrency,
+        )
 
         copied = 0
-        sem = asyncio.Semaphore(concurrency)
+        sem = asyncio.Semaphore(options.concurrency)
 
         session = aioboto3.Session()
         async with session.client(
             "s3",
-            endpoint_url=src_endpoint_url,
-            region_name=src_region,
-            aws_access_key_id=src_access_key,
-            aws_secret_access_key=src_secret_key,
+            endpoint_url=src.endpoint,
+            region_name=src.object_storage_region,
+            aws_access_key_id=src.object_storage_access_key,
+            aws_secret_access_key=src.object_storage_secret_key,
         ) as src_s3:
-            keys: list[str] = []
-            paginator = src_s3.get_paginator("list_objects_v2")
-            paginate_kwargs = {"Bucket": src_bucket_name}
-            if src_norm:
-                paginate_kwargs["Prefix"] = src_norm
 
-            async for page in paginator.paginate(**paginate_kwargs):
-                for obj in page.get("Contents", []) or []:
-                    key = obj["Key"]
-                    if not _is_dir_marker(key):
-                        keys.append(key)
-
-            # 2) 개별 복사 태스크
             async def _copy_one(key: str) -> None:
                 async with sem:
-                    resp = await src_s3.get_object(Bucket=src_bucket_name, Key=key)
+                    size = size_map.get(key, -1)
+                    log.trace("[copy] begin key={} size={}", key, size)
+
+                    resp = await src_s3.get_object(Bucket=bucket_name, Key=key)
                     body = resp["Body"]
 
-                    # 대상 키: dst_prefix + (src_prefix 이후 상대경로)
-                    rel = key[len(src_norm) :] if src_norm and key.startswith(src_norm) else key
-                    dst_key = f"{dst_norm}{rel}" if dst_norm else rel
-
                     ctype = (
-                        override_content_type
+                        options.override_content_type
                         or resp.get("ContentType")
                         or mimetypes.guess_type(key)[0]
                         or "application/octet-stream"
                     )
 
                     async def _gen() -> AsyncIterator[bytes]:
+                        sent = 0
+                        next_mark = options.progress_log_interval_bytes or 0
                         while True:
-                            chunk = await body.read(read_chunk_size)
+                            chunk = await body.read(options.read_chunk_size)
                             if not chunk:
                                 break
+                            sent += len(chunk)
+                            if next_mark and sent >= next_mark:
+                                log.trace("[copy] progress key={} sent={}/{}", key, sent, size)
+                                next_mark += options.progress_log_interval_bytes
                             yield chunk
 
-                    await dst.upload_stream(
+                    await dst_client.upload_stream(
                         _gen(),
-                        dst_key,
+                        key,  # same key at destination (no dst_prefix per your spec)
                         content_type=ctype,
                         part_size=part_size,
                     )
 
-            if keys:
-                await asyncio.gather(*(_copy_one(k) for k in keys))
+                    log.trace("[copy] done key={} bytes={}", key, size)
+
+            await asyncio.gather(*(_copy_one(k) for k in keys))
             copied = len(keys)
 
+        log.trace("[copy] all done objects={} total_bytes={}", copied, total_bytes)
         return copied
-
-    async def stream_from_url(
-        self,
-        storage_name: str,
-        bucket_name: str,
-        filepath: str,
-        url: str,
-        content_type: Optional[str] = None,
-    ) -> UploadObjectResponse:
-        """
-        Download a file from URL and upload it to S3 using streaming.
-
-        Args:
-            storage_name: Name of the storage configuration
-            bucket_name: Name of the S3 bucket
-            filepath: Path where to store the file in the bucket
-            url: URL to download the file from
-            content_type: Content type of the file
-
-        Returns:
-            UploadObjectResponse
-        """
-        try:
-            s3_client = self._get_s3_client(storage_name, bucket_name)
-            part_size = self._storage_configs[storage_name].upload_chunk_size
-
-            async def url_stream() -> AsyncIterator[bytes]:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        response.raise_for_status()
-
-                        # Auto-detect content type if not provided
-                        detected_content_type = content_type
-                        if not detected_content_type:
-                            detected_content_type = response.headers.get(
-                                "content-type", "application/octet-stream"
-                            )
-
-                        async for chunk in response.content.iter_chunked(part_size):
-                            yield chunk
-
-            await s3_client.upload_stream(
-                url_stream(),
-                filepath,
-                content_type=content_type,
-                part_size=part_size,
-            )
-
-            return UploadObjectResponse()
-
-        except Exception as e:
-            log.error(f"Stream from URL failed: {e}")
-            raise FileStreamUploadError("URL streaming failed") from e
 
     # TODO: Replace `request` with proper options
     async def generate_presigned_upload_url(

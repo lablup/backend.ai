@@ -34,6 +34,7 @@ from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
     ReservoirConfig,
 )
+from ai.backend.storage.types import BucketCopyOptions
 
 from ...services.storages import StorageService
 from ...utils import log_client_api_entry
@@ -168,19 +169,10 @@ class StorageAPIHandler:
             storage_service = StorageService(self._storage_configs)
 
             await storage_service.stream_bucket_to_bucket(
-                src_endpoint_url=reservoir_config.endpoint,
-                src_access_key=reservoir_config.object_storage_access_key,
-                src_secret_key=reservoir_config.object_storage_secret_key,
-                src_region=reservoir_config.object_storage_region,
-                src_bucket_name=bucket_name,
-                src_prefix=None,
-                dst_storage_name=storage_name,
-                dst_bucket_name=bucket_name,
-                dst_prefix=None,
-                concurrency=16,
-                part_size=None,
-                override_content_type=None,
-                read_chunk_size=10024 * 1024,
+                src=reservoir_config,
+                storage_name=storage_name,
+                bucket_name=bucket_name,
+                options=BucketCopyOptions(),
             )
 
         task_id = await self._background_task_manager.start(_pull_task)

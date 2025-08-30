@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Any, Final, Mapping, Optional
@@ -105,3 +106,12 @@ class DirEntry:
     type: DirEntryType
     stat: Stat
     symlink_target: str
+
+
+@dataclass
+class BucketCopyOptions:
+    concurrency: int = 16
+    part_size: Optional[int] = None
+    override_content_type: Optional[str] = None
+    read_chunk_size: int = 1024 * 1024
+    progress_log_interval_bytes: int = 0
