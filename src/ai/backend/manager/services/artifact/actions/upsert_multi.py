@@ -1,19 +1,14 @@
-import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class ScanArtifactsAction(ArtifactAction):
-    registry_id: uuid.UUID
-    limit: int
-    order: ModelSortKey
-    search: Optional[str]
+class UpsertArtifactsAction(ArtifactAction):
+    data: list[ArtifactDataWithRevisions]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -22,11 +17,11 @@ class ScanArtifactsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "scan"
+        return "upsert_multi"
 
 
 @dataclass
-class ScanArtifactsActionResult(BaseActionResult):
+class UpsertArtifactsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
 
     @override

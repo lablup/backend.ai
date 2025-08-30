@@ -36,7 +36,7 @@ class ArtifactData:
     id: uuid.UUID
     name: str
     type: ArtifactType
-    description: str
+    description: Optional[str]
     registry_id: uuid.UUID
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
@@ -56,7 +56,6 @@ class ArtifactRevisionData:
     updated_at: Optional[datetime]
 
 
-# TODO: Should we keep this for REST API?
 @dataclass
 class ArtifactDataWithRevisions:
     artifact: ArtifactData

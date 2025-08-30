@@ -54,6 +54,14 @@ class DownloadObjectReq(BaseRequestModel):
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
 
 
+class PullObjectReq(BaseRequestModel):
+    """
+    Data model for file pull requests from object storage.
+    """
+
+    pass
+
+
 class PresignedUploadObjectReq(BaseRequestModel):
     """
     Data model for generating presigned upload URLs for object storage operations.

@@ -2,19 +2,12 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class ScanArtifactsAction(ArtifactAction):
-    registry_id: uuid.UUID
-    limit: int
-    order: ModelSortKey
-    search: Optional[str]
-
+class GetInstalledStorageNamespacesAction(ArtifactAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -22,12 +15,12 @@ class ScanArtifactsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "scan"
+        return "get_installed_storages"
 
 
 @dataclass
-class ScanArtifactsActionResult(BaseActionResult):
-    result: list[ArtifactDataWithRevisions]
+class GetInstalledStorageNamspacesActionResult(BaseActionResult):
+    result: dict[uuid.UUID, uuid.UUID]
 
     @override
     def entity_id(self) -> Optional[str]:

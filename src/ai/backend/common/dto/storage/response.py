@@ -57,6 +57,10 @@ class DownloadObjectResponse(BaseResponseModel):
     pass
 
 
+class PullObjectResponse(BaseResponseModel):
+    task_id: uuid.UUID
+
+
 class ObjectMetaResponse(BaseResponseModel):
     content_length: Optional[int]
     content_type: Optional[str]

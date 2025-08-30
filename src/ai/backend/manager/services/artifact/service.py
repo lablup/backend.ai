@@ -1,13 +1,25 @@
+from pydantic import TypeAdapter
+
 from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
+from ai.backend.manager.client.manager_client import ManagerFacingClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
+from ai.backend.manager.dto.response import ArtifactRegistriesSearchResponse
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
+)
+from ai.backend.manager.services.artifact.actions.get_installed_storages import (
+    GetInstalledStorageNamespacesAction,
+    GetInstalledStorageNamspacesActionResult,
 )
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
@@ -17,6 +29,10 @@ from ai.backend.manager.services.artifact.actions.list import (
     ListArtifactsAction,
     ListArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.list_with_revisions import (
+    ListArtifactsWithRevisionsAction,
+    ListArtifactsWithRevisionsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
@@ -25,50 +41,114 @@ from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
     UpdateArtifactActionResult,
 )
+from ai.backend.manager.services.artifact.actions.upsert_multi import (
+    UpsertArtifactsAction,
+    UpsertArtifactsActionResult,
+)
 
 
 class ArtifactService:
     _artifact_repository: ArtifactRepository
+    _artifact_registry_repository: ArtifactRegistryRepository
     _object_storage_repository: ObjectStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
+    _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
+        artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
+        reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
+        self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
+        self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
+        self._config_provider = config_provider
 
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
-        storage = await self._object_storage_repository.get_by_namespace_id(
-            action.storage_namespace_id
-        )
-        registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-            action.registry_id
-        )
+        reservoir_config = self._config_provider.config.reservoir
+        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+
         # TODO: Abstract remote registry client layer (scan, import)
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
-
-        scan_result = await storage_proxy_client.scan_huggingface_models(
-            HuggingFaceScanModelsReq(
-                registry_name=registry_data.name,
-                limit=action.limit,
-                order=action.order,
-                search=action.search,
-            )
+        registry_id = action.registry_id
+        registry_type = await self._artifact_registry_repository.get_artifact_registry_type(
+            registry_id
         )
+        scanned_models = []
 
-        # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
-        scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
-            scan_result.models,
-            registry_id=registry_data.id,
-        )
+        match registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
+                    action.registry_id
+                )
+                # TODO: Abstract remote registry client layer (scan, import)
+                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+
+                scan_result = await storage_proxy_client.scan_huggingface_models(
+                    HuggingFaceScanModelsReq(
+                        registry_name=registry_data.name,
+                        limit=action.limit,
+                        order=action.order,
+                        search=action.search,
+                    )
+                )
+
+                # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
+                scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
+                    scan_result.models,
+                    registry_id=registry_data.id,
+                )
+            case ArtifactRegistryType.RESERVOIR:
+                registry_data = (
+                    await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                        action.registry_id
+                    )
+                )
+                remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
+
+                offset = 0
+                limit = 10
+                all_artifacts: list[ArtifactDataWithRevisions] = []
+
+                while True:
+                    payload = {
+                        "pagination": {
+                            "offset": {"offset": offset, "limit": limit},
+                        },
+                    }
+                    client_resp = await remote_reservoir_client.request(
+                        "POST", "/artifact-registries/search", json=payload
+                    )
+                    RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
+                    parsed = RespTypeAdapter.validate_python(client_resp)
+
+                    if not parsed.artifacts:
+                        break
+
+                    all_artifacts.extend(parsed.artifacts)
+
+                    if len(parsed.artifacts) < limit:
+                        break
+
+                    offset += limit
+
+                if all_artifacts:
+                    for artifact_data in all_artifacts:
+                        artifact_data.artifact.registry_id = registry_id
+                        artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
+
+                    upsert_result = await self.upsert(UpsertArtifactsAction(data=all_artifacts))
+                    scanned_models = upsert_result.result
 
         return ScanArtifactsActionResult(result=scanned_models)
 
@@ -84,6 +164,19 @@ class ArtifactService:
         )
         return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
 
+    async def list_with_revisions(
+        self, action: ListArtifactsWithRevisionsAction
+    ) -> ListArtifactsWithRevisionsActionResult:
+        (
+            artifacts_data,
+            total_count,
+        ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
+            pagination=action.pagination,
+            ordering=action.ordering,
+            filters=action.filters,
+        )
+        return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
+
     async def get_revisions(
         self, action: GetArtifactRevisionsAction
     ) -> GetArtifactRevisionsActionResult:
@@ -95,3 +188,33 @@ class ArtifactService:
             action.artifact_id, action.modifier
         )
         return UpdateArtifactActionResult(result=updated_artifact)
+
+    async def upsert(self, action: UpsertArtifactsAction) -> UpsertArtifactsActionResult:
+        result_data: list[ArtifactDataWithRevisions] = []
+
+        for artifact_with_revisions in action.data:
+            # Upsert artifact first
+            upserted_artifacts = await self._artifact_repository.upsert_artifacts([
+                artifact_with_revisions.artifact
+            ])
+            upserted_artifact = upserted_artifacts[0]
+
+            # Upsert revisions for this artifact
+            upserted_revisions = await self._artifact_repository.upsert_artifact_revisions(
+                artifact_with_revisions.revisions
+            )
+
+            # Combine into ArtifactDataWithRevisions
+            result_data.append(
+                ArtifactDataWithRevisions(artifact=upserted_artifact, revisions=upserted_revisions)
+            )
+
+        return UpsertArtifactsActionResult(result=result_data)
+
+    async def get_installed_storage_namespaces(
+        self, action: GetInstalledStorageNamespacesAction
+    ) -> GetInstalledStorageNamspacesActionResult:
+        installed_storages = (
+            await self._artifact_repository.get_installed_storages_for_artifact_revisions()
+        )
+        return GetInstalledStorageNamspacesActionResult(result=installed_storages)

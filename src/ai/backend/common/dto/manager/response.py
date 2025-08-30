@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Optional
 
 from graphql import GraphQLFormattedError
@@ -80,6 +81,46 @@ class ObjectStorageListResponse(BaseResponseModel):
 
 class DeleteObjectStorageResponse(BaseResponseModel):
     pass
+
+
+# Object Storage Presigned URL Response Models
+class GetPresignedDownloadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned download URL")
+
+
+class GetPresignedUploadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned upload URL")
+    fields: str = Field(description="JSON string containing the form fields")
+
+
+# Object Storage Bucket Response Models
+class RegisterObjectStorageBucketResponse(BaseResponseModel):
+    id: uuid.UUID = Field(description="The ID of the registered bucket")
+
+
+class ObjectStorageBucketsResponse(BaseResponseModel):
+    buckets: list[str] = Field(description="List of bucket names for a specific storage")
+
+
+class ObjectStorageAllBucketsResponse(BaseResponseModel):
+    buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
+        description="Mapping of storage IDs to bucket lists"
+    )
+
+
+# Artifact Installed Storages Response Models
+class ArtifactInstalledStoragesResponse(BaseResponseModel):
+    installed_storages: dict[uuid.UUID, uuid.UUID] = Field(
+        description="Mapping of artifact revision IDs to storage IDs"
+    )
+
+
+class UnregisterObjectStorageBucketResponse(BaseResponseModel):
+    id: uuid.UUID = Field(description="The ID of the unregistered bucket")
+
+
+class ObjectStorageBucketListResponse(BaseResponseModel):
+    buckets: list[str] = Field(default_factory=list, description="List of bucket names")
 
 
 # Association Artifact-Storage API Response Models

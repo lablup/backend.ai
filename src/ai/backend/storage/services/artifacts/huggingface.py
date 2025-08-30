@@ -636,7 +636,7 @@ class HuggingFaceService:
             )
 
             log.info(
-                f"Successfully uploaded file to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
+                f"Successfully uploaded file to {storage_name}: model_id={model_id}, revision={revision}, file_path={file_info.path}, "
                 f"storage_key={storage_key}"
             )
 

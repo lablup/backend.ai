@@ -36,7 +36,6 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
-from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
@@ -57,7 +56,7 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import PaginationOptions, TriState
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -158,7 +157,6 @@ class ArtifactRevisionOrderBy:
 @strawberry.input(description="Added in 25.13.0")
 class ScanArtifactsInput:
     registry_id: ID
-    storage_namespace_id: ID
     limit: int
     search: Optional[str] = None
 
@@ -166,7 +164,6 @@ class ScanArtifactsInput:
 @strawberry.input(description="Added in 25.13.0")
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
-    storage_namespace_id: ID
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -181,14 +178,8 @@ class CancelArtifactInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactRevisionTarget:
-    artifact_revision_id: ID
-    storage_namespace_id: ID
-
-
-@strawberry.input(description="Added in 25.13.0")
 class DeleteArtifactRevisionsInput:
-    targets: list[DeleteArtifactRevisionTarget]
+    artifact_revision_ids: list[ID]
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -614,7 +605,7 @@ async def resolve_artifact_revisions(
     )
 
     # Get artifact revisions using list action
-    action_result = await info.context.processors.artifact_revision.list_.wait_for_complete(
+    action_result = await info.context.processors.artifact_revision.list_revision.wait_for_complete(
         ListArtifactRevisionsAction(
             pagination=pagination_options,
             ordering=repo_ordering,
@@ -721,7 +712,6 @@ async def scan_artifacts(
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             registry_id=uuid.UUID(input.registry_id),
-            storage_namespace_id=uuid.UUID(input.storage_namespace_id),
             limit=input.limit,
             # TODO: Move this huggingface_registries config if needed
             order=ModelSortKey.DOWNLOADS,
@@ -750,10 +740,11 @@ async def import_artifacts(
     imported_artifacts = []
     task_ids = []
     for revision_id in input.artifact_revision_ids:
-        action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
-            ImportArtifactRevisionAction(
-                artifact_revision_id=uuid.UUID(revision_id),
-                storage_namespace_id=uuid.UUID(input.storage_namespace_id),
+        action_result = (
+            await info.context.processors.artifact_revision.import_revision.wait_for_complete(
+                ImportArtifactRevisionAction(
+                    artifact_revision_id=uuid.UUID(revision_id),
+                )
             )
         )
         imported_artifacts.append(ArtifactRevision.from_dataclass(action_result.result))
@@ -809,11 +800,10 @@ async def delete_artifact_revisions(
     input: DeleteArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactRevisionsPayload:
     artifact_revision_ids = []
-    for target in input.targets:
+    for artifact_revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
             DeleteArtifactRevisionAction(
-                artifact_revision_id=uuid.UUID(target.artifact_revision_id),
-                storage_namespace_id=uuid.UUID(target.storage_namespace_id),
+                artifact_revision_id=uuid.UUID(artifact_revision_id),
             )
         )
         artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))

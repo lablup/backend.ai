@@ -40,3 +40,10 @@ class ArtifactRegistryRepository:
             )
             typ = result.scalar()
             return ArtifactRegistryType(typ)
+
+    @repository_decorator()
+    async def list_artifact_registry_data(self) -> list[ArtifactRegistryData]:
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(sa.select(ArtifactRegistryRow))
+            rows: list[ArtifactRegistryRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]

@@ -34,6 +34,7 @@ class AuthToken:
     content = attrs.field(default=None)  # type: str
 
 
+# TODO: Can we remove this?
 def generate_signature(
     *,
     method: str,

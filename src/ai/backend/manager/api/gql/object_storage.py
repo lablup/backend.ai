@@ -8,10 +8,10 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.data.object_storage_meta.creator import ObjectStorageNamespaceCreator
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
+from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetObjectStorageBucketsAction,
+    GetBucketsAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -86,7 +86,7 @@ class ObjectStorage(Node):
     ) -> ObjectStorageNamespaceConnection:
         # TODO: Support pagination
         action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
-            GetObjectStorageBucketsAction(uuid.UUID(self.id))
+            GetBucketsAction(uuid.UUID(self.id))
         )
 
         nodes = [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
@@ -213,14 +213,12 @@ class DeleteObjectStorageInput:
 @strawberry.input(description="Added in 25.13.0")
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
-    storage_namespace_id: ID
     key: str
 
 
 @strawberry.input(description="Added in 25.13.0")
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID
-    storage_namespace_id: ID
     key: str
     content_type: Optional[str] = None
     expiration: Optional[int] = None
@@ -313,7 +311,6 @@ async def get_presigned_download_url(
     action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
         GetDownloadPresignedURLAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            storage_namespace_id=uuid.UUID(input.storage_namespace_id),
             key=input.key,
         )
     )
@@ -330,7 +327,6 @@ async def get_presigned_upload_url(
     action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
         GetUploadPresignedURLAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            storage_namespace_id=uuid.UUID(input.storage_namespace_id),
             key=input.key,
             content_type=input.content_type,
             expiration=input.expiration,

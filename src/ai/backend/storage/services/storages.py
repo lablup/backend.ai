@@ -1,5 +1,9 @@
+import asyncio
 import logging
+import mimetypes
 from typing import AsyncIterable, AsyncIterator, Optional
+
+import aioboto3
 
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
@@ -10,7 +14,8 @@ from ai.backend.common.dto.storage.response import (
     UploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.config.unified import ObjectStorageConfig
+from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
+from ai.backend.storage.types import BucketCopyOptions
 
 from ..client.s3 import S3Client
 from ..exception import (
@@ -27,6 +32,13 @@ from ..exception import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
+
+
+def _is_dir_marker(key: str) -> bool:
+    # Return True if the given object key represents a "directory marker".
+    # In S3/MinIO, folders do not really exist; some tools create zero-byte
+    # objects whose keys end with "/" to simulate directories.
+    return key.endswith("/")
 
 
 class StorageService:
@@ -104,6 +116,141 @@ class StorageService:
         except Exception as e:
             log.error(f"Stream download failed: {e}")
             raise FileStreamDownloadError("Download failed") from e
+
+    async def _list_all_keys_and_sizes(
+        self,
+        *,
+        endpoint_url: str,
+        access_key: Optional[str],
+        secret_key: Optional[str],
+        region: Optional[str],
+        bucket: str,
+    ) -> tuple[list[str], dict[str, int], int]:
+        """List all non-marker object keys in the bucket and return (keys, size_map, total_bytes)."""
+        session = aioboto3.Session()
+        keys: list[str] = []
+        size_map: dict[str, int] = {}
+        total = 0
+
+        log.trace("[list] start bucket={} endpoint={}", bucket, endpoint_url)
+        async with session.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            region_name=region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        ) as s3:
+            paginator = s3.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=bucket):
+                for obj in page.get("Contents", []) or []:
+                    key = obj["Key"]
+                    if _is_dir_marker(key):
+                        continue
+                    size = int(obj.get("Size", 0))
+                    keys.append(key)
+                    size_map[key] = size
+                    total += size
+
+        log.trace("[list] done keys={} total_bytes={}", len(keys), total)
+        return keys, size_map, total
+
+    async def stream_bucket_to_bucket(
+        self,
+        src: ReservoirConfig,
+        storage_name: str,
+        bucket_name: str,
+        options: BucketCopyOptions,
+    ) -> int:
+        """
+        Stream-copy ALL objects from the source bucket (no prefix) to the destination bucket.
+
+        - Source S3/MinIO endpoint is taken from `src.endpoint` (assumed S3-compatible).
+        - Credentials/region come from `src.object_storage_access_key`, `src.object_storage_secret_key`, `src.object_storage_region`.
+        - Destination is looked up via your wrapper: `_get_s3_client(storage_name, bucket_name)`.
+        - Returns the number of copied objects.
+        """
+        # Destination upload client & part size
+        dst_client = self._get_s3_client(storage_name, bucket_name)
+        part_size = options.part_size or self._storage_configs[storage_name].upload_chunk_size
+
+        # List all objects up front
+        keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
+            endpoint_url=src.endpoint,
+            access_key=src.object_storage_access_key,
+            secret_key=src.object_storage_secret_key,
+            region=src.object_storage_region,
+            bucket=bucket_name,
+        )
+
+        if not keys:
+            log.trace("[copy] no objects to copy; nothing to do")
+            return 0
+
+        log.trace(
+            "[copy] start src_endpoint={} src_bucket={} dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
+            src.endpoint,
+            bucket_name,
+            storage_name,
+            bucket_name,
+            len(keys),
+            total_bytes,
+            options.concurrency,
+        )
+
+        copied = 0
+        sem = asyncio.Semaphore(options.concurrency)
+
+        session = aioboto3.Session()
+        async with session.client(
+            "s3",
+            endpoint_url=src.endpoint,
+            region_name=src.object_storage_region,
+            aws_access_key_id=src.object_storage_access_key,
+            aws_secret_access_key=src.object_storage_secret_key,
+        ) as src_s3:
+
+            async def _copy_one(key: str) -> None:
+                async with sem:
+                    size = size_map.get(key, -1)
+                    log.trace("[copy] begin key={} size={}", key, size)
+
+                    resp = await src_s3.get_object(Bucket=bucket_name, Key=key)
+                    body = resp["Body"]
+
+                    ctype = (
+                        options.override_content_type
+                        or resp.get("ContentType")
+                        or mimetypes.guess_type(key)[0]
+                        or "application/octet-stream"
+                    )
+
+                    async def _gen() -> AsyncIterator[bytes]:
+                        sent = 0
+                        next_mark = options.progress_log_interval_bytes or 0
+                        while True:
+                            chunk = await body.read(options.read_chunk_size)
+                            if not chunk:
+                                break
+                            sent += len(chunk)
+                            if next_mark and sent >= next_mark:
+                                log.trace("[copy] progress key={} sent={}/{}", key, sent, size)
+                                next_mark += options.progress_log_interval_bytes
+                            yield chunk
+
+                    await dst_client.upload_stream(
+                        _gen(),
+                        key,  # same key at destination (no dst_prefix per your spec)
+                        content_type=ctype,
+                        part_size=part_size,
+                    )
+
+                    log.trace("[copy] done key={} bytes={}", key, size)
+
+            await asyncio.gather(*(_copy_one(k) for k in keys))
+            copied = len(keys)
+
+        log.trace("[copy] all done objects={} total_bytes={}", copied, total_bytes)
+        return copied
 
     # TODO: Replace `request` with proper options
     async def generate_presigned_upload_url(
@@ -235,6 +382,29 @@ class StorageService:
         except Exception as e:
             log.error(f"Delete object failed: {e}")
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
+
+    async def delete_folder(
+        self, storage_name: str, bucket_name: str, prefix: str
+    ) -> DeleteObjectResponse:
+        """
+        Delete folder and all its contents.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path of the file to delete
+
+        Returns:
+            DeleteResponse with success status
+        """
+        try:
+            s3_client = self._get_s3_client(storage_name, bucket_name)
+            await s3_client.delete_folder(prefix)
+            return DeleteObjectResponse()
+
+        except Exception as e:
+            log.error(f"Delete folder failed: {e}")
+            raise StorageBucketNotFoundError(f"Delete folder failed: {str(e)}") from e
 
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
         storage_config = self._storage_configs.get(storage_name)

@@ -70,6 +70,7 @@ class ArtifactRevisionRow(Base):
         "ArtifactRow",
         back_populates="revision_rows",
         primaryjoin=_get_artifact_join_cond,
+        viewonly=True,
     )
 
     association_artifacts_storages_rows = relationship(

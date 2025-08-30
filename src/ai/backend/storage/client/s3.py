@@ -1,6 +1,6 @@
 import logging
 from collections.abc import AsyncIterable
-from typing import AsyncIterator, Optional
+from typing import Any, AsyncIterator, Iterable, Optional
 
 import aioboto3
 
@@ -325,3 +325,79 @@ class S3Client:
                 Bucket=self.bucket_name,
                 Key=s3_key,
             )
+
+    async def delete_folder(
+        self,
+        prefix: str,
+        *,
+        delete_all_versions: bool = False,
+        batch_size: int = 1000,
+    ) -> int:
+        """
+        Delete all objects under a given prefix ("folder").
+        If delete_all_versions=True, also deletes all versions & delete markers (versioned buckets).
+
+        Returns:
+            Total number of object entries deleted (for versioned buckets, counts each version/marker).
+        """
+        # Normalize prefix to behave like a folder path
+        norm_prefix = prefix if prefix.endswith("/") else f"{prefix}/"
+        total_deleted = 0
+
+        def _chunks(seq: list[Any], size: int) -> Iterable[list[Any]]:
+            for i in range(0, len(seq), size):
+                return_chunk = seq[i : i + size]
+                if return_chunk:
+                    yield return_chunk
+
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3:
+            if delete_all_versions:
+                # Remove all versions and delete markers under the prefix
+                paginator = s3.get_paginator("list_object_versions")
+                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=norm_prefix):
+                    to_delete: list[dict[str, str]] = []
+                    for v in page.get("Versions", []):
+                        to_delete.append({"Key": v["Key"], "VersionId": v["VersionId"]})
+                    for m in page.get("DeleteMarkers", []):
+                        to_delete.append({"Key": m["Key"], "VersionId": m["VersionId"]})
+
+                    for chunk in _chunks(to_delete, batch_size):
+                        resp = await s3.delete_objects(
+                            Bucket=self.bucket_name,
+                            Delete={"Objects": chunk, "Quiet": True},
+                        )
+                        total_deleted += len(resp.get("Deleted", []))
+                # Also try to delete an explicit "directory marker" object version if it exists
+                # (covered by the paginator above since it matches the same prefix).
+                return total_deleted
+
+            # Non-versioned (or just current versions): list & batch-delete
+            paginator = s3.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=norm_prefix):
+                contents = page.get("Contents", [])
+                if not contents:
+                    continue
+                keys = [{"Key": obj["Key"]} for obj in contents]
+                for chunk in _chunks(keys, batch_size):
+                    resp = await s3.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete={"Objects": chunk, "Quiet": True},
+                    )
+                    total_deleted += len(resp.get("Deleted", []))
+
+            # In case there's a standalone "directory marker" object like "prefix/"
+            # (It may already have been removed above; this call is idempotent.)
+            try:
+                await s3.delete_object(Bucket=self.bucket_name, Key=norm_prefix)
+                total_deleted += 1
+            except Exception:
+                # Ignore if it doesn't exist or bucket is not versioned / marker absent
+                pass
+
+        return total_deleted
