@@ -32,7 +32,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
-from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
@@ -78,7 +78,6 @@ from ..session import (
     SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     SessionTypes,
     by_domain_name,
     by_raw_filter,
@@ -232,6 +231,8 @@ class ComputeSessionNode(graphene.ObjectType):
     starts_at = GQLDateTime()
     scheduled_at = GQLDateTime()
 
+    queue_position = graphene.Int(description="Added in 25.13.0.")
+
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
@@ -294,6 +295,21 @@ class ComputeSessionNode(graphene.ObjectType):
         for option in options:
             stmt = option(stmt)
         return stmt
+
+    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> Optional[int]:
+        if self.status != SessionStatus.PENDING:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, self._batch_load_queue_position
+        )
+        return await loader.load(self.row_id)
+
+    async def _batch_load_queue_position(
+        self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
+    ) -> list[Optional[int]]:
+        positions = await ctx.valkey_schedule.get_queue_positions(session_ids)
+        return positions
 
     @classmethod
     def from_row(

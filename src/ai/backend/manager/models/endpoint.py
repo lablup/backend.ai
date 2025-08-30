@@ -44,6 +44,26 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.scale import (
+    AutoScalingAction,
+    AutoScalingCondition,
+    AutoScalingRule,
+    AutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    DeploymentState,
+    ExecutionSpec,
+    ModelRevisionSpec,
+    MountMetadata,
+    ReplicaSpec,
+    ResourceSpec,
+)
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.session.types import SessionStatus
 
 from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ..data.model_serving.creator import EndpointCreator
@@ -72,7 +92,6 @@ from .base import (
 from .image import ImageRow
 from .routing import RouteStatus
 from .scaling_group import scaling_groups
-from .session import SessionStatus
 from .user import UserRow
 from .vfolder import prepare_vfolder_mounts
 
@@ -87,6 +106,7 @@ __all__ = (
     "EndpointStatistics",
     "EndpointTokenRow",
     "EndpointAutoScalingRuleRow",
+    "EndpointLifecycle",
 )
 
 
@@ -106,6 +126,14 @@ class EndpointRow(Base):
             ),
             name="ck_image_required_unless_destroyed",
         ),
+        sa.Index(
+            "ix_endpoints_unique_name_when_not_destroyed",
+            "name",
+            "domain",
+            "project",
+            unique=True,
+            postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
+        ),
     )
 
     id = EndpointIDColumn()
@@ -114,6 +142,9 @@ class EndpointRow(Base):
     session_owner = sa.Column("session_owner", GUID, nullable=False)
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
+    desired_replicas = sa.Column(
+        "desired_replicas", sa.Integer, nullable=True, default=None, server_default=sa.null()
+    )
     image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
@@ -150,7 +181,7 @@ class EndpointRow(Base):
         "lifecycle_stage",
         EnumValueType(EndpointLifecycle),
         nullable=False,
-        default=EndpointLifecycle.CREATED,
+        default=EndpointLifecycle.PENDING,
     )
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
@@ -586,6 +617,128 @@ class EndpointRow(Base):
             open_to_public=creator.open_to_public,
         )
 
+    @classmethod
+    async def from_deployment_creator(
+        cls,
+        db_session: AsyncSession,
+        creator: DeploymentCreator,
+    ) -> Self:
+        """
+        Create an EndpointRow instance from a DeploymentCreator instance.
+
+        Args:
+            db_session: Database session for resolving image information
+            creator: DeploymentCreator containing deployment configuration
+
+        Returns:
+            EndpointRow instance with image ID resolved from ImageIdentifier
+
+        Raises:
+            InvalidAPIParameters: If image is not specified in creator
+            ImageNotFound: If image cannot be resolved
+        """
+        # Image is required
+        if not creator.model_revision.image_identifier:
+            raise InvalidAPIParameters("Image must be specified in DeploymentCreator")
+
+        # Resolve image ID from ImageIdentifier
+        image_row = await ImageRow.lookup(
+            db_session,
+            creator.model_revision.image_identifier,
+        )
+
+        return cls(
+            name=creator.metadata.name,
+            created_user=creator.metadata.created_user,
+            session_owner=creator.metadata.session_owner,
+            replicas=creator.replica_spec.replica_count,
+            image=image_row.id,
+            model=creator.model_revision.mounts.model_vfolder_id,
+            model_mount_destination=creator.model_revision.mounts.model_mount_destination,
+            model_definition_path=creator.model_revision.mounts.model_definition_path,
+            domain=creator.metadata.domain,
+            project=creator.metadata.project,
+            resource_group=creator.metadata.resource_group,
+            tag=creator.metadata.tag,
+            startup_command=creator.model_revision.execution.startup_command,
+            bootstrap_script=creator.model_revision.execution.bootstrap_script,
+            callback_url=creator.model_revision.execution.callback_url,
+            environ=creator.model_revision.execution.environ,
+            open_to_public=creator.network.open_to_public,
+            runtime_variant=creator.model_revision.execution.runtime_variant,
+            resource_slots=creator.model_revision.resource_spec.resource_slots,
+            url=creator.network.url,
+            resource_opts=creator.model_revision.resource_spec.resource_opts,
+            cluster_mode=creator.model_revision.resource_spec.cluster_mode,
+            cluster_size=creator.model_revision.resource_spec.cluster_size,
+            extra_mounts=creator.model_revision.mounts.extra_mounts,
+            # Fields not in creator - use defaults
+            lifecycle_stage=EndpointLifecycle.PENDING,
+            retries=0,
+        )
+
+    def to_deployment_info(self) -> DeploymentInfo:
+        """
+        Convert EndpointRow to DeploymentInfo dataclass.
+
+        If image_row is loaded (via selectinload), ImageIdentifier will be populated.
+        Otherwise, ImageIdentifier will be None.
+        """
+        # Create ImageIdentifier only if image_row is loaded
+        image_identifier = ImageIdentifier(
+            canonical=self.image_row.name,
+            architecture=self.image_row.architecture,
+        )
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                created_at=self.created_at,
+                tag=self.tag,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retries,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+                desired_replica_count=self.desired_replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            model_revisions=[
+                ModelRevisionSpec(
+                    image_identifier=image_identifier,
+                    resource_spec=ResourceSpec(
+                        cluster_mode=self.cluster_mode,
+                        cluster_size=self.cluster_size,
+                        resource_slots=self.resource_slots,
+                        resource_opts=self.resource_opts,
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=self.model,
+                        model_definition_path=self.model_definition_path,
+                        model_mount_destination=self.model_mount_destination,
+                        extra_mounts=self.extra_mounts,
+                    ),
+                    execution=ExecutionSpec(
+                        startup_command=self.startup_command,
+                        bootstrap_script=self.bootstrap_script,
+                        environ=self.environ,
+                        runtime_variant=self.runtime_variant,
+                        callback_url=self.callback_url,
+                    ),
+                ),
+            ],
+        )
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
@@ -793,6 +946,40 @@ class EndpointAutoScalingRuleRow(Base):
             created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
             endpoint=self.endpoint,
+        )
+
+    @classmethod
+    def from_creator(cls, endpoint_id: UUID, creator: AutoScalingRuleCreator) -> Self:
+        return cls(
+            id=uuid4(),
+            endpoint=endpoint_id,
+            metric_source=creator.condition.metric_source,
+            metric_name=creator.condition.metric_name,
+            threshold=creator.condition.threshold,
+            comparator=creator.condition.comparator,
+            step_size=creator.action.step_size,
+            cooldown_seconds=creator.action.cooldown_seconds,
+            min_replicas=creator.action.min_replicas,
+            max_replicas=creator.action.max_replicas,
+        )
+
+    def to_autoscaling_rule(self) -> AutoScalingRule:
+        return AutoScalingRule(
+            id=self.id,
+            condition=AutoScalingCondition(
+                metric_source=self.metric_source,
+                metric_name=self.metric_name,
+                threshold=self.threshold,
+                comparator=self.comparator,
+            ),
+            action=AutoScalingAction(
+                step_size=self.step_size,
+                cooldown_seconds=self.cooldown_seconds,
+                min_replicas=self.min_replicas,
+                max_replicas=self.max_replicas,
+            ),
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
         )
 
 

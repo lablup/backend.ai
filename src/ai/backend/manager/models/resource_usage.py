@@ -11,12 +11,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common.utils import nmget
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .group import GroupRow
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine

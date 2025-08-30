@@ -63,7 +63,7 @@ class ValkeyImageClient:
         Close the ValkeyImageClient connection.
         """
         if self._closed:
-            log.warning("ValkeyImageClient is already closed.")
+            log.debug("ValkeyImageClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

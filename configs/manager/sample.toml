@@ -73,12 +73,12 @@
   # Number of worker processes to spawn for the manager.
   # Defaults to the number of CPU cores available.
   # For optimal performance, set this to match your CPU core count.
-  num-proc = 14
+  num-proc = 12
   # Unique identifier for this manager instance.
   # Used to distinguish between multiple manager instances in a cluster.
   # By default, uses the hostname with an 'i-' prefix.
   # Must be unique across all managers in the same Backend.AI cluster.
-  id = "i-localdev"
+  id = "i-gimhyeogjin-ui-MacBookPro.local"
   # User ID (UID) under which the manager process runs.
   # If not specified, defaults to the UID of the server.py file.
   # Important for proper file permissions when creating files/sockets.
@@ -86,7 +86,7 @@
   # Group ID (GID) under which the manager process runs.
   # If not specified, defaults to the GID of the server.py file.
   # Important for proper file permissions when creating files/sockets.
-  ## group = "501"
+  ## group = "20"
   # Network address and port where the manager service will listen.
   # Default is all interfaces (0.0.0.0) on port 8080.
   # For private deployments, consider using 127.0.0.1 instead.
@@ -246,10 +246,10 @@
   version = 1
   # The main log level to filter messages from all loggers.
   level = "INFO"
-  # Array of log drivers to print.
-  drivers = [ "console",]
   # Disable the existing loggers when applying the config.
   disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
   ## file = "{ FileConfig }"
   ## logstash = "{ LogstashConfig }"
   ## graylog = "{ GraylogConfig }"

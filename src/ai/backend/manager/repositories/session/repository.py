@@ -9,7 +9,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
-from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -17,7 +17,7 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
+from ai.backend.manager.models.image import ImageRow, rescan_images
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (

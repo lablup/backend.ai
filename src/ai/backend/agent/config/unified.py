@@ -484,28 +484,28 @@ class AgentConfig(BaseModel):
     allow_compute_plugins: Optional[set[str]] = Field(
         default=None,
         description="Allowed compute plugins",
-        examples=[{"cuda", "rocm"}],
+        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
         validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
         serialization_alias="allow-compute-plugins",
     )
     block_compute_plugins: Optional[set[str]] = Field(
         default=None,
         description="Blocked compute plugins",
-        examples=[{"cpu"}],
+        examples=[{"ai.backend.accelerator.mock"}],
         validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
         serialization_alias="block-compute-plugins",
     )
     allow_network_plugins: Optional[set[str]] = Field(
         default=None,
         description="Allowed network plugins",
-        examples=[{"overlay"}],
+        examples=[{"ai.backend.manager.network.overlay"}],
         validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
         serialization_alias="allow-network-plugins",
     )
     block_network_plugins: Optional[set[str]] = Field(
         default=None,
         description="Blocked network plugins",
-        examples=[{"host"}],
+        examples=[{"ai.backend.manager.network.overlay"}],
         validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
         serialization_alias="block-network-plugins",
     )

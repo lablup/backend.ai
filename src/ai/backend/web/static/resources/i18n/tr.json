@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Bir veya daha fazla oturuma bağlı klasör silinemez. Lütfen önce oturumu sonlandırın.",
       "CannotDeletePipelineFolder": "Boru hattı klasörlerini silemezsiniz.",
       "CannotRestorePipelineFolder": "Boru hattı klasörlerini geri yükleyemezsiniz.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir. \nGeçerli projeyi veya kullanıcı türünü değiştirin.",
       "CloneAFolder": "Klasörü klonla",
       "CloneFolder": "Klasör klonlama",
       "Cloneable": "klonlanabilir",
       "Control": "Kontrol",
+      "CreateModelFolderOnlyInExclusiveProject": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir.",
       "CreatedAt": "Yaratılmış",
       "Delete": "Sil",
       "DeleteAFolder": "Klasörü sil",
@@ -398,6 +400,7 @@
       "Path": "Depolama yolu",
       "Permission": "izin",
       "ProjectFolderAlertDesc": "Bu klasör projenin tüm üyeleriyle paylaşılıyor",
+      "ProjectFolderCreationHelp": "\"{{projectName}}\" proje kullanıcıları tarafından erişilebilen bir klasör oluşturulacaktır.",
       "Rename": "Adını değiştirmek",
       "Restore": "Eski haline getirmek",
       "RestoreDescription": "\"{{ folderName }}\" klasörünü geri yüklemek istiyor musunuz?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
     "TooManyLoginFailures": "Kısa süre içinde çok fazla oturum açma hatası oldu. Giriş bir süreliğine engellendi.",
     "UnauthorizedToken": "Yetkisiz belirteç. Lütfen belirtecinizi kontrol edin.",
+    "UnexpectedError": "Beklenmedik bir hata oluştu. \nSorun devam ederse lütfen daha sonra tekrar deneyin veya destekle iletişime geçin.",
     "UnknownError": "Bilinmeyen bir hata oluştu. Lütfen tekrar deneyin.",
     "UpdateError": "Güncelleme hatası",
     "UserHasNoGroup": "Kullanıcının grubu yok. Düzeltmek için lütfen yöneticiyle iletişime geçin.",
@@ -634,8 +638,10 @@
     "Title": "Bir hata oluştu."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Klasör bulunamadı veya erişim reddedildi",
     "InputTooShort": "GirişÇok Kısa",
     "NoExplorerSupportForUnmanagedFolder": "Yönetilmeyen klasörler Dosya Gezgini'ni desteklemez.",
+    "NoPermissions": "Bu klasöre erişmek için izin yok",
     "ValueRequired": "DeğerGerekli"
   },
   "general": {
@@ -770,6 +776,9 @@
   "kernel": {
     "AgentId": "Ajan kimliği",
     "ContainerId": "Konteyner kimliği",
+    "ContainerLogs": "Konteyner Günlükleri",
+    "Hostname": "Ana bilgisayar adı",
+    "Kernel": "Çekirdek",
     "KernelId": "Çekirdek kimliği",
     "Kernels": "Çekirdek",
     "Role": "Rol",
@@ -911,6 +920,7 @@
     "EndpointName": "Uç Nokta Adı",
     "Error": "Hata",
     "ExpiredDate": "Son Kullanma Tarihi",
+    "ExtraMountsWarning": "Hizmeti düzenlerken, ek monte edilmiş klasörlerin adı (takma ad) korunmayabilir. \nKaydetmeden önce lütfen klasör adlarını çift kontrol edin.",
     "FailedToStartService": "Hizmet oluşturulamadı.",
     "FailedToTerminateService": "Hizmeti sonlandırma isteği başarısız oldu.",
     "FailedToUpdateService": "Hizmet güncellenemedi.",
@@ -1025,10 +1035,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{total}} öğelerinin {{end}}"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Arama",
-    "ResetFilter": "Filtreleri sıfırla"
   },
   "registry": {
     "AddRegistry": "Kayıt Ekle",
@@ -1197,6 +1203,9 @@
     "SharedMemory": "Paylaşılan Bellek",
     "Updated": "Kaynak ön ayarı güncellendi"
   },
+  "scheduler": {
+    "PendingSessions": "Bekleyen seanslar"
+  },
   "session": {
     "Agent": "Temsilci",
     "AgentId": "Ajan kimliği",
@@ -1277,12 +1286,15 @@
     "OpenToPublic": "Uygulamayı herkese açık olarak aç",
     "OpenToPublicDesc": "Bu seçeneğin etkinleştirilmesi, ağ içindeki tüm kullanıcılar için uygulama erişimine izin verir.<br /><br /> \nErişim yönetimi için 'izin verilen IP' alanına belirli IP adreslerini girin.<br /><br /> \nBu alanı boş bırakmak tüm IP adreslerinden erişime izin verecektir.<br /><br /> \nGüvenlik yönetimi için gerektiğinde IP kısıtlamaları ayarlamayı düşünün.",
     "Others": "Diğerleri",
+    "PanelSettings": "Panel Ayarları",
+    "PendingPosition": "Kuyruk konumu",
     "PredicateChecks": "Yumurlamalı Çekler",
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
     "ReadLess": "Daha az oku",
     "ReadMore": "Daha Fazlasını Oku...",
     "RecentlyCreatedSessions": "Son zamanlarda oluşturulan oturumlar",
+    "RecentlyCreatedSessionsTooltip": "Geçerli projede en son oluşturulan {{count}} çalışan oturumu gösterir",
     "RequestContainerCommit": "Konteyner Taahhüdü İste",
     "Reservation": "Rezervasyon",
     "ResourceGroup": "Kaynak Grubu",
@@ -1538,6 +1550,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max Desteği",
     "ATOMPlusSupport": "ATOM+ Desteği",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Aracı tarafı kaydına izin ver",
@@ -1545,6 +1558,7 @@
     "Config": "yapılandırma",
     "ConfigPerJobSchduler": "Zamanlayıcı ayarları",
     "ConfigPerJobSchdulerDescription": "Zamanlayıcı ayarındaki değerler, her kaynak grubunda zamanlayıcı ayarı olmadığında kullanılacak varsayılan değerlerdir. Kaynak grubuna özel bir ayar varsa bu değer yok sayılır.",
+    "DescATOMMaxSupport": "Rebellions ATOM Max Accelerator kullanın.",
     "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın.",
     "DescATOMSupport": "Rebellions ATOM hızlandırıcısını kullanın",
     "DescAllowAgentSideRegistration": "Temsilcinin kendisini yöneticiye kaydetmesine izin verin. Yalnızca Backend.Ai kümesi güvenli konumda yönetilirse kullanın.",
@@ -1588,6 +1602,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU desteği",
     "RegisterNewImagesFromRepo": "Depodan yeni görüntüler kaydet",
+    "RequireATOMMaxPlugin": "Backend.AI ATOM Max Eklentisi gereklidir.",
     "RequireATOMPlugin": "Backend.AI ATOM Eklentisi gerektirir.",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
     "RequireFGPUPlugin": "Backend.AI Sanal CUDA API Katmanı Eklentisi gerektirir.",
@@ -1752,6 +1767,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Etkin",
+    "ATOMMaxEnabled": "Atom Max NPU etkin",
     "ATOMPlusEnabled": "ATOM+ NPU Etkin",
     "Accept": "Kabul etmek",
     "AcceptSharedVFolder": "Artık klasöre erişebilirsiniz:",
@@ -1971,6 +1987,7 @@
       "MyResources": "Kaynaklarım",
       "MyResourcesDescription": "<p> Bu panel, toplam kaynak kullanımınızı ve tüm projelerde ve kaynak gruplarında kaldığınızı gösterir.",
       "MyResourcesIn": "Kaynaklarım",
+      "MyResourcesInResourceGroup": "Kaynak Grubundaki Kaynaklarım",
       "MyResourcesInResourceGroupDescription": "Bu panel, mevcut kaynak kullanımınızı ve seçilen kaynak grubunda mevcut kapasitenizi gösterir.",
       "NewPassword": "Yeni Şifre",
       "NewPasswordAgain": "Yeni Şifre Tekrar)",
@@ -1990,6 +2007,7 @@
       "Remaining": "Geriye kalan",
       "ResourcePolicy": "Kaynak Politikası",
       "Resources": "Kaynaklar",
+      "Scheduler": "Zamanlayıcı",
       "Serving": "Servis",
       "Sessions": "Oturumlar",
       "Settings": "Ayarlar",
@@ -2001,6 +2019,7 @@
       "Tasks": "Görevler",
       "TermsOfService": "Kullanım Şartları",
       "TotalResourcesIn": "Toplam Kaynaklar",
+      "TotalResourcesInResourceGroup": "Kaynak Grubundaki Toplam Kaynaklar",
       "TotalResourcesInResourceGroupDescription": "Bu panel, kullanılan ve kalan toplam kaynakları gösterir. \nDeğerler, seçilen kaynak grubunu kullanan tüm ajanların kullanımını ve kalan miktarlarını ekleyerek hesaplanır.",
       "TotpActivated": "2FA Etkin",
       "Update": "Güncelleme",

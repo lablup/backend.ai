@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Không thể xóa thư mục được gắn trong một hoặc nhiều phiên. Vui lòng kết thúc phiên trước.",
       "CannotDeletePipelineFolder": "Bạn không thể xóa các thư mục đường ống.",
       "CannotRestorePipelineFolder": "Bạn không thể khôi phục các thư mục đường ống.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ. \nThay đổi dự án hiện tại hoặc loại người dùng.",
       "CloneAFolder": "Sao chép một thư mục",
       "CloneFolder": "Sao chép thư mục",
       "Cloneable": "Có thể nhân bản",
       "Control": "Điều khiển",
+      "CreateModelFolderOnlyInExclusiveProject": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ.",
       "CreatedAt": "Được tạo ra tại",
       "Delete": "Xóa bỏ",
       "DeleteAFolder": "Xóa một thư mục",
@@ -398,6 +400,7 @@
       "Path": "Đường dẫn lưu trữ",
       "Permission": "Sự cho phép",
       "ProjectFolderAlertDesc": "Thư mục này được chia sẻ với tất cả các thành viên của dự án",
+      "ProjectFolderCreationHelp": "Một thư mục có thể truy cập bằng \"{{projectName}}\" Người dùng dự án sẽ được tạo.",
       "Rename": "Đổi tên",
       "Restore": "Khôi phục",
       "RestoreDescription": "Bạn có muốn khôi phục thư mục \"{{ folderName }}\" không?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "Yêu cầu tài nguyên của bạn nhỏ hơn mức tối thiểu mà hình ảnh yêu cầu. \nHãy thử nhiều tài nguyên hơn.",
     "TooManyLoginFailures": "Đã có quá nhiều lần đăng nhập thất bại trong một thời gian ngắn. \nĐăng nhập bị chặn trong một thời gian.",
     "UnauthorizedToken": "Mã thông báo trái phép. \nVui lòng kiểm tra mã thông báo của bạn.",
+    "UnexpectedError": "Một lỗi không mong muốn đã xảy ra. \nVui lòng thử lại sau hoặc liên hệ với hỗ trợ nếu vấn đề vẫn còn.",
     "UnknownError": "Một lỗi không xác định xảy ra. \nHãy thử lại.",
     "UpdateError": "Cập nhật lỗi",
     "UserHasNoGroup": "Người dùng không có nhóm. \nHãy liên hệ với quản trị viên để sửa nó.",
@@ -634,8 +638,10 @@
     "Title": "Một lỗi đã xảy ra."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Thư mục không tìm thấy hoặc truy cập bị từ chối",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Các thư mục không được quản lý không hỗ trợ trình thám hiểm tệp.",
+    "NoPermissions": "Không có quyền truy cập thư mục này",
     "ValueRequired": "Giá trị bắt buộc"
   },
   "general": {
@@ -770,6 +776,9 @@
   "kernel": {
     "AgentId": "Id đại lý",
     "ContainerId": "ID container",
+    "ContainerLogs": "Nhật ký container",
+    "Hostname": "Tên máy chủ",
+    "Kernel": "Kernel",
     "KernelId": "Kernel Id",
     "Kernels": "Hạt nhân",
     "Role": "Vai trò",
@@ -911,6 +920,7 @@
     "EndpointName": "Tên điểm cuối",
     "Error": "Lỗi",
     "ExpiredDate": "Ngày hết hạn",
+    "ExtraMountsWarning": "Khi chỉnh sửa dịch vụ, tên (bí danh) của các thư mục được gắn bổ sung có thể không được giữ lại. \nVui lòng kiểm tra lại tên thư mục trước khi lưu.",
     "FailedToStartService": "Không thể tạo dịch vụ.",
     "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công.",
     "FailedToUpdateService": "Không thể cập nhật dịch vụ.",
@@ -1025,10 +1035,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} của {{Total}}"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Tìm kiếm",
-    "ResetFilter": "Đặt lại bộ lọc"
   },
   "registry": {
     "AddRegistry": "Thêm sổ đăng ký",
@@ -1197,6 +1203,9 @@
     "SharedMemory": "Bộ nhớ chia sẻ",
     "Updated": "Đã cập nhật cài đặt trước tài nguyên"
   },
+  "scheduler": {
+    "PendingSessions": "Phiên đang chờ xử lý"
+  },
   "session": {
     "Agent": "Đặc vụ",
     "AgentId": "Id đại lý",
@@ -1277,12 +1286,15 @@
     "OpenToPublic": "Mở ứng dụng công khai",
     "OpenToPublicDesc": "Kích hoạt tùy chọn này cho phép truy cập ứng dụng cho tất cả người dùng trong mạng.<br /><br /> \nĐể quản lý truy cập, hãy nhập các địa chỉ IP cụ thể trong trường 'IP được phép'.<br /><br /> \nĐể lại trường này trống sẽ cho phép truy cập từ tất cả các địa chỉ IP.<br /><br /> \nXem xét thiết lập các hạn chế IP khi cần thiết để quản lý bảo mật.",
     "Others": "Khác",
+    "PanelSettings": "Cài đặt bảng điều khiển",
+    "PendingPosition": "Vị trí hàng đợi",
     "PredicateChecks": "Kiểm tra vị ngữ",
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
     "ReadLess": "Đọc ít hơn",
     "ReadMore": "Đọc thêm...",
     "RecentlyCreatedSessions": "Phiên được tạo gần đây",
+    "RecentlyCreatedSessionsTooltip": "Hiển thị {{count}} phiên đang chạy được tạo gần đây nhất trong dự án hiện tại",
     "RequestContainerCommit": "Yêu cầu cam kết vùng chứa",
     "Reservation": "Dự phòng",
     "ResourceGroup": "Nhóm tài nguyên",
@@ -1538,6 +1550,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Hỗ trợ Atom Max",
     "ATOMPlusSupport": "Hỗ trợ ATOM+",
     "ATOMSupport": "nguyên tử",
     "AllowAgentSideRegistration": "Cho phép đăng ký phía đại lý",
@@ -1545,6 +1558,7 @@
     "Config": "Cấu hình",
     "ConfigPerJobSchduler": "Cài đặt bộ lập lịch",
     "ConfigPerJobSchdulerDescription": "Các giá trị trong cài đặt bộ lập lịch là các giá trị mặc định được sử dụng khi không có cài đặt bộ lập lịch trong mỗi nhóm tài nguyên. Nếu có cài đặt dành riêng cho nhóm tài nguyên, giá trị này sẽ bị bỏ qua.",
+    "DescATOMMaxSupport": "Sử dụng Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions.",
     "DescATOMSupport": "Sử dụng máy gia tốc ATOM của Rebellions",
     "DescAllowAgentSideRegistration": "Cho phép đại lý đăng ký vào người quản lý. Chỉ sử dụng nếu cụm phụ trợ.ai được quản lý trên vị trí an toàn.",
@@ -1588,6 +1602,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Hỗ trợ GPU ROCm",
     "RegisterNewImagesFromRepo": "Đăng ký hình ảnh mới từ kho",
+    "RequireATOMMaxPlugin": "Yêu cầu Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Yêu cầu Plugin Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Yêu cầu Plugin lớp API CUDA ảo Backend.AI.",
@@ -1752,6 +1767,7 @@
   },
   "summary": {
     "ATOMEnabled": "Đã bật NPU ATOM",
+    "ATOMMaxEnabled": "Atom Max NPU được bật",
     "ATOMPlusEnabled": "Đã bật NPU ATOM+",
     "Accept": "Chấp nhận",
     "AcceptSharedVFolder": "Bây giờ bạn có thể truy cập thư mục:",
@@ -1971,6 +1987,7 @@
       "MyResources": "Tài nguyên của tôi",
       "MyResourcesDescription": "<p> Bảng điều khiển này hiển thị tổng số sử dụng tài nguyên của bạn và còn lại trên tất cả các dự án và nhóm tài nguyên.",
       "MyResourcesIn": "Tài nguyên của tôi trong",
+      "MyResourcesInResourceGroup": "Tài nguyên của tôi trong nhóm tài nguyên",
       "MyResourcesInResourceGroupDescription": "Bảng điều khiển này hiển thị việc sử dụng tài nguyên hiện tại của bạn và công suất có sẵn trong nhóm tài nguyên đã chọn.",
       "NewPassword": "Mật khẩu mới",
       "NewPasswordAgain": "Mật khẩu mới (một lần nữa)",
@@ -1990,6 +2007,7 @@
       "Remaining": "Còn lại",
       "ResourcePolicy": "Chính sách tài nguyên",
       "Resources": "Tài nguyên",
+      "Scheduler": "Người lập lịch",
       "Serving": "Phục vụ",
       "Sessions": "Phiên",
       "Settings": "Cài đặt",
@@ -2001,6 +2019,7 @@
       "Tasks": "Nhiệm vụ",
       "TermsOfService": "Điều khoản dịch vụ",
       "TotalResourcesIn": "Tổng tài nguyên trong",
+      "TotalResourcesInResourceGroup": "Tổng tài nguyên trong nhóm tài nguyên",
       "TotalResourcesInResourceGroupDescription": "Bảng điều khiển này cho thấy tổng tài nguyên được sử dụng và còn lại. \nCác giá trị được tính bằng cách thêm sử dụng và số lượng còn lại của tất cả các tác nhân bằng nhóm tài nguyên đã chọn.",
       "TotpActivated": "Đã bật 2FA",
       "Update": "Cập nhật",

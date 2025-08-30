@@ -243,10 +243,12 @@ class TestSchedulerAllocation:
             agent_selector=mock_agent_selector_with_verification,
             allocator=MagicMock(),
             repository=mock_repository,
+            deployment_repository=MagicMock(),
             config_provider=MagicMock(),
             lock_factory=MagicMock(),
             agent_pool=MagicMock(),
             network_plugin_ctx=MagicMock(),
+            valkey_schedule=None,  # type: ignore
         )
         return Scheduler(args)
 

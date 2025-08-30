@@ -122,6 +122,14 @@ from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
+from ai.backend.manager.sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
+)
+from ai.backend.manager.sokovan.deployment.route.route_controller import (
+    RouteController,
+    RouteControllerArgs,
+)
 
 from . import __version__
 from .api.context import RootContext
@@ -770,7 +778,9 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
             root_ctx.scheduling_controller,
-            root_ctx.sokovan_orchestrator.coordinator._scheduler._repository,  # Add scheduler_repository
+            root_ctx.sokovan_orchestrator.deployment_coordinator,
+            root_ctx.sokovan_orchestrator.route_coordinator,
+            root_ctx.repositories.scheduler.repository,
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
@@ -938,26 +948,22 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             network_plugin_ctx=root_ctx.network_plugin_ctx,
         )
     )
-
     # Create deployment controller if Sokovan is enabled
-    if root_ctx.config_provider.config.manager.use_sokovan:
-        from ai.backend.manager.sokovan.deployment import DeploymentController
-        from ai.backend.manager.sokovan.deployment.deployment_controller import (
-            DeploymentControllerArgs,
+    root_ctx.deployment_controller = DeploymentController(
+        DeploymentControllerArgs(
+            scheduling_controller=root_ctx.scheduling_controller,
+            deployment_repository=root_ctx.repositories.deployment.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
         )
-
-        root_ctx.deployment_controller = DeploymentController(
-            DeploymentControllerArgs(
-                scheduling_controller=root_ctx.scheduling_controller,
-                deployment_repository=root_ctx.repositories.deployment.repository,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                event_producer=root_ctx.event_producer,
-            )
+    )
+    root_ctx.route_controller = RouteController(
+        RouteControllerArgs(
+            valkey_schedule=root_ctx.valkey_schedule,
         )
-    else:
-        root_ctx.deployment_controller = None
-
+    )
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
     )
@@ -1072,10 +1078,47 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
     # Create scheduler with default components
     scheduler = create_default_scheduler(
         root_ctx.repositories.scheduler.repository,
+        root_ctx.repositories.deployment.repository,
         root_ctx.config_provider,
         root_ctx.distributed_lock_factory,
         agent_pool,
         root_ctx.network_plugin_ctx,
+        root_ctx.valkey_schedule,
+    )
+
+    # Create HTTP client pool for deployment operations
+    from ai.backend.common.clients.http_client.client_pool import (
+        ClientPool,
+        tcp_client_session_factory,
+    )
+    from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+    from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+
+    client_pool = ClientPool(tcp_client_session_factory)
+
+    # Create deployment coordinator
+    deployment_coordinator = DeploymentCoordinator(
+        valkey_schedule=root_ctx.valkey_schedule,
+        deployment_controller=root_ctx.deployment_controller,
+        deployment_repository=root_ctx.repositories.deployment.repository,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+        config_provider=root_ctx.config_provider,
+        scheduling_controller=root_ctx.scheduling_controller,
+        client_pool=client_pool,
+        valkey_stat=root_ctx.valkey_stat,
+        route_controller=root_ctx.route_controller,
+    )
+
+    # Create route coordinator
+    route_coordinator = RouteCoordinator(
+        valkey_schedule=root_ctx.valkey_schedule,
+        deployment_repository=root_ctx.repositories.deployment.repository,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+        config_provider=root_ctx.config_provider,
+        scheduling_controller=root_ctx.scheduling_controller,
+        client_pool=client_pool,
     )
 
     # Create sokovan orchestrator with lock factory for timers
@@ -1085,6 +1128,8 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,
         scheduling_controller=root_ctx.scheduling_controller,
+        deployment_coordinator=deployment_coordinator,
+        route_coordinator=route_coordinator,
     )
 
     log.info("Sokovan orchestrator initialized")

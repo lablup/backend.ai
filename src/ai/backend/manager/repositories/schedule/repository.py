@@ -32,6 +32,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -46,7 +48,6 @@ from ai.backend.manager.models import (
     GroupRow,
     KernelRow,
     KernelStatistics,
-    KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     RoutingRow,
@@ -54,7 +55,6 @@ from ai.backend.manager.models import (
     ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     UserRow,
     recalc_agent_resource_occupancy,
 )
@@ -2068,6 +2068,7 @@ class ScheduleRepository:
                 (SessionRow.scaling_group_name == scaling_group)
                 & (SessionRow.status == SessionStatus.PENDING)
             )
+            .order_by(SessionRow.created_at.asc())
         )
         result = await db_sess.execute(query)
 
@@ -2590,7 +2591,7 @@ class ScheduleRepository:
 
         from dateutil.tz import tzutc
 
-        from ai.backend.manager.models.session import SessionStatus
+        from ai.backend.manager.data.session.types import SessionStatus
 
         timed_out_sessions: list["SweptSessionInfo"] = []
         now = datetime.now(tzutc())

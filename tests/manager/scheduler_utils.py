@@ -25,10 +25,12 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT, SessionRow, SessionStatus
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT, SessionRow
 
 ARCH_FOR_TEST: Final = "x86_64"
 

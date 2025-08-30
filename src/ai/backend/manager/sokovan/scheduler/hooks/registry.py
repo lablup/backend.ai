@@ -9,7 +9,7 @@ from collections import defaultdict
 from ai.backend.common.types import SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentPool
-from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from .base import NoOpSessionHook, SessionHook
 from .batch import BatchSessionHook
@@ -21,11 +21,11 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class HookRegistry:
-    _repository: SchedulerRepository
+    _repository: DeploymentRepository
     _agent_pool: AgentPool
     _hooks: defaultdict[SessionTypes, SessionHook]
 
-    def __init__(self, repository: SchedulerRepository, agent_pool: AgentPool) -> None:
+    def __init__(self, repository: DeploymentRepository, agent_pool: AgentPool) -> None:
         self._repository = repository
         self._agent_pool = agent_pool
         self._hooks = defaultdict(NoOpSessionHook)

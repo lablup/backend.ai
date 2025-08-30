@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Der in einer oder mehreren Sitzungen bereitgestellte Ordner kann nicht gelöscht werden. Bitte beenden Sie zuerst die Sitzung.",
       "CannotDeletePipelineFolder": "Sie können Pipeline -Ordner nicht löschen.",
       "CannotRestorePipelineFolder": "Sie können Pipeline -Ordner nicht wiederherstellen.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Modellprojektordner können nur in Model Store -Exclusive -Projekten erstellt werden. \nÄndern Sie das aktuelle Projekt- oder Benutzertyp.",
       "CloneAFolder": "Einen Ordner klonen",
       "CloneFolder": "Ordner klonen",
       "Cloneable": "klonbar",
       "Control": "Steuerung",
+      "CreateModelFolderOnlyInExclusiveProject": "Modellprojektordner können nur in Model Store -Exclusive -Projekten erstellt werden.",
       "CreatedAt": "Erstellt at",
       "Delete": "Löschen",
       "DeleteAFolder": "Einen Ordner löschen",
@@ -398,6 +400,7 @@
       "Path": "Speicherpfad",
       "Permission": "Genehmigung",
       "ProjectFolderAlertDesc": "Dieser Ordner wird an alle Mitglieder des Projekts geteilt",
+      "ProjectFolderCreationHelp": "Ein Ordner, der von \"{{projectName}}\" -Projektnutzern zugänglich ist, wird erstellt.",
       "Rename": "Umbenennen",
       "Restore": "Wiederherstellen",
       "RestoreDescription": "Möchten Sie \"{{ folderName }}\" -Fordner wiederherstellen?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "Ihre Ressourcenanforderung ist kleiner als das für das Bild erforderliche Minimum. Versuchen Sie es mit mehr Ressourcen.",
     "TooManyLoginFailures": "Es gab zu viele Login-Fehler in kurzer Zeit. Die Anmeldung ist eine Zeit lang blockiert.",
     "UnauthorizedToken": "Nicht autorisierter Token. Bitte überprüfen Sie Ihr Token.",
+    "UnexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support, falls das Problem weiterhin besteht.",
     "UnknownError": "Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
     "UpdateError": "Aktualisierungsfehler",
     "UserHasNoGroup": "Der Benutzer hat keine Gruppe. Bitte kontaktieren Sie den Administrator, um das Problem zu beheben.",
@@ -634,8 +638,10 @@
     "Title": "Es ist ein Fehler aufgetreten."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Ordner, der nicht gefunden oder zugänglich ist verweigert",
     "InputTooShort": "EingabeTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Nicht verwaltete Ordner unterstützen den Datei -Explorer nicht.",
+    "NoPermissions": "Keine Berechtigungen für den Zugriff auf diesen Ordner",
     "ValueRequired": "WertErforderlich"
   },
   "general": {
@@ -770,6 +776,9 @@
   "kernel": {
     "AgentId": "Agenten -ID",
     "ContainerId": "Container -ID",
+    "ContainerLogs": "Containerprotokolle",
+    "Hostname": "Hostname",
+    "Kernel": "Kernel",
     "KernelId": "Kernel ID",
     "Kernels": "Kerne",
     "Role": "Rolle",
@@ -911,6 +920,7 @@
     "EndpointName": "Endpunkt Name",
     "Error": "Fehler",
     "ExpiredDate": "Abgelaufen Datum",
+    "ExtraMountsWarning": "Bei der Bearbeitung des Dienstes kann der Name (Alias) zusätzlicher montierter Ordner nicht beibehalten werden. \nBitte überprüfen Sie die Ordnernamen vor dem Speichern.",
     "FailedToStartService": "Der Dienst konnte nicht erstellt werden.",
     "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen.",
     "FailedToUpdateService": "Der Dienst konnte nicht aktualisiert werden.",
@@ -1025,10 +1035,6 @@
   },
   "pagination": {
     "Total": "{{Start}} - {{end}} von {{Total}} Elementen"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Suche",
-    "ResetFilter": "Filter zurücksetzen"
   },
   "registry": {
     "AddRegistry": "Registrierung hinzufügen",
@@ -1195,6 +1201,9 @@
     "SharedMemory": "Gemeinsamer Speicher",
     "Updated": "Ressourcenvoreinstellung aktualisiert"
   },
+  "scheduler": {
+    "PendingSessions": "Ausstehende Sitzungen"
+  },
   "session": {
     "Agent": "Agent",
     "AgentId": "Agenten -ID",
@@ -1275,12 +1284,15 @@
     "OpenToPublic": "App für die Öffentlichkeit öffnen",
     "OpenToPublicDesc": "Durch die Aktivierung dieser Option ermöglicht der Anwendungszugriff für alle Benutzer im Netzwerk.<br /><br /> \nGeben Sie für die Zugriffsverwaltung bestimmte IP -Adressen in das Feld \"Zulässige IP\" ein.<br /><br /> \nWenn Sie dieses Feld leer verlassen, können Sie den Zugriff aus allen IP -Adressen ermöglichen.<br /><br /> \nErwägen Sie, IP -Beschränkungen bei Bedarf für das Sicherheitsmanagement festzulegen.",
     "Others": "Andere",
+    "PanelSettings": "Paneleinstellungen",
+    "PendingPosition": "Warteschlangenposition",
     "PredicateChecks": "Prädikatüberprüfungen",
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
     "ReadLess": "Weniger lesen",
     "ReadMore": "Mehr lesen...",
     "RecentlyCreatedSessions": "Kürzlich erstellte Sitzungen",
+    "RecentlyCreatedSessionsTooltip": "Zeigt die {{count}} zuletzt erstellten laufenden Sessions im aktuellen Projekt",
     "RequestContainerCommit": "Container Commit anfordern",
     "Reservation": "Reservierung",
     "ResourceGroup": "Ressourcengruppe",
@@ -1536,6 +1548,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max -Unterstützung",
     "ATOMPlusSupport": "ATOM+ Unterstützung",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Agentseitige Registrierung zulassen",
@@ -1543,6 +1556,7 @@
     "Config": "Konfig",
     "ConfigPerJobSchduler": "Zeitplaneinstellungen",
     "ConfigPerJobSchdulerDescription": "Die Werte in der Scheduler-Einstellung sind die Standardwerte, die verwendet werden, wenn keine Scheduler-Einstellung in jeder Ressourcengruppe vorhanden ist. Wenn eine ressourcengruppenspezifische Einstellung vorhanden ist, wird dieser Wert ignoriert.",
+    "DescATOMMaxSupport": "Verwenden Sie Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Benutzen Sie den ATOM+ Beschleuniger von Rebellions.",
     "DescATOMSupport": "Rebellions ATOM-Beschleuniger verwenden",
     "DescAllowAgentSideRegistration": "Erlauben Sie Agent, sich beim Manager zu registrieren. Verwenden Sie nur, wenn Backend.ai -Cluster am sicheren Ort verwaltet wird.",
@@ -1586,6 +1600,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm-GPU-Unterstützung",
     "RegisterNewImagesFromRepo": "Neue Bilder aus dem Repository registrieren",
+    "RequireATOMMaxPlugin": "Erfordert das Backend.AI ATOM Max Plugin.",
     "RequireATOMPlugin": "Erfordert Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Erfordert das Backend.AI ATOM+ Plugin.",
     "RequireFGPUPlugin": "Erfordert Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1750,6 +1765,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Aktiviert",
+    "ATOMMaxEnabled": "Atom Max NPU aktiviert",
     "ATOMPlusEnabled": "ATOM+ NPU aktiviert",
     "Accept": "Akzeptieren",
     "AcceptSharedVFolder": "Sie können jetzt auf den Ordner zugreifen:",
@@ -1969,6 +1985,7 @@
       "MyResources": "Meine Ressourcen",
       "MyResourcesDescription": "<p> Dieses Panel zeigt Ihre gesamte Ressourcennutzung und verbleibend über alle Projekte und Ressourcengruppen hinweg.",
       "MyResourcesIn": "Meine Ressourcen in",
+      "MyResourcesInResourceGroup": "Meine Ressourcen in der Ressourcengruppe",
       "MyResourcesInResourceGroupDescription": "Dieses Panel zeigt Ihre aktuelle Ressourcenverwendung und verbleibt in der ausgewählten Ressourcengruppe.",
       "NewPassword": "Neues Kennwort",
       "NewPasswordAgain": "Neues Passwort nochmal)",
@@ -1988,6 +2005,7 @@
       "Remaining": "Übrig",
       "ResourcePolicy": "Ressourcenpolitik",
       "Resources": "Ressourcen",
+      "Scheduler": "Scheduler",
       "Serving": "Bedienung von",
       "Sessions": "Sitzungen",
       "Settings": "die Einstellungen",
@@ -1999,6 +2017,7 @@
       "Tasks": "Aufgaben",
       "TermsOfService": "Nutzungsbedingungen",
       "TotalResourcesIn": "Gesamtressourcen in",
+      "TotalResourcesInResourceGroup": "Gesamtressourcen in der Ressourcengruppe",
       "TotalResourcesInResourceGroupDescription": "Dieses Panel zeigt die verwendeten und verbleibenden Ressourcen. \nDie Werte werden berechnet, indem die Verwendung und die verbleibenden Mengen aller Agenten mithilfe der ausgewählten Ressourcengruppe addiert werden.",
       "TotpActivated": "2FA Aktiviert",
       "Update": "Aktualisieren",

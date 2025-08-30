@@ -26,21 +26,6 @@ class DeploymentError(BackendAIError):
         )
 
 
-class EndpointNotFound(DeploymentError):
-    """Raised when an endpoint cannot be found."""
-
-    error_type = "https://api.backend.ai/probs/endpoint-not-found"
-    error_title = "Endpoint not found."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class InvalidEndpointState(DeploymentError):
     """Raised when an endpoint is in an invalid state for the requested operation."""
 
