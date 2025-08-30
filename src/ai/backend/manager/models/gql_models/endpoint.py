@@ -851,7 +851,7 @@ class Endpoint(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[UUID] = None,
         project: Optional[UUID] = None,
-    ) -> Sequence["Endpoint"]:
+    ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
                 session,
@@ -862,7 +862,7 @@ class Endpoint(graphene.ObjectType):
                 load_created_user=True,
                 load_session_owner=True,
             )
-            return [await Endpoint.from_row(ctx, row) for row in rows]
+            return [await cls.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -890,7 +890,7 @@ class Endpoint(graphene.ObjectType):
                     load_created_user=True,
                     load_session_owner=True,
                 )
-                return await Endpoint.from_row(ctx, row)
+                return await cls.from_row(ctx, row)
         except NoResultFound:
             raise EndpointNotFound
 

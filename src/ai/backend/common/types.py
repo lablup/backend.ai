@@ -44,6 +44,7 @@ from typing import (
     override,
 )
 from uuid import UUID
+from warnings import deprecated
 
 import attrs
 import redis.asyncio.sentinel
@@ -1019,6 +1020,17 @@ class ResourceSlot(UserDict):
 
     def has_intrinsic_slots(self) -> bool:
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
+
+class ResourceSlotState(enum.StrEnum):
+    OCCUPIED = "occupied"
+    AVAILABLE = "available"
+
+
+@deprecated("Use `ResourceSlotState` instead.")
+class LegacyResourceSlotState(enum.StrEnum):
+    OCCUPIED = "using"
+    AVAILABLE = "remaining"
 
 
 class JSONSerializableMixin(metaclass=ABCMeta):
