@@ -9,13 +9,13 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
 
-HASH_TYPE = "sha256"
+_HASH_TYPE = "sha256"
 
 
-# TODO: Rename this to `ReservoirClient`?
-class ManagerFacingClient:
+class ReservoirRegistryClient:
     """
-    TODO: Write this.
+    Client used to connect from one manager to another.
+    Used when connecting to a remote reservoir service.
     """
 
     _registry_data: ReservoirRegistryData
@@ -34,7 +34,7 @@ class ManagerFacingClient:
             content_type="application/json",
             access_key=self._registry_data.access_key,
             secret_key=self._registry_data.secret_key,
-            hash_type=HASH_TYPE,
+            hash_type=_HASH_TYPE,
         )
 
         return {

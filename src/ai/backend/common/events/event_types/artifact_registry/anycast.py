@@ -4,8 +4,8 @@ from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
-class DoScanArtifactRegistryEvent(AbstractAnycastEvent):
-    """Event to trigger artifact registry scanning."""
+class DoScanReservoirRegistryEvent(AbstractAnycastEvent):
+    """Event to trigger reservoir registry scanning."""
 
     def __init__(self) -> None:
         pass
@@ -22,7 +22,7 @@ class DoScanArtifactRegistryEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "do_scan_artifact_registry"
+        return "do_scan_reservoir_registry"
 
     @classmethod
     @override

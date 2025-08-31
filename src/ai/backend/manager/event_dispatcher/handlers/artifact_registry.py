@@ -3,7 +3,7 @@ from typing import Callable
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
-    DoScanArtifactRegistryEvent,
+    DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -46,7 +46,7 @@ class ArtifactRegistryEventHandler:
         self._storage_manager = storage_manager
 
     async def handle_artifact_registry_scan(
-        self, context: None, source: AgentId, event: DoScanArtifactRegistryEvent
+        self, context: None, source: AgentId, event: DoScanReservoirRegistryEvent
     ) -> None:
         processors = self._processors_factory()
         registries = await self._artifact_registry_repository.list_artifact_registry_data()

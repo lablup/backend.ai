@@ -3,7 +3,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import ArtifactRegistryNotFoundError
+from ai.backend.common.exception import ArtifactNotFoundError, ArtifactRegistryNotFoundError
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import (
@@ -62,7 +62,7 @@ class ReservoirRegistryRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Artifact with ID {artifact_id} not found")
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.reservoir_registry.to_dataclass()
 
     @repository_decorator()

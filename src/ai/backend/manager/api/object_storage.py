@@ -94,7 +94,7 @@ class APIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def get_buckets(
+    async def get_all_buckets(
         self,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
@@ -108,7 +108,7 @@ class APIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def get_storage_buckets(
+    async def get_buckets(
         self,
         path: PathParam[ObjectStoragePathParam],
         processors_ctx: ProcessorsCtx,
@@ -160,8 +160,8 @@ def create_app(
     cors.add(
         app.router.add_route("GET", "/presigned/download", api_handler.get_presigned_download_url)
     )
-    cors.add(app.router.add_route("GET", "/buckets", api_handler.get_buckets))
-    cors.add(app.router.add_route("GET", "/{storage_id}/buckets", api_handler.get_storage_buckets))
+    cors.add(app.router.add_route("GET", "/buckets", api_handler.get_all_buckets))
+    cors.add(app.router.add_route("GET", "/{storage_id}/buckets", api_handler.get_buckets))
     cors.add(app.router.add_route("GET", "/", api_handler.list_object_storages))
 
     return app, []

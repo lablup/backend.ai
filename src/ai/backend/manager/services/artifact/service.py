@@ -3,7 +3,7 @@ from pydantic import TypeAdapter
 from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
-from ai.backend.manager.client.manager_client import ManagerFacingClient
+from ai.backend.manager.client.reservoir_registry_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
@@ -110,7 +110,7 @@ class ArtifactService:
                         action.registry_id
                     )
                 )
-                remote_reservoir_client = ManagerFacingClient(registry_data=registry_data)
+                remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
                 offset = 0
                 limit = 10
