@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import uuid
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Type
 
 import orjson
 import strawberry
 from graphql import StringValueNode
-from graphql_relay.utils import unbase64
+from graphql_relay.utils import base64, unbase64
+from strawberry.types import get_object_definition, has_object_definition
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import (
@@ -125,6 +127,13 @@ def parse_json(value: str | bytes) -> Any:
 )
 class JSONString:
     pass
+
+
+def to_global_id(type_: Type[Any], id_: uuid.UUID) -> str:
+    if not has_object_definition(type_):
+        raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
+    typename = get_object_definition(type_, strict=True).name
+    return base64(f"{typename}:{id_}")
 
 
 def resolve_global_id(global_id: str) -> tuple[str, str]:

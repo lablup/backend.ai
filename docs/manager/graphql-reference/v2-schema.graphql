@@ -175,7 +175,7 @@ input CancelArtifactInput {
 }
 
 type CancelImportArtifactPayload {
-  artifactRevisionId: ID!
+  artifactRevision: ArtifactRevision!
 }
 
 """Added in 25.13.0"""
@@ -185,7 +185,7 @@ input CleanupArtifactRevisionsInput {
 
 """Added in 25.13.0"""
 type CleanupArtifactRevisionsPayload {
-  artifactRevisionIds: [ID!]!
+  artifactRevisions: ArtifactRevisionConnection!
 }
 
 type ClusterConfig {

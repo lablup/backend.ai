@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     build_pagination_options,
+    to_global_id,
 )
 from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -351,7 +352,7 @@ class UpdateArtifactPayload:
 
 @strawberry.type(description="Added in 25.13.0")
 class CleanupArtifactRevisionsPayload:
-    artifact_revision_ids: list[ID]
+    artifact_revisions: ArtifactRevisionConnection
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -366,7 +367,7 @@ class RejectArtifactPayload:
 
 @strawberry.type
 class CancelImportArtifactPayload:
-    artifact_revision_id: ID
+    artifact_revision: ArtifactRevision
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -462,7 +463,7 @@ async def _build_artifact_connection(
         artifact = Artifact.from_dataclass(
             artifact_data, registry_url=registry_data.url, source_url=source_registry_data.url
         )
-        cursor = str(artifact_data.id)  # Use artifact ID as cursor
+        cursor = to_global_id(Artifact, artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
     # Calculate pagination info
@@ -524,9 +525,9 @@ def _build_artifact_revision_connection(
 ) -> ArtifactRevisionConnection:
     """Build GraphQL connection from artifact revision data"""
     edges = []
-    for i, revision_data in enumerate(artifact_revisions):
+    for revision_data in artifact_revisions:
         revision = ArtifactRevision.from_dataclass(revision_data)
-        cursor = str(revision_data.id)  # Use revision ID as cursor
+        cursor = to_global_id(ArtifactRevision, revision_data.id)
         edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
 
     # Calculate pagination info
@@ -799,16 +800,32 @@ async def update_artifact(
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> CleanupArtifactRevisionsPayload:
-    artifact_revision_ids = []
+    cleaned_artifact_revisions = []
     for artifact_revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
             CleanupArtifactRevisionAction(
                 artifact_revision_id=uuid.UUID(artifact_revision_id),
             )
         )
-        artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))
+        cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
 
-    return CleanupArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
+    edges = [
+        ArtifactRevisionEdge(node=revision, cursor=to_global_id(ArtifactRevisionEdge, revision.id))
+        for revision in cleaned_artifact_revisions
+    ]
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(cleaned_artifact_revisions),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
 @strawberry.mutation(description="Added in 25.13.0")
@@ -822,7 +839,7 @@ async def cancel_import_artifact(
         )
     )
     return CancelImportArtifactPayload(
-        artifact_revision_id=ID(str(action_result.artifact_revision_id))
+        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
     )
 
 

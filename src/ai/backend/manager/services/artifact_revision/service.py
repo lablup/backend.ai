@@ -123,11 +123,11 @@ class ArtifactRevisionService:
         return DisassociateWithStorageActionResult(result=result)
 
     async def cancel_import(self, action: CancelImportAction) -> CancelImportActionResult:
+        await self._artifact_repository.reset_artifact_revision_status(action.artifact_revision_id)
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
-        await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
-        return CancelImportActionResult(artifact_revision_id=revision_data.id)
+        return CancelImportActionResult(result=revision_data)
 
     async def import_revision(
         self, action: ImportArtifactRevisionAction
@@ -207,6 +207,7 @@ class ArtifactRevisionService:
                 "Artifact revision status not ready to be deleted"
             )
 
+        await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
         artifact_data = await self._artifact_repository.get_artifact_by_id(
             revision_data.artifact_id
         )
@@ -216,7 +217,6 @@ class ArtifactRevisionService:
         # TODO: Abstract this.
         bucket_name = reservoir_config.config.bucket_name
 
-        result = await self._artifact_repository.reset_artifact_revision_status(revision_data.id)
         storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
         storage_namespace = await self._object_storage_repository.get_storage_namespace(
             storage_data.id, bucket_name
@@ -243,4 +243,7 @@ class ArtifactRevisionService:
             )
         )
 
-        return CleanupArtifactRevisionActionResult(artifact_revision_id=result)
+        artifact_revision = await self._artifact_repository.get_artifact_revision_by_id(
+            revision_data.id
+        )
+        return CleanupArtifactRevisionActionResult(result=artifact_revision)

@@ -600,7 +600,7 @@ input CancelArtifactInput
 type CancelImportArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
-  artifactRevisionId: ID!
+  artifactRevision: ArtifactRevision!
 }
 
 """Added in 24.12.0"""
@@ -630,7 +630,7 @@ input CleanupArtifactRevisionsInput
 type CleanupArtifactRevisionsPayload
   @join__type(graph: STRAWBERRY)
 {
-  artifactRevisionIds: [ID!]!
+  artifactRevisions: ArtifactRevisionConnection!
 }
 
 """Added in 25.6.0."""
