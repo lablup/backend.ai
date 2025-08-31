@@ -9281,7 +9281,7 @@
     },
     "/object-storages/buckets": {
       "get": {
-        "operationId": "object-storages.get_buckets",
+        "operationId": "object-storages.get_all_buckets",
         "tags": [
           "object-storages"
         ],
@@ -9301,7 +9301,7 @@
     },
     "/object-storages/{storage_id}/buckets": {
       "get": {
-        "operationId": "object-storages.get_storage_buckets",
+        "operationId": "object-storages.get_buckets",
         "tags": [
           "object-storages"
         ],
