@@ -22,15 +22,17 @@ build_script=$(cat <<'EOF'
 # Download ttyd source.
 git clone https://github.com/tsl0922/ttyd.git
 cd ttyd
+git checkout eccebc6bb1dfbaf0c46f1fd9c53b89abc773784d
 
 # Apply custom patch.
 git apply /workspace/patch.diff
 
 # Run build script.
-./scripts/cross-build.sh
-
-# Check ttyd binary version.
+env BUILD_TARGET=x86_64 ./scripts/cross-build.sh
 ./build/ttyd --version
+mv ./build/ttyd ./build/ttyd_linux.x86_64.bin
+env BUILD_TARGET=aarch64 ./scripts/cross-build.sh
+mv ./build/ttyd ./build/ttyd_linux.aarch64.bin
 
 # The script requires sudo to bootstrap a crossbuild toolchain.
 chown -R ${BUILDER_UID}:${BUILDER_GID} .
