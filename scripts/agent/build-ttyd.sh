@@ -10,12 +10,15 @@ fi
 
 builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:20.04
-sudo apt-get update
-sudo apt-get install -y autoconf automake build-essential cmake curl file libtool
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y autoconf automake build-essential cmake curl file libtool
+RUN apt-get install -y git
 EOF
 )
 
 build_script=$(cat <<'EOF'
+#!/bin/bash
 # Download ttyd source.
 git clone https://github.com/tsl0922/ttyd.git
 cd ttyd
@@ -28,6 +31,9 @@ git apply /workspace/patch.diff
 
 # Check ttyd binary version.
 ./build/ttyd --version
+
+# The script requires sudo to bootstrap a crossbuild toolchain.
+chown -R ${BUILDER_UID}:${BUILDER_GID} .
 EOF
 )
 
@@ -61,12 +67,13 @@ docker build -t ttyd-builder \
 
 docker run --rm -it \
   -w /workspace \
+  -e BUILDER_UID=$(id -u) \
+  -e BUILDER_GID=$(id -g) \
   -v $temp_dir:/workspace \
-  -u $(id -u):$(id -g) \
   ttyd-builder \
   /workspace/build.sh
 
-ls -lh $temp_dir/
+ls -lh $temp_dir/ttyd/build/
 # cp $temp_dir/ttyd.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
 # ls -lh src/ai/backend/runner
 
