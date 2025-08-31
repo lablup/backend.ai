@@ -19,6 +19,8 @@ EOF
 
 build_script=$(cat <<'EOF'
 #!/bin/bash
+mkdir -p dist
+
 # Download ttyd source.
 git clone https://github.com/tsl0922/ttyd.git
 cd ttyd
@@ -30,11 +32,12 @@ git apply /workspace/patch.diff
 # Run build script.
 env BUILD_TARGET=x86_64 ./scripts/cross-build.sh
 ./build/ttyd --version
-mv ./build/ttyd ./build/ttyd_linux.x86_64.bin
+cp ./build/ttyd /workspace/dist/ttyd_linux.x86_64.bin
 env BUILD_TARGET=aarch64 ./scripts/cross-build.sh
-mv ./build/ttyd ./build/ttyd_linux.aarch64.bin
+cp ./build/ttyd /workspace/dist/ttyd_linux.aarch64.bin
 
 # The script requires sudo to bootstrap a crossbuild toolchain.
+chown -R ${BUILDER_UID}:${BUILDER_GID} /workspace/dist
 chown -R ${BUILDER_UID}:${BUILDER_GID} .
 EOF
 )
@@ -57,7 +60,7 @@ EOF
 )
 
 SCRIPT_DIR=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-temp_dir=$(mktemp -d -t tmux-build.XXXXX)
+temp_dir=$(mktemp -d -t ttyd-build.XXXXX)
 echo "Using temp directory: $temp_dir"
 echo "$build_script" > "$temp_dir/build.sh"
 echo "$patch_diff" > "$temp_dir/patch.diff"
@@ -75,8 +78,6 @@ docker run --rm -it \
   ttyd-builder \
   /workspace/build.sh
 
-ls -lh $temp_dir/ttyd/build/
-# cp $temp_dir/ttyd.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
-# ls -lh src/ai/backend/runner
-
-# rm -rf "$temp_dir"
+ls -lh "$temp_dir/dist/"
+cp $temp_dir/dist/ttyd*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+rm -rf "$temp_dir"

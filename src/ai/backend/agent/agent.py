@@ -598,7 +598,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
-        mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
+        mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
+        mount_static_binary("yank.sh", "/usr/local/bin/yank.sh")
 
         jail_path: Optional[Path]
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:

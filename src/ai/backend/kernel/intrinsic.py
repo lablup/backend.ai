@@ -162,7 +162,7 @@ async def prepare_ttyd_service(service_info):
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
+    cmdargs = ["/opt/kernel/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
     if shell != "ash":  # Currently Alpine-based containers are not supported.
         cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
     return cmdargs, {}
