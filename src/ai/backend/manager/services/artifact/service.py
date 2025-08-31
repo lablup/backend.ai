@@ -17,10 +17,6 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
 )
-from ai.backend.manager.services.artifact.actions.get_installed_storages import (
-    GetInstalledStorageNamespacesAction,
-    GetInstalledStorageNamspacesActionResult,
-)
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
@@ -147,7 +143,9 @@ class ArtifactService:
                         artifact_data.artifact.registry_id = registry_id
                         artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
 
-                    upsert_result = await self.upsert(UpsertArtifactsAction(data=all_artifacts))
+                    upsert_result = await self.upsert_artifacts_with_revisions(
+                        UpsertArtifactsAction(data=all_artifacts)
+                    )
                     scanned_models = upsert_result.result
 
         return ScanArtifactsActionResult(result=scanned_models)
@@ -189,7 +187,9 @@ class ArtifactService:
         )
         return UpdateArtifactActionResult(result=updated_artifact)
 
-    async def upsert(self, action: UpsertArtifactsAction) -> UpsertArtifactsActionResult:
+    async def upsert_artifacts_with_revisions(
+        self, action: UpsertArtifactsAction
+    ) -> UpsertArtifactsActionResult:
         result_data: list[ArtifactDataWithRevisions] = []
 
         for artifact_with_revisions in action.data:
@@ -210,11 +210,3 @@ class ArtifactService:
             )
 
         return UpsertArtifactsActionResult(result=result_data)
-
-    async def get_installed_storage_namespaces(
-        self, action: GetInstalledStorageNamespacesAction
-    ) -> GetInstalledStorageNamspacesActionResult:
-        installed_storages = (
-            await self._artifact_repository.get_installed_storages_for_artifact_revisions()
-        )
-        return GetInstalledStorageNamspacesActionResult(result=installed_storages)

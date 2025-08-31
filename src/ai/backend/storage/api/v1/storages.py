@@ -34,6 +34,7 @@ from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
     ReservoirConfig,
 )
+from ai.backend.storage.exception import ReservoirStorageConfigInvalidError
 from ai.backend.storage.types import BucketCopyOptions
 
 from ...services.storages import StorageService
@@ -152,6 +153,10 @@ class StorageAPIHandler:
         reservoir_configs = list(
             filter(lambda r: isinstance(r.config, ReservoirConfig), self._registry_configs)
         )
+
+        if len(reservoir_configs) == 0:
+            raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
+
         # For now, we only use the first reservoir registry configuration
         reservoir_config: ReservoirConfig = cast(ReservoirConfig, reservoir_configs[0].config)
         await log_client_api_entry(log, "pull_file", req)
@@ -161,8 +166,7 @@ class StorageAPIHandler:
                 not reservoir_config.object_storage_access_key
                 or not reservoir_config.object_storage_secret_key
             ):
-                # TODO: Add exception
-                raise RuntimeError(
+                raise ReservoirStorageConfigInvalidError(
                     "Reservoir registry is not properly configured for object storage access."
                 )
 

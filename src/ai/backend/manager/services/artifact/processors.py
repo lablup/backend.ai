@@ -7,10 +7,6 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
 )
-from ai.backend.manager.services.artifact.actions.get_installed_storages import (
-    GetInstalledStorageNamespacesAction,
-    GetInstalledStorageNamspacesActionResult,
-)
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
@@ -47,11 +43,10 @@ class ArtifactProcessors(AbstractProcessorPackage):
         ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
-    get_installed_storage_namespaces: ActionProcessor[
-        GetInstalledStorageNamespacesAction, GetInstalledStorageNamspacesActionResult
-    ]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
-    upsert: ActionProcessor[UpsertArtifactsAction, UpsertArtifactsActionResult]
+    upsert_artifacts_with_revisions: ActionProcessor[
+        UpsertArtifactsAction, UpsertArtifactsActionResult
+    ]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         self.scan = ActionProcessor(service.scan, action_monitors)
@@ -61,11 +56,10 @@ class ArtifactProcessors(AbstractProcessorPackage):
             service.list_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
-        self.get_installed_storage_namespaces = ActionProcessor(
-            service.get_installed_storage_namespaces, action_monitors
-        )
         self.update = ActionProcessor(service.update, action_monitors)
-        self.upsert = ActionProcessor(service.upsert, action_monitors)
+        self.upsert_artifacts_with_revisions = ActionProcessor(
+            service.upsert_artifacts_with_revisions, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -77,5 +71,4 @@ class ArtifactProcessors(AbstractProcessorPackage):
             GetArtifactRevisionsAction.spec(),
             UpdateArtifactAction.spec(),
             UpsertArtifactsAction.spec(),
-            GetInstalledStorageNamespacesAction.spec(),
         ]

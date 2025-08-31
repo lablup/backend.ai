@@ -375,9 +375,7 @@ class ArtifactRepository:
                     )
                     db_sess.add(new_revision)
                     await db_sess.flush()
-                    await db_sess.refresh(
-                        new_revision, attribute_names=["created_at", "updated_at"]
-                    )
+                    await db_sess.refresh(new_revision)
                     result_revisions.append(new_revision.to_dataclass())
                 else:
                     # Update existing revision
@@ -385,9 +383,7 @@ class ArtifactRepository:
                     existing_revision.size = revision_data.size
                     existing_revision.status = revision_data.status
                     await db_sess.flush()
-                    await db_sess.refresh(
-                        existing_revision, attribute_names=["created_at", "updated_at"]
-                    )
+                    await db_sess.refresh(existing_revision)
                     result_revisions.append(existing_revision.to_dataclass())
 
             return result_revisions
@@ -457,7 +453,7 @@ class ArtifactRepository:
                         db_sess.add(artifact_revision_row)
 
                     await db_sess.flush()
-                    await db_sess.refresh(existing_revision, attribute_names=["updated_at"])
+                    await db_sess.refresh(existing_revision)
                     artifacts_map[artifact_row.id][1].append(existing_revision)
                 else:
                     # Insert new artifact revision
@@ -468,9 +464,7 @@ class ArtifactRepository:
 
                     db_sess.add(new_revision)
                     await db_sess.flush()
-                    await db_sess.refresh(
-                        new_revision, attribute_names=["id", "created_at", "updated_at"]
-                    )
+                    await db_sess.refresh(new_revision, attribute_names=["id"])
                     artifacts_map[artifact_row.id][1].append(new_revision)
 
             # Convert to ArtifactDataWithRevisions format
@@ -862,22 +856,3 @@ class ArtifactRepository:
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
-
-    @repository_decorator()
-    async def get_installed_storages_for_artifact_revisions(
-        self,
-    ) -> dict[uuid.UUID, uuid.UUID]:
-        """Get mapping of artifact revision IDs to storage IDs where they are installed.
-
-        Returns:
-            Dictionary mapping artifact_revision_id to storage_namespace_id
-        """
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(
-                    AssociationArtifactsStorageRow.artifact_revision_id,
-                    AssociationArtifactsStorageRow.storage_namespace_id,
-                )
-            )
-            rows: list[AssociationArtifactsStorageRow] = result.all()
-            return {row.artifact_revision_id: row.storage_namespace_id for row in rows}
