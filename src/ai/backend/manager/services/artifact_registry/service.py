@@ -1,15 +1,9 @@
 import logging
 
-from ai.backend.common.exception import InvalidArtifactRegistryTypeError
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
-from ai.backend.manager.services.artifact_registry.actions.common.get import (
-    GetArtifactRegistryAction,
-    GetArtifactRegistryActionResult,
-)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -178,27 +172,3 @@ class ArtifactRegistryService:
         log.info("Listing reservoirs")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
-
-    async def get_artifact_registry(
-        self, action: GetArtifactRegistryAction
-    ) -> GetArtifactRegistryActionResult:
-        """
-        Get an existing artifact registry by ID.
-        """
-        log.info("Getting artifact registry with id: {}", action.registry_id)
-        registry_data = await self._artifact_registry_repository.get_artifact_registry_data(
-            action.registry_id
-        )
-        match registry_data.type:
-            case ArtifactRegistryType.HUGGINGFACE:
-                result = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    action.registry_id
-                )
-            case ArtifactRegistryType.RESERVOIR:
-                result = await self._reservoir_repository.get_reservoir_registry_data_by_id(
-                    action.registry_id
-                )
-            case _:
-                raise InvalidArtifactRegistryTypeError()
-
-        return GetArtifactRegistryActionResult(result=result, common=registry_data)

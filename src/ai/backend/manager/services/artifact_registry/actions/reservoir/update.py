@@ -22,7 +22,7 @@ class UpdateReservoirRegistryAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "update"
+        return "update_reservoir_registry"
 
 
 @dataclass

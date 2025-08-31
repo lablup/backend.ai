@@ -18,7 +18,7 @@ class GetReservoirRegistryAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get"
+        return "get_reservoir_registry"
 
 
 @dataclass

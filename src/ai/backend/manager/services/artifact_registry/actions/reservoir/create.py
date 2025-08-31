@@ -20,7 +20,7 @@ class CreateReservoirRegistryAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create"
+        return "create_reservoir_registry"
 
 
 @dataclass

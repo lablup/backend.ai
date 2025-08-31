@@ -15,7 +15,7 @@ class ListReservoirRegistriesAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list"
+        return "list_reservoir_registries"
 
 
 @dataclass
