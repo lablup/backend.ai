@@ -1,0 +1,73 @@
+#! /bin/bash
+set -e
+
+# This script should be executed on an x86-64 host,
+# as it uses a custom cross-build toolchain based on musl.
+if [[ "$(uname -m)" != "x86_64" ]]; then
+  echo "This script must be executed on an x86-64 host."
+  exit 1
+fi
+
+builder_dockerfile=$(cat <<'EOF'
+FROM ubuntu:20.04
+sudo apt-get update
+sudo apt-get install -y autoconf automake build-essential cmake curl file libtool
+EOF
+)
+
+build_script=$(cat <<'EOF'
+# Download ttyd source.
+git clone https://github.com/tsl0922/ttyd.git
+cd ttyd
+
+# Apply custom patch.
+git apply /workspace/patch.diff
+
+# Run build script.
+./scripts/cross-build.sh
+
+# Check ttyd binary version.
+./build/ttyd --version
+EOF
+)
+
+patch_diff=$(cat <<'EOF'
+diff --git a/scripts/cross-build.sh b/scripts/cross-build.sh
+index d520d3a..45ce5e9 100755
+--- a/scripts/cross-build.sh
++++ b/scripts/cross-build.sh
+@@ -85,6 +85,8 @@ build_libwebsockets() {
+     echo "=== Building libwebsockets-${LIBWEBSOCKETS_VERSION} (${TARGET})..."
+     curl -fSsLo- "https://github.com/warmcat/libwebsockets/archive/v${LIBWEBSOCKETS_VERSION}.tar.gz" | tar xz -C "${BUILD_DIR}"
+     pushd "${BUILD_DIR}/libwebsockets-${LIBWEBSOCKETS_VERSION}"
++        sed -i 's/context->default_retry.secs_since_valid_ping = 300/context->default_retry.secs_since_valid_ping = 20/g' lib/core/context.c
++        sed -i 's/context->default_retry.secs_since_valid_hangup = 310/context->default_retry.secs_since_valid_hangup = 30/g' lib/core/context.c
+         sed -i 's/ websockets_shared//g' cmake/libwebsockets-config.cmake.in
+         sed -i 's/ OR PC_OPENSSL_FOUND//g' lib/tls/CMakeLists.txt
+         sed -i '/PC_OPENSSL/d' lib/tls/CMakeLists.txt
+EOF
+)
+
+SCRIPT_DIR=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+temp_dir=$(mktemp -d -t tmux-build.XXXXX)
+echo "Using temp directory: $temp_dir"
+echo "$build_script" > "$temp_dir/build.sh"
+echo "$patch_diff" > "$temp_dir/patch.diff"
+chmod +x $temp_dir/*.sh
+echo "$builder_dockerfile" > "$SCRIPT_DIR/ttyd-builder.dockerfile"
+
+docker build -t ttyd-builder \
+  -f $SCRIPT_DIR/ttyd-builder.dockerfile $SCRIPT_DIR
+
+docker run --rm -it \
+  -w /workspace \
+  -v $temp_dir:/workspace \
+  -u $(id -u):$(id -g) \
+  ttyd-builder \
+  /workspace/build.sh
+
+ls -lh $temp_dir/
+# cp $temp_dir/ttyd.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
+# ls -lh src/ai/backend/runner
+
+# rm -rf "$temp_dir"
