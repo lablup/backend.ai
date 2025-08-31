@@ -800,7 +800,7 @@ async def update_artifact(
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> CleanupArtifactRevisionsPayload:
-    cleaned_artifact_revisions = []
+    cleaned_artifact_revisions: list[ArtifactRevision] = []
     for artifact_revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
             CleanupArtifactRevisionAction(

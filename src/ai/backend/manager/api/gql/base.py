@@ -129,7 +129,7 @@ class JSONString:
     pass
 
 
-def to_global_id(type_: Type[Any], id_: uuid.UUID) -> str:
+def to_global_id(type_: Type[Any], id_: uuid.UUID | str) -> str:
     if not has_object_definition(type_):
         raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
     typename = get_object_definition(type_, strict=True).name
