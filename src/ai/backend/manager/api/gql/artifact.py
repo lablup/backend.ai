@@ -45,8 +45,8 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactRevisionAction,
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
@@ -178,7 +178,7 @@ class CancelArtifactInput:
 
 
 @strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactRevisionsInput:
+class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
 
@@ -350,7 +350,7 @@ class UpdateArtifactPayload:
 
 
 @strawberry.type(description="Added in 25.13.0")
-class DeleteArtifactRevisionsPayload:
+class CleanupArtifactRevisionsPayload:
     artifact_revision_ids: list[ID]
 
 
@@ -796,19 +796,19 @@ async def update_artifact(
 
 
 @strawberry.mutation(description="Added in 25.13.0")
-async def delete_artifact_revisions(
-    input: DeleteArtifactRevisionsInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactRevisionsPayload:
+async def cleanup_artifact_revisions(
+    input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
+) -> CleanupArtifactRevisionsPayload:
     artifact_revision_ids = []
     for artifact_revision_id in input.artifact_revision_ids:
-        action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
-            DeleteArtifactRevisionAction(
+        action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
+            CleanupArtifactRevisionAction(
                 artifact_revision_id=uuid.UUID(artifact_revision_id),
             )
         )
         artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))
 
-    return DeleteArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
+    return CleanupArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
 
 
 @strawberry.mutation(description="Added in 25.13.0")

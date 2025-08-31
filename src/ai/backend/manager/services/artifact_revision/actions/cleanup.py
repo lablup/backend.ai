@@ -7,7 +7,7 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 
 @dataclass
-class DeleteArtifactRevisionAction(ArtifactRevisionAction):
+class CleanupArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
 
     @override
@@ -17,11 +17,11 @@ class DeleteArtifactRevisionAction(ArtifactRevisionAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "delete"
+        return "cleanup"
 
 
 @dataclass
-class DeleteArtifactRevisionActionResult(BaseActionResult):
+class CleanupArtifactRevisionActionResult(BaseActionResult):
     artifact_revision_id: uuid.UUID
 
     @override

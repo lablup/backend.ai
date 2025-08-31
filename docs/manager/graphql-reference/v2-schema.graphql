@@ -178,6 +178,16 @@ type CancelImportArtifactPayload {
   artifactRevisionId: ID!
 }
 
+"""Added in 25.13.0"""
+input CleanupArtifactRevisionsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.13.0"""
+type CleanupArtifactRevisionsPayload {
+  artifactRevisionIds: [ID!]!
+}
+
 type ClusterConfig {
   mode: ClusterMode!
   size: Int!
@@ -261,16 +271,6 @@ type CreateReservoirRegistryPayload {
 
 """Date with time (isoformat)"""
 scalar DateTime
-
-"""Added in 25.13.0"""
-input DeleteArtifactRevisionsInput {
-  artifactRevisionIds: [ID!]!
-}
-
-"""Added in 25.13.0"""
-type DeleteArtifactRevisionsPayload {
-  artifactRevisionIds: [ID!]!
-}
 
 """Added in 25.13.0"""
 input DeleteHuggingFaceRegistryInput {
@@ -607,7 +607,7 @@ type Mutation {
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
   """Added in 25.13.0"""
-  deleteArtifactRevisions(input: DeleteArtifactRevisionsInput!): DeleteArtifactRevisionsPayload!
+  cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
 
   """Added in 25.13.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!

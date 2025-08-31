@@ -25,9 +25,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
     CancelImportAction,
     CancelImportActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactRevisionAction,
-    DeleteArtifactRevisionActionResult,
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
+    CleanupArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
@@ -195,9 +195,9 @@ class ArtifactRevisionService:
         # TODO: Improve event-based state structure with heartbeat-based structure
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=result.task_id)
 
-    async def delete(
-        self, action: DeleteArtifactRevisionAction
-    ) -> DeleteArtifactRevisionActionResult:
+    async def cleanup(
+        self, action: CleanupArtifactRevisionAction
+    ) -> CleanupArtifactRevisionActionResult:
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
@@ -243,4 +243,4 @@ class ArtifactRevisionService:
             )
         )
 
-        return DeleteArtifactRevisionActionResult(artifact_revision_id=result)
+        return CleanupArtifactRevisionActionResult(artifact_revision_id=result)

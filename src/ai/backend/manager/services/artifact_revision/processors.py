@@ -11,9 +11,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
     CancelImportAction,
     CancelImportActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactRevisionAction,
-    DeleteArtifactRevisionActionResult,
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
+    CleanupArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
@@ -43,7 +43,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         ImportArtifactRevisionAction, ImportArtifactRevisionActionResult
     ]
     cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
-    delete: ActionProcessor[DeleteArtifactRevisionAction, DeleteArtifactRevisionActionResult]
+    cleanup: ActionProcessor[CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult]
 
     def __init__(
         self, service: ArtifactRevisionService, action_monitors: list[ActionMonitor]
@@ -54,7 +54,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         self.reject = ActionProcessor(service.reject, action_monitors)
         self.import_revision = ActionProcessor(service.import_revision, action_monitors)
         self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
+        self.cleanup = ActionProcessor(service.cleanup, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -65,5 +65,5 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             RejectArtifactRevisionAction.spec(),
             ImportArtifactRevisionAction.spec(),
             CancelImportAction.spec(),
-            DeleteArtifactRevisionAction.spec(),
+            CleanupArtifactRevisionAction.spec(),
         ]
