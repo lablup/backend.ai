@@ -7,7 +7,7 @@ Developer guide for Backend.AI documentation
 
 ### Installing pyenv and pyenv-virtualenv  
 
-* Please refer to the official docs:
+* Please refer to the official docs:  
   - https://github.com/pyenv/pyenv#installation
   - https://github.com/pyenv/pyenv-virtualenv#installation
 
