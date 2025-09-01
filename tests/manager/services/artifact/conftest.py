@@ -8,7 +8,9 @@ from ai.backend.manager.repositories.huggingface_registry.repository import Hugg
 from ai.backend.manager.repositories.object_storage.repository import (
     ObjectStorageRepository,  # pants: no-infer-dep
 )
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 
