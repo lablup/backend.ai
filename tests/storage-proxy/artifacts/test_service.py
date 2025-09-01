@@ -20,6 +20,7 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
+    ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
@@ -521,7 +522,7 @@ class TestHuggingFaceService:
             service._background_task_manager = mock_background_task_manager
             service._storages_service = None  # type: ignore
 
-        with pytest.raises(HuggingFaceAPIError):
+        with pytest.raises(ObjectStorageConfigInvalidError):
             await service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
