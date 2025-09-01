@@ -24,7 +24,7 @@ $ pip install -U pip setuptools wheel
 $ pip install -U -r requirements.txt
 ```  
 
-
+  
 ## Building API Reference JSON file     
 REST API
 ```console
