@@ -110,8 +110,5 @@ class DirEntry:
 
 @dataclass
 class BucketCopyOptions:
-    concurrency: int = 16
-    part_size: Optional[int] = None
-    override_content_type: Optional[str] = None
-    read_chunk_size: int = 1024 * 1024
+    concurrency: int
     progress_log_interval_bytes: int = 0

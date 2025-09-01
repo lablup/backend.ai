@@ -12,6 +12,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
 )
+from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -186,8 +187,7 @@ class ArtifactRevisionService:
                     PullObjectReq(),
                 )
             case _:
-                # TODO: Add exception
-                raise NotImplementedError(
+                raise InvalidArtifactRegistryTypeError(
                     f"Unsupported artifact registry type: {artifact.registry_type}"
                 )
 
@@ -197,7 +197,6 @@ class ArtifactRevisionService:
             )
         )
 
-        # TODO: Improve event-based state structure with heartbeat-based structure
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=result.task_id)
 
     async def cleanup(

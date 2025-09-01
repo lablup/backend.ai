@@ -171,7 +171,11 @@ class StorageService:
         """
         # Destination upload client & part size
         dst_client = self._get_s3_client(storage_name, bucket_name)
-        part_size = options.part_size or self._storage_configs[storage_name].upload_chunk_size
+        part_size = self._storage_configs[storage_name].upload_chunk_size
+
+        # TODO: # Instead of using its own download_chunksize,
+        # it should retrieve and use the configuration from the remote storage.
+        download_chunk_size = self._storage_configs[storage_name].download_chunk_size
 
         # List all objects up front
         keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
@@ -218,17 +222,16 @@ class StorageService:
                     body = resp["Body"]
 
                     ctype = (
-                        options.override_content_type
-                        or resp.get("ContentType")
+                        resp.get("ContentType")
                         or mimetypes.guess_type(key)[0]
                         or "application/octet-stream"
                     )
 
-                    async def _gen() -> AsyncIterator[bytes]:
+                    async def _data_stream() -> AsyncIterator[bytes]:
                         sent = 0
                         next_mark = options.progress_log_interval_bytes or 0
                         while True:
-                            chunk = await body.read(options.read_chunk_size)
+                            chunk = await body.read(download_chunk_size)
                             if not chunk:
                                 break
                             sent += len(chunk)
@@ -238,7 +241,7 @@ class StorageService:
                             yield chunk
 
                     await dst_client.upload_stream(
-                        _gen(),
+                        _data_stream(),
                         key,  # same key at destination (no dst_prefix per your spec)
                         content_type=ctype,
                         part_size=part_size,

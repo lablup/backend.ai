@@ -176,7 +176,7 @@ class StorageAPIHandler:
                 src=reservoir_config,
                 storage_name=storage_name,
                 bucket_name=bucket_name,
-                options=BucketCopyOptions(),
+                options=BucketCopyOptions(concurrency=16),
             )
 
         task_id = await self._background_task_manager.start(_pull_task)
