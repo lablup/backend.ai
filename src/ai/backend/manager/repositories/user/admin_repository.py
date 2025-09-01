@@ -63,6 +63,8 @@ class AdminUserRepository:
             await self._delete_keypairs(conn, user_uuid)
             await self._delete_vfolder_permissions(conn, user_uuid)
             await self._clear_user_groups(conn, user_uuid)
+            await self._delete_kernels(conn, user_uuid)
+            await self._delete_sessions(conn, user_uuid)
 
             # Finally delete the user
             await conn.execute(sa.delete(users).where(users.c.email == email))
@@ -210,6 +212,16 @@ class AdminUserRepository:
                 association_groups_users.c.user_id == user_uuid
             )
         )
+
+    async def _delete_kernels(self, conn: SAConnection, user_uuid: UUID) -> int:
+        """Private method to delete user's kernels."""
+        result = await conn.execute(sa.delete(kernels).where(kernels.c.user_uuid == user_uuid))
+        return result.rowcount
+
+    async def _delete_sessions(self, conn: SAConnection, user_uuid: UUID) -> int:
+        """Private method to delete user's sessions."""
+        result = await conn.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+        return result.rowcount
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,
