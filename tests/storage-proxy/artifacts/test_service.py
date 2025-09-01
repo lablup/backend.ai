@@ -9,6 +9,7 @@ import pytest
 from aiohttp import ClientError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -66,7 +67,9 @@ def create_mock_aiohttp_session() -> Tuple[Mock, Mock]:
 def mock_huggingface_config() -> HuggingfaceConfig:
     """Mock HuggingfaceConfig object."""
     return HuggingfaceConfig(
-        type="huggingface", token="test_token", endpoint="https://huggingface.co"
+        type=ArtifactRegistryType.HUGGINGFACE.value,
+        token="test_token",
+        endpoint="https://huggingface.co",
     )
 
 

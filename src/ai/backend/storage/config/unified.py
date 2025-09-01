@@ -13,6 +13,7 @@ from pydantic import (
     FilePath,
 )
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -715,7 +716,7 @@ class ArtifactRegistryConfig(BaseModel):
         Name of the artifact registry configuration.
         Used to identify this registry in the system.
         """,
-        examples=["huggingface", "reservoir"],
+        examples=[typ.value for typ in ArtifactRegistryType],
     )
     config: RegistrySpecificConfig = Field(
         discriminator="registry_type",

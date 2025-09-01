@@ -3,8 +3,8 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,

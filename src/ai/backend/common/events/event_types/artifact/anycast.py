@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -20,7 +21,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     model_id: str
     revision: str
     registry_name: str
-    registry_type: str
+    registry_type: ArtifactRegistryType
     total_size: int
 
     @classmethod

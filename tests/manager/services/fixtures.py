@@ -4,8 +4,8 @@ import uuid
 from dateutil.parser import isoparse
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
-    ArtifactRegistryType,
     ArtifactStatus,
     ArtifactType,
 )

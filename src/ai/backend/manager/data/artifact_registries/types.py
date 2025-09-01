@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.types import OptionalState
 
 

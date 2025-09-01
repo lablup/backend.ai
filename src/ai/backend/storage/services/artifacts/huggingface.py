@@ -11,6 +11,7 @@ from typing import Callable, Optional, Protocol
 import aiohttp
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -318,8 +319,7 @@ class HuggingFaceService:
                         model_id=model_id,
                         revision=revision,
                         registry_name=registry_name,
-                        # TODO: Use ArtifactRegistryType
-                        registry_type="huggingface",
+                        registry_type=ArtifactRegistryType.HUGGINGFACE,
                         total_size=artifact_total_size,
                     )
                 )

@@ -2,8 +2,8 @@ import uuid
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,

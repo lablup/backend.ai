@@ -3,10 +3,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactOrderField,
-    ArtifactRegistryType,
     ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,

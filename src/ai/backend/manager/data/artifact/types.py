@@ -4,16 +4,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
+
 
 class ArtifactType(enum.StrEnum):
     MODEL = "MODEL"
     PACKAGE = "PACKAGE"
     IMAGE = "IMAGE"
-
-
-class ArtifactRegistryType(enum.StrEnum):
-    HUGGINGFACE = "huggingface"
-    RESERVOIR = "reservoir"
 
 
 class ArtifactStatus(enum.StrEnum):

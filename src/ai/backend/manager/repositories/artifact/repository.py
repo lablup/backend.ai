@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.metrics.metric import LayerType
@@ -12,7 +13,6 @@ from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
-    ArtifactRegistryType,
     ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
