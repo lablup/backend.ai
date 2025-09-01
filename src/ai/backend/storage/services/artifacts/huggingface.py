@@ -31,6 +31,7 @@ from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
+    ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
 from ai.backend.storage.services.storages import StorageService
@@ -336,7 +337,7 @@ class HuggingFaceService:
                     f"Model import failed: error={str(e)}, model_id={model_id}, revision={revision}"
                 )
                 raise HuggingFaceAPIError(
-                    f"Import failed for {model_id}@{revision}: {str(e)}"
+                    f"Import failed for {model_id}, revision={revision}: {str(e)}"
                 ) from e
 
         bgtask_id = await self._background_task_manager.start(_import_model)
@@ -615,11 +616,12 @@ class HuggingFaceService:
             bucket_name: Target bucket name
         """
         if not self._storages_service:
-            # TODO: Add new exception type for missing storage service
-            raise HuggingFaceAPIError("Storage service not configured for import operations")
+            raise ObjectStorageConfigInvalidError(
+                "Storage service not configured for import operations"
+            )
 
         try:
-            # Create storage key path: {model_id}/{revision}/{file_path}
+            # Create storage key path
             storage_key = f"{model_id}/{revision}/{file_info.path}"
 
             log.info(

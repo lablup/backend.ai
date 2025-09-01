@@ -245,7 +245,22 @@ class HuggingFaceModelNotFoundError(web.HTTPNotFound):
         )
 
 
-class ReservoirStorageConfigInvalidError(web.HTTPNotFound):
+class ObjectStorageConfigInvalidError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/object/config/invalid",
+            "title": "Object Storage Config Invalid",
+        }
+        if msg is not None:
+            payload["title"] = f"Object Storage Config Invalid ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )
+
+
+class ReservoirStorageConfigInvalidError(web.HTTPInternalServerError):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
             "type": "https://api.backend.ai/probs/storage/reservoir/config/invalid",
