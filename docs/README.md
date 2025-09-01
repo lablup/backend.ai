@@ -22,7 +22,7 @@ $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
 $ pip install -U -r requirements.txt
-```
+```  
 
 
 ## Building API Reference JSON file   
