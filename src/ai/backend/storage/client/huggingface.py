@@ -122,10 +122,8 @@ class HuggingFaceClient:
             )
             return result
         except Exception as e:
-            log.error(f"Failed to get model info for {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to get model info for {model_id}@{revision}: {str(e)}"
-            ) from e
+            log.error(f"Failed to get model info for {model}: {str(e)}")
+            raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
 
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
@@ -144,10 +142,8 @@ class HuggingFaceClient:
             )
             return filepaths
         except Exception as e:
-            log.error(f"Failed to list files for {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to list files for {model_id}@{revision}: {str(e)}"
-            ) from e
+            log.error(f"Failed to list files for {model}: {str(e)}")
+            raise HuggingFaceAPIError(f"Failed to list files for {model}: {str(e)}") from e
 
     async def list_model_files_info(
         self, model: ModelTarget, paths: list[str]
@@ -173,10 +169,8 @@ class HuggingFaceClient:
             )
             return info
         except Exception as e:
-            log.error(f"Failed to get paths info for {model_id}@{revision} ({paths}): {str(e)}")
-            raise HuggingFaceAPIError(
-                f'Failed to get paths info for "{model_id}@{revision}": {str(e)}'
-            ) from e
+            log.error(f"Failed to get paths info for {model} ({paths}): {str(e)}")
+            raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {str(e)}') from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -229,7 +223,7 @@ class HuggingFaceScanner:
                 log.info("No models returned from scan_models()")
                 return []
 
-            async def build_model_data_for_revisions(model: HfModelInfo) -> list[ModelData]:
+            async def build_model_data_per_revision(model: HfModelInfo) -> list[ModelData]:
                 """Build ModelData objects for all revisions of a single model."""
                 model_data_list = []
                 try:
@@ -259,16 +253,16 @@ class HuggingFaceScanner:
                 return model_data_list
 
             # Fire tasks concurrently and collect results
-            tasks = [asyncio.create_task(build_model_data_for_revisions(m)) for m in models]
-            results = await asyncio.gather(*tasks, return_exceptions=False)
+            tasks = [asyncio.create_task(build_model_data_per_revision(m)) for m in models]
+            task_results = await asyncio.gather(*tasks, return_exceptions=False)
 
             # Flatten the list of lists
-            model_infos: list[ModelData] = []
-            for model_data_list in results:
-                model_infos.extend(model_data_list)
+            result: list[ModelData] = []
+            for model_data_list in task_results:
+                result.extend(model_data_list)
 
-            log.info(f"Successfully scanned HuggingFace models: count={len(model_infos)}")
-            return model_infos
+            log.info(f"Successfully scanned HuggingFace models: count={len(result)}")
+            return result
 
         except Exception as e:
             log.error(f"Failed to scan HuggingFace models: {str(e)}")
@@ -287,9 +281,7 @@ class HuggingFaceScanner:
         revision = model.revision
 
         try:
-            log.info(
-                f"Scanning specific HuggingFace model: model_id={model_id}, revision={revision}"
-            )
+            log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
 
             readme_content = await self._download_readme(model)
@@ -306,15 +298,13 @@ class HuggingFaceScanner:
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model: model_id={model_id}, revision={revision}",
+                f"Successfully scanned HuggingFace model: {model}",
             )
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace model {model_id}, revision={revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to scan model {model_id}, revision={revision}: {str(e)}"
-            ) from e
+            log.error(f"Failed to scan HuggingFace model {model}: {str(e)}")
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -337,9 +327,6 @@ class HuggingFaceScanner:
         Returns:
             List of FileInfo objects
         """
-        model_id = model.model_id
-        revision = model.revision
-
         try:
             filepaths = await self._client.list_model_filepaths(model)
             model_files = await self._client.list_model_files_info(model, filepaths)
@@ -370,17 +357,15 @@ class HuggingFaceScanner:
                 except Exception as e:
                     path = getattr(file, "path", "unknown")
                     log.error(
-                        f"Error processing file {path} info for model {model_id}@{revision}. Details: {str(e)}"
+                        f"Error processing file {path} info for model {model}. Details: {str(e)}"
                     )
                     continue
 
             return file_infos
 
         except Exception as e:
-            log.error(f"Failed to list files for model {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to list files for model {model_id}@{revision}: {str(e)}"
-            ) from e
+            log.error(f"Failed to list files for model {model}: {str(e)}")
+            raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
 
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
         """Download README content for a model.

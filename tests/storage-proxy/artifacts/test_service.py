@@ -315,7 +315,7 @@ class TestHuggingFaceService:
         )
 
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-        url = await hf_service.get_download_url(
+        url = hf_service.get_download_url(
             registry_name="test_registry",
             model=model_target,
             filename="config.json",
@@ -470,8 +470,7 @@ class TestHuggingFaceService:
 
             await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
-                model_id="microsoft/DialoGPT-medium",
-                revision="main",
+                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
                 storage_name="test_storage",
                 bucket_name="test_bucket",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
@@ -498,8 +497,10 @@ class TestHuggingFaceService:
 
             await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
-                model_id="microsoft/DialoGPT-medium",
-                revision="main",
+                model=ModelTarget(
+                    model_id="microsoft/DialoGPT-medium",
+                    revision="main",
+                ),
                 storage_name="test_storage",
                 bucket_name="test_bucket",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
@@ -523,8 +524,7 @@ class TestHuggingFaceService:
         with pytest.raises(HuggingFaceAPIError):
             await service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
-                model_id="microsoft/DialoGPT-medium",
-                revision="main",
+                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
                 storage_name="test_storage",
                 bucket_name="test_bucket",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
@@ -547,8 +547,7 @@ class TestHuggingFaceService:
         with pytest.raises(HuggingFaceAPIError):
             await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
-                model_id="microsoft/DialoGPT-medium",
-                revision="main",
+                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
                 storage_name="test_storage",
                 bucket_name="test_bucket",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
