@@ -10,9 +10,9 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
-from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
-from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
+from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
+from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )

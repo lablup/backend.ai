@@ -3,7 +3,9 @@ import logging
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,

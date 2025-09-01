@@ -12,7 +12,9 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
@@ -87,7 +89,6 @@ class ArtifactService:
                 registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
                     action.registry_id
                 )
-                # TODO: Abstract remote registry client layer (scan, import)
                 storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 scan_result = await storage_proxy_client.scan_huggingface_models(

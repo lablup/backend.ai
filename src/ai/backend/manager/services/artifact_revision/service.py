@@ -12,7 +12,9 @@ from ai.backend.manager.data.artifact.types import ArtifactRegistryType, Artifac
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,

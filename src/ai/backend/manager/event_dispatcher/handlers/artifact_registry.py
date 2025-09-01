@@ -14,7 +14,9 @@ from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.processors import Processors
 
@@ -54,8 +56,6 @@ class ArtifactRegistryEventHandler:
         for registry in registries:
             if registry.type != ArtifactRegistryType.RESERVOIR:
                 continue
-
-            self._artifact_registry_repository.get_artifact_registry_data
 
             await processors.artifact.scan.wait_for_complete(
                 ScanArtifactsAction(
