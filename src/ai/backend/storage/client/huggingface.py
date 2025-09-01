@@ -98,9 +98,8 @@ class HuggingFaceClient:
             for branch in refs.branches:
                 revisions.append(branch.name)
 
-            # TODO: Should we consider tag?
-            # for tag in refs.tags:
-            #     revisions.append(tag.name)
+            for tag in refs.tags:
+                revisions.append(tag.name)
             return revisions
         except Exception as e:
             log.error(f"Failed to list revisions for {model_id}: {str(e)}")

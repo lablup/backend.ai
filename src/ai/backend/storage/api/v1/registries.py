@@ -11,6 +11,7 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
@@ -108,7 +109,7 @@ def create_app(ctx: RootContext) -> web.Application:
     huggingface_registry_configs = dict(
         (r.name, r.config)
         for r in ctx.local_config.registries
-        if r.config.registry_type == "huggingface"
+        if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
     )
 
     huggingface_service = HuggingFaceService(
