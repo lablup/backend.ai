@@ -5,7 +5,7 @@ Developer guide for Backend.AI documentation
 
 ## Setting up the build environment for docs
 
-### Installing pyenv and pyenv-virtualenv
+### Installing pyenv and pyenv-virtualenv  
 
 * Please refer to the official docs:
   - https://github.com/pyenv/pyenv#installation
