@@ -101,7 +101,10 @@ class HuggingFaceClient:
                 revisions.add(tag.name)
             return list(revisions)
         except Exception as e:
-            log.error(f"Failed to list revisions for {model_id}: {str(e)}")
+            # TODO: Is this logging level proper?
+            log.warning(
+                f"Failed to list revisions for {model_id}: {str(e)}, skipping and fallback to main..."
+            )
             # Fall back to main revision if revision listing fails
             return ["main"]
 
@@ -386,12 +389,10 @@ class HuggingFaceScanner:
                         return content
                     else:
                         log.warning(
-                            f"Failed to download README for {model.model_id}@{model.revision}: HTTP {response.status}"
+                            f"Failed to download README for {model}, status code: {response.status}"
                         )
                         return None
 
         except Exception as e:
-            log.warning(
-                f"Failed to download README for {model.model_id}@{model.revision}: {str(e)}"
-            )
+            log.warning(f"Failed to download README for {model}: {str(e)}")
             return None
