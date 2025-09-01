@@ -137,13 +137,13 @@ class ArtifactRevisionService:
     async def import_revision(
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
+        await self._artifact_repository.update_artifact_revision_status(
+            action.artifact_revision_id, ArtifactStatus.PULLING
+        )
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
         )
         artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
-        await self._artifact_repository.update_artifact_revision_status(
-            artifact.id, ArtifactStatus.PULLING
-        )
 
         reservoir_config = self._config_provider.config.reservoir
         storage_type = reservoir_config.config.storage_type
