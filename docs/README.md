@@ -25,7 +25,7 @@ $ pip install -U -r requirements.txt
 ```
 
 
-## Building API Reference JSON file
+## Building API Reference JSON file  
 REST API
 ```console
 $ ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
