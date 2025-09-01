@@ -147,6 +147,8 @@ class StorageAPIHandler:
         Downloads file content from URL and uploads it to storage using streaming.
         """
         req = body.parsed
+        await log_client_api_entry(log, "pull_file", req)
+
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
@@ -159,7 +161,6 @@ class StorageAPIHandler:
 
         # For now, we only use the first reservoir registry configuration
         reservoir_config: ReservoirConfig = cast(ReservoirConfig, reservoir_configs[0].config)
-        await log_client_api_entry(log, "pull_file", req)
 
         async def _pull_task(reporter: ProgressReporter) -> None:
             if (
@@ -177,12 +178,13 @@ class StorageAPIHandler:
                 storage_name=storage_name,
                 bucket_name=bucket_name,
                 options=BucketCopyOptions(concurrency=16),
+                progress_reporter=reporter,
             )
 
         task_id = await self._background_task_manager.start(_pull_task)
 
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=PullObjectResponse(task_id=task_id)
+            status_code=HTTPStatus.ACCEPTED, response_model=PullObjectResponse(task_id=task_id)
         )
 
     @api_handler

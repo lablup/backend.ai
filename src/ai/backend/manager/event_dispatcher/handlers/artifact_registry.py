@@ -62,12 +62,13 @@ class ArtifactRegistryEventHandler:
                 await processors.artifact.scan.wait_for_complete(
                     ScanArtifactsAction(
                         registry_id=registry.registry_id,
-                        order=ModelSortKey.DOWNLOADS,
                         # Ignored in reservoir types
+                        order=ModelSortKey.DOWNLOADS,
                         limit=-1,
                         search=None,
                     )
                 )
+                log.info("Completed scanning reservoir registry: {}.", registry.registry_id)
             except ReservoirConnectionError:
                 log.warning(
                     "Failed to scan reservoir registry: {}.",

@@ -5,6 +5,7 @@ from typing import AsyncIterable, AsyncIterator, Optional
 
 import aioboto3
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     DeleteObjectResponse,
@@ -158,6 +159,7 @@ class StorageService:
         storage_name: str,
         bucket_name: str,
         options: BucketCopyOptions,
+        progress_reporter: ProgressReporter,
     ) -> int:
         """
         Stream-copy ALL objects from the source bucket (no prefix) to the destination bucket.
