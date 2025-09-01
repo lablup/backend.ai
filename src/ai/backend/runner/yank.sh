@@ -19,7 +19,7 @@ maxlen=74994
 
 # warn if exceeds maxlen
 if [ "$buflen" -gt "$maxlen" ]; then
-  printf "yank.sh: input is too long (%d bytes, max: ${max_len} bytes)" "$(( buflen - maxlen ))" >&2
+  printf "yank.sh: input is too long (%d bytes, max: $maxlen bytes)" "$(( buflen - maxlen ))" >&2
 fi
 
 # build up OSC 52 ANSI escape sequence
