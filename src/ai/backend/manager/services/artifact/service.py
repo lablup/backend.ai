@@ -12,6 +12,7 @@ from ai.backend.manager.client.reservoir_registry_client import ReservoirRegistr
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
+from ai.backend.manager.dto.request import ArtifactRegistriesSearchReq
 from ai.backend.manager.dto.response import ArtifactRegistriesSearchResponse
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -49,6 +50,7 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
     UpsertArtifactsActionResult,
 )
+from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -124,20 +126,20 @@ class ArtifactService:
                 offset = 0
                 limit = 10
                 all_artifacts: list[ArtifactDataWithRevisions] = []
+                MAX_RETRIES = 3
 
                 while True:
-                    payload = {
-                        "pagination": {
-                            "offset": {"offset": offset, "limit": limit},
-                        },
-                    }
-
-                    max_retries = 3
                     retry_count = 0
                     client_resp = None
 
-                    while retry_count < max_retries:
+                    while retry_count < MAX_RETRIES:
                         try:
+                            req = ArtifactRegistriesSearchReq(
+                                pagination=PaginationOptions(
+                                    offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
+                                )
+                            )
+                            payload = req.model_dump(mode="json")
                             client_resp = await remote_reservoir_client.request(
                                 "POST", "/artifact-registries/search", json=payload
                             )
@@ -148,16 +150,16 @@ class ArtifactService:
                                 "Cannot connect to reservoir registry: {} (attempt {}/{}). Error: {}",
                                 registry_data.endpoint,
                                 retry_count,
-                                max_retries,
+                                MAX_RETRIES,
                                 e,
                             )
-                            if retry_count < max_retries:
+                            if retry_count < MAX_RETRIES:
                                 await asyncio.sleep(1)
 
                     if client_resp is None:
                         log.warning(
                             "Failed to connect to reservoir registry after {} attempts: {}",
-                            max_retries,
+                            MAX_RETRIES,
                             registry_data.endpoint,
                         )
                         raise ReservoirConnectionError()
