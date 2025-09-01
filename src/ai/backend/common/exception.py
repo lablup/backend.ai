@@ -786,3 +786,16 @@ class ReservoirFileSyncError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ReservoirConnectionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/reservoir-connection-error"
+    error_title = "Reservoir Connection Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

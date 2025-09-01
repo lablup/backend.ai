@@ -1,8 +1,14 @@
+import asyncio
+import logging
+
+from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
 from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
+from ai.backend.common.exception import ReservoirConnectionError
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.client.reservoir_registry_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -43,6 +49,8 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
     UpsertArtifactsActionResult,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactService:
@@ -123,9 +131,37 @@ class ArtifactService:
                             "offset": {"offset": offset, "limit": limit},
                         },
                     }
-                    client_resp = await remote_reservoir_client.request(
-                        "POST", "/artifact-registries/search", json=payload
-                    )
+
+                    max_retries = 3
+                    retry_count = 0
+                    client_resp = None
+
+                    while retry_count < max_retries:
+                        try:
+                            client_resp = await remote_reservoir_client.request(
+                                "POST", "/artifact-registries/search", json=payload
+                            )
+                            break
+                        except ClientConnectorError as e:
+                            retry_count += 1
+                            log.warning(
+                                "Cannot connect to reservoir registry: {} (attempt {}/{}). Error: {}",
+                                registry_data.endpoint,
+                                retry_count,
+                                max_retries,
+                                e,
+                            )
+                            if retry_count < max_retries:
+                                await asyncio.sleep(1)
+
+                    if client_resp is None:
+                        log.warning(
+                            "Failed to connect to reservoir registry after {} attempts: {}",
+                            max_retries,
+                            registry_data.endpoint,
+                        )
+                        raise ReservoirConnectionError()
+
                     RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
                     parsed = RespTypeAdapter.validate_python(client_resp)
 

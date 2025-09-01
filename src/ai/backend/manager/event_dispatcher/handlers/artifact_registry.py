@@ -5,6 +5,7 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
 )
+from ai.backend.common.exception import ReservoirConnectionError
 from ai.backend.common.types import (
     AgentId,
 )
@@ -57,12 +58,18 @@ class ArtifactRegistryEventHandler:
             if registry.type != ArtifactRegistryType.RESERVOIR:
                 continue
 
-            await processors.artifact.scan.wait_for_complete(
-                ScanArtifactsAction(
-                    registry_id=registry.registry_id,
-                    order=ModelSortKey.DOWNLOADS,
-                    # Ignored in reservoir types
-                    limit=-1,
-                    search=None,
+            try:
+                await processors.artifact.scan.wait_for_complete(
+                    ScanArtifactsAction(
+                        registry_id=registry.registry_id,
+                        order=ModelSortKey.DOWNLOADS,
+                        # Ignored in reservoir types
+                        limit=-1,
+                        search=None,
+                    )
                 )
-            )
+            except ReservoirConnectionError:
+                log.warning(
+                    "Failed to scan reservoir registry: {}.",
+                    registry.registry_id,
+                )
