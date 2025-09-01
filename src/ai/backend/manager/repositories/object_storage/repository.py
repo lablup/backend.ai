@@ -4,8 +4,6 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import (
-    ObjectStorageBucketNotFoundError,
-    ObjectStorageNotFoundError,
     StorageNamespaceNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -16,6 +14,10 @@ from ai.backend.manager.data.object_storage_namespace.creator import ObjectStora
 from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
+)
+from ai.backend.manager.errors.object_storage import (
+    ObjectStorageBucketNotFoundError,
+    ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageNamespaceRow, ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

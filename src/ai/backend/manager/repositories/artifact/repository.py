@@ -7,9 +7,6 @@ from sqlalchemy.sql import Select
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.exception import (
-    ObjectStorageNotFoundError,
-)
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
@@ -34,6 +31,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactUpdateError,
     InvalidArtifactModifierTypeError,
 )
+from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
