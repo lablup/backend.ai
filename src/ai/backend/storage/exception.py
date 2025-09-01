@@ -159,10 +159,10 @@ class StorageNotFoundError(web.HTTPNotFound):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
             "type": "https://api.backend.ai/probs/storage/object-not-found",
-            "title": "Object not found or failed",
+            "title": "Storage Config Not Found",
         }
         if msg is not None:
-            payload["title"] = f"Object not found or failed to get object info ({msg})"
+            payload["title"] = f"Storage Config Not Found ({msg})"
             payload["data"] = msg
         super().__init__(
             text=dump_json_str(payload),
@@ -174,10 +174,10 @@ class StorageBucketNotFoundError(web.HTTPNotFound):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
             "type": "https://api.backend.ai/probs/storage/bucket/object-not-found",
-            "title": "Object not found or failed to get object info",
+            "title": "Storage Bucket Not Found",
         }
         if msg is not None:
-            payload["title"] = f"Object not found or failed to get object info ({msg})"
+            payload["title"] = f"Storage Bucket Not Found ({msg})"
             payload["data"] = msg
         super().__init__(
             text=dump_json_str(payload),
@@ -189,10 +189,10 @@ class StorageBucketFileNotFoundError(web.HTTPNotFound):
     def __init__(self, msg: Optional[str] = None) -> None:
         payload = {
             "type": "https://api.backend.ai/probs/storage/bucket/file/object-not-found",
-            "title": "Object not found or failed to get object info",
+            "title": "Storage Bucket File Not Found",
         }
         if msg is not None:
-            payload["title"] = f"Object not found or failed to get object info ({msg})"
+            payload["title"] = f"Storage Bucket File Not Found ({msg})"
             payload["data"] = msg
         super().__init__(
             text=dump_json_str(payload),

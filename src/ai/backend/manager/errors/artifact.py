@@ -63,7 +63,7 @@ class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
 
 class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
-    error_title = "Artifact Deletion Failed"
+    error_title = "Artifact Deletion Bad Request"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -100,7 +100,7 @@ class ArtifactAssociationCreationError(BackendAIError, web.HTTPInternalServerErr
         )
 
 
-class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
+class ArtifactAssociationDeletionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-association-deletion-failed"
     error_title = "Artifact Association Deletion Failed"
 
