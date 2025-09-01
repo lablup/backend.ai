@@ -147,7 +147,7 @@ class StorageAPIHandler:
         Downloads file content from URL and uploads it to storage using streaming.
         """
         req = body.parsed
-        await log_client_api_entry(log, "pull_file", req)
+        await log_client_api_entry(log, "pull_bucket", req)
 
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
