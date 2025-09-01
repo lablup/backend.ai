@@ -137,7 +137,7 @@ class StorageAPIHandler:
         )
 
     @api_handler
-    async def pull_file(
+    async def pull_bucket(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[PullObjectReq],
@@ -313,17 +313,12 @@ def create_app(ctx: RootContext) -> web.Application:
         "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/download", api_handler.download_file
     )
     app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/pull", api_handler.pull_file
+        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/pull", api_handler.pull_bucket
     )
     app.router.add_route(
         "POST",
         "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
         api_handler.presigned_upload_url,
-    )
-    app.router.add_route(
-        "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/pull",
-        api_handler.pull_file,
     )
     app.router.add_route(
         "GET",

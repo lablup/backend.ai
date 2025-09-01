@@ -120,9 +120,7 @@ class APIHandler:
             GetBucketsAction(storage_id=storage_id)
         )
 
-        # Extract bucket names from the ObjectStorageMetaData objects
-        bucket_names = [meta.bucket for meta in action_result.result]
-
+        bucket_names = [namespace_data.bucket for namespace_data in action_result.result]
         resp = ObjectStorageBucketsResponse(buckets=bucket_names)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
