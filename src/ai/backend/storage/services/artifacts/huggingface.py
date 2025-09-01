@@ -197,7 +197,9 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Scanning HuggingFace model: model_id={model.model_id}@{model.revision}")
+        log.info(
+            f"Scanning HuggingFace model: model_id={model.model_id}, revision={model.revision}"
+        )
         return await self._make_scanner(registry_name).scan_model(model)
 
     async def list_model_files(
@@ -216,7 +218,7 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Listing model files: model_id={model.model_id}@{model.revision}")
+        log.info(f"Listing model files: model_id={model.model_id}, revision={model.revision}")
         return await self._make_scanner(registry_name).list_model_files_info(model)
 
     async def get_download_url(self, registry_name: str, model: ModelTarget, filename: str) -> str:
@@ -231,7 +233,7 @@ class HuggingFaceService:
             Download URL string
         """
         log.info(
-            f"Getting download URL: model_id={model.model_id}@{model.revision}, filename={filename}"
+            f"Getting download URL: model_id={model.model_id}, revision={model.revision}, filename={filename}"
         )
         return self._make_scanner(registry_name).get_download_url(model, filename)
 
@@ -265,7 +267,9 @@ class HuggingFaceService:
             model_id = model.model_id
             revision = model.revision
             try:
-                log.info(f"Rescanning model for latest metadata: model_id={model_id}@{revision}")
+                log.info(
+                    f"Rescanning model for latest metadata: model_id={model_id}, revision={revision}"
+                )
                 scanner = self._make_scanner(registry_name)
                 file_infos = await scanner.list_model_files_info(model)
 
@@ -273,7 +277,7 @@ class HuggingFaceService:
                 reporter.total_progress = file_count
                 file_total_size = sum(file.size for file in file_infos)
                 log.info(
-                    f"Found files to import: model_id={model_id}@{revision}, file_count={file_count}, "
+                    f"Found files to import: model_id={model_id}, revision={revision}, file_count={file_count}, "
                     f"total_size={file_total_size / (1024 * 1024)} MB"
                 )
                 artifact_total_size += file_total_size
@@ -295,7 +299,7 @@ class HuggingFaceService:
                         successful_uploads += 1
                     except Exception as e:
                         log.error(
-                            f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
+                            f"Failed to upload file: {str(e)}, model_id={model_id}, revision={revision}, file_path={file_info.path}"
                         )
                         failed_uploads += 1
                     finally:
@@ -305,13 +309,13 @@ class HuggingFaceService:
                         )
 
                 log.info(
-                    f"Model import completed: model_id={model_id}@{revision}, successful_uploads={successful_uploads}, "
+                    f"Model import completed: model_id={model_id}, revision={revision}, successful_uploads={successful_uploads}, "
                     f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
                 )
 
                 if failed_uploads > 0:
                     log.warning(
-                        f"Some files failed to import: model_id={model_id}@{revision}, failed_count={failed_uploads}"
+                        f"Some files failed to import: model_id={model_id}, revision={revision}, failed_count={failed_uploads}"
                     )
 
                 await self._event_producer.anycast_event(
@@ -325,10 +329,12 @@ class HuggingFaceService:
                 )
 
             except HuggingFaceModelNotFoundError:
-                log.error(f"Model not found: model_id={model_id}@{revision}")
+                log.error(f"Model not found: model_id={model_id}, revision={revision}")
                 raise
             except Exception as e:
-                log.error(f"Model import failed: error={str(e)}, model_id={model_id}@{revision}")
+                log.error(
+                    f"Model import failed: error={str(e)}, model_id={model_id}, revision={revision}"
+                )
                 raise HuggingFaceAPIError(
                     f"Import failed for {model_id}@{revision}: {str(e)}"
                 ) from e
@@ -617,7 +623,7 @@ class HuggingFaceService:
             storage_key = f"{model_id}/{revision}/{file_info.path}"
 
             log.info(
-                f"Starting file upload to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
+                f"Starting file upload to {storage_name}: model_id={model_id}, revision={revision}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 

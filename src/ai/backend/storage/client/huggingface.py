@@ -287,7 +287,9 @@ class HuggingFaceScanner:
         revision = model.revision
 
         try:
-            log.info(f"Scanning specific HuggingFace model: model_id={model_id}@{revision}")
+            log.info(
+                f"Scanning specific HuggingFace model: model_id={model_id}, revision={revision}"
+            )
             model_info = await self._client.scan_model(model)
 
             readme_content = await self._download_readme(model)
@@ -304,14 +306,14 @@ class HuggingFaceScanner:
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model: model_id={model_id}@{revision}",
+                f"Successfully scanned HuggingFace model: model_id={model_id}, revision={revision}",
             )
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace model {model_id}@{revision}: {str(e)}")
+            log.error(f"Failed to scan HuggingFace model {model_id}, revision={revision}: {str(e)}")
             raise HuggingFaceAPIError(
-                f"Failed to scan model {model_id}@{revision}: {str(e)}"
+                f"Failed to scan model {model_id}, revision={revision}: {str(e)}"
             ) from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
