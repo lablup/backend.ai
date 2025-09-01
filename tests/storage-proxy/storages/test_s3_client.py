@@ -270,3 +270,174 @@ async def test_delete_bucket_nonexistent(s3_client: S3Client):
         await s3_client.delete_bucket("nonexistent-bucket-12345")
     except ClientError:
         pass  # Expected to fail for nonexistent bucket
+
+
+@pytest.mark.asyncio
+async def test_bucket_to_bucket_copy_simulation(s3_client: S3Client):
+    """Test bucket-to-bucket copy simulation using S3Client methods (simulating pull_bucket functionality)"""
+    import uuid
+
+    source_bucket = "source-bucket-test"
+    dest_bucket = "dest-bucket-test"
+    test_suffix = str(uuid.uuid4())[:8]
+
+    # Test files to copy
+    test_files = [
+        (f"copy_test_{test_suffix}_file1.txt", b"content of source file 1"),
+        (f"copy_test_{test_suffix}_file2.txt", b"content of source file 2"),
+        (f"copy_test_{test_suffix}_subdir/file3.txt", b"content of source file 3 in subdir"),
+    ]
+
+    try:
+        # Create source and destination buckets
+        await s3_client.create_bucket(source_bucket)
+        await s3_client.create_bucket(dest_bucket)
+
+        # Create source client
+        source_client = S3Client(
+            bucket_name=source_bucket,
+            endpoint_url=s3_client.endpoint_url,
+            region_name=s3_client.region_name,
+            aws_access_key_id=s3_client.aws_access_key_id,
+            aws_secret_access_key=s3_client.aws_secret_access_key,
+        )
+
+        # Create destination client
+        dest_client = S3Client(
+            bucket_name=dest_bucket,
+            endpoint_url=s3_client.endpoint_url,
+            region_name=s3_client.region_name,
+            aws_access_key_id=s3_client.aws_access_key_id,
+            aws_secret_access_key=s3_client.aws_secret_access_key,
+        )
+
+        # Upload test files to source bucket
+        for key, content in test_files:
+
+            async def content_stream():
+                yield content
+
+            await source_client.upload_stream(
+                content_stream(),
+                key,
+                _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE,
+                content_type="text/plain",
+            )
+
+        # Simulate bucket-to-bucket copy (what stream_bucket_to_bucket does)
+        for key, expected_content in test_files:
+            # Download from source
+            chunks = []
+            async for chunk in source_client.download_stream(
+                key, _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE
+            ):
+                chunks.append(chunk)
+
+            downloaded_content = b"".join(chunks)
+            assert downloaded_content == expected_content
+
+            # Upload to destination
+            async def copy_stream():
+                yield downloaded_content
+
+            await dest_client.upload_stream(
+                copy_stream(),
+                key,
+                _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE,
+                content_type="text/plain",
+            )
+
+            # Verify file exists in destination
+            dest_info = await dest_client.get_object_meta(key)
+            assert dest_info.content_length == len(expected_content)
+
+            # Double check by downloading from destination
+            dest_chunks = []
+            async for chunk in dest_client.download_stream(
+                key, _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE
+            ):
+                dest_chunks.append(chunk)
+
+            dest_content = b"".join(dest_chunks)
+            assert dest_content == expected_content
+
+    finally:
+        # Clean up: delete all objects and buckets
+        try:
+            # Delete objects from source bucket
+            for key, _ in test_files:
+                try:
+                    await source_client.delete_object(key)
+                except Exception:
+                    pass
+
+            # Delete objects from dest bucket
+            for key, _ in test_files:
+                try:
+                    await dest_client.delete_object(key)
+                except Exception:
+                    pass
+
+            # Delete buckets
+            await s3_client.delete_bucket(source_bucket)
+            await s3_client.delete_bucket(dest_bucket)
+        except Exception:
+            pass  # Ignore cleanup errors
+
+
+@pytest.mark.asyncio
+async def test_multiple_files_batch_operations(s3_client: S3Client):
+    """Test batch operations on multiple files (used by pull_bucket functionality)"""
+    import uuid
+
+    test_suffix = str(uuid.uuid4())[:8]
+    test_files = [
+        (f"batch_test_{test_suffix}_file1.txt", b"batch test content 1"),
+        (f"batch_test_{test_suffix}_file2.txt", b"batch test content 2"),
+        (f"batch_test_{test_suffix}_file3.txt", b"batch test content 3"),
+    ]
+
+    try:
+        # Upload multiple files
+        for key, content in test_files:
+
+            async def content_stream():
+                yield content
+
+            await s3_client.upload_stream(
+                content_stream(),
+                key,
+                _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE,
+                content_type="text/plain",
+            )
+
+        # Verify all files exist and have correct content
+        for key, expected_content in test_files:
+            # Check metadata
+            info = await s3_client.get_object_meta(key)
+            assert info.content_length == len(expected_content)
+
+            # Check content
+            chunks = []
+            async for chunk in s3_client.download_stream(key, _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE):
+                chunks.append(chunk)
+
+            actual_content = b"".join(chunks)
+            assert actual_content == expected_content
+
+        # Batch delete all files
+        for key, _ in test_files:
+            await s3_client.delete_object(key)
+
+        # Verify all files are deleted
+        for key, _ in test_files:
+            with pytest.raises(ClientError):
+                await s3_client.get_object_meta(key)
+
+    finally:
+        # Cleanup in case of test failure
+        for key, _ in test_files:
+            try:
+                await s3_client.delete_object(key)
+            except Exception:
+                pass
