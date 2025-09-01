@@ -188,11 +188,13 @@ class HuggingFaceClient:
         Returns:
             Download URL
         """
-        try:
-            return hf_hub_url(repo_id=model.model_id, filename=filename, revision=model.revision)
-        except Exception:
-            # Fallback URL
-            return f"https://huggingface.co/{model.model_id}/resolve/{model.revision}/{filename}"
+        return hf_hub_url(
+            repo_id=model.model_id,
+            filename=filename,
+            revision=model.revision,
+            endpoint=self._endpoint,
+            repo_type="model",
+        )
 
 
 @dataclass
