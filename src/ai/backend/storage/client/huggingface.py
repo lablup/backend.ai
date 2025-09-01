@@ -94,13 +94,12 @@ class HuggingFaceClient:
             refs = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_refs(model_id, token=self._token)
             )
-            revisions = []
+            revisions = set()
             for branch in refs.branches:
-                revisions.append(branch.name)
-
+                revisions.add(branch.name)
             for tag in refs.tags:
-                revisions.append(tag.name)
-            return revisions
+                revisions.add(tag.name)
+            return list(revisions)
         except Exception as e:
             log.error(f"Failed to list revisions for {model_id}: {str(e)}")
             # Fall back to main revision if revision listing fails
