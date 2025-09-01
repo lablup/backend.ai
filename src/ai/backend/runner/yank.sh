@@ -3,6 +3,8 @@
 # to make it working with no-clear, no-cancel variants of the tmux copy-pipe commands
 set -eu
 
+tmux=/opt/kernel/tmux
+
 # get data either form stdin or from file
 buf=$(cat "$@")
 
@@ -24,7 +26,7 @@ fi
 esc="\033]52;c;$( printf %s "$buf" | head -c $maxlen | base64 | tr -d '\r\n' )\a"
 
 # resolve target terminal to send escape sequence
-pane_active_tty=$(tmux list-panes -F "#{pane_active} #{pane_tty}" | awk '$1=="1" { print $2 }')
+pane_active_tty=$("$tmux" list-panes -F "#{pane_active} #{pane_tty}" | awk '$1=="1" { print $2 }')
 target_tty="${SSH_TTY:-$pane_active_tty}"
 
 printf "$esc" > "$target_tty"
