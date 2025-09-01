@@ -132,7 +132,6 @@ class StorageService:
         size_map: dict[str, int] = {}
         total = 0
 
-        log.trace("[list] start bucket={} endpoint={}", bucket, endpoint_url)
         async with session.client(
             "s3",
             endpoint_url=endpoint_url,
@@ -151,7 +150,6 @@ class StorageService:
                     size_map[key] = size
                     total += size
 
-        log.trace("[list] done keys={} total_bytes={}", len(keys), total)
         return keys, size_map, total
 
     async def stream_bucket_to_bucket(
@@ -163,22 +161,15 @@ class StorageService:
     ) -> int:
         """
         Stream-copy ALL objects from the source bucket (no prefix) to the destination bucket.
-
-        - Source S3/MinIO endpoint is taken from `src.endpoint` (assumed S3-compatible).
-        - Credentials/region come from `src.object_storage_access_key`, `src.object_storage_secret_key`, `src.object_storage_region`.
-        - Destination is looked up via your wrapper: `_get_s3_client(storage_name, bucket_name)`.
-        - Returns the number of copied objects.
+        Returns the number of copied objects.
         """
-        # Destination upload client & part size
         dst_client = self._get_s3_client(storage_name, bucket_name)
-        part_size = self._storage_configs[storage_name].upload_chunk_size
-
         # TODO: # Instead of using its own download_chunksize,
         # it should retrieve and use the configuration from the remote storage.
         download_chunk_size = self._storage_configs[storage_name].download_chunk_size
 
         # List all objects up front
-        keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
+        target_keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
             endpoint_url=src.endpoint,
             access_key=src.object_storage_access_key,
             secret_key=src.object_storage_secret_key,
@@ -186,17 +177,17 @@ class StorageService:
             bucket=bucket_name,
         )
 
-        if not keys:
-            log.trace("[copy] no objects to copy; nothing to do")
+        if not target_keys:
+            log.trace("[stream_b2b] no objects to copy; nothing to do")
             return 0
 
         log.trace(
-            "[copy] start src_endpoint={} src_bucket={} dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
+            "[stream_b2b] start src_endpoint={} src_bucket={} dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
             src.endpoint,
             bucket_name,
             storage_name,
             bucket_name,
-            len(keys),
+            len(target_keys),
             total_bytes,
             options.concurrency,
         )
@@ -213,10 +204,10 @@ class StorageService:
             aws_secret_access_key=src.object_storage_secret_key,
         ) as src_s3:
 
-            async def _copy_one(key: str) -> None:
+            async def _copy_single_object(key: str) -> None:
                 async with sem:
                     size = size_map.get(key, -1)
-                    log.trace("[copy] begin key={} size={}", key, size)
+                    log.trace("[stream_b2b] begin key={} size={}", key, size)
 
                     resp = await src_s3.get_object(Bucket=bucket_name, Key=key)
                     body = resp["Body"]
@@ -236,23 +227,26 @@ class StorageService:
                                 break
                             sent += len(chunk)
                             if next_mark and sent >= next_mark:
-                                log.trace("[copy] progress key={} sent={}/{}", key, sent, size)
+                                log.trace(
+                                    "[stream_b2b] progress key={} sent={}/{}", key, sent, size
+                                )
                                 next_mark += options.progress_log_interval_bytes
                             yield chunk
 
+                    part_size = self._storage_configs[storage_name].upload_chunk_size
                     await dst_client.upload_stream(
                         _data_stream(),
-                        key,  # same key at destination (no dst_prefix per your spec)
+                        key,  # same key at destination
                         content_type=ctype,
                         part_size=part_size,
                     )
 
-                    log.trace("[copy] done key={} bytes={}", key, size)
+                    log.trace("[stream_b2b] done key={} bytes={}", key, size)
 
-            await asyncio.gather(*(_copy_one(k) for k in keys))
-            copied = len(keys)
+            await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
+            copied = len(target_keys)
 
-        log.trace("[copy] all done objects={} total_bytes={}", copied, total_bytes)
+        log.trace("[stream_b2b] all done objects={} total_bytes={}", copied, total_bytes)
         return copied
 
     # TODO: Replace `request` with proper options
