@@ -541,162 +541,6 @@ class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/artifact-not-found"
-    error_title = "Artifact Not Found"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/artifact-revision-not-found"
-    error_title = "Artifact Revision Not Found"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/artifact-not-approved"
-    error_title = "Artifact Not Approved"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class ArtifactReadonly(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/artifact-readonly"
-    error_title = "You cannot upload files to readonly artifact storage"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/artifact-not-verified"
-    error_title = "Artifact Not Verified"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class ArtifactNotAvailable(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/artifact-not-available"
-    error_title = "Artifact Not Available"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/artifact-association-not-found"
-    error_title = "Artifact Association Not Found"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/artifact-update-failed"
-    error_title = "Artifact Update Failed"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ArtifactAssociationCreationError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/artifact-association-creation-failed"
-    error_title = "Artifact Association Creation Failed"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ArtifactAssociationDeletionError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/artifact-association-deletion-failed"
-    error_title = "Artifact Association Deletion Failed"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ArtifactDeletionError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
-    error_title = "Artifact Deletion Failed"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
-    error_title = "Artifact Deletion Failed"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-cursor-type"
     error_title = "Invalid Cursor Type"
@@ -706,19 +550,6 @@ class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class InvalidArtifactModifierTypeError(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-modifier-type"
-    error_title = "Invalid Artifact Modifier Type"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
 
@@ -736,32 +567,6 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/artifact-registry-not-found"
-    error_title = "Artifact Registry Not Found"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class InvalidArtifactRegistryTypeError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/invalid-artifact-registry-type"
-    error_title = "Invalid Artifact Registry Type"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_REGISTRY,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.NOT_IMPLEMENTED,
-        )
-
-
 class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/relation-not-loaded"
     error_title = "Relation Not Loaded"
@@ -771,31 +576,5 @@ class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ReservoirFileSyncError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/reservoir-file-sync-error"
-    error_title = "Reservoir File Sync Error"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ReservoirConnectionError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/reservoir-connection-error"
-    error_title = "Reservoir Connection Error"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_REGISTRY,
-            operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )

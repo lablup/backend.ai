@@ -5,10 +5,13 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     PullObjectReq,
 )
-from ai.backend.common.exception import ArtifactDeletionBadRequestError, ArtifactDeletionError
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType, ArtifactStatus
+from ai.backend.manager.errors.artifact import (
+    ArtifactDeletionBadRequestError,
+    ArtifactDeletionError,
+)
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository

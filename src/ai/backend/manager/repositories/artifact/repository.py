@@ -8,13 +8,6 @@ from sqlalchemy.sql import Select
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import (
-    ArtifactAssociationDeletionError,
-    ArtifactAssociationNotFoundError,
-    ArtifactNotFoundError,
-    ArtifactNotVerified,
-    ArtifactRevisionNotFoundError,
-    ArtifactUpdateError,
-    InvalidArtifactModifierTypeError,
     ObjectStorageNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -31,6 +24,15 @@ from ai.backend.manager.data.association.types import AssociationArtifactsStorag
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
+)
+from ai.backend.manager.errors.artifact import (
+    ArtifactAssociationDeletionError,
+    ArtifactAssociationNotFoundError,
+    ArtifactNotFoundError,
+    ArtifactNotVerified,
+    ArtifactRevisionNotFoundError,
+    ArtifactUpdateError,
+    InvalidArtifactModifierTypeError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow

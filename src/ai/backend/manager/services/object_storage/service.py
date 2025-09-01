@@ -5,11 +5,11 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
 )
-from ai.backend.common.exception import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
+from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.services.object_storage.actions.create import (

@@ -7,13 +7,13 @@ from pydantic import TypeAdapter
 from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
-from ai.backend.common.exception import ReservoirConnectionError
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.client.reservoir_registry_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
 from ai.backend.manager.dto.response import ArtifactRegistriesSearchResponse
+from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository

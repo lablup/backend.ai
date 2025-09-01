@@ -3,7 +3,6 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import ArtifactNotFoundError, ArtifactRegistryNotFoundError
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import (
@@ -16,6 +15,8 @@ from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryDa
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.artifact import ArtifactNotFoundError
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
