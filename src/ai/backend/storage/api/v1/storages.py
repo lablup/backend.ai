@@ -294,7 +294,6 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages"
 
-    # TODO: Add bucket creation and deletion endpoints when working Manager integration
     api_handler = StorageAPIHandler(
         storage_configs=ctx.local_config.storages,
         registry_configs=ctx.local_config.registries,

@@ -323,7 +323,11 @@ class TestHuggingFaceService:
 
         assert url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         mock_hf_hub_url.assert_called_once_with(
-            repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
+            repo_id="microsoft/DialoGPT-medium",
+            filename="config.json",
+            revision="main",
+            endpoint="https://huggingface.co",
+            repo_type="model",
         )
 
     @pytest.mark.asyncio

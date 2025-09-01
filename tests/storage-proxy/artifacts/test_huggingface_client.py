@@ -235,21 +235,22 @@ class TestHuggingFaceClient:
                 url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
             )
             mock_hf_hub_url.assert_called_once_with(
-                repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
+                repo_id="microsoft/DialoGPT-medium",
+                filename="config.json",
+                revision="main",
+                endpoint="https://huggingface.co",
+                repo_type="model",
             )
 
     def test_get_download_url_fallback(self, hf_client: HuggingFaceClient) -> None:
-        """Test download URL generation with fallback."""
+        """Test download URL generation with error."""
         with patch("ai.backend.storage.client.huggingface.hf_hub_url") as mock_hf_hub_url:
             mock_hf_hub_url.side_effect = Exception("Error")
 
-            url = hf_client.get_download_url(
-                ModelTarget(model_id="microsoft/DialoGPT-medium"), "config.json"
-            )
-
-            assert (
-                url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
-            )
+            with pytest.raises(Exception):
+                hf_client.get_download_url(
+                    ModelTarget(model_id="microsoft/DialoGPT-medium"), "config.json"
+                )
 
 
 class TestHuggingFaceScanner:
@@ -383,7 +384,11 @@ class TestHuggingFaceScanner:
 
         assert url == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         mock_hf_hub_url.assert_called_once_with(
-            repo_id="microsoft/DialoGPT-medium", filename="config.json", revision="main"
+            repo_id="microsoft/DialoGPT-medium",
+            filename="config.json",
+            revision="main",
+            endpoint="https://huggingface.co",
+            repo_type="model",
         )
 
     @pytest.mark.asyncio
