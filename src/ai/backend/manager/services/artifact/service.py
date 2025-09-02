@@ -139,10 +139,7 @@ class ArtifactService:
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
                                 )
                             )
-                            payload = req.model_dump(mode="json")
-                            client_resp = await remote_reservoir_client.request(
-                                "POST", "/artifact-registries/search", json=payload
-                            )
+                            client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
                         except ClientConnectorError as e:
                             retry_count += 1

@@ -8,6 +8,8 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.dto.request import SearchArtifactsReq
+from ai.backend.manager.dto.response import SearchArtifactsResponse
 
 _HASH_TYPE = "sha256"
 
@@ -45,10 +47,15 @@ class ReservoirRegistryClient:
             **hdrs,
         }
 
-    async def request(self, method: str, rel_url: str, **kwargs) -> Any:
+    async def _request(self, method: str, rel_url: str, **kwargs) -> Any:
         header = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._registry_data.endpoint) / rel_url.lstrip("/")
         async with aiohttp.ClientSession() as session:
             async with session.request(method, str(url), headers=header, **kwargs) as response:
                 response.raise_for_status()
                 return await response.json()
+
+    async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
+        return await self._request(
+            "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
+        )
