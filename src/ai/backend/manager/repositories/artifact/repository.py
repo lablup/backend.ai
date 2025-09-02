@@ -76,32 +76,29 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
                 conditions.append(name_condition)
 
         # Handle registry_filter by joining with registry tables
-        # TODO: Handle to join with proper table?
         if filters.registry_filter is not None:
-            from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+            from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
-            registry_condition = filters.registry_filter.apply_to_column(
-                HuggingFaceRegistryRow.name
-            )
+            registry_condition = filters.registry_filter.apply_to_column(ArtifactRegistryRow.name)
             if registry_condition is not None:
-                # Join with registry table and add condition
+                # Join with artifact registry table and add condition
                 stmt = stmt.join(
-                    HuggingFaceRegistryRow,
-                    HuggingFaceRegistryRow.id == ArtifactRow.registry_id,
+                    ArtifactRegistryRow,
+                    ArtifactRegistryRow.registry_id == ArtifactRow.registry_id,
                 )
                 conditions.append(registry_condition)
 
         # Handle source_filter by joining with source registry tables
         if filters.source_filter is not None:
-            from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+            from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
-            source_registry = sa.orm.aliased(HuggingFaceRegistryRow)
+            source_registry = sa.orm.aliased(ArtifactRegistryRow)
             source_condition = filters.source_filter.apply_to_column(source_registry.name)
             if source_condition is not None:
                 # Join with source registry table (using alias to avoid conflicts)
                 stmt = stmt.join(
                     source_registry,
-                    source_registry.id == ArtifactRow.source_registry_id,
+                    source_registry.registry_id == ArtifactRow.source_registry_id,
                 )
                 conditions.append(source_condition)
 
@@ -296,6 +293,7 @@ class ArtifactRepository:
             rows: list[ArtifactRevisionRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
+    # TODO: Refactor using on_conflict_do_update?
     @repository_decorator()
     async def upsert_artifacts(
         self,
@@ -569,13 +567,19 @@ class ArtifactRepository:
             if row is None:
                 raise ArtifactRevisionNotFoundError()
 
+            # TODO: How to handle already APPROVED?
             if row.status != ArtifactStatus.NEEDS_APPROVAL:
                 raise ArtifactNotVerified("Only verified artifacts could be approved")
 
             update_stmt = (
                 sa.update(ArtifactRevisionRow)
-                .where(ArtifactRevisionRow.id == revision_id)
-                .values(status=ArtifactStatus.AVAILABLE.value)
+                .where(
+                    sa.and_(
+                        ArtifactRevisionRow.id == revision_id,
+                        ArtifactRevisionRow.status == ArtifactStatus.NEEDS_APPROVAL,
+                    )
+                )
+                .values(status=ArtifactStatus.AVAILABLE)
                 .returning(ArtifactRevisionRow)
             )
 
