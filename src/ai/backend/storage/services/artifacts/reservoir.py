@@ -140,7 +140,7 @@ class ReservoirService:
         """
         Stream-copy objects from the source bucket (optionally under key_prefix)
         to the destination bucket.
-        Returns the number of copied objects.
+        Returns the total number of bytes copied.
         """
         dst_client = self._get_s3_client(storage_name, bucket_name)
         download_chunk_size = self._storage_configs[storage_name].remote_storage_download_chunk_size
@@ -183,7 +183,10 @@ class ReservoirService:
             aws_secret_access_key=src.object_storage_secret_key,
         )
 
-        async def _copy_single_object(key: str) -> None:
+        async def _copy_single_object(key: str) -> int:
+            """
+            Return the number of bytes copied.
+            """
             async with sem:
                 size = size_map.get(key, -1)
                 log.trace("[stream_bucket_to_bucket] begin key={} size={}", key, size)
@@ -222,14 +225,15 @@ class ReservoirService:
                 )
 
                 log.trace("[stream_bucket_to_bucket] done key={} bytes={}", key, size)
+                return size if size >= 0 else 0
 
-        await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
-        copied = len(target_keys)
+        sizes = await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
+        bytes_copied = sum(sizes)
 
         log.trace(
             "[stream_bucket_to_bucket] all done objects={} total_bytes={}", copied, total_bytes
         )
-        return copied
+        return bytes_copied
 
     async def import_model(
         self,
@@ -246,7 +250,7 @@ class ReservoirService:
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
 
-        await self.stream_bucket_to_bucket(
+        copied_bytesize = await self.stream_bucket_to_bucket(
             src=reservoir_config,
             storage_name=storage_name,
             bucket_name=bucket_name,
@@ -264,8 +268,7 @@ class ReservoirService:
                 revision=model.revision,
                 registry_name=registry_name,
                 registry_type=ArtifactRegistryType.RESERVOIR,
-                # TODO: Add size
-                total_size=1,
+                total_size=copied_bytesize,
             )
         )
 
