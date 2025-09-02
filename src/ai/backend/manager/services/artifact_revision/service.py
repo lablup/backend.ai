@@ -4,6 +4,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceImportModelsReq,
+    ReservoirImportModelsReq,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -181,9 +182,15 @@ class ArtifactRevisionService:
                     )
                 )
 
-                result = await storage_proxy_client.pull_s3_bucket(
-                    storage_data.name,
-                    storage_namespace.bucket,
+                result = await storage_proxy_client.import_reservoir_models(
+                    ReservoirImportModelsReq(
+                        models=[
+                            ModelTarget(model_id=artifact.name, revision=revision_data.version)
+                        ],
+                        registry_name=registry_data.name,
+                        storage_name=storage_data.name,
+                        bucket_name=storage_namespace.bucket,
+                    )
                 )
             case _:
                 raise InvalidArtifactRegistryTypeError(

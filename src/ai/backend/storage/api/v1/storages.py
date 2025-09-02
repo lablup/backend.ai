@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
@@ -15,7 +15,6 @@ from ai.backend.common.api_handlers import (
     stream_api_handler,
 )
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.dto.storage.context import MultipartUploadCtx
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
@@ -26,15 +25,11 @@ from ai.backend.common.dto.storage.request import (
     PresignedUploadObjectReq,
     UploadObjectReq,
 )
-from ai.backend.common.dto.storage.response import PullBucketResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
     ArtifactRegistryConfig,
     ObjectStorageConfig,
-    ReservoirConfig,
 )
-from ai.backend.storage.exception import ReservoirStorageConfigInvalidError
-from ai.backend.storage.types import BucketCopyOptions
 
 from ...services.storages import StorageService
 from ...utils import log_client_api_entry
@@ -132,57 +127,6 @@ class StorageAPIHandler:
             headers={
                 "Content-Type": "application/octet-stream",
             },
-        )
-
-    @api_handler
-    async def pull_bucket(
-        self,
-        path: PathParam[ObjectStorageAPIPathParams],
-    ) -> APIResponse:
-        """
-        Pull object storage bucket from reservoir and store it in the specified S3 bucket.
-        """
-        await log_client_api_entry(log, "pull_bucket", None)
-
-        storage_name = path.parsed.storage_name
-        bucket_name = path.parsed.bucket_name
-
-        reservoir_configs = list(
-            filter(lambda r: isinstance(r.config, ReservoirConfig), self._registry_configs)
-        )
-
-        if len(reservoir_configs) == 0:
-            raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
-
-        # For now, we only use the first reservoir registry configuration
-        reservoir_config: ReservoirConfig = cast(ReservoirConfig, reservoir_configs[0].config)
-
-        async def _pull_task(reporter: ProgressReporter) -> None:
-            if (
-                not reservoir_config.object_storage_access_key
-                or not reservoir_config.object_storage_secret_key
-            ):
-                raise ReservoirStorageConfigInvalidError(
-                    "Reservoir registry is not properly configured for object storage access."
-                )
-
-            storage_service = StorageService(self._storage_configs)
-
-            await storage_service.stream_bucket_to_bucket(
-                src=reservoir_config,
-                storage_name=storage_name,
-                bucket_name=bucket_name,
-                options=BucketCopyOptions(
-                    concurrency=16,
-                    progress_log_interval_bytes=0,  # disabled
-                ),
-                progress_reporter=reporter,
-            )
-
-        task_id = await self._background_task_manager.start(_pull_task)
-
-        return APIResponse.build(
-            status_code=HTTPStatus.ACCEPTED, response_model=PullBucketResponse(task_id=task_id)
         )
 
     @api_handler
@@ -309,9 +253,6 @@ def create_app(ctx: RootContext) -> web.Application:
         "POST",
         "/s3/{storage_name}/buckets/{bucket_name}/object/download",
         api_handler.download_file,
-    )
-    app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/object/pull", api_handler.pull_bucket
     )
     app.router.add_route(
         "POST",

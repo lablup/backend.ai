@@ -13,13 +13,14 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
+    ReservoirImportModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
-    PullBucketResponse,
+    ReservoirImportModelsResponse,
     VFolderCloneResponse,
 )
 from ai.backend.common.metrics.metric import LayerType
@@ -695,20 +696,19 @@ class StorageProxyManagerFacingClient:
         )
 
     @client_decorator()
-    async def pull_s3_bucket(
+    async def import_reservoir_models(
         self,
-        storage_name: str,
-        bucket_name: str,
-    ) -> PullBucketResponse:
+        req: ReservoirImportModelsReq,
+    ) -> ReservoirImportModelsResponse:
         """
         Pull bucket from reservoir storage to S3 storage.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._client.request(
             "POST",
-            # TODO: Replace this API with /reservoir/import
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/pull",
+            "v1/registries/reservoir/import",
+            body=req.model_dump(by_alias=True),
         )
-        return PullBucketResponse.model_validate(resp)
+        return ReservoirImportModelsResponse.model_validate(resp)
 
     @client_decorator()
     async def get_s3_presigned_download_url(

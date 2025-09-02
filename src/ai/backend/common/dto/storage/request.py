@@ -169,6 +169,44 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
     )
 
 
+class ReservoirImportModelsReq(BaseRequestModel):
+    """Request for batch importing multiple HuggingFace models to storage."""
+
+    models: list[ModelTarget] = Field(
+        description="""
+        List of models to import from HuggingFace.
+        Each model must specify the model ID and optional revision.
+        """,
+        examples=[
+            [
+                {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+                {"model_id": "openai/gpt-2", "revision": "v1.0"},
+            ]
+        ],
+    )
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to import from.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface"],
+    )
+    storage_name: str = Field(
+        description="""
+        Target storage name where all models will be imported.
+        Must be a configured and accessible storage backend.
+        """,
+        examples=["default-minio", "s3-storage", "local-storage"],
+    )
+    bucket_name: str = Field(
+        description="""
+        Target bucket name within the storage for all models.
+        The bucket must exist and be writable by the service.
+        """,
+        examples=["models", "huggingface-models", "ai-models"],
+    )
+
+
 class DeleteObjectReq(BaseRequestModel):
     """
     Data model for file deletion requests from object storage.

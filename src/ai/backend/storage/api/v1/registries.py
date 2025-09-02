@@ -11,22 +11,30 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     HuggingFaceScanModelsReq,
+    ReservoirImportModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
+    PullBucketResponse,
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
+from ai.backend.storage.exception import ReservoirStorageConfigInvalidError
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
+from ai.backend.storage.services.artifacts.reservoir import ReservoirService, ReservoirServiceArgs
 from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.types import BucketCopyOptions
 
 from ...utils import log_client_api_entry
 
@@ -34,6 +42,82 @@ if TYPE_CHECKING:
     from ...context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class ReservoirRegistryAPIHandler:
+    _storage_configs: list[ObjectStorageConfig]
+    _reservoir_service: ReservoirService
+    _event_producer: EventProducer
+    _background_task_manager: BackgroundTaskManager
+    _registry_configs: list[ReservoirConfig]
+
+    def __init__(
+        self,
+        storage_configs: list[ObjectStorageConfig],
+        reservoir_service: ReservoirService,
+        event_producer: EventProducer,
+        background_task_manager: BackgroundTaskManager,
+        registry_configs: list[ReservoirConfig],
+    ) -> None:
+        self._storage_configs = storage_configs
+        self._reservoir_service = reservoir_service
+        self._event_producer = event_producer
+        self._background_task_manager = background_task_manager
+        self._registry_configs = registry_configs
+
+    @api_handler
+    async def import_models(
+        self,
+        body: BodyParam[ReservoirImportModelsReq],
+    ) -> APIResponse:
+        """
+        Import multiple HuggingFace models to storage in batch.
+        """
+        await log_client_api_entry(log, "import_models", None)
+
+        storage_name = body.parsed.storage_name
+        bucket_name = body.parsed.bucket_name
+
+        if len(self._registry_configs) == 0:
+            raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
+
+        # For now, we only use the first reservoir registry configuration
+        reservoir_config: ReservoirConfig = self._registry_configs[0]
+
+        async def _pull_task(reporter: ProgressReporter) -> None:
+            if (
+                not reservoir_config.object_storage_access_key
+                or not reservoir_config.object_storage_secret_key
+            ):
+                raise ReservoirStorageConfigInvalidError(
+                    "Reservoir registry is not properly configured for object storage access."
+                )
+
+            storage_service = ReservoirService(
+                ReservoirServiceArgs(
+                    background_task_manager=self._background_task_manager,
+                    storage_service=self._reservoir_service._storages_service,
+                    event_producer=self._event_producer,
+                    storage_configs=self._storage_configs,
+                )
+            )
+
+            await storage_service.stream_bucket_to_bucket(
+                src=reservoir_config,
+                storage_name=storage_name,
+                bucket_name=bucket_name,
+                options=BucketCopyOptions(
+                    concurrency=16,
+                    progress_log_interval_bytes=0,  # disabled
+                ),
+                progress_reporter=reporter,
+            )
+
+        task_id = await self._background_task_manager.start(_pull_task)
+
+        return APIResponse.build(
+            status_code=HTTPStatus.ACCEPTED, response_model=PullBucketResponse(task_id=task_id)
+        )
 
 
 class HuggingFaceRegistryAPIHandler:
@@ -112,6 +196,10 @@ def create_app(ctx: RootContext) -> web.Application:
         if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
     )
 
+    reservoir_registry_configs: list[ReservoirConfig] = [
+        r.config for r in ctx.local_config.registries if isinstance(r.config, ReservoirConfig)
+    ]
+
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
@@ -120,12 +208,27 @@ def create_app(ctx: RootContext) -> web.Application:
             event_producer=ctx.event_producer,
         )
     )
+    reservoir_service = ReservoirService(
+        ReservoirServiceArgs(
+            background_task_manager=ctx.background_task_manager,
+            storage_service=storage_service,
+            event_producer=ctx.event_producer,
+            storage_configs=ctx.local_config.storages,
+        )
+    )
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(
         huggingface_service=huggingface_service, event_producer=ctx.event_producer
     )
+    reservoir_api_handler = ReservoirRegistryAPIHandler(
+        storage_configs=ctx.local_config.storages,
+        reservoir_service=reservoir_service,
+        event_producer=ctx.event_producer,
+        registry_configs=reservoir_registry_configs,
+        background_task_manager=ctx.background_task_manager,
+    )
 
-    # HuggingFace registry endpoints
     app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_models)
+    app.router.add_route("POST", "/reservoir/import", reservoir_api_handler.import_models)
 
     return app

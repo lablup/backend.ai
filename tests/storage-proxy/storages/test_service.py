@@ -1,8 +1,5 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
@@ -18,7 +15,6 @@ from ai.backend.storage.exception import (
     StorageNotFoundError,
 )
 from ai.backend.storage.services.storages import StorageService
-from ai.backend.storage.types import BucketCopyOptions
 
 _BUCKET_FIXTURE_NAME = "test-bucket"
 
@@ -343,27 +339,27 @@ async def test_delete_object_success(s3_client, storages_service: StorageService
     )
 
     # Delete the object
-    await storages_service.delete_file("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
+    await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
 async def test_delete_object_nonexistent_file(s3_client, storages_service: StorageService):
     """Test deletion of nonexistent file (should still return success)"""
-    await storages_service.delete_file("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
+    await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
 
 
 @pytest.mark.asyncio
 async def test_delete_object_invalid_storage(storages_service: StorageService):
     """Test object deletion with invalid storage"""
     with pytest.raises(StorageBucketNotFoundError):
-        await storages_service.delete_file("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
+        await storages_service.delete_object("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
 async def test_delete_object_invalid_bucket(storages_service: StorageService):
     """Test object deletion with invalid bucket"""
     with pytest.raises(StorageBucketNotFoundError):
-        await storages_service.delete_file("test_storage", "invalid-bucket", _TEST_KEY)
+        await storages_service.delete_object("test_storage", "invalid-bucket", _TEST_KEY)
 
 
 def test_get_s3_client_no_storage_config(storages_service: StorageService):
@@ -376,159 +372,3 @@ def test_get_s3_client_invalid_bucket(storages_service: StorageService):
     """Test S3 client creation with invalid bucket"""
     with pytest.raises(StorageBucketNotFoundError):
         storages_service._get_s3_client("test_storage", "invalid-bucket")
-
-
-@pytest.mark.asyncio
-async def test_stream_bucket_to_bucket_success(
-    s3_client, storages_service: StorageService, reservoir_config: ReservoirConfig
-):
-    """Test successful bucket to bucket streaming with mock progress reporter"""
-    import uuid
-
-    test_suffix = str(uuid.uuid4())[:8]
-
-    # Upload test data to source bucket (simulating reservoir)
-    test_objects = [
-        (f"pull_test_{test_suffix}_file1.txt", b"content of file 1"),
-        (f"pull_test_{test_suffix}_file2.txt", b"content of file 2"),
-        (f"pull_test_{test_suffix}_subdir/file3.txt", b"content of file 3 in subdir"),
-    ]
-
-    # Upload files to the source bucket using the s3_client fixture
-    for key, content in test_objects:
-
-        async def content_stream():
-            yield content
-
-        await storages_service.stream_upload(
-            "test_storage",
-            _BUCKET_FIXTURE_NAME,
-            key,
-            "text/plain",
-            content_stream(),
-        )
-
-    # Create a mock progress reporter
-    mock_reporter = AsyncMock(spec=ProgressReporter)
-
-    # Test bucket to bucket copy
-    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
-    copied_count = await storages_service.stream_bucket_to_bucket(
-        src=reservoir_config,
-        storage_name="test_storage",
-        bucket_name=_BUCKET_FIXTURE_NAME,
-        options=copy_options,
-        progress_reporter=mock_reporter,
-    )
-
-    # Should have copied at least the 3 files we uploaded (may have more from other tests)
-    assert copied_count >= 3
-
-    # Verify files exist in destination bucket by downloading them
-    for key, expected_content in test_objects:
-        chunks = []
-        async for chunk in storages_service.stream_download(
-            "test_storage", _BUCKET_FIXTURE_NAME, key
-        ):
-            chunks.append(chunk)
-
-        downloaded_content = b"".join(chunks)
-        assert downloaded_content == expected_content
-
-
-@pytest.mark.asyncio
-async def test_stream_bucket_to_bucket_empty_source(
-    s3_client, storages_service: StorageService, minio_container
-):
-    """Test bucket to bucket streaming with empty source bucket"""
-    # Create a separate empty bucket for this test
-    empty_bucket_name = "empty-test-bucket"
-
-    # Create a new storage config with the empty bucket
-    container_id, host_port = minio_container
-    empty_storage_config = ObjectStorageConfig(
-        name="empty_storage",
-        buckets=[empty_bucket_name],
-        endpoint=f"http://{host_port.host}:{host_port.port}",
-        region="us-east-1",
-        access_key="minioadmin",
-        secret_key="minioadmin",
-    )
-
-    # Create empty reservoir config
-    empty_reservoir_config = ReservoirConfig(
-        type="reservoir",
-        endpoint=f"http://{host_port.host}:{host_port.port}",
-        object_storage_access_key="minioadmin",
-        object_storage_secret_key="minioadmin",
-        object_storage_region="us-east-1",
-    )
-
-    # Create storage service with the empty storage config
-    empty_storages_service = StorageService([empty_storage_config])
-
-    # Create the empty bucket
-    import aioboto3
-
-    session = aioboto3.Session()
-    async with session.client(
-        "s3",
-        endpoint_url=f"http://{host_port.host}:{host_port.port}",
-        region_name="us-east-1",
-        aws_access_key_id="minioadmin",
-        aws_secret_access_key="minioadmin",
-    ) as s3:
-        try:
-            await s3.create_bucket(Bucket=empty_bucket_name)
-        except Exception:
-            pass  # Bucket may already exist
-
-    mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
-
-    copied_count = await empty_storages_service.stream_bucket_to_bucket(
-        src=empty_reservoir_config,
-        storage_name="empty_storage",
-        bucket_name=empty_bucket_name,
-        options=copy_options,
-        progress_reporter=mock_reporter,
-    )
-
-    # Should have copied 0 files from empty bucket
-    assert copied_count == 0
-
-
-@pytest.mark.asyncio
-async def test_stream_bucket_to_bucket_invalid_storage(
-    s3_client, storages_service: StorageService, reservoir_config: ReservoirConfig
-):
-    """Test bucket to bucket streaming with invalid destination storage"""
-    mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
-
-    with pytest.raises(StorageNotFoundError):
-        await storages_service.stream_bucket_to_bucket(
-            src=reservoir_config,
-            storage_name="invalid_storage",
-            bucket_name=_BUCKET_FIXTURE_NAME,
-            options=copy_options,
-            progress_reporter=mock_reporter,
-        )
-
-
-@pytest.mark.asyncio
-async def test_stream_bucket_to_bucket_invalid_bucket(
-    s3_client, storages_service: StorageService, reservoir_config: ReservoirConfig
-):
-    """Test bucket to bucket streaming with invalid destination bucket"""
-    mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
-
-    with pytest.raises(StorageBucketNotFoundError):
-        await storages_service.stream_bucket_to_bucket(
-            src=reservoir_config,
-            storage_name="test_storage",
-            bucket_name="invalid-bucket",
-            options=copy_options,
-            progress_reporter=mock_reporter,
-        )

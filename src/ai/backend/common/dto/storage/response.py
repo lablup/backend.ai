@@ -86,3 +86,15 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
         """,
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
+
+
+class ReservoirImportModelsResponse(BaseResponseModel):
+    """Response for Reservoir batch model import operation."""
+
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the batch import task.
+        Used to track the progress of the batch model import operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )
