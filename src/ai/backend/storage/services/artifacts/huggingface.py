@@ -102,13 +102,13 @@ def _make_download_progress_logger(
             eta_str = _fmt_eta(eta_sec)
 
             log.trace(
-                "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                "[stream_hf2b] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
                 )
             )
         else:
             log.trace(
-                "Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                "[stream_hf2b] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
                     offset / _MiB, inst_mibs
                 )
             )
@@ -614,7 +614,7 @@ class HuggingFaceService:
             storage_key = f"{model.model_id}/{model.revision}/{file_info.path}"
 
             log.info(
-                f"Starting file upload to {storage_name}: {model}, file_path={file_info.path}, "
+                f"[stream_hf2b] Starting file upload to {storage_name}: {model}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
