@@ -231,7 +231,7 @@ class ArtifactRevisionService:
         key = f"{artifact_data.name}/{revision_data.version}"
 
         try:
-            await storage_proxy_client.delete_s3_file(
+            await storage_proxy_client.delete_s3_object(
                 storage_name=storage_data.name,
                 bucket_name=storage_namespace.bucket,
                 req=DeleteObjectReq(

@@ -750,7 +750,7 @@ class StorageProxyManagerFacingClient:
         return PresignedUploadObjectResponse.model_validate(resp)
 
     @client_decorator()
-    async def delete_s3_file(
+    async def delete_s3_object(
         self,
         storage_name: str,
         bucket_name: str,

@@ -73,9 +73,6 @@ class VFolderCloneResponse(BaseResponseModel):
     bgtask_id: TaskID
 
 
-# HuggingFace API Response Models
-
-
 class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 

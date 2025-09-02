@@ -372,6 +372,8 @@ class ArtifactRepository:
                         readme=revision_data.readme,
                         size=revision_data.size,
                         status=revision_data.status,
+                        created_at=revision_data.created_at,
+                        updated_at=revision_data.updated_at,
                     )
                     db_sess.add(new_revision)
                     await db_sess.flush()
@@ -382,6 +384,8 @@ class ArtifactRepository:
                     existing_revision.readme = revision_data.readme
                     existing_revision.size = revision_data.size
                     existing_revision.status = revision_data.status
+                    existing_revision.created_at = revision_data.created_at
+                    existing_revision.updated_at = revision_data.updated_at
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision)
                     result_revisions.append(existing_revision.to_dataclass())
@@ -444,13 +448,6 @@ class ArtifactRepository:
                     # TODO: Reset to SCANNED?
                     existing_revision.readme = model.readme
                     existing_revision.updated_at = model.modified_at
-
-                    # Create revision row if it doesn't exist
-                    if existing_revision is None:
-                        artifact_revision_row = ArtifactRevisionRow(
-                            artifact_id=artifact_row.id, version=model.revision
-                        )
-                        db_sess.add(artifact_revision_row)
 
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision)
