@@ -273,3 +273,18 @@ class ReservoirStorageConfigInvalidError(web.HTTPInternalServerError):
             text=dump_json_str(payload),
             content_type="application/problem+json",
         )
+
+
+class ArtifactStorageEmptyError(web.HTTPNotFound):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/artifact/config/invalid",
+            "title": "Artifact Storage Empty",
+        }
+        if msg is not None:
+            payload["title"] = f"Artifact Storage Empty ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )

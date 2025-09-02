@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import mimetypes
+import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Optional
@@ -18,6 +19,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
+    ArtifactStorageEmptyError,
     ReservoirStorageConfigInvalidError,
     StorageBucketNotFoundError,
     StorageNotFoundError,
@@ -151,8 +153,7 @@ class ReservoirService:
         )
 
         if not target_keys:
-            log.trace("[stream_bucket_to_bucket] no objects to copy; nothing to do")
-            return 0
+            raise ArtifactStorageEmptyError()
 
         log.trace(
             "[stream_bucket_to_bucket] start src_endpoint={} src_bucket={} src_prefix={} "
@@ -274,7 +275,7 @@ class ReservoirService:
         models: list[ModelTarget],
         storage_name: str,
         bucket_name: str,
-    ):
+    ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
             if not model_count:
