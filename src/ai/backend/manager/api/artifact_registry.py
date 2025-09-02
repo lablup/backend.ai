@@ -12,12 +12,12 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
-    ArtifactRegistriesScanReq,
-    ArtifactRegistriesSearchReq,
+    ScanArtifactsReq,
+    SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
-    ArtifactRegistriesScanResponse,
-    ArtifactRegistriesSearchResponse,
+    ScanArtifactsResponse,
+    SearchArtifactsResponse,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
@@ -35,7 +35,7 @@ class APIHandler:
     @api_handler
     async def scan_artifacts(
         self,
-        body: BodyParam[ArtifactRegistriesScanReq],
+        body: BodyParam[ScanArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
@@ -48,14 +48,14 @@ class APIHandler:
             )
         )
 
-        resp = ArtifactRegistriesScanResponse()
+        resp = ScanArtifactsResponse()
         return APIResponse.build(status_code=200, response_model=resp)
 
     @auth_required_for_method
     @api_handler
     async def search_artifacts(
         self,
-        body: BodyParam[ArtifactRegistriesSearchReq],
+        body: BodyParam[SearchArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
@@ -69,7 +69,7 @@ class APIHandler:
             )
         )
 
-        resp = ArtifactRegistriesSearchResponse(
+        resp = SearchArtifactsResponse(
             artifacts=action_result.data,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

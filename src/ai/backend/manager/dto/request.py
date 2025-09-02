@@ -7,7 +7,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.manager.types import PaginationOptions
 
 
-class ArtifactRegistriesScanReq(BaseRequestModel):
+class ScanArtifactsReq(BaseRequestModel):
     registry_id: uuid.UUID = Field(
         description="The unique identifier of the artifact registry to scan."
     )
@@ -15,7 +15,7 @@ class ArtifactRegistriesScanReq(BaseRequestModel):
     search: Optional[str] = None
 
 
-class ArtifactRegistriesSearchReq(BaseRequestModel):
+class SearchArtifactsReq(BaseRequestModel):
     pagination: PaginationOptions
     # TODO: Support this. (we need to make strawberry independent types)
     # ordering: Optional[ArtifactOrderingOptions] = None

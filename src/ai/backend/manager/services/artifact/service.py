@@ -12,8 +12,8 @@ from ai.backend.manager.client.artifact_registry.reservoir_client import Reservo
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
-from ai.backend.manager.dto.request import ArtifactRegistriesSearchReq
-from ai.backend.manager.dto.response import ArtifactRegistriesSearchResponse
+from ai.backend.manager.dto.request import SearchArtifactsReq
+from ai.backend.manager.dto.response import SearchArtifactsResponse
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -134,7 +134,7 @@ class ArtifactService:
 
                     while retry_count < MAX_RETRIES:
                         try:
-                            req = ArtifactRegistriesSearchReq(
+                            req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
                                 )
@@ -164,7 +164,7 @@ class ArtifactService:
                         )
                         raise ReservoirConnectionError()
 
-                    RespTypeAdapter = TypeAdapter(ArtifactRegistriesSearchResponse)
+                    RespTypeAdapter = TypeAdapter(SearchArtifactsResponse)
                     parsed = RespTypeAdapter.validate_python(client_resp)
 
                     if not parsed.artifacts:
