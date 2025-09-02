@@ -369,7 +369,7 @@ class ArtifactRepository:
                         version=revision_data.version,
                         readme=revision_data.readme,
                         size=revision_data.size,
-                        status=revision_data.status,
+                        status=ArtifactStatus.SCANNED,
                         created_at=revision_data.created_at,
                         updated_at=revision_data.updated_at,
                     )
@@ -381,7 +381,6 @@ class ArtifactRepository:
                     # Update existing revision
                     existing_revision.readme = revision_data.readme
                     existing_revision.size = revision_data.size
-                    existing_revision.status = revision_data.status
                     existing_revision.created_at = revision_data.created_at
                     existing_revision.updated_at = revision_data.updated_at
                     await db_sess.flush()
