@@ -48,6 +48,23 @@ class ReservoirRegistryRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRegistryRow)
+                .where(ArtifactRegistryRow.name == name)
+                .options(
+                    selectinload(ArtifactRegistryRow.reservoir_registries).selectinload(
+                        ReservoirRegistryRow.meta
+                    )
+                )
+            )
+            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
+            return row.reservoir_registries.to_dataclass()
+
+    @repository_decorator()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:

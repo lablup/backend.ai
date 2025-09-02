@@ -203,6 +203,7 @@ class Dispatchers:
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
+            args.repositories.reservoir_registry.repository,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
             args.processors_factory,

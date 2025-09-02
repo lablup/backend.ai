@@ -246,8 +246,6 @@ class ReservoirService:
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
 
-        print("prefix_key!", prefix_key)
-
         await self.stream_bucket_to_bucket(
             src=reservoir_config,
             storage_name=storage_name,
@@ -266,7 +264,8 @@ class ReservoirService:
                 revision=model.revision,
                 registry_name=registry_name,
                 registry_type=ArtifactRegistryType.RESERVOIR,
-                total_size=-1,
+                # TODO: Add size
+                total_size=1,
             )
         )
 
