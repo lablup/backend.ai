@@ -5,8 +5,6 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Optional
 
-import aioboto3
-
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
@@ -74,11 +72,7 @@ class ReservoirService:
     async def _list_all_keys_and_sizes(
         self,
         *,
-        endpoint_url: str,
-        access_key: Optional[str],
-        secret_key: Optional[str],
-        region: Optional[str],
-        bucket: str,
+        s3_client: S3Client,
         prefix: Optional[str] = None,
     ) -> tuple[list[str], dict[str, int], int]:
         """
@@ -89,22 +83,26 @@ class ReservoirService:
             size_map: mapping from key -> object size
             total_bytes: total sum of all object sizes
         """
-        session = aioboto3.Session()
         keys: list[str] = []
         size_map: dict[str, int] = {}
         total = 0
 
-        log.trace("[list] start bucket={} prefix={} endpoint={}", bucket, prefix, endpoint_url)
+        log.trace(
+            "[list] start bucket={} prefix={} endpoint={}",
+            s3_client.bucket_name,
+            prefix,
+            s3_client.endpoint_url,
+        )
 
-        async with session.client(
+        async with s3_client.session.client(
             "s3",
-            endpoint_url=endpoint_url,
-            region_name=region,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
+            endpoint_url=s3_client.endpoint_url,
+            region_name=s3_client.region_name,
+            aws_access_key_id=s3_client.aws_access_key_id,
+            aws_secret_access_key=s3_client.aws_secret_access_key,
         ) as s3:
             paginator = s3.get_paginator("list_objects_v2")
-            kwargs = {"Bucket": bucket}
+            kwargs = {"Bucket": s3_client.bucket_name}
             if prefix:
                 kwargs["Prefix"] = prefix
 
@@ -123,7 +121,7 @@ class ReservoirService:
 
     async def _stream_bucket_to_bucket(
         self,
-        src: ReservoirConfig,
+        source_cfg: ReservoirConfig,
         storage_name: str,
         bucket_name: str,
         options: BucketCopyOptions,
@@ -139,12 +137,16 @@ class ReservoirService:
         download_chunk_size = self._storage_configs[storage_name].reservoir_download_chunk_size
 
         # List all objects under prefix
+        src_s3_client = S3Client(
+            bucket_name=bucket_name,
+            endpoint_url=source_cfg.endpoint,
+            region_name=source_cfg.object_storage_region,
+            aws_access_key_id=source_cfg.object_storage_access_key,
+            aws_secret_access_key=source_cfg.object_storage_secret_key,
+        )
+
         target_keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
-            endpoint_url=src.endpoint,
-            access_key=src.object_storage_access_key,
-            secret_key=src.object_storage_secret_key,
-            region=src.object_storage_region,
-            bucket=bucket_name,
+            s3_client=src_s3_client,
             prefix=key_prefix,
         )
 
@@ -155,7 +157,7 @@ class ReservoirService:
         log.trace(
             "[stream_bucket_to_bucket] start src_endpoint={} src_bucket={} src_prefix={} "
             "dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
-            src.endpoint,
+            source_cfg.endpoint,
             bucket_name,
             key_prefix,
             storage_name,
@@ -167,14 +169,6 @@ class ReservoirService:
 
         copied = 0
         sem = asyncio.Semaphore(options.concurrency)
-
-        src_s3_client = S3Client(
-            bucket_name=bucket_name,
-            endpoint_url=src.endpoint,
-            region_name=src.object_storage_region,
-            aws_access_key_id=src.object_storage_access_key,
-            aws_secret_access_key=src.object_storage_secret_key,
-        )
 
         async def _copy_single_object(key: str) -> int:
             """
@@ -220,6 +214,7 @@ class ReservoirService:
                 log.trace("[stream_bucket_to_bucket] done key={} bytes={}", key, size)
                 return size if size >= 0 else 0
 
+        # TODO: Replace this with global semaphore
         sizes = await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
         bytes_copied = sum(sizes)
 
@@ -238,6 +233,12 @@ class ReservoirService:
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
+
+        Args:
+            registry_name: Name of the Reservoir registry
+            model: Reservoir model to import
+            storage_name: Target storage name
+            bucket_name: Target bucket name
         """
         if len(self._reservoir_registry_configs) == 0:
             raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
@@ -246,7 +247,7 @@ class ReservoirService:
         prefix_key = f"{model.model_id}/{model.revision}"
 
         copied_bytesize = await self._stream_bucket_to_bucket(
-            src=reservoir_config,
+            source_cfg=reservoir_config,
             storage_name=storage_name,
             bucket_name=bucket_name,
             options=BucketCopyOptions(

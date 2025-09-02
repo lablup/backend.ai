@@ -627,12 +627,13 @@ class TestReservoirService:
                 1500,  # total
             )
 
+            # Create a mock S3Client for testing
+            from unittest.mock import Mock
+
+            mock_s3_client = Mock()
+
             keys, size_map, total = await reservoir_service._list_all_keys_and_sizes(
-                endpoint_url="https://s3.amazonaws.com",
-                access_key="test_key",
-                secret_key="test_secret",
-                region="us-west-2",
-                bucket="test-bucket",
+                s3_client=mock_s3_client,
                 prefix="models/",
             )
 
@@ -652,12 +653,13 @@ class TestReservoirService:
         with patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys:
             mock_list_keys.return_value = ([], {}, 0)
 
+            # Create a mock S3Client for testing
+            from unittest.mock import Mock
+
+            mock_s3_client = Mock()
+
             keys, size_map, total = await reservoir_service._list_all_keys_and_sizes(
-                endpoint_url="https://s3.amazonaws.com",
-                access_key="test_key",
-                secret_key="test_secret",
-                region="us-west-2",
-                bucket="empty-bucket",
+                s3_client=mock_s3_client,
             )
 
             assert len(keys) == 0
@@ -709,7 +711,7 @@ class TestReservoirService:
             mock_src_client.get_object_meta.return_value = mock_meta
 
             bytes_copied = await reservoir_service._stream_bucket_to_bucket(
-                src=mock_reservoir_config,
+                source_cfg=mock_reservoir_config,
                 storage_name="test_storage",
                 bucket_name="test-bucket",
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
@@ -733,7 +735,7 @@ class TestReservoirService:
             mock_list_keys.return_value = ([], {}, 0)
 
             bytes_copied = await reservoir_service._stream_bucket_to_bucket(
-                src=mock_reservoir_config,
+                source_cfg=mock_reservoir_config,
                 storage_name="test_storage",
                 bucket_name="test-bucket",
                 options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
@@ -753,7 +755,7 @@ class TestReservoirService:
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main")
 
         with (
-            patch.object(reservoir_service, "stream_bucket_to_bucket") as mock_stream,
+            patch.object(reservoir_service, "_stream_bucket_to_bucket") as mock_stream,
             patch.object(
                 reservoir_service._event_producer, "anycast_event", new=AsyncMock()
             ) as mock_event,
