@@ -109,13 +109,31 @@ async def create_or_update_endpoint(
     health_check_enabled = health_check_config is not None
 
     async def _sync(sess: SASession) -> URL:
-        # Create new endpoint record
-        endpoint = Endpoint.create(
-            endpoint_id=endpoint_id,
-            health_check_enabled=health_check_enabled,
-            health_check_config=health_check_config,
-        )
-        sess.add(endpoint)
+        # Check if endpoint already exists
+        try:
+            endpoint = await Endpoint.get(sess, endpoint_id, load_circuit=False)
+            # Update health check configuration
+            endpoint.health_check_enabled = health_check_enabled
+            endpoint.health_check_config = health_check_config
+        except ObjectNotFound:
+            # Create new endpoint record
+            endpoint = Endpoint.create(
+                endpoint_id=endpoint_id,
+                health_check_enabled=health_check_enabled,
+                health_check_config=health_check_config,
+            )
+            sess.add(endpoint)
+
+        # Check if circuit already exists for this endpoint
+        try:
+            circuit = await Circuit.get_by_endpoint(
+                sess, endpoint_id, load_worker=True, load_endpoint=True
+            )
+            circuit.endpoint_row = endpoint
+            # Return existing circuit URL
+            return await circuit.get_endpoint_url()
+        except ObjectNotFound:
+            pass  # Continue with creating new circuit
 
         # supported for subdomain based workers only
         matched_worker_id: UUID | None = None
