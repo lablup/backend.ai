@@ -94,10 +94,6 @@ class GetPresignedUploadURLResponse(BaseResponseModel):
 
 
 # Object Storage Bucket Response Models
-class RegisterObjectStorageBucketResponse(BaseResponseModel):
-    id: uuid.UUID = Field(description="The ID of the registered bucket")
-
-
 class ObjectStorageBucketsResponse(BaseResponseModel):
     buckets: list[str] = Field(description="List of bucket names for a specific storage")
 
@@ -109,32 +105,5 @@ class ObjectStorageAllBucketsResponse(BaseResponseModel):
 
 
 # Artifact Installed Storages Response Models
-class ArtifactInstalledStoragesResponse(BaseResponseModel):
-    installed_storages: dict[uuid.UUID, uuid.UUID] = Field(
-        description="Mapping of artifact revision IDs to storage IDs"
-    )
-
-
-class UnregisterObjectStorageBucketResponse(BaseResponseModel):
-    id: uuid.UUID = Field(description="The ID of the unregistered bucket")
-
-
 class ObjectStorageBucketListResponse(BaseResponseModel):
     buckets: list[str] = Field(default_factory=list, description="List of bucket names")
-
-
-# Association Artifact-Storage API Response Models
-class AssociationArtifactStorageResponse(BaseResponseModel):
-    id: str = Field(description="ID of the association")
-    artifact_id: str = Field(description="ID of the associated artifact")
-    storage_id: str = Field(description="ID of the associated storage")
-
-
-class AssociateArtifactWithStorageResponse(BaseResponseModel):
-    association: AssociationArtifactStorageResponse = Field(description="Created association")
-    message: str = Field(description="Success message")
-
-
-class DisassociateArtifactWithStorageResponse(BaseResponseModel):
-    association: AssociationArtifactStorageResponse = Field(description="Removed association")
-    message: str = Field(description="Success message")
