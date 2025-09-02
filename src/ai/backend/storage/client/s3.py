@@ -330,8 +330,8 @@ class S3Client:
         self,
         prefix: str,
         *,
-        delete_all_versions: bool = False,
-        batch_size: int = 1000,
+        delete_all_versions: bool = True,
+        batch_size: int = 100,
     ) -> int:
         """
         Delete all objects under a given prefix ("folder").
