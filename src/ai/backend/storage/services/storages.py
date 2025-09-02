@@ -197,56 +197,51 @@ class StorageService:
         copied = 0
         sem = asyncio.Semaphore(options.concurrency)
 
-        session = aioboto3.Session()
-        async with session.client(
-            "s3",
+        src_s3_client = S3Client(
+            bucket_name=bucket_name,
             endpoint_url=src.endpoint,
             region_name=src.object_storage_region,
             aws_access_key_id=src.object_storage_access_key,
             aws_secret_access_key=src.object_storage_secret_key,
-        ) as src_s3:
+        )
 
-            async def _copy_single_object(key: str) -> None:
-                async with sem:
-                    size = size_map.get(key, -1)
-                    log.trace("[stream_b2b] begin key={} size={}", key, size)
+        async def _copy_single_object(key: str) -> None:
+            async with sem:
+                size = size_map.get(key, -1)
+                log.trace("[stream_b2b] begin key={} size={}", key, size)
 
-                    resp = await src_s3.get_object(Bucket=bucket_name, Key=key)
-                    body = resp["Body"]
+                async def _data_stream() -> AsyncIterator[bytes]:
+                    sent = 0
+                    next_mark = options.progress_log_interval_bytes
+                    async for chunk in src_s3_client.download_stream(
+                        key, chunk_size=download_chunk_size
+                    ):
+                        sent += len(chunk)
+                        if next_mark and sent >= next_mark:
+                            log.trace("[stream_b2b] progress key={} sent={}/{}", key, sent, size)
+                            next_mark += options.progress_log_interval_bytes
+                        yield chunk
 
-                    ctype = (
-                        resp.get("ContentType")
-                        or mimetypes.guess_type(key)[0]
-                        or "application/octet-stream"
-                    )
+                # Get object metadata to determine content type
+                object_meta = await src_s3_client.get_object_meta(key)
+                ctype = (
+                    (object_meta.content_type if object_meta else None)
+                    or mimetypes.guess_type(key)[0]
+                    or "application/octet-stream"
+                )
 
-                    async def _data_stream() -> AsyncIterator[bytes]:
-                        sent = 0
-                        next_mark = options.progress_log_interval_bytes
-                        while True:
-                            chunk = await body.read(download_chunk_size)
-                            if not chunk:
-                                break
-                            sent += len(chunk)
-                            if next_mark and sent >= next_mark:
-                                log.trace(
-                                    "[stream_b2b] progress key={} sent={}/{}", key, sent, size
-                                )
-                                next_mark += options.progress_log_interval_bytes
-                            yield chunk
+                part_size = self._storage_configs[storage_name].upload_chunk_size
+                await dst_client.upload_stream(
+                    _data_stream(),
+                    key,  # same key at destination
+                    content_type=ctype,
+                    part_size=part_size,
+                )
 
-                    part_size = self._storage_configs[storage_name].upload_chunk_size
-                    await dst_client.upload_stream(
-                        _data_stream(),
-                        key,  # same key at destination
-                        content_type=ctype,
-                        part_size=part_size,
-                    )
+                log.trace("[stream_b2b] done key={} bytes={}", key, size)
 
-                    log.trace("[stream_b2b] done key={} bytes={}", key, size)
-
-            await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
-            copied = len(target_keys)
+        await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
+        copied = len(target_keys)
 
         log.trace("[stream_b2b] all done objects={} total_bytes={}", copied, total_bytes)
         return copied

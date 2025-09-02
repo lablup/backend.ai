@@ -412,7 +412,7 @@ async def test_stream_bucket_to_bucket_success(
     mock_reporter = AsyncMock(spec=ProgressReporter)
 
     # Test bucket to bucket copy
-    copy_options = BucketCopyOptions(concurrency=2)
+    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
     copied_count = await storages_service.stream_bucket_to_bucket(
         src=reservoir_config,
         storage_name="test_storage",
@@ -484,7 +484,7 @@ async def test_stream_bucket_to_bucket_empty_source(
             pass  # Bucket may already exist
 
     mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2)
+    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
 
     copied_count = await empty_storages_service.stream_bucket_to_bucket(
         src=empty_reservoir_config,
@@ -504,7 +504,7 @@ async def test_stream_bucket_to_bucket_invalid_storage(
 ):
     """Test bucket to bucket streaming with invalid destination storage"""
     mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2)
+    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
 
     with pytest.raises(StorageNotFoundError):
         await storages_service.stream_bucket_to_bucket(
@@ -522,7 +522,7 @@ async def test_stream_bucket_to_bucket_invalid_bucket(
 ):
     """Test bucket to bucket streaming with invalid destination bucket"""
     mock_reporter = AsyncMock(spec=ProgressReporter)
-    copy_options = BucketCopyOptions(concurrency=2)
+    copy_options = BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0)
 
     with pytest.raises(StorageBucketNotFoundError):
         await storages_service.stream_bucket_to_bucket(

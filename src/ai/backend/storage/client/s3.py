@@ -18,7 +18,7 @@ class S3Client:
         self,
         bucket_name: str,
         endpoint_url: str,
-        region_name: str,
+        region_name: Optional[str],
         aws_access_key_id: Optional[str],
         aws_secret_access_key: Optional[str],
     ):
