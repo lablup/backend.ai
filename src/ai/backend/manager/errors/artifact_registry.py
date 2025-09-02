@@ -22,6 +22,19 @@ class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ArtifactRegistryBadScanRequestError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-registry-bad-scan-request"
+    error_title = "Artifact Registry Bad Scan Request"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class InvalidArtifactRegistryTypeError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-artifact-registry-type"
     error_title = "Invalid Artifact Registry Type"

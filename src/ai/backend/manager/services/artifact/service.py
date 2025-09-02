@@ -14,7 +14,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactRegistryType
 from ai.backend.manager.dto.request import SearchArtifactsReq
 from ai.backend.manager.dto.response import SearchArtifactsResponse
-from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
+from ai.backend.manager.errors.artifact_registry import (
+    ArtifactRegistryBadScanRequestError,
+    ReservoirConnectionError,
+)
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -100,6 +103,9 @@ class ArtifactService:
                     action.registry_id
                 )
                 storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+
+                if not (action.limit and action.order):
+                    raise ArtifactRegistryBadScanRequestError()
 
                 scan_result = await storage_proxy_client.scan_huggingface_models(
                     HuggingFaceScanModelsReq(
