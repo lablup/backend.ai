@@ -22,19 +22,6 @@ class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotAvailable(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/artifact-not-available"
-    error_title = "Artifact Not Available"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
