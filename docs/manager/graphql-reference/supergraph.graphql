@@ -325,6 +325,14 @@ input ArtifactRevisionFilter
 }
 
 """Added in 25.13.0"""
+type ArtifactRevisionImportTask
+  @join__type(graph: STRAWBERRY)
+{
+  taskId: ID!
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.13.0"""
 input ArtifactRevisionOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -2336,7 +2344,7 @@ type ImportArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisions: ArtifactRevisionConnection!
-  taskIds: [UUID!]!
+  tasks: [ArtifactRevisionImportTask!]!
 }
 
 type InferenceSessionError

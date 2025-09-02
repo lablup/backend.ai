@@ -339,11 +339,17 @@ class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
+@strawberry.type(description="Added in 25.13.0")
+class ArtifactRevisionImportTask:
+    task_id: ID
+    artifact_revision: ArtifactRevision
+
+
 # Mutation Payloads
 @strawberry.type(description="Added in 25.13.0")
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
-    task_ids: list[uuid.UUID]
+    tasks: list[ArtifactRevisionImportTask]
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -742,7 +748,7 @@ async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
-    task_ids = []
+    tasks = []
     for revision_id in input.artifact_revision_ids:
         action_result = (
             await info.context.processors.artifact_revision.import_revision.wait_for_complete(
@@ -751,13 +757,18 @@ async def import_artifacts(
                 )
             )
         )
-        imported_artifacts.append(ArtifactRevision.from_dataclass(action_result.result))
-        task_ids.append(action_result.task_id)
+        artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
+        imported_artifacts.append(artifact_revision)
+        tasks.append(
+            ArtifactRevisionImportTask(
+                task_id=ID(str(action_result.task_id)),
+                artifact_revision=artifact_revision,
+            )
+        )
 
     edges = [
-        # 9. cursor
-        ArtifactRevisionEdge(node=artifact, cursor=str(i))
-        for i, artifact in enumerate(imported_artifacts)
+        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        for artifact in imported_artifacts
     ]
 
     artifacts_connection = ArtifactRevisionConnection(
@@ -771,7 +782,7 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, task_ids=task_ids)
+    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
 @strawberry.mutation(description="Added in 25.13.0")

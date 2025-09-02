@@ -121,6 +121,12 @@ input ArtifactRevisionFilter {
 }
 
 """Added in 25.13.0"""
+type ArtifactRevisionImportTask {
+  taskId: ID!
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.13.0"""
 input ArtifactRevisionOrderBy {
   field: ArtifactRevisionOrderField!
   direction: OrderDirection! = ASC
@@ -434,7 +440,7 @@ input ImportArtifactsInput {
 """Added in 25.13.0"""
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
-  taskIds: [UUID!]!
+  tasks: [ArtifactRevisionImportTask!]!
 }
 
 """A custom scalar for JSON strings using orjson"""

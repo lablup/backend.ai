@@ -129,6 +129,7 @@ class ArtifactService:
                 )
                 remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
+                # TODO: Apply client_decorator instead of retrying here
                 offset = 0
                 limit = 10
                 all_artifacts: list[ArtifactDataWithRevisions] = []
