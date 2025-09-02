@@ -14,7 +14,6 @@ from ai.backend.common.api_handlers import (
     api_handler,
     stream_api_handler,
 )
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.dto.storage.context import MultipartUploadCtx
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
@@ -43,15 +42,12 @@ _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 class StorageAPIHandler:
     _storage_configs: list[ObjectStorageConfig]
-    _background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
         storage_configs: list[ObjectStorageConfig],
-        background_task_manager: BackgroundTaskManager,
     ) -> None:
         self._storage_configs = storage_configs
-        self._background_task_manager = background_task_manager
 
     @api_handler
     async def upload_object(
@@ -71,7 +67,7 @@ class StorageAPIHandler:
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
-        await log_client_api_entry(log, "upload_file", req)
+        await log_client_api_entry(log, "upload_object", req)
 
         storage_service = StorageService(self._storage_configs)
 
@@ -191,7 +187,7 @@ class StorageAPIHandler:
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
-        await log_client_api_entry(log, "get_file_meta", req)
+        await log_client_api_entry(log, "get_object_meta", req)
 
         storage_service = StorageService(self._storage_configs)
         response = await storage_service.get_object_info(storage_name, bucket_name, filepath)
@@ -233,7 +229,6 @@ def create_app(ctx: RootContext) -> web.Application:
 
     api_handler = StorageAPIHandler(
         storage_configs=ctx.local_config.storages,
-        background_task_manager=ctx.background_task_manager,
     )
     app.router.add_route(
         "GET", "/s3/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta

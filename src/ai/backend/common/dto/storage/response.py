@@ -48,10 +48,6 @@ class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
 
 
-class PullBucketResponse(BaseResponseModel):
-    task_id: uuid.UUID
-
-
 class ObjectMetaResponse(BaseResponseModel):
     content_length: Optional[int]
     content_type: Optional[str]

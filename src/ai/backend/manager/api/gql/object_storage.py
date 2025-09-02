@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
@@ -91,7 +92,10 @@ class ObjectStorage(Node):
 
         nodes = [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
         edges = [
-            ObjectStorageNamespaceEdge(node=node, cursor=node.id) for _, node in enumerate(nodes)
+            ObjectStorageNamespaceEdge(
+                node=node, cursor=to_global_id(ObjectStorageNamespace, node.id)
+            )
+            for node in nodes
         ]
 
         return ObjectStorageNamespaceConnection(
@@ -151,7 +155,9 @@ async def object_storages(
     )
 
     nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
-    edges = [ObjectStorageEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
+    edges = [
+        ObjectStorageEdge(node=node, cursor=to_global_id(ObjectStorage, node.id)) for node in nodes
+    ]
 
     return ObjectStorageConnection(
         edges=edges,

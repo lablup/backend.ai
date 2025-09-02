@@ -6,6 +6,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -108,7 +109,10 @@ async def reservoir_registries(
     )
 
     nodes = [ReservoirRegistry.from_dataclass(data) for data in action_result.data]
-    edges = [ReservoirRegistryEdge(node=node, cursor=str(i)) for i, node in enumerate(nodes)]
+    edges = [
+        ReservoirRegistryEdge(node=node, cursor=to_global_id(ReservoirRegistry, node.id))
+        for node in nodes
+    ]
 
     return ReservoirRegistryConnection(
         edges=edges,

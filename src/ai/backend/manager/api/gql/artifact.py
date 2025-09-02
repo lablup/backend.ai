@@ -727,7 +727,6 @@ async def scan_artifacts(
         )
     )
 
-    # 여기도 고쳐야...
     registry_meta_loader = DataLoader(
         apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )

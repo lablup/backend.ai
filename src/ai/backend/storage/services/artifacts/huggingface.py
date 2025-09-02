@@ -1,5 +1,3 @@
-"""HuggingFace model scanner implementation for Backend.AI storage."""
-
 import asyncio
 import logging
 import ssl

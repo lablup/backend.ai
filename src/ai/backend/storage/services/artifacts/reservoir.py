@@ -1,5 +1,3 @@
-"""HuggingFace model scanner implementation for Backend.AI storage."""
-
 import asyncio
 import logging
 import mimetypes
@@ -22,12 +20,10 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
-    HuggingFaceModelNotFoundError,
     ReservoirStorageConfigInvalidError,
     StorageBucketNotFoundError,
     StorageNotFoundError,
 )
-from ai.backend.storage.services.storages import StorageService
 from ai.backend.storage.types import BucketCopyOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -36,7 +32,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass
 class ReservoirServiceArgs:
     background_task_manager: BackgroundTaskManager
-    storage_service: StorageService
     event_producer: EventProducer
     storage_configs: list[ObjectStorageConfig]
     reservoir_registry_configs: list[ReservoirConfig]
@@ -45,18 +40,16 @@ class ReservoirServiceArgs:
 class ReservoirService:
     """Service for Reservoir model operations"""
 
-    _storages_service: StorageService
     _background_task_manager: BackgroundTaskManager
     _event_producer: EventProducer
-    _storage_configs: dict[str, ObjectStorageConfig]
     _reservoir_registry_configs: list[ReservoirConfig]
+    _storage_configs: dict[str, ObjectStorageConfig]
 
     def __init__(self, args: ReservoirServiceArgs):
-        self._storages_service = args.storage_service
         self._background_task_manager = args.background_task_manager
         self._event_producer = args.event_producer
-        self._storage_configs = {cfg.name: cfg for cfg in args.storage_configs}
         self._reservoir_registry_configs = args.reservoir_registry_configs
+        self._storage_configs = {cfg.name: cfg for cfg in args.storage_configs}
 
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
         storage_config = self._storage_configs.get(storage_name)
@@ -128,7 +121,7 @@ class ReservoirService:
         log.trace("[list] done keys={} total_bytes={}", len(keys), total)
         return keys, size_map, total
 
-    async def stream_bucket_to_bucket(
+    async def _stream_bucket_to_bucket(
         self,
         src: ReservoirConfig,
         storage_name: str,
@@ -243,14 +236,16 @@ class ReservoirService:
         bucket_name: str,
         reporter: ProgressReporter,
     ) -> None:
-        """ """
+        """
+        Import a single model from a reservoir registry to a reservoir storage.
+        """
         if len(self._reservoir_registry_configs) == 0:
             raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
 
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
 
-        copied_bytesize = await self.stream_bucket_to_bucket(
+        copied_bytesize = await self._stream_bucket_to_bucket(
             src=reservoir_config,
             storage_name=storage_name,
             bucket_name=bucket_name,
@@ -320,14 +315,6 @@ class ReservoirService:
                         log.info(
                             f"Successfully imported model in batch: model_id={model_id}, progress={idx}/{model_count}"
                         )
-
-                    except HuggingFaceModelNotFoundError as e:
-                        failed_models += 1
-                        log.error(
-                            f"Model not found in batch import: model_id={model_id}, progress={idx}/{model_count}"
-                        )
-                        errors.append(str(e))
-
                     except Exception as e:
                         failed_models += 1
                         log.error(
