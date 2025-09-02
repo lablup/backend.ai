@@ -501,7 +501,6 @@ class ArtifactRepository:
             )
             existing_row: AssociationArtifactsStorageRow = select_result.scalar_one_or_none()
             if existing_row is None:
-                # TODO: Make exception
                 raise ArtifactAssociationNotFoundError(
                     f"Association between artifact {artifact_revision_id} and storage {storage_namespace_id} does not exist"
                 )
@@ -523,7 +522,6 @@ class ArtifactRepository:
                 )
             )
 
-            # TODO: Make exception
             if delete_result.rowcount == 0:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
@@ -539,7 +537,8 @@ class ArtifactRepository:
             if row is None:
                 raise ArtifactRevisionNotFoundError()
 
-            # TODO: How to handle already APPROVED?
+            if row.status == ArtifactStatus.AVAILABLE:
+                raise ArtifactNotVerified("Artifacts already approved")
             if row.status != ArtifactStatus.NEEDS_APPROVAL:
                 raise ArtifactNotVerified("Only verified artifacts could be approved")
 
