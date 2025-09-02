@@ -86,7 +86,7 @@ class ReservoirService:
         secret_key: Optional[str],
         region: Optional[str],
         bucket: str,
-        prefix: Optional[str] = None,  # ✅ 추가됨
+        prefix: Optional[str] = None,
     ) -> tuple[list[str], dict[str, int], int]:
         """
         List all non-marker object keys in the given bucket (optionally under a prefix).
