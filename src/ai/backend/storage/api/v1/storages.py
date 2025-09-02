@@ -24,10 +24,10 @@ from ai.backend.common.dto.storage.request import (
     ObjectStorageAPIPathParams,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
-    PullObjectReq,
+    PullBucketReq,
     UploadObjectReq,
 )
-from ai.backend.common.dto.storage.response import PullObjectResponse
+from ai.backend.common.dto.storage.response import PullBucketResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
     ArtifactRegistryConfig,
@@ -140,11 +140,10 @@ class StorageAPIHandler:
     async def pull_bucket(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[PullObjectReq],
+        body: BodyParam[PullBucketReq],
     ) -> APIResponse:
         """
-        Pull a file from URL and store it in the specified S3 bucket.
-        Downloads file content from URL and uploads it to storage using streaming.
+        Pull object storage bucket from reservoir and store it in the specified S3 bucket.
         """
         req = body.parsed
         await log_client_api_entry(log, "pull_bucket", req)
@@ -184,7 +183,7 @@ class StorageAPIHandler:
         task_id = await self._background_task_manager.start(_pull_task)
 
         return APIResponse.build(
-            status_code=HTTPStatus.ACCEPTED, response_model=PullObjectResponse(task_id=task_id)
+            status_code=HTTPStatus.ACCEPTED, response_model=PullBucketResponse(task_id=task_id)
         )
 
     @api_handler

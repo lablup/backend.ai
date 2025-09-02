@@ -54,7 +54,7 @@ class DownloadObjectReq(BaseRequestModel):
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
 
 
-class PullObjectReq(BaseRequestModel):
+class PullBucketReq(BaseRequestModel):
     """
     Data model for file pull requests from object storage.
     """

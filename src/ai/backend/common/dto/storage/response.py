@@ -57,7 +57,7 @@ class DownloadObjectResponse(BaseResponseModel):
     pass
 
 
-class PullObjectResponse(BaseResponseModel):
+class PullBucketResponse(BaseResponseModel):
     task_id: uuid.UUID
 
 
