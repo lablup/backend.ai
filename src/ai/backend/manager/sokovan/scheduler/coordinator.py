@@ -1,5 +1,6 @@
 import logging
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -13,11 +14,17 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.schedule.anycast import (
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
+)
+from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.handlers import ScheduleHandler
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
@@ -29,7 +36,6 @@ from .handlers import (
     CheckTerminatingProgressHandler,
     RetryCreatingHandler,
     RetryPreparingHandler,
-    ScheduleHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
     SweepSessionsHandler,
@@ -39,6 +45,34 @@ from .kernel import KernelStateEngine
 from .types import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+@dataclass
+class SchedulerTaskSpec:
+    """Specification for a scheduler's periodic task."""
+
+    schedule_type: ScheduleType
+    short_interval: Optional[float] = None  # None means no short-cycle task
+    long_interval: float = 60.0
+    initial_delay: float = 30.0
+
+    def create_if_needed_event(self) -> DoSokovanProcessIfNeededEvent:
+        """Create event for checking if processing is needed."""
+        return DoSokovanProcessIfNeededEvent(self.schedule_type.value)
+
+    def create_process_event(self) -> DoSokovanProcessScheduleEvent:
+        """Create event for forced processing."""
+        return DoSokovanProcessScheduleEvent(self.schedule_type.value)
+
+    @property
+    def short_task_name(self) -> str:
+        """Name for the short-cycle task."""
+        return f"sokovan_process_if_needed_{self.schedule_type.value}"
+
+    @property
+    def long_task_name(self) -> str:
+        """Name for the long-cycle task."""
+        return f"sokovan_process_schedule_{self.schedule_type.value}"
 
 
 class ScheduleCoordinator:
@@ -179,7 +213,7 @@ class ScheduleCoordinator:
         result = await self._kernel_state_engine.mark_kernel_pulling(event.kernel_id, event.reason)
         if result:
             # Request CHECK_PULLING_PROGRESS to monitor image pull progress
-            await self._scheduling_controller.request_scheduling(
+            await self._scheduling_controller.mark_scheduling_needed(
                 ScheduleType.CHECK_PULLING_PROGRESS
             )
         return result
@@ -199,7 +233,7 @@ class ScheduleCoordinator:
         )
         if result:
             # Request CHECK_CREATING_PROGRESS to check if session should transition to RUNNING
-            await self._scheduling_controller.request_scheduling(
+            await self._scheduling_controller.mark_scheduling_needed(
                 ScheduleType.CHECK_CREATING_PROGRESS
             )
         return result
@@ -209,7 +243,9 @@ class ScheduleCoordinator:
         result = await self._kernel_state_engine.mark_kernel_preparing(event.kernel_id)
         if result:
             # Request CHECK_PRECONDITION to check if images are ready
-            await self._scheduling_controller.request_scheduling(ScheduleType.CHECK_PRECONDITION)
+            await self._scheduling_controller.mark_scheduling_needed(
+                ScheduleType.CHECK_PRECONDITION
+            )
         return result
 
     async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
@@ -225,7 +261,7 @@ class ScheduleCoordinator:
         )
         if result:
             # Request CHECK_TERMINATING_PROGRESS to check if session should transition to TERMINATED
-            await self._scheduling_controller.request_scheduling(
+            await self._scheduling_controller.mark_scheduling_needed(
                 ScheduleType.CHECK_TERMINATING_PROGRESS
             )
         return result
@@ -265,7 +301,7 @@ class ScheduleCoordinator:
                 image,
             )
             # Request scheduling to check if sessions can transition to RUNNING
-            await self._scheduling_controller.request_scheduling(
+            await self._scheduling_controller.mark_scheduling_needed(
                 ScheduleType.CHECK_CREATING_PROGRESS
             )
 
@@ -281,3 +317,100 @@ class ScheduleCoordinator:
             agent_id, image, error_msg, image_ref
         )
         # No need to request scheduling for cancelled kernels
+
+    @staticmethod
+    def _create_task_specs() -> list[SchedulerTaskSpec]:
+        """Create task specifications for all schedule types."""
+        return [
+            # Regular scheduling operations with both short and long cycle tasks
+            SchedulerTaskSpec(
+                ScheduleType.SCHEDULE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_PRECONDITION,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.START,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.TERMINATE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Sweep is a maintenance task - only needs long cycle task
+            SchedulerTaskSpec(
+                ScheduleType.SWEEP,
+                short_interval=None,  # No short-cycle task for maintenance
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Progress check operations with both short and long cycle tasks
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_PULLING_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_CREATING_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_TERMINATING_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Retry operations - only long cycle tasks
+            SchedulerTaskSpec(
+                ScheduleType.RETRY_PREPARING,
+                short_interval=None,  # No short-cycle task
+                long_interval=10.0,  # 10 seconds for retry operations
+                initial_delay=10.0,  # Wait a bit before first retry
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.RETRY_CREATING,
+                short_interval=None,  # No short-cycle task
+                long_interval=10.0,  # 10 seconds for retry operations
+                initial_delay=10.0,  # Wait a bit before first retry
+            ),
+        ]
+
+    def create_task_specs(self) -> list[EventTaskSpec]:
+        """Create task specifications for leader-based scheduling."""
+        timer_specs = self._create_task_specs()
+        specs: list[EventTaskSpec] = []
+
+        for spec in timer_specs:
+            # Create short-cycle task spec if specified
+            if spec.short_interval is not None:
+                short_spec = EventTaskSpec(
+                    name=spec.short_task_name,
+                    event_factory=spec.create_if_needed_event,
+                    interval=spec.short_interval,
+                    initial_delay=0.0,  # Start immediately for short tasks
+                )
+                specs.append(short_spec)
+
+            # Create long-cycle task spec (always present)
+            long_spec = EventTaskSpec(
+                name=spec.long_task_name,
+                event_factory=spec.create_process_event,
+                interval=spec.long_interval,
+                initial_delay=spec.initial_delay,
+            )
+            specs.append(long_spec)
+
+        return specs

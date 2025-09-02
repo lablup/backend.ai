@@ -21,11 +21,11 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.models.session import SessionStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.selectors.selector import (
@@ -472,14 +472,6 @@ class KernelBindingData:
     vfolder_mounts: list[Any] = field(
         default_factory=list
     )  # Would be list[VFolderMount] in full impl
-
-
-@dataclass(frozen=True)
-class ImageIdentifier:
-    """Identifier for an image with architecture."""
-
-    image: str
-    architecture: str
 
 
 @dataclass

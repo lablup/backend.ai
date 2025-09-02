@@ -337,10 +337,12 @@
       "CannotDeleteFolder": "Δεν είναι δυνατή η διαγραφή του φακέλου που είναι τοποθετημένος σε μία ή περισσότερες περιόδους σύνδεσης. Κλείστε πρώτα τη συνεδρία.",
       "CannotDeletePipelineFolder": "Δεν μπορείτε να διαγράψετε τους φακέλους αγωγών.",
       "CannotRestorePipelineFolder": "Δεν μπορείτε να επαναφέρετε τους φακέλους αγωγών.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Οι φακέλοι έργων μοντέλων μπορούν να δημιουργηθούν μόνο σε αποκλειστικά έργα Model Store. \nΑλλάξτε το τρέχον έργο ή τον τύπο χρήστη.",
       "CloneAFolder": "Κλωνοποίηση φακέλου",
       "CloneFolder": "Φάκελος κλωνοποίησης",
       "Cloneable": "Κλωνοποιήσιμο",
       "Control": "Ελεγχος",
+      "CreateModelFolderOnlyInExclusiveProject": "Οι φακέλοι έργων μοντέλων μπορούν να δημιουργηθούν μόνο σε αποκλειστικά έργα Model Store.",
       "CreatedAt": "Δημιουργήθηκε στο",
       "Delete": "Διαγράφω",
       "DeleteAFolder": "Διαγραφή φακέλου",
@@ -395,6 +397,7 @@
       "Path": "Διαδρομή αποθήκευσης",
       "Permission": "Αδεια",
       "ProjectFolderAlertDesc": "Αυτός ο φάκελος μοιράζεται με όλα τα μέλη του έργου",
+      "ProjectFolderCreationHelp": "Ένα φάκελο προσβάσιμο από το \"{{projectName}}\" Οι χρήστες του έργου θα δημιουργηθούν.",
       "Rename": "Μετονομάζω",
       "Restore": "Επαναφέρω",
       "RestoreDescription": "Θέλετε να επαναφέρετε \"{{ folderName }}\" \"Φάκελος;",
@@ -614,6 +617,7 @@
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "TooManyLoginFailures": "Υπήρξαν πάρα πολλές αποτυχίες σύνδεσης σε σύντομο χρονικό διάστημα. Η είσοδος έχει μπλοκαριστεί για λίγο.",
     "UnauthorizedToken": "Μη εξουσιοδοτημένο token. Ελέγξτε το διακριτικό σας.",
+    "UnexpectedError": "Παρουσιάστηκε ένα απροσδόκητο σφάλμα. \nΔοκιμάστε ξανά αργότερα ή επικοινωνήστε με την υποστήριξη εάν το πρόβλημα παραμένει.",
     "UnknownError": "Εμφανίστηκε ένα άγνωστο σφάλμα. Προσπαθήστε ξανά.",
     "UpdateError": "Σφάλμα ενημέρωσης",
     "UserHasNoGroup": "Ο χρήστης δεν έχει ομάδα. Παρακαλούμε επικοινωνήστε με τον διαχειριστή για να το διορθώσετε.",
@@ -630,8 +634,10 @@
     "Title": "Εμφανίστηκε σφάλμα."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Ο φάκελος δεν βρέθηκε ή απορρίφθηκε η πρόσβαση",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Οι μη διαχειριζόμενοι φάκελοι δεν υποστηρίζουν τον εξερευνητή αρχείων.",
+    "NoPermissions": "Δεν υπάρχουν δικαιώματα πρόσβασης σε αυτόν τον φάκελο",
     "ValueRequired": "Απαιτούμενη τιμή"
   },
   "general": {
@@ -766,6 +772,9 @@
   "kernel": {
     "AgentId": "Αναγνωριστικό πράκτορα",
     "ContainerId": "Αναγνωριστικό δοχείου",
+    "ContainerLogs": "Αρχεία καταγραφής εμπορευματοκιβωτίων",
+    "Hostname": "Όνομα κεντρικού υπολογιστή",
+    "Kernel": "Πυρήνας",
     "KernelId": "Αναγνωριστικό πυρήνα",
     "Kernels": "Πυρήνες",
     "Role": "Ρόλος",
@@ -907,6 +916,7 @@
     "EndpointName": "Όνομα τελικού σημείου",
     "Error": "Λάθος",
     "ExpiredDate": "Ημερομηνία λήξης",
+    "ExtraMountsWarning": "Κατά την επεξεργασία της υπηρεσίας, το όνομα (ψευδώνυμο) των πρόσθετων τοποθετημένων φακέλων μπορεί να μην διατηρηθεί. \nΠαρακαλώ ελέγξτε τα ονόματα φακέλων πριν από την αποθήκευση.",
     "FailedToStartService": "Απέτυχε η δημιουργία υπηρεσίας.",
     "FailedToTerminateService": "Η αίτηση τερματισμού της υπηρεσίας απέτυχε.",
     "FailedToUpdateService": "Η ενημέρωση της υπηρεσίας απέτυχε.",
@@ -1021,10 +1031,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} των στοιχείων {{Total}}"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρων"
   },
   "registry": {
     "AddRegistry": "Προσθήκη μητρώου",
@@ -1193,6 +1199,9 @@
     "SharedMemory": "Κοινόχρηστη μνήμη",
     "Updated": "Η προεπιλογή πόρων ενημερώθηκε"
   },
+  "scheduler": {
+    "PendingSessions": "Εκκρεμείς συνεδρίες"
+  },
   "session": {
     "Agent": "Μέσο",
     "AgentId": "Αναγνωριστικό πράκτορα",
@@ -1273,12 +1282,15 @@
     "OpenToPublic": "Ανοίξτε την εφαρμογή στο κοινό",
     "OpenToPublicDesc": "Η ενεργοποίηση αυτής της επιλογής επιτρέπει την πρόσβαση εφαρμογών για όλους τους χρήστες του δικτύου.<br /><br /> \nΓια τη διαχείριση πρόσβασης, εισαγάγετε συγκεκριμένες διευθύνσεις IP στο πεδίο «Επιτρεπόμενο IP».<br /><br /> \nΗ έξοδος από αυτό το πεδίο κενό θα επιτρέψει την πρόσβαση από όλες τις διευθύνσεις IP.<br /><br /> \nΕξετάστε τον καθορισμό περιορισμών IP όταν είναι απαραίτητο για τη διαχείριση της ασφάλειας.",
     "Others": "Οι υπολοιποι",
+    "PanelSettings": "Ρυθμίσεις πίνακα",
+    "PendingPosition": "Θέση ουράς",
     "PredicateChecks": "Έλεγχοι κατηγορίας",
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
     "ReadLess": "Διαβάστε λιγότερα",
     "ReadMore": "Διαβάστε Περισσότερα...",
     "RecentlyCreatedSessions": "Πρόσφατα δημιουργήθηκαν συνεδρίες",
+    "RecentlyCreatedSessionsTooltip": "Εμφανίζει τις {{count}} πιο πρόσφατα δημιουργημένες εκτελούμενες συνεδρίες στο τρέχον έργο",
     "RequestContainerCommit": "Αίτηση δέσμευσης εμπορευματοκιβωτίου",
     "Reservation": "Κράτηση",
     "ResourceGroup": "Ομάδα πόρων",
@@ -1534,6 +1546,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max Υποστήριξη",
     "ATOMPlusSupport": "Υποστήριξη ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Να επιτρέπεται η εγγραφή από τον αντιπρόσωπο",
@@ -1541,6 +1554,7 @@
     "Config": "Διαμόρφωση",
     "ConfigPerJobSchduler": "Ρυθμίσεις προγραμματιστή",
     "ConfigPerJobSchdulerDescription": "Οι τιμές στη ρύθμιση χρονοπρογραμματισμού είναι οι προεπιλογές που θα χρησιμοποιηθούν όταν δεν υπάρχει ρύθμιση χρονοπρογραμματισμού σε κάθε ομάδα πόρων. Εάν υπάρχει μια ρύθμιση για συγκεκριμένη ομάδα πόρων, αυτή η τιμή θα αγνοηθεί.",
+    "DescATOMMaxSupport": "Χρησιμοποιήστε Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+.",
     "DescATOMSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Επιτρέψτε στον πράκτορα να εγγραφεί στον διαχειριστή. Χρησιμοποιήστε μόνο εάν το backend.ai cluster διαχειρίζεται σε ασφαλή τοποθεσία.",
@@ -1584,6 +1598,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Υποστήριξη ROCm GPU",
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
+    "RequireATOMMaxPlugin": "Απαιτεί το Backend.AI ATOM Max Plugin.",
     "RequireATOMPlugin": "Απαιτεί Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Απαιτείται Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1748,6 +1763,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
+    "ATOMMaxEnabled": "Atom Max NPU ενεργοποιημένη",
     "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
     "Accept": "Αποδέχομαι",
     "AcceptSharedVFolder": "Τώρα μπορείτε να αποκτήσετε πρόσβαση σε φάκελο:",
@@ -1965,6 +1981,7 @@
       "MyResources": "Οι πόροι μου",
       "MyResourcesDescription": "<p> Αυτός ο πίνακας δείχνει τη συνολική χρήση των πόρων σας και παραμένει σε όλα τα έργα και τις ομάδες πόρων.",
       "MyResourcesIn": "Οι πόροι μου στο",
+      "MyResourcesInResourceGroup": "Οι πόροι μου στην ομάδα πόρων",
       "MyResourcesInResourceGroupDescription": "Αυτός ο πίνακας δείχνει την τρέχουσα χρήση πόρων και παραμένοντας στην επιλεγμένη ομάδα πόρων.",
       "NewPassword": "Νέος κωδικός πρόσβασης",
       "NewPasswordAgain": "Καινούριος κωδικός ξανά)",
@@ -1984,6 +2001,7 @@
       "Remaining": "Παραμένων",
       "ResourcePolicy": "Πολιτική Πόρων",
       "Resources": "Πόροι",
+      "Scheduler": "Προγραμματιστής",
       "Serving": "Εξυπηρέτηση",
       "Sessions": "Συνεδρίες",
       "Settings": "Ρυθμίσεις",
@@ -1995,6 +2013,7 @@
       "Tasks": "Εργασίες",
       "TermsOfService": "Όροι χρήσης",
       "TotalResourcesIn": "Συνολικοί πόροι στο",
+      "TotalResourcesInResourceGroup": "Συνολικοί πόροι στην ομάδα πόρων",
       "TotalResourcesInResourceGroupDescription": "Αυτός ο πίνακας δείχνει τους συνολικά χρησιμοποιούμενα και εναπομένοντα πόρους. \nΟι τιμές υπολογίζονται με την προσθήκη της χρήσης και των υπόλοιπων ποσών όλων των παραγόντων χρησιμοποιώντας την επιλεγμένη ομάδα πόρων.",
       "TotpActivated": "Ενεργοποίηση 2FA",
       "Update": "Εκσυγχρονίζω",

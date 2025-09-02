@@ -9,13 +9,12 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 @dataclass
 class GetDownloadPresignedURLAction(ObjectStorageAction):
     artifact_revision_id: uuid.UUID
-    storage_id: uuid.UUID
-    bucket_name: str
+    storage_namespace_id: uuid.UUID
     key: str
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.storage_id)
+        return None
 
     @override
     @classmethod

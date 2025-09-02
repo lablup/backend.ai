@@ -339,10 +339,12 @@
       "CannotDeleteFolder": "1つ以上のセッションでマウントされたフォルダを削除できません。最初にセッションを終了してください。",
       "CannotDeletePipelineFolder": "パイプラインフォルダーを削除することはできません。",
       "CannotRestorePipelineFolder": "パイプラインフォルダーを復元することはできません。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "モデルプロジェクトフォルダーは、モデルストアと独占プロジェクトでのみ作成できます。\n現在のプロジェクトまたはユーザータイプを変更します。",
       "CloneAFolder": "フォルダのクローンを作成する",
       "CloneFolder": "フォルダクローン",
       "Cloneable": "クローン可能",
       "Control": "コントロール",
+      "CreateModelFolderOnlyInExclusiveProject": "モデルプロジェクトフォルダーは、モデルストアと独占プロジェクトでのみ作成できます。",
       "CreatedAt": "で作成されました",
       "Delete": "削除",
       "DeleteAFolder": "フォルダを削除する",
@@ -397,6 +399,7 @@
       "Path": "ストレージパス",
       "Permission": "許可",
       "ProjectFolderAlertDesc": "このフォルダはプロジェクトのすべてのメンバーと共有されます",
+      "ProjectFolderCreationHelp": "「{{projectName}}」プロジェクトユーザーが作成できるフォルダーが作成されます。",
       "Rename": "名前を変更",
       "Restore": "復元する",
       "RestoreDescription": "\"{{ folderName }}\"フォルダーを復元しますか？",
@@ -617,6 +620,7 @@
     "SmallerResourceThenImageRequires": "リソース要求が画像に必要な最小値より小さい。より多くのリソースを試してください。",
     "TooManyLoginFailures": "短時間にログイン失敗が多すぎます。しばらくログインがブロックされます。",
     "UnauthorizedToken": "トークンが不正です。トークンを確認してください。",
+    "UnexpectedError": "予期しないエラーが発生しました。\n問題が続いている場合は、後でもう一度やり直すか、サポートに連絡してください。",
     "UnknownError": "不明なエラーが発生しました。もう一度お試しください。",
     "UpdateError": "更新エラー",
     "UserHasNoGroup": "ユーザーにグループがありません。管理者に連絡して修正してください。",
@@ -633,8 +637,10 @@
     "Title": "エラーが発生しました。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "フォルダーが見つかりませんまたはアクセスが拒否されません",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "管理されていないフォルダーは、ファイルエクスプローラーをサポートしていません。",
+    "NoPermissions": "このフォルダーにアクセスする権限はありません",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -769,6 +775,9 @@
   "kernel": {
     "AgentId": "エージェントID",
     "ContainerId": "コンテナID",
+    "ContainerLogs": "コンテナログ",
+    "Hostname": "ホスト名",
+    "Kernel": "カーネル",
     "KernelId": "カーネルID",
     "Kernels": "カーネル",
     "Role": "役割",
@@ -910,6 +919,7 @@
     "EndpointName": "エンドポイント名",
     "Error": "エラー",
     "ExpiredDate": "トークン有効期限",
+    "ExtraMountsWarning": "サービスを編集する場合、追加のマウントフォルダーの名前（エイリアス）が保持されない場合があります。\n保存する前に、フォルダー名を再確認してください。",
     "FailedToStartService": "サービスを作成できませんでした。",
     "FailedToTerminateService": "サービス終了のリクエストに失敗しました。",
     "FailedToUpdateService": "サービスの更新に失敗しました。",
@@ -1024,10 +1034,6 @@
   },
   "pagination": {
     "Total": "{{start}}  -  {{end}} of {{attol}}アイテム"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "検索",
-    "ResetFilter": "フィルターをリセットする"
   },
   "registry": {
     "AddRegistry": "レジストリを追加する",
@@ -1196,6 +1202,9 @@
     "SharedMemory": "共有メモリ",
     "Updated": "リソースプリセットが更新されました"
   },
+  "scheduler": {
+    "PendingSessions": "保留中のセッション"
+  },
   "session": {
     "Agent": "エージェント",
     "AgentId": "エージェントID",
@@ -1276,12 +1285,15 @@
     "OpenToPublic": "アプリを公開する",
     "OpenToPublicDesc": "このオプションを有効にすることで、ネットワーク内のすべてのユーザーにアプリケーションにアクセスできます。<br /><br />\nアクセス管理の場合、「許可されたIP」フィールドに特定のIPアドレスを入力します。<br /><br />\nこのフィールドを空にすると、すべてのIPアドレスからのアクセスが可能になります。<br /><br />\nセキュリティ管理に必要な場合は、IP制限を設定することを検討してください。",
     "Others": "その他",
+    "PanelSettings": "パネル設定",
+    "PendingPosition": "キュー位置",
     "PredicateChecks": "述語チェック",
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
     "ReadLess": "内容折りたたみ",
     "ReadMore": "もっと詳しく...",
     "RecentlyCreatedSessions": "最近作成されたセッション",
+    "RecentlyCreatedSessionsTooltip": "現在のプロジェクトで最近作成された実行中のセッション{{count}}件を表示します",
     "RequestContainerCommit": "コンテナをコミットする",
     "Reservation": "予約",
     "ResourceGroup": "リソースグループ",
@@ -1537,6 +1549,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Maxサポート",
     "ATOMPlusSupport": "アトムのサポート",
     "ATOMSupport": "ATOM対応",
     "AllowAgentSideRegistration": "エージェント側の登録を許可する",
@@ -1544,6 +1557,7 @@
     "Config": "構成",
     "ConfigPerJobSchduler": "スケジューラ設定",
     "ConfigPerJobSchdulerDescription": "スケジューラ設定の値は、各リソースグループにスケジューラ設定がない場合に使用するデフォルトです。リソースグループ固有の設定がある場合、この値は無視されます。",
+    "DescATOMMaxSupport": "Rebellions ATOM Max Acceleratorを使用します。",
     "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。",
     "DescATOMSupport": "Rebellions ATOMアクセラレータを使用します。",
     "DescAllowAgentSideRegistration": "エージェントがマネージャーに登録できるようにします。 BackEnd.aiクラスターが安全な場所で管理されている場合にのみ使用します。",
@@ -1587,6 +1601,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCmGPUサポート",
     "RegisterNewImagesFromRepo": "リポジトリから新しい画像を登録する",
+    "RequireATOMMaxPlugin": "Backend.AI ATOM Max プラグインが必要です。",
     "RequireATOMPlugin": "Backend.AI ATOMプラグインが必要です。",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
     "RequireFGPUPlugin": "Backend.AI Virtual CUDA APILayerプラグインが必要です。",
@@ -1751,6 +1766,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU使用中",
+    "ATOMMaxEnabled": "Atom Max NPUが有効になっています",
     "ATOMPlusEnabled": "ATOM+ NPU 有効",
     "Accept": "受け入れる",
     "AcceptSharedVFolder": "これで、フォルダにアクセスできます。",
@@ -1970,6 +1986,7 @@
       "MyResources": "私のリソース",
       "MyResourcesDescription": "<p>このパネルは、リソースの合計使用量とすべてのプロジェクトとリソースグループに残っていることを示しています。</p> <p>複数の制限（ドメイン、プロジェクト、キーペアなど）がある場合、使用容量と残りの容量を示すために最も制限的な制限が適用されます。</p>",
       "MyResourcesIn": "私のリソース",
+      "MyResourcesInResourceGroup": "リソースグループの私のリソース",
       "MyResourcesInResourceGroupDescription": "このパネルは、現在のリソースの使用と選択したリソースグループに残ることを示しています。",
       "NewPassword": "新しいパスワード",
       "NewPasswordAgain": "新しいパスワードを再入力）",
@@ -1989,6 +2006,7 @@
       "Remaining": "残り",
       "ResourcePolicy": "リソースポリシー",
       "Resources": "リソース管理",
+      "Scheduler": "スケジューラ",
       "Serving": "モデルサービング",
       "Sessions": "セッション",
       "Settings": "設定",
@@ -2000,6 +2018,7 @@
       "Tasks": "作業",
       "TermsOfService": "利用規約",
       "TotalResourcesIn": "総リソース",
+      "TotalResourcesInResourceGroup": "リソースグループの総リソース",
       "TotalResourcesInResourceGroupDescription": "このパネルは、使用されている合計と残りのリソースを示しています。\n値は、選択したリソースグループを使用して、すべてのエージェントの使用量と残りの量を追加することによって計算されます。",
       "TotpActivated": "二要素認証の使用",
       "Update": "更新",

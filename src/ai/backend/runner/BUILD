@@ -57,6 +57,8 @@ resources(
         ".zshrc",
         ".tmux.conf",
         ".vimrc",
+        "all-smi.1",
+        "yank.sh",
         "terminfo.alpine3.8/**/*",
     ],
 )

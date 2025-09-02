@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.model_serving.types import RouteStatus, RoutingData
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteInfo, RouteStatus
+from ai.backend.manager.data.model_serving.types import RoutingData
 
 from ..errors.service import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
@@ -63,7 +65,7 @@ class RoutingRow(Base):
         nullable=False,
         default=RouteStatus.PROVISIONING,
     )
-
+    weight = sa.Column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
     created_at = sa.Column(
         "created_at",
@@ -76,6 +78,17 @@ class RoutingRow(Base):
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
+
+    @classmethod
+    def by_deployment_info(cls, deployment_info: DeploymentInfo) -> Self:
+        return cls(
+            id=uuid.uuid4(),
+            endpoint=deployment_info.id,
+            session=None,
+            session_owner=deployment_info.metadata.created_user,
+            domain=deployment_info.metadata.domain,
+            project=deployment_info.metadata.project,
+        )
 
     @classmethod
     async def get_by_session(
@@ -199,6 +212,17 @@ class RoutingRow(Base):
             id=self.id,
             endpoint=self.endpoint,
             session=self.session,
+            status=self.status,
+            traffic_ratio=self.traffic_ratio,
+            created_at=self.created_at,
+            error_data=self.error_data or {},
+        )
+
+    def to_route_info(self) -> RouteInfo:
+        return RouteInfo(
+            route_id=self.id,
+            endpoint_id=self.endpoint,
+            session_id=SessionId(self.session) if self.session else None,
             status=self.status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,

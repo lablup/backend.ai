@@ -848,6 +848,9 @@ type ComputeSessionNode implements Node
   terminated_at: DateTime
   starts_at: DateTime
   scheduled_at: DateTime
+
+  """Added in 25.13.0."""
+  queue_position: Int
   startup_command: String
   result: String
   commit_status: String
@@ -1398,8 +1401,7 @@ input DeleteArtifactRevisionTarget
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
@@ -1967,8 +1969,7 @@ input GetPresignedDownloadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
 }
 
@@ -1984,7 +1985,7 @@ input GetPresignedUploadURLInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
   key: String!
   contentType: String = null
   expiration: Int = null
@@ -2306,8 +2307,7 @@ input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
-  storageId: ID!
-  bucketName: String!
+  storageNamespaceId: ID!
 }
 
 """Added in 25.13.0"""
@@ -3792,7 +3792,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  meta: [ObjectStorageMeta!]!
+  namespaces: [ObjectStorageNamespace!]!
 }
 
 """Added in 25.13.0"""
@@ -3819,7 +3819,7 @@ type ObjectStorageEdge
 }
 
 """Added in 25.13.0"""
-type ObjectStorageMeta implements Node
+type ObjectStorageNamespace implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
@@ -4274,6 +4274,28 @@ type Query
     first: Int
     last: Int
   ): ComputeSessionConnection @join__field(graph: GRAPHENE)
+
+  """Added in 25.13.0."""
+  session_pending_queue(
+    resource_group_id: String!
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): SessionPendingQueueConnection @join__field(graph: GRAPHENE)
   compute_session(id: UUID!): ComputeSession @join__field(graph: GRAPHENE)
   compute_container(id: UUID!): ComputeContainer @join__field(graph: GRAPHENE)
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList @join__field(graph: GRAPHENE)
@@ -4712,7 +4734,7 @@ input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   registryId: ID!
-  storageId: ID!
+  storageNamespaceId: ID!
   limit: Int!
   search: String = null
 }
@@ -4781,6 +4803,33 @@ type ServiceConfigNode implements Node
 
   """JSON schema of the configuration. Added in 25.8.0."""
   schema: JSONString!
+}
+
+"""Added in 25.13.0."""
+type SessionPendingQueueConnection
+  @join__type(graph: GRAPHENE)
+{
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [SessionPendingQueueEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.13.0. A Relay edge containing a `SessionPendingQueue` and its cursor.
+"""
+type SessionPendingQueueEdge
+  @join__type(graph: GRAPHENE)
+{
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 """

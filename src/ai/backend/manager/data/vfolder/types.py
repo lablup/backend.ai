@@ -132,3 +132,16 @@ class VFolderDeleteResult:
 
     vfolder_id: VFolderID
     status: DeleteStatus
+
+
+@dataclass
+class VFolderLocation:
+    """
+    Minimal VFolder location information for storage access.
+    Contains only the essential fields needed to locate and access a vfolder in storage.
+    """
+
+    id: uuid.UUID
+    quota_scope_id: Optional[QuotaScopeID]
+    host: str
+    ownership_type: VFolderOwnershipType

@@ -49,6 +49,10 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 )
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
+    DoDeploymentLifecycleEvent,
+    DoDeploymentLifecycleIfNeededEvent,
+    DoRouteLifecycleEvent,
+    DoRouteLifecycleIfNeededEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoSokovanProcessIfNeededEvent,
@@ -92,6 +96,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
+from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -114,6 +120,8 @@ class DispatcherArgs:
     scheduler_dispatcher: SchedulerDispatcher
     schedule_coordinator: ScheduleCoordinator
     scheduling_controller: SchedulingController
+    deployment_coordinator: DeploymentCoordinator
+    route_coordinator: RouteCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -166,6 +174,8 @@ class Dispatchers:
             args.scheduler_dispatcher,
             args.schedule_coordinator,
             args.scheduling_controller,
+            args.deployment_coordinator,
+            args.route_coordinator,
             args.event_hub,
             args.use_sokovan,
         )
@@ -401,6 +411,32 @@ class Dispatchers:
             SchedulingBroadcastEvent,
             None,
             self._schedule_event_handler.handle_scheduling_broadcast,
+        )
+        # Deployment lifecycle events
+        event_dispatcher.consume(
+            DoDeploymentLifecycleIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_deployment_lifecycle_if_needed,
+            name="deployment.lifecycle_if_needed",
+        )
+        event_dispatcher.consume(
+            DoDeploymentLifecycleEvent,
+            None,
+            self._schedule_event_handler.handle_do_deployment_lifecycle,
+            name="deployment.lifecycle",
+        )
+        # Route lifecycle events
+        event_dispatcher.consume(
+            DoRouteLifecycleIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_route_lifecycle_if_needed,
+            name="route.lifecycle_if_needed",
+        )
+        event_dispatcher.consume(
+            DoRouteLifecycleEvent,
+            None,
+            self._schedule_event_handler.handle_do_route_lifecycle,
+            name="route.lifecycle",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

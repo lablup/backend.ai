@@ -11,8 +11,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 @dataclass
 class ImportArtifactBatchAction(ArtifactAction):
     artifact_revision_ids: list[uuid.UUID]
-    storage_id: uuid.UUID
-    bucket_name: str
+    storage_namespace_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:

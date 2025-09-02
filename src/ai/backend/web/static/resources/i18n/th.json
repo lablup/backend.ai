@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "ไม่สามารถลบโฟลเดอร์ที่ถูกเมาท์ในหนึ่งหรือหลายเซสชัน กรุณายุติเซสชันก่อน",
       "CannotDeletePipelineFolder": "คุณไม่สามารถลบโฟลเดอร์ไปป์ไลน์ได้",
       "CannotRestorePipelineFolder": "คุณไม่สามารถกู้คืนโฟลเดอร์ไปป์ไลน์ได้",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "โมเดลโฟลเดอร์โครงการสามารถสร้างขึ้นได้ในโครงการโมเดล - โครงการพิเศษเท่านั้น \nเปลี่ยนโครงการหรือประเภทผู้ใช้ปัจจุบัน",
       "CloneAFolder": "โคลนโฟลเดอร์",
       "CloneFolder": "โคลนโฟลเดอร์",
       "Cloneable": "สามารถโคลนได้",
       "Control": "ควบคุม",
+      "CreateModelFolderOnlyInExclusiveProject": "โมเดลโฟลเดอร์โครงการสามารถสร้างขึ้นได้ในโครงการโมเดล - โครงการพิเศษเท่านั้น",
       "CreatedAt": "สร้างขึ้นที่",
       "Delete": "ลบ",
       "DeleteAFolder": "ลบโฟลเดอร์",
@@ -398,6 +400,7 @@
       "Path": "เส้นทางการจัดเก็บ",
       "Permission": "สิทธิ์",
       "ProjectFolderAlertDesc": "โฟลเดอร์นี้แบ่งปันกับสมาชิกทุกคนในโครงการ",
+      "ProjectFolderCreationHelp": "โฟลเดอร์สามารถเข้าถึงได้โดย \"{{projectName}}\" ผู้ใช้โครงการจะถูกสร้างขึ้น",
       "Rename": "เปลี่ยนชื่อ",
       "Restore": "กู้คืน",
       "RestoreDescription": "คุณต้องการกู้คืนโฟลเดอร์ \"{{ folderName }}\" หรือไม่?",
@@ -607,6 +610,7 @@
     "SmallerResourceThenImageRequires": "คำขอทรัพยากรของคุณน้อยกว่าขั้นต่ำที่อิมเมจต้องการ ลองเพิ่มทรัพยากร",
     "TooManyLoginFailures": "มีความพยายามเข้าสู่ระบบล้มเหลวมากเกินไปในเวลาอันสั้น การเข้าสู่ระบบถูกบล็อกชั่วคราว",
     "UnauthorizedToken": "โทเค็นที่ไม่ได้รับอนุญาต \nโปรดตรวจสอบโทเค็นของคุณ",
+    "UnexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด \nโปรดลองอีกครั้งในภายหลังหรือติดต่อฝ่ายสนับสนุนหากปัญหายังคงอยู่",
     "UnknownError": "เกิดข้อผิดพลาดที่ไม่รู้จัก \nโปรดลองอีกครั้ง",
     "UpdateError": "ข้อผิดพลาดในการอัปเดต",
     "UserHasNoGroup": "ผู้ใช้ไม่มีกลุ่ม กรุณาติดต่อผู้ดูแลระบบเพื่อแก้ไข",
@@ -623,8 +627,10 @@
     "Title": "เกิดข้อผิดพลาด"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "ไม่พบโฟลเดอร์หรือถูกปฏิเสธการเข้าถึง",
     "InputTooShort": "ข้อมูลที่ป้อนสั้นเกินไป",
     "NoExplorerSupportForUnmanagedFolder": "โฟลเดอร์ที่ไม่มีการจัดการไม่รองรับ File Explorer",
+    "NoPermissions": "ไม่มีสิทธิ์ในการเข้าถึงโฟลเดอร์นี้",
     "ValueRequired": "ต้องระบุค่า"
   },
   "general": {
@@ -759,6 +765,9 @@
   "kernel": {
     "AgentId": "ID ตัวแทน",
     "ContainerId": "ID คอนเทนเนอร์",
+    "ContainerLogs": "บันทึกคอนเทนเนอร์",
+    "Hostname": "ชื่อโฮสต์",
+    "Kernel": "เคอร์เนล",
     "KernelId": "ID เคอร์เนล",
     "Kernels": "เมล็ด",
     "Role": "บทบาท",
@@ -900,6 +909,7 @@
     "EndpointName": "ชื่อจุดสิ้นสุด",
     "Error": "ข้อผิดพลาด",
     "ExpiredDate": "วันหมดอายุ",
+    "ExtraMountsWarning": "เมื่อแก้ไขบริการชื่อ (นามแฝง) ของโฟลเดอร์ที่ติดตั้งเพิ่มเติมอาจไม่ถูกเก็บไว้ \nโปรดตรวจสอบชื่อโฟลเดอร์สองครั้งก่อนบันทึก",
     "FailedToStartService": "ไม่สามารถสร้างบริการ",
     "FailedToTerminateService": "คำขอยุติบริการล้มเหลว",
     "FailedToUpdateService": "ไม่สามารถอัปเดตบริการ",
@@ -1014,10 +1024,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} ของ {{total}} รายการ"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "ค้นหา",
-    "ResetFilter": "รีเซ็ตตัวกรอง"
   },
   "registry": {
     "AddRegistry": "เพิ่มทะเบียน",
@@ -1186,6 +1192,9 @@
     "SharedMemory": "หน่วยความจำที่ใช้ร่วมกัน",
     "Updated": "อัปเดตค่าที่กำหนดไว้ล่วงหน้าของทรัพยากรแล้ว"
   },
+  "scheduler": {
+    "PendingSessions": "รอการประชุม"
+  },
   "session": {
     "Agent": "ตัวแทน",
     "AgentId": "ID ตัวแทน",
@@ -1265,12 +1274,15 @@
     "OpenToPublic": "เปิดแอปให้สาธารณะ",
     "OpenToPublicDesc": "การเปิดใช้งานตัวเลือกนี้ช่วยให้การเข้าถึงแอปพลิเคชันสำหรับผู้ใช้ทั้งหมดภายในเครือข่าย<br /><br /> \nสำหรับการจัดการการเข้าถึงให้ป้อนที่อยู่ IP เฉพาะในฟิลด์ 'IP ที่อนุญาต'<br /><br /> \nการปล่อยให้ฟิลด์นี้ว่างเปล่าจะอนุญาตให้เข้าถึงจากที่อยู่ IP ทั้งหมด<br /><br /> \nพิจารณาการตั้งค่าการ จำกัด IP เมื่อจำเป็นสำหรับการจัดการความปลอดภัย",
     "Others": "อื่นๆ",
+    "PanelSettings": "การตั้งค่าแผง",
+    "PendingPosition": "ตำแหน่งคิว",
     "PredicateChecks": "การตรวจสอบภาคแสดง",
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
     "ReadLess": "อ่านน้อยลง",
     "ReadMore": "อ่านเพิ่มเติม...",
     "RecentlyCreatedSessions": "เซสชันที่สร้างขึ้นเมื่อเร็ว ๆ นี้",
+    "RecentlyCreatedSessionsTooltip": "แสดง {{count}} เซสชันที่กำลังทำงานที่สร้างล่าสุดในโปรเจกต์ปัจจุบัน",
     "RequestContainerCommit": "ขอคอมมิตคอนเทนเนอร์",
     "Reservation": "การจอง",
     "ResourceGroup": "กลุ่มทรัพยากร",
@@ -1525,12 +1537,15 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "การสนับสนุน Atom Max",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "อนุญาตการลงทะเบียนฝั่งตัวแทน",
     "CUDAGPUdisabledByFGPUsupport": "ปิดใช้งานเนื่องจากระบบใช้ปลั๊กอิน Fractional GPU",
     "Config": "กำหนดค่า",
     "ConfigPerJobSchduler": "การตั้งค่าตัวจัดกำหนดการ",
     "ConfigPerJobSchdulerDescription": "ค่าในการตั้งค่าตัวจัดกำหนดการเป็นค่าเริ่มต้นที่จะใช้เมื่อไม่มีการตั้งค่าตัวจัดกำหนดการในแต่ละกลุ่มทรัพยากร หากมีการตั้งค่าเฉพาะสำหรับกลุ่มทรัพยากร ค่านี้จะถูกละเว้น",
+    "DescATOMMaxSupport": "ใช้ Rebellions ATOM Max Accelerator",
+    "DescATOMPlusSupport": "ใช้ Rebellions ATOM+ accelerator",
     "DescATOMSupport": "ใช้ตัวเร่งความเร็ว Rebellions ATOM",
     "DescAllowAgentSideRegistration": "อนุญาตให้ตัวแทนลงทะเบียนตัวเองไปยังผู้จัดการ ใช้เฉพาะในกรณีที่แบ็กเอนด์คลัสเตอร์ได้รับการจัดการในตำแหน่งที่ปลอดภัย",
     "DescCudaGPUSupport": "การสนับสนุน NVIDIA CUDA GPU ต้องใช้ backend.ai cuda ปลั๊กอิน",
@@ -1571,7 +1586,9 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "การสนับสนุน GPU ROCm",
     "RegisterNewImagesFromRepo": "ลงทะเบียนอิมเมจใหม่จากพื้นที่เก็บข้อมูล",
+    "RequireATOMMaxPlugin": "ต้องใช้ Plugin Backend.AI ATOM Max",
     "RequireATOMPlugin": "ต้องใช้ปลั๊กอิน Backend.AI ATOM",
+    "RequireATOMPlusPlugin": "ต้องใช้ปลั๊กอิน Backend.AI ATOM+",
     "RequireFGPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI Virtual CUDA API Layer",
     "RequireHyperaccelLPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI Hyperaccel LPU",
     "RequireIPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI IPU",
@@ -1733,6 +1750,7 @@
   },
   "summary": {
     "ATOMEnabled": "เปิดใช้งาน ATOM NPU",
+    "ATOMMaxEnabled": "เปิดใช้งาน Atom Max NPU",
     "ATOMPlusEnabled": "เปิดใช้งาน ATOM+ NPU",
     "Accept": "ยอมรับ",
     "AcceptSharedVFolder": "ตอนนี้คุณสามารถเข้าถึงโฟลเดอร์ได้แล้ว: ",
@@ -1952,6 +1970,7 @@
       "MyResources": "ทรัพยากรของฉัน",
       "MyResourcesDescription": "<p> พาเนลนี้แสดงการใช้ทรัพยากรทั้งหมดของคุณและที่เหลืออยู่ในทุกโครงการและกลุ่มทรัพยากร </p> <p> เมื่อมีข้อ จำกัด หลายประการ (เช่นโดเมนโครงการหรือแป้นพิมพ์) ขีด จำกัด ที่ จำกัด ที่สุดจะถูกนำไปใช้เพื่อแสดงการใช้งานและความสามารถที่เหลืออยู่ </p>",
       "MyResourcesIn": "ทรัพยากรของฉันใน",
+      "MyResourcesInResourceGroup": "ทรัพยากรของฉันในกลุ่มทรัพยากร",
       "MyResourcesInResourceGroupDescription": "แผงนี้แสดงการใช้ทรัพยากรปัจจุบันของคุณและความสามารถที่มีอยู่ในกลุ่มทรัพยากรที่เลือก",
       "NewPassword": "รหัสผ่านใหม่",
       "NewPasswordAgain": "รหัสผ่านใหม่ (อีกครั้ง)",
@@ -1971,6 +1990,7 @@
       "Remaining": "ที่เหลืออยู่",
       "ResourcePolicy": "นโยบายทรัพยากร",
       "Resources": "ทรัพยากร",
+      "Scheduler": "ผู้กำหนดตารางเวลา",
       "Serving": "การให้บริการ",
       "Sessions": "เซสชัน",
       "Settings": "การตั้งค่า",
@@ -1982,6 +2002,7 @@
       "Tasks": "งาน",
       "TermsOfService": "ข้อตกลงการใช้บริการ",
       "TotalResourcesIn": "ทรัพยากรทั้งหมดใน",
+      "TotalResourcesInResourceGroup": "ทรัพยากรทั้งหมดในกลุ่มทรัพยากร",
       "TotalResourcesInResourceGroupDescription": "แผงนี้แสดงทรัพยากรที่ใช้และที่เหลือทั้งหมด \nค่าจะถูกคำนวณโดยการเพิ่มการใช้งานและจำนวนที่เหลือของตัวแทนทั้งหมดโดยใช้กลุ่มทรัพยากรที่เลือก",
       "TotpActivated": "เปิดใช้งาน 2FA แล้ว",
       "Update": "อัปเดต",

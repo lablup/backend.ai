@@ -59,7 +59,7 @@ def mock_scheduler_dispatcher():
 def mock_scheduling_controller():
     """Mock SchedulingController for testing."""
     mock = MagicMock(spec=SchedulingController)
-    mock.request_scheduling = AsyncMock()
+    mock.mark_schedule_needed = AsyncMock()
     mock.mark_sessions_for_termination = AsyncMock()
     return mock
 
@@ -192,7 +192,7 @@ class TestScheduleCoordinator:
             reason="USER_REQUESTED",
         )
 
-    async def test_request_scheduling_direct(
+    async def test_mark_schedule_needed_direct(
         self,
         schedule_coordinator: ScheduleCoordinator,
         mock_scheduling_controller,
@@ -200,13 +200,13 @@ class TestScheduleCoordinator:
     ):
         """Test direct scheduling request via controller."""
         # Execute - request different schedule types via controller
-        await mock_scheduling_controller.request_scheduling(ScheduleType.SCHEDULE)
-        await mock_scheduling_controller.request_scheduling(ScheduleType.START)
-        await mock_scheduling_controller.request_scheduling(ScheduleType.TERMINATE)
+        await mock_scheduling_controller.mark_schedule_needed(ScheduleType.SCHEDULE)
+        await mock_scheduling_controller.mark_schedule_needed(ScheduleType.START)
+        await mock_scheduling_controller.mark_schedule_needed(ScheduleType.TERMINATE)
 
         # Verify controller methods were called
-        assert mock_scheduling_controller.request_scheduling.call_count == 3
-        calls = mock_scheduling_controller.request_scheduling.call_args_list
+        assert mock_scheduling_controller.mark_schedule_needed.call_count == 3
+        calls = mock_scheduling_controller.mark_schedule_needed.call_args_list
         assert calls[0] == call(ScheduleType.SCHEDULE)
         assert calls[1] == call(ScheduleType.START)
         assert calls[2] == call(ScheduleType.TERMINATE)

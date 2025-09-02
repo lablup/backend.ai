@@ -1,8 +1,10 @@
 """Factory functions for creating scheduler components."""
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
 from ai.backend.manager.sokovan.scheduler.scheduler import (
@@ -41,10 +43,12 @@ from ai.backend.manager.types import DistributedLockFactory
 
 def create_default_scheduler(
     repository: SchedulerRepository,
+    deployment_repository: DeploymentRepository,
     config_provider: ManagerConfigProvider,
     lock_factory: DistributedLockFactory,
     agent_pool: AgentPool,
     network_plugin_ctx: NetworkPluginContext,
+    valkey_schedule: ValkeyScheduleClient,
 ) -> Scheduler:
     """
     Create a scheduler with default components.
@@ -74,16 +78,18 @@ def create_default_scheduler(
     resource_priority = config_provider.config.manager.agent_selection_resource_priority
     agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
     allocator = RepositoryAllocator(repository)
-    args = SchedulerArgs(
-        validator=validator,
-        sequencer=sequencer,
-        agent_selector=agent_selector,
-        allocator=allocator,
-        repository=repository,
-        config_provider=config_provider,
-        lock_factory=lock_factory,
-        agent_pool=agent_pool,
-        network_plugin_ctx=network_plugin_ctx,
+    return Scheduler(
+        SchedulerArgs(
+            validator=validator,
+            sequencer=sequencer,
+            agent_selector=agent_selector,
+            allocator=allocator,
+            repository=repository,
+            deployment_repository=deployment_repository,
+            config_provider=config_provider,
+            lock_factory=lock_factory,
+            agent_pool=agent_pool,
+            network_plugin_ctx=network_plugin_ctx,
+            valkey_schedule=valkey_schedule,
+        )
     )
-
-    return Scheduler(args)

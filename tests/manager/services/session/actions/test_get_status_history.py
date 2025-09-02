@@ -11,6 +11,7 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
@@ -70,6 +71,7 @@ def mock_get_status_history_rpc(mocker):
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
             "users": [USER_FIXTURE_DATA],

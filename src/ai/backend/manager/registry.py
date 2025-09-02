@@ -62,7 +62,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.config.types import HealthCheckConfig
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -153,11 +153,20 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.wsproxy.types import (
+    CreateEndpointRequestBody,
+    EndpointTagsModel,
+    SessionTagsModel,
+    TagsModel,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.utils import query_userinfo
 
@@ -189,7 +198,6 @@ from .models import (
     ImageRow,
     KernelLoadingStrategy,
     KernelRow,
-    KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     NetworkRow,
@@ -199,7 +207,6 @@ from .models import (
     ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     UserRole,
     UserRow,
     VFolderRow,
@@ -988,10 +995,6 @@ class AgentRegistry:
         network: NetworkRow | None,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
-        from ai.backend.manager.repositories.scheduler.types.session_creation import (
-            SessionCreationSpec,
-        )
-
         kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
             "kernel_configs"
         ]
@@ -3766,11 +3769,11 @@ class AgentRegistry:
 
     async def get_health_check_info(
         self, endpoint: EndpointData, model: VFolderRow
-    ) -> HealthCheckConfig | None:
-        _info: HealthCheckConfig | None = None
+    ) -> ModelHealthCheck | None:
+        _info: ModelHealthCheck | None = None
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
-            _info = HealthCheckConfig(path=_path)
+            _info = ModelHealthCheck(path=_path)
         elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
@@ -3787,7 +3790,7 @@ class AgentRegistry:
 
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
-                    _info = HealthCheckConfig(
+                    _info = ModelHealthCheck(
                         path=health_check_info["path"],
                         interval=health_check_info["interval"],
                         max_retries=health_check_info["max_retries"],
@@ -3818,27 +3821,25 @@ class AgentRegistry:
 
         health_check_config = await self.get_health_check_info(endpoint, model)
 
-        request_body = {
-            "version": "v2",
-            "service_name": endpoint.name,
-            "tags": {
-                "session": {
-                    "user_uuid": str(endpoint.session_owner_id),
-                    "group_id": str(endpoint.project),
-                    "domain_name": endpoint.domain,
-                },
-                "endpoint": {
-                    "id": str(endpoint.id),
-                    "runtime_variant": endpoint.runtime_variant.value,
-                    "existing_url": str(endpoint.url) if endpoint.url else None,
-                },
-            },
-            "apps": {},
-            "open_to_public": endpoint.open_to_public,
-            "health_check": health_check_config.model_dump(mode="json")
-            if health_check_config
-            else None,
-        }
+        request_body = CreateEndpointRequestBody(
+            version="v2",
+            service_name=endpoint.name,
+            tags=TagsModel(
+                session=SessionTagsModel(
+                    user_uuid=str(endpoint.session_owner_id),
+                    group_id=str(endpoint.project),
+                    domain_name=endpoint.domain,
+                ),
+                endpoint=EndpointTagsModel(
+                    id=str(endpoint.id),
+                    runtime_variant=endpoint.runtime_variant.value,
+                    existing_url=str(endpoint.url) if endpoint.url else None,
+                ),
+            ),
+            apps={},
+            open_to_public=endpoint.open_to_public,
+            health_check=health_check_config,
+        )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
         return endpoint_json["endpoint"]
 

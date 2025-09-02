@@ -13,8 +13,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -32,15 +32,16 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
@@ -65,7 +66,7 @@ from .selectors.selector import (
 from .sequencers.drf import DRFSequencer
 from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
-from .sequencers.sequencer import WorkloadSequencer
+from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
 from .types import (
     AllocationBatch,
     ImageConfigData,
@@ -102,10 +103,13 @@ class SchedulerArgs:
     agent_selector: AgentSelector
     allocator: SchedulingAllocator
     repository: SchedulerRepository
+    deployment_repository: DeploymentRepository
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
     agent_pool: AgentPool
     network_plugin_ctx: NetworkPluginContext
+
+    valkey_schedule: ValkeyScheduleClient
 
 
 class Scheduler:
@@ -123,6 +127,8 @@ class Scheduler:
     _phase_metrics: SchedulerPhaseMetricObserver
     _hook_registry: HookRegistry
 
+    _valkey_schedule: ValkeyScheduleClient  # TODO: Remove this client and use only via repository
+
     def __init__(self, args: SchedulerArgs) -> None:
         self._validator = args.validator
         self._default_sequencer = args.sequencer
@@ -138,7 +144,8 @@ class Scheduler:
             args.config_provider.config.manager.agent_selection_resource_priority
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
-        self._hook_registry = HookRegistry(args.repository, args.agent_pool)
+        self._hook_registry = HookRegistry(args.deployment_repository, args.agent_pool)
+        self._valkey_schedule = args.valkey_schedule
 
     @classmethod
     def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
@@ -168,6 +175,10 @@ class Scheduler:
             LegacyAgentSelector(agent_selection_resource_priority)
         )
         return pool
+
+    def _get_sequencer(self, name: str) -> SchedulingSequencer:
+        sequncer = self._sequencer_pool[name]
+        return SchedulingSequencer(sequncer)
 
     async def schedule_all_scaling_groups(self) -> ScheduleResult:
         """
@@ -268,7 +279,7 @@ class Scheduler:
         with self._phase_metrics.measure_phase(
             "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
         ):
-            sequencer = self._sequencer_pool[sg_info.scheduler]
+            sequencer = self._get_sequencer(sg_info.scheduler)
             sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
         # Build mutable agents with occupancy data from snapshot
@@ -336,6 +347,7 @@ class Scheduler:
                             msg=str(e),
                         )
                     )
+
                 failure = SchedulingFailure(
                     session_id=session_workload.session_id,
                     passed_phases=passed_phases,
@@ -358,6 +370,8 @@ class Scheduler:
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
             scheduled_sessions = await self._allocator.allocate(batch)
 
+        failure_ids = [f.session_id for f in scheduling_failures]
+        await self._valkey_schedule.set_pending_queue(scaling_group, failure_ids)
         return ScheduleResult(
             scheduled_sessions=scheduled_sessions,
         )
@@ -725,7 +739,7 @@ class Scheduler:
         # Check both PREPARING and PULLING statuses
         sessions_data = await self._repository.get_sessions_for_transition(
             [SessionStatus.PREPARING, SessionStatus.PULLING],
-            KernelStatus.PREPARED,
+            [KernelStatus.PREPARED, KernelStatus.RUNNING],
         )
 
         if not sessions_data:
@@ -756,7 +770,7 @@ class Scheduler:
         """
         sessions_data = await self._repository.get_sessions_for_transition(
             [SessionStatus.CREATING],
-            KernelStatus.RUNNING,
+            [KernelStatus.RUNNING],
         )
 
         if not sessions_data:
@@ -809,7 +823,7 @@ class Scheduler:
         """
         sessions_data = await self._repository.get_sessions_for_transition(
             [SessionStatus.TERMINATING],
-            KernelStatus.TERMINATED,
+            [KernelStatus.TERMINATED],
         )
 
         if not sessions_data:
@@ -860,7 +874,12 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions transitioned
         """
         # Get scheduled sessions for image pulling
-        result = await self._repository.get_sessions_for_pull([SessionStatus.SCHEDULED])
+        result = await self._repository.get_sessions_for_pull(
+            [SessionStatus.SCHEDULED],
+            [
+                KernelStatus.SCHEDULED,
+            ],
+        )
         scheduled_sessions = result.sessions
         image_configs = result.image_configs
 
@@ -936,9 +955,12 @@ class Scheduler:
         :return: ScheduleResult with the count of sessions started
         """
         # Get prepared sessions for starting
-        sessions_with_images = await self._repository.get_sessions_for_start([
-            SessionStatus.PREPARED
-        ])
+        sessions_with_images = await self._repository.get_sessions_for_start(
+            [SessionStatus.PREPARED],
+            [
+                KernelStatus.PREPARED,
+            ],
+        )
         prepared_sessions = sessions_with_images.sessions
         image_configs = sessions_with_images.image_configs
 
@@ -1140,7 +1162,7 @@ class Scheduler:
                         "mounts": [
                             m.to_json() if hasattr(m, "to_json") else m for m in k.vfolder_mounts
                         ],
-                        "package_directory": tuple(),  # Use tuple like registry.py
+                        "package_directory": tuple(),
                         "idle_timeout": int(idle_timeout),
                         "bootstrap_script": k.bootstrap_script,
                         "startup_command": k.startup_command,
@@ -1193,56 +1215,9 @@ class Scheduler:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
-
-            # Mark session as cancelled
-            await self._repository.mark_session_cancelled(
-                session.session_id,
-                error_info,
-                reason=KernelLifecycleEventReason.FAILED_TO_START,
-            )
-
-            # Cleanup: destroy any partially created kernels
-            log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
-            try:
-                # Get container info for cleanup
-                container_info = await self._repository.get_container_info_for_kernels(
-                    session.session_id
-                )
-
-                # Destroy kernels through agent pool
-                destroyed_kernels = [
-                    {
-                        "agent": kernel.agent_id,
-                        "agent_addr": kernel.agent_addr or "",
-                        "id": kernel.kernel_id,
-                        "container_id": container_info.get(kernel.kernel_id),
-                    }
-                    for kernel in session.kernels
-                ]
-
-                # Destroy kernels through agent pool
-                destroy_tasks: list[Awaitable[Any]] = []
-                for kernel_info in destroyed_kernels:
-                    if kernel_info["agent"] and kernel_info["container_id"]:
-                        agent_client = self._agent_pool.get_agent_client(
-                            AgentId(str(kernel_info["agent"])), order_key=str(session.session_id)
-                        )
-                        destroy_tasks.append(
-                            agent_client.destroy_kernel(
-                                str(kernel_info["id"]),
-                                str(session.session_id),
-                                reason=KernelLifecycleEventReason.FAILED_TO_START,
-                                suppress_events=True,
-                            )
-                        )
-
-                if destroy_tasks:
-                    await asyncio.gather(*destroy_tasks, return_exceptions=True)
-
-            except Exception as destroy_err:
-                log.error(log_fmt + "cleanup-start-failure: error", *log_args, exc_info=destroy_err)
-            finally:
-                log.debug(log_fmt + "cleanup-start-failure: done", *log_args)
+            # Update error info in status_data without changing status
+            # Session will be retried by retry_creating_sessions later
+            await self._repository.update_session_error_info(session.session_id, error_info)
 
     async def _setup_network_configuration(
         self,
@@ -1423,7 +1398,7 @@ class Scheduler:
 
         # Group images by agent to check pulling status
         agent_images: defaultdict[AgentId, set[str]] = defaultdict(set)
-        session_images: dict[SessionDataForPull, set[str]] = {}
+        session_images: dict[SessionId, set[str]] = {}
 
         for session in sessions:
             session_image_set = set()
@@ -1433,7 +1408,7 @@ class Scheduler:
                     canonical = img_cfg.canonical
                     agent_images[kernel.agent_id].add(canonical)
                     session_image_set.add(canonical)
-            session_images[session] = session_image_set
+            session_images[session.session_id] = session_image_set
 
         # Check pulling status for each agent
         agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
@@ -1457,7 +1432,7 @@ class Scheduler:
 
         # Determine truly stuck sessions
         for session in sessions:
-            images_to_check = session_images[session]
+            images_to_check = session_images[session.session_id]
             if not images_to_check:
                 # No images to check, consider it stuck
                 truly_stuck_sessions.append(session)
@@ -1489,10 +1464,17 @@ class Scheduler:
         PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
         # Get sessions with PREPARING and PULLING statuses
-        sessions_with_images = await self._repository.get_sessions_for_pull([
-            SessionStatus.PREPARING,
-            SessionStatus.PULLING,
-        ])
+        sessions_with_images = await self._repository.get_sessions_for_pull(
+            [
+                SessionStatus.PREPARING,
+                SessionStatus.PULLING,
+            ],
+            [
+                KernelStatus.SCHEDULED,
+                KernelStatus.PREPARING,
+                KernelStatus.PULLING,
+            ],
+        )
         sessions = sessions_with_images.sessions
         image_configs = sessions_with_images.image_configs
 
@@ -1517,8 +1499,25 @@ class Scheduler:
 
         log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
 
+        # Update retry counts and get sessions that should continue retrying
+        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
+        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+            stuck_session_ids, SERVICE_MAX_RETRIES
+        )
+
+        if not sessions_to_retry_ids:
+            log.info("All stuck sessions exceeded max retries, moved to PENDING")
+            return ScheduleResult()
+
+        # Filter sessions that should be retried based on returned IDs
+        sessions_to_retry = [
+            session
+            for session in truly_stuck_sessions
+            if session.session_id in sessions_to_retry_ids
+        ]
+
         # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(truly_stuck_sessions, image_configs)
+        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
 
         # Convert retried sessions to ScheduledSessionData format
         scheduled_data = [
@@ -1528,7 +1527,7 @@ class Scheduler:
                 access_key=session.access_key,
                 reason="triggered-by-scheduler",
             )
-            for session in truly_stuck_sessions
+            for session in sessions_to_retry
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
 
@@ -1612,9 +1611,13 @@ class Scheduler:
         CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
         # Get CREATING sessions from repository
-        sessions_with_images = await self._repository.get_sessions_for_start([
-            SessionStatus.CREATING
-        ])
+        sessions_with_images = await self._repository.get_sessions_for_start(
+            [SessionStatus.CREATING],
+            [
+                KernelStatus.PREPARED,
+                KernelStatus.CREATING,
+            ],
+        )
         sessions = sessions_with_images.sessions
         image_configs = sessions_with_images.image_configs
 
@@ -1636,9 +1639,26 @@ class Scheduler:
 
         log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
+        # Update retry counts and get sessions that should continue retrying
+        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
+        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+            stuck_session_ids, SERVICE_MAX_RETRIES
+        )
+
+        if not sessions_to_retry_ids:
+            log.info("All stuck sessions exceeded max retries, moved to PENDING")
+            return ScheduleResult()
+
+        # Filter sessions that should be retried based on returned IDs
+        sessions_to_retry = [
+            session
+            for session in truly_stuck_sessions
+            if session.session_id in sessions_to_retry_ids
+        ]
+
         # Use the existing _start_sessions_concurrently method to retry
         # This will re-trigger kernel creation for stuck sessions
-        await self._start_sessions_concurrently(truly_stuck_sessions, image_configs)
+        await self._start_sessions_concurrently(sessions_to_retry, image_configs)
 
         # Convert retried sessions to ScheduledSessionData format
         scheduled_data = [
@@ -1648,6 +1668,6 @@ class Scheduler:
                 access_key=session.access_key,
                 reason="triggered-by-scheduler",
             )
-            for session in truly_stuck_sessions
+            for session in sessions_to_retry
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)

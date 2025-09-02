@@ -16,6 +16,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DICT,
 )
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
@@ -58,6 +59,7 @@ PUSH_IMAGE_MOCK_TASK_ID = uuid4()
     [
         {
             "container_registries": [CONTAINER_REGISTRY_FIXTURE_DICT],
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
             "users": [USER_FIXTURE_DATA],

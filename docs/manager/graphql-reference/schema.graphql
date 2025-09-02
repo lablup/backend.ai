@@ -284,6 +284,28 @@ type Query {
     first: Int
     last: Int
   ): ComputeSessionConnection
+
+  """Added in 25.13.0."""
+  session_pending_queue(
+    resource_group_id: String!
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): SessionPendingQueueConnection
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
@@ -1554,6 +1576,9 @@ type ComputeSessionNode implements Node {
   terminated_at: DateTime
   starts_at: DateTime
   scheduled_at: DateTime
+
+  """Added in 25.13.0."""
+  queue_position: Int
   startup_command: String
   result: String
   commit_status: String
@@ -1607,6 +1632,29 @@ type ComputeSessionConnection {
 Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
 """
 type ComputeSessionEdge {
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.13.0."""
+type SessionPendingQueueConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [SessionPendingQueueEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.13.0. A Relay edge containing a `SessionPendingQueue` and its cursor.
+"""
+type SessionPendingQueueEdge {
   """The item at the end of the edge"""
   node: ComputeSessionNode
 
